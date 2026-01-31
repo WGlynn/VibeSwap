@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Custom focus styles */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid #d946ef;
+  outline-offset: 2px;
+}
+
+/* Input number arrows hidden */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #d946ef 0%, #8b5cf6 50%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effects */
+.glow-vibe {
+  box-shadow: 0 0 20px rgba(217, 70, 239, 0.3);
+}
+
+.glow-vibe-lg {
+  box-shadow: 0 0 40px rgba(217, 70, 239, 0.4);
+}
+
+/* Animated background */
+.animated-bg {
+  background: linear-gradient(-45deg, #0f172a, #1e1a3a, #0f172a, #1a1e2e);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Swap card hover effect */
+.swap-card {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+}
+
+.swap-card:hover {
+  border-color: rgba(217, 70, 239, 0.3);
+}
+
+/* Token input styling */
+.token-input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(71, 85, 105, 0.4);
+}
+
+.token-input:focus-within {
+  border-color: rgba(217, 70, 239, 0.5);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700;
+  @apply text-white font-semibold py-4 px-6 rounded-2xl;
+  @apply transition-all duration-200;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply bg-dark-800 hover:bg-dark-700;
+  @apply text-white font-medium py-2 px-4 rounded-xl;
+  @apply border border-dark-600 hover:border-dark-500;
+  @apply transition-all duration-200;
+}
+
+/* Pulse animation for batch timer */
+@keyframes batch-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.batch-pulse {
+  animation: batch-pulse 2s ease-in-out infinite;
+}

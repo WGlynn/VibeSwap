@@ -1,0 +1,114 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "tokenIn", "type": "address" },
+      { "internalType": "address", "name": "tokenOut", "type": "address" },
+      { "internalType": "uint256", "name": "amountIn", "type": "uint256" },
+      { "internalType": "uint256", "name": "minAmountOut", "type": "uint256" },
+      { "internalType": "bytes32", "name": "secret", "type": "bytes32" }
+    ],
+    "name": "commitSwap",
+    "outputs": [{ "internalType": "bytes32", "name": "commitId", "type": "bytes32" }],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "commitId", "type": "bytes32" },
+      { "internalType": "uint256", "name": "priorityBid", "type": "uint256" }
+    ],
+    "name": "revealSwap",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint64", "name": "batchId", "type": "uint64" }],
+    "name": "settleBatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getCurrentBatch",
+    "outputs": [
+      { "internalType": "uint64", "name": "batchId", "type": "uint64" },
+      { "internalType": "uint8", "name": "phase", "type": "uint8" },
+      { "internalType": "uint256", "name": "timeUntilPhaseChange", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "tokenIn", "type": "address" },
+      { "internalType": "address", "name": "tokenOut", "type": "address" },
+      { "internalType": "uint256", "name": "amountIn", "type": "uint256" }
+    ],
+    "name": "getQuote",
+    "outputs": [{ "internalType": "uint256", "name": "amountOut", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "tokenA", "type": "address" },
+      { "internalType": "address", "name": "tokenB", "type": "address" }
+    ],
+    "name": "getPoolInfo",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+          { "internalType": "address", "name": "token0", "type": "address" },
+          { "internalType": "address", "name": "token1", "type": "address" },
+          { "internalType": "uint256", "name": "reserve0", "type": "uint256" },
+          { "internalType": "uint256", "name": "reserve1", "type": "uint256" },
+          { "internalType": "uint256", "name": "spotPrice", "type": "uint256" },
+          { "internalType": "uint256", "name": "feeRate", "type": "uint256" }
+        ],
+        "internalType": "struct VibeSwapCore.PoolInfo",
+        "name": "info",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "commitId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "trader", "type": "address" },
+      { "indexed": true, "internalType": "uint64", "name": "batchId", "type": "uint64" }
+    ],
+    "name": "SwapCommitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "commitId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "trader", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "tokenIn", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "tokenOut", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amountIn", "type": "uint256" }
+    ],
+    "name": "SwapRevealed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "commitId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "trader", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "tokenIn", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "tokenOut", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amountIn", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "amountOut", "type": "uint256" }
+    ],
+    "name": "SwapExecuted",
+    "type": "event"
+  }
+]

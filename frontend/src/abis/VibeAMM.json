@@ -1,0 +1,137 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "token0", "type": "address" },
+      { "internalType": "address", "name": "token1", "type": "address" },
+      { "internalType": "uint256", "name": "feeRate", "type": "uint256" }
+    ],
+    "name": "createPool",
+    "outputs": [{ "internalType": "bytes32", "name": "poolId", "type": "bytes32" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+      { "internalType": "uint256", "name": "amount0Desired", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1Desired", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount0Min", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1Min", "type": "uint256" }
+    ],
+    "name": "addLiquidity",
+    "outputs": [
+      { "internalType": "uint256", "name": "amount0", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1", "type": "uint256" },
+      { "internalType": "uint256", "name": "liquidity", "type": "uint256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+      { "internalType": "uint256", "name": "liquidity", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount0Min", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1Min", "type": "uint256" }
+    ],
+    "name": "removeLiquidity",
+    "outputs": [
+      { "internalType": "uint256", "name": "amount0", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1", "type": "uint256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "poolId", "type": "bytes32" }],
+    "name": "getPool",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "token0", "type": "address" },
+          { "internalType": "address", "name": "token1", "type": "address" },
+          { "internalType": "uint256", "name": "reserve0", "type": "uint256" },
+          { "internalType": "uint256", "name": "reserve1", "type": "uint256" },
+          { "internalType": "uint256", "name": "totalLiquidity", "type": "uint256" },
+          { "internalType": "uint256", "name": "feeRate", "type": "uint256" },
+          { "internalType": "bool", "name": "initialized", "type": "bool" }
+        ],
+        "internalType": "struct IVibeAMM.Pool",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "tokenA", "type": "address" },
+      { "internalType": "address", "name": "tokenB", "type": "address" }
+    ],
+    "name": "getPoolId",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+      { "internalType": "address", "name": "tokenIn", "type": "address" },
+      { "internalType": "uint256", "name": "amountIn", "type": "uint256" }
+    ],
+    "name": "quote",
+    "outputs": [{ "internalType": "uint256", "name": "amountOut", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "poolId", "type": "bytes32" }],
+    "name": "getSpotPrice",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "poolId", "type": "bytes32" }],
+    "name": "getLPToken",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "token0", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "token1", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "feeRate", "type": "uint256" }
+    ],
+    "name": "PoolCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "provider", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount0", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "amount1", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "liquidity", "type": "uint256" }
+    ],
+    "name": "LiquidityAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "poolId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "provider", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount0", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "amount1", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "liquidity", "type": "uint256" }
+    ],
+    "name": "LiquidityRemoved",
+    "type": "event"
+  }
+]

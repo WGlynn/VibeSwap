@@ -1,0 +1,432 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./interfaces/IIncentiveController.sol";
+import "./interfaces/IVolatilityOracle.sol";
+import "./interfaces/IILProtectionVault.sol";
+import "./interfaces/ILoyaltyRewardsManager.sol";
+import "./interfaces/ISlippageGuaranteeFund.sol";
+
+/**
+ * @title IncentiveController
+ * @notice Central coordinator for all VibeSwap incentive mechanisms
+ * @dev Routes fees and proceeds to appropriate vaults, provides unified claim interface
+ */
+contract IncentiveController is
+    IIncentiveController,
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuardUpgradeable
+{
+    using SafeERC20 for IERC20;
+
+    // ============ Constants ============
+
+    uint256 public constant BPS_PRECISION = 10000;
+    uint256 public constant PRECISION = 1e18;
+
+    // ============ State ============
+
+    // Core contract references
+    address public vibeAMM;
+    address public vibeSwapCore;
+    address public treasury;
+
+    // Incentive vault references
+    IVolatilityOracle public volatilityOracle;
+    address public volatilityInsurancePool;
+    IILProtectionVault public ilProtectionVault;
+    ISlippageGuaranteeFund public slippageGuaranteeFund;
+    ILoyaltyRewardsManager public loyaltyRewardsManager;
+
+    // Default configuration
+    IncentiveConfig public defaultConfig;
+
+    // Pool-specific overrides
+    mapping(bytes32 => IncentiveConfig) public poolConfigs;
+    mapping(bytes32 => bool) public hasPoolConfig;
+
+    // Auction proceeds distribution
+    mapping(bytes32 => uint256) public poolAuctionProceeds; // poolId => accumulated proceeds
+    mapping(bytes32 => mapping(address => uint256)) public lpAuctionClaims; // poolId => lp => claimed
+
+    // Authorized callers
+    mapping(address => bool) public authorizedCallers;
+
+    // ============ Errors ============
+
+    error Unauthorized();
+    error ZeroAddress();
+    error InvalidConfig();
+    error InvalidAmount();
+    error NothingToClaim();
+
+    // ============ Modifiers ============
+
+    modifier onlyAuthorized() {
+        if (!authorizedCallers[msg.sender] && msg.sender != owner()) {
+            revert Unauthorized();
+        }
+        _;
+    }
+
+    modifier onlyAMM() {
+        if (msg.sender != vibeAMM) revert Unauthorized();
+        _;
+    }
+
+    modifier onlyCore() {
+        if (msg.sender != vibeSwapCore) revert Unauthorized();
+        _;
+    }
+
+    // ============ Initializer ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address _owner,
+        address _vibeAMM,
+        address _vibeSwapCore,
+        address _treasury
+    ) external initializer {
+        if (_vibeAMM == address(0) || _vibeSwapCore == address(0) || _treasury == address(0)) {
+            revert ZeroAddress();
+        }
+
+        __Ownable_init(_owner);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+
+        vibeAMM = _vibeAMM;
+        vibeSwapCore = _vibeSwapCore;
+        treasury = _treasury;
+
+        authorizedCallers[_vibeAMM] = true;
+        authorizedCallers[_vibeSwapCore] = true;
+
+        // Set default config
+        defaultConfig = IncentiveConfig({
+            volatilityFeeRatioBps: 10000,   // 100% of extra fees to volatility pool
+            auctionToLPRatioBps: 10000,     // 100% of auction proceeds to LPs
+            ilProtectionCapBps: 8000,       // 80% max IL coverage
+            slippageGuaranteeCapBps: 200,   // 2% max slippage coverage
+            loyaltyBoostMaxBps: 20000       // 2x max loyalty boost
+        });
+    }
+
+    // ============ Fee Routing ============
+
+    /**
+     * @notice Route volatility fees to insurance pool
+     * @param poolId Pool identifier
+     * @param token Fee token
+     * @param amount Fee amount
+     */
+    function routeVolatilityFee(
+        bytes32 poolId,
+        address token,
+        uint256 amount
+    ) external override onlyAMM {
+        if (amount == 0) return;
+
+        IncentiveConfig memory config = _getConfig(poolId);
+
+        // Calculate portion for volatility pool
+        uint256 toVolatilityPool = (amount * config.volatilityFeeRatioBps) / BPS_PRECISION;
+
+        if (toVolatilityPool > 0 && volatilityInsurancePool != address(0)) {
+            // Transfer to this contract first, then forward
+            IERC20(token).safeTransferFrom(msg.sender, address(this), toVolatilityPool);
+
+            // Approve and deposit to volatility pool
+            IERC20(token).approve(volatilityInsurancePool, toVolatilityPool);
+
+            // Call deposit on volatility insurance pool
+            (bool success, ) = volatilityInsurancePool.call(
+                abi.encodeWithSignature(
+                    "depositFees(bytes32,address,uint256)",
+                    poolId,
+                    token,
+                    toVolatilityPool
+                )
+            );
+
+            if (success) {
+                emit VolatilityFeeRouted(poolId, token, toVolatilityPool);
+            }
+        }
+    }
+
+    /**
+     * @notice Distribute auction proceeds to LPs
+     * @param batchId Batch identifier
+     * @param poolIds Pools involved in batch
+     * @param amounts Amounts per pool
+     */
+    function distributeAuctionProceeds(
+        uint64 batchId,
+        bytes32[] calldata poolIds,
+        uint256[] calldata amounts
+    ) external payable override onlyCore {
+        if (poolIds.length != amounts.length) revert InvalidConfig();
+
+        uint256 totalDistributed;
+
+        for (uint256 i = 0; i < poolIds.length; i++) {
+            if (amounts[i] > 0) {
+                poolAuctionProceeds[poolIds[i]] += amounts[i];
+                totalDistributed += amounts[i];
+            }
+        }
+
+        // Verify we received enough
+        if (msg.value < totalDistributed) revert InvalidAmount();
+
+        // Refund excess
+        if (msg.value > totalDistributed) {
+            (bool success, ) = msg.sender.call{value: msg.value - totalDistributed}("");
+            require(success, "Refund failed");
+        }
+
+        emit AuctionProceedsDistributed(batchId, totalDistributed);
+    }
+
+    // ============ LP Lifecycle Hooks ============
+
+    /**
+     * @notice Called when liquidity is added
+     * @param poolId Pool identifier
+     * @param lp LP address
+     * @param liquidity Amount of liquidity
+     * @param entryPrice TWAP at deposit
+     */
+    function onLiquidityAdded(
+        bytes32 poolId,
+        address lp,
+        uint256 liquidity,
+        uint256 entryPrice
+    ) external override onlyAMM {
+        // Register with IL Protection
+        if (address(ilProtectionVault) != address(0)) {
+            ilProtectionVault.registerPosition(poolId, lp, liquidity, entryPrice, 0);
+        }
+
+        // Register with Loyalty Rewards
+        if (address(loyaltyRewardsManager) != address(0)) {
+            loyaltyRewardsManager.registerStake(poolId, lp, liquidity);
+        }
+
+        emit LiquidityAdded(poolId, lp, liquidity, entryPrice);
+    }
+
+    /**
+     * @notice Called when liquidity is removed
+     * @param poolId Pool identifier
+     * @param lp LP address
+     * @param liquidity Amount removed
+     */
+    function onLiquidityRemoved(
+        bytes32 poolId,
+        address lp,
+        uint256 liquidity
+    ) external override onlyAMM {
+        // Record unstake and get penalty
+        if (address(loyaltyRewardsManager) != address(0)) {
+            loyaltyRewardsManager.recordUnstake(poolId, lp, liquidity);
+        }
+
+        emit LiquidityRemoved(poolId, lp, liquidity);
+    }
+
+    // ============ Execution Tracking ============
+
+    /**
+     * @notice Record trade execution for slippage tracking
+     * @param poolId Pool identifier
+     * @param trader Trader address
+     * @param amountIn Input amount
+     * @param amountOut Output received
+     * @param expectedMinOut Expected minimum output
+     */
+    function recordExecution(
+        bytes32 poolId,
+        address trader,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 expectedMinOut
+    ) external override onlyAMM returns (bytes32 claimId) {
+        emit ExecutionRecorded(poolId, trader, amountIn, amountOut);
+
+        // Record with slippage guarantee fund if shortfall
+        if (address(slippageGuaranteeFund) != address(0) && amountOut < expectedMinOut) {
+            // Get quote token for pool (simplified - would need pool lookup)
+            // claimId = slippageGuaranteeFund.recordExecution(poolId, trader, quoteToken, expectedMinOut, amountOut);
+        }
+
+        return claimId;
+    }
+
+    // ============ Claims ============
+
+    /**
+     * @notice Claim IL protection
+     * @param poolId Pool identifier
+     */
+    function claimILProtection(bytes32 poolId) external override nonReentrant returns (uint256 amount) {
+        if (address(ilProtectionVault) == address(0)) revert NothingToClaim();
+
+        amount = ilProtectionVault.claimProtection(poolId, msg.sender);
+
+        if (amount > 0) {
+            emit ILProtectionClaimed(poolId, msg.sender, amount);
+        }
+    }
+
+    /**
+     * @notice Claim slippage compensation
+     * @param claimId Claim identifier
+     */
+    function claimSlippageCompensation(bytes32 claimId) external override nonReentrant returns (uint256 amount) {
+        if (address(slippageGuaranteeFund) == address(0)) revert NothingToClaim();
+
+        amount = slippageGuaranteeFund.processClaim(claimId);
+
+        if (amount > 0) {
+            emit SlippageCompensationClaimed(claimId, msg.sender, amount);
+        }
+    }
+
+    /**
+     * @notice Claim loyalty rewards
+     * @param poolId Pool identifier
+     */
+    function claimLoyaltyRewards(bytes32 poolId) external override nonReentrant returns (uint256 amount) {
+        if (address(loyaltyRewardsManager) == address(0)) revert NothingToClaim();
+
+        amount = loyaltyRewardsManager.claimRewards(poolId, msg.sender);
+
+        if (amount > 0) {
+            emit LoyaltyRewardsClaimed(poolId, msg.sender, amount);
+        }
+    }
+
+    /**
+     * @notice Claim auction proceeds
+     * @param poolId Pool identifier
+     */
+    function claimAuctionProceeds(bytes32 poolId) external override nonReentrant returns (uint256 amount) {
+        // Get LP's share of pool liquidity
+        // This would need integration with AMM to get LP balances
+        // For now, simplified implementation
+
+        uint256 totalProceeds = poolAuctionProceeds[poolId];
+        uint256 claimed = lpAuctionClaims[poolId][msg.sender];
+
+        if (totalProceeds <= claimed) revert NothingToClaim();
+
+        // Simplified: would need to calculate pro-rata share
+        amount = totalProceeds - claimed;
+        lpAuctionClaims[poolId][msg.sender] = totalProceeds;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
+
+        return amount;
+    }
+
+    // ============ View Functions ============
+
+    function getPoolIncentiveStats(bytes32 poolId) external view override returns (PoolIncentiveStats memory stats) {
+        // Aggregate stats from all vaults
+        // This would need to query each vault
+        stats = PoolIncentiveStats({
+            volatilityReserve: 0, // Would query volatility pool
+            ilReserve: 0,         // Would query IL vault
+            slippageReserve: 0,   // Would query slippage fund
+            totalLoyaltyStaked: 0, // Would query loyalty manager
+            totalAuctionProceedsDistributed: poolAuctionProceeds[poolId]
+        });
+    }
+
+    function getPoolConfig(bytes32 poolId) external view override returns (IncentiveConfig memory) {
+        return _getConfig(poolId);
+    }
+
+    function getPendingILClaim(bytes32 poolId, address lp) external view override returns (uint256) {
+        if (address(ilProtectionVault) == address(0)) return 0;
+        return ilProtectionVault.getClaimableAmount(poolId, lp);
+    }
+
+    function getPendingLoyaltyRewards(bytes32 poolId, address lp) external view override returns (uint256) {
+        if (address(loyaltyRewardsManager) == address(0)) return 0;
+        return loyaltyRewardsManager.getPendingRewards(poolId, lp);
+    }
+
+    function getPendingAuctionProceeds(bytes32 poolId, address lp) external view override returns (uint256) {
+        uint256 totalProceeds = poolAuctionProceeds[poolId];
+        uint256 claimed = lpAuctionClaims[poolId][lp];
+        return totalProceeds > claimed ? totalProceeds - claimed : 0;
+    }
+
+    // ============ Internal Functions ============
+
+    function _getConfig(bytes32 poolId) internal view returns (IncentiveConfig memory) {
+        if (hasPoolConfig[poolId]) {
+            return poolConfigs[poolId];
+        }
+        return defaultConfig;
+    }
+
+    // ============ Admin Functions ============
+
+    function setPoolConfig(bytes32 poolId, IncentiveConfig calldata config) external override onlyOwner {
+        poolConfigs[poolId] = config;
+        hasPoolConfig[poolId] = true;
+    }
+
+    function setDefaultConfig(IncentiveConfig calldata config) external override onlyOwner {
+        defaultConfig = config;
+    }
+
+    function setVolatilityOracle(address _oracle) external onlyOwner {
+        if (_oracle == address(0)) revert ZeroAddress();
+        volatilityOracle = IVolatilityOracle(_oracle);
+    }
+
+    function setVolatilityInsurancePool(address _pool) external onlyOwner {
+        volatilityInsurancePool = _pool;
+    }
+
+    function setILProtectionVault(address _vault) external onlyOwner {
+        ilProtectionVault = IILProtectionVault(_vault);
+    }
+
+    function setSlippageGuaranteeFund(address _fund) external onlyOwner {
+        slippageGuaranteeFund = ISlippageGuaranteeFund(_fund);
+    }
+
+    function setLoyaltyRewardsManager(address _manager) external onlyOwner {
+        loyaltyRewardsManager = ILoyaltyRewardsManager(_manager);
+    }
+
+    function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
+        authorizedCallers[caller] = authorized;
+    }
+
+    // ============ Receive ETH ============
+
+    receive() external payable {}
+
+    // ============ UUPS ============
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+}

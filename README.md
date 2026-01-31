@@ -109,19 +109,122 @@ VibeSwap implements six mechanisms that align all participants toward mutual ben
 └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
-## Batch Processing Flow (1-second batches)
+## Batch Processing Flow
 
 ```
-COMMIT PHASE (800ms)     REVEAL PHASE (200ms)      SETTLEMENT
+COMMIT (8 sec)           REVEAL (2 sec)            SETTLEMENT
 ─────────────────────────────────────────────────────────────────
-Users submit             Users reveal orders       1. Generate shuffle seed
-commit hashes    ──►     + priority bids     ──►   2. Finalize auction
-                                                   3. Order execution:
-                                                      - Priority winners first
-                                                      - Shuffled regular orders
-                                                   4. Execute against AMM
-                                                   5. Send proceeds to DAO
+Users submit             Users reveal orders       1. Priority auction winners
+commit hashes    ──►     + optional priority  ──►  2. Shuffled regular orders
+(encrypted)              bids                      3. All at uniform price
 ```
+
+### Phase 1: Commit (8 seconds)
+
+Users submit a **hash** of their order. Nobody can see what you're trading.
+
+```
+You want to buy 10 ETH
+You submit: hash(buy, 10 ETH, secret_xyz) → 0x7f3a9c2b...
+Observers see: meaningless hex. Can't frontrun what they can't read.
+```
+
+### Phase 2: Reveal (2 seconds)
+
+Users reveal their actual orders by submitting the preimage. Optionally attach a **priority bid** (extra ETH) for guaranteed early execution.
+
+```
+You reveal: (buy, 10 ETH, secret_xyz)
+Protocol verifies: hash(buy, 10 ETH, secret_xyz) == 0x7f3a9c2b... ✓
+```
+
+Once reveal closes, the batch is **sealed**. No new orders can enter.
+
+### Phase 3: Settlement
+
+Orders execute in a specific sequence, but **all at the same uniform clearing price**.
+
+#### Step 1: Priority Winners Execute First
+
+Traders who attached priority bids get guaranteed early execution, sorted by bid amount:
+
+```
+Example batch with 100 orders:
+
+Priority bidders (5 traders):
+  Position 1: Trader A bid 0.10 ETH → executes first
+  Position 2: Trader B bid 0.05 ETH → executes second
+  Position 3: Trader C bid 0.03 ETH → executes third
+  ...
+
+Regular orders (95 traders):
+  Positions 6-100: Shuffled (see below)
+```
+
+**Why pay for priority?**
+- Arbitrageurs need guaranteed execution to lock in profit
+- When liquidity is limited, earlier position = better fill
+- **Priority bids go to LPs** — not validators, not the protocol
+
+#### Step 2: Regular Orders Are Shuffled
+
+The remaining orders get **deterministically shuffled** so no one can predict or manipulate their position.
+
+**How the shuffle works:**
+
+```
+1. Every trader revealed a secret during the reveal phase
+
+2. All secrets are XORed together to create a seed:
+   seed = secret₁ ⊕ secret₂ ⊕ secret₃ ⊕ ... ⊕ secret₉₅
+
+3. This seed drives a Fisher-Yates shuffle:
+   for i = n-1 down to 1:
+       j = random(seed, i)     ← deterministic from seed
+       swap(orders[i], orders[j])
+```
+
+**Why XOR all secrets together?**
+
+- **No single trader controls the seed** — it's derived from everyone's input
+- To manipulate ordering, you'd need to know everyone else's secrets before revealing
+- But secrets are committed as hashes first — you can't see them until reveal
+- **Manipulation requires collusion with ALL other traders** (impractical)
+
+#### Step 3: Uniform Clearing Price
+
+Regardless of execution position, **everyone gets the same price**:
+
+```
+100 people want to buy ETH
+50 people want to sell ETH
+
+Protocol finds the price where supply = demand
+Everyone — buyers AND sellers — transacts at that single price
+```
+
+**Position only matters when liquidity is limited.** If there's enough depth, everyone gets filled. If not, earlier positions get priority on partial fills.
+
+### Visual Example
+
+```
+REVEAL PHASE                           SETTLEMENT
+───────────────                        ─────────────────────────────────
+
+Order A (bid: 0.1 ETH) ─┐              1. [A] ← Priority (0.10 ETH bid)
+Order B (no bid) ───────┤              2. [C] ← Priority (0.05 ETH bid)
+Order C (bid: 0.05 ETH)─┤    ────►     3. [F] ← Shuffled
+Order D (no bid) ───────┤              4. [B] ← Shuffled
+Order E (no bid) ───────┤              5. [D] ← Shuffled
+Order F (no bid) ───────┘              6. [E] ← Shuffled
+
+                                       All execute at SAME clearing price
+                                       Priority bids (0.15 ETH) → LPs
+```
+
+**The result:** Fair ordering without centralized sequencing. Arbs pay for priority, that payment goes to LPs, everyone else gets random-fair ordering.
+
+---
 
 ## Setup
 

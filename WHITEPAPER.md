@@ -134,6 +134,40 @@ The Treasury Stabilizer monitors market conditions via 7-day TWAP trends. During
 
 *Effect:* The protocol is counter-cyclical. When markets stress and LPs withdraw, treasury liquidity fills the gap. This prevents death spirals and maintains depth during downturns.
 
+### 3.7 Shapley-Based Fair Distribution
+
+Traditional LP reward distribution is pro-rata by liquidity: `reward = (your_liquidity / total) × fees`. This ignores synergy, enabling effects, and scarcity contributions.
+
+VibeSwap optionally implements **Shapley value** distribution from cooperative game theory. Each batch settlement is treated as an independent cooperative game where rewards reflect marginal contribution.
+
+**The Glove Game Intuition:**
+
+In the classic glove game, one left glove has no value alone. One right glove has no value alone. Together, they form a pair worth $10. Neither player "deserves" the full $10—value exists only through cooperation. The Shapley value splits it fairly.
+
+Applied to AMMs: buy-side liquidity alone enables no trades. Sell-side liquidity alone enables no trades. Together, they create a market. Fees should reflect this synergy.
+
+**Contribution Components:**
+
+| Component | Weight | Captures |
+|-----------|--------|----------|
+| Direct | 40% | Raw liquidity provided |
+| Enabling | 30% | Time in pool (created conditions for value) |
+| Scarcity | 20% | Provided the scarce side of the market |
+| Stability | 10% | Remained during volatility |
+
+**Scarcity Scoring:**
+
+When a batch has 80 ETH of buy orders and 20 ETH of sell orders, sell-side LPs are scarce. They provided the critical resource. Shapley weights their contribution higher for that batch.
+
+**Properties (from Glynn's Cooperative Reward System):**
+
+- **Efficiency:** All realized value is distributed (no inflation)
+- **Symmetry:** Equal contributors receive equal rewards
+- **Null player:** No contribution means no reward
+- **Event-based:** Each batch is independent (no compounding)
+
+*Effect:* Rewards become **fair by construction**, not by governance decision. LPs who provide scarce liquidity, stay during stress, and enable trading are mathematically guaranteed higher shares.
+
 ---
 
 ## 4. Cooperative Equilibrium
@@ -167,6 +201,8 @@ VibeSwap is how decentralized exchange should have been built from the start.
 2. Budish, E., Cramton, P., Shim, J. "The High-Frequency Trading Arms Race." Quarterly Journal of Economics, 2015.
 3. Adams, H., et al. "Uniswap v2 Core." 2020.
 4. LayerZero Labs. "LayerZero V2: Omnichain Interoperability Protocol." 2024.
+5. Glynn, W.T. "A Cooperative Reward System for Decentralized Networks: Shapley-Based Incentives for Fair, Sustainable Value Distribution." 2025.
+6. Shapley, L.S. "A Value for n-Person Games." Contributions to the Theory of Games, 1953.
 
 ---
 

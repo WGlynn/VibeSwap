@@ -11,11 +11,23 @@ import "./interfaces/IVolatilityOracle.sol";
 import "./interfaces/IILProtectionVault.sol";
 import "./interfaces/ILoyaltyRewardsManager.sol";
 import "./interfaces/ISlippageGuaranteeFund.sol";
+import "./interfaces/IShapleyDistributor.sol";
 
 /**
  * @title IncentiveController
  * @notice Central coordinator for all VibeSwap incentive mechanisms
  * @dev Routes fees and proceeds to appropriate vaults, provides unified claim interface
+ *
+ * Supports two distribution modes:
+ * - Pro-rata: Simple proportional distribution by liquidity (default)
+ * - Shapley: Fair distribution based on marginal contribution (opt-in per pool)
+ *
+ * Shapley distribution implements cooperative game theory where each economic
+ * event (batch settlement) is treated as an independent game. Rewards reflect:
+ * - Direct contribution (liquidity provided)
+ * - Enabling contribution (time in pool)
+ * - Scarcity contribution (providing the scarce side)
+ * - Stability contribution (staying during volatility)
  */
 contract IncentiveController is
     IIncentiveController,
@@ -43,6 +55,10 @@ contract IncentiveController is
     IILProtectionVault public ilProtectionVault;
     ISlippageGuaranteeFund public slippageGuaranteeFund;
     ILoyaltyRewardsManager public loyaltyRewardsManager;
+    IShapleyDistributor public shapleyDistributor;
+
+    // Shapley distribution settings
+    mapping(bytes32 => bool) public useShapleyDistribution; // poolId => use Shapley
 
     // Default configuration
     IncentiveConfig public defaultConfig;
@@ -420,6 +436,91 @@ contract IncentiveController is
 
     function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
         authorizedCallers[caller] = authorized;
+    }
+
+    function setShapleyDistributor(address _distributor) external onlyOwner {
+        shapleyDistributor = IShapleyDistributor(_distributor);
+    }
+
+    /**
+     * @notice Enable or disable Shapley distribution for a pool
+     * @dev When enabled, rewards are distributed based on marginal contribution
+     *      When disabled, simple pro-rata distribution is used
+     * @param poolId Pool identifier
+     * @param enabled Whether to use Shapley distribution
+     */
+    function setShapleyEnabled(bytes32 poolId, bool enabled) external onlyOwner {
+        useShapleyDistribution[poolId] = enabled;
+    }
+
+    // ============ Shapley Distribution ============
+
+    /**
+     * @notice Create a Shapley game for batch fee distribution
+     * @dev Called after batch settlement to distribute fees fairly
+     * @param batchId Batch identifier
+     * @param poolId Pool identifier
+     * @param totalFees Total fees to distribute
+     * @param token Fee token
+     * @param participants LP participants with contribution data
+     */
+    function createShapleyGame(
+        uint64 batchId,
+        bytes32 poolId,
+        uint256 totalFees,
+        address token,
+        IShapleyDistributor.Participant[] calldata participants
+    ) external onlyAuthorized {
+        if (address(shapleyDistributor) == address(0)) return;
+        if (!useShapleyDistribution[poolId]) return;
+
+        bytes32 gameId = keccak256(abi.encodePacked(batchId, poolId));
+
+        // Transfer fees to Shapley distributor
+        if (token != address(0)) {
+            IERC20(token).safeTransfer(address(shapleyDistributor), totalFees);
+        }
+
+        // Create and compute game
+        shapleyDistributor.createGame(gameId, totalFees, token, participants);
+        shapleyDistributor.computeShapleyValues(gameId);
+    }
+
+    /**
+     * @notice Claim Shapley-distributed rewards from a batch
+     * @param batchId Batch identifier
+     * @param poolId Pool identifier
+     */
+    function claimShapleyReward(uint64 batchId, bytes32 poolId) external nonReentrant returns (uint256) {
+        if (address(shapleyDistributor) == address(0)) revert NothingToClaim();
+
+        bytes32 gameId = keccak256(abi.encodePacked(batchId, poolId));
+        return shapleyDistributor.claimReward(gameId);
+    }
+
+    /**
+     * @notice Get pending Shapley reward for a batch
+     * @param batchId Batch identifier
+     * @param poolId Pool identifier
+     * @param lp LP address
+     */
+    function getPendingShapleyReward(
+        uint64 batchId,
+        bytes32 poolId,
+        address lp
+    ) external view returns (uint256) {
+        if (address(shapleyDistributor) == address(0)) return 0;
+
+        bytes32 gameId = keccak256(abi.encodePacked(batchId, poolId));
+        return shapleyDistributor.getPendingReward(gameId, lp);
+    }
+
+    /**
+     * @notice Check if pool uses Shapley distribution
+     * @param poolId Pool identifier
+     */
+    function isShapleyEnabled(bytes32 poolId) external view returns (bool) {
+        return useShapleyDistribution[poolId] && address(shapleyDistributor) != address(0);
     }
 
     // ============ Receive ETH ============

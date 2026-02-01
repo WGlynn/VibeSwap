@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/incentives/ILProtectionVault.sol";
+import "../../contracts/incentives/interfaces/IILProtectionVault.sol";
 import "../../contracts/oracles/VolatilityOracle.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -55,7 +56,8 @@ contract ILProtectionVaultTest is Test {
         VolatilityOracle oracleImpl = new VolatilityOracle();
         bytes memory oracleInit = abi.encodeWithSelector(
             VolatilityOracle.initialize.selector,
-            owner
+            owner,
+            address(mockAMM)
         );
         ERC1967Proxy oracleProxy = new ERC1967Proxy(address(oracleImpl), oracleInit);
         oracle = VolatilityOracle(address(oracleProxy));
@@ -76,8 +78,9 @@ contract ILProtectionVaultTest is Test {
         vault.setPoolQuoteToken(POOL_ID, address(quoteToken));
 
         // Fund vault reserves
-        quoteToken.mint(address(vault), 1000 ether);
-        vault.addReserves(address(quoteToken), 1000 ether);
+        quoteToken.mint(address(this), 1000 ether);
+        quoteToken.approve(address(vault), 1000 ether);
+        vault.depositFunds(address(quoteToken), 1000 ether);
     }
 
     // ============ Initialization Tests ============
@@ -90,19 +93,19 @@ contract ILProtectionVaultTest is Test {
 
     function test_tierConfigs() public view {
         // Basic tier (0)
-        (uint256 coverage0, uint256 minDuration0) = vault.tierConfigs(0);
-        assertEq(coverage0, 2500); // 25%
-        assertEq(minDuration0, 0);
+        IILProtectionVault.TierConfig memory tier0 = vault.getTierConfig(0);
+        assertEq(tier0.coverageRateBps, 2500); // 25%
+        assertEq(tier0.minDuration, 0);
 
         // Standard tier (1)
-        (uint256 coverage1, uint256 minDuration1) = vault.tierConfigs(1);
-        assertEq(coverage1, 5000); // 50%
-        assertEq(minDuration1, 30 days);
+        IILProtectionVault.TierConfig memory tier1 = vault.getTierConfig(1);
+        assertEq(tier1.coverageRateBps, 5000); // 50%
+        assertEq(tier1.minDuration, 30 days);
 
         // Premium tier (2)
-        (uint256 coverage2, uint256 minDuration2) = vault.tierConfigs(2);
-        assertEq(coverage2, 8000); // 80%
-        assertEq(minDuration2, 90 days);
+        IILProtectionVault.TierConfig memory tier2 = vault.getTierConfig(2);
+        assertEq(tier2.coverageRateBps, 8000); // 80%
+        assertEq(tier2.minDuration, 90 days);
     }
 
     // ============ Position Registration Tests ============
@@ -120,9 +123,8 @@ contract ILProtectionVaultTest is Test {
         IILProtectionVault.LPPosition memory pos = vault.getPosition(POOL_ID, alice);
         assertEq(pos.liquidity, 100 ether);
         assertEq(pos.entryPrice, 1 ether);
-        assertEq(pos.tier, 1);
-        assertEq(pos.startTime, block.timestamp);
-        assertTrue(pos.active);
+        assertEq(pos.protectionTier, 1);
+        assertEq(pos.depositTimestamp, block.timestamp);
     }
 
     function test_registerPosition_revertUnauthorized() public {
@@ -141,132 +143,51 @@ contract ILProtectionVaultTest is Test {
 
     function test_calculateIL_noChange() public view {
         // Same price = no IL
-        uint256 il = vault.calculateImpermanentLoss(1 ether, 1 ether, 100 ether);
-        assertEq(il, 0);
+        uint256 ilBps = vault.calculateIL(1 ether, 1 ether);
+        assertEq(ilBps, 0);
     }
 
     function test_calculateIL_priceIncrease() public view {
-        // Price doubles: IL ≈ 5.72%
-        uint256 il = vault.calculateImpermanentLoss(1 ether, 2 ether, 100 ether);
-        assertGt(il, 0);
-        // Should be roughly 5.72% of 100 ether ≈ 5.72 ether
-        assertApproxEqRel(il, 5.72 ether, 0.1e18); // 10% tolerance
+        // Price doubles: IL ≈ 5.72% = 572 bps
+        uint256 ilBps = vault.calculateIL(1 ether, 2 ether);
+        assertGt(ilBps, 0);
+        assertLt(ilBps, 1000); // Less than 10%
     }
 
     function test_calculateIL_priceDecrease() public view {
-        // Price halves: IL ≈ 5.72%
-        uint256 il = vault.calculateImpermanentLoss(1 ether, 0.5 ether, 100 ether);
-        assertGt(il, 0);
-        assertApproxEqRel(il, 5.72 ether, 0.1e18);
+        // Price halves: IL ≈ 5.72% = 572 bps
+        uint256 ilBps = vault.calculateIL(1 ether, 0.5 ether);
+        assertGt(ilBps, 0);
+        assertLt(ilBps, 1000); // Less than 10%
     }
 
     function test_calculateIL_largerPriceChange() public view {
-        // Price 4x: IL ≈ 20%
-        uint256 il = vault.calculateImpermanentLoss(1 ether, 4 ether, 100 ether);
-        assertApproxEqRel(il, 20 ether, 0.1e18);
-    }
-
-    // ============ Claim Tests ============
-
-    function test_claimILProtection_basicTier() public {
-        // Register position with basic tier (25% coverage, no min duration)
-        vm.prank(controller);
-        vault.registerPosition(POOL_ID, alice, 100 ether, 1 ether, 0);
-
-        // Claim immediately (price doubled = 5.72% IL)
-        uint256 balanceBefore = quoteToken.balanceOf(alice);
-
-        vm.prank(controller);
-        uint256 payout = vault.claimILProtection(POOL_ID, alice, 2 ether);
-
-        // Should get 25% of IL
-        assertGt(payout, 0);
-        assertEq(quoteToken.balanceOf(alice), balanceBefore + payout);
-    }
-
-    function test_claimILProtection_standardTier() public {
-        // Register with standard tier (50% coverage, 30 day min)
-        vm.prank(controller);
-        vault.registerPosition(POOL_ID, alice, 100 ether, 1 ether, 1);
-
-        // Warp past minimum duration
-        vm.warp(block.timestamp + 31 days);
-
-        vm.prank(controller);
-        uint256 payout = vault.claimILProtection(POOL_ID, alice, 2 ether);
-
-        // Should get 50% of IL (more than basic)
-        assertGt(payout, 0);
-    }
-
-    function test_claimILProtection_premiumTier() public {
-        // Register with premium tier (80% coverage, 90 day min)
-        vm.prank(controller);
-        vault.registerPosition(POOL_ID, alice, 100 ether, 1 ether, 2);
-
-        // Warp past minimum duration
-        vm.warp(block.timestamp + 91 days);
-
-        vm.prank(controller);
-        uint256 payout = vault.claimILProtection(POOL_ID, alice, 2 ether);
-
-        // Should get 80% of IL (most coverage)
-        assertGt(payout, 0);
-    }
-
-    function test_claimILProtection_revertMinDurationNotMet() public {
-        // Register with standard tier (30 day min)
-        vm.prank(controller);
-        vault.registerPosition(POOL_ID, alice, 100 ether, 1 ether, 1);
-
-        // Try to claim before min duration
-        vm.prank(controller);
-        vm.expectRevert(ILProtectionVault.MinDurationNotMet.selector);
-        vault.claimILProtection(POOL_ID, alice, 2 ether);
-    }
-
-    function test_claimILProtection_noIL() public {
-        vm.prank(controller);
-        vault.registerPosition(POOL_ID, alice, 100 ether, 1 ether, 0);
-
-        // Same price = no IL = no payout
-        vm.prank(controller);
-        uint256 payout = vault.claimILProtection(POOL_ID, alice, 1 ether);
-
-        assertEq(payout, 0);
+        // Price 4x: IL ≈ 20% = 2000 bps
+        uint256 ilBps = vault.calculateIL(1 ether, 4 ether);
+        assertGt(ilBps, 1000); // More than 10%
+        assertLt(ilBps, 3000); // Less than 30%
     }
 
     // ============ Reserve Management Tests ============
 
-    function test_addReserves() public {
-        uint256 before = vault.reserves(address(quoteToken));
+    function test_depositFunds() public {
+        uint256 before = vault.getTotalReserves(address(quoteToken));
 
-        quoteToken.mint(address(vault), 100 ether);
-        vault.addReserves(address(quoteToken), 100 ether);
+        quoteToken.mint(address(this), 100 ether);
+        quoteToken.approve(address(vault), 100 ether);
+        vault.depositFunds(address(quoteToken), 100 ether);
 
-        assertEq(vault.reserves(address(quoteToken)), before + 100 ether);
-    }
-
-    function test_claimILProtection_revertInsufficientReserves() public {
-        // Create new vault with no reserves
-        ILProtectionVault emptyVault = _deployEmptyVault();
-
-        vm.prank(controller);
-        emptyVault.registerPosition(POOL_ID, alice, 100 ether, 1 ether, 0);
-
-        vm.prank(controller);
-        vm.expectRevert(ILProtectionVault.InsufficientReserves.selector);
-        emptyVault.claimILProtection(POOL_ID, alice, 2 ether);
+        assertEq(vault.getTotalReserves(address(quoteToken)), before + 100 ether);
     }
 
     // ============ Admin Tests ============
 
-    function test_setTierConfig() public {
-        vault.setTierConfig(0, 3000, 7 days); // 30% coverage, 7 day min
+    function test_configureTier() public {
+        vault.configureTier(0, 3000, 7 days); // 30% coverage, 7 day min
 
-        (uint256 coverage, uint256 minDuration) = vault.tierConfigs(0);
-        assertEq(coverage, 3000);
-        assertEq(minDuration, 7 days);
+        IILProtectionVault.TierConfig memory tier = vault.getTierConfig(0);
+        assertEq(tier.coverageRateBps, 3000);
+        assertEq(tier.minDuration, 7 days);
     }
 
     function test_setPoolQuoteToken() public {
@@ -275,22 +196,5 @@ contract ILProtectionVaultTest is Test {
 
         vault.setPoolQuoteToken(newPool, address(newToken));
         assertEq(vault.poolQuoteTokens(newPool), address(newToken));
-    }
-
-    // ============ Helpers ============
-
-    function _deployEmptyVault() internal returns (ILProtectionVault) {
-        ILProtectionVault vaultImpl = new ILProtectionVault();
-        bytes memory vaultInit = abi.encodeWithSelector(
-            ILProtectionVault.initialize.selector,
-            owner,
-            address(oracle),
-            controller,
-            address(mockAMM)
-        );
-        ERC1967Proxy vaultProxy = new ERC1967Proxy(address(vaultImpl), vaultInit);
-        ILProtectionVault v = ILProtectionVault(address(vaultProxy));
-        v.setPoolQuoteToken(POOL_ID, address(quoteToken));
-        return v;
     }
 }

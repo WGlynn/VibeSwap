@@ -53,7 +53,7 @@ contract SlippageGuaranteeFund is
     error InvalidAmount();
     error ClaimNotFound();
     error ClaimAlreadyProcessed();
-    error ClaimExpired();
+    error ClaimExpiredError();
     error ClaimNotExpired();
     error InsufficientReserves();
     error UserLimitExceeded();
@@ -164,13 +164,13 @@ contract SlippageGuaranteeFund is
 
         if (claim.trader == address(0)) revert ClaimNotFound();
         if (claim.processed) revert ClaimAlreadyProcessed();
-        if (claim.expired) revert ClaimExpired();
+        if (claim.expired) revert ClaimExpiredError();
 
         // Check claim window
         if (block.timestamp > claim.timestamp + config.claimWindow) {
             claim.expired = true;
             emit ClaimExpired(claimId);
-            revert ClaimExpired();
+            revert ClaimExpiredError();
         }
 
         // Only trader or controller can process

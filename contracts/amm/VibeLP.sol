@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -95,12 +96,4 @@ contract VibeLP is ERC20, Ownable {
         }
         return string(result);
     }
-}
-
-/**
- * @title IERC20Metadata
- * @notice Interface for ERC20 metadata
- */
-interface IERC20Metadata {
-    function symbol() external view returns (string memory);
 }

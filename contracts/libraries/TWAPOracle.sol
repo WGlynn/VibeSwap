@@ -137,9 +137,9 @@ library TWAPOracle {
 
         // Calculate TWAP
         uint224 cumulativeDelta = current.priceCumulative - targetCumulative;
-        uint32 timeDelta = current.timestamp - targetTime;
+        uint32 twapTimeDelta = current.timestamp - targetTime;
 
-        twap = uint256(cumulativeDelta) / timeDelta;
+        twap = uint256(cumulativeDelta) / twapTimeDelta;
     }
 
     /**

@@ -62,7 +62,7 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
 
     error GloballyPaused();
     error FunctionPaused(bytes4 selector);
-    error BreakerTripped(bytes32 breakerType);
+    error BreakerTrippedError(bytes32 breakerType);
     error NotGuardian();
     error CooldownActive();
 
@@ -194,7 +194,7 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         if (state.tripped) {
             // Check if cooldown has passed
             if (block.timestamp < state.trippedAt + config.cooldownPeriod) {
-                revert BreakerTripped(breakerType);
+                revert BreakerTrippedError(breakerType);
             }
         }
     }

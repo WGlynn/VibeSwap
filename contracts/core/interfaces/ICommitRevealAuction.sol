@@ -155,4 +155,9 @@ interface ICommitRevealAuction {
      * @notice Settle the current batch
      */
     function settleBatch() external;
+
+    /**
+     * @notice Get execution order indices for a settled batch
+     */
+    function getExecutionOrder(uint64 batchId) external view returns (uint256[] memory indices);
 }

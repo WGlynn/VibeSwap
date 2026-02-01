@@ -150,7 +150,7 @@ contract VibeSwapCore is
     error InvalidPhase();
     error SwapFailed();
     error Blacklisted();
-    error RateLimitExceeded();
+    error RateLimitExceededError();
     error NotEOA();
     error CommitCooldownActive();
     error NotGuardian();
@@ -649,7 +649,7 @@ contract VibeSwapCore is
 
         if (!allowed) {
             emit RateLimitExceeded(user, amount, limit.maxAmount);
-            revert RateLimitExceeded();
+            revert RateLimitExceededError();
         }
 
         // Update state

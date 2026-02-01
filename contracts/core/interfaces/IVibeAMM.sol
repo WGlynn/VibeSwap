@@ -162,4 +162,9 @@ interface IVibeAMM {
      * @notice Get LP token address for a pool
      */
     function getLPToken(bytes32 poolId) external view returns (address);
+
+    /**
+     * @notice Get spot price for a pool (token1 per token0)
+     */
+    function getSpotPrice(bytes32 poolId) external view returns (uint256);
 }

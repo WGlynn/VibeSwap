@@ -836,7 +836,7 @@ contract VibeAMM is
     /**
      * @notice Check for donation attack (unexpected balance increase)
      */
-    function _checkDonationAttack(address token, uint256 expectedBalance) internal view {
+    function _checkDonationAttack(address token, uint256 expectedBalance) internal {
         uint256 actualBalance = IERC20(token).balanceOf(address(this));
         uint256 tracked = trackedBalances[token];
 

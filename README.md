@@ -481,7 +481,8 @@ forge coverage
 
 | Document | Description |
 |----------|-------------|
-| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Deep dive into Shapley distribution, IL protection, loyalty rewards, and game theory |
+| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, reputation system, and Nash equilibrium analysis |
+| [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, on-chain accountability, and cryptoeconomic defense mechanisms |
 
 ## License
 

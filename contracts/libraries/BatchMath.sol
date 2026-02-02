@@ -158,6 +158,7 @@ library BatchMath {
 
     /**
      * @notice Calculate AMM's capacity to absorb trades at a given price
+     * @dev Uses geometric mean of reserves weighted by target price for more accurate capacity
      */
     function calculateAMMCapacity(
         uint256 reserve0,
@@ -165,9 +166,30 @@ library BatchMath {
         uint256 targetPrice
     ) internal pure returns (uint256 capacity) {
         // Calculate how much can be traded before price moves significantly
-        // Using constant product: (r0 + Δ)(r1 - Δ*p) = r0 * r1
-        // Simplified: capacity ≈ reserve0 * 0.1 (10% of liquidity)
-        capacity = reserve0 / 10;
+        // Using constant product: capacity scales with sqrt(reserve0 * reserve1)
+        // Weighted by how far targetPrice is from spot price
+        uint256 spotPrice = (reserve1 * PRECISION) / reserve0;
+        uint256 priceRatio = targetPrice > spotPrice
+            ? (targetPrice * PRECISION) / spotPrice
+            : (spotPrice * PRECISION) / targetPrice;
+
+        // Base capacity is 10% of geometric mean, reduced if price is far from spot
+        uint256 geometricMean = sqrt(reserve0 * reserve1);
+        capacity = (geometricMean * PRECISION) / (10 * priceRatio);
+    }
+
+    /**
+     * @notice Integer square root using Newton's method
+     */
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        return y;
     }
 
     /**
@@ -274,21 +296,6 @@ library BatchMath {
             uint256 liquidity0 = (amount0 * totalSupply) / reserve0;
             uint256 liquidity1 = (amount1 * totalSupply) / reserve1;
             liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-        }
-    }
-
-    /**
-     * @notice Integer square root using Babylonian method
-     */
-    function sqrt(uint256 x) internal pure returns (uint256 y) {
-        if (x == 0) return 0;
-
-        uint256 z = (x + 1) / 2;
-        y = x;
-
-        while (z < y) {
-            y = z;
-            z = (x / z + z) / 2;
         }
     }
 

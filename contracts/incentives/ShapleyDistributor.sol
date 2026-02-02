@@ -394,6 +394,11 @@ contract ShapleyDistributor is
         uint256 reputationScore,
         uint256 economicScore
     ) external onlyAuthorized {
+        // Validate scores are within bounds (0-10000 bps)
+        require(activityScore <= BPS_PRECISION, "Activity score exceeds max");
+        require(reputationScore <= BPS_PRECISION, "Reputation score exceeds max");
+        require(economicScore <= BPS_PRECISION, "Economic score exceeds max");
+
         qualityWeights[participant] = QualityWeight({
             activityScore: activityScore,
             reputationScore: reputationScore,

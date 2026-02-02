@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
 
 function MobileNav() {
   const location = useLocation()
@@ -8,8 +9,8 @@ function MobileNav() {
       path: '/swap',
       label: 'Swap',
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
       ),
     },
@@ -17,8 +18,8 @@ function MobileNav() {
       path: '/pool',
       label: 'Pool',
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
         </svg>
       ),
     },
@@ -26,35 +27,83 @@ function MobileNav() {
       path: '/bridge',
       label: 'Bridge',
       icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+      ),
+    },
+    {
+      path: '/rewards',
+      label: 'Rewards',
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      path: '/analytics',
+      label: 'Stats',
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       ),
     },
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden glass border-t border-dark-700">
-      <div className="flex items-center justify-around py-2 px-4 safe-area-bottom">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path ||
-            (item.path === '/swap' && location.pathname === '/')
+    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+      {/* Top gradient border */}
+      <div className="h-px bg-gradient-to-r from-transparent via-vibe-500/30 to-transparent" />
 
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex flex-col items-center py-2 px-4 rounded-xl transition-colors ${
-                isActive
-                  ? 'text-vibe-400'
-                  : 'text-dark-400 hover:text-white'
-              }`}
-            >
-              {item.icon}
-              <span className="text-xs mt-1 font-medium">{item.label}</span>
-            </Link>
-          )
-        })}
+      <div className="glass-strong border-t border-void-600/30">
+        <div className="flex items-center justify-around py-2 px-2 safe-area-bottom">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path ||
+              (item.path === '/swap' && location.pathname === '/')
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="relative flex-1"
+              >
+                <motion.div
+                  whileTap={{ scale: 0.9 }}
+                  className={`flex flex-col items-center py-2 px-2 rounded-xl transition-all ${
+                    isActive
+                      ? 'text-vibe-400'
+                      : 'text-void-400'
+                  }`}
+                >
+                  {/* Active background */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="mobileNavActive"
+                      className="absolute inset-1 bg-vibe-500/10 rounded-xl border border-vibe-500/20"
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+
+                  {/* Glow effect for active */}
+                  {isActive && (
+                    <div className="absolute inset-0 bg-vibe-500/5 blur-xl rounded-xl" />
+                  )}
+
+                  <div className="relative z-10">
+                    {item.icon}
+                  </div>
+                  <span className={`relative z-10 text-[10px] mt-1 font-medium tracking-wide ${
+                    isActive ? 'text-vibe-400' : ''
+                  }`}>
+                    {item.label}
+                  </span>
+                </motion.div>
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </nav>
   )

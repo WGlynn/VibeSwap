@@ -32,15 +32,17 @@ library TWAPOracle {
     /**
      * @notice Initialize oracle state
      * @param state Oracle state to initialize
-     * @param initialPrice Initial spot price
+     * @param initialPrice Initial spot price (used to seed cumulative for immediate TWAP availability)
      */
     function initialize(
         OracleState storage state,
         uint256 initialPrice
     ) internal {
+        // Seed with initial price so TWAP is immediately available
+        // Use initialPrice * 1 second as initial cumulative value
         state.observations[0] = Observation({
             timestamp: uint32(block.timestamp),
-            priceCumulative: 0
+            priceCumulative: uint224(initialPrice)
         });
         state.index = 0;
         state.cardinality = 1;

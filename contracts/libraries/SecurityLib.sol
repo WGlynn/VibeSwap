@@ -251,4 +251,121 @@ library SecurityLib {
         require(b > 0, "Division by zero");
         return a == 0 ? 0 : (a - 1) / b + 1;
     }
+
+    // ============ Address Validation ============
+
+    /**
+     * @notice Validates that an address is not zero
+     * @param addr Address to validate
+     */
+    function requireNonZeroAddress(address addr) internal pure {
+        require(addr != address(0), "Zero address");
+    }
+
+    /**
+     * @notice Checks if an address is a contract
+     * @param addr Address to check
+     * @return True if the address has code (is a contract)
+     */
+    function isContract(address addr) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(addr)
+        }
+        return size > 0;
+    }
+
+    // ============ Bounds Validation ============
+
+    /// @notice Maximum basis points (100%)
+    uint256 public constant MAX_BPS = 10000;
+
+    /**
+     * @notice Validates that a value is valid basis points (0-10000)
+     * @param bps Basis points to validate
+     */
+    function requireValidBps(uint256 bps) internal pure {
+        require(bps <= MAX_BPS, "Invalid BPS");
+    }
+
+    /**
+     * @notice Validates that a value is within a range
+     * @param value Value to validate
+     * @param min Minimum allowed value
+     * @param max Maximum allowed value
+     */
+    function requireInRange(uint256 value, uint256 min, uint256 max) internal pure {
+        require(value >= min && value <= max, "Value out of range");
+    }
+
+    /**
+     * @notice Calculate percentage in basis points
+     * @param amount Base amount
+     * @param bps Basis points (100 = 1%)
+     * @return Amount * bps / 10000
+     */
+    function bpsOf(uint256 amount, uint256 bps) internal pure returns (uint256) {
+        return (amount * bps) / MAX_BPS;
+    }
+
+    // ============ Signature Validation ============
+
+    /**
+     * @notice Recovers signer from a signature with malleability protection
+     * @param hash Message hash
+     * @param v Recovery byte
+     * @param r ECDSA r
+     * @param s ECDSA s
+     * @return Recovered signer address
+     */
+    function recoverSigner(
+        bytes32 hash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal pure returns (address) {
+        // EIP-2: Ensure s is in the lower half to prevent signature malleability
+        require(
+            uint256(s) <= 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0,
+            "Invalid signature s value"
+        );
+        require(v == 27 || v == 28, "Invalid signature v value");
+
+        address signer = ecrecover(hash, v, r, s);
+        require(signer != address(0), "Invalid signature");
+
+        return signer;
+    }
+
+    /**
+     * @notice Creates an EIP-712 typed data hash
+     * @param domainSeparator The domain separator
+     * @param structHash The struct hash
+     * @return The typed data hash
+     */
+    function toTypedDataHash(
+        bytes32 domainSeparator,
+        bytes32 structHash
+    ) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encodePacked("\x19\x01", domainSeparator, structHash)
+        );
+    }
+
+    // ============ Interaction Tracking ============
+
+    /**
+     * @notice Computes a unique key for tracking interactions
+     * @param user User address
+     * @param poolId Pool identifier
+     * @param blockNum Block number
+     * @return Unique interaction key
+     */
+    function interactionKey(
+        address user,
+        bytes32 poolId,
+        uint256 blockNum
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(user, poolId, blockNum));
+    }
 }

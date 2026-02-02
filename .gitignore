@@ -6,8 +6,8 @@ out/
 broadcast/
 !/broadcast/*/31337/
 
-# Docs
-docs/
+# Forge auto-generated docs (keep manual docs/)
+docs/book/
 
 # Dotenv file
 .env

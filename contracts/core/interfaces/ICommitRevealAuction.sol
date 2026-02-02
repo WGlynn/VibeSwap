@@ -122,6 +122,28 @@ interface ICommitRevealAuction {
     ) external payable;
 
     /**
+     * @notice Reveal order on behalf of another address (for cross-chain or aggregator use)
+     * @param commitId The commitment ID from commitOrder
+     * @param originalDepositor Original address that made the commitment
+     * @param tokenIn Token being sold
+     * @param tokenOut Token being bought
+     * @param amountIn Amount of tokenIn
+     * @param minAmountOut Minimum acceptable tokenOut
+     * @param secret Secret used in commitment
+     * @param priorityBid Additional bid for priority execution
+     */
+    function revealOrderCrossChain(
+        bytes32 commitId,
+        address originalDepositor,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        bytes32 secret,
+        uint256 priorityBid
+    ) external payable;
+
+    /**
      * @notice Get the current batch ID
      */
     function getCurrentBatchId() external view returns (uint64);

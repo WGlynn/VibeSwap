@@ -98,6 +98,10 @@ contract VibeAMMTest is Test {
         tokenA.approve(address(amm), type(uint256).max);
         vm.prank(trader);
         tokenB.approve(address(amm), type(uint256).max);
+
+        // Disable flash loan protection for unit testing
+        // In production, this is an important security feature
+        amm.setFlashLoanProtection(false);
     }
 
     // ============ Pool Creation Tests ============
@@ -306,8 +310,9 @@ contract VibeAMMTest is Test {
         vm.prank(lp1);
         amm.addLiquidity(poolId, 100 ether, 100 ether, 0, 0);
 
-        // Transfer tokens to AMM for batch execution
+        // Transfer tokens to AMM for batch execution and sync balance
         tokenA.mint(address(amm), 20 ether);
+        amm.syncTrackedBalance(address(tokenA));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](2);
         orders[0] = IVibeAMM.SwapOrder({

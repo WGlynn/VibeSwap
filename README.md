@@ -83,6 +83,8 @@ VibeSwap implements six mechanisms that align all participants toward mutual ben
 - Arbitrageurs pay for the privilege of correcting prices
 - The protocol stabilizes itself during downturns
 
+> **Deep Dive:** See the full [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) for mathematical foundations, game theory analysis, and implementation details.
+
 ---
 
 ## Shapley-Based Fair Distribution
@@ -474,6 +476,12 @@ forge coverage
 4. **Slashing**: Invalid reveals forfeit 50% of deposits
 5. **Rate Limiting**: Per-chain message rate limits
 6. **Upgradeability**: UUPS with timelock
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Deep dive into Shapley distribution, IL protection, loyalty rewards, and game theory |
 
 ## License
 

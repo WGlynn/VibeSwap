@@ -318,9 +318,11 @@ contract VibeSwapCore is
         // Update priority bid
         params.priorityBid = priorityBid;
 
-        // Reveal to auction
-        auction.revealOrder{value: msg.value}(
+        // Reveal to auction - use cross-chain variant since we're acting on behalf of user
+        // This passes the original trader address for hash verification
+        auction.revealOrderCrossChain{value: msg.value}(
             commitId,
+            msg.sender, // Original trader (commit owner)
             params.tokenIn,
             params.tokenOut,
             params.amountIn,

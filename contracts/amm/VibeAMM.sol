@@ -103,6 +103,7 @@ contract VibeAMM is
     event PriceManipulationDetected(bytes32 indexed poolId, uint256 spotPrice, uint256 twapPrice);
     event DonationAttackDetected(address indexed token, uint256 tracked, uint256 actual);
     event LargeTradeLimited(bytes32 indexed poolId, uint256 requested, uint256 allowed);
+    event FeesCollected(address indexed token, uint256 amount);
 
     // ============ Security Errors ============
 
@@ -272,8 +273,8 @@ contract VibeAMM is
         Pool storage pool = pools[poolId];
 
         // Check for donation attack before calculating optimal amounts
-        _checkDonationAttack(pool.token0, pool.reserve0);
-        _checkDonationAttack(pool.token1, pool.reserve1);
+        _checkDonationAttack(pool.token0);
+        _checkDonationAttack(pool.token1);
 
         // Calculate optimal amounts
         (amount0, amount1) = BatchMath.calculateOptimalLiquidity(
@@ -433,8 +434,8 @@ contract VibeAMM is
         Pool storage pool = pools[poolId];
 
         // Check for donation attacks before batch execution
-        _checkDonationAttack(pool.token0, pool.reserve0);
-        _checkDonationAttack(pool.token1, pool.reserve1);
+        _checkDonationAttack(pool.token0);
+        _checkDonationAttack(pool.token1);
 
         // Separate buy and sell orders for clearing price calculation
         (uint256[] memory buyOrders, uint256[] memory sellOrders) = _categorizeOrders(
@@ -477,6 +478,10 @@ contract VibeAMM is
 
         // Check price breaker after batch
         _checkAndUpdatePriceBreaker(poolId);
+
+        // Sync tracked balances to prevent donation attack false positives on next batch
+        trackedBalances[pool.token0] = IERC20(pool.token0).balanceOf(address(this));
+        trackedBalances[pool.token1] = IERC20(pool.token1).balanceOf(address(this));
 
         emit BatchSwapExecuted(
             poolId,
@@ -582,12 +587,20 @@ contract VibeAMM is
      * @notice Collect accumulated protocol fees
      * @param token Token to collect fees for
      */
+    /**
+     * @notice Collect accumulated protocol fees for a token
+     * @dev Only callable by treasury to prevent griefing during settlements
+     * @param token Token address to collect fees for
+     */
     function collectFees(address token) external {
+        require(msg.sender == treasury || msg.sender == owner(), "Only treasury or owner");
         uint256 amount = accumulatedFees[token];
         require(amount > 0, "No fees to collect");
 
         accumulatedFees[token] = 0;
         IERC20(token).safeTransfer(treasury, amount);
+
+        emit FeesCollected(token, amount);
     }
 
     // ============ View Functions ============
@@ -836,7 +849,7 @@ contract VibeAMM is
     /**
      * @notice Check for donation attack (unexpected balance increase)
      */
-    function _checkDonationAttack(address token, uint256 expectedBalance) internal {
+    function _checkDonationAttack(address token) internal {
         uint256 actualBalance = IERC20(token).balanceOf(address(this));
         uint256 tracked = trackedBalances[token];
 

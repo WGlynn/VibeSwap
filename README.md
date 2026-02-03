@@ -481,6 +481,7 @@ forge coverage
 
 | Document | Description |
 |----------|-------------|
+| [Price Intelligence Oracle](docs/PRICE_INTELLIGENCE_ORACLE.md) | Manipulation detection, liquidation cascade identification, rubber band reversion, reputation-weighted signals |
 | [True Price Discovery](docs/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices, and Nash equilibrium analysis |
 | [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, reputation system, and game theory |
 | [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, on-chain accountability, and cryptoeconomic defense |

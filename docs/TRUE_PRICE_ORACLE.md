@@ -2,7 +2,7 @@
 
 ## A Quantitative Framework for Manipulation-Resistant Price Discovery
 
-**Version 1.0 | February 2026**
+**Version 2.0 | February 2026**
 
 ---
 
@@ -17,7 +17,11 @@ This paper presents a rigorous framework for computing a **True Price**—a late
 - **Statistically robust**: Formally modeled with quantified uncertainty
 - **Actionable**: Provides deviation signals for mean-reversion opportunities
 
-We employ a **state-space model** with Kalman filtering to estimate True Price as a hidden state, incorporating multi-venue price data, leverage metrics, on-chain fundamentals, and order-book quality signals. The framework outputs not just a price estimate, but confidence intervals and regime classifications that distinguish organic volatility from manipulation-driven distortions.
+We employ a **state-space model** with Kalman filtering to estimate True Price as a hidden state, incorporating multi-venue price data, leverage metrics, on-chain fundamentals, order-book quality signals, and **stablecoin flow dynamics**.
+
+A key innovation of this framework is the **asymmetric treatment of stablecoins**: USDT flows are modeled as leverage-enabling and volatility-amplifying, while USDC flows are modeled as capital-confirming and trend-validating. This distinction is critical for separating genuine price discovery from leverage-fueled manipulation.
+
+The framework outputs not just a price estimate, but confidence intervals and regime classifications that distinguish organic volatility from manipulation-driven distortions.
 
 ---
 
@@ -26,16 +30,17 @@ We employ a **state-space model** with Kalman filtering to estimate True Price a
 1. [Introduction: The Price Distortion Problem](#1-introduction-the-price-distortion-problem)
 2. [What True Price Is (And Is Not)](#2-what-true-price-is-and-is-not)
 3. [Model Inputs](#3-model-inputs)
-4. [The State-Space Model](#4-the-state-space-model)
-5. [Kalman Filter Implementation](#5-kalman-filter-implementation)
-6. [Leverage Stress and Trust Weighting](#6-leverage-stress-and-trust-weighting)
-7. [Deviation Bands and Regime Detection](#7-deviation-bands-and-regime-detection)
-8. [Liquidation Cascade Identification](#8-liquidation-cascade-identification)
-9. [Signal Generation Framework](#9-signal-generation-framework)
-10. [Bad Actor Neutralization](#10-bad-actor-neutralization)
-11. [Integration with VibeSwap](#11-integration-with-vibeswap)
-12. [Extensions and Future Work](#12-extensions-and-future-work)
-13. [Conclusion](#13-conclusion)
+4. [Stablecoin Flow Dynamics](#4-stablecoin-flow-dynamics)
+5. [The State-Space Model](#5-the-state-space-model)
+6. [Kalman Filter Implementation](#6-kalman-filter-implementation)
+7. [Leverage Stress and Trust Weighting](#7-leverage-stress-and-trust-weighting)
+8. [Deviation Bands and Regime Detection](#8-deviation-bands-and-regime-detection)
+9. [Liquidation Cascade Identification](#9-liquidation-cascade-identification)
+10. [Signal Generation Framework](#10-signal-generation-framework)
+11. [Bad Actor Neutralization](#11-bad-actor-neutralization)
+12. [Integration with VibeSwap](#12-integration-with-vibeswap)
+13. [Extensions and Future Work](#13-extensions-and-future-work)
+14. [Conclusion](#14-conclusion)
 
 ---
 
@@ -77,6 +82,13 @@ Latency arbitrage: faster execution extracts value
 Market-making privileges: see order flow before public
 ```
 
+**Stablecoin-Enabled Leverage**
+```
+USDT minted → Flows to derivatives exchanges → Enables margin positions
+Large USDT mints often precede volatility spikes
+The "capital" entering is not genuine investment—it's leverage fuel
+```
+
 ### 1.2 The Cost of Distorted Prices
 
 | Stakeholder | Impact |
@@ -106,12 +118,13 @@ Design a **True Price** that represents the latent equilibrium price absent forc
 Formally:
 
 ```
-P_true(t) = E[P_equilibrium(t) | I(t), L(t), O(t)]
+P_true(t) = E[P_equilibrium(t) | I(t), L(t), O(t), S(t)]
 
 Where:
   I(t) = Information set (prices, volumes, on-chain data)
   L(t) = Leverage state (open interest, funding, liquidations)
   O(t) = Order-book quality (persistence, depth, spoofing probability)
+  S(t) = Stablecoin flow state (USDT vs USDC dynamics)
 ```
 
 ### 2.2 What True Price Is NOT
@@ -138,6 +151,9 @@ True Price comes with uncertainty quantification. We report not just a point est
 
 **Mean-Reversion Anchor**
 When spot deviates significantly from True Price, there's statistical expectation of reversion. The deviation magnitude indicates reversion probability.
+
+**Stablecoin-Aware**
+True Price distinguishes between capital inflows (USDC-dominant) and leverage enablement (USDT-dominant), adjusting confidence accordingly.
 
 ---
 
@@ -172,6 +188,12 @@ When spot deviates significantly from True Price, there's statistical expectatio
 │  ├── Order persistence (how long orders stay)                   │
 │  ├── Depth imbalance (bid depth vs ask depth)                   │
 │  └── Spoofing probability score                                 │
+│                                                                  │
+│  Layer 5: STABLECOIN FLOWS (NEW)                                │
+│  ├── USDT mint/burn volume and destination                      │
+│  ├── USDC mint/burn volume and destination                      │
+│  ├── Stablecoin exchange flow classification                    │
+│  └── USDT/USDC flow ratio and regime signals                    │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -401,9 +423,371 @@ def spoofing_score(orderbook_history):
 
 ---
 
-## 4. The State-Space Model
+## 4. Stablecoin Flow Dynamics
 
-### 4.1 Model Structure
+### 4.1 Why Stablecoins Must Be Treated Asymmetrically
+
+**Critical Insight**: Not all stablecoin inflows represent genuine capital. The distinction between USDT and USDC flows is fundamental to understanding whether a price move reflects real demand or leverage-fueled manipulation.
+
+```
+USDT (Tether):
+├── Primary use: Derivatives margin, offshore trading
+├── Destination: Binance, Bybit, OKX (derivatives-heavy)
+├── Behavior: Enables leverage, amplifies volatility
+├── Model treatment: VOLATILITY AMPLIFIER
+└── Effect on True Price: Increases σ, reduces trust in spot
+
+USDC (Circle):
+├── Primary use: Spot trading, custody, DeFi
+├── Destination: Coinbase, regulated venues, on-chain
+├── Behavior: Represents genuine capital movement
+├── Model treatment: CAPITAL VALIDATOR
+└── Effect on True Price: Confirms slow drift direction
+```
+
+**Why Symmetric Treatment Is Wrong**
+
+```
+Treating all stablecoins equally:
+  $1B USDT mint = $1B "capital inflow"
+
+Reality:
+  $1B USDT mint → Flows to Binance → Enables $10-50B notional leverage
+  $1B USDC mint → Flows to Coinbase → $1B actual buying power
+
+The same "inflow" has 10-50x different impact on price dynamics.
+```
+
+### 4.2 Stablecoin Flow Classification
+
+We classify stablecoin activity into three categories:
+
+```python
+class StablecoinFlowClassifier:
+    """
+    Classify stablecoin flows by their market impact.
+    """
+
+    def classify_flow(self, mint_data, exchange_flow_data, leverage_data):
+        """
+        Classify a stablecoin flow event.
+
+        Categories:
+          1. INVENTORY_REBALANCING - Neutral, market-making activity
+          2. LEVERAGE_ENABLEMENT - Fuel for derivatives positions
+          3. GENUINE_CAPITAL - Real investment inflow
+
+        Returns:
+          classification: Category label
+          confidence: [0, 1]
+          market_impact: Expected impact on price dynamics
+        """
+        features = self.extract_features(mint_data, exchange_flow_data, leverage_data)
+        return self.model.predict(features)
+
+    def extract_features(self, mint_data, exchange_flow_data, leverage_data):
+        """
+        Extract classification features.
+        """
+        return {
+            # Mint characteristics
+            'mint_size': mint_data.amount,
+            'mint_frequency': mint_data.frequency_24h,
+            'stablecoin_type': mint_data.token,  # USDT vs USDC
+
+            # Destination characteristics
+            'dest_derivatives_ratio': exchange_flow_data.derivatives_venue_ratio,
+            'dest_spot_ratio': exchange_flow_data.spot_venue_ratio,
+            'dest_defi_ratio': exchange_flow_data.defi_ratio,
+
+            # Leverage context
+            'oi_change_concurrent': leverage_data.oi_change_1h,
+            'funding_rate_current': leverage_data.funding_rate,
+            'funding_acceleration': leverage_data.funding_rate_change,
+
+            # Timing
+            'time_to_oi_increase': leverage_data.lag_to_oi_increase,
+            'time_to_price_move': leverage_data.lag_to_price_move,
+        }
+```
+
+### 4.3 Classification Logic
+
+**Category 1: Inventory Rebalancing**
+```
+Indicators:
+├── Small to medium mint size (< $100M)
+├── Flow to multiple venues proportionally
+├── No significant OI change following
+├── No funding rate acceleration
+├── Balanced time distribution
+
+Interpretation:
+  Market makers adjusting inventory
+  Neutral for True Price
+
+Model Treatment:
+  Weight: 0 (ignore for True Price calculation)
+```
+
+**Category 2: Leverage Enablement**
+```
+Indicators:
+├── Large mint size (> $100M) OR high frequency
+├── Flow concentrated to derivatives venues
+├── OI increases within 1-4 hours
+├── Funding rate accelerates in one direction
+├── Often USDT, rarely USDC
+
+Interpretation:
+  Fuel for leveraged positions
+  Will amplify volatility
+  Price moves NOT representative of genuine demand
+
+Model Treatment:
+  USDT: Increase observation noise σ by 50-200%
+  USDC: Rare, but if occurs, still increase σ by 25%
+```
+
+**Category 3: Genuine Capital**
+```
+Indicators:
+├── Gradual mint over days/weeks
+├── Flow to spot-heavy venues or custody
+├── No corresponding OI increase
+├── Stable or decreasing funding rates
+├── Often USDC, sometimes USDT
+
+Interpretation:
+  Real capital entering the market
+  Supports slow True Price drift
+
+Model Treatment:
+  USDC: Increase confidence in True Price drift direction
+  USDT: Partial weight (0.3x) due to uncertainty
+```
+
+### 4.4 USDT-Specific Modeling
+
+```python
+class USDTFlowModel:
+    """
+    Model USDT flows as leverage-enabling and volatility-amplifying.
+    """
+
+    def compute_usdt_impact(self, usdt_flow_data, leverage_state):
+        """
+        Compute impact of USDT flows on True Price model.
+
+        USDT flows:
+          - Do NOT directly influence True Price level
+          - DO increase expected volatility (σ)
+          - DO reduce trust in spot price inputs
+          - DO raise manipulation probability
+
+        Returns:
+          volatility_multiplier: Factor to multiply σ
+          trust_reduction: Factor to reduce spot price weight
+          manipulation_prob_adjustment: Addition to manipulation probability
+        """
+        # Base metrics
+        mint_volume_24h = usdt_flow_data.mint_volume_24h
+        flow_to_derivatives = usdt_flow_data.derivatives_exchange_flow
+        oi_correlation = self.compute_oi_correlation(usdt_flow_data, leverage_state)
+
+        # Volatility amplification
+        # Large USDT flows to derivatives venues = expect volatility
+        vol_multiplier = 1.0 + (
+            0.5 * normalize(mint_volume_24h, typical_mint) +
+            0.3 * flow_to_derivatives / (flow_to_derivatives + usdt_flow_data.spot_flow + 1) +
+            0.2 * max(0, oi_correlation)
+        )
+        vol_multiplier = min(3.0, vol_multiplier)  # Cap at 3x
+
+        # Trust reduction in spot prices
+        # When USDT enables leverage, spot prices reflect leverage, not value
+        trust_reduction = 0.5 * (vol_multiplier - 1.0)  # 0 to 1
+
+        # Manipulation probability adjustment
+        # Large concentrated flows = higher manipulation probability
+        manip_adjustment = 0.2 * normalize(flow_to_derivatives, typical_flow)
+
+        return USDTImpact(
+            volatility_multiplier=vol_multiplier,
+            trust_reduction=trust_reduction,
+            manipulation_prob_adjustment=manip_adjustment
+        )
+
+    def compute_oi_correlation(self, usdt_flow_data, leverage_state):
+        """
+        Compute correlation between USDT flows and OI changes.
+
+        High correlation = USDT is enabling leverage
+        Low correlation = USDT may be for spot or custody
+        """
+        usdt_flows = usdt_flow_data.hourly_flows[-24:]
+        oi_changes = leverage_state.hourly_oi_changes[-24:]
+
+        # Lag correlation (USDT typically precedes OI by 1-4 hours)
+        max_corr = 0
+        for lag in range(1, 5):
+            corr = np.corrcoef(usdt_flows[:-lag], oi_changes[lag:])[0, 1]
+            max_corr = max(max_corr, corr)
+
+        return max_corr
+```
+
+### 4.5 USDC-Specific Modeling
+
+```python
+class USDCFlowModel:
+    """
+    Model USDC flows as capital-confirming and trend-validating.
+    """
+
+    def compute_usdc_impact(self, usdc_flow_data, price_trend):
+        """
+        Compute impact of USDC flows on True Price model.
+
+        USDC flows:
+          - Marginally increase confidence in slow True Price drift
+          - Help distinguish trend from manipulation
+          - Do NOT directly move True Price
+
+        Returns:
+          drift_confidence_adjustment: Factor to adjust drift confidence
+          regime_signal: Trend vs manipulation signal
+        """
+        # Metrics
+        mint_volume_7d = usdc_flow_data.mint_volume_7d
+        flow_to_spot = usdc_flow_data.spot_exchange_flow
+        flow_to_custody = usdc_flow_data.custody_flow
+        flow_to_defi = usdc_flow_data.defi_flow
+
+        # Capital confirmation score
+        # USDC to spot/custody = genuine capital
+        capital_score = (
+            0.5 * normalize(flow_to_spot, typical_spot_flow) +
+            0.3 * normalize(flow_to_custody, typical_custody_flow) +
+            0.2 * normalize(flow_to_defi, typical_defi_flow)
+        )
+
+        # Drift confidence adjustment
+        # If USDC flows align with price direction, increase confidence
+        if price_trend.direction == 'up' and mint_volume_7d > typical_mint:
+            drift_confidence_adj = 0.1 * capital_score  # Up to +10%
+        elif price_trend.direction == 'down' and usdc_flow_data.burn_volume_7d > typical_burn:
+            drift_confidence_adj = 0.1 * capital_score  # Confirms downtrend
+        else:
+            drift_confidence_adj = 0  # Neutral
+
+        # Regime signal
+        # Strong USDC flows = more likely genuine trend
+        regime_signal = self.compute_regime_signal(usdc_flow_data, price_trend)
+
+        return USDCImpact(
+            drift_confidence_adjustment=drift_confidence_adj,
+            regime_signal=regime_signal
+        )
+
+    def compute_regime_signal(self, usdc_flow_data, price_trend):
+        """
+        Compute whether current price action is trend or manipulation.
+
+        USDC-dominant = more likely trend
+        USDT-dominant = more likely manipulation
+        """
+        usdc_flow = usdc_flow_data.total_flow_7d
+        usdt_flow = usdc_flow_data.usdt_comparison_flow_7d
+
+        usdc_ratio = usdc_flow / (usdc_flow + usdt_flow + 1e-10)
+
+        if usdc_ratio > 0.6:
+            return RegimeSignal('TREND', confidence=usdc_ratio)
+        elif usdc_ratio < 0.3:
+            return RegimeSignal('MANIPULATION', confidence=1 - usdc_ratio)
+        else:
+            return RegimeSignal('UNCERTAIN', confidence=0.5)
+```
+
+### 4.6 Stablecoin Flow Ratio
+
+```python
+def compute_stablecoin_flow_ratio(usdt_flow, usdc_flow, window='7d'):
+    """
+    Compute the USDT/USDC flow ratio as a regime indicator.
+
+    Ratio interpretation:
+      > 3.0: USDT-dominant, high leverage risk, manipulation likely
+      1.0-3.0: Mixed, moderate leverage
+      < 1.0: USDC-dominant, genuine capital, trend likely
+
+    Returns:
+      ratio: USDT flow / USDC flow
+      regime_probability: P(manipulation) based on ratio
+    """
+    usdt_total = usdt_flow.sum(window)
+    usdc_total = usdc_flow.sum(window)
+
+    ratio = usdt_total / (usdc_total + 1e-10)
+
+    # Manipulation probability as function of ratio
+    # Logistic function centered at ratio = 2
+    regime_probability = 1 / (1 + np.exp(-1.5 * (ratio - 2)))
+
+    return StablecoinRatio(
+        ratio=ratio,
+        usdt_dominant=(ratio > 2),
+        usdc_dominant=(ratio < 0.5),
+        manipulation_probability=regime_probability
+    )
+```
+
+### 4.7 Integration with True Price Model
+
+```python
+def incorporate_stablecoin_dynamics(kalman_filter, stablecoin_state):
+    """
+    Adjust Kalman filter parameters based on stablecoin flows.
+    """
+    usdt_impact = stablecoin_state.usdt_impact
+    usdc_impact = stablecoin_state.usdc_impact
+
+    # 1. Adjust observation noise (R matrix)
+    # USDT flows increase observation noise (less trust in spot)
+    observation_noise_mult = usdt_impact.volatility_multiplier
+
+    # 2. Adjust process noise (Q matrix)
+    # USDC-confirmed trends allow slightly faster True Price drift
+    if usdc_impact.regime_signal.label == 'TREND':
+        process_noise_mult = 1.0 + 0.2 * usdc_impact.drift_confidence_adjustment
+    else:
+        process_noise_mult = 1.0
+
+    # 3. Adjust venue weights
+    # During USDT-dominant periods, reduce weight on derivatives-heavy venues
+    if stablecoin_state.flow_ratio.usdt_dominant:
+        venue_weight_adjustments = {
+            'binance': 0.5,  # Reduce weight
+            'bybit': 0.5,
+            'coinbase': 1.2,  # Increase weight
+            'kraken': 1.2,
+        }
+    else:
+        venue_weight_adjustments = {}  # No adjustment
+
+    return KalmanAdjustments(
+        observation_noise_mult=observation_noise_mult,
+        process_noise_mult=process_noise_mult,
+        venue_weight_adjustments=venue_weight_adjustments
+    )
+```
+
+---
+
+## 5. The State-Space Model
+
+### 5.1 Model Structure
 
 We model True Price as a **hidden state** that generates observable prices through a noisy observation process:
 
@@ -416,14 +800,15 @@ State Equation (True Price Evolution):
     η(t) ~ N(0, Q(t)) = process noise (organic volatility)
 
 Observation Equation (Spot Price Generation):
-  P_spot(t) = P_true(t) + leverage_distortion(t) + ε(t)
+  P_spot(t) = P_true(t) + leverage_distortion(t) + stablecoin_distortion(t) + ε(t)
 
   Where:
     leverage_distortion(t) = f(OI, funding, liquidations)
+    stablecoin_distortion(t) = f(USDT_flow, USDC_flow)
     ε(t) ~ N(0, R(t)) = observation noise
 ```
 
-### 4.2 Formal Specification
+### 5.2 Formal Specification
 
 **State Vector**
 
@@ -436,10 +821,12 @@ x(t) = F × x(t-1) + w(t)
 F = [1  1]    (True Price inherits drift)
     [0  ρ]    (Drift is mean-reverting with persistence ρ)
 
-w(t) ~ N(0, Q)
+w(t) ~ N(0, Q(t))
 
-Q = [σ²_price    0        ]
-    [0           σ²_drift  ]
+Q(t) = [σ²_price(t)    0           ]
+       [0              σ²_drift(t)  ]
+
+Note: Q is now TIME-VARYING based on USDC confirmation
 ```
 
 **Observation Vector**
@@ -459,20 +846,26 @@ H = [1  0]    (Each venue observes True Price + noise)
 v(t) ~ N(0, R(t))
 
 R(t) = diag(σ²_1(t), σ²_2(t), ..., σ²_N(t), σ²_realized)
+
+Note: R is TIME-VARYING based on leverage stress AND USDT flows
 ```
 
-### 4.3 Time-Varying Noise Covariance
+### 5.3 Time-Varying Noise Covariance
 
-The key innovation: **observation noise variance increases with leverage stress**.
+The key innovation: **observation noise variance increases with leverage stress AND USDT activity**.
 
 ```python
-def compute_observation_variance(venue, leverage_state, orderbook_quality):
+def compute_observation_variance(venue, leverage_state, orderbook_quality, stablecoin_state):
     """
     Observation variance is NOT constant.
     It increases when:
       - Leverage is high (price driven by forced flows)
       - Orderbook quality is low (spoofing detected)
       - Liquidation cascade in progress
+      - USDT flows are elevated (leverage enablement)
+
+    It may decrease when:
+      - USDC flows confirm the trend (genuine capital)
     """
     base_variance = venue.historical_variance
 
@@ -488,19 +881,29 @@ def compute_observation_variance(venue, leverage_state, orderbook_quality):
     else:
         cascade_mult = 1
 
-    return base_variance * leverage_mult * quality_mult * cascade_mult
+    # USDT multiplier (NEW)
+    usdt_mult = stablecoin_state.usdt_impact.volatility_multiplier  # 1.0 to 3.0
+
+    # USDC adjustment (NEW)
+    # If USDC confirms trend, slightly reduce variance
+    if stablecoin_state.usdc_impact.regime_signal.label == 'TREND':
+        usdc_adj = 0.9  # 10% reduction
+    else:
+        usdc_adj = 1.0
+
+    return base_variance * leverage_mult * quality_mult * cascade_mult * usdt_mult * usdc_adj
 ```
 
 ---
 
-## 5. Kalman Filter Implementation
+## 6. Kalman Filter Implementation
 
-### 5.1 The Kalman Filter Algorithm
+### 6.1 The Kalman Filter Algorithm
 
 ```python
 class TruePriceKalmanFilter:
     """
-    Kalman filter for True Price estimation.
+    Kalman filter for True Price estimation with stablecoin dynamics.
 
     State: [P_true, drift]
     Observations: [venue_prices..., realized_price]
@@ -516,8 +919,8 @@ class TruePriceKalmanFilter:
             [0, config.initial_drift_var]
         ])
 
-        # Process noise covariance
-        self.Q = np.array([
+        # Process noise covariance (base, adjusted dynamically)
+        self.Q_base = np.array([
             [config.process_noise_price, 0],
             [0, config.process_noise_drift]
         ])
@@ -528,21 +931,23 @@ class TruePriceKalmanFilter:
             [0, config.drift_persistence]  # ρ ≈ 0.99
         ])
 
-        # Observation matrix (updated dynamically based on available venues)
-        self.H = None
-
-        # Observation noise covariance (updated dynamically)
-        self.R = None
-
-    def predict(self):
+    def predict(self, stablecoin_state):
         """
         Prediction step: propagate state forward.
+        Adjust process noise based on stablecoin dynamics.
         """
+        # Adjust Q based on USDC confirmation
+        usdc_adj = 1.0
+        if stablecoin_state.usdc_impact.regime_signal.label == 'TREND':
+            usdc_adj = 1.0 + 0.2 * stablecoin_state.usdc_impact.drift_confidence_adjustment
+
+        Q = self.Q_base * usdc_adj
+
         # State prediction
         self.x_pred = self.F @ self.x
 
         # Covariance prediction
-        self.P_pred = self.F @ self.P @ self.F.T + self.Q
+        self.P_pred = self.F @ self.P @ self.F.T + Q
 
         return self.x_pred[0]  # Return predicted True Price
 
@@ -557,28 +962,28 @@ class TruePriceKalmanFilter:
         n_obs = len(observations)
 
         # Build observation matrix
-        self.H = np.zeros((n_obs, 2))
-        self.H[:, 0] = 1  # All observations measure True Price
+        H = np.zeros((n_obs, 2))
+        H[:, 0] = 1  # All observations measure True Price
 
         # Build observation noise covariance (DIAGONAL, time-varying)
-        self.R = np.diag(observation_variances)
+        R = np.diag(observation_variances)
 
         # Innovation (measurement residual)
-        y_pred = self.H @ self.x_pred
+        y_pred = H @ self.x_pred
         innovation = observations - y_pred
 
         # Innovation covariance
-        S = self.H @ self.P_pred @ self.H.T + self.R
+        S = H @ self.P_pred @ H.T + R
 
         # Kalman gain
-        K = self.P_pred @ self.H.T @ np.linalg.inv(S)
+        K = self.P_pred @ H.T @ np.linalg.inv(S)
 
         # State update
         self.x = self.x_pred + K @ innovation
 
         # Covariance update
         I = np.eye(2)
-        self.P = (I - K @ self.H) @ self.P_pred
+        self.P = (I - K @ H) @ self.P_pred
 
         return self.x[0], np.sqrt(self.P[0, 0])  # True Price estimate and std dev
 
@@ -592,26 +997,28 @@ class TruePriceKalmanFilter:
         return (self.x[0] - z * std, self.x[0] + z * std)
 ```
 
-### 5.2 Full Update Cycle
+### 6.2 Full Update Cycle
 
 ```python
-def update_true_price(kf, market_data, leverage_state, orderbook_quality):
+def update_true_price(kf, market_data, leverage_state, orderbook_quality, stablecoin_state):
     """
-    Complete True Price update cycle.
+    Complete True Price update cycle with stablecoin dynamics.
 
     Args:
         kf: TruePriceKalmanFilter instance
         market_data: Current venue prices, realized price
         leverage_state: Current leverage metrics
         orderbook_quality: Current orderbook quality scores
+        stablecoin_state: Current USDT/USDC flow state
 
     Returns:
         true_price: Point estimate
         confidence_interval: (lower, upper)
         deviation_zscore: How far spot is from True Price in std devs
+        regime: Current regime classification
     """
-    # 1. Prediction step
-    predicted_price = kf.predict()
+    # 1. Prediction step (with stablecoin adjustment)
+    predicted_price = kf.predict(stablecoin_state)
 
     # 2. Compute time-varying observation variances
     obs_variances = []
@@ -619,7 +1026,8 @@ def update_true_price(kf, market_data, leverage_state, orderbook_quality):
         var = compute_observation_variance(
             venue,
             leverage_state,
-            orderbook_quality[venue.name]
+            orderbook_quality[venue.name],
+            stablecoin_state
         )
         obs_variances.append(var)
 
@@ -641,25 +1049,34 @@ def update_true_price(kf, market_data, leverage_state, orderbook_quality):
     median_spot = np.median([v.price for v in market_data.venues])
     deviation_zscore = (median_spot - true_price) / true_price_std
 
+    # 7. Classify regime (incorporating stablecoin signals)
+    regime = classify_regime(
+        deviation_zscore,
+        leverage_state,
+        stablecoin_state
+    )
+
     return TruePriceEstimate(
         price=true_price,
         std=true_price_std,
         confidence_interval=ci,
         deviation_zscore=deviation_zscore,
-        spot_median=median_spot
+        spot_median=median_spot,
+        regime=regime
     )
 ```
 
 ---
 
-## 6. Leverage Stress and Trust Weighting
+## 7. Leverage Stress and Trust Weighting
 
-### 6.1 Leverage Stress Score
+### 7.1 Leverage Stress Score
 
 ```python
-def compute_leverage_stress(oi_data, funding_data, liquidation_data):
+def compute_leverage_stress(oi_data, funding_data, liquidation_data, stablecoin_state):
     """
     Compute composite leverage stress score [0, 1].
+    Now incorporates stablecoin flow signals.
 
     High stress = spot prices less reliable for True Price estimation.
     """
@@ -676,16 +1093,19 @@ def compute_leverage_stress(oi_data, funding_data, liquidation_data):
     liq_stress = min(1, liq_intensity / 5)  # Saturate at 5x typical
 
     # Component 4: Funding-price divergence
-    # If funding is positive but price is falling, forced liquidations likely
-    divergence = funding_data.rate * (-price_return_1h)  # Positive if diverging
+    divergence = funding_data.rate * (-price_return_1h)
     divergence_stress = max(0, min(1, divergence * 10))
+
+    # Component 5: USDT flow stress (NEW)
+    usdt_stress = min(1, (stablecoin_state.usdt_impact.volatility_multiplier - 1) / 2)
 
     # Weighted combination
     stress = (
-        0.25 * oi_stress +
-        0.25 * funding_stress +
-        0.35 * liq_stress +
-        0.15 * divergence_stress
+        0.20 * oi_stress +
+        0.20 * funding_stress +
+        0.25 * liq_stress +
+        0.10 * divergence_stress +
+        0.25 * usdt_stress  # NEW: USDT is significant factor
     )
 
     return LeverageStress(
@@ -693,20 +1113,21 @@ def compute_leverage_stress(oi_data, funding_data, liquidation_data):
         oi_component=oi_stress,
         funding_component=funding_stress,
         liquidation_component=liq_stress,
-        divergence_component=divergence_stress
+        divergence_component=divergence_stress,
+        usdt_component=usdt_stress
     )
 ```
 
-### 6.2 Trust Weighting by Venue
+### 7.2 Trust Weighting by Venue
 
-When leverage stress is high, we trust certain venues more than others:
+When leverage stress is high OR USDT flows are elevated, we trust certain venues more than others:
 
 ```python
-def compute_venue_trust_weights(venues, leverage_stress, orderbook_quality):
+def compute_venue_trust_weights(venues, leverage_stress, orderbook_quality, stablecoin_state):
     """
     Compute trust weights for each venue based on current conditions.
 
-    During high leverage stress:
+    During high leverage stress OR USDT-dominant periods:
       - Reduce weight on derivatives-heavy venues (Binance, Bybit)
       - Increase weight on spot-only venues (Coinbase)
       - Increase weight on decentralized venues (Uniswap)
@@ -714,17 +1135,24 @@ def compute_venue_trust_weights(venues, leverage_stress, orderbook_quality):
     """
     weights = {}
 
+    # Is this a USDT-dominant period?
+    usdt_dominant = stablecoin_state.flow_ratio.usdt_dominant
+
     for venue in venues:
         base_weight = venue.base_reliability
 
         # Derivatives exposure penalty
         if venue.has_derivatives:
             derivatives_penalty = venue.derivatives_ratio * leverage_stress.score
-            base_weight *= (1 - derivatives_penalty * 0.5)  # Up to 50% reduction
+            base_weight *= (1 - derivatives_penalty * 0.5)
+
+            # Additional penalty during USDT-dominant periods
+            if usdt_dominant:
+                base_weight *= 0.7  # Extra 30% reduction
 
         # Orderbook quality adjustment
         quality = orderbook_quality[venue.name]
-        quality_mult = 0.5 + 0.5 * quality.persistence_score  # 0.5x to 1.0x
+        quality_mult = 0.5 + 0.5 * quality.persistence_score
         base_weight *= quality_mult
 
         # Spoofing penalty
@@ -733,13 +1161,17 @@ def compute_venue_trust_weights(venues, leverage_stress, orderbook_quality):
 
         # Decentralization bonus during stress
         if venue.is_decentralized and leverage_stress.score > 0.5:
-            base_weight *= 1.2  # 20% bonus for decentralized during stress
+            base_weight *= 1.2
 
-        # VibeSwap special case: manipulation-resistant by design
+        # USDC-heavy venue bonus during USDC-dominant periods (NEW)
+        if stablecoin_state.flow_ratio.usdc_dominant and venue.usdc_primary:
+            base_weight *= 1.3  # 30% bonus
+
+        # VibeSwap special case
         if venue.name == 'VibeSwap':
             base_weight = 1.0  # Always maximum weight
 
-        weights[venue.name] = max(0.1, base_weight)  # Floor at 0.1
+        weights[venue.name] = max(0.1, base_weight)
 
     # Normalize
     total = sum(weights.values())
@@ -748,48 +1180,44 @@ def compute_venue_trust_weights(venues, leverage_stress, orderbook_quality):
     return weights
 ```
 
-### 6.3 Cascade Detection
+### 7.3 Cascade Detection with Stablecoin Context
 
 ```python
-def detect_liquidation_cascade(leverage_state, price_data, threshold=0.7):
+def detect_liquidation_cascade(leverage_state, price_data, stablecoin_state, threshold=0.7):
     """
     Detect if a liquidation cascade is in progress.
+    Stablecoin context helps distinguish cascade from genuine selling.
 
     Cascade indicators:
       1. Open interest dropping rapidly (> 5% in 5 minutes)
       2. Liquidation volume spiking (> 5x typical)
       3. Price moving faster than spot volume justifies
       4. Funding rate and price moving in same direction
+      5. USDT-dominant conditions (leverage-enabled) - NEW
 
     Returns:
         is_cascade: Boolean
         cascade_confidence: [0, 1]
         cascade_direction: 'long_squeeze' or 'short_squeeze'
     """
-    # Indicator 1: OI drop
-    oi_change_5m = (leverage_state.oi_current - leverage_state.oi_5m_ago) / leverage_state.oi_5m_ago
-    oi_drop_signal = min(1, abs(oi_change_5m) / 0.05)  # Saturate at 5%
+    # Existing indicators...
+    oi_drop_signal = min(1, abs(leverage_state.oi_change_5m) / 0.05)
+    liq_spike_signal = min(1, leverage_state.liq_ratio / 5)
+    divergence_signal = min(1, (leverage_state.divergence_ratio - 1) / 4)
+    alignment_signal = max(0, leverage_state.funding_price_alignment * 100)
 
-    # Indicator 2: Liquidation spike
-    liq_ratio = leverage_state.liquidation_volume_5m / leverage_state.typical_liq_5m
-    liq_spike_signal = min(1, liq_ratio / 5)  # Saturate at 5x
-
-    # Indicator 3: Price/volume divergence
-    price_change = abs(price_data.return_5m)
-    expected_price_change = price_data.volume_5m / price_data.typical_volume * price_data.typical_return
-    divergence_ratio = price_change / (expected_price_change + 1e-10)
-    divergence_signal = min(1, (divergence_ratio - 1) / 4)  # Signal if > 1, saturate at 5x
-
-    # Indicator 4: Funding alignment
-    funding_price_alignment = leverage_state.funding_rate * price_data.return_5m
-    alignment_signal = max(0, funding_price_alignment * 100)  # Positive = cascading
+    # NEW: Stablecoin context
+    # If USDT-dominant, more likely to be cascade
+    # If USDC-dominant, more likely to be genuine move
+    stablecoin_signal = stablecoin_state.flow_ratio.manipulation_probability
 
     # Combine
     cascade_confidence = (
-        0.3 * oi_drop_signal +
-        0.4 * liq_spike_signal +
-        0.2 * divergence_signal +
-        0.1 * alignment_signal
+        0.25 * oi_drop_signal +
+        0.30 * liq_spike_signal +
+        0.15 * divergence_signal +
+        0.10 * alignment_signal +
+        0.20 * stablecoin_signal  # NEW
     )
 
     is_cascade = cascade_confidence > threshold
@@ -806,20 +1234,21 @@ def detect_liquidation_cascade(leverage_state, price_data, threshold=0.7):
     return CascadeDetection(
         is_cascade=is_cascade,
         confidence=cascade_confidence,
-        direction=direction
+        direction=direction,
+        stablecoin_context=stablecoin_state.flow_ratio
     )
 ```
 
 ---
 
-## 7. Deviation Bands and Regime Detection
+## 8. Deviation Bands and Regime Detection
 
-### 7.1 Dynamic Standard Deviation Bands
+### 8.1 Dynamic Standard Deviation Bands
 
-Standard deviation bands around True Price expand and contract based on regime:
+Standard deviation bands around True Price expand and contract based on regime AND stablecoin dynamics:
 
 ```python
-def compute_deviation_bands(true_price, true_price_std, regime):
+def compute_deviation_bands(true_price, true_price_std, regime, stablecoin_state):
     """
     Compute dynamic standard deviation bands.
 
@@ -827,10 +1256,12 @@ def compute_deviation_bands(true_price, true_price_std, regime):
       - High leverage regimes
       - Liquidation cascades
       - Low orderbook quality periods
+      - USDT-dominant periods (NEW)
 
     Bands tighten during:
       - Low leverage, stable markets
       - High orderbook quality
+      - USDC-dominant periods (NEW)
     """
     # Base multipliers for bands
     base_multipliers = {
@@ -842,17 +1273,29 @@ def compute_deviation_bands(true_price, true_price_std, regime):
 
     # Regime adjustment
     if regime == 'cascade':
-        regime_mult = 2.0  # Bands 2x wider during cascades
+        regime_mult = 2.0
     elif regime == 'high_leverage':
         regime_mult = 1.5
+    elif regime == 'manipulation':
+        regime_mult = 1.75
     elif regime == 'normal':
         regime_mult = 1.0
-    else:  # 'low_volatility'
+    else:  # 'low_volatility' or 'trend'
         regime_mult = 0.8
+
+    # Stablecoin adjustment (NEW)
+    if stablecoin_state.flow_ratio.usdt_dominant:
+        stablecoin_mult = 1.3  # Widen bands by 30%
+    elif stablecoin_state.flow_ratio.usdc_dominant:
+        stablecoin_mult = 0.85  # Tighten bands by 15%
+    else:
+        stablecoin_mult = 1.0
+
+    combined_mult = regime_mult * stablecoin_mult
 
     bands = {}
     for name, mult in base_multipliers.items():
-        adjusted_mult = mult * regime_mult
+        adjusted_mult = mult * combined_mult
         bands[name] = {
             'upper': true_price + adjusted_mult * true_price_std,
             'lower': true_price - adjusted_mult * true_price_std
@@ -861,28 +1304,26 @@ def compute_deviation_bands(true_price, true_price_std, regime):
     return bands
 ```
 
-### 7.2 Regime Classification
+### 8.2 Regime Classification with Stablecoin Signals
 
 ```python
 class RegimeClassifier:
     """
-    Classify current market regime.
+    Classify current market regime using stablecoin flow signals.
 
     Regimes:
+      - 'trend': USDC-dominant, genuine price discovery
       - 'low_volatility': Stable, low leverage, tight bands
       - 'normal': Typical conditions
       - 'high_leverage': Elevated leverage but no cascade
+      - 'manipulation': USDT-dominant, leverage-driven
       - 'cascade': Active liquidation cascade
-      - 'manipulation': Detected spoofing or wash trading
     """
 
-    def __init__(self):
-        self.regime_history = []
-        self.transition_matrix = None
-
-    def classify(self, leverage_stress, cascade_detection, orderbook_quality, volatility_regime):
+    def classify(self, leverage_stress, cascade_detection, orderbook_quality,
+                 volatility_regime, stablecoin_state):
         """
-        Classify current regime based on multiple inputs.
+        Classify current regime incorporating stablecoin signals.
         """
         # Priority-based classification
 
@@ -890,20 +1331,26 @@ class RegimeClassifier:
         if cascade_detection.is_cascade:
             return Regime('cascade', confidence=cascade_detection.confidence)
 
-        # 2. Check for manipulation
-        avg_spoof_prob = np.mean([q.spoofing_probability for q in orderbook_quality.values()])
-        if avg_spoof_prob > 0.7:
-            return Regime('manipulation', confidence=avg_spoof_prob)
+        # 2. Check stablecoin-based manipulation signal (NEW)
+        if stablecoin_state.flow_ratio.manipulation_probability > 0.7:
+            return Regime('manipulation',
+                         confidence=stablecoin_state.flow_ratio.manipulation_probability)
 
-        # 3. Check leverage level
+        # 3. Check for USDC-confirmed trend (NEW)
+        if (stablecoin_state.usdc_impact.regime_signal.label == 'TREND' and
+            stablecoin_state.flow_ratio.usdc_dominant):
+            return Regime('trend',
+                         confidence=stablecoin_state.usdc_impact.regime_signal.confidence)
+
+        # 4. Check leverage level
         if leverage_stress.score > 0.7:
             return Regime('high_leverage', confidence=leverage_stress.score)
 
-        # 4. Check volatility
-        if volatility_regime.annualized < 0.2:  # < 20% annualized
+        # 5. Check volatility
+        if volatility_regime.annualized < 0.2:
             return Regime('low_volatility', confidence=1 - volatility_regime.annualized / 0.2)
 
-        # 5. Default to normal
+        # 6. Default to normal
         return Regime('normal', confidence=0.8)
 
     def get_regime_dependent_parameters(self, regime):
@@ -911,6 +1358,12 @@ class RegimeClassifier:
         Return regime-specific model parameters.
         """
         params = {
+            'trend': {  # NEW regime
+                'process_noise_mult': 1.2,  # Allow True Price to drift
+                'observation_noise_mult': 0.8,  # Trust observations more
+                'band_mult': 0.85,
+                'reversion_speed': 'slow'  # Don't expect reversion in trends
+            },
             'low_volatility': {
                 'process_noise_mult': 0.5,
                 'observation_noise_mult': 0.8,
@@ -929,101 +1382,112 @@ class RegimeClassifier:
                 'band_mult': 1.5,
                 'reversion_speed': 'normal'
             },
-            'cascade': {
-                'process_noise_mult': 0.5,  # True Price shouldn't move fast
-                'observation_noise_mult': 5.0,  # Don't trust spot at all
-                'band_mult': 2.0,
-                'reversion_speed': 'fast'  # Expect quick reversion
-            },
-            'manipulation': {
+            'manipulation': {  # USDT-dominant
                 'process_noise_mult': 0.3,  # True Price very stable
-                'observation_noise_mult': 10.0,  # Heavily discount observations
+                'observation_noise_mult': 3.0,  # Don't trust spot
                 'band_mult': 1.5,
+                'reversion_speed': 'fast'  # Expect reversion
+            },
+            'cascade': {
+                'process_noise_mult': 0.5,
+                'observation_noise_mult': 5.0,
+                'band_mult': 2.0,
                 'reversion_speed': 'fast'
             }
         }
         return params.get(regime.name, params['normal'])
 ```
 
-### 7.3 Deviation Magnitude and Manipulation Probability
+### 8.3 Manipulation Probability with Stablecoin Context
 
 ```python
-def compute_manipulation_probability(deviation_zscore, regime, leverage_stress):
+def compute_manipulation_probability(deviation_zscore, regime, leverage_stress, stablecoin_state):
     """
     Estimate probability that current price deviation is manipulation-driven.
+
+    Stablecoin context is critical:
+      - Same deviation with USDT-dominant flows = high manipulation probability
+      - Same deviation with USDC-dominant flows = lower manipulation probability
 
     Higher probability when:
       - Deviation is large (> 2 sigma)
       - Regime indicates stress
       - Leverage is elevated
       - Move happened quickly
+      - USDT flows are elevated (NEW)
     """
     # Base probability from z-score
-    # Using logistic function: P = 1 / (1 + exp(-k*(|z| - z0)))
-    z0 = 2.0  # Inflection point at 2 sigma
-    k = 2.0   # Steepness
+    z0 = 2.0
+    k = 2.0
     base_prob = 1 / (1 + np.exp(-k * (abs(deviation_zscore) - z0)))
 
     # Regime adjustment
     regime_multipliers = {
-        'cascade': 1.5,        # Very likely manipulation during cascade
-        'manipulation': 1.8,   # Already detected manipulation
+        'cascade': 1.5,
+        'manipulation': 1.8,
         'high_leverage': 1.3,
         'normal': 1.0,
-        'low_volatility': 0.7  # Less likely during quiet periods
+        'low_volatility': 0.7,
+        'trend': 0.5  # NEW: trends are less likely manipulation
     }
     regime_mult = regime_multipliers.get(regime.name, 1.0)
 
     # Leverage stress adjustment
-    stress_mult = 1 + leverage_stress.score * 0.5  # Up to 1.5x
+    stress_mult = 1 + leverage_stress.score * 0.5
+
+    # Stablecoin adjustment (NEW - key innovation)
+    stablecoin_mult = 1.0
+    if stablecoin_state.flow_ratio.usdt_dominant:
+        # USDT-dominant: much more likely manipulation
+        stablecoin_mult = 1.5
+    elif stablecoin_state.flow_ratio.usdc_dominant:
+        # USDC-dominant: less likely manipulation
+        stablecoin_mult = 0.6
 
     # Final probability (capped at 0.95)
-    manipulation_prob = min(0.95, base_prob * regime_mult * stress_mult)
+    manipulation_prob = min(0.95, base_prob * regime_mult * stress_mult * stablecoin_mult)
 
     return manipulation_prob
 ```
 
 ---
 
-## 8. Liquidation Cascade Identification
+## 9. Liquidation Cascade Identification
 
-### 8.1 Pre-Cascade Indicators
+### 9.1 Pre-Cascade Indicators
 
 ```python
-def compute_precascade_risk(leverage_state, price_data, orderbook):
+def compute_precascade_risk(leverage_state, price_data, orderbook, stablecoin_state):
     """
     Compute probability that a liquidation cascade is imminent.
+    Incorporates stablecoin context for better prediction.
 
     Warning signs:
       1. Price approaching major liquidation cluster
       2. Funding rate extreme (crowded positioning)
       3. OI at local high
       4. Orderbook thin near liquidation levels
+      5. Recent large USDT inflows to derivatives venues (NEW)
     """
-    # 1. Distance to liquidation cluster
-    nearest_cluster = find_nearest_liquidation_cluster(leverage_state.liquidation_map)
-    distance_pct = abs(price_data.current - nearest_cluster.price) / price_data.current
-    proximity_risk = max(0, 1 - distance_pct / 0.02)  # Risk increases within 2%
+    # Existing indicators...
+    proximity_risk = compute_liquidation_proximity_risk(leverage_state, price_data)
+    funding_risk = compute_funding_extremity_risk(leverage_state)
+    oi_risk = compute_oi_risk(leverage_state)
+    thinness_risk = compute_orderbook_thinness_risk(orderbook, leverage_state)
 
-    # 2. Funding extremity
-    funding_zscore = abs(leverage_state.funding_rate) / leverage_state.funding_std_30d
-    funding_risk = min(1, funding_zscore / 3)
-
-    # 3. OI level
-    oi_percentile = percentile_rank(leverage_state.oi_current, leverage_state.oi_history_90d)
-    oi_risk = max(0, (oi_percentile - 0.7) / 0.3)  # Risk above 70th percentile
-
-    # 4. Orderbook thinness at liquidation level
-    depth_at_cluster = orderbook.get_depth_at_price(nearest_cluster.price)
-    typical_depth = orderbook.typical_depth
-    thinness_risk = max(0, 1 - depth_at_cluster / typical_depth)
+    # NEW: USDT flow risk
+    # Large USDT flows to derivatives = ammunition for cascade
+    usdt_derivatives_flow = stablecoin_state.usdt_flow_data.derivatives_exchange_flow_24h
+    typical_flow = stablecoin_state.usdt_flow_data.typical_derivatives_flow
+    usdt_risk = min(1, usdt_derivatives_flow / (typical_flow * 3))  # Risk at 3x typical
 
     # Combine
     precascade_risk = (
-        0.35 * proximity_risk +
-        0.25 * funding_risk +
-        0.20 * oi_risk +
-        0.20 * thinness_risk
+        0.30 * proximity_risk +
+        0.20 * funding_risk +
+        0.15 * oi_risk +
+        0.15 * thinness_risk +
+        0.20 * usdt_risk  # NEW: significant weight
     )
 
     return PrecascadeRisk(
@@ -1032,66 +1496,58 @@ def compute_precascade_risk(leverage_state, price_data, orderbook):
         funding=funding_risk,
         oi=oi_risk,
         thinness=thinness_risk,
-        nearest_cluster=nearest_cluster
+        usdt=usdt_risk,
+        stablecoin_context=stablecoin_state.flow_ratio
     )
 ```
 
-### 8.2 Real vs. Fake Price Movement Classification
+### 9.2 Real vs. Fake Price Movement Classification
 
 ```python
-def classify_price_movement(price_data, leverage_state, onchain_data, news_data):
+def classify_price_movement(price_data, leverage_state, onchain_data, news_data, stablecoin_state):
     """
     Classify whether a price movement is organic or manipulation-driven.
+    Stablecoin context is now a primary signal.
 
     Real (organic) movement:
       - Spot volume proportional to price change
       - No liquidation spike
       - On-chain flow supports direction
       - Fundamental news present
+      - USDC-dominant stablecoin flows (NEW)
 
     Fake (manipulation) movement:
       - Derivatives volume >> spot volume
       - Liquidation cascade signature
       - On-chain flow contradicts price
       - No fundamental news
+      - USDT-dominant stablecoin flows (NEW)
     """
     scores = {}
 
-    # Factor 1: Spot vs derivatives volume
-    spot_ratio = price_data.spot_volume / (price_data.spot_volume + leverage_state.derivatives_volume)
-    scores['spot_dominance'] = spot_ratio  # Higher = more organic
+    # Existing factors...
+    scores['spot_dominance'] = compute_spot_ratio(price_data, leverage_state)
+    scores['proportionality'] = compute_volume_proportionality(price_data)
+    scores['non_liquidation'] = compute_non_liquidation_ratio(leverage_state, price_data)
+    scores['onchain_alignment'] = compute_onchain_alignment(onchain_data, price_data)
+    scores['news_presence'] = news_data.relevance_score
 
-    # Factor 2: Volume-price proportionality
-    expected_move = estimate_move_from_volume(price_data.spot_volume)
-    actual_move = abs(price_data.return_1h)
-    proportionality = min(1, expected_move / (actual_move + 1e-10))
-    scores['proportionality'] = proportionality  # Higher = more organic
-
-    # Factor 3: Liquidation contribution
-    liq_volume_usd = leverage_state.liquidation_volume_1h
-    total_volume_usd = price_data.volume_1h_usd
-    liq_contribution = liq_volume_usd / (total_volume_usd + 1e-10)
-    scores['non_liquidation'] = 1 - liq_contribution  # Higher = more organic
-
-    # Factor 4: On-chain alignment
-    if price_data.return_1h > 0:
-        # Price up: should see exchange outflows (buying)
-        flow_alignment = -onchain_data.net_exchange_flow_1h / onchain_data.typical_flow
+    # NEW: Stablecoin context (major factor)
+    if stablecoin_state.flow_ratio.usdc_dominant:
+        scores['stablecoin_organic'] = 0.8 + 0.2 * stablecoin_state.flow_ratio.ratio
+    elif stablecoin_state.flow_ratio.usdt_dominant:
+        scores['stablecoin_organic'] = 0.2 * (1 / stablecoin_state.flow_ratio.ratio)
     else:
-        # Price down: should see exchange inflows (selling)
-        flow_alignment = onchain_data.net_exchange_flow_1h / onchain_data.typical_flow
-    scores['onchain_alignment'] = max(0, min(1, flow_alignment))  # Higher = more organic
+        scores['stablecoin_organic'] = 0.5
 
-    # Factor 5: News presence
-    scores['news_presence'] = news_data.relevance_score  # Higher = more organic
-
-    # Aggregate
+    # Aggregate with stablecoin as significant factor
     organic_score = (
-        0.25 * scores['spot_dominance'] +
-        0.20 * scores['proportionality'] +
-        0.25 * scores['non_liquidation'] +
-        0.15 * scores['onchain_alignment'] +
-        0.15 * scores['news_presence']
+        0.15 * scores['spot_dominance'] +
+        0.15 * scores['proportionality'] +
+        0.20 * scores['non_liquidation'] +
+        0.10 * scores['onchain_alignment'] +
+        0.10 * scores['news_presence'] +
+        0.30 * scores['stablecoin_organic']  # NEW: 30% weight
     )
 
     classification = 'organic' if organic_score > 0.5 else 'manipulation'
@@ -1100,79 +1556,89 @@ def classify_price_movement(price_data, leverage_state, onchain_data, news_data)
         classification=classification,
         organic_score=organic_score,
         manipulation_score=1 - organic_score,
-        factor_scores=scores
+        factor_scores=scores,
+        stablecoin_context=stablecoin_state.flow_ratio
     )
 ```
 
 ---
 
-## 9. Signal Generation Framework
+## 10. Signal Generation Framework
 
-### 9.1 Trading Distance from Equilibrium
+### 10.1 Trading Distance from Equilibrium
 
-The core trading thesis: **trade mean-reversion when spot deviates from True Price**.
+The core trading thesis: **trade mean-reversion when spot deviates from True Price**, but adjust expectations based on stablecoin context.
 
 ```python
 class TruePriceSignalGenerator:
     """
     Generate trading signals based on deviation from True Price.
+    Now incorporates stablecoin context for signal confidence.
 
-    Key principle: We trade DISTANCE FROM EQUILIBRIUM, not direction.
+    Key principles:
+      - Trade DISTANCE FROM EQUILIBRIUM, not direction
+      - USDT-dominant deviations = higher reversion probability
+      - USDC-dominant deviations = lower reversion probability (may be trend)
     """
 
-    def __init__(self, config):
-        self.config = config
-        self.signal_history = []
-
-    def generate_signal(self, true_price_estimate, regime, leverage_stress):
+    def generate_signal(self, true_price_estimate, regime, leverage_stress, stablecoin_state):
         """
         Generate trading signal based on current state.
-
-        Returns:
-            Signal with direction, confidence, targets, and timeframe
         """
         z = true_price_estimate.deviation_zscore
         spot = true_price_estimate.spot_median
         true_p = true_price_estimate.price
 
         # No signal in small deviations
-        if abs(z) < self.config.min_zscore_threshold:  # e.g., 1.5
+        if abs(z) < self.config.min_zscore_threshold:
             return Signal(type='NEUTRAL', confidence=0)
 
-        # Compute manipulation probability
-        manip_prob = compute_manipulation_probability(z, regime, leverage_stress)
+        # Compute manipulation probability (includes stablecoin context)
+        manip_prob = compute_manipulation_probability(z, regime, leverage_stress, stablecoin_state)
 
-        # Higher manipulation probability = higher reversion probability
-        reversion_prob = 0.5 + 0.4 * manip_prob  # Range: 0.5 to 0.9
+        # Reversion probability depends on manipulation probability AND stablecoin context
+        if stablecoin_state.flow_ratio.usdt_dominant:
+            # USDT-dominant: high reversion probability
+            reversion_prob = 0.6 + 0.35 * manip_prob  # Range: 0.6 to 0.95
+        elif stablecoin_state.flow_ratio.usdc_dominant:
+            # USDC-dominant: lower reversion probability (may be trend)
+            reversion_prob = 0.3 + 0.3 * manip_prob  # Range: 0.3 to 0.6
+        else:
+            # Mixed: standard calculation
+            reversion_prob = 0.5 + 0.4 * manip_prob  # Range: 0.5 to 0.9
 
         # Adjust for regime
         regime_adjustments = {
-            'cascade': 0.1,        # Very high reversion during cascade
+            'cascade': 0.1,
             'manipulation': 0.1,
             'high_leverage': 0.05,
             'normal': 0,
-            'low_volatility': -0.1  # Less confident in reversion during quiet
+            'low_volatility': -0.1,
+            'trend': -0.2  # NEW: trends don't revert quickly
         }
         reversion_prob += regime_adjustments.get(regime.name, 0)
-        reversion_prob = max(0.3, min(0.95, reversion_prob))
+        reversion_prob = max(0.2, min(0.95, reversion_prob))
 
         # Direction: opposite of deviation
         if z > 0:
-            direction = 'SHORT'  # Spot above True Price, expect reversion down
+            direction = 'SHORT'
         else:
-            direction = 'LONG'  # Spot below True Price, expect reversion up
+            direction = 'LONG'
 
-        # Confidence scales with z-score
-        confidence = min(0.95, 0.5 + 0.1 * (abs(z) - 1.5))
+        # Confidence scales with z-score AND stablecoin clarity
+        base_confidence = min(0.95, 0.5 + 0.1 * (abs(z) - 1.5))
+        stablecoin_clarity = abs(stablecoin_state.flow_ratio.ratio - 1)  # Clearer signal when ratio != 1
+        confidence = base_confidence * (1 + 0.1 * min(stablecoin_clarity, 3))
+        confidence = min(0.95, confidence)
 
         # Compute targets
-        targets = self.compute_reversion_targets(spot, true_p, z, regime)
+        targets = self.compute_reversion_targets(spot, true_p, z, regime, stablecoin_state)
 
         # Compute timeframe
-        timeframe = self.estimate_reversion_timeframe(z, regime, leverage_stress)
+        timeframe = self.estimate_reversion_timeframe(z, regime, stablecoin_state)
 
         # Compute stop loss
-        stop_loss = self.compute_stop_loss(spot, z, regime)
+        stop_loss = self.compute_stop_loss(spot, z, regime, stablecoin_state)
 
         return Signal(
             type=direction,
@@ -1183,89 +1649,93 @@ class TruePriceSignalGenerator:
             timeframe=timeframe,
             stop_loss=stop_loss,
             zscore=z,
-            regime=regime.name
+            regime=regime.name,
+            stablecoin_context={
+                'ratio': stablecoin_state.flow_ratio.ratio,
+                'usdt_dominant': stablecoin_state.flow_ratio.usdt_dominant,
+                'usdc_dominant': stablecoin_state.flow_ratio.usdc_dominant
+            }
         )
 
-    def compute_reversion_targets(self, spot, true_price, z, regime):
+    def compute_reversion_targets(self, spot, true_price, z, regime, stablecoin_state):
         """
         Compute probabilistic reversion targets.
+        Adjust probabilities based on stablecoin context.
         """
         deviation = spot - true_price
-
         targets = []
+
+        # Base probabilities
+        if stablecoin_state.flow_ratio.usdt_dominant:
+            # USDT-dominant: higher reversion probabilities
+            prob_mult = 1.2
+        elif stablecoin_state.flow_ratio.usdc_dominant:
+            # USDC-dominant: lower reversion probabilities
+            prob_mult = 0.7
+        else:
+            prob_mult = 1.0
 
         # Target 1: 50% reversion
         t1_price = spot - 0.5 * deviation
-        t1_prob = 0.75 if regime.name in ['cascade', 'manipulation'] else 0.65
+        t1_prob = min(0.95, 0.70 * prob_mult)
         targets.append(Target(price=t1_price, probability=t1_prob, label='T1_50%'))
 
         # Target 2: 75% reversion
         t2_price = spot - 0.75 * deviation
-        t2_prob = 0.55 if regime.name in ['cascade', 'manipulation'] else 0.45
+        t2_prob = min(0.80, 0.50 * prob_mult)
         targets.append(Target(price=t2_price, probability=t2_prob, label='T2_75%'))
 
         # Target 3: Full reversion to True Price
-        t3_prob = 0.35 if regime.name in ['cascade', 'manipulation'] else 0.25
+        t3_prob = min(0.60, 0.35 * prob_mult)
         targets.append(Target(price=true_price, probability=t3_prob, label='T3_Full'))
 
-        # Target 4: Overshoot (beyond True Price)
+        # Target 4: Overshoot (more likely in cascade/manipulation)
         overshoot = true_price - 0.25 * deviation
-        t4_prob = 0.15 if regime.name == 'cascade' else 0.10
+        t4_prob = min(0.30, 0.15 * prob_mult)
         targets.append(Target(price=overshoot, probability=t4_prob, label='T4_Overshoot'))
 
         return targets
 
-    def estimate_reversion_timeframe(self, z, regime, leverage_stress):
+    def estimate_reversion_timeframe(self, z, regime, stablecoin_state):
         """
         Estimate how quickly reversion will occur.
+        USDT-dominant = faster reversion (manipulation resolves quickly)
+        USDC-dominant = slower or no reversion (may be trend)
         """
-        # Base timeframe in hours
         base_hours = 4
 
-        # Larger deviation = faster expected reversion (more stretched rubber band)
-        zscore_mult = max(0.5, 2 - abs(z) * 0.3)  # Range: 0.5x to 2x
+        zscore_mult = max(0.5, 2 - abs(z) * 0.3)
 
-        # Regime affects speed
         regime_mults = {
-            'cascade': 0.25,       # Very fast reversion
+            'cascade': 0.25,
             'manipulation': 0.5,
             'high_leverage': 0.75,
             'normal': 1.0,
-            'low_volatility': 1.5  # Slower reversion
+            'low_volatility': 1.5,
+            'trend': 3.0  # NEW: trends don't revert quickly
         }
         regime_mult = regime_mults.get(regime.name, 1.0)
 
-        hours = base_hours * zscore_mult * regime_mult
+        # Stablecoin adjustment (NEW)
+        if stablecoin_state.flow_ratio.usdt_dominant:
+            stablecoin_mult = 0.7  # Faster reversion
+        elif stablecoin_state.flow_ratio.usdc_dominant:
+            stablecoin_mult = 1.5  # Slower reversion
+        else:
+            stablecoin_mult = 1.0
+
+        hours = base_hours * zscore_mult * regime_mult * stablecoin_mult
 
         return Timeframe(
             expected_hours=hours,
             range_hours=(hours * 0.5, hours * 2),
             confidence=0.7
         )
-
-    def compute_stop_loss(self, spot, z, regime):
-        """
-        Compute stop loss level.
-
-        Stop loss is placed beyond the current deviation,
-        anticipating that if we're wrong, the move continues.
-        """
-        # Extension beyond current deviation
-        extension_mult = 1.5 if regime.name in ['cascade', 'high_leverage'] else 1.3
-
-        if z > 0:
-            # Short position: stop above current spot
-            stop = spot * (1 + abs(z) * 0.01 * extension_mult)
-        else:
-            # Long position: stop below current spot
-            stop = spot * (1 - abs(z) * 0.01 * extension_mult)
-
-        return stop
 ```
 
-### 9.2 Signal Examples
+### 10.2 Signal Examples
 
-**Example 1: Liquidation Cascade Signal**
+**Example 1: USDT-Dominant Liquidation Cascade**
 
 ```
 Current State:
@@ -1273,54 +1743,69 @@ Current State:
   Spot (median):  $28,200
   Deviation:      -6% (-3.8σ)
   Regime:         cascade
-  Leverage Stress: 0.85
+
+Stablecoin Context:
+  USDT/USDC Ratio: 4.2 (USDT-dominant)
+  USDT 24h Flow:   $800M to derivatives
+  USDC 24h Flow:   $150M to spot
 
 Signal Generated:
-  Type:           LONG
-  Confidence:     0.88
-  Manipulation P: 0.91
-  Reversion P:    0.89
+  Type:           LONG (expect reversion)
+  Confidence:     0.91
+  Manipulation P: 0.94
+  Reversion P:    0.92
 
   Targets:
-    T1 (50%): $29,100 - Probability 0.80
-    T2 (75%): $29,550 - Probability 0.60
-    T3 (Full): $30,000 - Probability 0.40
-    T4 (Overshoot): $30,450 - Probability 0.18
+    T1 (50%): $29,100 - Probability 0.84
+    T2 (75%): $29,550 - Probability 0.65
+    T3 (Full): $30,000 - Probability 0.48
+    T4 (Overshoot): $30,450 - Probability 0.22
 
-  Timeframe: 1-2 hours
+  Timeframe: 0.5-2 hours (fast reversion expected)
   Stop Loss: $27,500
+
+  Note: High confidence due to USDT-dominant conditions
+        indicating leverage-driven manipulation
 ```
 
-**Example 2: High Leverage Warning**
+**Example 2: USDC-Dominant Trend**
 
 ```
 Current State:
   True Price:     $30,000
-  Spot (median):  $30,900
-  Deviation:      +3% (+2.1σ)
-  Regime:         high_leverage
-  Leverage Stress: 0.72
+  Spot (median):  $32,500
+  Deviation:      +8.3% (+2.5σ)
+  Regime:         trend
+
+Stablecoin Context:
+  USDT/USDC Ratio: 0.4 (USDC-dominant)
+  USDT 24h Flow:   $200M (mixed)
+  USDC 24h Flow:   $500M to spot/custody
 
 Signal Generated:
-  Type:           SHORT
-  Confidence:     0.65
-  Manipulation P: 0.58
-  Reversion P:    0.68
+  Type:           SHORT (against trend)
+  Confidence:     0.45 (LOW)
+  Manipulation P: 0.35
+  Reversion P:    0.42
 
   Targets:
-    T1 (50%): $30,450 - Probability 0.60
-    T2 (75%): $30,225 - Probability 0.42
-    T3 (Full): $30,000 - Probability 0.28
+    T1 (50%): $31,250 - Probability 0.40
+    T2 (75%): $30,625 - Probability 0.28
+    T3 (Full): $30,000 - Probability 0.18
 
-  Timeframe: 3-6 hours
-  Stop Loss: $31,500
+  Timeframe: 6-12 hours (slow if at all)
+  Stop Loss: $33,800
+
+  WARNING: USDC-dominant conditions suggest genuine trend.
+           Consider NOT trading against this deviation.
+           True Price may need to adjust upward.
 ```
 
 ---
 
-## 10. Bad Actor Neutralization
+## 11. Bad Actor Neutralization
 
-### 10.1 Why This Framework Reduces Manipulation Advantage
+### 11.1 Why This Framework Reduces Manipulation Advantage
 
 The True Price framework doesn't moralize about "bad actors"—it mechanically reduces their advantage:
 
@@ -1332,68 +1817,75 @@ Traditional:
     - Order flow across venues
     - Liquidation levels
     - Stop loss clusters
+    - Stablecoin flows (mints they control)
   Advantage: Trade ahead of forced flows
 
 True Price Framework:
   - Forced flows identified and discounted
+  - Stablecoin flows classified and incorporated
+  - USDT flows flagged as volatility signal, not capital
   - True Price doesn't move with manipulation
   - Dominant actor's information advantage neutralized
 ```
 
-**Manipulation Profit Extraction**
+**Stablecoin Visibility Neutralization (NEW)**
 
 ```
 Traditional manipulation:
-  1. Push price to liquidation level
-  2. Cascade triggers forced selling
-  3. Buy at artificially low prices
-  4. Profit as price recovers
+  1. Mint USDT
+  2. Flow to Binance
+  3. Enable massive leverage
+  4. Push price to liquidation level
+  5. Cascade triggers
+  6. Buy the dip
+  7. Price recovers
+  8. Profit
 
-With True Price:
-  1. Manipulation detected in real-time
-  2. True Price doesn't follow manipulation
-  3. Counter-traders know reversion is coming
-  4. Manipulation becomes negative EV:
-     - Cost of manipulation (pushing price)
-     - No information edge (everyone knows it's manipulation)
-     - Counter-traders front-run the recovery
+With True Price + Stablecoin Analysis:
+  1. USDT mint detected
+  2. Flow to derivatives flagged
+  3. Model increases observation noise (don't trust spot)
+  4. True Price doesn't follow manipulation
+  5. Counter-traders see USDT-dominant regime
+  6. Counter-traders front-run the recovery
+  7. Manipulation becomes negative EV
 ```
 
-### 10.2 Mechanical Focus, Not Moral Judgment
+### 11.2 Mechanical Focus, Not Moral Judgment
 
-The framework makes no moral claims about manipulation. It simply:
+The framework makes no moral claims about USDT or USDC. It simply:
 
-1. **Identifies** leverage-driven price distortions mechanically
-2. **Discounts** distorted observations in the True Price model
-3. **Quantifies** reversion probability statistically
-4. **Enables** counter-trading that makes manipulation unprofitable
+1. **Observes** that USDT flows correlate with leverage enablement
+2. **Observes** that USDC flows correlate with spot capital
+3. **Models** these correlations mathematically
+4. **Adjusts** confidence based on observable behavior
 
-If manipulation becomes unprofitable, rational actors stop doing it. No enforcement required.
+If USDT becomes used primarily for spot trading, the model will adapt. If USDC becomes used for leverage, the model will adapt. The framework follows mechanics, not narratives.
 
-### 10.3 Incentive Realignment
+### 11.3 Incentive Realignment
 
 ```
 Old Equilibrium:
-  Dominant actor: Manipulate → Profit
-  Regular trader: Get liquidated → Loss
-  Net: Zero-sum extraction
+  USDT mint → Leverage → Manipulation → Profit
+  Regular trader → Liquidated → Loss
 
-New Equilibrium (with True Price):
-  Dominant actor: Manipulation detected → Counter-traded → Loss
-  Regular trader: See manipulation → Trade reversion → Profit
-  Net: Manipulation becomes negative EV
+New Equilibrium (with True Price + Stablecoin Analysis):
+  USDT mint → Detected as leverage enablement
+  Manipulation attempt → True Price stable, regime flagged
+  Counter-traders → Trade reversion → Profit
+  Manipulator → Counter-traded → Loss
 
 Result:
-  Rational dominant actors stop manipulating
+  Manipulation becomes unprofitable
+  Rational actors stop manipulating
   Price converges to True Price
-  Everyone benefits from accurate prices
 ```
 
 ---
 
-## 11. Integration with VibeSwap
+## 12. Integration with VibeSwap
 
-### 11.1 Oracle Integration Architecture
+### 12.1 Oracle Integration Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1401,8 +1893,8 @@ Result:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐               │
-│  │   Kalman   │  │  Regime    │  │   Signal   │               │
-│  │   Filter   │──│ Classifier │──│  Generator │               │
+│  │   Kalman   │  │ Stablecoin │  │  Regime    │               │
+│  │   Filter   │◄─┤  Analyzer  │──┤ Classifier │               │
 │  └────────────┘  └────────────┘  └────────────┘               │
 │        │               │               │                        │
 │        ▼               ▼               ▼                        │
@@ -1413,355 +1905,180 @@ Result:
 │  │  - Deviation z-score                         │              │
 │  │  - Regime classification                     │              │
 │  │  - Manipulation probability                  │              │
+│  │  - Stablecoin context (USDT/USDC ratio)     │              │
 │  │  - Reversion signal                          │              │
 │  └─────────────────────────────────────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    VIBESWAP INTEGRATION                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. BATCH AUCTION CLEARING                                      │
-│     - Use True Price as reference for clearing price bounds     │
-│     - Reject batches that clear too far from True Price         │
-│                                                                  │
-│  2. CIRCUIT BREAKER                                             │
-│     - Trigger pause when manipulation probability > 80%         │
-│     - Prevent trades during detected cascades                   │
-│                                                                  │
-│  3. DYNAMIC FEES                                                │
-│     - Increase fees during high-deviation regimes               │
-│     - Capture volatility premium                                │
-│                                                                  │
-│  4. LP PROTECTION                                               │
-│     - Don't let LPs provide liquidity at manipulated prices     │
-│     - IL protection uses True Price, not spot                   │
-│                                                                  │
-│  5. USER INTERFACE                                              │
-│     - Show True Price alongside spot                            │
-│     - Display manipulation warnings                             │
-│     - Provide reversion signal opt-in                           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 11.2 Batch Auction Enhancement
+### 12.2 Stablecoin-Aware Circuit Breaker
 
 ```python
-def validate_batch_clearing(batch, true_price_oracle):
+def should_trigger_circuit_breaker(true_price_estimate, stablecoin_state):
     """
-    Validate that batch clears at a reasonable price relative to True Price.
+    Enhanced circuit breaker with stablecoin context.
     """
-    clearing_price = batch.computed_clearing_price
-    true_price = true_price_oracle.get_current_estimate()
+    z = abs(true_price_estimate.deviation_zscore)
+    regime = true_price_estimate.regime
 
-    deviation = abs(clearing_price - true_price.price) / true_price.price
-    zscore = (clearing_price - true_price.price) / true_price.std
+    # Base thresholds
+    if regime.name == 'cascade':
+        threshold = 2.0  # Stricter during cascade
+    elif regime.name == 'manipulation':
+        threshold = 2.5
+    else:
+        threshold = 3.0
 
-    # Regime-dependent thresholds
-    thresholds = {
-        'cascade': 0.005,       # Only 0.5% deviation allowed during cascade
-        'manipulation': 0.005,
-        'high_leverage': 0.01,
-        'normal': 0.02,
-        'low_volatility': 0.02
-    }
+    # Stablecoin adjustment
+    if stablecoin_state.flow_ratio.usdt_dominant:
+        # USDT-dominant: be more conservative
+        threshold *= 0.8  # Lower threshold = trigger earlier
+    elif stablecoin_state.flow_ratio.usdc_dominant:
+        # USDC-dominant: may be genuine trend
+        threshold *= 1.2  # Higher threshold = more tolerant
 
-    max_deviation = thresholds.get(true_price.regime, 0.02)
-
-    if deviation > max_deviation:
-        return ValidationResult(
-            valid=False,
-            reason=f"Clearing price deviates {deviation:.2%} from True Price during {true_price.regime} regime",
-            suggested_action="Pause batch, wait for price stabilization"
+    if z > threshold:
+        return CircuitBreakerDecision(
+            trigger=True,
+            reason=f"Deviation {z:.1f}σ exceeds threshold {threshold:.1f}σ",
+            stablecoin_context=stablecoin_state.flow_ratio,
+            recommended_action="Pause trading, wait for stabilization"
         )
 
-    return ValidationResult(valid=True)
-```
-
-### 11.3 LP Protection Enhancement
-
-```python
-def compute_il_protection(position, exit_price, true_price_oracle):
-    """
-    Compute IL protection using True Price instead of manipulated spot.
-
-    This prevents:
-      - LPs getting liquidated at manipulated prices
-      - IL claims based on temporary distortions
-    """
-    # Use True Price for IL calculation, not spot
-    true_price = true_price_oracle.get_current_estimate()
-
-    # If current spot is significantly manipulated, use True Price
-    if true_price.manipulation_probability > 0.7:
-        reference_price = true_price.price
-        note = "Using True Price due to detected manipulation"
-    else:
-        # Use average of spot and True Price
-        reference_price = (exit_price + true_price.price) / 2
-        note = "Using blended price"
-
-    il = compute_impermanent_loss(position.entry_price, reference_price)
-
-    return ILProtectionCalc(
-        impermanent_loss=il,
-        reference_price=reference_price,
-        note=note
-    )
+    return CircuitBreakerDecision(trigger=False)
 ```
 
 ---
 
-## 12. Extensions and Future Work
+## 13. Extensions and Future Work
 
-### 12.1 Backtesting Framework
+### 13.1 Stablecoin Flow Machine Learning
 
 ```python
-class TruePriceBacktester:
+class StablecoinFlowPredictor:
     """
-    Backtest True Price model and trading signals.
+    ML model to predict stablecoin flow impact on price.
     """
 
-    def __init__(self, historical_data, config):
-        self.data = historical_data
-        self.config = config
-        self.kf = TruePriceKalmanFilter(
-            initial_price=historical_data.prices[0],
-            config=config
-        )
+    def __init__(self):
+        self.model = GradientBoostingRegressor()
+        self.features = [
+            'usdt_mint_volume',
+            'usdc_mint_volume',
+            'usdt_derivatives_ratio',
+            'usdc_spot_ratio',
+            'oi_change_lag1',
+            'funding_rate',
+            'price_return_lag1',
+            'volatility_regime',
+        ]
 
-    def run_backtest(self):
+    def predict_price_impact(self, stablecoin_data, leverage_data):
         """
-        Run full historical backtest.
+        Predict expected price impact of current stablecoin flows.
         """
-        results = []
+        X = self.extract_features(stablecoin_data, leverage_data)
+        return self.model.predict(X)
 
-        for t in range(len(self.data)):
-            # Update True Price estimate
-            estimate = self.update_step(t)
-
-            # Generate signal
-            signal = self.generate_signal(estimate)
-
-            # Track signal outcomes
-            if signal.type != 'NEUTRAL':
-                outcome = self.evaluate_signal_outcome(t, signal)
-                results.append(outcome)
-
-        return BacktestResults(
-            signals=results,
-            accuracy=self.compute_accuracy(results),
-            sharpe=self.compute_sharpe(results),
-            max_drawdown=self.compute_max_drawdown(results)
-        )
-
-    def evaluate_signal_outcome(self, t, signal):
+    def train(self, historical_data):
         """
-        Evaluate how signal performed.
+        Train on historical stablecoin flows and subsequent price moves.
         """
-        entry_price = self.data.spot_prices[t]
-
-        # Look ahead to see if targets hit
-        for future_t in range(t + 1, min(t + 48, len(self.data))):  # Up to 48 hours
-            future_price = self.data.spot_prices[future_t]
-
-            # Check each target
-            for target in signal.targets:
-                if signal.type == 'LONG' and future_price >= target.price:
-                    return SignalOutcome(
-                        signal=signal,
-                        entry_price=entry_price,
-                        exit_price=future_price,
-                        target_hit=target.label,
-                        time_to_hit=future_t - t,
-                        profit_pct=(future_price - entry_price) / entry_price
-                    )
-                elif signal.type == 'SHORT' and future_price <= target.price:
-                    return SignalOutcome(
-                        signal=signal,
-                        entry_price=entry_price,
-                        exit_price=future_price,
-                        target_hit=target.label,
-                        time_to_hit=future_t - t,
-                        profit_pct=(entry_price - future_price) / entry_price
-                    )
-
-            # Check stop loss
-            if signal.type == 'LONG' and future_price <= signal.stop_loss:
-                return SignalOutcome(
-                    signal=signal,
-                    entry_price=entry_price,
-                    exit_price=signal.stop_loss,
-                    target_hit='STOP_LOSS',
-                    time_to_hit=future_t - t,
-                    profit_pct=(signal.stop_loss - entry_price) / entry_price
-                )
-            elif signal.type == 'SHORT' and future_price >= signal.stop_loss:
-                return SignalOutcome(
-                    signal=signal,
-                    entry_price=entry_price,
-                    exit_price=signal.stop_loss,
-                    target_hit='STOP_LOSS',
-                    time_to_hit=future_t - t,
-                    profit_pct=(entry_price - signal.stop_loss) / entry_price
-                )
-
-        # No target or stop hit within window
-        return SignalOutcome(
-            signal=signal,
-            entry_price=entry_price,
-            exit_price=self.data.spot_prices[min(t + 48, len(self.data) - 1)],
-            target_hit='TIMEOUT',
-            time_to_hit=48,
-            profit_pct=None
-        )
+        X = self.extract_features(historical_data)
+        y = historical_data.price_return_next_24h
+        self.model.fit(X, y)
 ```
 
-### 12.2 True Price Index
-
-A tradeable index based on True Price:
+### 13.2 True Price Index with Stablecoin Adjustment
 
 ```
-TRUE PRICE INDEX (TPI):
+TRUE PRICE INDEX (TPI) v2.0:
 
 Definition:
   TPI(t) = True_Price(t) / True_Price(0) × 100
 
-Properties:
-  - Tracks manipulation-resistant price
-  - Slower-moving than spot
-  - Can serve as benchmark for performance
+Stablecoin-Adjusted TPI:
+  TPI_adj(t) = TPI(t) × (1 + stablecoin_confidence_adjustment(t))
 
-Potential Products:
-  - TPI futures (trade True Price directly)
-  - TPI options (volatility on True Price)
-  - TPI-spot spread (arbitrage manipulation premium)
+Where:
+  stablecoin_confidence_adjustment =
+    +0.05 if USDC-dominant (higher confidence)
+    -0.05 if USDT-dominant (lower confidence)
+    0 otherwise
 ```
 
-### 12.3 Multi-Asset Extension
+### 13.3 Cross-Stablecoin Regime Indicator
 
 ```python
-def compute_true_price_correlation(asset_a, asset_b):
+def compute_stablecoin_regime_indicator():
     """
-    Compute correlation of True Prices (not spot prices).
+    A single metric summarizing stablecoin market structure.
 
-    True Price correlation is more stable because it filters out
-    correlated manipulation events (e.g., cascade on BTC affecting ETH).
+    Range: -1 (fully USDT-dominant, manipulation likely)
+           +1 (fully USDC-dominant, trend likely)
     """
-    true_prices_a = [estimate.price for estimate in asset_a.true_price_history]
-    true_prices_b = [estimate.price for estimate in asset_b.true_price_history]
+    usdt_score = normalize(usdt_flow, typical_usdt)
+    usdc_score = normalize(usdc_flow, typical_usdc)
 
-    true_correlation = np.corrcoef(
-        np.diff(np.log(true_prices_a)),
-        np.diff(np.log(true_prices_b))
-    )[0, 1]
+    indicator = (usdc_score - usdt_score) / (usdc_score + usdt_score + 1e-10)
 
-    # Compare to spot correlation
-    spot_prices_a = [estimate.spot_median for estimate in asset_a.true_price_history]
-    spot_prices_b = [estimate.spot_median for estimate in asset_b.true_price_history]
-
-    spot_correlation = np.corrcoef(
-        np.diff(np.log(spot_prices_a)),
-        np.diff(np.log(spot_prices_b))
-    )[0, 1]
-
-    return TruePriceCorrelation(
-        true_correlation=true_correlation,
-        spot_correlation=spot_correlation,
-        manipulation_correlation=spot_correlation - true_correlation  # Correlated manipulation
+    return StablecoinRegimeIndicator(
+        value=indicator,
+        interpretation='MANIPULATION_LIKELY' if indicator < -0.3 else
+                       'TREND_LIKELY' if indicator > 0.3 else
+                       'NEUTRAL'
     )
-```
-
-### 12.4 Machine Learning Enhancement
-
-```python
-class MLRegimeClassifier:
-    """
-    Use machine learning to improve regime classification.
-
-    Features:
-      - Kalman filter innovation sequence
-      - Leverage stress components
-      - Orderbook features
-      - On-chain metrics
-      - Time of day / day of week
-
-    Labels:
-      - Manual labels from known manipulation events
-      - Retrospective labels from price reversions
-    """
-
-    def __init__(self):
-        self.model = GradientBoostingClassifier(n_estimators=100)
-        self.feature_names = []
-
-    def train(self, labeled_data):
-        """
-        Train on historically labeled manipulation events.
-        """
-        X = self.extract_features(labeled_data)
-        y = labeled_data.labels
-
-        self.model.fit(X, y)
-
-    def predict_regime(self, current_state):
-        """
-        Predict current regime with probability.
-        """
-        X = self.extract_features([current_state])
-        proba = self.model.predict_proba(X)[0]
-
-        return {
-            regime: prob
-            for regime, prob in zip(self.model.classes_, proba)
-        }
 ```
 
 ---
 
-## 13. Conclusion
+## 14. Conclusion
 
-### 13.1 Summary
+### 14.1 Summary
 
-This paper has presented a rigorous framework for **True Price** estimation in cryptocurrency markets:
+This paper has presented a rigorous framework for **True Price** estimation that explicitly incorporates **stablecoin flow dynamics**:
 
-1. **Definition**: True Price is the Bayesian posterior estimate of equilibrium price, filtering out leverage-driven distortions.
+1. **Definition**: True Price is the Bayesian posterior estimate of equilibrium price, filtering out leverage-driven distortions and stablecoin-enabled manipulation.
 
-2. **Model**: A state-space model with Kalman filtering, where observation noise increases during leverage stress.
+2. **Asymmetric Stablecoin Treatment**: USDT flows are modeled as leverage-enabling and volatility-amplifying. USDC flows are modeled as capital-confirming and trend-validating. This distinction is critical.
 
-3. **Inputs**: Multi-venue prices, leverage metrics, on-chain fundamentals, and order-book quality signals.
+3. **Model**: A state-space model with Kalman filtering, where observation noise increases during USDT-dominant periods and decreases during USDC-dominant periods.
 
-4. **Regimes**: Dynamic classification of market conditions with regime-dependent parameters.
+4. **Regimes**: Dynamic classification now includes 'trend' (USDC-dominant) and 'manipulation' (USDT-dominant) as distinct regimes.
 
-5. **Signals**: Trading signals based on deviation from True Price, with probabilistic targets and timeframes.
+5. **Signals**: Trading signals adjust reversion probability based on stablecoin context. USDT-dominant deviations have higher reversion probability; USDC-dominant deviations may be genuine trends.
 
-6. **Integration**: Seamless connection with VibeSwap's batch auction mechanism for manipulation-resistant trading.
+### 14.2 Key Innovations
 
-### 13.2 Key Properties Achieved
+| Innovation | Benefit |
+|------------|---------|
+| Asymmetric stablecoin treatment | Distinguishes capital from leverage |
+| USDT as volatility signal | Increases observation noise appropriately |
+| USDC as trend confirmation | Validates slow True Price drift |
+| Stablecoin flow classification | Separates inventory/leverage/capital |
+| Regime-dependent signal generation | Avoids trading against genuine trends |
+| Manipulation probability adjustment | More accurate under USDT-dominant conditions |
 
-| Requirement | How Achieved |
-|-------------|--------------|
-| Exchange-agnostic | Weighted multi-venue aggregation |
-| Slow-moving | Kalman filter smoothing + low process noise |
-| Statistically robust | Formal state-space model with uncertainty quantification |
-| Manipulation-resistant | Time-varying observation noise discounts leverage distortions |
-| Actionable | Clear signal generation with targets and timeframes |
+### 14.3 Why USDT and USDC Must Never Be Treated Symmetrically
 
-### 13.3 The Bigger Picture
+The empirical reality is clear:
 
-True Price is not just a technical tool—it's a step toward **fair markets**.
+- USDT flows to derivatives venues and correlates with OI increases
+- USDC flows to spot venues and correlates with genuine capital movement
 
-When manipulation becomes detectable and counterable:
-- Manipulation becomes unprofitable
-- Rational actors stop manipulating
-- Prices converge to genuine equilibrium
-- Everyone benefits from accurate price signals
+Treating them symmetrically would be like treating margin debt and cash deposits as equivalent—they're not. The True Price framework respects this distinction mathematically.
 
-This is the vision: markets that serve price discovery, not extraction.
+### 14.4 The Bigger Picture
 
-The mathematics is rigorous. The framework is implementable. The question is whether we choose to build it.
+This framework transforms stablecoin flows from a manipulation tool into a transparency signal:
+
+- When USDT dominates, we know to distrust spot prices
+- When USDC dominates, we know to trust the trend
+- The information that dominant actors use to manipulate becomes the information that neutralizes their advantage
+
+Markets can be fair. Manipulation can be detected. True prices can emerge.
+
+We just have to model the mechanics correctly.
 
 ---
 
@@ -1771,51 +2088,41 @@ The mathematics is rigorous. The framework is implementable. The question is whe
 
 ```
 State equation:
-  x(t) = F × x(t-1) + w(t),    w(t) ~ N(0, Q)
+  x(t) = F × x(t-1) + w(t),    w(t) ~ N(0, Q(t))
 
 Observation equation:
   y(t) = H × x(t) + v(t),      v(t) ~ N(0, R(t))
+
+Key: Both Q(t) and R(t) are now TIME-VARYING based on stablecoin dynamics
 ```
 
-### Prediction Step
+### Stablecoin-Adjusted Covariances
 
 ```
-x̂(t|t-1) = F × x̂(t-1|t-1)
-P(t|t-1) = F × P(t-1|t-1) × F' + Q
-```
-
-### Update Step
-
-```
-Innovation: ỹ(t) = y(t) - H × x̂(t|t-1)
-Innovation covariance: S(t) = H × P(t|t-1) × H' + R(t)
-Kalman gain: K(t) = P(t|t-1) × H' × S(t)⁻¹
-
-State update: x̂(t|t) = x̂(t|t-1) + K(t) × ỹ(t)
-Covariance update: P(t|t) = (I - K(t) × H) × P(t|t-1)
-```
-
-### Time-Varying R(t)
-
-```
-R(t) = diag(σ²₁(t), σ²₂(t), ..., σ²ₙ(t))
+R(t) = R_base × leverage_mult(t) × usdt_mult(t) × usdc_adj(t)
 
 Where:
-  σ²ᵢ(t) = base_variance_i × leverage_mult(t) × quality_mult(t) × cascade_mult(t)
+  usdt_mult(t) = 1 + 0.5 × usdt_flow_normalized(t)  # Range: 1.0 to 3.0
+  usdc_adj(t) = 0.9 if USDC-dominant else 1.0       # 10% reduction if USDC
+
+Q(t) = Q_base × trend_mult(t)
+
+Where:
+  trend_mult(t) = 1.2 if USDC-confirmed trend else 1.0
 ```
 
 ---
 
-## Appendix B: Data Source Specifications
+## Appendix B: Stablecoin Data Sources
 
-| Source | Data Type | Update Frequency | API |
-|--------|-----------|------------------|-----|
-| Binance | Spot, futures, liquidations | Real-time | WebSocket |
-| Coinbase | Spot | Real-time | WebSocket |
-| Uniswap | Spot, volume | Per-block | Subgraph |
-| Chainlink | Aggregated price | ~1 minute | On-chain |
-| Glassnode | On-chain metrics | Hourly | REST API |
-| Coinglass | OI, funding, liquidations | Real-time | WebSocket |
+| Source | Data Available | Update Frequency |
+|--------|----------------|------------------|
+| Tether Treasury | USDT mints/burns | Real-time (on-chain) |
+| Circle API | USDC mints/burns | Real-time (on-chain) |
+| Glassnode | Stablecoin exchange flows | Hourly |
+| CryptoQuant | Stablecoin exchange reserves | Real-time |
+| DefiLlama | Stablecoin market caps | Real-time |
+| Arkham | Stablecoin flow destinations | Real-time |
 
 ---
 
@@ -1823,29 +2130,28 @@ Where:
 
 | Parameter | Recommended Value | Notes |
 |-----------|-------------------|-------|
-| Kalman process noise (price) | 0.0001 | Low = slow-moving True Price |
-| Kalman process noise (drift) | 0.00001 | Very slow drift adaptation |
-| Drift persistence (ρ) | 0.99 | Near unit root |
-| Base observation variance | Per-venue historical | Calibrate from data |
-| Leverage stress saturation | 5x base variance | During max stress |
-| Cascade observation variance | 10x base variance | Heavy discounting |
-| Minimum z-score for signal | 1.5σ | Filter noise |
-| High-confidence z-score | 3.0σ | Strong signals |
+| USDT volatility multiplier range | 1.0 - 3.0 | Based on flow intensity |
+| USDC confidence adjustment | +/- 10% | When dominant |
+| Flow ratio manipulation threshold | > 2.0 | USDT/USDC ratio |
+| Flow ratio trend threshold | < 0.5 | USDT/USDC ratio |
+| USDT classification: leverage | > 60% to derivatives | Destination-based |
+| USDC classification: capital | > 60% to spot/custody | Destination-based |
 
 ---
 
 *"The market can stay irrational longer than you can stay solvent."*
 *— John Maynard Keynes*
 
-*"Unless you can quantify the irrationality and know when it will end."*
-*— True Price Oracle*
+*"Unless you can see which stablecoins are fueling the irrationality."*
+*— True Price Oracle v2.0*
 
 ---
 
-**VibeSwap** - True Prices Through Rigorous Estimation
+**VibeSwap** - True Prices Through Stablecoin-Aware Estimation
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 2.0
 **Date**: February 2026
+**Major Update**: Stablecoin Flow Dynamics (USDT vs USDC asymmetric treatment)
 **License**: MIT

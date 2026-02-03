@@ -481,8 +481,9 @@ forge coverage
 
 | Document | Description |
 |----------|-------------|
-| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, reputation system, and Nash equilibrium analysis |
-| [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, on-chain accountability, and cryptoeconomic defense mechanisms |
+| [True Price Discovery](docs/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices, and Nash equilibrium analysis |
+| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, reputation system, and game theory |
+| [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, on-chain accountability, and cryptoeconomic defense |
 
 ## License
 

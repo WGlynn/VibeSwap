@@ -481,6 +481,8 @@ forge coverage
 
 | Document | Description |
 |----------|-------------|
+| [**Complete Mechanism Design**](docs/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md) | **Master document** - Comprehensive guide covering all mechanism designs in narrative form |
+| [True Price Oracle](docs/TRUE_PRICE_ORACLE.md) | **Quantitative framework** - Kalman filter state-space model, Bayesian estimation, regime detection, signal generation |
 | [Price Intelligence Oracle](docs/PRICE_INTELLIGENCE_ORACLE.md) | Manipulation detection, liquidation cascade identification, rubber band reversion, reputation-weighted signals |
 | [True Price Discovery](docs/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices, and Nash equilibrium analysis |
 | [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, reputation system, and game theory |

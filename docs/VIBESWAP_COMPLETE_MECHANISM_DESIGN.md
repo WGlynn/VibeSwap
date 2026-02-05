@@ -327,6 +327,29 @@ A price is "true" when it represents a **Nash equilibrium** of honest revelation
 
 If honest behavior is the dominant strategy for everyone, the resulting price aggregates genuine information.
 
+### 5.5 Manipulation as Noise
+
+There's a useful way to think about price accuracy:
+
+**Manipulation is noise.** Front-running, sandwich attacks, information asymmetry, liquidation hunting—these distort prices away from genuine supply and demand. The observed price isn't what the asset is worth; it's the true value plus exploitation artifacts.
+
+**Fair price discovery is signal.** When the mechanism prevents cheating, when orders count equally, when supply meets demand without interference—you get the undistorted price.
+
+| Source | Effect on Price |
+|--------|-----------------|
+| Genuine buying/selling demand | Signal |
+| Front-running profits | Noise |
+| Sandwich attack extraction | Noise |
+| Liquidation cascade hunting | Noise |
+| Information asymmetry exploitation | Noise |
+| Honest market making | Signal |
+
+MEV-resistant batch auctions don't just produce *fairer* prices—they produce **more accurate prices**. Remove the noise, get closer to truth.
+
+**0% noise. 100% signal.**
+
+This matters beyond individual fairness. Prices coordinate economic activity across the entire economy. Noisy prices misallocate resources. Clean prices enable efficiency. True price discovery isn't just about protecting traders—it's about making markets actually work as intended.
+
 ---
 
 ## 6. Cooperative Capitalism
@@ -506,6 +529,39 @@ Batch Auction:
 ```
 
 The uniform price removes the advantage of trading first.
+
+### 8.5 AMM as Liquidity Backstop
+
+A common concern: "What if there's no counterparty for my trade?"
+
+VibeSwap isn't purely order-matching. The batch auction sits on top of an **AMM (x*y=k)**.
+
+**How orders execute:**
+
+```
+1. Orders in batch first try to match with each other
+   (coincidence of wants - direct counterparty matching)
+
+2. Remaining orders trade against AMM liquidity
+   (backstop - always available)
+
+3. Everything settles at uniform clearing price
+   (fairness - regardless of execution path)
+```
+
+**Why this matters:**
+
+| Scenario | What happens |
+|----------|--------------|
+| No counterparty | AMM provides liquidity - trade still executes |
+| Counterparty exists | Direct matching - less slippage than AMM alone |
+| Mixed | Some orders match directly, rest hit AMM |
+
+This is similar to CowSwap's model: try to match users first (better prices), fall back to AMM liquidity (guaranteed execution).
+
+**The result:** You get passive liquidity (like Uniswap) plus fair price discovery (batch auction). No counterparty? No problem. The AMM is always there. Counterparty exists? Even better—direct matching means less slippage.
+
+Fair price either way.
 
 ---
 

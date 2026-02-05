@@ -124,6 +124,28 @@ A price is "true" when it represents a **Nash equilibrium** of honest revelation
 
 If honest behavior is the dominant strategy for everyone, the resulting price aggregates genuine information.
 
+### 2.5 Manipulation as Noise, Fair Discovery as Signal
+
+Here's another way to think about true price:
+
+**Manipulation is noise.** Front-running, sandwich attacks, information asymmetry—these distort prices away from genuine supply and demand. The price you see isn't what the asset is worth; it's what it's worth *plus exploitation artifacts*.
+
+**Fair price discovery is signal.** When no one can cheat, when orders count equally, when supply meets demand without interference—you get the undistorted price. The real value.
+
+This reframes MEV resistance:
+
+| Traditional framing | Signal framing |
+|---------------------|----------------|
+| "Fairer prices" | "More accurate prices" |
+| "Protects users" | "Removes noise from price signal" |
+| "Prevents extraction" | "Improves market information quality" |
+
+MEV-resistant batch auctions don't just produce fairer prices—they produce **more accurate prices**. The clearing price reflects genuine market sentiment, not who has the fastest bot or the most information asymmetry.
+
+**0% noise. 100% signal.**
+
+This matters beyond individual fairness. Prices are signals that coordinate economic activity. Noisy prices → misallocated resources. Clean prices → efficient markets. True price discovery isn't just about protecting traders—it's about making markets actually work.
+
 ---
 
 ## 3. Why Current Mechanisms Fail

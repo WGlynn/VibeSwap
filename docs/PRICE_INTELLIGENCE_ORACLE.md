@@ -20,6 +20,10 @@ This paper proposes a **Price Intelligence Oracle** that:
 
 The goal isn't just accurate prices—it's **actionable intelligence** about when prices are fake and when they'll revert.
 
+**Core insight:** Manipulation is noise. Genuine supply and demand is signal. This oracle separates the two—identifying when observed prices have diverged from true prices, and predicting when they'll snap back.
+
+**0% noise. 100% signal.**
+
 ---
 
 ## Table of Contents

@@ -4,6 +4,32 @@
 
 VibeSwap is an omnichain DEX using LayerZero V2 with a commit-reveal auction system for MEV-resistant trading.
 
+## Why Batch Auctions?
+
+**The problem with continuous trading:** Front-running, sandwich attacks, information asymmetry. Manipulated prices aren't true prices—they're distorted by exploiter advantage. Manipulation is noise.
+
+**The batch auction solution:** Orders are collected, hidden (commit-reveal), then settled simultaneously at a uniform clearing price. No one can see your order and trade ahead. Everyone gets the same price.
+
+**The result:** MEV-resistant batch auctions don't just produce *fairer* prices—they produce more *accurate* prices. The clearing price reflects genuine supply and demand, not who has the fastest bot. Remove the noise, get closer to signal.
+
+**0% noise. 100% signal.**
+
+## AMM + Batch Auction: How They Work Together
+
+VibeSwap isn't purely order-matching. The batch auction sits on top of an AMM (x*y=k).
+
+**How orders execute:**
+1. Orders in a batch first try to match with each other (coincidence of wants)
+2. Remaining orders trade against AMM liquidity
+3. Everything settles at the uniform clearing price
+
+**Why this matters:**
+- **No counterparty? No problem.** The AMM provides passive liquidity as a backstop.
+- **Counterparty exists? Even better.** Direct matching means less slippage than AMM alone.
+- **Fair price either way.** Batch auction ensures uniform clearing price regardless of execution path.
+
+This is similar to CowSwap's model: try to match users first (better prices), fall back to AMM liquidity (guaranteed execution).
+
 ## Architecture
 
 ```

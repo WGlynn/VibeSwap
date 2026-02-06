@@ -23,8 +23,11 @@ VibeSwap uses **batch auctions with commit-reveal ordering** to guarantee fair e
 - Orders are hidden until a batch closes (no front-running)
 - All trades in a batch execute at one uniform price (no sandwich attacks)
 - Passive AMM liquidity ensures trades always execute (no counterparty risk)
+- Eliminates flash crashes by removing the game-theoretic conditions that cause them
 
 **Result:** The clearing price reflects genuine supply and demand — not who has the fastest bot.
+
+**On flash crashes:** In continuous markets, "exit first" is the Nash-stable strategy because you can't compete with HFT colocation. This causes cascading panics. Batch auctions eliminate the speed advantage entirely — there's no benefit to panicking first when all orders clear at one price.
 
 ## Why Now
 

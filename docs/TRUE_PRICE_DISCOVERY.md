@@ -176,6 +176,50 @@ This matters beyond individual fairness. Prices are signals that coordinate econ
 **Who wins**: Arbitrageurs, MEV extractors
 **Who loses**: LPs, traders
 
+### 3.3 Flash Crashes: The Nash Equilibrium of Panic
+
+Flash crashes aren't random—they're the inevitable result of continuous market structure.
+
+**The game theory:**
+
+In continuous markets, speed determines survival. HFT firms with colocation advantages will always execute faster than regular traders. Everyone knows this.
+
+So what's the rational response?
+
+```
+Regular trader's calculation:
+  "I can't compete on speed with HFT..."
+  "If price drops, they'll exit before me..."
+  "My best strategy: exit at the FIRST sign of trouble"
+  "Better to exit early and be wrong than exit late and be wiped out"
+```
+
+When EVERYONE adopts this strategy:
+1. Any small price move triggers a wave of "get out first" orders
+2. The wave causes a larger price move
+3. Which triggers more "get out first" orders
+4. Cascade continues until liquidity is exhausted
+5. **Flash crash**
+
+**The uncomfortable truth:** Flash ordering isn't irrational panic—it's the **Nash-stable strategy** when you can't compete with HFT colocation. The market structure makes panic optimal.
+
+**Why batch auctions solve this:**
+
+| Continuous Market | Batch Auction |
+|-------------------|---------------|
+| Speed determines who exits first | No speed advantage—all orders equal |
+| Rational to exit at first sign of trouble | Rational to reveal true valuation |
+| Cascading exits cause crash | Uniform clearing absorbs selling pressure |
+| HFT wins, everyone else loses | Fair execution regardless of infrastructure |
+
+In a batch auction:
+- You can't "beat" others to the exit (orders are hidden)
+- There's no advantage to panicking first
+- The clearing price aggregates ALL orders, not just the fastest
+- Large selling pressure is absorbed into one clearing price, not cascaded through sequential trades
+
+**Flash crashes are a feature of continuous markets, not a bug.** They emerge from rational behavior in a poorly designed game. Change the game, eliminate the crashes.
+
 ### 3.3 The Common Thread
 
 Both mechanisms allow **private information exploitation**:

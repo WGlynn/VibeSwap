@@ -497,7 +497,46 @@ Time 10+ sec:   SETTLEMENT
 
 **Honest revelation**: No benefit to misrepresenting valuations
 
-### 8.3 Uniform Clearing Price
+**No flash crashes**: Eliminates the game-theoretic conditions that cause cascading exits
+
+### 8.3 Solving Flash Crashes
+
+Flash crashes aren't random failures—they're the **Nash equilibrium** of continuous markets.
+
+**The problem:**
+
+In continuous markets, HFT firms with colocation advantages always execute faster than regular traders. When price moves, they exit first. Everyone knows this.
+
+The rational response for regular traders: exit at the **first sign of trouble**, before HFT can front-run you. When everyone adopts this strategy, you get cascading exits:
+
+```
+Small price drop
+  → Wave of "exit first" orders
+    → Larger price drop
+      → More "exit first" orders
+        → Flash crash
+```
+
+**Flash ordering is Nash-stable** in continuous markets. You can't compete with HFT on speed, so panic is optimal.
+
+**The batch auction solution:**
+
+| Continuous Market | Batch Auction |
+|-------------------|---------------|
+| Speed determines exit order | No speed advantage |
+| First sign of trouble → exit | Hidden orders → no information to panic on |
+| Cascading sequential exits | Single clearing price absorbs all selling |
+| HFT colocation wins | Infrastructure irrelevant |
+
+In batch auctions:
+- You can't "beat" others to the exit (orders are sealed)
+- Large selling pressure resolves to one clearing price
+- No cascade possible—everything clears simultaneously
+- The Nash equilibrium shifts from "panic first" to "reveal true valuation"
+
+**Flash crashes are a feature of continuous markets, not a bug.** Change the mechanism, eliminate the failure mode.
+
+### 8.4 Uniform Clearing Price
 
 All trades in a batch execute at the **same price**:
 
@@ -514,7 +553,7 @@ All sellers receive the same price.
 
 This is how traditional stock exchanges run opening and closing auctions—because it's mathematically fairer.
 
-### 8.4 The Single Price Property
+### 8.5 The Single Price Property
 
 With one price, there's no "price impact" per trade:
 
@@ -530,7 +569,7 @@ Batch Auction:
 
 The uniform price removes the advantage of trading first.
 
-### 8.5 AMM as Liquidity Backstop
+### 8.6 AMM as Liquidity Backstop
 
 A common concern: "What if there's no counterparty for my trade?"
 

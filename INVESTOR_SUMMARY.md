@@ -80,3 +80,4 @@ William Glynn
 Co-founder & CEO
 willglynn123@gmail.com
 Telegram: @Willwillwillwillwill
+LinkedIn: https://www.linkedin.com/in/william-ethereum-glynn-352031142/

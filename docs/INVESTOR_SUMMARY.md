@@ -78,6 +78,11 @@ We understand the problem deeply — not just technically, but philosophically. 
 **Contact:**
 William Glynn
 Co-founder & CEO
-willglynn123@gmail.com
+
+Email: willglynn123@gmail.com
+Phone: +1 774-571-4257
 Telegram: @Willwillwillwillwill
+Twitter: @economitra
 LinkedIn: https://www.linkedin.com/in/william-ethereum-glynn-352031142/
+
+**HQ:** 73 Coles Pond Drive, South Dennis, MA 02660

@@ -73,4 +73,9 @@ We understand the problem deeply — not just technically, but philosophically. 
 
 *For technical deep-dive, see full mechanism design documentation.*
 
-*Contact: [Your contact info]*
+---
+
+**Contact:**
+William Glynn
+Co-founder & CEO
+willglynn123@gmail.com

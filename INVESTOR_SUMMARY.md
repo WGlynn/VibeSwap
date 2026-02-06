@@ -79,3 +79,4 @@ We understand the problem deeply — not just technically, but philosophically. 
 William Glynn
 Co-founder & CEO
 willglynn123@gmail.com
+Telegram: @Willwillwillwillwill

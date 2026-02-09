@@ -9,9 +9,52 @@ import "../../contracts/libraries/VWAPOracle.sol";
  * @title LiquidityProtectionTest
  * @notice Tests for liquidity protection mechanisms with formal invariant verification
  */
+// Helper contract to test library reverts via external calls
+contract LiquidityProtectionHelper {
+    function validateConfig(LiquidityProtection.ProtectionConfig memory config) external pure {
+        LiquidityProtection.validateConfig(config);
+    }
+
+    function requireMinimumLiquidity(uint256 current, uint256 minimum) external pure {
+        LiquidityProtection.requireMinimumLiquidity(current, minimum);
+    }
+
+    function requirePriceImpactWithinBounds(
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 reserveOut,
+        uint256 maxImpactBps
+    ) external pure {
+        LiquidityProtection.requirePriceImpactWithinBounds(amountIn, reserveIn, reserveOut, maxImpactBps);
+    }
+
+    function calculateVirtualReserves(
+        uint256 reserve0,
+        uint256 reserve1,
+        uint256 amplification
+    ) external pure returns (uint256, uint256) {
+        return LiquidityProtection.calculateVirtualReserves(reserve0, reserve1, amplification);
+    }
+
+    function applyProtections(
+        LiquidityProtection.ProtectionConfig memory config,
+        LiquidityProtection.LiquidityMetrics memory metrics,
+        uint256 amountIn,
+        uint256 tradeValueUsd
+    ) external pure returns (uint256, uint256, uint256) {
+        return LiquidityProtection.applyProtections(config, metrics, amountIn, tradeValueUsd);
+    }
+}
+
 contract LiquidityProtectionTest is Test {
     uint256 constant PRECISION = 1e18;
     uint256 constant BPS = 10000;
+
+    LiquidityProtectionHelper helper;
+
+    function setUp() public {
+        helper = new LiquidityProtectionHelper();
+    }
 
     // ============ Virtual Reserves Tests ============
 
@@ -41,12 +84,12 @@ contract LiquidityProtectionTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(LiquidityProtection.InvalidAmplification.selector, 0)
         );
-        LiquidityProtection.calculateVirtualReserves(100 ether, 100 ether, 0);
+        helper.calculateVirtualReserves(100 ether, 100 ether, 0);
 
         vm.expectRevert(
             abi.encodeWithSelector(LiquidityProtection.InvalidAmplification.selector, 1001)
         );
-        LiquidityProtection.calculateVirtualReserves(100 ether, 100 ether, 1001);
+        helper.calculateVirtualReserves(100 ether, 100 ether, 1001);
     }
 
     /**
@@ -230,7 +273,7 @@ contract LiquidityProtectionTest is Test {
                 300  // max allowed
             )
         );
-        LiquidityProtection.requirePriceImpactWithinBounds(
+        helper.requirePriceImpactWithinBounds(
             100 ether,
             1000 ether,
             1000 ether,
@@ -259,15 +302,15 @@ contract LiquidityProtectionTest is Test {
         if (actualImpact > maxImpactBps) {
             // Should revert
             vm.expectRevert();
-            LiquidityProtection.requirePriceImpactWithinBounds(
+            helper.requirePriceImpactWithinBounds(
                 amountIn,
                 reserveIn,
                 reserveIn,
                 maxImpactBps
             );
         } else {
-            // Should pass
-            LiquidityProtection.requirePriceImpactWithinBounds(
+            // Should pass - use helper to make external call
+            helper.requirePriceImpactWithinBounds(
                 amountIn,
                 reserveIn,
                 reserveIn,
@@ -309,7 +352,7 @@ contract LiquidityProtectionTest is Test {
                 10_000 * PRECISION
             )
         );
-        LiquidityProtection.requireMinimumLiquidity(
+        helper.requireMinimumLiquidity(
             5_000 * PRECISION,
             10_000 * PRECISION
         );
@@ -324,9 +367,9 @@ contract LiquidityProtectionTest is Test {
     ) public {
         if (liquidity < minimum) {
             vm.expectRevert();
-            LiquidityProtection.requireMinimumLiquidity(liquidity, minimum);
+            helper.requireMinimumLiquidity(liquidity, minimum);
         } else {
-            LiquidityProtection.requireMinimumLiquidity(liquidity, minimum);
+            helper.requireMinimumLiquidity(liquidity, minimum);
         }
     }
 
@@ -380,9 +423,9 @@ contract LiquidityProtectionTest is Test {
         assertEq(config.maxPriceImpactBps, 50);    // Tighter for stable
     }
 
-    function test_validateConfig_valid() public pure {
+    function test_validateConfig_valid() public view {
         LiquidityProtection.ProtectionConfig memory config = LiquidityProtection.getDefaultConfig();
-        LiquidityProtection.validateConfig(config); // Should not revert
+        helper.validateConfig(config); // Should not revert
     }
 
     function test_validateConfig_invalidAmplification() public {
@@ -390,7 +433,7 @@ contract LiquidityProtectionTest is Test {
         config.amplificationFactor = 2000; // Too high
 
         vm.expectRevert(LiquidityProtection.InvalidConfiguration.selector);
-        LiquidityProtection.validateConfig(config);
+        helper.validateConfig(config);
     }
 
     function test_validateConfig_invalidImpact() public {
@@ -398,7 +441,7 @@ contract LiquidityProtectionTest is Test {
         config.maxPriceImpactBps = 2000; // > 10% absolute max
 
         vm.expectRevert(LiquidityProtection.InvalidConfiguration.selector);
-        LiquidityProtection.validateConfig(config);
+        helper.validateConfig(config);
     }
 
     // ============ Composite Protection Tests ============
@@ -445,7 +488,7 @@ contract LiquidityProtectionTest is Test {
                 10_000 * PRECISION
             )
         );
-        LiquidityProtection.applyProtections(
+        helper.applyProtections(
             config,
             metrics,
             1 ether,
@@ -478,11 +521,11 @@ contract LiquidityProtectionTest is Test {
     function test_getRecommendedFee_lowLiquidity() public pure {
         uint256 fee = LiquidityProtection.getRecommendedFee(
             false,
-            2 * PRECISION / 100,     // 2% volatility
+            2 * PRECISION / 100,     // 2% volatility (medium, so base fee = 50 bps)
             50_000 * PRECISION       // $50k (half threshold)
         );
 
-        // Should be 2x the base 30 bps
-        assertEq(fee, 60);
+        // Base fee for 2% vol is 50 bps, scaled by 100k/50k = 2x => 100 bps
+        assertEq(fee, 100);
     }
 }

@@ -528,10 +528,15 @@ The protocol maintains a community-funded insurance pool for:
 
 | Claim Type | Coverage | Funded By |
 |------------|----------|-----------|
-| Smart contract bugs | 80% | Protocol fees (10%) |
-| Oracle failures | 60% | Slashed stakes |
+| Smart contract bugs | 80% | Slashed stakes + Dynamic fees |
+| Oracle failures | 60% | Slashed stakes + Dynamic fees |
 | Governance attacks | 50% | Violation penalties |
 | User error | 0% | N/A |
+
+**Pure economics model**: No protocol fees fund insurance. All coverage comes from:
+- Dynamic volatility fee excess (collected during high volatility)
+- Slashed stakes from violations (50% of slashes)
+- Violation penalties
 
 ### 9.4 External Insurance Integration
 
@@ -557,9 +562,13 @@ False positives are handleable through governance:
 ### 10.1 Base Fee Structure
 
 ```
-Trading Fee: 0.30% (30 bps)
-  ├── 80% → LP Pool Reserves
-  └── 20% → Protocol Treasury
+Base Trading Fee: 0.30% (30 bps)
+  └── 100% → LP Pool Reserves (via Shapley distribution)
+
+Dynamic Volatility Fee: (excess above 0.30% during high volatility)
+  └── 100% → Volatility Insurance Pool
+
+Zero protocol extraction. Zero founder allocation.
 ```
 
 ### 10.2 Volatility Adjustment

@@ -7,6 +7,7 @@ import PoolPage from './components/PoolPage'
 import BridgePage from './components/BridgePage'
 import AnalyticsPage from './components/AnalyticsPage'
 import RewardsPage from './components/RewardsPage'
+import DocsPage from './components/DocsPage'
 import MobileNav from './components/MobileNav'
 
 // Page transition variants
@@ -54,6 +55,7 @@ function AnimatedRoutes() {
           <Route path="/bridge" element={<BridgePage />} />
           <Route path="/rewards" element={<RewardsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/docs" element={<DocsPage />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

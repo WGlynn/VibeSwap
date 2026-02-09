@@ -1147,9 +1147,14 @@ Maximum payout per event is capped at 50% of reserves to prevent fund depletion.
 ### 17.1 Base Fee Structure
 
 ```
-Trading Fee: 0.30% (30 bps)
-  ├── 80% → LP Pool Reserves
-  └── 20% → Protocol Treasury
+Base Trading Fee: 0.30% (30 bps)
+  └── 100% → LP Pool Reserves (via Shapley distribution)
+
+Dynamic Volatility Fee: (excess above 0.30% during high volatility)
+  └── 100% → Volatility Insurance Pool
+
+Zero protocol extraction. Zero founder allocation.
+Creator compensation: Voluntary tip jar only.
 ```
 
 ### 17.2 Volatility Adjustment

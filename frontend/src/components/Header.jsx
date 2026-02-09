@@ -15,6 +15,7 @@ function Header() {
     { path: '/pool', label: 'Pool', icon: '💧' },
     { path: '/bridge', label: 'Bridge', icon: '🌉' },
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
+    { path: '/docs', label: 'Docs', icon: '📚' },
   ]
 
   return (

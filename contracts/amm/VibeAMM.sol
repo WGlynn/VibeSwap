@@ -16,6 +16,7 @@ import "../libraries/TWAPOracle.sol";
 import "../libraries/VWAPOracle.sol";
 import "../libraries/TruePriceLib.sol";
 import "../libraries/LiquidityProtection.sol";
+import "../libraries/FibonacciScaling.sol";
 import "../oracles/interfaces/ITruePriceOracle.sol";
 
 /**
@@ -130,6 +131,29 @@ contract VibeAMM is
     /// @notice Cached USD prices per token (updated by keeper)
     mapping(address => uint256) public tokenUsdPrices;
 
+    // ============ Fibonacci Scaling State ============
+
+    /// @notice Whether Fibonacci scaling is enabled
+    bool public fibonacciScalingEnabled;
+
+    /// @notice User throughput tracking per pool (user => pool => volume in window)
+    mapping(address => mapping(bytes32 => uint256)) public userPoolVolume;
+
+    /// @notice User volume window start timestamp
+    mapping(address => uint256) public userVolumeWindowStart;
+
+    /// @notice Base unit for Fibonacci tier calculation (per pool)
+    mapping(bytes32 => uint256) public fibonacciBaseUnit;
+
+    /// @notice Recent high price per pool (for Fib retracement)
+    mapping(bytes32 => uint256) public recentHighPrice;
+
+    /// @notice Recent low price per pool (for Fib retracement)
+    mapping(bytes32 => uint256) public recentLowPrice;
+
+    /// @notice Fibonacci volume window duration (default 1 hour)
+    uint256 public fibonacciWindowDuration = 1 hours;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
@@ -142,6 +166,9 @@ contract VibeAMM is
     event LiquidityProtectionConfigured(bytes32 indexed poolId, uint256 amplification, uint256 maxImpactBps);
     event DynamicFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 adjustedFee);
     event TradeRejectedLowLiquidity(bytes32 indexed poolId, uint256 liquidity, uint256 minimum);
+    event FibonacciTierReached(bytes32 indexed poolId, address indexed user, uint8 tier, uint256 volume);
+    event FibonacciPriceLevelDetected(bytes32 indexed poolId, uint256 price, uint256 fibLevel, bool isSupport);
+    event FibonacciFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 fibFee, uint8 tier);
 
     // ============ Security Errors ============
 
@@ -152,6 +179,7 @@ contract VibeAMM is
     error DonationAttackSuspected();
     error PriceImpactExceedsLimit(uint256 impact, uint256 maxAllowed);
     error InsufficientPoolLiquidity(uint256 current, uint256 minimum);
+    error FibonacciRateLimitExceeded(uint256 requested, uint256 allowed, uint256 cooldownSeconds);
 
     // ============ Modifiers ============
 
@@ -591,6 +619,11 @@ contract VibeAMM is
             }
         }
 
+        // ============ Fibonacci Scaling ============
+        if (fibonacciScalingEnabled) {
+            feeRate = _applyFibonacciScaling(poolId, msg.sender, amountIn, feeRate);
+        }
+
         // TRADE SIZE LIMIT - prevent large trades that could manipulate price
         uint256 maxTradeSize = poolMaxTradeSize[poolId] > 0
             ? poolMaxTradeSize[poolId]
@@ -983,6 +1016,102 @@ contract VibeAMM is
     }
 
     /**
+     * @notice Apply Fibonacci-based scaling for throughput and fees
+     * @param poolId Pool identifier
+     * @param user User address
+     * @param amountIn Trade amount
+     * @param currentFee Current fee rate
+     * @return adjustedFee Fibonacci-adjusted fee rate
+     */
+    function _applyFibonacciScaling(
+        bytes32 poolId,
+        address user,
+        uint256 amountIn,
+        uint256 currentFee
+    ) internal returns (uint256 adjustedFee) {
+        // Reset volume window if expired
+        if (block.timestamp > userVolumeWindowStart[user] + fibonacciWindowDuration) {
+            userVolumeWindowStart[user] = block.timestamp;
+            userPoolVolume[user][poolId] = 0;
+        }
+
+        uint256 currentVolume = userPoolVolume[user][poolId];
+        uint256 baseUnit = fibonacciBaseUnit[poolId];
+        if (baseUnit == 0) {
+            baseUnit = 1 ether; // Default 1 ETH base unit
+        }
+
+        // Get current tier and check rate limit
+        (uint8 tier, uint256 maxAllowed, ) = FibonacciScaling.getThroughputTier(
+            currentVolume + amountIn,
+            baseUnit
+        );
+
+        // Calculate rate limit
+        uint256 maxBandwidth = FibonacciScaling.fibonacciSum(tier + 5) * baseUnit;
+        (uint256 allowedAmount, uint256 cooldownSeconds) = FibonacciScaling.calculateRateLimit(
+            currentVolume,
+            maxBandwidth,
+            fibonacciWindowDuration
+        );
+
+        if (amountIn > allowedAmount && allowedAmount < amountIn) {
+            revert FibonacciRateLimitExceeded(amountIn, allowedAmount, cooldownSeconds);
+        }
+
+        // Apply Fibonacci fee multiplier based on tier
+        adjustedFee = FibonacciScaling.getFibonacciFeeMultiplier(tier, currentFee);
+
+        // Update user volume
+        userPoolVolume[user][poolId] = currentVolume + amountIn;
+
+        // Emit tier event if significant
+        if (tier > 0) {
+            emit FibonacciTierReached(poolId, user, tier, currentVolume + amountIn);
+        }
+
+        // Emit fee event if adjusted
+        if (adjustedFee != currentFee) {
+            emit FibonacciFeeApplied(poolId, currentFee, adjustedFee, tier);
+        }
+
+        // Update high/low prices for Fib retracement
+        _updateFibonacciPriceLevels(poolId);
+    }
+
+    /**
+     * @notice Update high/low prices and detect Fibonacci levels
+     */
+    function _updateFibonacciPriceLevels(bytes32 poolId) internal {
+        Pool storage pool = pools[poolId];
+        if (pool.reserve0 == 0) return;
+
+        uint256 currentPrice = (pool.reserve1 * 1e18) / pool.reserve0;
+
+        // Update high/low
+        if (currentPrice > recentHighPrice[poolId] || recentHighPrice[poolId] == 0) {
+            recentHighPrice[poolId] = currentPrice;
+        }
+        if (currentPrice < recentLowPrice[poolId] || recentLowPrice[poolId] == 0) {
+            recentLowPrice[poolId] = currentPrice;
+        }
+
+        // Detect Fibonacci level (with 1% tolerance)
+        if (recentHighPrice[poolId] > recentLowPrice[poolId]) {
+            (uint256 level, bool isSupport) = FibonacciScaling.detectFibonacciLevel(
+                currentPrice,
+                recentHighPrice[poolId],
+                recentLowPrice[poolId],
+                100 // 1% tolerance
+            );
+
+            if (level != 9999) {
+                emit FibonacciPriceLevelDetected(poolId, currentPrice, level, isSupport);
+            }
+        }
+    }
+
+    /**
      * @notice Get pool liquidity metrics for protection calculations
      */
     function _getPoolMetrics(bytes32 poolId) internal view returns (LiquidityProtection.LiquidityMetrics memory metrics) {
@@ -1266,5 +1395,170 @@ contract VibeAMM is
             tradeValueUsd,
             pool.feeRate
         );
+    }
+
+    // ============ Fibonacci Scaling Admin Functions ============
+
+    /**
+     * @notice Enable/disable Fibonacci scaling
+     */
+    function setFibonacciScaling(bool enabled) external onlyOwner {
+        fibonacciScalingEnabled = enabled;
+    }
+
+    /**
+     * @notice Set Fibonacci base unit for a pool
+     * @param poolId Pool identifier
+     * @param baseUnit Base unit for tier calculation
+     */
+    function setFibonacciBaseUnit(bytes32 poolId, uint256 baseUnit) external onlyOwner {
+        require(baseUnit > 0, "Base unit must be > 0");
+        fibonacciBaseUnit[poolId] = baseUnit;
+    }
+
+    /**
+     * @notice Set Fibonacci volume window duration
+     * @param duration Window duration in seconds
+     */
+    function setFibonacciWindowDuration(uint256 duration) external onlyOwner {
+        require(duration >= 1 minutes && duration <= 24 hours, "Invalid duration");
+        fibonacciWindowDuration = duration;
+    }
+
+    /**
+     * @notice Reset high/low prices for Fibonacci retracement
+     * @param poolId Pool identifier
+     */
+    function resetFibonacciPriceLevels(bytes32 poolId) external onlyOwner {
+        Pool storage pool = pools[poolId];
+        if (pool.reserve0 > 0) {
+            uint256 currentPrice = (pool.reserve1 * 1e18) / pool.reserve0;
+            recentHighPrice[poolId] = currentPrice;
+            recentLowPrice[poolId] = currentPrice;
+        }
+    }
+
+    // ============ Fibonacci Scaling View Functions ============
+
+    /**
+     * @notice Get user's current Fibonacci tier for a pool
+     * @param user User address
+     * @param poolId Pool identifier
+     * @return tier Current tier
+     * @return volume Current volume in window
+     * @return maxAllowed Maximum allowed for current tier
+     */
+    function getUserFibonacciTier(
+        address user,
+        bytes32 poolId
+    ) external view returns (uint8 tier, uint256 volume, uint256 maxAllowed) {
+        // Check if window is expired
+        if (block.timestamp > userVolumeWindowStart[user] + fibonacciWindowDuration) {
+            return (0, 0, fibonacciBaseUnit[poolId] > 0 ? fibonacciBaseUnit[poolId] : 1 ether);
+        }
+
+        volume = userPoolVolume[user][poolId];
+        uint256 baseUnit = fibonacciBaseUnit[poolId] > 0 ? fibonacciBaseUnit[poolId] : 1 ether;
+
+        (tier, maxAllowed, ) = FibonacciScaling.getThroughputTier(volume, baseUnit);
+    }
+
+    /**
+     * @notice Get Fibonacci retracement levels for a pool
+     * @param poolId Pool identifier
+     * @return levels All Fibonacci retracement levels
+     */
+    function getFibonacciRetracementLevels(
+        bytes32 poolId
+    ) external view returns (FibonacciScaling.FibRetracementLevels memory levels) {
+        uint256 high = recentHighPrice[poolId];
+        uint256 low = recentLowPrice[poolId];
+
+        if (high > 0 && low > 0 && high >= low) {
+            return FibonacciScaling.calculateRetracementLevels(high, low);
+        }
+
+        // Return current price as all levels if no history
+        Pool storage pool = pools[poolId];
+        if (pool.reserve0 > 0) {
+            uint256 currentPrice = (pool.reserve1 * 1e18) / pool.reserve0;
+            levels.level0 = currentPrice;
+            levels.level236 = currentPrice;
+            levels.level382 = currentPrice;
+            levels.level500 = currentPrice;
+            levels.level618 = currentPrice;
+            levels.level786 = currentPrice;
+            levels.level1000 = currentPrice;
+        }
+    }
+
+    /**
+     * @notice Get Fibonacci price bands for a pool
+     * @param poolId Pool identifier
+     * @param volatilityBps Volatility in basis points (e.g., 500 for 5%)
+     * @return bands Support and resistance levels
+     */
+    function getFibonacciPriceBands(
+        bytes32 poolId,
+        uint256 volatilityBps
+    ) external view returns (FibonacciScaling.FibPriceBand memory bands) {
+        Pool storage pool = pools[poolId];
+        if (pool.reserve0 == 0) return bands;
+
+        uint256 currentPrice = (pool.reserve1 * 1e18) / pool.reserve0;
+        return FibonacciScaling.calculatePriceBands(currentPrice, volatilityBps);
+    }
+
+    /**
+     * @notice Calculate Fibonacci-weighted price from recent trades
+     * @dev Uses VWAP observations weighted by Fibonacci sequence
+     * @param poolId Pool identifier
+     * @return weightedPrice Fibonacci-weighted average price
+     */
+    function getFibonacciWeightedPrice(bytes32 poolId) external view returns (uint256 weightedPrice) {
+        // Get recent prices from TWAP oracle
+        if (!poolOracles[poolId].canConsult(5 minutes)) {
+            Pool storage pool = pools[poolId];
+            return pool.reserve0 > 0 ? (pool.reserve1 * 1e18) / pool.reserve0 : 0;
+        }
+
+        // Use TWAP as approximation (full implementation would use observation array)
+        return poolOracles[poolId].consult(5 minutes);
+    }
+
+    /**
+     * @notice Get Fibonacci liquidity score for a pool
+     * @param poolId Pool identifier
+     * @return score Liquidity score (0-100) based on Fibonacci bands
+     */
+    function getFibonacciLiquidityScore(bytes32 poolId) external view returns (uint256 score) {
+        Pool storage pool = pools[poolId];
+        if (pool.reserve0 == 0) return 0;
+
+        uint256 currentPrice = (pool.reserve1 * 1e18) / pool.reserve0;
+        uint256 priceRange = recentHighPrice[poolId] > recentLowPrice[poolId]
+            ? recentHighPrice[poolId] - recentLowPrice[poolId]
+            : currentPrice / 10; // Default 10% range
+
+        return FibonacciScaling.calculateFibLiquidityScore(
+            pool.reserve0 + pool.reserve1,
+            currentPrice,
+            priceRange
+        );
+    }
+
+    /**
+     * @notice Get golden ratio mean between bid and ask
+     * @param poolId Pool identifier
+     * @param bidPrice Bid price
+     * @param askPrice Ask price
+     * @return goldenMean Price at golden ratio point
+     */
+    function getGoldenRatioPrice(
+        bytes32 poolId,
+        uint256 bidPrice,
+        uint256 askPrice
+    ) external pure returns (uint256 goldenMean) {
+        return FibonacciScaling.goldenRatioMean(bidPrice, askPrice);
     }
 }

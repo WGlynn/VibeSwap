@@ -165,6 +165,68 @@ VibeSwap's Shapley implementation:
 
 ---
 
+## Bitcoin Halving Schedule for Rewards
+
+VibeSwap uses Bitcoin's halving model for Shapley reward distribution:
+
+| Era | Games | Emission | Multiplier |
+|-----|-------|----------|------------|
+| 0 | 0 - 52,559 | 100% | 1.0x |
+| 1 | 52,560 - 105,119 | 50% | 0.5x |
+| 2 | 105,120 - 157,679 | 25% | 0.25x |
+| 3 | 157,680 - 210,239 | 12.5% | 0.125x |
+| ... | ... | ... | ... |
+| 32+ | 1,683,840+ | ~0% | ~0x |
+
+**Why this matters:**
+- Early participants rewarded for bootstrapping
+- Deflationary long-term economics
+- Predictable, transparent emission schedule
+- No perpetual inflation tax
+
+---
+
+## Fibonacci Scaling Mathematics
+
+VibeSwap uses Fibonacci sequence properties for natural, harmonic market design:
+
+### Throughput Bandwidth
+Rate limits follow Fibonacci progression:
+```
+Tier 0: 1 × base  →  Tier 1: 2 × base  →  Tier 2: 4 × base  →  Tier 3: 7 × base
+(1)              (1+1)              (1+1+2)            (1+1+2+3)
+```
+
+### Fee Scaling with Golden Ratio
+```
+fee(tier) = base_fee × (1 + (φ - 1) × tier / 10)
+```
+Higher-volume traders pay progressively higher fees following golden ratio (φ ≈ 1.618) dampening.
+
+### Price Retracement Levels
+Standard Fibonacci levels for support/resistance detection:
+- 23.6%, 38.2%, 50%, 61.8%, 78.6%
+
+These inform oracle validation, circuit breakers, and liquidity scoring.
+
+---
+
+## Pure Economics: No Rent-Seeking
+
+**Zero protocol extraction:**
+- 100% of trading fees → Liquidity providers (via Shapley)
+- 0% → Protocol/founders
+
+**Creator compensation via tip jar:**
+```solidity
+// Voluntary retroactive gratitude, not codified extraction
+function tipEth(string calldata message) external payable;
+```
+
+> "The best systems reward creators through voluntary gratitude, not codified extraction."
+
+---
+
 ## Features
 
 - **MEV Protection**: Commit-reveal mechanism hides order details until reveal phase
@@ -364,11 +426,13 @@ contracts/
 │       └── ISlippageGuaranteeFund.sol
 ├── oracles/
 │   └── VolatilityOracle.sol       # Dynamic fee multipliers
+├── CreatorTipJar.sol              # Voluntary creator tips
 ├── messaging/
 │   └── CrossChainRouter.sol       # LayerZero V2 OApp
 └── libraries/
     ├── DeterministicShuffle.sol   # Fisher-Yates shuffle
-    └── BatchMath.sol              # Clearing price math
+    ├── BatchMath.sol              # Clearing price math
+    └── FibonacciScaling.sol       # Golden ratio math, throughput tiers
 
 test/
 ├── CommitRevealAuction.t.sol
@@ -481,12 +545,13 @@ forge coverage
 
 | Document | Description |
 |----------|-------------|
-| [**Complete Mechanism Design**](docs/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md) | **Master document** - Comprehensive guide covering all mechanism designs in narrative form |
-| [True Price Oracle](docs/TRUE_PRICE_ORACLE.md) | **Quantitative framework** - Kalman filter state-space model, Bayesian estimation, regime detection, signal generation |
-| [Price Intelligence Oracle](docs/PRICE_INTELLIGENCE_ORACLE.md) | Manipulation detection, liquidation cascade identification, rubber band reversion, reputation-weighted signals |
-| [True Price Discovery](docs/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices, and Nash equilibrium analysis |
-| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, reputation system, and game theory |
-| [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, on-chain accountability, and cryptoeconomic defense |
+| [**VibeSwap Whitepaper**](docs/VIBESWAP_WHITEPAPER.md) | **Start here** - Comprehensive whitepaper covering all innovations: batch auctions, Fibonacci scaling, Shapley distribution, Bitcoin halving, and pure economics |
+| [Complete Mechanism Design](docs/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md) | Detailed guide covering all mechanism designs in narrative form |
+| [True Price Oracle](docs/TRUE_PRICE_ORACLE.md) | Kalman filter state-space model, Bayesian estimation, regime detection |
+| [Price Intelligence Oracle](docs/PRICE_INTELLIGENCE_ORACLE.md) | Manipulation detection, liquidation cascade identification, rubber band reversion |
+| [True Price Discovery](docs/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices |
+| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, game theory |
+| [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, cryptoeconomic defense |
 
 ## License
 

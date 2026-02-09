@@ -29,6 +29,8 @@ contract ShapleyDistributorTest is Test {
     event GameCreated(bytes32 indexed gameId, uint256 totalValue, address token, uint256 participantCount);
     event ShapleyComputed(bytes32 indexed gameId, address indexed participant, uint256 shapleyValue);
     event RewardClaimed(bytes32 indexed gameId, address indexed participant, uint256 amount);
+    event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
+    event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
 
     function setUp() public {
         owner = address(this);
@@ -622,6 +624,203 @@ contract ShapleyDistributorTest is Test {
 
         // All value distributed (efficiency property)
         assertEq(aliceShare + bobShare, 100 ether);
+    }
+
+    // ============ Bitcoin Halving Schedule Tests ============
+
+    function test_halving_initialState() public view {
+        // Initial state: Era 0, 100% emission
+        assertEq(distributor.getCurrentHalvingEra(), 0);
+        assertEq(distributor.getEmissionMultiplier(0), 1e18); // 100%
+        assertTrue(distributor.halvingEnabled());
+        assertEq(distributor.gamesPerEra(), 52560); // Default ~1 year
+        assertEq(distributor.totalGamesCreated(), 0);
+    }
+
+    function test_halving_emissionMultiplierMath() public pure {
+        // Test the underlying math: PRECISION >> era
+        uint256 PRECISION = 1e18;
+
+        // Era 0: 100% (1e18 >> 0 = 1e18)
+        assertEq(PRECISION >> 0, 1e18);
+
+        // Era 1: 50% (1e18 >> 1 = 5e17)
+        assertEq(PRECISION >> 1, 5e17);
+
+        // Era 2: 25% (1e18 >> 2 = 2.5e17)
+        assertEq(PRECISION >> 2, 25e16);
+
+        // Era 3: 12.5% (1e18 >> 3 = 1.25e17)
+        assertEq(PRECISION >> 3, 125e15);
+    }
+
+    function test_halving_getEmissionMultiplier() public view {
+        assertEq(distributor.getEmissionMultiplier(0), 1e18);        // 100%
+        assertEq(distributor.getEmissionMultiplier(1), 5e17);        // 50%
+        assertEq(distributor.getEmissionMultiplier(2), 25e16);       // 25%
+        assertEq(distributor.getEmissionMultiplier(3), 125e15);      // 12.5%
+        assertEq(distributor.getEmissionMultiplier(10), 976562500000000); // ~0.1%
+        assertEq(distributor.getEmissionMultiplier(32), 0);          // After 32 halvings
+    }
+
+    function test_halving_era0_fullValue() public {
+        // In Era 0, full Shapley value should be distributed
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        // Game value should be unchanged in Era 0
+        (, uint256 totalValue,,) = distributor.games(GAME_ID);
+        assertEq(totalValue, 100 ether);
+        assertEq(distributor.totalGamesCreated(), 1);
+    }
+
+    function test_halving_era1_halfValue() public {
+        // Fast-forward to Era 1 by creating gamesPerEra games
+        uint256 gamesPerEra = distributor.gamesPerEra();
+
+        // First, let's use a smaller gamesPerEra for testing
+        distributor.setGamesPerEra(10); // 10 games per era for testing
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 1000 ether);
+
+        // Create 10 games to enter Era 1
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 gameId = keccak256(abi.encode("game", i));
+            distributor.createGame(gameId, 10 ether, address(token), participants);
+        }
+
+        // Now we should be in Era 1
+        assertEq(distributor.getCurrentHalvingEra(), 1);
+
+        // Create a game in Era 1
+        bytes32 era1Game = keccak256("era1-game");
+        distributor.createGame(era1Game, 100 ether, address(token), participants);
+
+        // Game value should be halved
+        (, uint256 totalValue,,) = distributor.games(era1Game);
+        assertEq(totalValue, 50 ether); // 50% of 100 ether
+    }
+
+    function test_halving_era2_quarterValue() public {
+        // Set small gamesPerEra for testing
+        distributor.setGamesPerEra(5);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 1000 ether);
+
+        // Create 10 games to enter Era 2
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 gameId = keccak256(abi.encode("game", i));
+            distributor.createGame(gameId, 10 ether, address(token), participants);
+        }
+
+        // Should be in Era 2
+        assertEq(distributor.getCurrentHalvingEra(), 2);
+
+        // Create a game in Era 2
+        bytes32 era2Game = keccak256("era2-game");
+        distributor.createGame(era2Game, 100 ether, address(token), participants);
+
+        // Game value should be 25%
+        (, uint256 totalValue,,) = distributor.games(era2Game);
+        assertEq(totalValue, 25 ether); // 25% of 100 ether
+    }
+
+    function test_halving_gamesUntilNextHalving() public {
+        distributor.setGamesPerEra(100);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 1000 ether);
+
+        // Initially, 100 games until first halving
+        assertEq(distributor.gamesUntilNextHalving(), 100);
+
+        // Create 30 games
+        for (uint256 i = 0; i < 30; i++) {
+            bytes32 gameId = keccak256(abi.encode("game", i));
+            distributor.createGame(gameId, 1 ether, address(token), participants);
+        }
+
+        // Should be 70 games until halving
+        assertEq(distributor.gamesUntilNextHalving(), 70);
+    }
+
+    function test_halving_getHalvingInfo() public {
+        distributor.setGamesPerEra(100);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 1000 ether);
+
+        // Create 50 games
+        for (uint256 i = 0; i < 50; i++) {
+            bytes32 gameId = keccak256(abi.encode("game", i));
+            distributor.createGame(gameId, 1 ether, address(token), participants);
+        }
+
+        (
+            uint8 currentEra,
+            uint256 currentMultiplier,
+            uint256 currentMultiplierBps,
+            uint256 gamesInCurrentEra,
+            uint256 totalGames
+        ) = distributor.getHalvingInfo();
+
+        assertEq(currentEra, 0);
+        assertEq(currentMultiplier, 1e18); // 100%
+        assertEq(currentMultiplierBps, 10000); // 100% in bps
+        assertEq(gamesInCurrentEra, 50);
+        assertEq(totalGames, 50);
+    }
+
+    function test_halving_canBeDisabled() public {
+        distributor.setGamesPerEra(5);
+        distributor.setHalvingEnabled(false);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 1000 ether);
+
+        // Create 10 games (would be Era 2 if enabled)
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 gameId = keccak256(abi.encode("game", i));
+            distributor.createGame(gameId, 10 ether, address(token), participants);
+        }
+
+        // Even though we're in "Era 2", halving is disabled
+        // Create a game - should get full value
+        bytes32 testGame = keccak256("test-game");
+        distributor.createGame(testGame, 100 ether, address(token), participants);
+
+        (, uint256 totalValue,,) = distributor.games(testGame);
+        assertEq(totalValue, 100 ether); // Full value, no halving applied
+    }
+
+    function test_halving_adminFunctions() public {
+        // Test setGamesPerEra
+        distributor.setGamesPerEra(1000);
+        assertEq(distributor.gamesPerEra(), 1000);
+
+        // Test setHalvingEnabled
+        distributor.setHalvingEnabled(false);
+        assertFalse(distributor.halvingEnabled());
+
+        distributor.setHalvingEnabled(true);
+        assertTrue(distributor.halvingEnabled());
+
+        // Test resetGenesisTimestamp
+        uint256 originalTimestamp = distributor.genesisTimestamp();
+        vm.warp(block.timestamp + 1 days);
+        distributor.resetGenesisTimestamp();
+        assertGt(distributor.genesisTimestamp(), originalTimestamp);
+    }
+
+    function test_halving_maxEras() public view {
+        // After 32 halvings, emission should be 0
+        assertEq(distributor.getEmissionMultiplier(32), 0);
+        assertEq(distributor.getEmissionMultiplier(33), 0);
+        assertEq(distributor.getEmissionMultiplier(100), 0);
     }
 
     // ============ Helpers ============

@@ -25,6 +25,20 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * - Symmetry: equal contributors get equal rewards
  * - Null player: no contribution = no reward
  * - Additivity: consistent across combined games
+ *
+ * Bitcoin Halving Schedule:
+ * - Rewards follow Bitcoin's deflationary emission model
+ * - Halving occurs every epoch (configurable, default ~1 year equivalent)
+ * - Era 0: 100% of computed Shapley value
+ * - Era 1: 50% of computed Shapley value
+ * - Era 2: 25% of computed Shapley value
+ * - ... continues until rewards approach 0 (~32 halvings)
+ *
+ * This ensures:
+ * - Early participants are rewarded for bootstrapping
+ * - Long-term sustainability without inflation
+ * - Predictable, transparent emission schedule
+ * - No rent-seeking - just fair, diminishing rewards
  */
 contract ShapleyDistributor is
     OwnableUpgradeable,
@@ -43,6 +57,18 @@ contract ShapleyDistributor is
     uint256 public constant ENABLING_WEIGHT = 3000;    // 30% - Time-based enabling
     uint256 public constant SCARCITY_WEIGHT = 2000;    // 20% - Providing scarce side
     uint256 public constant STABILITY_WEIGHT = 1000;   // 10% - Staying during volatility
+
+    // ============ Bitcoin Halving Schedule Constants ============
+
+    /// @notice Number of games per halving era (like Bitcoin's 210,000 blocks)
+    /// @dev Default: 52,560 games ≈ 1 year at 1 game per 10 minutes
+    uint256 public constant DEFAULT_GAMES_PER_ERA = 52560;
+
+    /// @notice Maximum number of halving eras (32 halvings = rewards approach 0)
+    uint8 public constant MAX_HALVING_ERAS = 32;
+
+    /// @notice Initial emission multiplier (100% = PRECISION)
+    uint256 public constant INITIAL_EMISSION = PRECISION;
 
     // ============ Structs ============
 
@@ -112,12 +138,34 @@ contract ShapleyDistributor is
     uint256 public maxParticipants;
     bool public useQualityWeights;
 
+    // ============ Bitcoin Halving State ============
+
+    /// @notice Genesis timestamp (when halving schedule started)
+    uint256 public genesisTimestamp;
+
+    /// @notice Total games created (used for era calculation)
+    uint256 public totalGamesCreated;
+
+    /// @notice Games per era (configurable, default DEFAULT_GAMES_PER_ERA)
+    uint256 public gamesPerEra;
+
+    /// @notice Whether halving schedule is enabled
+    bool public halvingEnabled;
+
+    /// @notice Total value distributed across all eras (for tracking)
+    uint256 public totalValueDistributed;
+
+    /// @notice Value distributed per era
+    mapping(uint8 => uint256) public eraDistributed;
+
     // ============ Events ============
 
     event GameCreated(bytes32 indexed gameId, uint256 totalValue, address token, uint256 participantCount);
     event ShapleyComputed(bytes32 indexed gameId, address indexed participant, uint256 shapleyValue);
     event RewardClaimed(bytes32 indexed gameId, address indexed participant, uint256 amount);
     event QualityWeightUpdated(address indexed participant, uint256 activity, uint256 reputation, uint256 economic);
+    event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
+    event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
 
     // ============ Errors ============
 
@@ -157,6 +205,11 @@ contract ShapleyDistributor is
         minParticipants = 2;
         maxParticipants = 100;  // Practical limit for on-chain computation
         useQualityWeights = true;
+
+        // Initialize Bitcoin halving schedule
+        genesisTimestamp = block.timestamp;
+        gamesPerEra = DEFAULT_GAMES_PER_ERA;
+        halvingEnabled = true;
     }
 
     // ============ Game Creation ============
@@ -179,9 +232,20 @@ contract ShapleyDistributor is
         if (participants.length < minParticipants) revert TooFewParticipants();
         if (participants.length > maxParticipants) revert TooManyParticipants();
 
+        // Apply Bitcoin halving schedule
+        uint256 adjustedValue = totalValue;
+        uint8 currentEra = getCurrentHalvingEra();
+
+        if (halvingEnabled && currentEra > 0) {
+            uint256 emissionMultiplier = getEmissionMultiplier(currentEra);
+            adjustedValue = (totalValue * emissionMultiplier) / PRECISION;
+
+            emit HalvingApplied(gameId, totalValue, adjustedValue, currentEra);
+        }
+
         games[gameId] = CooperativeGame({
             gameId: gameId,
-            totalValue: totalValue,
+            totalValue: adjustedValue,
             token: token,
             settled: false
         });
@@ -191,7 +255,16 @@ contract ShapleyDistributor is
             gameParticipants[gameId].push(participants[i]);
         }
 
-        emit GameCreated(gameId, totalValue, token, participants.length);
+        // Update halving tracking
+        uint8 prevEra = totalGamesCreated > 0 ? uint8((totalGamesCreated - 1) / gamesPerEra) : 0;
+        totalGamesCreated++;
+
+        // Check if we crossed into a new era
+        if (currentEra > prevEra && currentEra <= MAX_HALVING_ERAS) {
+            emit HalvingEraChanged(currentEra, getEmissionMultiplier(currentEra), totalGamesCreated);
+        }
+
+        emit GameCreated(gameId, adjustedValue, token, participants.length);
     }
 
     /**
@@ -409,6 +482,79 @@ contract ShapleyDistributor is
         emit QualityWeightUpdated(participant, activityScore, reputationScore, economicScore);
     }
 
+    // ============ Bitcoin Halving Functions ============
+
+    /**
+     * @notice Get the current halving era based on games created
+     * @dev Era 0 = first gamesPerEra games, Era 1 = next gamesPerEra, etc.
+     * @return Current era (0 to MAX_HALVING_ERAS)
+     */
+    function getCurrentHalvingEra() public view returns (uint8) {
+        if (gamesPerEra == 0) return 0;
+
+        uint256 era = totalGamesCreated / gamesPerEra;
+
+        // Cap at MAX_HALVING_ERAS
+        if (era > MAX_HALVING_ERAS) {
+            return MAX_HALVING_ERAS;
+        }
+
+        return uint8(era);
+    }
+
+    /**
+     * @notice Get emission multiplier for a given era
+     * @dev Era 0 = 100% (PRECISION), Era 1 = 50%, Era 2 = 25%, etc.
+     *      Uses bit shifting for gas-efficient halving: PRECISION >> era
+     * @param era The halving era (0 to MAX_HALVING_ERAS)
+     * @return Emission multiplier (scaled by PRECISION)
+     */
+    function getEmissionMultiplier(uint8 era) public pure returns (uint256) {
+        if (era == 0) return INITIAL_EMISSION;
+        if (era >= MAX_HALVING_ERAS) return 0; // After 32 halvings, essentially 0
+
+        // Halving: PRECISION / 2^era = PRECISION >> era
+        return INITIAL_EMISSION >> era;
+    }
+
+    /**
+     * @notice Get remaining games until next halving
+     * @return Games remaining until next era
+     */
+    function gamesUntilNextHalving() external view returns (uint256) {
+        if (gamesPerEra == 0) return type(uint256).max;
+
+        uint8 currentEra = getCurrentHalvingEra();
+        if (currentEra >= MAX_HALVING_ERAS) return 0;
+
+        uint256 nextEraStartGame = (uint256(currentEra) + 1) * gamesPerEra;
+        if (totalGamesCreated >= nextEraStartGame) return 0;
+
+        return nextEraStartGame - totalGamesCreated;
+    }
+
+    /**
+     * @notice Get halving schedule info
+     * @return currentEra Current halving era
+     * @return currentMultiplier Current emission multiplier (PRECISION scale)
+     * @return currentMultiplierBps Current emission as basis points (10000 = 100%)
+     * @return gamesInCurrentEra Games created in current era
+     * @return totalGames Total games created ever
+     */
+    function getHalvingInfo() external view returns (
+        uint8 currentEra,
+        uint256 currentMultiplier,
+        uint256 currentMultiplierBps,
+        uint256 gamesInCurrentEra,
+        uint256 totalGames
+    ) {
+        currentEra = getCurrentHalvingEra();
+        currentMultiplier = getEmissionMultiplier(currentEra);
+        currentMultiplierBps = (currentMultiplier * BPS_PRECISION) / PRECISION;
+        gamesInCurrentEra = gamesPerEra > 0 ? totalGamesCreated % gamesPerEra : 0;
+        totalGames = totalGamesCreated;
+    }
+
     // ============ View Functions ============
 
     /**
@@ -454,6 +600,34 @@ contract ShapleyDistributor is
 
     function setUseQualityWeights(bool _use) external onlyOwner {
         useQualityWeights = _use;
+    }
+
+    // ============ Halving Admin Functions ============
+
+    /**
+     * @notice Enable or disable halving schedule
+     * @param _enabled Whether halving should be applied
+     */
+    function setHalvingEnabled(bool _enabled) external onlyOwner {
+        halvingEnabled = _enabled;
+    }
+
+    /**
+     * @notice Set games per halving era
+     * @dev Only affects future era calculations, not past games
+     * @param _gamesPerEra New games per era value
+     */
+    function setGamesPerEra(uint256 _gamesPerEra) external onlyOwner {
+        require(_gamesPerEra > 0, "Games per era must be > 0");
+        gamesPerEra = _gamesPerEra;
+    }
+
+    /**
+     * @notice Emergency reset of genesis timestamp (use with caution)
+     * @dev Only for correcting deployment issues, not regular use
+     */
+    function resetGenesisTimestamp() external onlyOwner {
+        genesisTimestamp = block.timestamp;
     }
 
     // ============ Receive ETH ============

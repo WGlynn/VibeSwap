@@ -15,7 +15,6 @@ function Header() {
     { path: '/pool', label: 'Pool', icon: '💧' },
     { path: '/bridge', label: 'Bridge', icon: '🌉' },
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
-    { path: '/analytics', label: 'Analytics', icon: '📊' },
   ]
 
   return (
@@ -58,7 +57,7 @@ function Header() {
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-1 bg-void-800/50 rounded-2xl p-1.5 border border-void-600/30">
               {navItems.map((item) => {
-                const isActive = location.pathname === item.path || (item.path === '/swap' && location.pathname === '/')
+                const isActive = location.pathname === item.path
                 return (
                   <Link
                     key={item.path}

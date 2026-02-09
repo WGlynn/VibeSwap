@@ -13,6 +13,8 @@ import "../core/CircuitBreaker.sol";
 import "../libraries/BatchMath.sol";
 import "../libraries/SecurityLib.sol";
 import "../libraries/TWAPOracle.sol";
+import "../libraries/TruePriceLib.sol";
+import "../oracles/interfaces/ITruePriceOracle.sol";
 
 /**
  * @title VibeAMM
@@ -97,6 +99,17 @@ contract VibeAMM is
     /// @notice Custom max trade size per pool (0 = use default)
     mapping(bytes32 => uint256) public poolMaxTradeSize;
 
+    // ============ True Price Oracle Integration ============
+
+    /// @notice True Price Oracle for manipulation-resistant price validation
+    ITruePriceOracle public truePriceOracle;
+
+    /// @notice Whether True Price validation is enabled
+    bool public truePriceValidationEnabled;
+
+    /// @notice Maximum staleness for True Price data (default 5 minutes)
+    uint256 public truePriceMaxStaleness = 5 minutes;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
@@ -104,6 +117,8 @@ contract VibeAMM is
     event DonationAttackDetected(address indexed token, uint256 tracked, uint256 actual);
     event LargeTradeLimited(bytes32 indexed poolId, uint256 requested, uint256 allowed);
     event FeesCollected(address indexed token, uint256 amount);
+    event TruePriceOracleUpdated(address indexed oracle);
+    event TruePriceValidationResult(bytes32 indexed poolId, uint256 spotPrice, uint256 truePrice, bool passed);
 
     // ============ Security Errors ============
 

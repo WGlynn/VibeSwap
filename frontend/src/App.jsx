@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Header from './components/Header'
+import HomePage from './components/HomePage'
 import SwapPage from './components/SwapPage'
 import PoolPage from './components/PoolPage'
 import BridgePage from './components/BridgePage'
@@ -47,7 +48,7 @@ function AnimatedRoutes() {
         transition={pageTransition}
       >
         <Routes location={location}>
-          <Route path="/" element={<SwapPage />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/swap" element={<SwapPage />} />
           <Route path="/pool" element={<PoolPage />} />
           <Route path="/bridge" element={<BridgePage />} />

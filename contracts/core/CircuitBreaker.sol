@@ -47,6 +47,7 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     bytes32 public constant PRICE_BREAKER = keccak256("PRICE_BREAKER");
     bytes32 public constant WITHDRAWAL_BREAKER = keccak256("WITHDRAWAL_BREAKER");
     bytes32 public constant LOSS_BREAKER = keccak256("LOSS_BREAKER");
+    bytes32 public constant TRUE_PRICE_BREAKER = keccak256("TRUE_PRICE_BREAKER");
 
     // ============ Events ============
 

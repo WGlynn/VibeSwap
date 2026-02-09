@@ -171,13 +171,13 @@ contract StablecoinFlowRegistry is
 
         if (currentFlowRatio <= MANIPULATION_THRESHOLD) {
             // 1.0 < ratio <= 2.0: linear from 0.1 to 0.5
-            uint256 normalized = ((currentFlowRatio - PRECISION) * PRECISION) / PRECISION;
-            return (PRECISION / 10) + (normalized * 4) / 10; // 0.1 + 0.4 * (ratio - 1)
+            uint256 normalizedLow = ((currentFlowRatio - PRECISION) * PRECISION) / PRECISION;
+            return (PRECISION / 10) + (normalizedLow * 4) / 10; // 0.1 + 0.4 * (ratio - 1)
         }
 
         // 2.0 < ratio < 3.5: linear from 0.5 to 1.0
-        uint256 normalized = ((currentFlowRatio - MANIPULATION_THRESHOLD) * PRECISION) / (15e17);
-        return (PRECISION / 2) + (normalized / 2); // 0.5 + 0.5 * ((ratio - 2) / 1.5)
+        uint256 normalizedHigh = ((currentFlowRatio - MANIPULATION_THRESHOLD) * PRECISION) / (15e17);
+        return (PRECISION / 2) + (normalizedHigh / 2); // 0.5 + 0.5 * ((ratio - 2) / 1.5)
     }
 
     /**

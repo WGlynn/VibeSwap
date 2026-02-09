@@ -7,6 +7,8 @@ import "../contracts/core/CommitRevealAuction.sol";
 import "../contracts/amm/VibeAMM.sol";
 import "../contracts/governance/DAOTreasury.sol";
 import "../contracts/messaging/CrossChainRouter.sol";
+import "../contracts/oracles/TruePriceOracle.sol";
+import "../contracts/oracles/StablecoinFlowRegistry.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -15,22 +17,31 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  * @dev Run with: forge script script/VerifyDeployment.s.sol --rpc-url $RPC_URL
  */
 contract VerifyDeployment is Script {
+    // Core contracts
     address public core;
     address public auction;
     address public amm;
     address public treasury;
     address public router;
 
+    // Oracle contracts
+    address public truePriceOracle;
+    address public stablecoinRegistry;
+
     uint256 public errors;
     uint256 public warnings;
 
     function run() external {
-        // Load addresses from environment
+        // Load core addresses from environment
         core = vm.envAddress("VIBESWAP_CORE");
         auction = vm.envAddress("VIBESWAP_AUCTION");
         amm = vm.envAddress("VIBESWAP_AMM");
         treasury = vm.envAddress("VIBESWAP_TREASURY");
         router = vm.envAddress("VIBESWAP_ROUTER");
+
+        // Load oracle addresses from environment
+        truePriceOracle = vm.envAddress("TRUE_PRICE_ORACLE_ADDRESS");
+        stablecoinRegistry = vm.envAddress("STABLECOIN_REGISTRY_ADDRESS");
 
         console.log("=== VibeSwap Deployment Verification ===");
         console.log("Chain ID:", block.chainid);
@@ -47,6 +58,9 @@ contract VerifyDeployment is Script {
 
         // Verify authorizations
         _verifyAuthorizations();
+
+        // Verify oracle configuration
+        _verifyOracleConfiguration();
 
         // Verify security settings
         _verifySecuritySettings();
@@ -71,13 +85,19 @@ contract VerifyDeployment is Script {
     }
 
     function _verifyContractsDeployed() internal view {
-        console.log("--- Contract Deployment ---");
+        console.log("--- Core Contract Deployment ---");
 
         _checkCode("VibeSwapCore", core);
         _checkCode("CommitRevealAuction", auction);
         _checkCode("VibeAMM", amm);
         _checkCode("DAOTreasury", treasury);
         _checkCode("CrossChainRouter", router);
+
+        console.log("");
+        console.log("--- Oracle Contract Deployment ---");
+
+        _checkCode("TruePriceOracle", truePriceOracle);
+        _checkCode("StablecoinFlowRegistry", stablecoinRegistry);
     }
 
     function _verifyProxyImplementations() internal view {
@@ -92,6 +112,8 @@ contract VerifyDeployment is Script {
         _checkImplementation("VibeAMM", amm, implSlot);
         _checkImplementation("DAOTreasury", treasury, implSlot);
         _checkImplementation("CrossChainRouter", router, implSlot);
+        _checkImplementation("TruePriceOracle", truePriceOracle, implSlot);
+        _checkImplementation("StablecoinFlowRegistry", stablecoinRegistry, implSlot);
     }
 
     function _verifyOwnership() internal view {
@@ -163,6 +185,37 @@ contract VerifyDeployment is Script {
         if (!coreIsAuthorizedRouter) {
             console.log("ERROR: Core must be authorized on Router");
         }
+    }
+
+    function _verifyOracleConfiguration() internal view {
+        console.log("");
+        console.log("--- Oracle Configuration ---");
+
+        // Check TruePriceOracle ownership
+        address oracleOwner = TruePriceOracle(truePriceOracle).owner();
+        console.log("TruePriceOracle owner:", oracleOwner);
+
+        // Check StablecoinFlowRegistry ownership
+        address registryOwner = StablecoinFlowRegistry(stablecoinRegistry).owner();
+        console.log("StablecoinFlowRegistry owner:", registryOwner);
+
+        // Check if TruePriceOracle is linked to StablecoinFlowRegistry
+        address linkedRegistry = address(TruePriceOracle(truePriceOracle).stablecoinRegistry());
+        console.log("TruePriceOracle linked to registry:", linkedRegistry);
+        if (linkedRegistry != stablecoinRegistry) {
+            console.log("ERROR: TruePriceOracle not linked to StablecoinFlowRegistry");
+        }
+
+        // Check if AMM has liquidity protection enabled
+        bool liquidityProtectionEnabled = VibeAMM(amm).liquidityProtectionEnabled();
+        console.log("AMM liquidity protection:", liquidityProtectionEnabled ? "ENABLED" : "DISABLED");
+        if (!liquidityProtectionEnabled) {
+            console.log("WARNING: Liquidity protection is disabled");
+        }
+
+        // Check oracle max staleness
+        uint256 maxStaleness = TruePriceOracle(truePriceOracle).MAX_STALENESS();
+        console.log("Oracle max staleness:", maxStaleness, "seconds");
     }
 
     function _verifySecuritySettings() internal view {

@@ -7,6 +7,9 @@ import "../contracts/core/CommitRevealAuction.sol";
 import "../contracts/amm/VibeAMM.sol";
 import "../contracts/governance/DAOTreasury.sol";
 import "../contracts/messaging/CrossChainRouter.sol";
+import "../contracts/oracles/TruePriceOracle.sol";
+import "../contracts/oracles/StablecoinFlowRegistry.sol";
+import "../contracts/libraries/LiquidityProtection.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -22,9 +25,10 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  * - OWNER_ADDRESS: Override owner (defaults to deployer)
  * - GUARDIAN_ADDRESS: Security guardian (defaults to deployer)
  * - MULTISIG_ADDRESS: Multisig for ownership transfer after deployment
+ * - ORACLE_SIGNER: Off-chain oracle signer address
  */
 contract DeployProduction is Script {
-    // Deployed addresses
+    // Deployed addresses - Core
     address public auctionImpl;
     address public ammImpl;
     address public treasuryImpl;
@@ -37,11 +41,18 @@ contract DeployProduction is Script {
     address public router;
     address public core;
 
+    // Deployed addresses - Oracles
+    address public truePriceOracleImpl;
+    address public stablecoinRegistryImpl;
+    address public truePriceOracle;
+    address public stablecoinRegistry;
+
     // Configuration
     address public owner;
     address public guardian;
     address public multisig;
     address public lzEndpoint;
+    address public oracleSigner;
 
     // Deployment tracking
     string public deploymentId;
@@ -54,6 +65,7 @@ contract DeployProduction is Script {
         owner = vm.envOr("OWNER_ADDRESS", deployer);
         guardian = vm.envOr("GUARDIAN_ADDRESS", deployer);
         multisig = vm.envOr("MULTISIG_ADDRESS", address(0));
+        oracleSigner = vm.envOr("ORACLE_SIGNER", deployer);
         lzEndpoint = _getLZEndpoint(block.chainid);
 
         // Generate deployment ID
@@ -70,6 +82,7 @@ contract DeployProduction is Script {
         console.log("Deployer:", deployer);
         console.log("Owner:", owner);
         console.log("Guardian:", guardian);
+        console.log("Oracle Signer:", oracleSigner);
         console.log("LZ Endpoint:", lzEndpoint);
         if (multisig != address(0)) {
             console.log("Multisig (for ownership transfer):", multisig);
@@ -79,23 +92,35 @@ contract DeployProduction is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Step 1: Deploy implementations
-        console.log("Step 1: Deploying implementations...");
+        console.log("Step 1: Deploying core implementations...");
         _deployImplementations();
 
-        // Step 2: Deploy proxies
-        console.log("Step 2: Deploying proxies...");
+        // Step 2: Deploy oracle implementations
+        console.log("Step 2: Deploying oracle implementations...");
+        _deployOracleImplementations();
+
+        // Step 3: Deploy proxies
+        console.log("Step 3: Deploying proxies...");
         _deployProxies();
 
-        // Step 3: Configure authorizations
-        console.log("Step 3: Configuring authorizations...");
+        // Step 4: Deploy oracle proxies
+        console.log("Step 4: Deploying oracle proxies...");
+        _deployOracleProxies();
+
+        // Step 5: Configure authorizations
+        console.log("Step 5: Configuring authorizations...");
         _configureAuthorizations();
 
-        // Step 4: Configure security
-        console.log("Step 4: Configuring security...");
+        // Step 6: Configure oracles
+        console.log("Step 6: Configuring oracles...");
+        _configureOracles();
+
+        // Step 7: Configure security
+        console.log("Step 7: Configuring security...");
         _configureSecurity();
 
-        // Step 5: Final verification
-        console.log("Step 5: Running verification...");
+        // Step 8: Final verification
+        console.log("Step 8: Running verification...");
         _verifyDeployment();
 
         vm.stopBroadcast();
@@ -119,6 +144,14 @@ contract DeployProduction is Script {
         console.log("  DAOTreasury impl:", treasuryImpl);
         console.log("  CrossChainRouter impl:", routerImpl);
         console.log("  VibeSwapCore impl:", coreImpl);
+    }
+
+    function _deployOracleImplementations() internal {
+        truePriceOracleImpl = address(new TruePriceOracle());
+        stablecoinRegistryImpl = address(new StablecoinFlowRegistry());
+
+        console.log("  TruePriceOracle impl:", truePriceOracleImpl);
+        console.log("  StablecoinFlowRegistry impl:", stablecoinRegistryImpl);
     }
 
     function _deployProxies() internal {
@@ -175,6 +208,28 @@ contract DeployProduction is Script {
         console.log("  VibeSwapCore proxy:", core);
     }
 
+    function _deployOracleProxies() internal {
+        // Deploy StablecoinFlowRegistry first (TruePriceOracle references it)
+        bytes memory registryInit = abi.encodeWithSelector(
+            StablecoinFlowRegistry.initialize.selector,
+            owner
+        );
+        stablecoinRegistry = address(new ERC1967Proxy(stablecoinRegistryImpl, registryInit));
+        console.log("  StablecoinFlowRegistry proxy:", stablecoinRegistry);
+
+        // Deploy TruePriceOracle
+        bytes memory oracleInit = abi.encodeWithSelector(
+            TruePriceOracle.initialize.selector,
+            owner
+        );
+        truePriceOracle = address(new ERC1967Proxy(truePriceOracleImpl, oracleInit));
+        console.log("  TruePriceOracle proxy:", truePriceOracle);
+
+        // Link TruePriceOracle to StablecoinRegistry
+        TruePriceOracle(truePriceOracle).setStablecoinRegistry(stablecoinRegistry);
+        console.log("  TruePriceOracle linked to StablecoinFlowRegistry");
+    }
+
     function _configureAuthorizations() internal {
         // Auction authorizations
         CommitRevealAuction(payable(auction)).setAuthorizedSettler(core, true);
@@ -195,6 +250,20 @@ contract DeployProduction is Script {
         console.log("  Router: Core authorized");
     }
 
+    function _configureOracles() internal {
+        // Authorize oracle signer for TruePriceOracle
+        TruePriceOracle(truePriceOracle).setAuthorizedSigner(oracleSigner, true);
+        console.log("  TruePriceOracle: Signer authorized:", oracleSigner);
+
+        // Authorize oracle signer for StablecoinFlowRegistry
+        StablecoinFlowRegistry(stablecoinRegistry).setAuthorizedUpdater(oracleSigner, true);
+        console.log("  StablecoinFlowRegistry: Updater authorized:", oracleSigner);
+
+        // Enable liquidity protection on AMM
+        VibeAMM(amm).setLiquidityProtection(true);
+        console.log("  AMM: Liquidity protection enabled");
+    }
+
     function _configureSecurity() internal {
         // AMM security
         VibeAMM(amm).setGuardian(guardian, true);
@@ -210,31 +279,50 @@ contract DeployProduction is Script {
     }
 
     function _verifyDeployment() internal view {
-        // Verify implementations have code
+        // Verify core implementations have code
         require(auctionImpl.code.length > 0, "Auction impl has no code");
         require(ammImpl.code.length > 0, "AMM impl has no code");
         require(treasuryImpl.code.length > 0, "Treasury impl has no code");
         require(routerImpl.code.length > 0, "Router impl has no code");
         require(coreImpl.code.length > 0, "Core impl has no code");
 
-        // Verify proxies have code
+        // Verify oracle implementations have code
+        require(truePriceOracleImpl.code.length > 0, "TruePriceOracle impl has no code");
+        require(stablecoinRegistryImpl.code.length > 0, "StablecoinRegistry impl has no code");
+
+        // Verify core proxies have code
         require(auction.code.length > 0, "Auction proxy has no code");
         require(amm.code.length > 0, "AMM proxy has no code");
         require(treasury.code.length > 0, "Treasury proxy has no code");
         require(router.code.length > 0, "Router proxy has no code");
         require(core.code.length > 0, "Core proxy has no code");
 
-        // Verify ownership
+        // Verify oracle proxies have code
+        require(truePriceOracle.code.length > 0, "TruePriceOracle proxy has no code");
+        require(stablecoinRegistry.code.length > 0, "StablecoinRegistry proxy has no code");
+
+        // Verify core ownership
         require(VibeSwapCore(payable(core)).owner() == owner, "Core owner mismatch");
         require(CommitRevealAuction(payable(auction)).owner() == owner, "Auction owner mismatch");
         require(VibeAMM(amm).owner() == owner, "AMM owner mismatch");
         require(DAOTreasury(payable(treasury)).owner() == owner, "Treasury owner mismatch");
         require(CrossChainRouter(payable(router)).owner() == owner, "Router owner mismatch");
 
+        // Verify oracle ownership
+        require(TruePriceOracle(truePriceOracle).owner() == owner, "TruePriceOracle owner mismatch");
+        require(StablecoinFlowRegistry(stablecoinRegistry).owner() == owner, "StablecoinRegistry owner mismatch");
+
         // Verify critical authorizations
         require(CommitRevealAuction(payable(auction)).authorizedSettlers(core), "Core not settler");
         require(VibeAMM(amm).authorizedExecutors(core), "Core not executor");
         require(DAOTreasury(payable(treasury)).authorizedFeeSenders(amm), "AMM not fee sender");
+
+        // Verify oracle authorizations
+        require(TruePriceOracle(truePriceOracle).authorizedSigners(oracleSigner), "Oracle signer not authorized");
+        require(StablecoinFlowRegistry(stablecoinRegistry).authorizedUpdaters(oracleSigner), "Registry updater not authorized");
+
+        // Verify liquidity protection
+        require(VibeAMM(amm).liquidityProtectionEnabled(), "Liquidity protection not enabled");
 
         console.log("  All verifications passed");
     }
@@ -243,12 +331,16 @@ contract DeployProduction is Script {
         console.log("");
         console.log("=== DEPLOYMENT SUCCESSFUL ===");
         console.log("");
-        console.log("Implementations:");
+        console.log("Core Implementations:");
         console.log("  CommitRevealAuction:", auctionImpl);
         console.log("  VibeAMM:", ammImpl);
         console.log("  DAOTreasury:", treasuryImpl);
         console.log("  CrossChainRouter:", routerImpl);
         console.log("  VibeSwapCore:", coreImpl);
+        console.log("");
+        console.log("Oracle Implementations:");
+        console.log("  TruePriceOracle:", truePriceOracleImpl);
+        console.log("  StablecoinFlowRegistry:", stablecoinRegistryImpl);
         console.log("");
         console.log("Proxies (use these addresses):");
         console.log("  VIBESWAP_CORE=", core);
@@ -256,13 +348,16 @@ contract DeployProduction is Script {
         console.log("  VIBESWAP_AMM=", amm);
         console.log("  VIBESWAP_TREASURY=", treasury);
         console.log("  VIBESWAP_ROUTER=", router);
+        console.log("  TRUE_PRICE_ORACLE=", truePriceOracle);
+        console.log("  STABLECOIN_REGISTRY=", stablecoinRegistry);
         console.log("");
         console.log("Next steps:");
         console.log("1. Verify contracts on block explorer");
         console.log("2. Run VerifyDeployment.s.sol to validate");
         console.log("3. Run SetupMVP.s.sol to create pools");
+        console.log("4. Start off-chain oracle (python -m oracle.main)");
         if (multisig != address(0)) {
-            console.log("4. Transfer ownership to multisig:", multisig);
+            console.log("5. Transfer ownership to multisig:", multisig);
         }
         console.log("=============================");
     }
@@ -277,6 +372,8 @@ contract DeployProduction is Script {
         console.log(string(abi.encodePacked("VIBESWAP_AMM=", vm.toString(amm))));
         console.log(string(abi.encodePacked("VIBESWAP_TREASURY=", vm.toString(treasury))));
         console.log(string(abi.encodePacked("VIBESWAP_ROUTER=", vm.toString(router))));
+        console.log(string(abi.encodePacked("TRUE_PRICE_ORACLE_ADDRESS=", vm.toString(truePriceOracle))));
+        console.log(string(abi.encodePacked("STABLECOIN_REGISTRY_ADDRESS=", vm.toString(stablecoinRegistry))));
     }
 
     function _getLZEndpoint(uint256 chainId) internal pure returns (address) {
@@ -311,11 +408,16 @@ contract TransferOwnership is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address multisig = vm.envAddress("MULTISIG_ADDRESS");
 
+        // Core contracts
         address core = vm.envAddress("VIBESWAP_CORE");
         address auction = vm.envAddress("VIBESWAP_AUCTION");
         address amm = vm.envAddress("VIBESWAP_AMM");
         address treasury = vm.envAddress("VIBESWAP_TREASURY");
         address router = vm.envAddress("VIBESWAP_ROUTER");
+
+        // Oracle contracts
+        address truePriceOracle = vm.envAddress("TRUE_PRICE_ORACLE_ADDRESS");
+        address stablecoinRegistry = vm.envAddress("STABLECOIN_REGISTRY_ADDRESS");
 
         require(multisig != address(0), "MULTISIG_ADDRESS required");
 
@@ -323,15 +425,20 @@ contract TransferOwnership is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
+        // Transfer core contract ownership
         VibeSwapCore(payable(core)).transferOwnership(multisig);
         CommitRevealAuction(payable(auction)).transferOwnership(multisig);
         VibeAMM(amm).transferOwnership(multisig);
         DAOTreasury(payable(treasury)).transferOwnership(multisig);
         CrossChainRouter(payable(router)).transferOwnership(multisig);
 
+        // Transfer oracle contract ownership
+        TruePriceOracle(truePriceOracle).transferOwnership(multisig);
+        StablecoinFlowRegistry(stablecoinRegistry).transferOwnership(multisig);
+
         vm.stopBroadcast();
 
-        console.log("Ownership transfer initiated");
+        console.log("Ownership transfer initiated for 7 contracts");
         console.log("Multisig must accept ownership for each contract");
     }
 }

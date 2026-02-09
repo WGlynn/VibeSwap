@@ -27,6 +27,7 @@ interface ICommitRevealAuction {
 
     struct OrderCommitment {
         bytes32 commitHash;
+        bytes32 poolId;           // Pool this commitment belongs to
         uint64 batchId;
         uint256 depositAmount;
         address depositor;
@@ -92,6 +93,15 @@ interface ICommitRevealAuction {
         uint256 slashedAmount
     );
 
+    event PoWProofAccepted(
+        bytes32 indexed commitId,
+        address indexed trader,
+        uint8 difficulty,
+        uint256 powValue
+    );
+
+    // Note: PoolConfigCreated event is defined in PoolComplianceConfig library
+
     // ============ Functions ============
 
     /**
@@ -100,6 +110,19 @@ interface ICommitRevealAuction {
      * @return commitId Unique identifier for this commitment
      */
     function commitOrder(bytes32 commitHash) external payable returns (bytes32 commitId);
+
+    /**
+     * @notice Commit an order hash to a specific pool
+     * @param poolId The pool to commit to (bytes32(0) for default open pool)
+     * @param commitHash Hash of order details
+     * @param estimatedTradeValue Estimated trade value for collateral calculation
+     * @return commitId Unique identifier for this commitment
+     */
+    function commitOrderToPool(
+        bytes32 poolId,
+        bytes32 commitHash,
+        uint256 estimatedTradeValue
+    ) external payable returns (bytes32 commitId);
 
     /**
      * @notice Reveal a previously committed order
@@ -119,6 +142,32 @@ interface ICommitRevealAuction {
         uint256 minAmountOut,
         bytes32 secret,
         uint256 priorityBid
+    ) external payable;
+
+    /**
+     * @notice Reveal a committed order with optional proof-of-work for priority
+     * @param commitId The commitment ID from commitOrder
+     * @param tokenIn Token being sold
+     * @param tokenOut Token being bought
+     * @param amountIn Amount of tokenIn
+     * @param minAmountOut Minimum acceptable tokenOut
+     * @param secret Secret used in commitment
+     * @param priorityBid Additional ETH bid for priority execution
+     * @param powNonce Nonce for proof-of-work (bytes32(0) if not using PoW)
+     * @param powAlgorithm 0 = Keccak256, 1 = SHA256
+     * @param claimedDifficulty Difficulty bits claimed for PoW
+     */
+    function revealOrderWithPoW(
+        bytes32 commitId,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        bytes32 secret,
+        uint256 priorityBid,
+        bytes32 powNonce,
+        uint8 powAlgorithm,
+        uint8 claimedDifficulty
     ) external payable;
 
     /**
@@ -182,4 +231,14 @@ interface ICommitRevealAuction {
      * @notice Get execution order indices for a settled batch
      */
     function getExecutionOrder(uint64 batchId) external view returns (uint256[] memory indices);
+
+    /**
+     * @notice Get time until the next phase change
+     */
+    function getTimeUntilPhaseChange() external view returns (uint256);
+
+    /**
+     * @notice Get the batch duration (PROTOCOL CONSTANT)
+     */
+    function getBatchDuration() external pure returns (uint256);
 }

@@ -434,22 +434,8 @@ contract VibeSwapCore is
     ) {
         batchId = auction.getCurrentBatchId();
         phase = auction.getCurrentPhase();
-
-        // Calculate time remaining
-        ICommitRevealAuction.Batch memory batch = auction.getBatch(batchId);
-        uint256 elapsed = block.timestamp - batch.startTimestamp;
-
-        // Use constants from auction contract (8 seconds commit, 10 seconds total)
-        uint256 COMMIT_DURATION = 8;
-        uint256 BATCH_DURATION = 10;
-
-        if (phase == ICommitRevealAuction.BatchPhase.COMMIT) {
-            timeUntilPhaseChange = COMMIT_DURATION > elapsed ? COMMIT_DURATION - elapsed : 0;
-        } else if (phase == ICommitRevealAuction.BatchPhase.REVEAL) {
-            timeUntilPhaseChange = BATCH_DURATION > elapsed ? BATCH_DURATION - elapsed : 0;
-        } else {
-            timeUntilPhaseChange = 0;
-        }
+        // Use auction's canonical time calculation (references protocol constants)
+        timeUntilPhaseChange = auction.getTimeUntilPhaseChange();
     }
 
     /**

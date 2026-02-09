@@ -174,9 +174,12 @@ contract VibeAMMFuzzTest is Test {
     // ============ Fee Invariant Tests ============
 
     /**
-     * @notice Fuzz test: Protocol fees are collected on swaps
+     * @notice Fuzz test: Base fees go 100% to LPs (no protocol extraction)
+     * @dev Pure economics model: PROTOCOL_FEE_SHARE = 0
+     *      All base trading fees stay in the pool as LP rewards.
+     *      Dynamic volatility fees (handled separately) may route to insurance.
      */
-    function testFuzz_protocolFeesCollected(uint256 amountIn) public {
+    function testFuzz_allFeesToLPs(uint256 amountIn) public {
         // Use reasonable bounds for swap amount
         amountIn = bound(amountIn, 1 ether, INITIAL_LIQUIDITY / 10);
 
@@ -197,13 +200,10 @@ contract VibeAMMFuzzTest is Test {
         vm.prank(executor);
         IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
 
-        // If swap executed, protocol fees should be collected
+        // If swap executed, protocol fees should be zero (100% to LPs)
         if (result.totalTokenInSwapped > 0) {
-            // Protocol fees should be non-zero
-            assertGt(result.protocolFees, 0, "Protocol fees should be collected");
-
-            // Protocol fees should be < 1% of input (0.3% * 20% = 0.06%)
-            assertLt(result.protocolFees, amountIn / 100, "Protocol fees too high");
+            // Protocol fees should be zero - all fees stay with LPs
+            assertEq(result.protocolFees, 0, "Protocol fees should be zero - pure economics model");
         }
     }
 

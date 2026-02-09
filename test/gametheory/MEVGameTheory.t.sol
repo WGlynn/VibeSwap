@@ -562,7 +562,7 @@ contract MEVGameTheoryTest is Test {
         uint256 kAfter = ammReserveAAfter * ammReserveBAfter;
         assertGe(kAfter, kBefore, "K should not decrease (budget balanced)");
 
-        // Protocol should collect fees
-        assertGt(result.protocolFees, 0, "Protocol should collect fees");
+        // Pure economics model: 100% of base fees to LPs, 0% to protocol
+        assertEq(result.protocolFees, 0, "Protocol fees should be zero - all fees to LPs");
     }
 }

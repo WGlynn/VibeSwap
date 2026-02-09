@@ -42,8 +42,11 @@ contract VibeAMM is
     /// @notice Default fee rate (0.3%)
     uint256 public constant DEFAULT_FEE_RATE = 30;
 
-    /// @notice Protocol's share of fees (20% of total fees)
-    uint256 public constant PROTOCOL_FEE_SHARE = 2000;
+    /// @notice Protocol's share of base fees (0% - all base fees to LPs)
+    /// @dev Pure economics model: 100% of base trading fees go to LPs.
+    ///      Dynamic volatility fees (excess above base during high vol) are
+    ///      handled separately through IncentiveController and route to insurance.
+    uint256 public constant PROTOCOL_FEE_SHARE = 0;
 
     /// @notice Minimum liquidity locked forever (prevents first depositor attack)
     uint256 public constant MINIMUM_LIQUIDITY = 10000;
@@ -71,7 +74,9 @@ contract VibeAMM is
     /// @notice Mapping of pool ID to user to LP balance (backup tracking)
     mapping(bytes32 => mapping(address => uint256)) public liquidityBalance;
 
-    /// @notice DAO treasury for protocol fees
+    /// @notice DAO treasury for dynamic volatility fees (routed to insurance)
+    /// @dev Base trading fees go 100% to LPs. Treasury only receives dynamic
+    ///      volatility fee excess during high-vol periods, which funds insurance.
     address public treasury;
 
     /// @notice Authorized executors (VibeSwapCore)
@@ -700,12 +705,10 @@ contract VibeAMM is
     }
 
     /**
-     * @notice Collect accumulated protocol fees
-     * @param token Token to collect fees for
-     */
-    /**
-     * @notice Collect accumulated protocol fees for a token
-     * @dev Only callable by treasury to prevent griefing during settlements
+     * @notice Collect accumulated fees (reserved for future dynamic volatility fees)
+     * @dev With PROTOCOL_FEE_SHARE = 0, base fees don't accumulate here.
+     *      This function exists for future integration with dynamic volatility
+     *      fees that route to insurance pools during high volatility periods.
      * @param token Token address to collect fees for
      */
     function collectFees(address token) external {

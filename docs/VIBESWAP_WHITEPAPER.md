@@ -747,6 +747,46 @@ The system reaches Nash equilibrium when:
 
 ---
 
+## 10.5 Decentralization and Frontend Independence
+
+VibeSwap is a **protocol**, not a product. The smart contracts are:
+
+- **Immutable**: Once deployed, core logic cannot be changed
+- **Permissionless**: Anyone can interact directly with contracts
+- **Ownerless**: No admin keys, no special privileges (after initial setup)
+
+**Anyone can build their own frontend.** This matters for:
+
+| Aspect | Why It Matters |
+|--------|----------------|
+| Decentralization | No single point of failure or control |
+| Censorship Resistance | Users can always access the protocol |
+| Legal Clarity | Frontend operators make their own compliance decisions |
+| Innovation | Specialized interfaces for different use cases |
+
+The protocol is neutral infrastructure. This frontend is a reference implementation—one of potentially many ways to interact with VibeSwap.
+
+```
+Protocol Layer (On-Chain, Immutable)
+├── VibeSwapCore
+├── CommitRevealAuction
+├── VibeAMM
+├── ShapleyDistributor
+└── ... all contracts
+
+         ↑ Anyone can build ↑
+
+Frontend Layer (Off-Chain, Diverse)
+├── Official reference frontend
+├── Community frontends
+├── Mobile apps
+├── Trading terminals
+├── Aggregator integrations
+└── Direct contract interaction
+```
+
+---
+
 ## 11. Implementation
 
 ### 11.1 Core Contracts

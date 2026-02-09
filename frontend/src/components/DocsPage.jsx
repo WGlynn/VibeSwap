@@ -9,6 +9,7 @@ const sections = [
   { id: 'fibonacci', label: 'Fibonacci Scaling', icon: '🌀' },
   { id: 'shapley', label: 'Fair Rewards', icon: '⚖️' },
   { id: 'halving', label: 'Halving Schedule', icon: '📉' },
+  { id: 'build-frontend', label: 'Build Your Own', icon: '🛠️' },
   { id: 'faq', label: 'FAQ', icon: '❓' },
 ]
 
@@ -82,6 +83,7 @@ function DocsPage() {
               {activeSection === 'fibonacci' && <FibonacciSection />}
               {activeSection === 'shapley' && <ShapleySection />}
               {activeSection === 'halving' && <HalvingSection />}
+              {activeSection === 'build-frontend' && <BuildFrontendSection />}
               {activeSection === 'faq' && <FAQSection />}
             </motion.div>
           </AnimatePresence>
@@ -505,6 +507,235 @@ function HalvingSection() {
   )
 }
 
+function BuildFrontendSection() {
+  return (
+    <div className="glass-strong rounded-2xl p-8 space-y-8">
+      <div>
+        <h2 className="text-3xl font-display font-bold text-white mb-4">Build Your Own Frontend</h2>
+        <p className="text-void-300 text-lg">
+          VibeSwap is a <span className="text-vibe-400 font-semibold">decentralized protocol</span>, not a company.
+          Anyone can build their own frontend to interact with the smart contracts.
+        </p>
+      </div>
+
+      {/* Why This Matters */}
+      <div className="bg-gradient-to-r from-vibe-500/10 to-cyber-500/10 rounded-xl p-6 border border-vibe-500/20">
+        <h3 className="text-lg font-semibold text-vibe-400 mb-3">Why This Matters</h3>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <h4 className="font-medium text-white">Decentralization</h4>
+            <p className="text-void-300 text-sm">
+              No single point of failure. If one frontend goes down, others remain. The protocol lives on-chain forever.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-medium text-white">Censorship Resistance</h4>
+            <p className="text-void-300 text-sm">
+              No entity can block access. Users can always interact directly with contracts or use alternative interfaces.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-medium text-white">Legal Clarity</h4>
+            <p className="text-void-300 text-sm">
+              The protocol is neutral infrastructure. Frontend operators make their own compliance decisions for their jurisdiction.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-medium text-white">Innovation</h4>
+            <p className="text-void-300 text-sm">
+              Anyone can build specialized interfaces - mobile apps, trading terminals, aggregators, or custom UX.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Contract Addresses */}
+      <div>
+        <h3 className="text-xl font-semibold text-white mb-4">Contract Addresses</h3>
+        <div className="bg-void-800/50 rounded-xl p-4 font-mono text-sm overflow-x-auto">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center border-b border-void-700 pb-2">
+              <span className="text-void-400">Network</span>
+              <span className="text-void-400">Contract</span>
+              <span className="text-void-400">Address</span>
+            </div>
+            <ContractRow network="Ethereum" contract="VibeSwapCore" address="Coming Soon" />
+            <ContractRow network="Ethereum" contract="VibeAMM" address="Coming Soon" />
+            <ContractRow network="Ethereum" contract="CommitRevealAuction" address="Coming Soon" />
+            <ContractRow network="Ethereum" contract="ShapleyDistributor" address="Coming Soon" />
+            <div className="border-t border-void-700 pt-2 mt-2">
+              <p className="text-void-500 text-xs">L2 deployments (Arbitrum, Optimism, Base) coming soon</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Integration Guide */}
+      <div>
+        <h3 className="text-xl font-semibold text-white mb-4">Quick Integration Guide</h3>
+        <div className="space-y-4">
+          <CodeBlock
+            title="1. Connect to the Protocol"
+            language="javascript"
+            code={`import { ethers } from 'ethers';
+import VibeSwapCore from './abis/VibeSwapCore.json';
+
+const provider = new ethers.BrowserProvider(window.ethereum);
+const signer = await provider.getSigner();
+
+const vibeSwap = new ethers.Contract(
+  VIBESWAP_CORE_ADDRESS,
+  VibeSwapCore.abi,
+  signer
+);`}
+          />
+
+          <CodeBlock
+            title="2. Submit a Commit"
+            language="javascript"
+            code={`// Generate a random secret
+const secret = ethers.randomBytes(32);
+
+// Create the commitment hash
+const commitment = ethers.keccak256(
+  ethers.AbiCoder.defaultAbiCoder().encode(
+    ['uint8', 'uint256', 'uint256', 'bytes32', 'uint256'],
+    [orderType, amount, minOutput, secret, depositAmount]
+  )
+);
+
+// Submit commit with deposit
+await vibeSwap.commit(poolId, commitment, { value: depositAmount });`}
+          />
+
+          <CodeBlock
+            title="3. Reveal Your Order"
+            language="javascript"
+            code={`// During reveal phase, submit the actual order
+await vibeSwap.reveal(
+  poolId,
+  orderType,      // 0 = buy, 1 = sell
+  amount,
+  minOutput,
+  secret,
+  priorityBid     // Optional: bid for priority execution
+);`}
+          />
+
+          <CodeBlock
+            title="4. Listen for Settlement"
+            language="javascript"
+            code={`// Listen for batch settlement events
+vibeSwap.on('BatchSettled', (batchId, clearingPrice, volume) => {
+  console.log(\`Batch \${batchId} settled at \${clearingPrice}\`);
+  // Update UI with results
+});`}
+          />
+        </div>
+      </div>
+
+      {/* Resources */}
+      <div>
+        <h3 className="text-xl font-semibold text-white mb-4">Resources</h3>
+        <div className="grid md:grid-cols-2 gap-4">
+          <a
+            href="https://github.com/WGlynn/vibeswap-private"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-void-800/50 rounded-xl p-5 border border-void-600/30 hover:border-vibe-500/30 transition-colors group"
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <span className="text-2xl">📦</span>
+              <h4 className="font-semibold text-white group-hover:text-vibe-400 transition-colors">GitHub Repository</h4>
+            </div>
+            <p className="text-void-400 text-sm">
+              Full source code, ABIs, deployment scripts, and this frontend as a reference implementation.
+            </p>
+          </a>
+
+          <a
+            href="#"
+            className="bg-void-800/50 rounded-xl p-5 border border-void-600/30 hover:border-vibe-500/30 transition-colors group"
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <span className="text-2xl">📄</span>
+              <h4 className="font-semibold text-white group-hover:text-vibe-400 transition-colors">Contract ABIs</h4>
+            </div>
+            <p className="text-void-400 text-sm">
+              Download ABI files for all VibeSwap contracts to integrate into your application.
+            </p>
+          </a>
+
+          <a
+            href="#"
+            className="bg-void-800/50 rounded-xl p-5 border border-void-600/30 hover:border-vibe-500/30 transition-colors group"
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <span className="text-2xl">🔌</span>
+              <h4 className="font-semibold text-white group-hover:text-vibe-400 transition-colors">SDK (Coming Soon)</h4>
+            </div>
+            <p className="text-void-400 text-sm">
+              TypeScript SDK with helper functions for commit generation, batch timing, and more.
+            </p>
+          </a>
+
+          <a
+            href="#"
+            className="bg-void-800/50 rounded-xl p-5 border border-void-600/30 hover:border-vibe-500/30 transition-colors group"
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <span className="text-2xl">📊</span>
+              <h4 className="font-semibold text-white group-hover:text-vibe-400 transition-colors">Subgraph</h4>
+            </div>
+            <p className="text-void-400 text-sm">
+              GraphQL API for querying historical data, pool stats, and user positions.
+            </p>
+          </a>
+        </div>
+      </div>
+
+      {/* Legal Notice */}
+      <div className="bg-void-800/30 rounded-xl p-6 border border-void-600/20">
+        <h3 className="text-lg font-semibold text-void-300 mb-3">Legal Notice</h3>
+        <p className="text-void-400 text-sm leading-relaxed">
+          VibeSwap is a decentralized protocol consisting of immutable smart contracts deployed on public blockchains.
+          The protocol has no owner, no admin keys, and cannot be modified or controlled by any entity.
+          This frontend is one of potentially many interfaces to the protocol.
+          Frontend operators are independent and responsible for their own regulatory compliance.
+          Users interact with the protocol at their own risk and should verify contract addresses independently.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ContractRow({ network, contract, address }) {
+  const isComingSoon = address === 'Coming Soon'
+  return (
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-void-400 w-24">{network}</span>
+      <span className="text-void-200">{contract}</span>
+      <span className={`${isComingSoon ? 'text-void-500 italic' : 'text-vibe-400'}`}>
+        {isComingSoon ? address : `${address.slice(0, 6)}...${address.slice(-4)}`}
+      </span>
+    </div>
+  )
+}
+
+function CodeBlock({ title, language, code }) {
+  return (
+    <div className="bg-void-800/50 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 bg-void-700/50 border-b border-void-600/30">
+        <span className="text-sm font-medium text-void-300">{title}</span>
+        <span className="text-xs text-void-500 font-mono">{language}</span>
+      </div>
+      <pre className="p-4 overflow-x-auto text-sm">
+        <code className="text-void-300">{code}</code>
+      </pre>
+    </div>
+  )
+}
+
 function FAQSection() {
   const faqs = [
     {
@@ -534,6 +765,14 @@ function FAQSection() {
     {
       q: "Which chains are supported?",
       a: "VibeSwap is built on LayerZero V2 for omnichain support. Initially launching on Ethereum mainnet, with L2s (Arbitrum, Optimism, Base) coming soon."
+    },
+    {
+      q: "Can I build my own frontend?",
+      a: "Yes! VibeSwap is a decentralized protocol - anyone can build their own frontend. All contract ABIs and source code are open source. See the 'Build Your Own' section for integration guides."
+    },
+    {
+      q: "Who controls the protocol?",
+      a: "No one. VibeSwap contracts are immutable and permissionless. There are no admin keys or special privileges. The protocol is neutral infrastructure that anyone can use."
     },
   ]
 

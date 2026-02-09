@@ -1,0 +1,183 @@
+# VibeSwap True Price Oracle Configuration
+# Copy to oracle.yaml and customize
+
+# Active blockchain network
+active_chain: sepolia  # ethereum, arbitrum, base, optimism, sepolia
+
+# Trading pairs to track
+pairs:
+  - ETH/USD
+  - BTC/USD
+  - ETH/BTC
+
+# Update intervals
+update_interval_seconds: 30
+stablecoin_update_interval_seconds: 300
+
+# Logging
+log_level: INFO
+log_file: ""  # Empty for stdout
+
+# Metrics server
+metrics_enabled: true
+metrics_port: 9090
+
+# ============ Kalman Filter ============
+kalman:
+  # Initial uncertainty (higher = more responsive initially)
+  initial_price_var: 100.0
+  initial_drift_var: 1.0
+
+  # Process noise (how much true price can move per update)
+  process_noise_price: 1.0
+  process_noise_drift: 0.01
+
+  # Drift persistence (0.99 = slow mean reversion, trending markets)
+  drift_persistence: 0.99
+
+  # Observation noise (adjusted dynamically based on leverage/stablecoins)
+  base_observation_var: 10.0
+
+# ============ Stablecoin Analysis ============
+stablecoin:
+  # USDT increases volatility (leverage proxy)
+  usdt_volatility_mult_base: 1.0
+  usdt_volatility_mult_max: 3.0
+  usdt_typical_mint_volume: 500000000
+  usdt_typical_derivatives_flow: 300000000
+
+  # USDC confirms trends (genuine capital)
+  usdc_drift_confidence_max: 0.1
+  usdc_typical_spot_flow: 200000000
+  usdc_typical_custody_flow: 100000000
+
+  # Flow ratio thresholds
+  manipulation_ratio_threshold: 2.0  # USDT/USDC > 2 = manipulation likely
+  trend_ratio_threshold: 0.5         # USDT/USDC < 0.5 = trend likely
+
+# ============ Regime Detection ============
+regime:
+  leverage_stress_high: 0.7
+  volatility_low_threshold: 0.2
+  manipulation_prob_threshold: 0.7
+  cascade_confidence_threshold: 0.7
+  cascade_price_drop_threshold: 0.05
+  cascade_volume_spike_threshold: 3.0
+
+# ============ Signal Generation ============
+signal:
+  min_zscore_threshold: 1.5
+  base_confidence: 0.5
+  zscore_confidence_scale: 0.1
+  base_reversion_hours: 4.0
+  min_signal_interval_seconds: 60
+
+# ============ On-Chain Data ============
+onchain:
+  # Glassnode (requires API key in env)
+  glassnode_enabled: false
+
+  # CryptoQuant (requires API key in env)
+  cryptoquant_enabled: false
+
+  # DeFiLlama (free, no key needed)
+  defillama_enabled: true
+
+  # Update intervals
+  leverage_data_interval_seconds: 300
+  stablecoin_data_interval_seconds: 600
+
+# ============ Exchange Venues ============
+venues:
+  - name: binance
+    enabled: true
+    base_reliability: 0.5
+    has_derivatives: true
+    derivatives_ratio: 0.7
+    websocket_url: wss://stream.binance.com:9443/ws
+    rest_url: https://api.binance.com
+    requests_per_second: 20.0
+
+  - name: coinbase
+    enabled: true
+    base_reliability: 0.8
+    has_derivatives: false
+    usdc_primary: true
+    websocket_url: wss://ws-feed.exchange.coinbase.com
+    rest_url: https://api.exchange.coinbase.com
+    requests_per_second: 10.0
+
+  - name: okx
+    enabled: true
+    base_reliability: 0.5
+    has_derivatives: true
+    derivatives_ratio: 0.6
+    websocket_url: wss://ws.okx.com:8443/ws/v5/public
+    rest_url: https://www.okx.com
+    requests_per_second: 20.0
+
+  - name: kraken
+    enabled: true
+    base_reliability: 0.8
+    has_derivatives: false
+    websocket_url: wss://ws.kraken.com
+    rest_url: https://api.kraken.com
+    requests_per_second: 1.0
+
+  - name: uniswap
+    enabled: true
+    base_reliability: 0.6
+    is_decentralized: true
+    rest_url: https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3
+    requests_per_second: 5.0
+
+# ============ Chain Configurations ============
+chains:
+  ethereum:
+    chain_id: 1
+    name: ethereum
+    # rpc_url from ETH_RPC_URL env var
+    confirmations_required: 2
+    max_gas_price_gwei: 100.0
+    gas_limit_multiplier: 1.2
+    tx_timeout_seconds: 120
+    # Contract addresses (set after deployment)
+    true_price_oracle: ""
+    stablecoin_registry: ""
+    vibe_amm: ""
+
+  arbitrum:
+    chain_id: 42161
+    name: arbitrum
+    confirmations_required: 1
+    max_gas_price_gwei: 1.0
+    true_price_oracle: ""
+    stablecoin_registry: ""
+    vibe_amm: ""
+
+  base:
+    chain_id: 8453
+    name: base
+    confirmations_required: 1
+    max_gas_price_gwei: 0.1
+    true_price_oracle: ""
+    stablecoin_registry: ""
+    vibe_amm: ""
+
+  optimism:
+    chain_id: 10
+    name: optimism
+    confirmations_required: 1
+    max_gas_price_gwei: 0.1
+    true_price_oracle: ""
+    stablecoin_registry: ""
+    vibe_amm: ""
+
+  sepolia:
+    chain_id: 11155111
+    name: sepolia
+    confirmations_required: 1
+    max_gas_price_gwei: 50.0
+    true_price_oracle: ""
+    stablecoin_registry: ""
+    vibe_amm: ""

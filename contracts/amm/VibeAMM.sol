@@ -13,7 +13,9 @@ import "../core/CircuitBreaker.sol";
 import "../libraries/BatchMath.sol";
 import "../libraries/SecurityLib.sol";
 import "../libraries/TWAPOracle.sol";
+import "../libraries/VWAPOracle.sol";
 import "../libraries/TruePriceLib.sol";
+import "../libraries/LiquidityProtection.sol";
 import "../oracles/interfaces/ITruePriceOracle.sol";
 
 /**
@@ -32,6 +34,7 @@ contract VibeAMM is
     using SafeERC20 for IERC20;
     using BatchMath for uint256;
     using TWAPOracle for TWAPOracle.OracleState;
+    using VWAPOracle for VWAPOracle.VWAPState;
 
     // ============ Constants ============
 
@@ -110,6 +113,23 @@ contract VibeAMM is
     /// @notice Maximum staleness for True Price data (default 5 minutes)
     uint256 public truePriceMaxStaleness = 5 minutes;
 
+    // ============ VWAP Oracle & Liquidity Protection ============
+
+    /// @notice VWAP oracle state per pool
+    mapping(bytes32 => VWAPOracle.VWAPState) internal poolVWAP;
+
+    /// @notice Liquidity protection config per pool
+    mapping(bytes32 => LiquidityProtection.ProtectionConfig) public poolProtectionConfig;
+
+    /// @notice Whether liquidity protection is enabled globally
+    bool public liquidityProtectionEnabled;
+
+    /// @notice Price oracle for USD value calculations (e.g., Chainlink)
+    address public priceOracle;
+
+    /// @notice Cached USD prices per token (updated by keeper)
+    mapping(address => uint256) public tokenUsdPrices;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
@@ -119,6 +139,9 @@ contract VibeAMM is
     event FeesCollected(address indexed token, uint256 amount);
     event TruePriceOracleUpdated(address indexed oracle);
     event TruePriceValidationResult(bytes32 indexed poolId, uint256 spotPrice, uint256 truePrice, bool passed);
+    event LiquidityProtectionConfigured(bytes32 indexed poolId, uint256 amplification, uint256 maxImpactBps);
+    event DynamicFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 adjustedFee);
+    event TradeRejectedLowLiquidity(bytes32 indexed poolId, uint256 liquidity, uint256 minimum);
 
     // ============ Security Errors ============
 
@@ -127,6 +150,8 @@ contract VibeAMM is
     error SameBlockInteraction();
     error TradeTooLarge(uint256 maxAllowed);
     error DonationAttackSuspected();
+    error PriceImpactExceedsLimit(uint256 impact, uint256 maxAllowed);
+    error InsufficientPoolLiquidity(uint256 current, uint256 minimum);
 
     // ============ Modifiers ============
 
@@ -328,6 +353,9 @@ contract VibeAMM is
             // Initialize TWAP oracle for this pool
             uint256 initialPrice = amount0 > 0 ? (amount1 * 1e18) / amount0 : 0;
             poolOracles[poolId].initialize(initialPrice);
+
+            // Initialize VWAP oracle
+            poolVWAP[poolId].initialize(initialPrice);
         }
 
         require(liquidity > 0, "Insufficient liquidity minted");
@@ -538,6 +566,31 @@ contract VibeAMM is
         uint256 reserveIn = isToken0 ? pool.reserve0 : pool.reserve1;
         uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
 
+        // ============ Liquidity Protection ============
+        uint256 feeRate = pool.feeRate;
+        uint256 effectiveReserveIn = reserveIn;
+        uint256 effectiveReserveOut = reserveOut;
+
+        if (liquidityProtectionEnabled && poolProtectionConfig[poolId].amplificationFactor > 0) {
+            uint256 tradeValueUsd = _getTradeValueUsd(tokenIn, amountIn);
+
+            // This will revert if liquidity is too low or impact too high
+            (uint256 adjustedFee, uint256 effRes0, uint256 effRes1) = _applyLiquidityProtection(
+                poolId,
+                amountIn,
+                tradeValueUsd
+            );
+
+            feeRate = adjustedFee;
+            effectiveReserveIn = isToken0 ? effRes0 : effRes1;
+            effectiveReserveOut = isToken0 ? effRes1 : effRes0;
+
+            // Emit if fee was adjusted
+            if (adjustedFee != pool.feeRate) {
+                emit DynamicFeeApplied(poolId, pool.feeRate, adjustedFee);
+            }
+        }
+
         // TRADE SIZE LIMIT - prevent large trades that could manipulate price
         uint256 maxTradeSize = poolMaxTradeSize[poolId] > 0
             ? poolMaxTradeSize[poolId]
@@ -547,20 +600,31 @@ contract VibeAMM is
             revert TradeTooLarge(maxTradeSize);
         }
 
-        // Calculate output
+        // Calculate output using effective reserves (virtual liquidity)
+        // But actual transfers use real reserves
         amountOut = BatchMath.getAmountOut(
             amountIn,
-            reserveIn,
-            reserveOut,
-            pool.feeRate
+            effectiveReserveIn,
+            effectiveReserveOut,
+            feeRate
         );
+
+        // Scale output back to actual reserves if using virtual liquidity
+        if (effectiveReserveIn != reserveIn) {
+            // Virtual reserves dampened the price impact
+            // Actual output is limited by real reserves
+            uint256 maxOutput = reserveOut * 99 / 100; // Max 99% of reserves
+            if (amountOut > maxOutput) {
+                amountOut = maxOutput;
+            }
+        }
 
         require(amountOut >= minAmountOut, "Insufficient output");
 
-        // Calculate fees
+        // Calculate fees using adjusted rate
         (uint256 protocolFee, ) = BatchMath.calculateFees(
             amountIn,
-            pool.feeRate,
+            feeRate,
             PROTOCOL_FEE_SHARE
         );
 
@@ -568,7 +632,7 @@ contract VibeAMM is
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         IERC20(tokenOut).safeTransfer(recipient, amountOut);
 
-        // Update reserves
+        // Update reserves (actual, not virtual)
         if (isToken0) {
             pool.reserve0 += amountIn;
             pool.reserve1 -= amountOut;
@@ -594,6 +658,10 @@ contract VibeAMM is
 
         // Update TWAP oracle
         _updateOracle(poolId);
+
+        // Update VWAP oracle with trade data
+        uint256 executionPrice = pool.reserve0 > 0 ? (pool.reserve1 * 1e18) / pool.reserve0 : 0;
+        _updateVWAP(poolId, executionPrice, amountIn);
 
         emit SwapExecuted(poolId, msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
@@ -693,6 +761,73 @@ contract VibeAMM is
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "Invalid treasury");
         treasury = _treasury;
+    }
+
+    // ============ Liquidity Protection Admin ============
+
+    /**
+     * @notice Enable/disable global liquidity protection
+     */
+    function setLiquidityProtection(bool enabled) external onlyOwner {
+        liquidityProtectionEnabled = enabled;
+    }
+
+    /**
+     * @notice Configure liquidity protection for a specific pool
+     * @param poolId Pool identifier
+     * @param config Protection configuration
+     */
+    function setPoolProtectionConfig(
+        bytes32 poolId,
+        LiquidityProtection.ProtectionConfig calldata config
+    ) external onlyOwner poolExists(poolId) {
+        LiquidityProtection.validateConfig(config);
+        poolProtectionConfig[poolId] = config;
+
+        emit LiquidityProtectionConfigured(poolId, config.amplificationFactor, config.maxPriceImpactBps);
+    }
+
+    /**
+     * @notice Set default protection config for a pool
+     * @param poolId Pool identifier
+     * @param isStablePair Whether this is a stablecoin pair
+     */
+    function setDefaultProtectionConfig(bytes32 poolId, bool isStablePair) external onlyOwner poolExists(poolId) {
+        if (isStablePair) {
+            poolProtectionConfig[poolId] = LiquidityProtection.getStablePairConfig();
+        } else {
+            poolProtectionConfig[poolId] = LiquidityProtection.getDefaultConfig();
+        }
+
+        emit LiquidityProtectionConfigured(
+            poolId,
+            poolProtectionConfig[poolId].amplificationFactor,
+            poolProtectionConfig[poolId].maxPriceImpactBps
+        );
+    }
+
+    /**
+     * @notice Update token USD price (called by keeper/oracle)
+     * @param token Token address
+     * @param priceUsd Price in USD (18 decimals)
+     */
+    function updateTokenPrice(address token, uint256 priceUsd) external {
+        require(msg.sender == owner() || msg.sender == priceOracle, "Not authorized");
+        tokenUsdPrices[token] = priceUsd;
+    }
+
+    /**
+     * @notice Set price oracle address
+     */
+    function setPriceOracle(address oracle) external onlyOwner {
+        priceOracle = oracle;
+    }
+
+    /**
+     * @notice Grow VWAP oracle cardinality for longer windows
+     */
+    function growVWAPCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
+        poolVWAP[poolId].grow(newCardinality);
     }
 
     // ============ Internal Functions ============
@@ -841,6 +976,84 @@ contract VibeAMM is
     }
 
     /**
+     * @notice Update VWAP oracle with trade data
+     */
+    function _updateVWAP(bytes32 poolId, uint256 price, uint256 volume) internal {
+        poolVWAP[poolId].recordTrade(price, volume);
+    }
+
+    /**
+     * @notice Get pool liquidity metrics for protection calculations
+     */
+    function _getPoolMetrics(bytes32 poolId) internal view returns (LiquidityProtection.LiquidityMetrics memory metrics) {
+        Pool storage pool = pools[poolId];
+
+        metrics.reserve0 = pool.reserve0;
+        metrics.reserve1 = pool.reserve1;
+
+        // Calculate USD value of liquidity
+        uint256 price0 = tokenUsdPrices[pool.token0];
+        uint256 price1 = tokenUsdPrices[pool.token1];
+
+        if (price0 > 0 && price1 > 0) {
+            metrics.totalValueUsd = (pool.reserve0 * price0 / 1e18) + (pool.reserve1 * price1 / 1e18);
+        } else {
+            // Fallback: estimate based on reserves (assumes 1:1 for unknown tokens)
+            metrics.totalValueUsd = pool.reserve0 + pool.reserve1;
+        }
+
+        // Concentration score (simplified - could be more sophisticated)
+        metrics.concentrationScore = 50; // Default medium concentration
+
+        // Utilization rate from VWAP volume data
+        if (poolVWAP[poolId].cardinality > 0 && metrics.totalValueUsd > 0) {
+            (, uint128 volumeCumulative) = poolVWAP[poolId].getCurrentCumulatives();
+            metrics.utilizationRate = (uint256(volumeCumulative) * 1e18) / metrics.totalValueUsd;
+        }
+    }
+
+    /**
+     * @notice Apply liquidity protection checks and get adjusted parameters
+     */
+    function _applyLiquidityProtection(
+        bytes32 poolId,
+        uint256 amountIn,
+        uint256 tradeValueUsd
+    ) internal view returns (uint256 adjustedFee, uint256 effectiveReserve0, uint256 effectiveReserve1) {
+        if (!liquidityProtectionEnabled) {
+            Pool storage pool = pools[poolId];
+            return (pool.feeRate, pool.reserve0, pool.reserve1);
+        }
+
+        LiquidityProtection.ProtectionConfig storage config = poolProtectionConfig[poolId];
+
+        // If no config set, use defaults
+        if (config.amplificationFactor == 0) {
+            Pool storage pool = pools[poolId];
+            return (pool.feeRate, pool.reserve0, pool.reserve1);
+        }
+
+        LiquidityProtection.LiquidityMetrics memory metrics = _getPoolMetrics(poolId);
+
+        // Apply all protections
+        (adjustedFee, effectiveReserve0, effectiveReserve1) = LiquidityProtection.applyProtections(
+            config,
+            metrics,
+            amountIn,
+            tradeValueUsd
+        );
+    }
+
+    /**
+     * @notice Calculate trade value in USD
+     */
+    function _getTradeValueUsd(address token, uint256 amount) internal view returns (uint256) {
+        uint256 price = tokenUsdPrices[token];
+        if (price == 0) return amount; // Fallback: assume 1:1
+        return (amount * price) / 1e18;
+    }
+
+    /**
      * @notice Validate current price against TWAP
      */
     function _validatePriceAgainstTWAP(bytes32 poolId) internal view {
@@ -967,5 +1180,91 @@ contract VibeAMM is
      */
     function getOracleCardinality(bytes32 poolId) external view returns (uint16 current, uint16 next) {
         return (poolOracles[poolId].cardinality, poolOracles[poolId].cardinalityNext);
+    }
+
+    // ============ VWAP & Protection View Functions ============
+
+    /**
+     * @notice Get VWAP price for a pool
+     * @param poolId Pool identifier
+     * @param period VWAP period in seconds
+     * @return vwap Volume-weighted average price
+     */
+    function getVWAP(bytes32 poolId, uint32 period) external view returns (uint256 vwap) {
+        if (!poolVWAP[poolId].canConsult(period)) {
+            return 0;
+        }
+        return poolVWAP[poolId].consult(period);
+    }
+
+    /**
+     * @notice Get VWAP with volume info
+     * @param poolId Pool identifier
+     * @param period VWAP period in seconds
+     * @return vwap Volume-weighted average price
+     * @return volume Total volume in period
+     */
+    function getVWAPWithVolume(bytes32 poolId, uint32 period) external view returns (uint256 vwap, uint256 volume) {
+        if (!poolVWAP[poolId].canConsult(period)) {
+            return (0, 0);
+        }
+        return poolVWAP[poolId].consultWithVolume(period);
+    }
+
+    /**
+     * @notice Check if VWAP is available for period
+     */
+    function hasVWAPHistory(bytes32 poolId, uint32 period) external view returns (bool) {
+        return poolVWAP[poolId].canConsult(period);
+    }
+
+    /**
+     * @notice Get liquidity score for a pool (0-100, higher = safer)
+     */
+    function getLiquidityScore(bytes32 poolId) external view returns (uint256 score) {
+        LiquidityProtection.LiquidityMetrics memory metrics = _getPoolMetrics(poolId);
+        return LiquidityProtection.calculateLiquidityScore(metrics);
+    }
+
+    /**
+     * @notice Get pool liquidity in USD
+     */
+    function getPoolLiquidityUsd(bytes32 poolId) external view returns (uint256) {
+        LiquidityProtection.LiquidityMetrics memory metrics = _getPoolMetrics(poolId);
+        return metrics.totalValueUsd;
+    }
+
+    /**
+     * @notice Get maximum trade size for given price impact
+     * @param poolId Pool identifier
+     * @param maxImpactBps Maximum acceptable price impact in basis points
+     * @return maxAmountIn Maximum input amount
+     */
+    function getMaxTradeSizeForImpact(bytes32 poolId, uint256 maxImpactBps) external view returns (uint256 maxAmountIn) {
+        Pool storage pool = pools[poolId];
+        return LiquidityProtection.getMaxTradeSize(pool.reserve0, maxImpactBps);
+    }
+
+    /**
+     * @notice Get effective fee rate after liquidity adjustments
+     * @param poolId Pool identifier
+     * @param amountIn Proposed trade size
+     * @return fee Effective fee in basis points
+     */
+    function getEffectiveFee(bytes32 poolId, uint256 amountIn) external view returns (uint256 fee) {
+        Pool storage pool = pools[poolId];
+
+        if (!liquidityProtectionEnabled || poolProtectionConfig[poolId].amplificationFactor == 0) {
+            return pool.feeRate;
+        }
+
+        LiquidityProtection.LiquidityMetrics memory metrics = _getPoolMetrics(poolId);
+        uint256 tradeValueUsd = _getTradeValueUsd(pool.token0, amountIn);
+
+        return LiquidityProtection.calculateDynamicFee(
+            metrics.totalValueUsd,
+            tradeValueUsd,
+            pool.feeRate
+        );
     }
 }

@@ -1,76 +1,79 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================
-   ROOT VARIABLES - The DNA of our design
+   ROOT VARIABLES
    ============================================ */
 :root {
-  --vibe-primary: #ff1ee8;
-  --vibe-secondary: #00d4ff;
-  --vibe-glow: #a3ff00;
-  --void-deep: #070815;
-  --void-surface: #12152a;
-
-  /* Glow intensities */
-  --glow-intensity: 1;
-  --hover-glow-intensity: 1.5;
+  --matrix: #00ff41;
+  --terminal: #00d4ff;
+  --black-900: #000000;
+  --black-800: #080808;
+  --black-700: #0d0d0d;
+  --black-600: #181818;
+  --black-500: #252525;
+  --black-400: #353535;
+  --black-300: #505050;
+  --black-200: #707070;
+  --text-primary: #e0e0e0;
+  --text-secondary: #808080;
+  --text-muted: #505050;
+  --border: #252525;
 }
 
 /* ============================================
-   BASE STYLES - Setting the stage
+   BASE STYLES
    ============================================ */
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  background: var(--void-deep);
-  color: #e2e8f0;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  background: var(--black-900);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Selection styling */
 ::selection {
-  background: rgba(255, 30, 232, 0.3);
+  background: rgba(0, 255, 65, 0.3);
   color: white;
 }
 
-/* Custom scrollbar - sleek and minimal */
+/* Minimal scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--black-900);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--vibe-primary), var(--vibe-secondary));
-  border-radius: 10px;
+  background: var(--black-500);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #ff57f0, #22d3ee);
+  background: var(--black-400);
 }
 
-/* Remove default focus, add custom */
+/* Focus states */
 *:focus {
   outline: none;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--vibe-primary);
+  outline: 1px solid var(--matrix);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
-/* Number input - clean */
+/* Number inputs */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -82,635 +85,263 @@ input[type="number"] {
 }
 
 /* ============================================
-   BACKGROUND EFFECTS - The living canvas
+   SURFACE COMPONENTS
    ============================================ */
-
-/* Main animated background */
-.cosmic-bg {
-  background:
-    radial-gradient(ellipse at 20% 20%, rgba(255, 30, 232, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(163, 255, 0, 0.03) 0%, transparent 70%),
-    linear-gradient(180deg, #070815 0%, #0c0e1f 50%, #070815 100%);
-  background-size: 100% 100%;
-  animation: cosmic-pulse 20s ease-in-out infinite;
+.surface {
+  background: var(--black-800);
+  border: 1px solid var(--border);
 }
 
-@keyframes cosmic-pulse {
-  0%, 100% {
-    background-position: 0% 0%, 100% 100%, 50% 50%, 0% 0%;
-  }
-  33% {
-    background-position: 30% 70%, 70% 30%, 60% 40%, 0% 0%;
-  }
-  66% {
-    background-position: 70% 30%, 30% 70%, 40% 60%, 0% 0%;
-  }
+.surface-raised {
+  background: var(--black-700);
+  border: 1px solid var(--black-500);
 }
 
-/* Noise texture overlay */
-.noise-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  opacity: 0.015;
-  z-index: 1000;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
-
-/* Floating orbs */
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  animation: orb-float 20s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.orb-1 {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(255, 30, 232, 0.15) 0%, transparent 70%);
-  top: -200px;
-  left: -200px;
-  animation-delay: 0s;
-}
-
-.orb-2 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.12) 0%, transparent 70%);
-  bottom: -150px;
-  right: -150px;
-  animation-delay: -7s;
-}
-
-.orb-3 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(163, 255, 0, 0.08) 0%, transparent 70%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation-delay: -14s;
-}
-
-@keyframes orb-float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-    opacity: 0.6;
-  }
-  25% {
-    transform: translate(30px, -30px) scale(1.05);
-    opacity: 0.8;
-  }
-  50% {
-    transform: translate(-20px, 20px) scale(0.95);
-    opacity: 0.5;
-  }
-  75% {
-    transform: translate(-30px, -20px) scale(1.02);
-    opacity: 0.7;
-  }
-}
-
-/* Grid pattern */
-.grid-pattern {
-  background-image:
-    linear-gradient(rgba(255, 30, 232, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 30, 232, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  animation: grid-move 30s linear infinite;
-}
-
-@keyframes grid-move {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 50px 50px;
-  }
+.surface-sunken {
+  background: var(--black-900);
+  border: 1px solid var(--black-600);
 }
 
 /* ============================================
-   GLASSMORPHISM - Modern depth
-   ============================================ */
-.glass {
-  background: rgba(18, 21, 42, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.glass-strong {
-  background: rgba(18, 21, 42, 0.85);
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-subtle {
-  background: rgba(18, 21, 42, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-/* ============================================
-   GRADIENT TEXT - Electric typography
-   ============================================ */
-.gradient-text {
-  background: linear-gradient(135deg, #ff1ee8 0%, #ff57f0 25%, #00d4ff 75%, #22d3ee 100%);
-  background-size: 300% 300%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: gradient-shift 8s ease infinite;
-}
-
-.gradient-text-static {
-  background: linear-gradient(135deg, #ff1ee8 0%, #00d4ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.gradient-text-glow {
-  background: linear-gradient(135deg, #a3ff00 0%, #00d4ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* ============================================
-   GLOW EFFECTS - Neon dreams
-   ============================================ */
-.glow-vibe {
-  box-shadow:
-    0 0 20px rgba(255, 30, 232, 0.3),
-    0 0 40px rgba(255, 30, 232, 0.1);
-}
-
-.glow-vibe-lg {
-  box-shadow:
-    0 0 30px rgba(255, 30, 232, 0.4),
-    0 0 60px rgba(255, 30, 232, 0.2),
-    0 0 100px rgba(255, 30, 232, 0.1);
-}
-
-.glow-cyber {
-  box-shadow:
-    0 0 20px rgba(0, 212, 255, 0.3),
-    0 0 40px rgba(0, 212, 255, 0.1);
-}
-
-.glow-success {
-  box-shadow:
-    0 0 20px rgba(163, 255, 0, 0.3),
-    0 0 40px rgba(163, 255, 0, 0.1);
-}
-
-.neon-border {
-  position: relative;
-}
-
-.neon-border::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, #ff1ee8, #00d4ff, #a3ff00, #ff1ee8);
-  background-size: 400% 400%;
-  animation: gradient-shift 4s ease infinite;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.neon-border:hover::before {
-  opacity: 1;
-}
-
-/* ============================================
-   SWAP CARD - The hero component
+   SWAP CARD - Clean and minimal
    ============================================ */
 .swap-card {
-  position: relative;
-  background: linear-gradient(
-    180deg,
-    rgba(18, 21, 42, 0.95) 0%,
-    rgba(7, 8, 21, 0.98) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.swap-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 30, 232, 0.05) 0%,
-    transparent 50%,
-    rgba(0, 212, 255, 0.05) 100%
-  );
-  opacity: 0;
-  transition: opacity 0.4s ease;
+  background: var(--black-800);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease;
 }
 
 .swap-card:hover {
-  border-color: rgba(255, 30, 232, 0.2);
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.3),
-    0 0 60px rgba(255, 30, 232, 0.1);
-}
-
-.swap-card:hover::before {
-  opacity: 1;
-}
-
-/* Animated border gradient */
-.swap-card-glow {
-  position: relative;
-}
-
-.swap-card-glow::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, #ff1ee8, #00d4ff, #ff1ee8);
-  background-size: 200% 200%;
-  animation: gradient-shift 4s ease infinite;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  filter: blur(8px);
-}
-
-.swap-card-glow:hover::after {
-  opacity: 0.6;
+  border-color: var(--black-400);
 }
 
 /* ============================================
-   TOKEN INPUT - Where magic happens
+   TOKEN INPUT
    ============================================ */
 .token-input {
-  position: relative;
-  background: rgba(7, 8, 21, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.token-input::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 30, 232, 0.1) 0%,
-    transparent 100%
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
+  background: var(--black-900);
+  border: 1px solid var(--black-600);
+  transition: border-color 0.2s ease;
 }
 
 .token-input:focus-within {
-  border-color: rgba(255, 30, 232, 0.4);
-  background: rgba(7, 8, 21, 0.8);
-  box-shadow:
-    0 0 30px rgba(255, 30, 232, 0.1),
-    inset 0 0 30px rgba(255, 30, 232, 0.03);
-}
-
-.token-input:focus-within::before {
-  opacity: 1;
+  border-color: var(--matrix);
 }
 
 /* ============================================
-   BUTTONS - Tactile and alive
+   BUTTONS
    ============================================ */
 .btn-primary {
   @apply relative overflow-hidden;
-  @apply bg-gradient-to-r from-vibe-500 via-vibe-400 to-cyber-500;
-  @apply text-white font-semibold py-4 px-6 rounded-2xl;
-  @apply transition-all duration-300;
-  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none;
-  background-size: 200% 200%;
-  animation: gradient-shift 4s ease infinite;
-}
-
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  transform: translateX(-100%);
-  transition: transform 0.5s ease;
+  @apply bg-matrix-600 hover:bg-matrix-500;
+  @apply text-black-900 font-semibold py-4 px-6 rounded-lg;
+  @apply border border-matrix-500;
+  @apply transition-all duration-200;
+  @apply disabled:opacity-40 disabled:cursor-not-allowed;
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow:
-    0 10px 30px rgba(255, 30, 232, 0.4),
-    0 0 60px rgba(255, 30, 232, 0.2);
-}
-
-.btn-primary:hover:not(:disabled)::before {
-  transform: translateX(100%);
-}
-
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
 }
 
 .btn-secondary {
-  @apply relative overflow-hidden;
-  @apply bg-void-700 hover:bg-void-600;
-  @apply text-white font-medium py-2.5 px-5 rounded-xl;
-  @apply border border-void-500 hover:border-vibe-500/30;
-  @apply transition-all duration-300;
-}
-
-.btn-secondary:hover {
-  box-shadow: 0 0 20px rgba(255, 30, 232, 0.15);
+  @apply bg-black-700 hover:bg-black-600;
+  @apply text-white font-medium py-2.5 px-5 rounded-lg;
+  @apply border border-black-500 hover:border-black-400;
+  @apply transition-all duration-200;
 }
 
 .btn-ghost {
-  @apply relative;
-  @apply bg-transparent hover:bg-void-700/50;
-  @apply text-void-200 hover:text-white;
-  @apply font-medium py-2 px-4 rounded-xl;
-  @apply border border-transparent hover:border-void-500;
-  @apply transition-all duration-300;
+  @apply bg-transparent hover:bg-black-700;
+  @apply text-black-200 hover:text-white;
+  @apply font-medium py-2 px-4 rounded-lg;
+  @apply border border-transparent hover:border-black-500;
+  @apply transition-all duration-200;
 }
 
 /* ============================================
-   BATCH TIMER - Living countdown
+   BATCH TIMER
    ============================================ */
 .batch-timer {
-  position: relative;
+  background: var(--black-800);
+  border: 1px solid var(--border);
+}
+
+.progress-bar {
+  background: var(--black-600);
   overflow: hidden;
 }
 
-.batch-timer::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  transform: translateX(-100%);
-  animation: shimmer 3s infinite;
+.progress-fill {
+  transition: width 0.3s ease;
 }
 
-@keyframes batch-pulse {
-  0%, 100% {
-    opacity: 1;
-    filter: brightness(1);
-  }
-  50% {
-    opacity: 0.8;
-    filter: brightness(1.2);
-  }
-}
+/* Phase colors */
+.phase-commit { --phase-color: #00ff41; }
+.phase-reveal { --phase-color: #ffaa00; }
+.phase-settling { --phase-color: #00d4ff; }
 
-.batch-pulse {
-  animation: batch-pulse 2s ease-in-out infinite;
-}
-
-.progress-glow {
-  position: relative;
-}
-
-.progress-glow::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 30px;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4));
-  filter: blur(4px);
-  animation: pulse-glow 1s ease-in-out infinite;
+.phase-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--phase-color);
 }
 
 /* ============================================
-   MODALS - Cinematic reveals
+   MODALS
    ============================================ */
 .modal-backdrop {
-  background: rgba(3, 3, 8, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
-  animation: modal-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--black-800);
+  border: 1px solid var(--border);
+  animation: scale-in 0.15s ease-out;
 }
 
-@keyframes modal-enter {
-  0% {
-    opacity: 0;
-    transform: scale(0.95) translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* ============================================
-   TOOLTIPS & POPOVERS
-   ============================================ */
-.tooltip {
-  @apply absolute z-50 px-3 py-2 text-sm rounded-lg;
-  @apply bg-void-700 border border-void-500;
-  @apply shadow-xl;
-  animation: fade-in 0.15s ease-out;
-}
-
-/* ============================================
-   TOKEN BADGES - Iconic
-   ============================================ */
-.token-badge {
-  @apply relative flex items-center justify-center;
-  @apply rounded-full bg-void-700 border border-void-500;
-  @apply transition-all duration-300;
-}
-
-.token-badge:hover {
-  @apply border-vibe-500/50;
-  box-shadow: 0 0 20px rgba(255, 30, 232, 0.3);
-}
-
-.token-badge-glow {
-  @apply absolute inset-0 rounded-full;
-  background: radial-gradient(circle, rgba(255, 30, 232, 0.3), transparent 70%);
-  filter: blur(10px);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.token-badge:hover .token-badge-glow {
-  opacity: 1;
-}
-
-/* ============================================
-   DATA CARDS - Information with style
-   ============================================ */
-.stat-card {
-  @apply relative overflow-hidden;
-  @apply bg-void-800/50 rounded-2xl p-5;
-  @apply border border-void-600/50;
-  @apply transition-all duration-300;
-}
-
-.stat-card::before {
-  content: '';
-  @apply absolute top-0 left-0 w-full h-1;
-  background: linear-gradient(90deg, #ff1ee8, #00d4ff);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.3s ease;
-}
-
-.stat-card:hover {
-  @apply border-void-500;
-  transform: translateY(-2px);
-}
-
-.stat-card:hover::before {
-  transform: scaleX(1);
-}
-
-/* ============================================
-   PHASE INDICATORS - State visualization
-   ============================================ */
-.phase-commit {
-  --phase-color: #a3ff00;
-}
-
-.phase-reveal {
-  --phase-color: #fbbf24;
-}
-
-.phase-settling {
-  --phase-color: #ff1ee8;
-}
-
-.phase-indicator {
-  background: var(--phase-color);
-  box-shadow: 0 0 20px var(--phase-color);
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* ============================================
-   CHAIN INDICATOR - Network presence
-   ============================================ */
-.chain-dot {
-  @apply relative w-2.5 h-2.5 rounded-full;
-}
-
-.chain-dot::before {
-  content: '';
-  @apply absolute inset-0 rounded-full;
-  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-.chain-dot.connected {
-  @apply bg-glow-500;
-}
-
-.chain-dot.connected::before {
-  @apply bg-glow-500/50;
-}
-
-/* ============================================
-   ANIMATIONS - Bringing it to life
-   ============================================ */
-@keyframes ping {
-  75%, 100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
-}
-
-@keyframes gradient-shift {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-@keyframes fade-in {
+@keyframes scale-in {
   from {
     opacity: 0;
+    transform: scale(0.95);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
 
 /* ============================================
-   HOVER STATES - Micro-interactions
+   TOOLTIPS
+   ============================================ */
+.tooltip {
+  @apply absolute z-50 px-3 py-2 text-sm rounded;
+  @apply bg-black-700 border border-black-500;
+  @apply shadow-medium;
+  animation: fade-in 0.1s ease-out;
+}
+
+/* ============================================
+   DATA DISPLAY - Terminal style
+   ============================================ */
+.data-label {
+  @apply text-sm text-black-300;
+}
+
+.data-value {
+  @apply font-mono text-matrix-500;
+}
+
+.data-value-secondary {
+  @apply font-mono text-terminal-500;
+}
+
+.data-value-muted {
+  @apply font-mono text-black-200;
+}
+
+/* ============================================
+   TOKEN BADGE
+   ============================================ */
+.token-badge {
+  @apply flex items-center justify-center;
+  @apply rounded-full bg-black-700 border border-black-500;
+  @apply transition-all duration-200;
+}
+
+.token-badge:hover {
+  @apply border-matrix-500/50;
+}
+
+/* ============================================
+   STAT CARDS
+   ============================================ */
+.stat-card {
+  @apply bg-black-800 rounded-lg p-4;
+  @apply border border-black-500;
+  @apply transition-all duration-200;
+}
+
+.stat-card:hover {
+  @apply border-black-400;
+}
+
+/* ============================================
+   CHAIN INDICATOR
+   ============================================ */
+.chain-dot {
+  @apply w-2 h-2 rounded-full;
+}
+
+.chain-dot.connected {
+  @apply bg-matrix-500;
+}
+
+.chain-dot.disconnected {
+  @apply bg-black-400;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@keyframes heartbeat {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+.animate-in {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* ============================================
+   HOVER STATES
    ============================================ */
 .hover-lift {
-  @apply transition-transform duration-300;
+  @apply transition-transform duration-200;
 }
 
 .hover-lift:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
 }
 
-.hover-glow {
-  @apply transition-all duration-300;
+.hover-accent {
+  @apply transition-colors duration-200;
 }
 
-.hover-glow:hover {
-  box-shadow: 0 0 30px rgba(255, 30, 232, 0.3);
-}
-
-.hover-scale {
-  @apply transition-transform duration-300;
-}
-
-.hover-scale:hover {
-  transform: scale(1.02);
-}
-
-.hover-rotate {
-  @apply transition-transform duration-500;
-}
-
-.hover-rotate:hover {
-  transform: rotate(180deg);
+.hover-accent:hover {
+  border-color: var(--matrix);
 }
 
 /* ============================================
@@ -718,32 +349,28 @@ input[type="number"] {
    ============================================ */
 .text-gradient {
   @apply bg-clip-text text-transparent;
-  background-image: linear-gradient(135deg, #ff1ee8, #00d4ff);
+  background-image: linear-gradient(90deg, #00ff41, #00d4ff);
 }
 
 .border-gradient {
-  border-image: linear-gradient(135deg, #ff1ee8, #00d4ff) 1;
+  border-image: linear-gradient(90deg, #00ff41, #00d4ff) 1;
 }
 
-.animate-in {
-  animation: slide-up 0.5s ease-out;
+/* Glass effect - minimal version */
+.glass {
+  background: rgba(13, 13, 13, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
 }
 
-/* Smooth global transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-/* Disable transitions on resize */
-.resize-animation-stopper * {
-  transition: none !important;
-  animation: none !important;
+.glass-strong {
+  background: rgba(13, 13, 13, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
 }
 
 /* ============================================
-   RESPONSIVE ADJUSTMENTS
+   RESPONSIVE
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -755,25 +382,37 @@ input[type="number"] {
   }
 }
 
-/* Mobile optimizations */
-@media (max-width: 768px) {
-  .orb {
-    filter: blur(40px);
-    opacity: 0.5;
-  }
+/* ============================================
+   LEGACY COMPATIBILITY
+   ============================================ */
+/* These map old class names to new styles for gradual migration */
+.gradient-text {
+  @apply text-matrix-500;
+}
 
-  .orb-1 {
-    width: 300px;
-    height: 300px;
-  }
+.gradient-text-static {
+  @apply text-white;
+}
 
-  .orb-2 {
-    width: 250px;
-    height: 250px;
-  }
+.glow-vibe,
+.glow-cyber,
+.glow-success {
+  /* Removed glow effects */
+}
 
-  .orb-3 {
-    width: 200px;
-    height: 200px;
-  }
+.swap-card-glow {
+  /* Removed glow effects */
+}
+
+.neon-border {
+  @apply border border-black-500;
+}
+
+/* Batch timer legacy */
+.batch-pulse {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.progress-glow::after {
+  display: none;
 }

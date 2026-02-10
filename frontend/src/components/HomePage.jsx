@@ -127,6 +127,14 @@ const stats = [
   { label: 'people', value: '48.2K', change: '+892' },
 ]
 
+// Live activity for social proof - simulated real-time feed
+const recentActivity = [
+  { action: 'exchanged', amount: '$420', from: 'ETH', to: 'USDC', time: '2s ago', location: 'Lagos' },
+  { action: 'sent', amount: '$1,200', to: 'family', time: '8s ago', location: 'Lima' },
+  { action: 'exchanged', amount: '$85', from: 'USDC', to: 'ETH', time: '12s ago', location: 'Mumbai' },
+  { action: 'saved', amount: '$15.40', note: 'vs bank fees', time: '15s ago', location: 'Manila' },
+]
+
 function HomePage() {
   const { isConnected, connect, isConnecting } = useWallet()
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -306,16 +314,18 @@ function HomePage() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link to="/swap">
+          {/* Primary: Try Demo - no wallet needed */}
+          <Link to="/swap?demo=true">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="px-6 py-3 rounded-lg font-semibold bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 transition-colors"
             >
-              get started
+              try demo — no wallet needed
             </motion.button>
           </Link>
 
+          {/* Secondary: Connect wallet for real transactions */}
           {!isConnected && (
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -324,7 +334,7 @@ function HomePage() {
               disabled={isConnecting}
               className="px-6 py-3 rounded-lg font-semibold bg-black-800 border border-black-500 hover:border-black-400 text-white transition-colors"
             >
-              {isConnecting ? 'connecting...' : 'connect wallet'}
+              {isConnecting ? 'connecting...' : 'i have a wallet'}
             </motion.button>
           )}
         </div>
@@ -362,7 +372,7 @@ function HomePage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-12 md:mb-16"
+        className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
       >
         {stats.map((stat, i) => (
           <motion.div
@@ -383,6 +393,40 @@ function HomePage() {
             </div>
           </motion.div>
         ))}
+      </motion.div>
+
+      {/* Live Activity Feed - Social Proof */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.25 }}
+        className="mb-12 md:mb-16"
+      >
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="w-2 h-2 rounded-full bg-matrix-500 animate-pulse" />
+          <span className="text-xs text-black-400 uppercase tracking-wider">live activity</span>
+        </div>
+        <div className="overflow-hidden rounded-lg bg-black-800/50 border border-black-600">
+          <div className="flex animate-marquee">
+            {[...recentActivity, ...recentActivity].map((activity, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 px-4 py-2 border-r border-black-600 flex items-center gap-2 text-xs"
+              >
+                <span className="text-black-500">{activity.location}</span>
+                <span className="text-matrix-500">{activity.action}</span>
+                <span className="text-white font-mono">{activity.amount}</span>
+                {activity.from && (
+                  <span className="text-black-400">{activity.from} → {activity.to}</span>
+                )}
+                {activity.note && (
+                  <span className="text-black-400">{activity.note}</span>
+                )}
+                <span className="text-black-500">{activity.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </motion.div>
 
       {/* Feature Cards */}

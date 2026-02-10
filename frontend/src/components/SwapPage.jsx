@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useBatchState } from '../hooks/useBatchState'
@@ -35,6 +36,8 @@ const TOKENS = {
 }
 
 function SwapPage() {
+  const [searchParams] = useSearchParams()
+  const isDemo = searchParams.get('demo') === 'true'
   const { isConnected, connect } = useWallet()
   const {
     phase,
@@ -51,7 +54,7 @@ function SwapPage() {
 
   const [tokenIn, setTokenIn] = useState(TOKENS.ETH)
   const [tokenOut, setTokenOut] = useState(TOKENS.USDC)
-  const [amountIn, setAmountIn] = useState('')
+  const [amountIn, setAmountIn] = useState(isDemo ? '0.5' : '')
   const [amountOut, setAmountOut] = useState('')
   const [showTokenSelector, setShowTokenSelector] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -63,6 +66,7 @@ function SwapPage() {
   const [priorityBid, setPriorityBid] = useState('')
   const [lastSavings, setLastSavings] = useState(null)
   const [showKeyboardHints, setShowKeyboardHints] = useState(false)
+  const [demoCompleted, setDemoCompleted] = useState(false)
 
   // Calculate USD values
   const amountInUsd = amountIn ? (parseFloat(amountIn) * USD_PRICES[tokenIn.symbol]).toFixed(2) : null
@@ -163,6 +167,12 @@ function SwapPage() {
   }
 
   const handleSwap = async () => {
+    // Demo mode - simulate swap without wallet
+    if (isDemo && !isConnected) {
+      handleDemoSwap()
+      return
+    }
+
     if (!isConnected) {
       connect()
       return
@@ -225,12 +235,52 @@ function SwapPage() {
   }
 
   const getButtonText = () => {
+    if (isDemo && !isConnected) {
+      if (!amountIn) return 'enter amount to try'
+      if (demoCompleted) return 'demo complete! connect wallet to trade for real'
+      return 'try demo exchange'
+    }
     if (!isConnected) return 'get started'
     if (!amountIn) return 'enter amount'
     if (isLoading) return 'processing...'
     if (hasActiveOrder) return 'exchange pending'
     if (!isCommitPhase) return 'next batch in a moment'
     return 'exchange now'
+  }
+
+  const handleDemoSwap = async () => {
+    if (!amountIn || parseFloat(amountIn) <= 0) {
+      toast.error('Enter an amount to try')
+      return
+    }
+
+    setIsLoading(true)
+    toast.loading('Processing demo exchange...', { id: 'demo' })
+
+    // Simulate the batch process
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.loading('Waiting for batch...', { id: 'demo' })
+
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const savedAmount = (parseFloat(amountIn) * USD_PRICES[tokenIn.symbol] * 0.003).toFixed(2)
+    setLastSavings({
+      amount: savedAmount,
+      tokenIn: tokenIn.symbol,
+      tokenOut: tokenOut.symbol,
+      timestamp: Date.now(),
+    })
+
+    toast.success(
+      <div className="flex flex-col">
+        <span>Demo complete! You would have saved ${savedAmount}</span>
+        <span className="text-xs text-matrix-500 mt-1">Connect a wallet to trade for real</span>
+      </div>,
+      { id: 'demo', duration: 5000 }
+    )
+
+    setDemoCompleted(true)
+    setIsLoading(false)
   }
 
   const isButtonDisabled = isConnected && (
@@ -249,6 +299,56 @@ function SwapPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
+      {/* Demo Mode Banner */}
+      {isDemo && !isConnected && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-lg bg-terminal-500/10 border border-terminal-500/30"
+        >
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-terminal-500 animate-pulse" />
+              <span className="text-sm text-terminal-500 font-medium">Demo Mode</span>
+              <span className="text-xs text-black-400">— try the exchange without connecting a wallet</span>
+            </div>
+            <button
+              onClick={connect}
+              className="text-xs px-3 py-1 rounded bg-terminal-500/20 text-terminal-500 hover:bg-terminal-500/30 transition-colors"
+            >
+              connect wallet for real trades
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Demo Complete Banner */}
+      {demoCompleted && !isConnected && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-4 p-4 rounded-lg bg-matrix-500/10 border border-matrix-500/30"
+        >
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center space-x-3">
+              <svg className="w-6 h-6 text-matrix-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-white">You just experienced fair trading!</p>
+                <p className="text-xs text-black-400">That's how it works. Ready to try for real?</p>
+              </div>
+            </div>
+            <button
+              onClick={connect}
+              className="px-4 py-2 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-medium text-sm transition-colors"
+            >
+              connect wallet
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Batch Timer */}
       <BatchTimer />
 

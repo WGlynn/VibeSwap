@@ -9,6 +9,12 @@ const RESERVED_USERNAMES = {
     signature: 'contrib-005',
     reason: 'Early tester feedback on simplicity and accessibility',
   },
+  'Bill': {
+    reservedBy: 'Faraday1',
+    signature: 'contrib-015',
+    reason: 'Father of Faraday1 - Inspired the Wallet Recovery System so nobody ever loses their crypto again',
+    relationship: 'father',
+  },
 }
 
 // Initial seed contributions
@@ -218,6 +224,57 @@ This reframes VibeSwap from a technical DeFi product to a practical financial to
     rewardPoints: 100,
     threadId: 'thread-001',
     threadOrder: 8,
+  },
+  // ============================================
+  // Bill's Contribution - Recovery System Inspiration
+  // Reserved username for Faraday1's father
+  // ============================================
+  {
+    id: 'contrib-015',
+    author: 'Faraday1',
+    type: 'context',
+    title: 'Username Reservation: Bill',
+    content: 'By this signature, I (Faraday1) hereby reserve the username "Bill" for my father, who inspired the Wallet Recovery System. His wisdom about the importance of never losing access to what matters most led directly to our 5-layer recovery architecture. This username is now reserved and can only be claimed by him. His contribution (contrib-016) is attributed to this account.',
+    tags: ['governance', 'username', 'reservation', 'family', 'recovery'],
+    timestamp: Date.now() - 86400000 * 0.5, // 12 hours ago
+    upvotes: 42,
+    replies: 8,
+    implemented: true,
+    rewardPoints: 100,
+    isSignature: true,
+    reservedUsername: 'Bill',
+  },
+  {
+    id: 'contrib-016',
+    author: 'Bill',
+    type: 'context',
+    title: 'Never Lose Your Crypto - The Recovery Philosophy',
+    content: `The inspiration behind VibeSwap's Wallet Recovery System.
+
+Too many people have lost everything because they forgot a password or lost a piece of paper. This doesn't have to happen.
+
+The core insight: Recovery should work the way humans actually live. We trust our family and friends. We have time to notice when something's wrong. We plan for when we're gone.
+
+From this came the 5-layer recovery system:
+1. Guardian Recovery - Your trusted circle can help you recover
+2. Timelock Recovery - Time is your ally against attackers
+3. Dead Man's Switch - Your digital will for those you leave behind
+4. Arbitration - A fair jury when all else fails
+5. Quantum Backup - Future-proof protection
+
+Plus 7 layers of AGI resistance to protect against sophisticated AI attacks.
+
+The goal: A world where "not your keys, not your coins" doesn't mean "lose your keys, lose everything."
+
+Your crypto. Your people. Your safety net.`,
+    tags: ['recovery', 'philosophy', 'security', 'guardian', 'family', 'inheritance', 'agi-resistance'],
+    timestamp: Date.now() - 86400000 * 1, // 1 day ago
+    upvotes: 156,
+    replies: 23,
+    implemented: true,
+    rewardPoints: 500,
+    isKeyInsight: true,
+    isFounding: true,
   },
   {
     id: 'contrib-006',

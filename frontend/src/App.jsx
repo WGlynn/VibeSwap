@@ -1,16 +1,19 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
-import SwapCore from './components/SwapCore'
-import PoolPage from './components/PoolPage'
-import BridgePage from './components/BridgePage'
-import BuySellPage from './components/BuySellPage'
-import RewardsPage from './components/RewardsPage'
-import DocsPage from './components/DocsPage'
-import ForumPage from './components/ForumPage'
-import ActivityPage from './components/ActivityPage'
-import AdminSybilDetection from './components/AdminSybilDetection'
 import { ContributionsProvider } from './contexts/ContributionsContext'
+
+// Lazy-load route components - each becomes its own chunk
+const SwapCore = lazy(() => import('./components/SwapCore'))
+const PoolPage = lazy(() => import('./components/PoolPage'))
+const BridgePage = lazy(() => import('./components/BridgePage'))
+const BuySellPage = lazy(() => import('./components/BuySellPage'))
+const RewardsPage = lazy(() => import('./components/RewardsPage'))
+const DocsPage = lazy(() => import('./components/DocsPage'))
+const ForumPage = lazy(() => import('./components/ForumPage'))
+const ActivityPage = lazy(() => import('./components/ActivityPage'))
+const AdminSybilDetection = lazy(() => import('./components/AdminSybilDetection'))
 
 // Minimal page transitions - subtle, fast
 const pageVariants = {
@@ -36,19 +39,21 @@ function AnimatedRoutes() {
         variants={pageVariants}
         transition={pageTransition}
       >
-        <Routes location={location}>
-          {/* Landing IS the swap - Steve's vision */}
-          <Route path="/" element={<SwapCore />} />
-          <Route path="/buy" element={<BuySellPage />} />
-          <Route path="/earn" element={<PoolPage />} />
-          <Route path="/send" element={<BridgePage />} />
-          <Route path="/history" element={<ActivityPage />} />
-          <Route path="/rewards" element={<RewardsPage />} />
-          <Route path="/forum" element={<ForumPage />} />
-          <Route path="/docs" element={<DocsPage />} />
-          {/* Admin routes */}
-          <Route path="/admin/sybil" element={<AdminSybilDetection />} />
-        </Routes>
+        <Suspense fallback={<div className="flex-1" />}>
+          <Routes location={location}>
+            {/* Landing IS the swap - Steve's vision */}
+            <Route path="/" element={<SwapCore />} />
+            <Route path="/buy" element={<BuySellPage />} />
+            <Route path="/earn" element={<PoolPage />} />
+            <Route path="/send" element={<BridgePage />} />
+            <Route path="/history" element={<ActivityPage />} />
+            <Route path="/rewards" element={<RewardsPage />} />
+            <Route path="/forum" element={<ForumPage />} />
+            <Route path="/docs" element={<DocsPage />} />
+            {/* Admin routes */}
+            <Route path="/admin/sybil" element={<AdminSybilDetection />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   )

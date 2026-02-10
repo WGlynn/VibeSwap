@@ -5,11 +5,11 @@ import { motion } from 'framer-motion'
 // Capture it. Display it. Let people FEEL it.
 
 const MOODS = [
-  { name: 'Extreme Fear', emoji: '😱', color: '#ef4444', position: 0 },
-  { name: 'Fear', emoji: '😰', color: '#f97316', position: 25 },
-  { name: 'Neutral', emoji: '😐', color: '#eab308', position: 50 },
-  { name: 'Greed', emoji: '🤑', color: '#22c55e', position: 75 },
-  { name: 'Extreme Greed', emoji: '🚀', color: '#a3ff00', position: 100 },
+  { name: 'Extreme Fear', emoji: '▽', color: '#ef4444', position: 0 },
+  { name: 'Fear', emoji: '▿', color: '#f97316', position: 25 },
+  { name: 'Neutral', emoji: '◇', color: '#eab308', position: 50 },
+  { name: 'Greed', emoji: '△', color: '#22c55e', position: 75 },
+  { name: 'Extreme Greed', emoji: '▲', color: '#a3ff00', position: 100 },
 ]
 
 function MarketMood() {
@@ -49,7 +49,7 @@ function MarketMood() {
       {/* Header */}
       <div className="p-4 border-b border-void-600/30 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <span className="text-lg">🧠</span>
+          <span className="text-lg text-matrix-500">◎</span>
           <h3 className="font-display font-bold text-sm">MARKET MOOD</h3>
         </div>
         <motion.div

@@ -135,6 +135,22 @@ const recentActivity = [
   { action: 'saved', amount: '$15.40', note: 'vs bank fees', time: '15s ago', location: 'Manila' },
 ]
 
+// Community contributors - human faces behind the protocol
+const communityHighlights = [
+  {
+    author: 'Matt',
+    contribution: 'Helped simplify the app for newcomers',
+    impact: 'Made it easier for everyone to use',
+    badge: 'Early Contributor'
+  },
+  {
+    author: 'Faraday1',
+    contribution: 'Designed the fair rewards system',
+    impact: 'Everyone gets their fair share',
+    badge: 'Founder'
+  },
+]
+
 function HomePage() {
   const { isConnected, connect, isConnecting } = useWallet()
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -530,11 +546,70 @@ function HomePage() {
         </div>
       </motion.div>
 
+      {/* Community Section - Human Touch */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="mt-12 md:mt-16 rounded-lg bg-black-800 border border-black-500 p-6 md:p-8"
+      >
+        <div className="text-center mb-6">
+          <h2 className="text-xl md:text-2xl font-bold mb-2">
+            built by <span className="text-matrix-500">real people</span>
+          </h2>
+          <p className="text-sm text-black-400">not a faceless corporation — a community</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {communityHighlights.map((person, i) => (
+            <motion.div
+              key={person.author}
+              initial={{ opacity: 0, x: i === 0 ? -20 : 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7 + i * 0.1 }}
+              className="p-4 rounded-lg bg-black-700/50 border border-black-600"
+            >
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-matrix-500/20 border border-matrix-500/30 flex items-center justify-center text-matrix-500 font-bold">
+                  {person.author[0]}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-white">{person.author}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-matrix-500/10 text-matrix-500 border border-matrix-500/30">
+                      {person.badge}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-black-300 mb-1">"{person.contribution}"</p>
+              <p className="text-xs text-black-500">{person.impact}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="text-center">
+          <Link to="/forum">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-black-700 border border-black-500 hover:border-matrix-500/50 text-sm font-medium transition-colors"
+            >
+              <span>join the community</span>
+              <svg className="w-4 h-4 text-matrix-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </motion.button>
+          </Link>
+          <p className="text-xs text-black-500 mt-2">contribute ideas, earn rewards</p>
+        </div>
+      </motion.div>
+
       {/* Analytics Link */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.7 }}
+        transition={{ delay: 0.8 }}
         className="mt-8 text-center"
       >
         <Link

@@ -612,27 +612,55 @@ function SwapPage() {
               )}
             </AnimatePresence>
 
-            {/* Last Trade Savings Banner */}
+            {/* Last Trade Success - Enhanced Confidence Loop */}
             <AnimatePresence>
-              {lastSavings && Date.now() - lastSavings.timestamp < 30000 && (
+              {lastSavings && Date.now() - lastSavings.timestamp < 60000 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="mt-3 p-3 rounded-lg bg-matrix-500/10 border border-matrix-500/30"
+                  className="mt-3 p-4 rounded-lg bg-matrix-500/10 border border-matrix-500/30"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                  {/* Success Header */}
+                  <div className="flex items-center space-x-2 mb-3">
+                    <div className="w-6 h-6 rounded-full bg-matrix-500/20 flex items-center justify-center">
                       <svg className="w-4 h-4 text-matrix-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M5 12l5 5L20 7" />
                       </svg>
-                      <span className="text-xs text-matrix-400">last exchange saved you</span>
                     </div>
-                    <span className="text-sm font-mono font-bold text-matrix-500">+${lastSavings.amount}</span>
+                    <span className="text-sm font-medium text-white">Exchange complete!</span>
                   </div>
-                  <p className="text-[10px] text-black-500 mt-1">
-                    vs. other currency exchanges
-                  </p>
+
+                  {/* What happened summary */}
+                  <div className="bg-black-800/50 rounded p-2 mb-3 text-xs">
+                    <div className="flex items-center justify-between text-black-300">
+                      <span>You exchanged</span>
+                      <span className="font-mono">{lastSavings.tokenIn} → {lastSavings.tokenOut}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-matrix-500 mt-1">
+                      <span>You saved</span>
+                      <span className="font-mono font-bold">+${lastSavings.amount}</span>
+                    </div>
+                  </div>
+
+                  {/* Next steps - Progressive Discovery */}
+                  <div className="border-t border-matrix-500/20 pt-3">
+                    <p className="text-[10px] text-black-400 mb-2">Want to save even more?</p>
+                    <div className="flex gap-2">
+                      <Link
+                        to="/pool"
+                        className="flex-1 text-center py-1.5 px-2 rounded bg-black-700 border border-black-500 hover:border-matrix-500/50 text-[10px] text-black-300 hover:text-white transition-colors"
+                      >
+                        earn passive income →
+                      </Link>
+                      <Link
+                        to="/rewards"
+                        className="flex-1 text-center py-1.5 px-2 rounded bg-black-700 border border-black-500 hover:border-matrix-500/50 text-[10px] text-black-300 hover:text-white transition-colors"
+                      >
+                        check your rewards →
+                      </Link>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

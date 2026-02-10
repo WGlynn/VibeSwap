@@ -18,60 +18,31 @@ function BatchTimer() {
     switch (phase) {
       case PHASES.COMMIT:
         return {
-          gradient: 'from-glow-500 to-cyber-500',
-          bg: 'bg-glow-500/10',
-          border: 'border-glow-500/30',
-          text: 'text-glow-500',
-          glow: 'shadow-[0_0_30px_rgba(163,255,0,0.2)]',
-          icon: (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          ),
-          description: 'Submit encrypted orders',
-          action: 'Orders are hidden',
+          color: 'text-matrix-500',
+          bgColor: 'bg-matrix-500',
+          borderColor: 'border-matrix-500/30',
+          bgTint: 'bg-matrix-500/5',
         }
       case PHASES.REVEAL:
         return {
-          gradient: 'from-yellow-400 to-orange-500',
-          bg: 'bg-yellow-500/10',
-          border: 'border-yellow-500/30',
-          text: 'text-yellow-400',
-          glow: 'shadow-[0_0_30px_rgba(251,191,36,0.2)]',
-          icon: (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-          ),
-          description: 'Batch sealed',
-          action: 'Revealing orders',
+          color: 'text-warning',
+          bgColor: 'bg-warning',
+          borderColor: 'border-warning/30',
+          bgTint: 'bg-warning/5',
         }
       case PHASES.SETTLING:
         return {
-          gradient: 'from-vibe-500 to-cyber-500',
-          bg: 'bg-vibe-500/10',
-          border: 'border-vibe-500/30',
-          text: 'text-vibe-400',
-          glow: 'shadow-[0_0_30px_rgba(255,30,232,0.2)]',
-          icon: (
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          ),
-          description: 'Finding clearing price',
-          action: 'Executing batch',
+          color: 'text-terminal-500',
+          bgColor: 'bg-terminal-500',
+          borderColor: 'border-terminal-500/30',
+          bgTint: 'bg-terminal-500/5',
         }
       default:
         return {
-          gradient: 'from-void-500 to-void-600',
-          bg: 'bg-void-500/10',
-          border: 'border-void-500/30',
-          text: 'text-void-400',
-          glow: '',
-          icon: null,
-          description: '',
-          action: '',
+          color: 'text-black-400',
+          bgColor: 'bg-black-400',
+          borderColor: 'border-black-500',
+          bgTint: 'bg-black-800',
         }
     }
   }
@@ -79,13 +50,40 @@ function BatchTimer() {
   const getPhaseLabel = () => {
     switch (phase) {
       case PHASES.COMMIT:
-        return 'COMMIT'
+        return 'ACCEPTING'
       case PHASES.REVEAL:
-        return 'REVEAL'
+        return 'PROCESSING'
       case PHASES.SETTLING:
-        return 'SETTLING'
+        return 'COMPLETING'
       default:
         return 'UNKNOWN'
+    }
+  }
+
+  // Human-friendly phase explanation
+  const getPhaseExplanation = () => {
+    if (!hasActiveOrder) {
+      switch (phase) {
+        case PHASES.COMMIT:
+          return 'Submit now to join this batch'
+        case PHASES.REVEAL:
+          return 'Wait for next batch to submit'
+        case PHASES.SETTLING:
+          return 'Trades completing...'
+        default:
+          return ''
+      }
+    } else {
+      switch (phase) {
+        case PHASES.COMMIT:
+          return 'Your order is protected and waiting'
+        case PHASES.REVEAL:
+          return 'Your order is being processed'
+        case PHASES.SETTLING:
+          return 'Almost done! Finding your best price...'
+        default:
+          return ''
+      }
     }
   }
 
@@ -93,196 +91,164 @@ function BatchTimer() {
   const totalTime = PHASE_DURATIONS[phase]
   const progress = ((totalTime - timeLeft) / totalTime) * 100
 
-  // Format value for display
   const formatValue = (value) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`
     return `$${value}`
   }
 
-  // Get user's order status indicator
   const getUserStatusIndicator = () => {
     if (!hasActiveOrder) return null
 
     const status = userOrder.status
     if (status === ORDER_STATUS.COMMITTED || status === ORDER_STATUS.PENDING_COMMIT) {
-      return { color: 'bg-glow-500', label: 'Your order' }
+      return { color: 'bg-matrix-500', label: 'committed' }
     }
     if (status === ORDER_STATUS.REVEALED || status === ORDER_STATUS.PENDING_REVEAL) {
-      return { color: 'bg-yellow-400', label: 'Revealed' }
+      return { color: 'bg-warning', label: 'revealed' }
     }
     if (status === ORDER_STATUS.SETTLING) {
-      return { color: 'bg-vibe-400', label: 'Settling' }
+      return { color: 'bg-terminal-500', label: 'settling' }
     }
     return null
   }
 
   const userStatus = getUserStatusIndicator()
 
+  // Urgency indicator for commit phase ending
+  const isUrgent = phase === PHASES.COMMIT && timeLeft <= 3
+  const isEnding = phase === PHASES.COMMIT && timeLeft <= 5
+
   return (
-    <motion.div
-      layout
-      className={`p-4 rounded-2xl ${config.bg} border ${config.border} ${config.glow} transition-all duration-500 relative overflow-hidden`}
-    >
-      {/* Animated background gradient */}
-      <div className="absolute inset-0 opacity-30">
-        <div className={`absolute inset-0 bg-gradient-to-r ${config.gradient} animate-gradient-shift bg-300%`} />
+    <div className={`p-4 rounded-lg surface border ${config.borderColor} ${isUrgent ? 'animate-pulse' : ''}`}>
+      {/* Urgent submit prompt */}
+      <AnimatePresence>
+        {isEnding && !hasActiveOrder && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-3 py-2 px-3 rounded bg-warning/10 border border-warning/30 flex items-center justify-between"
+          >
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-xs text-warning font-medium">submit now to join this batch</span>
+            </div>
+            <span className="font-mono text-sm font-bold text-warning">{timeLeft}s</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Top row: Phase + Timer */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          {/* Phase indicator with pulse */}
+          <div className="relative">
+            <div className={`w-2 h-2 rounded-full ${config.bgColor}`} />
+            {phase === PHASES.COMMIT && (
+              <div className={`absolute inset-0 w-2 h-2 rounded-full ${config.bgColor} animate-ping opacity-75`} />
+            )}
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className={`font-bold tracking-wider text-sm ${config.color}`}>
+              {getPhaseLabel()}
+            </span>
+            {phase === PHASES.COMMIT && (
+              <span className="text-[10px] text-black-500">• accepting orders</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <div className="text-xs text-black-400 font-mono">
+            batch <span className="text-black-200">#{batchId}</span>
+          </div>
+
+          {/* Countdown */}
+          <motion.div
+            className={`font-mono text-xl font-bold ${config.color} tabular-nums`}
+            animate={isUrgent ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 0.3, repeat: isUrgent ? Infinity : 0 }}
+          >
+            {timeLeft}
+            <span className="text-sm text-black-500">s</span>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Shimmer effect */}
-      <div className="absolute inset-0 overflow-hidden">
+      {/* Progress bar */}
+      <div className="h-1.5 bg-black-700 rounded-full overflow-hidden">
         <motion.div
-          animate={{ x: ['0%', '200%'] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-          className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12"
+          className={`h-full ${config.bgColor}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.3, ease: 'linear' }}
         />
       </div>
 
-      <div className="relative">
-        {/* Top row: Phase + Timer */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            {/* Phase indicator with pulse */}
-            <div className="relative">
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className={`absolute inset-0 rounded-full bg-gradient-to-r ${config.gradient} blur-sm opacity-50`}
-              />
-              <div className={`relative w-3 h-3 rounded-full bg-gradient-to-r ${config.gradient}`} />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <span className={config.text}>{config.icon}</span>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={phase}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className={`font-display font-bold tracking-wider ${config.text}`}
-                >
-                  {getPhaseLabel()}
-                </motion.span>
-              </AnimatePresence>
-            </div>
+      {/* Batch Queue Stats */}
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <div className="text-center">
+          <div className="text-base font-bold font-mono text-white">
+            {batchQueue.orderCount}
           </div>
-
-          <div className="flex items-center space-x-4">
-            <div className="text-xs text-void-400 font-mono bg-void-800/50 px-2 py-1 rounded-lg">
-              Batch <span className="text-white">#{batchId}</span>
-            </div>
-
-            {/* Countdown */}
-            <motion.div
-              key={timeLeft}
-              initial={{ scale: 1.2, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className={`font-mono text-2xl font-bold ${config.text} tabular-nums`}
-            >
-              {timeLeft}
-              <span className="text-sm text-void-400">s</span>
-            </motion.div>
-          </div>
+          <div className="text-[10px] text-black-500 uppercase">orders</div>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-2 bg-void-800/50 rounded-full overflow-hidden relative">
-          <motion.div
-            className={`h-full bg-gradient-to-r ${config.gradient} relative`}
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-          >
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/40 to-transparent" />
-          </motion.div>
-
-          {/* Tick marks */}
-          <div className="absolute inset-0 flex">
-            {[...Array(totalTime)].map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 border-r border-void-700/50 last:border-r-0"
-              />
-            ))}
+        <div className="text-center">
+          <div className="text-base font-bold font-mono text-white">
+            {formatValue(batchQueue.totalValue)}
           </div>
+          <div className="text-[10px] text-black-500 uppercase">value</div>
         </div>
 
-        {/* Batch Queue Stats */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {/* Orders in batch */}
-          <div className="bg-void-800/30 rounded-xl p-2.5 text-center">
-            <div className="text-lg font-bold font-mono text-white">
-              {batchQueue.orderCount}
-            </div>
-            <div className="text-xs text-void-400">Orders</div>
+        <div className="text-center">
+          <div className="text-base font-bold font-mono text-terminal-500">
+            {batchQueue.priorityOrders}
           </div>
+          <div className="text-[10px] text-black-500 uppercase">priority</div>
+        </div>
+      </div>
 
-          {/* Total value */}
-          <div className="bg-void-800/30 rounded-xl p-2.5 text-center">
-            <div className="text-lg font-bold font-mono text-white">
-              {formatValue(batchQueue.totalValue)}
-            </div>
-            <div className="text-xs text-void-400">Value</div>
-          </div>
+      {/* Phase explanation - human friendly */}
+      <div className="mt-3 text-center">
+        <span className="text-xs text-black-300">{getPhaseExplanation()}</span>
+      </div>
 
-          {/* Priority orders */}
-          <div className="bg-void-800/30 rounded-xl p-2.5 text-center">
-            <div className="text-lg font-bold font-mono text-cyber-400">
-              {batchQueue.priorityOrders}
-            </div>
-            <div className="text-xs text-void-400">Priority</div>
-          </div>
+      {/* Bottom info */}
+      <div className="flex items-center justify-between mt-3 text-xs">
+        <div className="flex items-center space-x-1.5 text-black-400">
+          {phase === PHASES.COMMIT && (
+            <span>orders hidden until reveal</span>
+          )}
+          {phase === PHASES.REVEAL && (
+            <span>batch sealed - no new orders</span>
+          )}
+          {phase === PHASES.SETTLING && (
+            <span>finding clearing price...</span>
+          )}
         </div>
 
-        {/* Bottom info */}
-        <div className="flex items-center justify-between mt-3 text-xs">
-          <div className="flex items-center space-x-1.5 text-void-400">
-            {phase === PHASES.COMMIT && (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <span>Orders hidden until reveal</span>
-              </>
-            )}
-            {phase === PHASES.REVEAL && (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>No new orders - batch sealed</span>
-              </>
-            )}
-            {phase === PHASES.SETTLING && (
-              <>
-                <svg className="w-3.5 h-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>Finding uniform clearing price</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-3">
-            {/* User's order indicator */}
-            {userStatus && (
-              <div className="flex items-center space-x-1.5">
-                <div className={`w-2 h-2 rounded-full ${userStatus.color}`} />
-                <span className="text-void-300">{userStatus.label}</span>
-              </div>
-            )}
-
-            <div className="flex items-center space-x-1.5 text-glow-500">
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span className="font-medium">MEV Protected</span>
+        <div className="flex items-center space-x-3">
+          {userStatus && (
+            <div className="flex items-center space-x-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${userStatus.color}`} />
+              <span className="text-black-300">{userStatus.label}</span>
             </div>
+          )}
+
+          <div className="flex items-center space-x-1 text-matrix-500">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">mev protected</span>
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 

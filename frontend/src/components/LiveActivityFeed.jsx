@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-// This is what makes the app feel ALIVE
-// Every swap, every trade - you see it happening in real-time
-// It's social proof. It's energy. It's the heartbeat of the market.
-
 const MOCK_ACTIVITIES = [
   { type: 'swap', from: 'ETH', to: 'USDC', amount: '2.5', value: '$5,000', wallet: '0x1a2b...3c4d', time: '2s ago' },
   { type: 'swap', from: 'WBTC', to: 'ETH', amount: '0.15', value: '$6,300', wallet: '0x5e6f...7g8h', time: '5s ago' },
@@ -15,19 +11,10 @@ const MOCK_ACTIVITIES = [
   { type: 'swap', from: 'ETH', to: 'ARB', amount: '1.2', value: '$2,400', wallet: '0x5y6z...7a8b', time: '45s ago' },
 ]
 
-const TOKEN_COLORS = {
-  ETH: '#627EEA',
-  USDC: '#2775CA',
-  WBTC: '#F7931A',
-  ARB: '#28A0F0',
-  OP: '#FF0420',
-}
-
 function LiveActivityFeed() {
   const [activities, setActivities] = useState(MOCK_ACTIVITIES.slice(0, 5))
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Simulate live activity
   useEffect(() => {
     const interval = setInterval(() => {
       const randomActivity = MOCK_ACTIVITIES[Math.floor(Math.random() * MOCK_ACTIVITIES.length)]
@@ -44,27 +31,22 @@ function LiveActivityFeed() {
   }, [])
 
   return (
-    <motion.div
-      layout
-      className="glass-strong rounded-2xl border border-void-600/30 overflow-hidden"
-    >
+    <div className="rounded-lg bg-black-800 border border-black-500 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-void-600/30">
-        <div className="flex items-center space-x-3">
+      <div className="flex items-center justify-between p-3 border-b border-black-600">
+        <div className="flex items-center space-x-2">
           <div className="relative">
-            <div className="w-2.5 h-2.5 rounded-full bg-glow-500" />
-            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-glow-500 animate-ping" />
+            <div className="w-2 h-2 rounded-full bg-matrix-500" />
+            <div className="absolute inset-0 w-2 h-2 rounded-full bg-matrix-500 animate-ping opacity-75" />
           </div>
-          <h3 className="font-display font-bold text-sm">LIVE ACTIVITY</h3>
+          <h3 className="font-bold text-xs uppercase tracking-wider text-black-200">live activity</h3>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs text-void-400 hover:text-vibe-400 transition-colors"
+          className="text-[10px] text-black-400 hover:text-matrix-500 transition-colors uppercase tracking-wider"
         >
-          {isExpanded ? 'Show less' : 'Show more'}
-        </motion.button>
+          {isExpanded ? 'less' : 'more'}
+        </button>
       </div>
 
       {/* Activity List */}
@@ -76,66 +58,42 @@ function LiveActivityFeed() {
               initial={{ opacity: 0, x: -20, height: 0 }}
               animate={{ opacity: 1, x: 0, height: 'auto' }}
               exit={{ opacity: 0, x: 20, height: 0 }}
-              transition={{ duration: 0.3 }}
-              className="px-4 py-3 border-b border-void-700/30 last:border-b-0 hover:bg-void-800/30 transition-colors"
+              transition={{ duration: 0.2 }}
+              className="px-3 py-2.5 border-b border-black-700 last:border-b-0 hover:bg-black-700/50 transition-colors"
             >
               {activity.type === 'swap' ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    {/* Swap visual */}
-                    <div className="flex items-center -space-x-1">
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 border-void-900 z-10"
-                        style={{ backgroundColor: `${TOKEN_COLORS[activity.from]}30`, color: TOKEN_COLORS[activity.from] }}
-                      >
-                        {activity.from[0]}
-                      </div>
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 border-void-900"
-                        style={{ backgroundColor: `${TOKEN_COLORS[activity.to]}30`, color: TOKEN_COLORS[activity.to] }}
-                      >
-                        {activity.to[0]}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-sm">
-                        <span className="text-void-300">Swapped</span>
-                        <span className="font-medium text-white"> {activity.amount} {activity.from}</span>
-                        <span className="text-void-300"> → </span>
-                        <span className="font-medium text-white">{activity.to}</span>
-                      </div>
-                      <div className="text-xs text-void-500 font-mono">{activity.wallet}</div>
+                  <div className="flex items-center space-x-2">
+                    {/* Swap indicator */}
+                    <div className="flex items-center text-xs text-black-400">
+                      <span className="font-mono text-white">{activity.from}</span>
+                      <span className="mx-1">→</span>
+                      <span className="font-mono text-white">{activity.to}</span>
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-glow-500">{activity.value}</div>
-                    <div className="text-xs text-void-500">{activity.time}</div>
+                  <div className="flex items-center space-x-3">
+                    <span className="font-mono text-xs text-matrix-500">{activity.value}</span>
+                    <span className="text-[10px] text-black-500 font-mono">{activity.wallet}</span>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      activity.type === 'add' ? 'bg-glow-500/20 text-glow-500' : 'bg-vibe-500/20 text-vibe-400'
-                    }`}>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-xs ${activity.type === 'add' ? 'text-matrix-500' : 'text-warning'}`}>
                       {activity.type === 'add' ? '+' : '-'}
-                    </div>
-                    <div>
-                      <div className="text-sm">
-                        <span className="text-void-300">{activity.type === 'add' ? 'Added to' : 'Removed from'}</span>
-                        <span className="font-medium text-white"> {activity.pool}</span>
-                      </div>
-                      <div className="text-xs text-void-500 font-mono">{activity.wallet}</div>
-                    </div>
+                    </span>
+                    <span className="text-xs text-black-400">
+                      {activity.type === 'add' ? 'added to' : 'removed from'}
+                    </span>
+                    <span className="font-mono text-xs text-white">{activity.pool}</span>
                   </div>
 
-                  <div className="text-right">
-                    <div className={`text-sm font-medium ${activity.type === 'add' ? 'text-glow-500' : 'text-vibe-400'}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className={`font-mono text-xs ${activity.type === 'add' ? 'text-matrix-500' : 'text-warning'}`}>
                       {activity.type === 'add' ? '+' : '-'}{activity.amount}
-                    </div>
-                    <div className="text-xs text-void-500">{activity.time}</div>
+                    </span>
+                    <span className="text-[10px] text-black-500 font-mono">{activity.wallet}</span>
                   </div>
                 </div>
               )}
@@ -145,13 +103,13 @@ function LiveActivityFeed() {
       </div>
 
       {/* Footer stats */}
-      <div className="p-3 bg-void-800/30 border-t border-void-600/30">
+      <div className="p-3 bg-black-900 border-t border-black-600">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-void-400">24h Volume</span>
+          <span className="text-black-500">24h volume</span>
           <span className="font-mono font-medium text-white">$12.4M</span>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 

@@ -2,22 +2,78 @@
 
 ## AUTO-SYNC INSTRUCTIONS (MANDATORY)
 
-**On session start**: Read `.claude/SESSION_STATE.md` for context from previous sessions.
+**At START of each response**:
+```bash
+git pull origin master
+```
+Then read `.claude/SESSION_STATE.md` for latest context.
 
-**At the END of each response** (after completing the user's request):
+**At END of each response** (after completing the user's request):
 1. Update `.claude/SESSION_STATE.md` if anything meaningful changed
 2. Commit all changes with descriptive message
 3. Push to BOTH remotes: `git push origin master && git push stealth master`
 
-**Sync once per prompt->response cycle**, not after every internal step.
+**Pull first, push last = no conflicts ever.**
 
 Example:
-1. User: "Fix the login bug and update the header"
-2. Claude fixes bug, updates header (multiple tool calls)
-3. At the END of response: update SESSION_STATE.md, commit, push
-4. Done - one sync per response
+1. User: "Fix the login bug"
+2. `git pull origin master` (get latest)
+3. Fix bug (multiple tool calls)
+4. Update SESSION_STATE.md, commit, push to both remotes
+5. Done
 
 This ensures real-time sync between all sessions (desktop, mobile, any device).
+
+---
+
+## WALLET SECURITY AXIOMS (MANDATORY DESIGN PRINCIPLES)
+
+These axioms are derived from Will's 2018 paper on wallet security fundamentals. They are **non-negotiable** and must be heavily weighted in ALL design decisions, code implementations, and documentation.
+
+See full paper: `docs/wallet-security-fundamentals-2018.md`
+
+### Core Axioms
+
+1. **"Your keys, your bitcoin. Not your keys, not your bitcoin."**
+   - Users MUST control their own private keys
+   - Never design systems that custody user keys on centralized servers
+   - VibeSwap's device wallet (WebAuthn) keeps keys in the user's Secure Element, never on our servers
+
+2. **Cold storage is king**
+   - Keys that never touch a network cannot be stolen remotely
+   - Signing should occur in isolated environments when possible
+   - Hardware wallets and Secure Elements are the gold standard
+
+3. **Web wallets are the least secure**
+   - Minimize trust in third-party servers
+   - If keys must be online, encrypt them client-side
+   - Never store private keys on servers we control
+
+4. **Centralized honeypots attract attackers**
+   - "It is more incentivizing for hackers to target centralized third party servers to steal many wallets than to target an individual's computer"
+   - Design for decentralization - no single point of compromise
+
+5. **Private keys must be encrypted and backed up**
+   - Always encrypt keys with strong passphrases
+   - Provide recovery mechanisms (but user-controlled, not custodial)
+   - Multiple backup copies in separate locations
+
+6. **Separation of concerns**
+   - Different wallets for different purposes (spending vs. storage)
+   - Hot wallet for daily use, cold storage for long-term holdings
+   - Limit exposure by limiting what's at risk
+
+7. **Offline generation is safest**
+   - Key generation should happen offline when possible
+   - Minimize network exposure during sensitive operations
+
+### Design Implications for VibeSwap
+
+- Device wallet uses Secure Element (keys never leave device)
+- No custodial key storage on our servers
+- Recovery via user-controlled mechanisms (iCloud backup with PIN encryption)
+- Encourage hardware wallet integration for large holdings
+- Transaction signing happens client-side, never server-side
 
 ---
 

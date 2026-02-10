@@ -9,6 +9,7 @@ const SwapCore = lazy(() => import('./components/SwapCore'))
 const PoolPage = lazy(() => import('./components/PoolPage'))
 const BridgePage = lazy(() => import('./components/BridgePage'))
 const BuySellPage = lazy(() => import('./components/BuySellPage'))
+const VaultPage = lazy(() => import('./components/VaultPage'))
 const RewardsPage = lazy(() => import('./components/RewardsPage'))
 const DocsPage = lazy(() => import('./components/DocsPage'))
 const ForumPage = lazy(() => import('./components/ForumPage'))
@@ -45,6 +46,7 @@ function AnimatedRoutes() {
             <Route path="/" element={<SwapCore />} />
             <Route path="/buy" element={<BuySellPage />} />
             <Route path="/earn" element={<PoolPage />} />
+            <Route path="/vault" element={<VaultPage />} />
             <Route path="/send" element={<BridgePage />} />
             <Route path="/history" element={<ActivityPage />} />
             <Route path="/rewards" element={<RewardsPage />} />

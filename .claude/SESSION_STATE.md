@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2025-02-10 (Desktop - GitBash)
+**Last Updated**: 2026-02-10 (Desktop - GitBash)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -11,7 +11,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend UI/UX improvements
 - Wallet connection flow for both external (MetaMask) and device (WebAuthn) wallets
 - Security-first design based on wallet security axioms
-- Axiom alignment gaps: Savings Vault (separation of concerns), hardware wallet prompts, paper backup
+- Axiom alignment: Vault + Paper Backup complete, hardware wallet prompts added
 
 ## Active Tasks
 - None currently in progress
@@ -31,6 +31,12 @@ This file maintains continuity between Claude Code sessions across devices.
     - VaultPage.jsx with deposit/withdraw UI
     - Hardware wallet recommendation when balance > $1000
     - Pending withdrawal management with cancel option
+11. Built Paper Backup feature (offline generation axiom):
+    - PaperBackup.jsx with 24-word BIP39-style recovery phrase
+    - Offline check recommendation before generating
+    - Verification step (user confirms 3 random words)
+    - Print-friendly output with security warnings
+    - Integrated into RecoverySetup.jsx
 
 ## Known Issues / TODO
 - Large bundle size warning (2.8MB chunk) - consider code splitting
@@ -62,6 +68,9 @@ const isConnected = isExternalConnected || isDeviceConnected
 | `frontend/src/hooks/useDeviceWallet.jsx` | WebAuthn/passkey wallet |
 | `frontend/src/hooks/useBalances.jsx` | Balance tracking (mock + real) |
 | `frontend/src/components/BridgePage.jsx` | Send money (0% fees) |
+| `frontend/src/components/VaultPage.jsx` | Savings vault (separation of concerns) |
+| `frontend/src/components/PaperBackup.jsx` | Offline recovery phrase backup |
+| `frontend/src/components/RecoverySetup.jsx` | Account protection options |
 
 ### Git Setup
 ```bash

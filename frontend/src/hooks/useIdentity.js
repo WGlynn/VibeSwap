@@ -9,11 +9,16 @@ const FORUM_ADDRESS = import.meta.env.VITE_FORUM_CONTRACT || '0x0000000000000000
 // Simplified ABI for frontend
 const IDENTITY_ABI = [
   'function mintIdentity(string username) returns (uint256)',
+  'function mintIdentityQuantum(string username, bytes32 quantumKeyRoot) returns (uint256)',
+  'function enableQuantumMode(bytes32 quantumKeyRoot)',
+  'function rotateQuantumKeys(bytes32 newKeyRoot)',
+  'function isQuantumEnabled(address addr) view returns (bool)',
+  'function getQuantumKeyRoot(address addr) view returns (bytes32)',
   'function changeUsername(string newUsername)',
   'function updateAvatar((uint8,uint8,uint8,uint8,uint8,uint8) newTraits)',
   'function vote(uint256 contributionId, bool upvote)',
-  'function getIdentity(address addr) view returns ((string,uint256,uint256,int256,uint256,uint256,uint256,uint256,(uint8,uint8,uint8,uint8,uint8,uint8)))',
-  'function getIdentityByTokenId(uint256 tokenId) view returns ((string,uint256,uint256,int256,uint256,uint256,uint256,uint256,(uint8,uint8,uint8,uint8,uint8,uint8)))',
+  'function getIdentity(address addr) view returns ((string,uint256,uint256,int256,uint256,uint256,uint256,uint256,(uint8,uint8,uint8,uint8,uint8,uint8),bool,bytes32))',
+  'function getIdentityByTokenId(uint256 tokenId) view returns ((string,uint256,uint256,int256,uint256,uint256,uint256,uint256,(uint8,uint8,uint8,uint8,uint8,uint8),bool,bytes32))',
   'function hasIdentity(address addr) view returns (bool)',
   'function addressToTokenId(address) view returns (uint256)',
   'function usernameTaken(string) view returns (bool)',
@@ -21,7 +26,8 @@ const IDENTITY_ABI = [
   'function getContribution(uint256 contributionId) view returns ((address,uint256,bytes32,uint8,uint256,uint256,uint256))',
   'function totalIdentities() view returns (uint256)',
   'function totalContributions() view returns (uint256)',
-  'event IdentityMinted(address indexed owner, uint256 indexed tokenId, string username)',
+  'event IdentityMinted(address indexed owner, uint256 indexed tokenId, string username, bool quantumEnabled)',
+  'event QuantumModeEnabled(uint256 indexed tokenId, bytes32 quantumKeyRoot)',
   'event XPGained(uint256 indexed tokenId, uint256 amount, string reason)',
   'event LevelUp(uint256 indexed tokenId, uint256 newLevel)',
 ]
@@ -98,6 +104,8 @@ export function useIdentity() {
         accessory: data[8][4],
         aura: data[8][5],
       },
+      quantumEnabled: data[9] || false,
+      quantumKeyRoot: data[10] || null,
     }
   }
 
@@ -224,6 +232,105 @@ export function useIdentity() {
     return tid
   }, [signer, address])
 
+  // Mint new identity with quantum mode
+  const mintIdentityQuantum = useCallback(async (username, quantumKeyRoot) => {
+    if (!signer || !address) throw new Error('Wallet not connected')
+    if (!quantumKeyRoot) throw new Error('Quantum key root required')
+
+    // Dev mode - use localStorage
+    if (IDENTITY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+      // Check if username taken
+      const allKeys = Object.keys(localStorage).filter(k => k.startsWith('vibeswap_identity_'))
+      for (const key of allKeys) {
+        const stored = JSON.parse(localStorage.getItem(key))
+        if (stored.username.toLowerCase() === username.toLowerCase()) {
+          throw new Error('Username already taken')
+        }
+      }
+
+      // Generate random avatar
+      const seed = ethers.keccak256(ethers.toUtf8Bytes(address + Date.now()))
+      const seedNum = BigInt(seed)
+
+      const mockIdentity = {
+        tokenId: allKeys.length + 1,
+        username,
+        level: 1,
+        xp: 0,
+        alignment: 0,
+        contributions: 0,
+        reputation: 0,
+        createdAt: Math.floor(Date.now() / 1000),
+        lastActive: Math.floor(Date.now() / 1000),
+        avatar: {
+          background: Number(seedNum % 16n),
+          body: Number((seedNum >> 8n) % 16n),
+          eyes: Number((seedNum >> 16n) % 16n),
+          mouth: Number((seedNum >> 24n) % 16n),
+          accessory: Number((seedNum >> 32n) % 16n),
+          aura: 0,
+        },
+        quantumEnabled: true,
+        quantumKeyRoot: quantumKeyRoot,
+      }
+
+      localStorage.setItem(`vibeswap_identity_${address}`, JSON.stringify(mockIdentity))
+      setIdentity(mockIdentity)
+      setTokenId(mockIdentity.tokenId)
+      setHasIdentity(true)
+      return mockIdentity.tokenId
+    }
+
+    const contract = new ethers.Contract(IDENTITY_ADDRESS, IDENTITY_ABI, signer)
+    const tx = await contract.mintIdentityQuantum(username, quantumKeyRoot)
+    const receipt = await tx.wait()
+
+    // Parse event for tokenId
+    const event = receipt.logs.find(log => {
+      try {
+        const parsed = contract.interface.parseLog(log)
+        return parsed.name === 'IdentityMinted'
+      } catch { return false }
+    })
+
+    const tid = event ? Number(contract.interface.parseLog(event).args.tokenId) : 1
+
+    // Reload identity
+    const data = await contract.getIdentity(address)
+    setIdentity(parseIdentity(data))
+    setTokenId(tid)
+    setHasIdentity(true)
+
+    return tid
+  }, [signer, address])
+
+  // Enable quantum mode for existing identity
+  const enableQuantumMode = useCallback(async (quantumKeyRoot) => {
+    if (!signer || !address) throw new Error('Wallet not connected')
+    if (!identity) throw new Error('No identity found')
+    if (!quantumKeyRoot) throw new Error('Quantum key root required')
+
+    // Dev mode
+    if (IDENTITY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+      const updated = {
+        ...identity,
+        quantumEnabled: true,
+        quantumKeyRoot: quantumKeyRoot,
+      }
+      localStorage.setItem(`vibeswap_identity_${address}`, JSON.stringify(updated))
+      setIdentity(updated)
+      return
+    }
+
+    const contract = new ethers.Contract(IDENTITY_ADDRESS, IDENTITY_ABI, signer)
+    const tx = await contract.enableQuantumMode(quantumKeyRoot)
+    await tx.wait()
+
+    // Reload identity
+    const data = await contract.getIdentity(address)
+    setIdentity(parseIdentity(data))
+  }, [signer, address, identity])
+
   // Check username availability
   const checkUsername = useCallback(async (username) => {
     if (!username || username.length < 3) return false
@@ -316,6 +423,8 @@ export function useIdentity() {
     isLoading,
     error,
     mintIdentity,
+    mintIdentityQuantum,
+    enableQuantumMode,
     checkUsername,
     addXP,
     addContribution,

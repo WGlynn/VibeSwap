@@ -24,6 +24,8 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         uint256 createdAt;
         uint256 lastActive;
         AvatarTraits avatar;
+        bool quantumEnabled;     // Whether quantum resistance is enabled
+        bytes32 quantumKeyRoot;  // Merkle root of Lamport public keys (if quantum enabled)
     }
 
     struct AvatarTraits {
@@ -84,7 +86,7 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
 
     // ============ Events ============
 
-    event IdentityMinted(address indexed owner, uint256 indexed tokenId, string username);
+    event IdentityMinted(address indexed owner, uint256 indexed tokenId, string username, bool quantumEnabled);
     event UsernameChanged(uint256 indexed tokenId, string oldUsername, string newUsername);
     event AvatarUpdated(uint256 indexed tokenId, AvatarTraits newTraits);
     event XPGained(uint256 indexed tokenId, uint256 amount, string reason);
@@ -92,6 +94,8 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     event AlignmentChanged(uint256 indexed tokenId, int256 oldAlignment, int256 newAlignment);
     event ContributionRecorded(uint256 indexed contributionId, uint256 indexed tokenId, ContributionType cType);
     event ContributionVoted(uint256 indexed contributionId, address indexed voter, bool upvote);
+    event QuantumModeEnabled(uint256 indexed tokenId, bytes32 quantumKeyRoot);
+    event QuantumKeyRotated(uint256 indexed tokenId, bytes32 newKeyRoot);
 
     // ============ Errors ============
 
@@ -136,10 +140,31 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     // ============ Identity Management ============
 
     /**
-     * @notice Mint a new soulbound identity
+     * @notice Mint a new soulbound identity (standard mode)
      * @param username Unique username (3-20 chars, alphanumeric + underscore)
      */
     function mintIdentity(string calldata username) external returns (uint256) {
+        return _mintIdentity(username, false, bytes32(0));
+    }
+
+    /**
+     * @notice Mint a new soulbound identity with quantum resistance
+     * @param username Unique username (3-20 chars, alphanumeric + underscore)
+     * @param quantumKeyRoot Merkle root of Lamport public key hashes
+     */
+    function mintIdentityQuantum(string calldata username, bytes32 quantumKeyRoot) external returns (uint256) {
+        require(quantumKeyRoot != bytes32(0), "Quantum key root required");
+        return _mintIdentity(username, true, quantumKeyRoot);
+    }
+
+    /**
+     * @notice Internal mint function
+     */
+    function _mintIdentity(
+        string calldata username,
+        bool quantumEnabled,
+        bytes32 quantumKeyRoot
+    ) internal returns (uint256) {
         if (addressToTokenId[msg.sender] != 0) revert AlreadyHasIdentity();
         if (!_isValidUsername(username)) revert UsernameInvalid();
 
@@ -162,16 +187,77 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
             reputation: 0,
             createdAt: block.timestamp,
             lastActive: block.timestamp,
-            avatar: avatar
+            avatar: avatar,
+            quantumEnabled: quantumEnabled,
+            quantumKeyRoot: quantumKeyRoot
         });
 
         addressToTokenId[msg.sender] = tokenId;
         usernameTaken[username] = true;
         usernameHashTaken[usernameHash] = true;
 
-        emit IdentityMinted(msg.sender, tokenId, username);
+        emit IdentityMinted(msg.sender, tokenId, username, quantumEnabled);
+
+        if (quantumEnabled) {
+            emit QuantumModeEnabled(tokenId, quantumKeyRoot);
+        }
 
         return tokenId;
+    }
+
+    /**
+     * @notice Enable quantum mode for existing identity
+     * @param quantumKeyRoot Merkle root of Lamport public key hashes
+     */
+    function enableQuantumMode(bytes32 quantumKeyRoot) external {
+        uint256 tokenId = addressToTokenId[msg.sender];
+        if (tokenId == 0) revert IdentityNotFound();
+        require(quantumKeyRoot != bytes32(0), "Quantum key root required");
+
+        Identity storage identity = identities[tokenId];
+        require(!identity.quantumEnabled, "Quantum mode already enabled");
+
+        identity.quantumEnabled = true;
+        identity.quantumKeyRoot = quantumKeyRoot;
+        identity.lastActive = block.timestamp;
+
+        emit QuantumModeEnabled(tokenId, quantumKeyRoot);
+    }
+
+    /**
+     * @notice Rotate quantum keys (for key refresh)
+     * @param newKeyRoot New Merkle root of Lamport public key hashes
+     */
+    function rotateQuantumKeys(bytes32 newKeyRoot) external {
+        uint256 tokenId = addressToTokenId[msg.sender];
+        if (tokenId == 0) revert IdentityNotFound();
+        require(newKeyRoot != bytes32(0), "Quantum key root required");
+
+        Identity storage identity = identities[tokenId];
+        require(identity.quantumEnabled, "Quantum mode not enabled");
+
+        identity.quantumKeyRoot = newKeyRoot;
+        identity.lastActive = block.timestamp;
+
+        emit QuantumKeyRotated(tokenId, newKeyRoot);
+    }
+
+    /**
+     * @notice Check if identity has quantum mode enabled
+     */
+    function isQuantumEnabled(address addr) external view returns (bool) {
+        uint256 tokenId = addressToTokenId[addr];
+        if (tokenId == 0) return false;
+        return identities[tokenId].quantumEnabled;
+    }
+
+    /**
+     * @notice Get quantum key root for an identity
+     */
+    function getQuantumKeyRoot(address addr) external view returns (bytes32) {
+        uint256 tokenId = addressToTokenId[addr];
+        if (tokenId == 0) return bytes32(0);
+        return identities[tokenId].quantumKeyRoot;
     }
 
     /**

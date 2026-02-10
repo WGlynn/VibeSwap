@@ -54,7 +54,7 @@ function HeaderMinimal() {
                   disabled={isConnecting}
                   className="px-4 py-2 rounded-full bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-sm transition-colors"
                 >
-                  {isConnecting ? 'Connecting...' : 'Connect'}
+                  {isConnecting ? 'Setting up...' : 'Get Started'}
                 </button>
               )}
 
@@ -102,11 +102,11 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
   const location = useLocation()
 
   const navItems = [
-    { path: '/', label: 'Swap', icon: '⚡' },
-    { path: '/buy', label: 'Buy', icon: '💳', description: 'Venmo, PayPal, Cash App' },
-    { path: '/earn', label: 'Earn', icon: '📈', description: 'Provide liquidity' },
-    { path: '/send', label: 'Send', icon: '→', description: 'Cross-chain transfer' },
-    { path: '/history', label: 'History', icon: '📋', description: 'Your transactions' },
+    { path: '/', label: 'Exchange', icon: '⚡', description: 'Trade one currency for another' },
+    { path: '/buy', label: 'Add Money', icon: '💳', description: 'Use Venmo, PayPal, or bank' },
+    { path: '/earn', label: 'Earn Interest', icon: '📈', description: 'Grow your savings' },
+    { path: '/send', label: 'Send Money', icon: '→', description: 'Transfer to anyone' },
+    { path: '/history', label: 'Activity', icon: '📋', description: 'Your transactions' },
   ]
 
   const secondaryItems = [
@@ -215,18 +215,18 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
           ))}
         </div>
 
-        {/* Security Section - Recovery Setup */}
+        {/* Security Section - Account Protection */}
         <div className="mx-4 h-px bg-black-700" />
         <div className="p-2">
-          <div className="px-4 py-2 text-xs text-black-500 uppercase">Security</div>
+          <div className="px-4 py-2 text-xs text-black-500 uppercase">Safety</div>
           <button
             onClick={onOpenRecoverySetup}
             className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors hover:bg-black-700/50 text-black-400 hover:text-matrix-400"
           >
             <span>🛡️</span>
             <div className="text-left">
-              <div>Recovery Setup</div>
-              <div className="text-xs text-black-500">Never lose access to your wallet</div>
+              <div>Protect My Account</div>
+              <div className="text-xs text-black-500">Set up backup options in case you lose access</div>
             </div>
           </button>
         </div>

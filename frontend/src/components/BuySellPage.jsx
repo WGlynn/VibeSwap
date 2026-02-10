@@ -213,9 +213,9 @@ function BuySellPage() {
     await new Promise(resolve => setTimeout(resolve, 2000))
 
     if (mode === 'buy') {
-      toast.success(`Purchased ${cryptoAmount} ${selectedCrypto.symbol}!`)
+      toast.success(`Done! Added $${amount} to your account`)
     } else {
-      toast.success(`Sold ${amount} ${selectedCrypto.symbol} for $${fiatAmount}!`)
+      toast.success(`Done! Sent $${fiatAmount} to your ${selectedPayment?.name}`)
     }
 
     setStep('complete')
@@ -234,9 +234,9 @@ function BuySellPage() {
     <div className="max-w-lg mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Buy & Sell</h1>
+        <h1 className="text-2xl font-bold">Add & Withdraw Money</h1>
         <p className="text-black-400 mt-1">
-          Use Venmo, PayPal, Cash App, and more
+          Use Venmo, PayPal, Cash App, or your bank
         </p>
       </div>
 
@@ -250,7 +250,7 @@ function BuySellPage() {
               : 'text-black-400 hover:text-white'
           }`}
         >
-          Buy Crypto
+          Add Money
         </button>
         <button
           onClick={() => setMode('sell')}
@@ -260,7 +260,7 @@ function BuySellPage() {
               : 'text-black-400 hover:text-white'
           }`}
         >
-          Sell Crypto
+          Cash Out
         </button>
       </div>
 
@@ -599,10 +599,10 @@ function BuySellPage() {
                 }`}
               >
                 {!isConnected
-                  ? 'Connect Wallet'
+                  ? 'Get Started'
                   : mode === 'buy'
-                    ? `Buy ${cryptoAmount} ${selectedCrypto.symbol}`
-                    : `Sell for $${getTotal()}`
+                    ? `Add $${amount}`
+                    : `Cash Out $${getTotal()}`
                 }
               </button>
 
@@ -644,8 +644,8 @@ function BuySellPage() {
               <h3 className="text-lg font-semibold mb-2">Processing</h3>
               <p className="text-black-400 text-sm">
                 {mode === 'buy'
-                  ? `Purchasing ${cryptoAmount} ${selectedCrypto.symbol}...`
-                  : `Selling ${amount} ${selectedCrypto.symbol}...`
+                  ? `Adding $${amount} to your account...`
+                  : `Sending $${fiatAmount} to your ${selectedPayment?.name}...`
                 }
               </p>
             </motion.div>
@@ -665,12 +665,12 @@ function BuySellPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold mb-2">
-                {mode === 'buy' ? 'Purchase Complete!' : 'Sale Complete!'}
+                {mode === 'buy' ? 'Money Added!' : 'Cash Out Complete!'}
               </h3>
               <p className="text-black-400 mb-6">
                 {mode === 'buy'
-                  ? `${cryptoAmount} ${selectedCrypto.symbol} has been added to your wallet`
-                  : `$${getTotal()} will be sent to your ${selectedPayment?.name}`
+                  ? `$${amount} has been added to your account`
+                  : `$${getTotal()} is on its way to your ${selectedPayment?.name}`
                 }
               </p>
 

@@ -11,56 +11,56 @@ import toast from 'react-hot-toast'
  * @version 3.0.0 - Selectable recovery options with game theory info tooltips
  */
 
-// Recovery options with game-theoretic tradeoff explanations
+// Recovery options with plain-English explanations (Grandma-friendly)
 const RECOVERY_OPTIONS = [
   {
     id: 'guardians',
-    icon: '👥',
-    title: 'Guardian Recovery',
-    desc: 'Trusted friends/family can recover your wallet',
+    icon: '👨‍👩‍👧',
+    title: 'Trusted Contacts',
+    desc: 'Family or friends can help you get back in',
     tradeoff: {
-      title: 'Trust vs. Collusion Risk',
-      explanation: 'Adding more guardians makes it harder for any single person to steal your funds, but you need to trust that 3 of them won\'t team up against you. Choose people who don\'t know each other well—this makes collusion nearly impossible while keeping recovery accessible.',
+      title: 'How it works',
+      explanation: 'Pick 3-5 people you trust (like your kids, spouse, or close friends). If you ever get locked out, any 3 of them together can help restore your access. Tip: Choose people who don\'t talk to each other much—that way they can\'t team up to access your account without you.',
     },
   },
   {
     id: 'timelock',
-    icon: '⏱️',
-    title: 'Time-Lock Recovery',
-    desc: '7-day waiting period prevents theft',
+    icon: '⏰',
+    title: 'Waiting Period',
+    desc: 'Extra time to stop unauthorized access',
     tradeoff: {
-      title: 'Security vs. Speed',
-      explanation: 'A 7-day delay gives you time to cancel if someone tries to steal your wallet. The downside: if you legitimately lose access, you wait 7 days to get it back. This is the classic security tradeoff—more protection means more friction.',
+      title: 'How it works',
+      explanation: 'If someone tries to access your account, there\'s a waiting period (like 7 days) before anything happens. This gives you time to notice and cancel it. The tradeoff: if YOU need to recover your account, you\'ll also wait 7 days.',
     },
   },
   {
     id: 'deadman',
-    icon: '📜',
-    title: 'Digital Will',
-    desc: 'Beneficiary inherits after 1 year inactivity',
+    icon: '💝',
+    title: 'Inheritance Plan',
+    desc: 'Pass your account to family if something happens',
     tradeoff: {
-      title: 'Inheritance vs. Liveness Risk',
-      explanation: 'Your crypto passes to your loved ones if something happens to you. But if you just forget to use your wallet for a year, they could claim it. Any transaction resets the timer, so stay active or set calendar reminders.',
+      title: 'How it works',
+      explanation: 'Choose someone to inherit your account if you pass away or become incapacitated. They can claim it after 1 year of no activity. Any time you use your account, the timer resets. Set a yearly calendar reminder to stay active!',
     },
   },
   {
     id: 'jury',
-    icon: '⚖️',
-    title: 'Jury Arbitration',
-    desc: 'Prove ownership to neutral jurors',
+    icon: '🗳️',
+    title: 'Community Verification',
+    desc: 'Prove your identity to get back in',
     tradeoff: {
-      title: 'Decentralization vs. Cost',
-      explanation: 'Random community members vote on whether you\'re the real owner. You stake funds to prevent spam attacks and pay a small fee to jurors. This is your last resort when other methods fail—slower and costlier, but doesn\'t require trusting anyone you know.',
+      title: 'How it works',
+      explanation: 'If all else fails, you can prove you\'re the real owner to a group of neutral reviewers. You\'ll need to provide evidence (like ID photos, old transactions, etc.). There\'s a small fee and it takes longer, but it\'s a last resort safety net.',
     },
   },
   {
     id: 'quantum',
-    icon: '🔐',
-    title: 'Quantum Backup',
-    desc: 'Unbreakable backup keys for the future',
+    icon: '🔒',
+    title: 'Future-Proof Backup',
+    desc: 'Extra-secure backup for long-term savings',
     tradeoff: {
-      title: 'Future-proofing vs. Complexity',
-      explanation: 'Creates backup keys using lattice cryptography that even future quantum computers can\'t crack. More secure for long-term holdings, but you need to safely store an extra set of keys. Worth it if you\'re holding for 10+ years.',
+      title: 'How it works',
+      explanation: 'Creates a super-secure backup key that will stay safe even as technology advances. Good if you\'re saving for 10+ years (like retirement funds). You\'ll need to store one extra password safely—treat it like your safe deposit box key.',
     },
   },
 ]
@@ -460,7 +460,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
           <div className="sticky top-0 bg-black-800 border-b border-black-700 p-4 z-10">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-lg font-bold">Recovery Setup</h2>
+                <h2 className="text-lg font-bold">Account Protection</h2>
                 {isConnected && (
                   <div className="text-xs text-matrix-500 font-mono">
                     {account?.slice(0, 6)}...{account?.slice(-4)}
@@ -500,9 +500,9 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Choose Your Safety Net</h3>
+                  <h3 className="text-xl font-bold mb-2">Protect Your Account</h3>
                   <p className="text-black-400 text-sm">
-                    Select which recovery methods to set up. Tap the info icon to learn about each option's tradeoffs.
+                    Choose backup plans so you never lose access. Tap the <span className="text-terminal-400">ⓘ</span> icon to learn more about each option.
                   </p>
                 </div>
 
@@ -672,11 +672,11 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               >
                 <div>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xl">👥</span>
-                    <h3 className="text-lg font-bold">Guardian Recovery</h3>
+                    <span className="text-xl">👨‍👩‍👧</span>
+                    <h3 className="text-lg font-bold">Add Trusted Contacts</h3>
                   </div>
                   <p className="text-black-400 text-sm">
-                    Add 3-5 trusted people. Any 3 can initiate recovery.
+                    Add 3-5 family members or close friends. If you get locked out, any 3 of them together can help you back in.
                   </p>
                 </div>
 
@@ -705,28 +705,28 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     type="text"
                     value={newGuardian.label}
                     onChange={(e) => setNewGuardian({ ...newGuardian, label: e.target.value })}
-                    placeholder="Name (e.g., Mom, Best Friend)"
+                    placeholder="Their name (e.g., Sarah - Daughter)"
                     className="w-full bg-black-700 rounded-lg p-3 text-white placeholder-black-500 outline-none border border-black-600 focus:border-terminal-500"
                   />
                   <input
                     type="text"
                     value={newGuardian.address}
                     onChange={(e) => setNewGuardian({ ...newGuardian, address: e.target.value })}
-                    placeholder="Wallet address (0x...)"
+                    placeholder="Their account address (ask them for it)"
                     className="w-full bg-black-700 rounded-lg p-3 text-white placeholder-black-500 outline-none border border-black-600 focus:border-terminal-500 font-mono text-sm"
                   />
                   <button
                     onClick={handleAddGuardianToPending}
                     className="w-full py-2 rounded-lg border border-terminal-500 text-terminal-500 hover:bg-terminal-500/10 font-medium transition-colors"
                   >
-                    + Add Guardian
+                    + Add This Person
                   </button>
                 </div>
 
                 {pendingGuardians.length > 0 && pendingGuardians.length < 3 && (
                   <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                     <p className="text-xs text-amber-400">
-                      Add {3 - pendingGuardians.length} more guardian{3 - pendingGuardians.length > 1 ? 's' : ''} (minimum 3)
+                      Add {3 - pendingGuardians.length} more {3 - pendingGuardians.length > 1 ? 'people' : 'person'} (you need at least 3)
                     </p>
                   </div>
                 )}
@@ -758,11 +758,11 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               >
                 <div>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xl">⏱️</span>
-                    <h3 className="text-lg font-bold">Time-Lock Recovery</h3>
+                    <span className="text-xl">⏰</span>
+                    <h3 className="text-lg font-bold">Set a Waiting Period</h3>
                   </div>
                   <p className="text-black-400 text-sm">
-                    Set a waiting period before any recovery executes. Gives you time to cancel unauthorized attempts.
+                    Add a delay before any account recovery can happen. This gives you time to cancel it if it wasn't you.
                   </p>
                 </div>
 
@@ -806,7 +806,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               </motion.div>
             )}
 
-            {/* Digital Will Step */}
+            {/* Inheritance Plan Step */}
             {step === 'deadman' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -815,25 +815,25 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               >
                 <div>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xl">📜</span>
-                    <h3 className="text-lg font-bold">Digital Will</h3>
+                    <span className="text-xl">💝</span>
+                    <h3 className="text-lg font-bold">Set Up Inheritance</h3>
                   </div>
                   <p className="text-black-400 text-sm">
-                    Your beneficiary can claim your wallet after 1 year of inactivity.
+                    Choose someone to inherit your account if you pass away or can't access it for a year.
                   </p>
                 </div>
 
                 <div className="space-y-3">
-                  <label className="block text-sm text-black-400">Beneficiary Address</label>
+                  <label className="block text-sm text-black-400">Who should inherit your account?</label>
                   <input
                     type="text"
                     value={beneficiaryAddress}
                     onChange={(e) => setBeneficiaryAddress(e.target.value)}
-                    placeholder="0x... (spouse, child, charity)"
+                    placeholder="Their account address (ask them for it)"
                     className="w-full bg-black-700 rounded-lg p-3 text-white placeholder-black-500 outline-none border border-black-600 focus:border-terminal-500 font-mono text-sm"
                   />
                   <p className="text-xs text-black-500">
-                    Any wallet activity resets the 1-year timer. They'll be notified 30 days before activation.
+                    They can claim your account after 1 year of no activity from you. Any time you use your account, the timer resets. They'll get a 30-day notice before it activates.
                   </p>
                 </div>
 
@@ -855,7 +855,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               </motion.div>
             )}
 
-            {/* Jury Arbitration Step */}
+            {/* Community Verification Step */}
             {step === 'jury' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -864,11 +864,11 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               >
                 <div>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xl">⚖️</span>
-                    <h3 className="text-lg font-bold">Jury Arbitration</h3>
+                    <span className="text-xl">🗳️</span>
+                    <h3 className="text-lg font-bold">Community Verification</h3>
                   </div>
                   <p className="text-black-400 text-sm">
-                    If other methods fail, prove ownership to random community jurors.
+                    A last-resort option: prove your identity to neutral reviewers if all else fails.
                   </p>
                 </div>
 
@@ -878,21 +878,21 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     <ul className="space-y-2 text-xs text-black-400">
                       <li className="flex items-start space-x-2">
                         <span className="text-terminal-500">1.</span>
-                        <span>You stake ETH to open a case (prevents spam)</span>
+                        <span>You put down a small deposit (you get it back if successful)</span>
                       </li>
                       <li className="flex items-start space-x-2">
                         <span className="text-terminal-500">2.</span>
-                        <span>5 random jurors review your evidence</span>
+                        <span>5 random people review your proof (ID, old photos, etc.)</span>
                       </li>
                       <li className="flex items-start space-x-2">
                         <span className="text-terminal-500">3.</span>
-                        <span>Majority vote decides; losers forfeit stake</span>
+                        <span>If they believe you, you get your account back</span>
                       </li>
                     </ul>
                   </div>
 
                   <div>
-                    <label className="block text-sm text-black-400 mb-2">Stake Amount</label>
+                    <label className="block text-sm text-black-400 mb-2">Security Deposit (refunded if successful)</label>
                     <div className="grid grid-cols-3 gap-3">
                       {['0.05', '0.1', '0.25'].map((amount) => (
                         <button
@@ -904,7 +904,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                               : 'bg-black-700 text-black-300 hover:bg-black-600'
                           }`}
                         >
-                          {amount} ETH
+                          ~${(parseFloat(amount) * 3250).toFixed(0)}
                         </button>
                       ))}
                     </div>
@@ -929,7 +929,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               </motion.div>
             )}
 
-            {/* Quantum Backup Step */}
+            {/* Future-Proof Backup Step */}
             {step === 'quantum' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -938,18 +938,18 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               >
                 <div>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xl">🔐</span>
-                    <h3 className="text-lg font-bold">Quantum Backup</h3>
+                    <span className="text-xl">🔒</span>
+                    <h3 className="text-lg font-bold">Extra-Secure Backup</h3>
                   </div>
                   <p className="text-black-400 text-sm">
-                    Generate backup keys that future quantum computers can't crack.
+                    Create a super-secure backup password that will stay safe even as technology improves over time.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-lg bg-terminal-500/10 border border-terminal-500/20">
-                  <h4 className="font-medium text-sm text-terminal-400 mb-2">Lattice-Based Cryptography</h4>
+                  <h4 className="font-medium text-sm text-terminal-400 mb-2">Why is this useful?</h4>
                   <p className="text-xs text-black-400">
-                    Uses CRYSTALS-Dilithium, a NIST-approved post-quantum algorithm. Your backup keys will remain secure even when quantum computers become powerful enough to break current encryption.
+                    Uses advanced security approved by the US government. Even if future computers get much more powerful, your backup will still be safe. Good for retirement savings or money you plan to keep for 10+ years.
                   </p>
                 </div>
 
@@ -959,7 +959,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     <div>
                       <h4 className="font-semibold text-sm text-amber-400">Important</h4>
                       <p className="text-xs text-black-400 mt-1">
-                        You'll need to securely store an additional recovery phrase. Treat it like your seed phrase.
+                        You'll get a special backup password to write down and keep safe—like in a safe deposit box or fireproof safe.
                       </p>
                     </div>
                   </div>
@@ -997,17 +997,17 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-bold mb-2">You're Protected!</h3>
+                  <h3 className="text-xl font-bold mb-2">All Done!</h3>
                   <p className="text-black-400 text-sm">
-                    Your selected recovery methods are now active.
+                    Your account is now protected. You'll never lose access.
                   </p>
                 </div>
 
-                {/* Recovery Score */}
+                {/* Protection Score */}
                 <div className="p-4 rounded-lg bg-black-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-black-400">Recovery Score</span>
-                    <span className="font-bold text-matrix-500">{recoveryScore}/100</span>
+                    <span className="text-sm text-black-400">Protection Level</span>
+                    <span className="font-bold text-matrix-500">{recoveryScore}%</span>
                   </div>
                   <div className="h-2 bg-black-600 rounded-full overflow-hidden">
                     <div

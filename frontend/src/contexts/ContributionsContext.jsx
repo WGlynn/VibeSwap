@@ -322,6 +322,38 @@ export const CONTRIBUTION_TYPES = {
   feedback: { label: 'Feedback', color: 'purple', icon: '💬', points: 20 },
 }
 
+// ============================================================
+// TIMESTAMP SYSTEM - Dual timestamps for value attribution
+// ============================================================
+//
+// Every contribution has TWO timestamp fields:
+//
+// 1. `timestamp` (required, immutable)
+//    - When the contribution was recorded in the system
+//    - Set automatically to Date.now() on creation
+//    - Cannot be changed after creation
+//
+// 2. `originTimestamp` (optional, governance-controlled)
+//    - Claimed earlier timestamp for contributions that existed before system
+//    - Example: Someone shared an idea via email 6 months ago, then added it here
+//    - Can be retroactively added through governance vote or AI verification
+//    - Requires proof (email, git commit, tweet, etc.)
+//
+// Why this matters:
+// - Chronology determines value attribution (who had the idea first)
+// - Some contributions predate the system (email threads, private chats, etc.)
+// - Governance/AI can verify claims and backdate origin timestamps
+// - The recorded `timestamp` always shows when it entered the system
+// - The `originTimestamp` shows when the idea actually originated
+//
+// Fields:
+// - originTimestamp: number | null - Unix timestamp of claimed origin
+// - originProof: string | null - Link/reference to evidence (email, commit, etc.)
+// - originVerified: boolean - Whether governance/AI has verified the claim
+// - originVerifiedBy: string | null - Who/what verified it (e.g., "governance-vote-42", "ai-verification")
+// - originVerifiedAt: number | null - When verification occurred
+// ============================================================
+
 export function ContributionsProvider({ children }) {
   const [contributions, setContributions] = useState(() => {
     const saved = localStorage.getItem('vibeswap_contributions')
@@ -383,10 +415,20 @@ export function ContributionsProvider({ children }) {
   }
 
   // Add a new contribution
+  // See TIMESTAMP SYSTEM comment above for dual-timestamp explanation
   const addContribution = (contribution) => {
+    const now = Date.now()
     const newContrib = {
-      id: `contrib-${Date.now()}`,
-      timestamp: Date.now(),
+      id: `contrib-${now}`,
+      // Primary timestamp: when recorded in system (immutable)
+      timestamp: now,
+      // Origin timestamp: for retroactive attribution (governance-controlled)
+      originTimestamp: null,      // Claimed earlier timestamp (null = same as timestamp)
+      originProof: null,          // Evidence link (email, commit, tweet URL, etc.)
+      originVerified: false,      // Has governance/AI verified the claim?
+      originVerifiedBy: null,     // Verifier ID (e.g., "governance-vote-42", "ai-gpt4")
+      originVerifiedAt: null,     // When verification occurred
+      // Standard fields
       upvotes: 0,
       replies: 0,
       implemented: false,
@@ -409,6 +451,67 @@ export function ContributionsProvider({ children }) {
     setContributions(prev => prev.map(c =>
       c.id === id ? { ...c, implemented: true, rewardPoints: points } : c
     ))
+  }
+
+  // ============================================================
+  // ORIGIN TIMESTAMP FUNCTIONS
+  // ============================================================
+
+  // Claim an origin timestamp (user submits proof of earlier contribution)
+  // This creates a pending claim that needs governance/AI verification
+  const claimOriginTimestamp = (id, originTimestamp, originProof) => {
+    setContributions(prev => prev.map(c =>
+      c.id === id ? {
+        ...c,
+        originTimestamp,
+        originProof,
+        originVerified: false,  // Pending verification
+        originVerifiedBy: null,
+        originVerifiedAt: null,
+      } : c
+    ))
+  }
+
+  // Verify an origin timestamp claim (called by governance or AI system)
+  // verifiedBy examples: "governance-vote-42", "ai-verification", "admin-faraday1"
+  const verifyOriginTimestamp = (id, verifiedBy) => {
+    setContributions(prev => prev.map(c =>
+      c.id === id && c.originTimestamp ? {
+        ...c,
+        originVerified: true,
+        originVerifiedBy: verifiedBy,
+        originVerifiedAt: Date.now(),
+      } : c
+    ))
+  }
+
+  // Reject an origin timestamp claim (resets to null)
+  const rejectOriginTimestamp = (id, rejectedBy) => {
+    setContributions(prev => prev.map(c =>
+      c.id === id ? {
+        ...c,
+        originTimestamp: null,
+        originProof: null,
+        originVerified: false,
+        originVerifiedBy: `rejected-by-${rejectedBy}`,
+        originVerifiedAt: Date.now(),
+      } : c
+    ))
+  }
+
+  // Get the effective timestamp for ordering (uses origin if verified, else recorded)
+  const getEffectiveTimestamp = (contribution) => {
+    if (contribution.originTimestamp && contribution.originVerified) {
+      return contribution.originTimestamp
+    }
+    return contribution.timestamp
+  }
+
+  // Get contributions sorted by effective timestamp (for chronological value attribution)
+  const getChronologicalContributions = () => {
+    return [...contributions].sort((a, b) =>
+      getEffectiveTimestamp(a) - getEffectiveTimestamp(b)
+    )
   }
 
   // Get knowledge graph data (connections between contributions)
@@ -467,6 +570,13 @@ export function ContributionsProvider({ children }) {
       addContribution,
       upvoteContribution,
       markImplemented,
+      // Origin timestamp functions (for retroactive attribution)
+      claimOriginTimestamp,
+      verifyOriginTimestamp,
+      rejectOriginTimestamp,
+      getEffectiveTimestamp,
+      getChronologicalContributions,
+      // Stats and graph functions
       calculateUserStats,
       getKnowledgeGraph,
       getLeaderboard,

@@ -26,6 +26,11 @@ This file maintains continuity between Claude Code sessions across devices.
 7. Set up auto-sync between devices (pull first, push last - no conflicts)
 8. Added Will's 2018 wallet security paper as project context
 9. Created wallet security axioms in CLAUDE.md (mandatory design principles)
+10. Built Savings Vault feature (separation of concerns axiom):
+    - useVault.jsx hook with 30-day timelock, guardian requirements
+    - VaultPage.jsx with deposit/withdraw UI
+    - Hardware wallet recommendation when balance > $1000
+    - Pending withdrawal management with cancel option
 
 ## Known Issues / TODO
 - Large bundle size warning (2.8MB chunk) - consider code splitting

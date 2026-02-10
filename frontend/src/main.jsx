@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { WalletProvider } from './hooks/useWallet'
 import { BalanceProvider } from './hooks/useBalances'
+import { VaultProvider } from './hooks/useVault'
 import { BatchProvider } from './hooks/useBatchState'
 import { IncentivesProvider } from './hooks/useIncentives'
 import { TransactionsProvider } from './hooks/useTransactions'
@@ -15,7 +16,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <WalletProvider>
         <BalanceProvider>
-          <BatchProvider>
+          <VaultProvider>
+            <BatchProvider>
             <IncentivesProvider>
               <TransactionsProvider>
                 <App />
@@ -43,7 +45,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         />
               </TransactionsProvider>
             </IncentivesProvider>
-          </BatchProvider>
+            </BatchProvider>
+          </VaultProvider>
         </BalanceProvider>
       </WalletProvider>
     </BrowserRouter>

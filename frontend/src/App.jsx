@@ -5,6 +5,7 @@ import SwapCore from './components/SwapCore'
 import PoolPage from './components/PoolPage'
 import BridgePage from './components/BridgePage'
 import BuySellPage from './components/BuySellPage'
+import VaultPage from './components/VaultPage'
 import RewardsPage from './components/RewardsPage'
 import DocsPage from './components/DocsPage'
 import ForumPage from './components/ForumPage'
@@ -41,6 +42,7 @@ function AnimatedRoutes() {
           <Route path="/" element={<SwapCore />} />
           <Route path="/buy" element={<BuySellPage />} />
           <Route path="/earn" element={<PoolPage />} />
+          <Route path="/vault" element={<VaultPage />} />
           <Route path="/send" element={<BridgePage />} />
           <Route path="/history" element={<ActivityPage />} />
           <Route path="/rewards" element={<RewardsPage />} />

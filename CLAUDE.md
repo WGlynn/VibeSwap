@@ -4,18 +4,18 @@
 
 **On session start**: Read `.claude/SESSION_STATE.md` for context from previous sessions.
 
-**After EVERY significant change** (code edit, task completion, bug fix, etc.):
-1. Update `.claude/SESSION_STATE.md` with what was just done
-2. Auto-commit all changes with descriptive message
+**At the END of each response** (after completing the user's request):
+1. Update `.claude/SESSION_STATE.md` if anything meaningful changed
+2. Commit all changes with descriptive message
 3. Push to BOTH remotes: `git push origin master && git push stealth master`
 
-**This is not optional.** Every change must be synced immediately so other devices have the latest state.
+**Sync once per prompt->response cycle**, not after every internal step.
 
-Example workflow:
-1. User asks to fix a bug
-2. Fix the bug
-3. Update SESSION_STATE.md (add to "Recently Completed", update "Current Focus")
-4. `git add -A && git commit -m "Fix XYZ" && git push origin master && git push stealth master`
+Example:
+1. User: "Fix the login bug and update the header"
+2. Claude fixes bug, updates header (multiple tool calls)
+3. At the END of response: update SESSION_STATE.md, commit, push
+4. Done - one sync per response
 
 This ensures real-time sync between all sessions (desktop, mobile, any device).
 

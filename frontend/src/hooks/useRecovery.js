@@ -138,7 +138,14 @@ export function useRecovery() {
 
   // ============ Guardian Management ============
 
-  const addGuardian = useCallback(async (guardianAddress, label, verificationMethod = 'none') => {
+  /**
+   * Add a guardian with optional signature proof
+   * @param {string} guardianAddress - The guardian's wallet address
+   * @param {string} label - Human-readable label for the guardian
+   * @param {string|object} signatureProofOrMethod - Either a string (legacy) or signature proof object
+   *   Signature proof object: { signature, timestamp, threshold, totalGuardians }
+   */
+  const addGuardian = useCallback(async (guardianAddress, label, signatureProofOrMethod = 'none') => {
     if (!isConnected) {
       toast.error('Connect wallet first')
       return false
@@ -166,16 +173,28 @@ export function useRecovery() {
 
     setIsLoading(true)
     try {
+      // Determine if we received a signature proof object or legacy verification method
+      const isSignatureProof = typeof signatureProofOrMethod === 'object' && signatureProofOrMethod !== null
+
       const newGuardian = {
         address: guardianAddress,
         label: label || 'Guardian',
         addedAt: Date.now(),
         isActive: true,
-        verified: false,
-        verificationMethod,
+        // If signature proof provided, guardian is verified
+        verified: isSignatureProof && signatureProofOrMethod.signature ? true : false,
+        verificationMethod: isSignatureProof ? 'wallet_signature' : signatureProofOrMethod,
         // AGI Resistance: Track relationship proof
         relationshipProof: null,
         socialConnection: null,
+        // Cryptographic signature proof from wallet owner
+        signatureProof: isSignatureProof ? {
+          signature: signatureProofOrMethod.signature,
+          timestamp: signatureProofOrMethod.timestamp,
+          threshold: signatureProofOrMethod.threshold,
+          totalGuardians: signatureProofOrMethod.totalGuardians,
+          signedBy: account,
+        } : null,
       }
 
       setGuardians(prev => [...prev, newGuardian])
@@ -184,8 +203,11 @@ export function useRecovery() {
       stored.push(newGuardian)
       localStorage.setItem(`guardians_${account}`, JSON.stringify(stored))
 
-      toast.success(`Added ${label || guardianAddress.slice(0, 8)}... as guardian`)
-      toast('Verify this guardian to increase your recovery score', { icon: '💡' })
+      // Only show toast if not part of a batch (first guardian shows message for all)
+      if (!isSignatureProof) {
+        toast.success(`Added ${label || guardianAddress.slice(0, 8)}... as guardian`)
+        toast('Verify this guardian to increase your recovery score', { icon: '💡' })
+      }
       return true
     } catch (error) {
       console.error('Failed to add guardian:', error)

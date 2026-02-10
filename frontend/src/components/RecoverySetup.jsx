@@ -1,16 +1,17 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ethers } from 'ethers'
 import { useRecovery } from '../hooks/useRecovery'
 import { useWallet } from '../hooks/useWallet'
 import toast from 'react-hot-toast'
 
 /**
  * Recovery Setup Guide
- * Helps users set up their wallet recovery safety net
- * Emphasizes peace of mind for users worried about losing access
+ * Requires wallet connection and signatures for all security-critical operations
+ * @version 2.0.0 - Added wallet signature requirements
  */
 function RecoverySetup({ isOpen, onClose }) {
-  const { isConnected } = useWallet()
+  const { isConnected, account, signer, connect } = useWallet()
   const {
     guardians,
     addGuardian,
@@ -18,40 +19,218 @@ function RecoverySetup({ isOpen, onClose }) {
     registerHardwareKey,
     behavioralScore,
     config,
-    constants,
   } = useRecovery()
 
-  const [step, setStep] = useState('intro') // intro, guardians, deadman, hardware, complete
+  // Flow state
+  const [step, setStep] = useState('intro') // intro, connect, guardians, confirm-guardians, deadman, confirm-deadman, hardware, complete
+
+  // Guardian state
+  const [pendingGuardians, setPendingGuardians] = useState([])
   const [newGuardian, setNewGuardian] = useState({ address: '', label: '' })
+
+  // Deadman state
   const [deadmanEnabled, setDeadmanEnabled] = useState(false)
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('')
 
+  // Signing state
+  const [isSigning, setIsSigning] = useState(false)
+  const [signatureStep, setSignatureStep] = useState(null) // 'guardians' | 'deadman'
+
   if (!isOpen) return null
 
-  const handleAddGuardian = async () => {
+  // Generate signature message for guardian setup
+  const generateGuardianMessage = (guardianList) => {
+    const timestamp = Math.floor(Date.now() / 1000)
+    const guardiansStr = guardianList.map(g => `${g.label}: ${g.address}`).join('\n')
+
+    return `VibeSwap Recovery Setup - Guardian Confirmation
+
+I authorize the following addresses as my wallet recovery guardians:
+
+${guardiansStr}
+
+Recovery Threshold: 3 of ${guardianList.length} guardians required
+
+Wallet: ${account}
+Timestamp: ${timestamp}
+Chain: Ethereum Mainnet
+
+By signing this message, I confirm that:
+1. I trust these individuals to help recover my wallet
+2. Any 3 of them working together can initiate recovery
+3. I understand there is a 24-hour delay before recovery executes
+4. I can cancel any recovery attempt during this period`
+  }
+
+  // Generate signature message for deadman switch
+  const generateDeadmanMessage = (beneficiary) => {
+    const timestamp = Math.floor(Date.now() / 1000)
+
+    return `VibeSwap Recovery Setup - Digital Will Confirmation
+
+I authorize the following Digital Will configuration:
+
+Beneficiary: ${beneficiary}
+Inactivity Period: 365 days
+Warning Notifications: 30, 7, and 1 day before activation
+
+Wallet: ${account}
+Timestamp: ${timestamp}
+Chain: Ethereum Mainnet
+
+By signing this message, I confirm that:
+1. After 1 year of wallet inactivity, the beneficiary can claim my assets
+2. Any wallet activity (transactions, signatures) resets the timer
+3. I will receive warnings before the switch activates
+4. I can disable this feature at any time while I have wallet access`
+  }
+
+  // Add guardian to pending list (not confirmed yet)
+  const handleAddGuardianToPending = () => {
     if (!newGuardian.address || !newGuardian.label) {
-      toast.error('Please enter both address and name')
+      toast.error('Please enter both name and address')
       return
     }
 
-    const success = await addGuardian(newGuardian.address, newGuardian.label)
-    if (success) {
-      setNewGuardian({ address: '', label: '' })
+    // Validate address
+    if (!ethers.isAddress(newGuardian.address)) {
+      toast.error('Invalid wallet address')
+      return
+    }
+
+    // Check for duplicates
+    if (pendingGuardians.some(g => g.address.toLowerCase() === newGuardian.address.toLowerCase())) {
+      toast.error('Guardian already added')
+      return
+    }
+
+    setPendingGuardians([...pendingGuardians, { ...newGuardian }])
+    setNewGuardian({ address: '', label: '' })
+    toast.success(`Added ${newGuardian.label} to pending guardians`)
+  }
+
+  // Remove guardian from pending list
+  const handleRemoveGuardian = (index) => {
+    setPendingGuardians(pendingGuardians.filter((_, i) => i !== index))
+  }
+
+  // Sign and confirm guardians
+  const handleConfirmGuardians = async () => {
+    if (pendingGuardians.length < 3) {
+      toast.error('Add at least 3 guardians for security')
+      return
+    }
+
+    if (!signer) {
+      toast.error('Wallet not connected')
+      return
+    }
+
+    setIsSigning(true)
+    setSignatureStep('guardians')
+
+    try {
+      const message = generateGuardianMessage(pendingGuardians)
+
+      // Request signature from wallet
+      const signature = await signer.signMessage(message)
+
+      // Store guardians with signature proof
+      for (const guardian of pendingGuardians) {
+        await addGuardian(guardian.address, guardian.label, {
+          signature,
+          timestamp: Math.floor(Date.now() / 1000),
+          threshold: 3,
+          totalGuardians: pendingGuardians.length,
+        })
+      }
+
+      toast.success('Guardians confirmed and registered!')
+      setStep('deadman')
+    } catch (error) {
+      console.error('Signature failed:', error)
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        toast.error('Signature rejected - guardians not saved')
+      } else {
+        toast.error('Failed to sign guardian confirmation')
+      }
+    } finally {
+      setIsSigning(false)
+      setSignatureStep(null)
     }
   }
 
-  const handleSaveDeadman = async () => {
-    if (deadmanEnabled && !beneficiaryAddress) {
+  // Sign and confirm deadman switch
+  const handleConfirmDeadman = async () => {
+    if (!deadmanEnabled) {
+      // Skip to next step if not enabled
+      setStep('hardware')
+      return
+    }
+
+    if (!beneficiaryAddress) {
       toast.error('Please enter a beneficiary address')
       return
     }
 
-    await updateConfig({
-      deadmanTimeout: deadmanEnabled ? 365 * 24 * 60 * 60 : 0,
-      deadmanBeneficiary: deadmanEnabled ? beneficiaryAddress : null,
-    })
+    if (!ethers.isAddress(beneficiaryAddress)) {
+      toast.error('Invalid beneficiary address')
+      return
+    }
 
-    setStep('hardware')
+    if (!signer) {
+      toast.error('Wallet not connected')
+      return
+    }
+
+    setIsSigning(true)
+    setSignatureStep('deadman')
+
+    try {
+      const message = generateDeadmanMessage(beneficiaryAddress)
+
+      // Request signature from wallet
+      const signature = await signer.signMessage(message)
+
+      // Store deadman config with signature proof
+      await updateConfig({
+        deadmanTimeout: 365 * 24 * 60 * 60,
+        deadmanBeneficiary: beneficiaryAddress,
+        deadmanSignature: signature,
+        deadmanTimestamp: Math.floor(Date.now() / 1000),
+      })
+
+      toast.success('Digital Will confirmed and registered!')
+      setStep('hardware')
+    } catch (error) {
+      console.error('Signature failed:', error)
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        toast.error('Signature rejected - Digital Will not saved')
+      } else {
+        toast.error('Failed to sign Digital Will confirmation')
+      }
+    } finally {
+      setIsSigning(false)
+      setSignatureStep(null)
+    }
+  }
+
+  // Handle wallet connection
+  const handleConnect = async () => {
+    try {
+      await connect()
+    } catch (error) {
+      toast.error('Failed to connect wallet')
+    }
+  }
+
+  // Proceed from intro - check wallet connection
+  const handleStartSetup = () => {
+    if (!isConnected) {
+      setStep('connect')
+    } else {
+      setStep('guardians')
+    }
   }
 
   const recoveryScore = Math.min(100, behavioralScore + (guardians.length * 10) + (config.deadmanBeneficiary ? 15 : 0))
@@ -73,8 +252,15 @@ function RecoverySetup({ isOpen, onClose }) {
           className="relative w-full max-w-lg bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
         >
           {/* Header */}
-          <div className="sticky top-0 bg-black-800 border-b border-black-700 p-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold">Recovery Setup</h2>
+          <div className="sticky top-0 bg-black-800 border-b border-black-700 p-4 flex items-center justify-between z-10">
+            <div>
+              <h2 className="text-lg font-bold">Recovery Setup</h2>
+              {isConnected && (
+                <div className="text-xs text-matrix-500 font-mono">
+                  {account?.slice(0, 6)}...{account?.slice(-4)}
+                </div>
+              )}
+            </div>
             <button onClick={onClose} className="p-2 hover:bg-black-700 rounded-lg transition-colors">
               <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -98,70 +284,50 @@ function RecoverySetup({ isOpen, onClose }) {
                   </div>
                   <h3 className="text-xl font-bold mb-2">Never Lose Your Crypto</h3>
                   <p className="text-black-400 text-sm">
-                    Set up your safety net in just a few minutes. If you ever lose access to your wallet, these options ensure you can always recover.
+                    Set up your safety net in just a few minutes. Your wallet signature confirms each step.
                   </p>
                 </div>
 
-                {/* Fear Reassurance */}
-                <div className="p-4 rounded-lg bg-matrix-500/10 border border-matrix-500/20">
-                  <h4 className="font-semibold text-sm text-matrix-400 mb-2">You're not alone in worrying</h4>
-                  <p className="text-xs text-black-400">
-                    Over <strong className="text-white">$140 billion</strong> in Bitcoin has been lost forever because people lost their seed phrases. VibeSwap's recovery system ensures this never happens to you.
-                  </p>
+                {/* Security Notice */}
+                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-amber-500 mt-0.5">🔐</span>
+                    <div>
+                      <h4 className="font-semibold text-sm text-amber-400">Signature Required</h4>
+                      <p className="text-xs text-black-400 mt-1">
+                        Each step requires your wallet signature to confirm changes. This ensures only you can modify your recovery settings.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* 5 Recovery Methods */}
                 <div className="space-y-3">
                   <h4 className="font-semibold text-sm text-black-300">Your 5 Recovery Options:</h4>
-
                   <div className="grid gap-2">
-                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
-                      <span className="text-lg">👥</span>
-                      <div>
-                        <div className="font-medium text-sm">Guardian Recovery</div>
-                        <div className="text-xs text-black-500">Trusted friends/family can recover your wallet</div>
+                    {[
+                      { icon: '👥', title: 'Guardian Recovery', desc: 'Trusted friends/family can recover your wallet' },
+                      { icon: '⏱️', title: 'Time-Lock Recovery', desc: '7-day waiting period prevents theft' },
+                      { icon: '📜', title: 'Digital Will', desc: 'Beneficiary inherits after 1 year inactivity' },
+                      { icon: '⚖️', title: 'Jury Arbitration', desc: 'Prove ownership to neutral jurors' },
+                      { icon: '🔐', title: 'Quantum Backup', desc: 'Unbreakable backup keys for the future' },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
+                        <span className="text-lg">{item.icon}</span>
+                        <div>
+                          <div className="font-medium text-sm">{item.title}</div>
+                          <div className="text-xs text-black-500">{item.desc}</div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
-                      <span className="text-lg">⏱️</span>
-                      <div>
-                        <div className="font-medium text-sm">Time-Lock Recovery</div>
-                        <div className="text-xs text-black-500">7-day waiting period prevents theft</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
-                      <span className="text-lg">📜</span>
-                      <div>
-                        <div className="font-medium text-sm">Digital Will</div>
-                        <div className="text-xs text-black-500">Beneficiary inherits after 1 year inactivity</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
-                      <span className="text-lg">⚖️</span>
-                      <div>
-                        <div className="font-medium text-sm">Jury Arbitration</div>
-                        <div className="text-xs text-black-500">Prove ownership to neutral jurors</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
-                      <span className="text-lg">🔐</span>
-                      <div>
-                        <div className="font-medium text-sm">Quantum Backup</div>
-                        <div className="text-xs text-black-500">Unbreakable backup keys for the future</div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
                 <button
-                  onClick={() => setStep('guardians')}
+                  onClick={handleStartSetup}
                   className="w-full py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
                 >
-                  Start Setup (2 min)
+                  {isConnected ? 'Start Setup' : 'Connect Wallet to Start'}
                 </button>
 
                 <button
@@ -170,6 +336,80 @@ function RecoverySetup({ isOpen, onClose }) {
                 >
                   I'll do this later
                 </button>
+              </motion.div>
+            )}
+
+            {/* Connect Wallet Step */}
+            {step === 'connect' && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Connect Your Wallet</h3>
+                  <p className="text-black-400 text-sm">
+                    Recovery setup requires wallet connection to sign and confirm your settings.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-black-700/50 border border-black-600">
+                  <h4 className="font-medium text-sm mb-2">Why is this required?</h4>
+                  <ul className="space-y-2 text-xs text-black-400">
+                    <li className="flex items-start space-x-2">
+                      <span className="text-matrix-500 mt-0.5">✓</span>
+                      <span>Proves you own the wallet you're protecting</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-matrix-500 mt-0.5">✓</span>
+                      <span>Creates cryptographic proof of your guardian choices</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-matrix-500 mt-0.5">✓</span>
+                      <span>Ensures only you can modify recovery settings</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {isConnected ? (
+                  <div className="p-4 rounded-lg bg-matrix-500/10 border border-matrix-500/20">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-matrix-500">✓</span>
+                      <div>
+                        <div className="font-medium text-sm text-matrix-400">Wallet Connected</div>
+                        <div className="text-xs text-black-400 font-mono">{account}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnect}
+                    className="w-full py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
+                  >
+                    Connect Wallet
+                  </button>
+                )}
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setStep('intro')}
+                    className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setStep('guardians')}
+                    disabled={!isConnected}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
+                  >
+                    Continue
+                  </button>
+                </div>
               </motion.div>
             )}
 
@@ -183,7 +423,7 @@ function RecoverySetup({ isOpen, onClose }) {
                 <div>
                   <h3 className="text-lg font-bold mb-1">Add Trusted Guardians</h3>
                   <p className="text-black-400 text-sm">
-                    Choose 3-5 people who can help you recover your wallet. They'll need to work together (3 of 5 must agree).
+                    Choose 3-5 people who can help you recover your wallet. Any 3 of them must agree to initiate recovery.
                   </p>
                 </div>
 
@@ -191,20 +431,44 @@ function RecoverySetup({ isOpen, onClose }) {
                 <div className="p-3 rounded-lg bg-black-700/50">
                   <p className="text-xs text-black-400 mb-2">Good guardian choices:</p>
                   <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">Parent</span>
-                    <span className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">Sibling</span>
-                    <span className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">Best Friend</span>
-                    <span className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">Spouse</span>
-                    <span className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">Lawyer</span>
+                    {['Parent', 'Sibling', 'Best Friend', 'Spouse', 'Lawyer'].map(s => (
+                      <span key={s} className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">{s}</span>
+                    ))}
                   </div>
                 </div>
 
-                {/* Current Guardians */}
+                {/* Pending Guardians */}
+                {pendingGuardians.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-black-300">
+                      Pending Guardians ({pendingGuardians.length})
+                      <span className="text-black-500 font-normal ml-2">- will be confirmed with signature</span>
+                    </h4>
+                    {pendingGuardians.map((g, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-black-700 border border-amber-500/30">
+                        <div>
+                          <div className="font-medium text-sm">{g.label}</div>
+                          <div className="text-xs text-black-500 font-mono">{g.address.slice(0, 10)}...{g.address.slice(-8)}</div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveGuardian(i)}
+                          className="text-red-500 hover:text-red-400 p-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Already Confirmed Guardians */}
                 {guardians.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-black-300">Your Guardians ({guardians.length})</h4>
+                    <h4 className="text-sm font-medium text-matrix-400">Confirmed Guardians ({guardians.length})</h4>
                     {guardians.map((g, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-black-700">
+                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-matrix-500/10 border border-matrix-500/30">
                         <div>
                           <div className="font-medium text-sm">{g.label}</div>
                           <div className="text-xs text-black-500 font-mono">{g.address.slice(0, 10)}...{g.address.slice(-8)}</div>
@@ -232,12 +496,21 @@ function RecoverySetup({ isOpen, onClose }) {
                     className="w-full bg-black-700 rounded-lg p-3 text-white placeholder-black-500 outline-none border border-black-600 focus:border-terminal-500 font-mono text-sm"
                   />
                   <button
-                    onClick={handleAddGuardian}
+                    onClick={handleAddGuardianToPending}
                     className="w-full py-2 rounded-lg border border-terminal-500 text-terminal-500 hover:bg-terminal-500/10 font-medium transition-colors"
                   >
                     + Add Guardian
                   </button>
                 </div>
+
+                {/* Minimum requirement notice */}
+                {pendingGuardians.length > 0 && pendingGuardians.length < 3 && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs text-amber-400">
+                      Add at least {3 - pendingGuardians.length} more guardian{3 - pendingGuardians.length > 1 ? 's' : ''} (minimum 3 required for security)
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex space-x-3">
                   <button
@@ -247,12 +520,32 @@ function RecoverySetup({ isOpen, onClose }) {
                     Back
                   </button>
                   <button
-                    onClick={() => setStep('deadman')}
-                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
+                    onClick={handleConfirmGuardians}
+                    disabled={pendingGuardians.length < 3 || isSigning}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors flex items-center justify-center space-x-2"
                   >
-                    Continue
+                    {isSigning && signatureStep === 'guardians' ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span>Sign in Wallet...</span>
+                      </>
+                    ) : (
+                      <span>Sign & Confirm Guardians</span>
+                    )}
                   </button>
                 </div>
+
+                {pendingGuardians.length === 0 && guardians.length === 0 && (
+                  <button
+                    onClick={() => setStep('deadman')}
+                    className="w-full py-2 text-sm text-black-500 hover:text-black-300 transition-colors"
+                  >
+                    Skip guardians for now
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -266,13 +559,13 @@ function RecoverySetup({ isOpen, onClose }) {
                 <div>
                   <h3 className="text-lg font-bold mb-1">Digital Will Setup</h3>
                   <p className="text-black-400 text-sm">
-                    Choose someone to inherit your wallet if you're inactive for 1 year. Don't worry—any activity resets the timer.
+                    Choose someone to inherit your wallet if you're inactive for 1 year. Your signature confirms this choice.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <p className="text-xs text-amber-400">
-                    <strong>Why this matters:</strong> If something happens to you, your crypto won't be lost forever. Your chosen beneficiary can claim it after a year of inactivity.
+                    <strong>Why this matters:</strong> If something happens to you, your crypto won't be lost forever. Your beneficiary can claim it after a year of inactivity.
                   </p>
                 </div>
 
@@ -307,6 +600,16 @@ function RecoverySetup({ isOpen, onClose }) {
                       <p className="text-xs text-black-500">
                         This person will be notified 30 days before the switch activates.
                       </p>
+
+                      {/* Signature preview */}
+                      <div className="p-3 rounded-lg bg-black-700/50 border border-black-600">
+                        <p className="text-xs text-black-500 mb-1">You'll sign a message confirming:</p>
+                        <ul className="text-xs text-black-400 space-y-1">
+                          <li>• Beneficiary: {beneficiaryAddress || '(enter address)'}</li>
+                          <li>• Inactivity period: 365 days</li>
+                          <li>• Warning notifications enabled</li>
+                        </ul>
+                      </div>
                     </motion.div>
                   )}
                 </div>
@@ -319,10 +622,23 @@ function RecoverySetup({ isOpen, onClose }) {
                     Back
                   </button>
                   <button
-                    onClick={handleSaveDeadman}
-                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
+                    onClick={handleConfirmDeadman}
+                    disabled={isSigning || (deadmanEnabled && !beneficiaryAddress)}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors flex items-center justify-center space-x-2"
                   >
-                    Continue
+                    {isSigning && signatureStep === 'deadman' ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span>Sign in Wallet...</span>
+                      </>
+                    ) : deadmanEnabled ? (
+                      <span>Sign & Confirm Will</span>
+                    ) : (
+                      <span>Continue</span>
+                    )}
                   </button>
                 </div>
               </motion.div>
@@ -338,7 +654,7 @@ function RecoverySetup({ isOpen, onClose }) {
                 <div>
                   <h3 className="text-lg font-bold mb-1">Hardware Key (Optional)</h3>
                   <p className="text-black-400 text-sm">
-                    Register a hardware security key for additional protection. This makes it nearly impossible for hackers or AI to fake your identity.
+                    Register a hardware security key for additional protection against AI impersonation.
                   </p>
                 </div>
 
@@ -381,7 +697,7 @@ function RecoverySetup({ isOpen, onClose }) {
                     onClick={() => setStep('complete')}
                     className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
                   >
-                    {guardians.length > 0 || deadmanEnabled ? 'Complete Setup' : 'Skip for Now'}
+                    {guardians.length > 0 || config.deadmanBeneficiary ? 'Complete Setup' : 'Skip for Now'}
                   </button>
                 </div>
               </motion.div>
@@ -403,7 +719,7 @@ function RecoverySetup({ isOpen, onClose }) {
                 <div>
                   <h3 className="text-xl font-bold mb-2">You're Protected!</h3>
                   <p className="text-black-400 text-sm">
-                    Your wallet recovery safety net is now active.
+                    Your wallet recovery safety net is now active and cryptographically signed.
                   </p>
                 </div>
 
@@ -419,24 +735,23 @@ function RecoverySetup({ isOpen, onClose }) {
                       style={{ width: `${recoveryScore}%` }}
                     />
                   </div>
-                  <p className="text-xs text-black-500 mt-2">
-                    {recoveryScore < 50 ? 'Add more guardians to increase your score' :
-                     recoveryScore < 80 ? 'Good protection! Consider adding a hardware key' :
-                     'Excellent! Your wallet is well protected'}
-                  </p>
                 </div>
 
                 {/* Summary */}
                 <div className="text-left space-y-2">
                   <div className="flex items-center justify-between p-3 rounded-lg bg-black-700/50">
                     <span className="text-sm text-black-400">Guardians</span>
-                    <span className="font-medium">{guardians.length}</span>
+                    <span className="font-medium">{guardians.length} confirmed</span>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-black-700/50">
                     <span className="text-sm text-black-400">Digital Will</span>
                     <span className={`font-medium ${config.deadmanBeneficiary ? 'text-matrix-500' : 'text-black-500'}`}>
-                      {config.deadmanBeneficiary ? 'Enabled' : 'Not set'}
+                      {config.deadmanBeneficiary ? 'Signed & Active' : 'Not set'}
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-black-700/50">
+                    <span className="text-sm text-black-400">Signed by</span>
+                    <span className="font-mono text-xs text-black-300">{account?.slice(0, 10)}...{account?.slice(-6)}</span>
                   </div>
                 </div>
 

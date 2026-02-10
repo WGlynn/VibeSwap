@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!-- Build: v1770726607139 -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/VibeSwap/vibe-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="description" content="VibeSwap - MEV-resistant omnichain DEX with batch auctions. Trade with zero frontrunning." />
+    <meta name="theme-color" content="#000000" />
+    <title>VibeSwap | MEV-Protected Trading</title>
+
+    <!-- iOS Native App Feel -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VibeSwap" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Preconnect for faster font loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="VibeSwap - MEV-Protected DEX" />
+    <meta property="og:description" content="Trade tokens with zero frontrunning. Batch auctions protect you from MEV." />
+    <meta property="og:type" content="website" />
+
+    <style>
+      /* NUCLEAR OPTION: Kill ALL scrolling on iOS Safari */
+      html, body {
+        position: fixed;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        height: -webkit-fill-available;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: none;
+        touch-action: none;
+        background: #000000;
+      }
+
+      #root {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+      }
+
+      /* Loading spinner */
+      #root:empty::after {
+        content: '';
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        margin: -20px 0 0 -20px;
+        border: 3px solid rgba(0, 255, 65, 0.2);
+        border-top-color: #00ff41;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+
+    <!-- IMMEDIATE scroll prevention - runs before React -->
+    <script>
+      document.addEventListener('touchmove', function(e) {
+        if (!e.target.closest('.allow-scroll')) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      document.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+
+      // Prevent pull-to-refresh
+      document.body.style.overscrollBehavior = 'none';
+    </script>
+    <script type="module" crossorigin src="/VibeSwap/assets/index-ORDQ-Lzf.js"></script>
+    <link rel="stylesheet" crossorigin href="/VibeSwap/assets/index-DdcBnHpi.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

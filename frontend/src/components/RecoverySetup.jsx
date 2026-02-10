@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ethers } from 'ethers'
 import { useRecovery } from '../hooks/useRecovery'
 import { useWallet } from '../hooks/useWallet'
+import PaperBackup from './PaperBackup'
 import toast from 'react-hot-toast'
 
 /**
@@ -72,6 +73,16 @@ const RECOVERY_OPTIONS = [
     tradeoff: {
       title: 'How it works',
       explanation: 'Creates a super-secure backup key that will stay safe even as technology advances. Good if you\'re saving for 10+ years (like retirement funds). You\'ll need to store one extra password safely—treat it like your safe deposit box key.',
+    },
+  },
+  {
+    id: 'paper',
+    icon: '📄',
+    title: 'Paper Backup',
+    desc: 'Print your recovery phrase for offline storage',
+    tradeoff: {
+      title: 'How it works',
+      explanation: 'Generate a 24-word recovery phrase and print it on paper. Store in a fireproof safe or safety deposit box. This is TRUE cold storage—completely offline and immune to hackers. From the 2018 paper: "Keeping your private keys entirely offline is the best way to protect them."',
     },
   },
 ]
@@ -147,6 +158,9 @@ function RecoverySetup({ isOpen, onClose }) {
   // Signing state
   const [isSigning, setIsSigning] = useState(false)
 
+  // Paper backup state
+  const [showPaperBackup, setShowPaperBackup] = useState(false)
+
   if (!isOpen) return null
 
   // Toggle option selection
@@ -172,6 +186,7 @@ function RecoverySetup({ isOpen, onClose }) {
     if (selectedOptions.has('deadman')) steps.push('deadman')
     if (selectedOptions.has('jury')) steps.push('jury')
     if (selectedOptions.has('quantum')) steps.push('quantum')
+    if (selectedOptions.has('paper')) steps.push('paper')
     if (selectedOptions.size > 0) steps.push('complete')
     return steps
   }
@@ -1177,6 +1192,67 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               </motion.div>
             )}
 
+            {/* Paper Backup Step */}
+            {step === 'paper' && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">📄</span>
+                    <h3 className="text-lg font-bold">Paper Backup</h3>
+                  </div>
+                  <p className="text-black-400 text-sm">
+                    Create a printable recovery phrase for true cold storage.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/20">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-terminal-500">📜</span>
+                    <div>
+                      <div className="text-sm font-medium text-terminal-400">From Your 2018 Paper</div>
+                      <p className="text-xs text-black-300 mt-1 italic">
+                        "Keeping your private keys entirely offline is the best way to protect them."
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-sm text-black-400">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-matrix-500">✓</span>
+                    <span>Maximum protection from cyber attacks</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-matrix-500">✓</span>
+                    <span>Works even if VibeSwap disappears</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-matrix-500">✓</span>
+                    <span>Store in fireproof safe or deposit box</span>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={prevStep}
+                    className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setShowPaperBackup(true)}
+                    className="flex-1 py-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-black-900 font-semibold transition-colors"
+                  >
+                    Create Paper Backup
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Complete Step */}
             {step === 'complete' && (
               <motion.div
@@ -1236,6 +1312,16 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Paper Backup Modal */}
+      <PaperBackup
+        isOpen={showPaperBackup}
+        onClose={() => {
+          setShowPaperBackup(false)
+          // Advance to next step after paper backup is done
+          nextStep()
+        }}
+      />
     </AnimatePresence>
   )
 }

@@ -2,8 +2,8 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2025-02-10 22:XX UTC (Desktop - GitBash)
-**Auto-sync**: Enabled - syncs after every change
+**Last Updated**: 2025-02-10 (Desktop - GitBash)
+**Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
@@ -21,7 +21,7 @@ This file maintains continuity between Claude Code sessions across devices.
 4. 0% protocol fees on bridge (only LayerZero gas)
 5. Created `useBalances` hook for balance tracking
 6. Deployed to Vercel: https://frontend-jade-five-87.vercel.app
-7. Set up auto-sync between devices (commits after every change)
+7. Set up auto-sync between devices (pull first, push last - no conflicts)
 
 ## Known Issues / TODO
 - Large bundle size warning (2.8MB chunk) - consider code splitting

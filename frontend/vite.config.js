@@ -19,11 +19,9 @@ export default defineConfig({
           if (id.includes('node_modules/ethers') || id.includes('node_modules/@adraffy') || id.includes('node_modules/@noble')) {
             return 'vendor-ethers'
           }
-          if (id.includes('node_modules/@walletconnect')) {
-            return 'vendor-walletconnect'
-          }
-          if (id.includes('node_modules/@web3modal')) {
-            return 'vendor-web3modal'
+          // Combined to fix circular dependency warning
+          if (id.includes('node_modules/@walletconnect') || id.includes('node_modules/@web3modal')) {
+            return 'vendor-wallet'
           }
           if (id.includes('node_modules/framer-motion')) {
             return 'vendor-motion'

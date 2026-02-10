@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/update-build-version.js",
     "build": "vite build",
     "build:gh": "vite build --base=/vibeswap/",
     "preview": "vite preview",

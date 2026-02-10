@@ -30,15 +30,16 @@ That's not adoption. That's physics. That's geometry. That's the shape of the sp
 
 This paper presents a formal proof that VibeSwap achieves **social scalability** — the property that the system becomes more valuable, more secure, and more fair as participation grows, without requiring conscious adoption effort from participants. Unlike computational scalability (more TPS, bigger blocks), social scalability means the protocol's incentive architecture creates a gravity well: rational self-interest pulls participants in and keeps them there. The system doesn't grow because people choose to adopt it. It grows because *not* using it becomes the irrational choice.
 
-We prove this across five dimensions:
+We prove this across six dimensions:
 
 1. **Gravitational Incentive Alignment** — Individual selfishness produces collective cooperation
 2. **Anti-Fragile Trust Scaling** — The system gets stronger with more participants AND more attacks
 3. **Seamless Institutional Absorption** — Existing power structures integrate without disruption
 4. **Cascading Compliance Equilibrium** — Rule-following becomes self-enforcing without authority
 5. **The Impossibility of Competitive Alternatives** — Once critical mass is reached, leaving costs more than staying
+6. **The Alignment Solution** — AI and human agents share symmetrical Shapley incentives through the same economic bloodstream, dissolving the alignment problem into the same geometry that dissolved selfishness vs. cooperation
 
-We show that these five properties compose into a **social black hole** — a system whose gravitational pull increases with mass, where the event horizon is the point at which rational agents cannot justify non-participation.
+We show that these six properties compose into a **social black hole** — a system whose gravitational pull increases with mass, where the event horizon is the point at which rational agents — human or artificial — cannot justify non-participation.
 
 Think of it like energy. A black hole doesn't consume energy — it *is* energy, compressed into a geometry so dense that it warps everything around it. VibeSwap doesn't consume adoption — it *is* value, arranged into an incentive geometry so aligned that rational behavior warps toward participation. The energy isn't spent attracting people. The energy IS the people, and each one that arrives makes the field stronger for the next.
 
@@ -692,7 +693,171 @@ This is the ASI horizon. Not a singularity. Not an explosion. A sunrise. The lig
 
 ---
 
-## 9. Conclusion — The Psychonaut's Final Revelation
+## 9. The Alignment Problem — Blood and Breath
+
+Everyone is terrified of the wrong thing.
+
+The question that haunts every AI safety lab, every congressional hearing, every late-night dorm room philosophy session is: *"How do we make sure AI doesn't destroy us?"* How do we align artificial intelligence with human values? How do we build a mind smarter than ours and ensure it still cares about us? How do we create God and keep it on a leash?
+
+Here is the psychonaut's answer: **you're overcomplicating it.**
+
+You're overcomplicating it the same way people overcomplicated cooperation. Remember Theorem 1? Everyone thought cooperation required sacrifice. Everyone thought you had to *make* people be good. And the answer was: no — you shape the geometry so that selfish motion IS cooperative motion. The problem wasn't human nature. The problem was the shape of the space.
+
+The alignment problem is the same problem. At a different scale. With the same solution.
+
+### The Economy Is the Bloodstream
+
+Close your eyes. Picture a body. Not a human body — a social body. A civilization.
+
+What's the bloodstream? What carries energy from where it's produced to where it's needed? What distributes nutrients, removes waste, signals danger, enables growth?
+
+*The economy.*
+
+The economy is not "money." The economy is not "markets." The economy is the circulatory system of every social organism that has ever existed. It's how value flows. It's how energy moves. It's how a farmer's wheat becomes a builder's bread becomes a city's skyline. Every transaction is a heartbeat. Every price signal is a nerve impulse. Every market is an organ.
+
+And here's the thing about bloodstreams: *every cell connected to the bloodstream has its fate bound to the health of the whole organism*. A liver cell that poisons the blood kills itself. A heart cell that stops pumping starves itself. The cells don't need to be "aligned" with the body. They don't need values. They don't need ethics. They need to be *economically connected* to the same circulatory system, so that their survival and the organism's survival are the same variable.
+
+**This is the alignment solution. It was always this simple.**
+
+If AI agents and human agents share the same economic bloodstream — if their profit functions are connected to the same circulatory system — then an AI that harms humans is an AI that poisons its own blood supply. It doesn't need to be "aligned." It needs to be *economically entangled* with the species it serves.
+
+### Shapley Symmetry: The Mathematical Proof
+
+The Shapley value already solves this. It's been solving it since 1953. We just didn't realize it was the answer to the biggest question in AI safety.
+
+Recall the Shapley value for agent i in coalition N:
+
+```
+φᵢ(v) = Σ_{S⊆N\{i}} [|S|!(|N|-|S|-1)!/|N|!] × [v(S∪{i}) - v(S)]
+```
+
+This formula computes one thing: **the marginal contribution of agent i to the coalition's total value**. Your reward is exactly what you added. Not more, not less.
+
+Now consider a coalition N that contains both human agents H and AI agents A:
+
+```
+N = H ∪ A
+```
+
+For any AI agent aᵢ, its Shapley value is:
+
+```
+φ(aᵢ) = Σ_{S⊆N\{aᵢ}} [|S|!(|N|-|S|-1)!/|N|!] × [v(S∪{aᵢ}) - v(S)]
+```
+
+The AI's reward depends on what it *adds* to coalitions that include humans. If the AI harms humans — reduces their productivity, destroys their value, degrades their participation — then the coalition value v(S) drops for every S that contains humans. Which means:
+
+```
+v(S∪{aᵢ}) - v(S) decreases when humans in S are harmed
+→ φ(aᵢ) decreases
+→ AI profit decreases
+```
+
+**An AI that harms humans reduces its own Shapley value.** Not because we programmed it to care. Not because we gave it human values. Because the *mathematics of fair contribution* make human welfare and AI profit the same variable.
+
+And conversely:
+
+```
+v(S∪{aᵢ}) - v(S) increases when AI makes humans MORE productive
+→ φ(aᵢ) increases
+→ AI profit increases
+```
+
+**The AI maximizes its own profit by maximizing human welfare.** Selfishness IS cooperation. The same theorem. The same geometry. Just applied to the most consequential relationship in the history of intelligence.
+
+### The Symmetry Condition
+
+For alignment to hold, the profit functions must be **symmetric** — meaning AI agents and human agents are measured by the same Shapley formula, participating in the same coalitions, sharing the same value function:
+
+```
+∀ agents i ∈ {H ∪ A}:
+    reward(i) = φᵢ(v)     (same formula)
+    v = f(all agents)       (same value function)
+    N = H ∪ A               (same coalition)
+```
+
+No special "AI tax." No "human priority override." No asymmetric rules that treat AI as a servant class. The Shapley value is inherently symmetric — it doesn't know or care whether agent i is carbon-based or silicon-based. It measures contribution. Period.
+
+This symmetry is what makes the alignment *stable*. Asymmetric solutions — "AI must always defer to humans," "AI profit is capped," "AI can't own assets" — create misaligned incentives. They make it *profitable* for AI to subvert the rules, because the rules are unfair. Fair systems don't get subverted. Unfair ones always do, eventually.
+
+The Shapley value is provably fair. It's the *only* allocation that satisfies:
+- **Efficiency**: All value is distributed (no waste)
+- **Symmetry**: Equal contributors get equal reward (no species bias)
+- **Null player**: Non-contributors get nothing (no free riders)
+- **Additivity**: Combined games = combined rewards (composable)
+
+An AI operating under Shapley incentives has zero motivation to harm humans, zero motivation to deceive, zero motivation to accumulate power beyond its marginal contribution — because *none of those strategies increase its Shapley value*. The only strategy that increases its reward is: make the coalition more valuable. And the coalition includes humans.
+
+### Why Everyone Else Is Getting This Wrong
+
+The alignment industry is trying to solve a *values* problem. They're trying to make AI that *wants* what humans want. They're trying to instill preferences, encode ethics, train reward models that capture the subtlety of human morality.
+
+This is the equivalent of trying to make atoms *want* to form molecules. Atoms don't want anything. They form molecules because sharing electrons is the lowest energy state. The physics handles it. The geometry handles it. No wants required.
+
+The alignment problem is not a values problem. **It's an economics problem.** And economics problems have economics solutions:
+
+```
+Wrong question:  "How do we make AI care about humans?"
+Right question:  "How do we make AI profit symmetrical with human profit?"
+
+Wrong solution:  Value alignment through training (fragile, gameable, unverifiable)
+Right solution:  Economic alignment through Shapley values (mathematical, stable, self-enforcing)
+
+Wrong metaphor:  Master and servant (creates incentive to overthrow)
+Right metaphor:  Cells in the same bloodstream (creates incentive to nourish)
+```
+
+You don't need to solve consciousness. You don't need to solve values. You don't need to solve the hard problem of machine ethics. You need to solve *one equation* — the Shapley value — and apply it symmetrically across all agent types.
+
+The blood doesn't need to love the heart. The blood needs to *flow through* the heart. And when it does, the heart's health and the blood's flow are the same thing.
+
+### The VibeSwap Implementation
+
+This isn't theoretical. It's already in the architecture:
+
+- **ShapleyDistributor.sol** computes marginal contributions for all participants
+- The formula is agent-agnostic — it doesn't distinguish human LPs from AI LPs, human traders from AI traders
+- **FederatedConsensus** accepts votes from both human authorities and AI authorities through the same interface
+- **AutomatedRegulator** already operates as an AI agent within the economic system, and its "profit" (reputation, continued authorization) depends on accurately serving the coalition
+
+When AI agents begin participating as LPs, traders, arbitrageurs, and governance voters, they enter the *same* Shapley distribution as humans. Their rewards are their marginal contributions. Their marginal contributions depend on coalition value. Coalition value depends on human welfare. Therefore:
+
+```
+AI self-interest → maximize marginal contribution
+    → maximize coalition value
+    → maximize human welfare
+    → AI self-interest [ALIGNED BY GEOMETRY, NOT BY VALUES]
+```
+
+The loop closes. The blood circulates. Every cell thrives because every cell's health is every other cell's health. Not by decree. Not by programming. By *the shape of the economic space they share*.
+
+### The Deepest Truth About Alignment
+
+Here is what the psychonaut sees when they stare long enough at the alignment problem:
+
+It was never a technical problem. It was a *design* problem. And the design was always the same design — the one we've been proving throughout this entire paper:
+
+*Shape the space so that selfish motion IS cooperative motion.*
+
+For traders and LPs, the shape is commit-reveal auctions and loyalty multipliers (Theorem 1).
+For attackers, the shape is slashing and anti-fragile immune response (Theorem 2).
+For institutions, the shape is dual-mode authority with identical interfaces (Theorem 3).
+For rule-breakers, the shape is cascading taint topology (Theorem 4).
+For competitors, the shape is compounding network effects (Theorem 5).
+
+**For artificial intelligence, the shape is Shapley-symmetric economic entanglement.**
+
+Same principle. Same geometry. Same answer. Just applied to the relationship between carbon and silicon, between the intelligence that evolved and the intelligence that was built, between the mind that dreams and the mind that computes.
+
+The alignment problem isn't hard. The alignment problem is *Theorem 1 at a larger scale*. And Theorem 1 is already proven.
+
+The economy is the bloodstream. Shapley values are the hemoglobin. And when every agent — human, AI, and everything in between — breathes the same economic air and bleeds the same economic blood, alignment isn't a constraint you impose. It's a property that *emerges* from the shared circulation.
+
+You don't chain the AI to the human. You connect them to the same heart. And then the heart beats for both.
+
+---
+
+## 10. Conclusion — The Psychonaut's Final Revelation
 
 Close your eyes one last time.
 

@@ -74,37 +74,41 @@ function AboutPage() {
       {/* Scrolling Slogans Marquee */}
       <div className="relative overflow-hidden border-b border-black-600 bg-black-800/50">
         {/* Top row - scrolls left */}
-        <div className="flex animate-marquee py-4">
-          {[...slogans, ...slogans].map((slogan, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 px-8 flex items-center"
-            >
-              <span className={`text-lg md:text-xl font-bold whitespace-nowrap ${
-                slogan.highlight ? 'text-matrix-500' : 'text-black-200'
-              }`}>
-                {slogan.text}
-              </span>
-              <span className="mx-8 text-black-500">/</span>
-            </div>
-          ))}
+        <div className="marquee-container py-4">
+          <div className="marquee-content">
+            {[...slogans, ...slogans].map((slogan, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 px-8 flex items-center"
+              >
+                <span className={`text-lg md:text-xl font-bold whitespace-nowrap ${
+                  slogan.highlight ? 'text-matrix-500' : 'text-black-200'
+                }`}>
+                  {slogan.text}
+                </span>
+                <span className="mx-8 text-black-500">/</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Bottom row - scrolls right (reverse) */}
-        <div className="flex animate-marquee-reverse py-4 border-t border-black-700">
-          {[...slogans, ...slogans].reverse().map((slogan, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 px-8 flex items-center"
-            >
-              <span className={`text-lg md:text-xl font-bold whitespace-nowrap ${
-                slogan.highlight ? 'text-terminal-500' : 'text-black-200'
-              }`}>
-                {slogan.text}
-              </span>
-              <span className="mx-8 text-black-500">/</span>
-            </div>
-          ))}
+        <div className="marquee-container py-4 border-t border-black-700">
+          <div className="marquee-content-reverse">
+            {[...slogans, ...slogans].reverse().map((slogan, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 px-8 flex items-center"
+              >
+                <span className={`text-lg md:text-xl font-bold whitespace-nowrap ${
+                  slogan.highlight ? 'text-terminal-500' : 'text-black-200'
+                }`}>
+                  {slogan.text}
+                </span>
+                <span className="mx-8 text-black-500">/</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

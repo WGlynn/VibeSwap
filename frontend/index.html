@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Build: v1770726607139 -->
+<!-- Build: v1770764327704 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -7,6 +7,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="description" content="VibeSwap - MEV-resistant omnichain DEX with batch auctions. Trade with zero frontrunning." />
     <meta name="theme-color" content="#000000" />
+
+    <!-- Cache Control - Force fresh fetch -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>VibeSwap | MEV-Protected Trading</title>
 
     <!-- iOS Native App Feel -->
@@ -109,6 +114,21 @@
       })();
     </script>
     <div id="root"></div>
+    <script>
+      // Catch and display fatal JavaScript errors
+      window.onerror = function(msg, url, line, col, error) {
+        var root = document.getElementById('root');
+        if (root && !root.hasChildNodes()) {
+          root.innerHTML = '<div style="color:#ff4444;font-family:monospace;padding:40px;text-align:center;">' +
+            '<h2>Failed to load</h2>' +
+            '<p style="color:#888;margin:20px 0;">Try hard refresh: Ctrl+Shift+R</p>' +
+            '<pre style="text-align:left;background:#111;padding:20px;border-radius:8px;overflow:auto;max-width:600px;margin:0 auto;">' +
+            msg + '\n' + url + ':' + line +
+            '</pre></div>';
+        }
+        return false;
+      };
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

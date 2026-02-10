@@ -1,4 +1,57 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import {
+  checkWalletEligibility,
+  calculateQualityScore,
+  calculateVotingPower,
+  createOriginTimestampProposal,
+  castVote,
+  finalizeProposal,
+  getGovernanceSummary,
+  GOVERNANCE_CONFIG,
+} from '../utils/governance'
+import {
+  createTrustGraph,
+  addVouch,
+  revokeVouch,
+  getTrustScore,
+  getVotingPowerWithTrust,
+  getTrustNetworkStats,
+  getPendingVouchRequests,
+  checkSybilRisk,
+  calculateReferralQuality,
+  calculateDiversityScore,
+  getAdjustedTrustScore,
+  TRUST_CONFIG,
+} from '../utils/trustChain'
+import {
+  calculateConsistencyScore,
+  getEffectiveAge,
+  calculateSkinInTheGameIndex,
+  createChallenge,
+  resolveChallenge,
+  SKIN_CONFIG,
+} from '../utils/skinInTheGame'
+import {
+  calculateShapleyDistribution,
+  createRewardLedger,
+  recordValueEvent,
+  calculateGlobalMultiplier,
+  createEpochTracker,
+  advanceEpochIfNeeded,
+  getRewardLeaderboard,
+  getTopEnablers,
+  SHAPLEY_CONFIG,
+} from '../utils/shapleyTrust'
+import {
+  createCommitment,
+  verifyCommitment,
+  createExtractionTracker,
+  attemptExtraction,
+  createCheckpoint,
+  createStateRoot,
+  getSecuritySummary,
+  FINALITY_CONFIG,
+} from '../utils/finality'
 
 const ContributionsContext = createContext()
 
@@ -379,6 +432,110 @@ export function ContributionsProvider({ children }) {
     return {}
   })
 
+  // Governance proposals state
+  const [proposals, setProposals] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_proposals')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return []
+      }
+    }
+    return []
+  })
+
+  // Trust graph state (Web of Trust / Handshake Protocol)
+  const [trustGraph, setTrustGraph] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_trust_graph')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return createTrustGraph()
+      }
+    }
+    return createTrustGraph()
+  })
+
+  // Plagiarism challenges state
+  const [challenges, setChallenges] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_challenges')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return []
+      }
+    }
+    return []
+  })
+
+  // Activity log state (for consistency scoring)
+  const [activityLog, setActivityLog] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_activity_log')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return []
+      }
+    }
+    return []
+  })
+
+  // Shapley reward ledger (tracks all value distributions)
+  const [rewardLedger, setRewardLedger] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_reward_ledger')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return createRewardLedger()
+      }
+    }
+    return createRewardLedger()
+  })
+
+  // Epoch tracker (quality weights update in epochs)
+  const [epochTracker, setEpochTracker] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_epoch_tracker')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return createEpochTracker()
+      }
+    }
+    return createEpochTracker()
+  })
+
+  // Checkpoints for finality
+  const [checkpoints, setCheckpoints] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_checkpoints')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return []
+      }
+    }
+    return []
+  })
+
+  // Extraction tracker (caps damage per epoch)
+  const [extractionTracker, setExtractionTracker] = useState(() => {
+    const saved = localStorage.getItem('vibeswap_extraction')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return createExtractionTracker(0, 1000)  // Initial values
+      }
+    }
+    return createExtractionTracker(0, 1000)
+  })
+
   // Persist to localStorage
   useEffect(() => {
     localStorage.setItem('vibeswap_contributions', JSON.stringify(contributions))
@@ -387,6 +544,38 @@ export function ContributionsProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('vibeswap_user_stats', JSON.stringify(userStats))
   }, [userStats])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_proposals', JSON.stringify(proposals))
+  }, [proposals])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_trust_graph', JSON.stringify(trustGraph))
+  }, [trustGraph])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_challenges', JSON.stringify(challenges))
+  }, [challenges])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_activity_log', JSON.stringify(activityLog))
+  }, [activityLog])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_reward_ledger', JSON.stringify(rewardLedger))
+  }, [rewardLedger])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_epoch_tracker', JSON.stringify(epochTracker))
+  }, [epochTracker])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_checkpoints', JSON.stringify(checkpoints))
+  }, [checkpoints])
+
+  useEffect(() => {
+    localStorage.setItem('vibeswap_extraction', JSON.stringify(extractionTracker))
+  }, [extractionTracker])
 
   // Calculate user stats from contributions
   const calculateUserStats = (username) => {
@@ -564,6 +753,366 @@ export function ContributionsProvider({ children }) {
     return [...tags]
   }
 
+  // ============================================================
+  // GOVERNANCE FUNCTIONS
+  // ============================================================
+
+  // Check if a wallet can participate in governance
+  const checkGovernanceEligibility = (walletData) => {
+    return checkWalletEligibility(walletData)
+  }
+
+  // Get quality score for a contribution
+  const getContributionQuality = (contributionId) => {
+    const contribution = contributions.find(c => c.id === contributionId)
+    if (!contribution) return null
+    return calculateQualityScore(contribution, contributions)
+  }
+
+  // Get voting power for a user
+  const getUserVotingPower = (username, walletData) => {
+    const userContribs = contributions.filter(c => c.author === username)
+    const stats = calculateUserStats(username)
+    return calculateVotingPower(stats, userContribs, contributions)
+  }
+
+  // Create a proposal for origin timestamp change
+  const createTimestampProposal = (contributionId, proposedTimestamp, proof, proposer) => {
+    const proposal = createOriginTimestampProposal(
+      contributionId,
+      proposedTimestamp,
+      proof,
+      proposer
+    )
+    setProposals(prev => [...prev, proposal])
+    return proposal
+  }
+
+  // Vote on a proposal
+  const voteOnProposal = (proposalId, voter, inFavor, walletData) => {
+    const proposal = proposals.find(p => p.id === proposalId)
+    if (!proposal) return { success: false, error: 'Proposal not found' }
+
+    const votingPower = getUserVotingPower(voter, walletData)
+    const result = castVote(proposal, voter, inFavor, votingPower.votingPower, walletData)
+
+    if (result.success) {
+      setProposals(prev => prev.map(p =>
+        p.id === proposalId ? result.proposal : p
+      ))
+    }
+
+    return result
+  }
+
+  // Finalize a proposal after challenge period
+  const finalizeTimestampProposal = (proposalId) => {
+    const proposal = proposals.find(p => p.id === proposalId)
+    if (!proposal) return { success: false, error: 'Proposal not found' }
+
+    const result = finalizeProposal(proposal)
+
+    // Update proposal
+    setProposals(prev => prev.map(p =>
+      p.id === proposalId ? result.proposal : p
+    ))
+
+    // If approved, update the contribution's origin timestamp
+    if (result.result === 'APPROVED') {
+      verifyOriginTimestamp(
+        proposal.contributionId,
+        `governance-proposal-${proposalId}`
+      )
+    }
+
+    return result
+  }
+
+  // Get all active proposals
+  const getActiveProposals = () => {
+    return proposals.filter(p =>
+      p.status === 'CHALLENGE_PERIOD' || p.status === 'VOTING'
+    )
+  }
+
+  // Get governance summary for a user
+  const getGovernanceStatus = (username, walletData) => {
+    const userContribs = contributions.filter(c => c.author === username)
+    const stats = calculateUserStats(username)
+    return getGovernanceSummary(walletData, stats, userContribs, contributions)
+  }
+
+  // ============================================================
+  // TRUST CHAIN / HANDSHAKE PROTOCOL FUNCTIONS
+  // ============================================================
+
+  // Vouch for another user (handshake if reciprocated)
+  const vouchForUser = (fromUsername, toUsername, message = '') => {
+    const result = addVouch(trustGraph, fromUsername, toUsername, message)
+    if (result.success) {
+      setTrustGraph(result.graph)
+    }
+    return result
+  }
+
+  // Revoke a vouch
+  const revokeUserVouch = (fromUsername, toUsername) => {
+    const result = revokeVouch(trustGraph, fromUsername, toUsername)
+    if (result.success) {
+      setTrustGraph(result.graph)
+    }
+    return result
+  }
+
+  // Get trust score for a user (with referral quality & diversity adjustments)
+  const getUserTrustScore = (username) => {
+    return getAdjustedTrustScore(trustGraph, username)
+  }
+
+  // Get referral quality for a user
+  const getUserReferralQuality = (username) => {
+    return calculateReferralQuality(trustGraph, username)
+  }
+
+  // Get diversity score for a user
+  const getUserDiversityScore = (username) => {
+    return calculateDiversityScore(trustGraph, username)
+  }
+
+  // Get voting power including trust multiplier (uses adjusted trust score)
+  const getFullVotingPower = (username, walletData) => {
+    const basePower = getUserVotingPower(username, walletData)
+    const adjustedTrust = getAdjustedTrustScore(trustGraph, username)
+
+    // Use adjusted score instead of base score
+    const adjustedPower = basePower.votingPower * (adjustedTrust.adjustedMultiplier || 1)
+
+    return {
+      basePower: basePower.votingPower,
+      adjustedPower,
+      trustScore: adjustedTrust.adjustedScore,
+      trustMultiplier: adjustedTrust.adjustedMultiplier,
+      modifiers: adjustedTrust.modifiers,
+      breakdown: {
+        base: basePower.votingPower,
+        referralQuality: adjustedTrust.modifiers?.referralQuality || 1,
+        diversity: adjustedTrust.modifiers?.diversityScore || 1,
+        final: adjustedPower,
+      },
+    }
+  }
+
+  // Get pending vouch requests for a user
+  const getUserPendingVouches = (username) => {
+    return getPendingVouchRequests(trustGraph, username)
+  }
+
+  // Get trust network stats
+  const getTrustStats = () => {
+    return getTrustNetworkStats(trustGraph)
+  }
+
+  // Check Sybil risk for a user based on trust network
+  const getUserSybilRisk = (username) => {
+    return checkSybilRisk(trustGraph, username, contributions)
+  }
+
+  // ============================================================
+  // SKIN IN THE GAME FUNCTIONS
+  // ============================================================
+
+  // Log an activity (for consistency scoring)
+  const logActivity = (username, action) => {
+    const entry = {
+      username,
+      action,
+      timestamp: Date.now(),
+    }
+    setActivityLog(prev => [...prev, entry])
+  }
+
+  // Get user's activity consistency
+  const getUserConsistency = (username) => {
+    const userActivity = activityLog.filter(a => a.username === username)
+    return calculateConsistencyScore(userActivity)
+  }
+
+  // Get user's effective account age
+  const getUserEffectiveAge = (username, createdAt) => {
+    const userActivity = activityLog.filter(a => a.username === username)
+    return getEffectiveAge(createdAt, userActivity)
+  }
+
+  // Challenge a contribution as plagiarized
+  const challengeContribution = (contributionId, challenger, sourceUrl) => {
+    const contribution = contributions.find(c => c.id === contributionId)
+    if (!contribution) return { success: false, error: 'Contribution not found' }
+
+    const challenge = createChallenge(contribution, challenger, sourceUrl)
+    setChallenges(prev => [...prev, challenge])
+    return { success: true, challenge }
+  }
+
+  // Resolve a plagiarism challenge
+  const resolvePlagiarismChallenge = (challengeId, isPlagiarism, resolvedBy) => {
+    const challenge = challenges.find(c => c.id === challengeId)
+    if (!challenge) return { success: false, error: 'Challenge not found' }
+
+    const resolved = resolveChallenge(challenge, isPlagiarism, resolvedBy)
+    setChallenges(prev => prev.map(c => c.id === challengeId ? resolved : c))
+
+    // If plagiarism verified, mark contribution
+    if (isPlagiarism) {
+      setContributions(prev => prev.map(c =>
+        c.id === challenge.contributionId
+          ? { ...c, flaggedPlagiarism: true, rewardPoints: 0 }
+          : c
+      ))
+    }
+
+    return { success: true, resolved }
+  }
+
+  // Get unified "Skin in the Game" index for a user
+  const getUserSkinIndex = (username, createdAt) => {
+    const userActivity = activityLog.filter(a => a.username === username)
+    const userContribs = contributions.filter(c => c.author === username)
+    const userChallenges = challenges.filter(c => c.contributionAuthor === username)
+    const trust = getTrustScore(trustGraph, username)
+
+    return calculateSkinInTheGameIndex({
+      activityLog: userActivity,
+      contributions: userContribs,
+      trustScore: trust.score,
+      challengeHistory: userChallenges,
+      createdAt,
+    })
+  }
+
+  // ============================================================
+  // SHAPLEY REWARD FUNCTIONS
+  // ============================================================
+
+  // Record a value-creating event and distribute rewards via Shapley
+  const recordValue = (eventType, actor, value) => {
+    const trust = getAdjustedTrustScore(trustGraph, actor)
+    const trustChain = trust.trustChain || [actor]
+
+    // Build quality weights from trust scores
+    const qualityWeights = {}
+    trustChain.forEach(user => {
+      const userTrust = getAdjustedTrustScore(trustGraph, user)
+      qualityWeights[user] = userTrust.adjustedScore || 0.5
+    })
+
+    // Calculate global multiplier from network health
+    const networkStats = {
+      userCount: Object.keys(trustGraph.trustScores || {}).length,
+      activeUsers: [...new Set(activityLog.slice(-100).map(a => a.username))].length,
+      avgTrustScore: Object.values(trustGraph.trustScores || {})
+        .reduce((sum, t) => sum + (t.score || 0), 0) /
+        Math.max(1, Object.keys(trustGraph.trustScores || {}).length),
+    }
+    const globalMultiplier = calculateGlobalMultiplier(networkStats)
+
+    const event = {
+      eventType,
+      actor,
+      value,
+      trustChain,
+      qualityWeights,
+      globalMultiplier,
+    }
+
+    const newLedger = recordValueEvent(rewardLedger, event)
+    setRewardLedger(newLedger)
+
+    // Also log the activity
+    logActivity(actor, eventType)
+
+    return {
+      distributed: newLedger.events[newLedger.events.length - 1],
+      globalMultiplier,
+    }
+  }
+
+  // Get user's Shapley rewards balance
+  const getUserRewardBalance = (username) => {
+    return rewardLedger.balances[username] || 0
+  }
+
+  // Get reward leaderboard
+  const getShapleyLeaderboard = () => {
+    return getRewardLeaderboard(rewardLedger)
+  }
+
+  // Get top enablers (people whose referrals create most value)
+  const getTopValueEnablers = () => {
+    return getTopEnablers(rewardLedger)
+  }
+
+  // Check and advance epoch if needed
+  const checkEpoch = () => {
+    const networkStats = {
+      userCount: Object.keys(trustGraph.trustScores || {}).length,
+    }
+    const newTracker = advanceEpochIfNeeded(epochTracker, networkStats)
+    if (newTracker.currentEpoch !== epochTracker.currentEpoch) {
+      setEpochTracker(newTracker)
+      return { advanced: true, newEpoch: newTracker.currentEpoch }
+    }
+    return { advanced: false, currentEpoch: epochTracker.currentEpoch }
+  }
+
+  // ============================================================
+  // FINALITY & COMMITMENT FUNCTIONS
+  // ============================================================
+
+  // Create a commitment for an action (commit-reveal scheme)
+  const commitAction = async (action) => {
+    return await createCommitment(action)
+  }
+
+  // Verify a revealed commitment
+  const verifyAction = async (commitment, reveal) => {
+    return await verifyCommitment(commitment, reveal)
+  }
+
+  // Attempt extraction (bounded by cap)
+  const tryExtraction = (address, amount) => {
+    const result = attemptExtraction(extractionTracker, address, amount)
+    if (result.success) {
+      setExtractionTracker(result.tracker)
+    }
+    return result
+  }
+
+  // Create a checkpoint of current state
+  const checkpoint = async () => {
+    const state = {
+      contributions: contributions.length,
+      trustGraph: Object.keys(trustGraph.trustScores || {}).length,
+      rewardLedger: rewardLedger.totalDistributed,
+      epoch: epochTracker.currentEpoch,
+    }
+    const stateRoot = await createStateRoot(state)
+    const previousCheckpoint = checkpoints[checkpoints.length - 1] || null
+    const newCheckpoint = await createCheckpoint(stateRoot, previousCheckpoint)
+
+    setCheckpoints(prev => [...prev, newCheckpoint])
+
+    // Reset extraction tracker for new epoch
+    const totalValue = rewardLedger.totalDistributed || 1000
+    setExtractionTracker(createExtractionTracker(newCheckpoint.height, totalValue))
+
+    return newCheckpoint
+  }
+
+  // Get security summary
+  const getSecurityStatus = () => {
+    return getSecuritySummary(checkpoints, extractionTracker)
+  }
+
   return (
     <ContributionsContext.Provider value={{
       contributions,
@@ -582,6 +1131,57 @@ export function ContributionsProvider({ children }) {
       getLeaderboard,
       getAllTags,
       CONTRIBUTION_TYPES,
+      // Governance functions
+      proposals,
+      checkGovernanceEligibility,
+      getContributionQuality,
+      getUserVotingPower,
+      createTimestampProposal,
+      voteOnProposal,
+      finalizeTimestampProposal,
+      getActiveProposals,
+      getGovernanceStatus,
+      GOVERNANCE_CONFIG,
+      // Trust chain / Handshake Protocol functions
+      trustGraph,
+      vouchForUser,
+      revokeUserVouch,
+      getUserTrustScore,
+      getUserReferralQuality,
+      getUserDiversityScore,
+      getFullVotingPower,
+      getUserPendingVouches,
+      getTrustStats,
+      getUserSybilRisk,
+      TRUST_CONFIG,
+      // Skin in the Game functions
+      challenges,
+      activityLog,
+      logActivity,
+      getUserConsistency,
+      getUserEffectiveAge,
+      challengeContribution,
+      resolvePlagiarismChallenge,
+      getUserSkinIndex,
+      SKIN_CONFIG,
+      // Shapley reward functions
+      rewardLedger,
+      epochTracker,
+      recordValue,
+      getUserRewardBalance,
+      getShapleyLeaderboard,
+      getTopValueEnablers,
+      checkEpoch,
+      SHAPLEY_CONFIG,
+      // Finality & commitment functions
+      checkpoints,
+      extractionTracker,
+      commitAction,
+      verifyAction,
+      tryExtraction,
+      checkpoint,
+      getSecurityStatus,
+      FINALITY_CONFIG,
     }}>
       {children}
     </ContributionsContext.Provider>

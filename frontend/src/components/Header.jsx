@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useGameMode } from '../contexts/GameModeContext'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,8 +9,13 @@ import TransactionHistory from './TransactionHistory'
 function Header() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isConnected, shortAddress, chainName, connect, disconnect, isConnecting, switchChain } = useWallet()
+  const { isConnected: isExternalConnected, shortAddress: externalShortAddress, chainName, connect, disconnect, isConnecting, switchChain } = useWallet()
+  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
   const { isGamerMode, toggleMode } = useGameMode()
+
+  // Combined wallet state - connected if EITHER wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected
+  const shortAddress = externalShortAddress || (deviceAddress ? `${deviceAddress.slice(0, 6)}...${deviceAddress.slice(-4)}` : '')
   const [showChainMenu, setShowChainMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 

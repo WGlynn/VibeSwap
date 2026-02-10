@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import SoulboundAvatar from './SoulboundAvatar'
 import RecoverySetup from './RecoverySetup'
@@ -9,14 +10,25 @@ import RecoverySetup from './RecoverySetup'
 /**
  * Minimal header - Logo, wallet, and hidden drawer for power users
  * The scalpel approach: hide complexity until needed
- * @version 2.0.0 - Added Security section with Recovery Setup
+ * @version 2.1.0 - Fixed wallet connection display for both external and device wallets
  */
 function HeaderMinimal() {
   const location = useLocation()
-  const { isConnected, shortAddress, connect, disconnect, isConnecting } = useWallet()
+  const { isConnected: isExternalConnected, shortAddress: externalShortAddress, connect, disconnect: externalDisconnect, isConnecting } = useWallet()
+  const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress, disconnect: deviceDisconnect } = useDeviceWallet()
   const { identity, hasIdentity } = useIdentity()
   const [showDrawer, setShowDrawer] = useState(false)
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
+
+  // Combined wallet state - connected if EITHER wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected
+  const shortAddress = externalShortAddress || deviceShortAddress
+
+  // Disconnect whichever wallet is connected
+  const disconnect = () => {
+    if (isExternalConnected) externalDisconnect()
+    if (isDeviceConnected) deviceDisconnect()
+  }
 
   return (
     <>
@@ -86,6 +98,7 @@ function HeaderMinimal() {
               setShowDrawer(false)
               setShowRecoverySetup(true)
             }}
+            showAdminSection={import.meta.env.DEV || new URLSearchParams(window.location.search).get('admin') === 'true'}
           />
         )}
       </AnimatePresence>
@@ -98,7 +111,7 @@ function HeaderMinimal() {
   )
 }
 
-function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect, onOpenRecoverySetup }) {
+function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect, onOpenRecoverySetup, showAdminSection }) {
   const location = useLocation()
 
   const navItems = [
@@ -113,6 +126,11 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
     { path: '/forum', label: 'Community', icon: '💬' },
     { path: '/docs', label: 'Learn', icon: '📚' },
+  ]
+
+  // Admin items - TODO: Add proper role check
+  const adminItems = [
+    { path: '/admin/sybil', label: 'Sybil Detection', icon: '🔍', description: 'Monitor for fake accounts' },
   ]
 
   return (
@@ -230,6 +248,39 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             </div>
           </button>
         </div>
+
+        {/* Admin Section - Development/Admin only */}
+        {showAdminSection && (
+          <>
+            <div className="mx-4 h-px bg-black-700" />
+            <div className="p-2">
+              <div className="px-4 py-2 text-xs text-red-500/70 uppercase flex items-center space-x-1">
+                <span>⚠️</span>
+                <span>Admin</span>
+              </div>
+              {adminItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
+                    location.pathname === item.path
+                      ? 'bg-red-500/10 text-red-400'
+                      : 'hover:bg-red-500/5 text-black-400 hover:text-red-400'
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <div className="text-left">
+                    <div>{item.label}</div>
+                    {item.description && (
+                      <div className="text-xs text-black-500">{item.description}</div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Settings & Disconnect */}
         {isConnected && (

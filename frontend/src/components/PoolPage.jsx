@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import toast from 'react-hot-toast'
 
 // Mock pool data
@@ -40,7 +41,12 @@ const POOLS = [
 ]
 
 function PoolPage() {
-  const { isConnected, connect } = useWallet()
+  const { isConnected: isExternalConnected, connect } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+
+  // Combined wallet state - connected if EITHER wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected
+
   const [activeTab, setActiveTab] = useState('pools')
   const [showAddLiquidity, setShowAddLiquidity] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
@@ -198,7 +204,12 @@ function PoolPage() {
 }
 
 function AddLiquidityModal({ pool, onClose }) {
-  const { isConnected, connect } = useWallet()
+  const { isConnected: isExternalConnected, connect } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+
+  // Combined wallet state - connected if EITHER wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected
+
   const [amount0, setAmount0] = useState('')
   const [amount1, setAmount1] = useState('')
   const [isLoading, setIsLoading] = useState(false)

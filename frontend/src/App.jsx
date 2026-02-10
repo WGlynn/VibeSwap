@@ -8,6 +8,8 @@ import BuySellPage from './components/BuySellPage'
 import RewardsPage from './components/RewardsPage'
 import DocsPage from './components/DocsPage'
 import ForumPage from './components/ForumPage'
+import ActivityPage from './components/ActivityPage'
+import AdminSybilDetection from './components/AdminSybilDetection'
 import { ContributionsProvider } from './contexts/ContributionsContext'
 
 // Minimal page transitions - subtle, fast
@@ -40,10 +42,12 @@ function AnimatedRoutes() {
           <Route path="/buy" element={<BuySellPage />} />
           <Route path="/earn" element={<PoolPage />} />
           <Route path="/send" element={<BridgePage />} />
-          <Route path="/history" element={<div className="text-center py-20 text-black-400">Transaction history coming soon</div>} />
+          <Route path="/history" element={<ActivityPage />} />
           <Route path="/rewards" element={<RewardsPage />} />
           <Route path="/forum" element={<ForumPage />} />
           <Route path="/docs" element={<DocsPage />} />
+          {/* Admin routes */}
+          <Route path="/admin/sybil" element={<AdminSybilDetection />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import toast from 'react-hot-toast'
 
 /**
@@ -152,7 +153,13 @@ const CRYPTO_OPTIONS = [
 ]
 
 function BuySellPage() {
-  const { isConnected, connect, account } = useWallet()
+  const { isConnected: isExternalConnected, connect, account: externalAccount } = useWallet()
+  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
+
+  // Combined wallet state - connected if EITHER wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected
+  const account = externalAccount || deviceAddress
+
   const [mode, setMode] = useState('buy') // 'buy' or 'sell'
   const [amount, setAmount] = useState('')
   const [selectedCrypto, setSelectedCrypto] = useState(CRYPTO_OPTIONS[0])

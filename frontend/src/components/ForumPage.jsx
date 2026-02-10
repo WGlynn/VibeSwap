@@ -3,13 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useContributions, CONTRIBUTION_TYPES, RESERVED_USERNAMES } from '../contexts/ContributionsContext'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import SoulboundAvatar from './SoulboundAvatar'
 import CreateIdentityModal from './CreateIdentityModal'
 import ContributionGraph from './ContributionGraph'
 
 function ForumPage() {
-  const { isConnected, connect } = useWallet()
+  const { isConnected: isExternalConnected, connect } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+
+  // Combined wallet state - connected if EITHER wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected
   const { identity, hasIdentity, isLoading: identityLoading, getLevelTitle, getLevelColor, addContribution: addIdentityContribution } = useIdentity()
 
   const {

@@ -9,6 +9,7 @@ import RecoverySetup from './RecoverySetup'
 /**
  * Minimal header - Logo, wallet, and hidden drawer for power users
  * The scalpel approach: hide complexity until needed
+ * @version 2.0.0 - Added Security section with Recovery Setup
  */
 function HeaderMinimal() {
   const location = useLocation()

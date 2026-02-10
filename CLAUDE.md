@@ -1,14 +1,23 @@
 # Claude Code Memory
 
-## AUTO-SYNC INSTRUCTIONS (READ FIRST)
+## AUTO-SYNC INSTRUCTIONS (MANDATORY)
 
-**On session start**: Always read `.claude/SESSION_STATE.md` for context from previous sessions.
+**On session start**: Read `.claude/SESSION_STATE.md` for context from previous sessions.
 
-**On session end** (when user says goodbye, signs off, or asks to commit):
-1. Update `.claude/SESSION_STATE.md` with current state
-2. Commit and push to BOTH remotes: `git push origin master && git push stealth master`
+**After EVERY significant change** (code edit, task completion, bug fix, etc.):
+1. Update `.claude/SESSION_STATE.md` with what was just done
+2. Auto-commit all changes with descriptive message
+3. Push to BOTH remotes: `git push origin master && git push stealth master`
 
-This ensures all sessions (desktop, mobile, any device) share the same context.
+**This is not optional.** Every change must be synced immediately so other devices have the latest state.
+
+Example workflow:
+1. User asks to fix a bug
+2. Fix the bug
+3. Update SESSION_STATE.md (add to "Recently Completed", update "Current Focus")
+4. `git add -A && git commit -m "Fix XYZ" && git push origin master && git push stealth master`
+
+This ensures real-time sync between all sessions (desktop, mobile, any device).
 
 ---
 

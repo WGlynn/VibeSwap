@@ -6,10 +6,16 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
  * @title FederatedConsensus
- * @notice Off-chain authority consensus for clawback decisions
- * @dev Authorized entities (government, lawyers, courts, SEC) vote on clawback
- *      proposals. A configurable threshold must be met before execution.
- *      Time-locked grace period gives the accused wallet time to respond.
+ * @notice Hybrid authority consensus for clawback decisions
+ * @dev Supports BOTH off-chain and on-chain authorities for seamless infrastructural
+ *      inversion. Today, off-chain entities (government, lawyers, courts, SEC) vote
+ *      alongside on-chain equivalents (DAO governance, decentralized tribunal,
+ *      arbitration protocol, automated regulator). Over time, on-chain authorities
+ *      become primary as the infrastructure inverts - the transition is seamless
+ *      because both systems use the same voting interface from day one.
+ *
+ *      Off-chain roles:  GOVERNMENT, LEGAL, COURT, REGULATOR
+ *      On-chain roles:   ONCHAIN_GOVERNANCE, ONCHAIN_TRIBUNAL, ONCHAIN_ARBITRATION, ONCHAIN_REGULATOR
  */
 contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
 
@@ -17,10 +23,14 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
 
     enum AuthorityRole {
         NONE,
-        GOVERNMENT,
-        LEGAL,
-        COURT,
-        REGULATOR
+        GOVERNMENT,           // Off-chain: FBI, DOJ, etc.
+        LEGAL,                // Off-chain: Lawyers, legal counsel
+        COURT,                // Off-chain: Judges, courts
+        REGULATOR,            // Off-chain: SEC, CFTC, etc.
+        ONCHAIN_GOVERNANCE,   // On-chain: DAO governance vote
+        ONCHAIN_TRIBUNAL,     // On-chain: Decentralized jury verdict
+        ONCHAIN_ARBITRATION,  // On-chain: Dispute resolution protocol
+        ONCHAIN_REGULATOR     // On-chain: Automated compliance oracle
     }
 
     enum ProposalStatus {

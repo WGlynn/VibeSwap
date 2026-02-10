@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanism Insulation - VibeSwap Protocol</title>
+    <style>
+        @media print {
+            body { font-size: 11pt; }
+            .no-print { display: none; }
+            pre { white-space: pre-wrap; }
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.6;
+            color: #1a1a1a;
+        }
+        h1 {
+            color: #00cc34;
+            border-bottom: 2px solid #00cc34;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #333;
+            margin-top: 2em;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        h3 { color: #555; }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        .highlight-box {
+            background: #fff8e6;
+            border-left: 4px solid #ffaa00;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .danger-box {
+            background: #fff0f0;
+            border-left: 4px solid #ff3366;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .success-box {
+            background: #f0fff4;
+            border-left: 4px solid #00cc34;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        ul { padding-left: 25px; }
+        li { margin-bottom: 8px; }
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .column {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .column h4 {
+            margin-top: 0;
+            color: #00cc34;
+        }
+        .column.cyan h4 { color: #00a8cc; }
+        hr { border: none; border-top: 1px solid #ddd; margin: 30px 0; }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #888;
+        }
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00cc34;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .print-button:hover { background: #00aa2a; }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">Print / Save as PDF</button>
+
+    <h1>Mechanism Insulation</h1>
+    <p><strong>Why Fees and Governance Must Be Separate</strong></p>
+    <p><em>VibeSwap Protocol Documentation</em></p>
+
+    <hr>
+
+    <h2>Executive Summary</h2>
+    <p>VibeSwap separates exchange fees (100% to LPs) from governance/arbitration rewards (token emissions). This document explains why these mechanisms must remain insulated to prevent game-breaking exploits.</p>
+
+    <hr>
+
+    <h2>The Two Mechanisms</h2>
+
+    <div class="two-column">
+        <div class="column">
+            <h4>Exchange Fees &rarr; LPs (100%)</h4>
+            <ul>
+                <li><strong>Direct incentive:</strong> provide liquidity, earn proportional to volume</li>
+                <li>Simple, measurable, predictable returns</li>
+                <li>LPs can calculate expected yield and commit capital accordingly</li>
+            </ul>
+        </div>
+        <div class="column cyan">
+            <h4>Token Rewards &rarr; Governance</h4>
+            <ul>
+                <li>Shapley value distribution rewards contribution to protocol health</li>
+                <li>Arbitrators, sybil hunters, governance participants earn tokens</li>
+                <li>Token value depends on long-term protocol success</li>
+            </ul>
+        </div>
+    </div>
+
+    <hr>
+
+    <h2>Game-Breaking Scenarios If Combined</h2>
+
+    <h3>1. Conflict of Interest</h3>
+    <div class="danger-box">
+        <p>If arbitrators were paid from trading fees:</p>
+        <ul>
+            <li>Incentive to rule in favor of high-volume traders (they generate more fees)</li>
+            <li>Incentive to maximize disputes (more work = more pay from pool)</li>
+            <li>Incentive to <em>not</em> ban bad actors if they trade a lot</li>
+        </ul>
+    </div>
+
+    <h3>2. Capture Attack</h3>
+    <pre>
+Attacker strategy:
+1. Become large LP (earn fees)
+2. Become arbitrator (paid from same pool you contribute to)
+3. Rule in your own favor in disputes
+4. You're paying yourself with other LPs' money
+    </pre>
+
+    <h3>3. Liquidity Death Spiral</h3>
+    <div class="danger-box">
+        <p><strong>Chain reaction:</strong></p>
+        <p>Legal costs spike &rarr; Fees diverted to lawyers &rarr; LP yields drop unpredictably &rarr; LPs withdraw &rarr; Less liquidity &rarr; Worse prices &rarr; Less volume &rarr; Less fees &rarr; Can't pay lawyers</p>
+    </div>
+
+    <h3>4. Fee Manipulation</h3>
+    <div class="danger-box">
+        <p>If governance is funded by fees, controlling fees = controlling governance:</p>
+        <ul>
+            <li>Whale does massive wash trading</li>
+            <li>Generates huge fees</li>
+            <li>Uses fee-funded governance to vote themselves more power</li>
+            <li><strong>Circular extraction loop</strong></li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>The Insulation Principle</h2>
+
+    <pre>
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;     &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;   TRADING FEES  &#9474;     &#9474;  TOKEN REWARDS  &#9474;
+&#9474;                 &#9474;     &#9474;                 &#9474;
+&#9474;  100% &rarr; LPs     &#9474;     &#9474;  &rarr; Arbitrators  &#9474;
+&#9474;                 &#9474;     &#9474;  &rarr; Governance   &#9474;
+&#9474;  Incentive:     &#9474;     &#9474;  &rarr; Sybil hunters&#9474;
+&#9474;  Provide        &#9474;     &#9474;                 &#9474;
+&#9474;  liquidity      &#9474;     &#9474;  Incentive:     &#9474;
+&#9474;                 &#9474;     &#9474;  Protocol health&#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;     &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+        &#9474;                       &#9474;
+        &#9474;    INSULATED          &#9474;
+        &#9474;    No cross-flow      &#9474;
+        &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+    </pre>
+
+    <div class="success-box">
+        <p><strong>LPs are mercenary</strong> &mdash; they go where yield is. Predictable fees keep them.</p>
+        <p><strong>Governance must be incorruptible</strong> &mdash; token rewards align with long-term protocol value, not short-term extraction.</p>
+    </div>
+
+    <hr>
+
+    <h2>Why This Matters</h2>
+
+    <p>If you let fee-funded lawyers into the LP pool, you've created a mechanism where:</p>
+    <ul>
+        <li>Short-term extraction (legal fees) competes with long-term alignment (LP incentives)</li>
+        <li>Legal costs become an attack surface</li>
+        <li>The people ruling on disputes have financial interest in dispute outcomes</li>
+    </ul>
+
+    <div class="highlight-box">
+        <p>This is similar to why in traditional systems:</p>
+        <ul>
+            <li>Judges aren't paid based on case outcomes</li>
+            <li>Court funding is separate from the parties involved</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>TL;DR</h2>
+
+    <div class="success-box">
+        <p><strong>Fees reward capital providers. Tokens reward protocol stewards.</strong></p>
+        <p>Mixing them creates circular incentives where the people judging disputes profit from the disputes themselves. That's how you get regulatory capture, not decentralized justice.</p>
+    </div>
+
+    <div class="footer">
+        <p>VibeSwap Protocol Documentation</p>
+        <p>Live docs: <a href="https://frontend-jade-five-87.vercel.app/docs">https://frontend-jade-five-87.vercel.app/docs</a></p>
+        <p>Generated: February 2026</p>
+    </div>
+</body>
+</html>

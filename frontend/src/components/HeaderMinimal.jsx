@@ -103,6 +103,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
 
   const navItems = [
     { path: '/', label: 'Swap', icon: '⚡' },
+    { path: '/buy', label: 'Buy', icon: '💳', description: 'Venmo, PayPal, Cash App' },
     { path: '/earn', label: 'Earn', icon: '📈', description: 'Provide liquidity' },
     { path: '/send', label: 'Send', icon: '→', description: 'Cross-chain transfer' },
     { path: '/history', label: 'History', icon: '📋', description: 'Your transactions' },

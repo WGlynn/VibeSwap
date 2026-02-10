@@ -4,6 +4,7 @@ import HeaderMinimal from './components/HeaderMinimal'
 import SwapCore from './components/SwapCore'
 import PoolPage from './components/PoolPage'
 import BridgePage from './components/BridgePage'
+import BuySellPage from './components/BuySellPage'
 import RewardsPage from './components/RewardsPage'
 import DocsPage from './components/DocsPage'
 import ForumPage from './components/ForumPage'
@@ -36,6 +37,7 @@ function AnimatedRoutes() {
         <Routes location={location}>
           {/* Landing IS the swap - Steve's vision */}
           <Route path="/" element={<SwapCore />} />
+          <Route path="/buy" element={<BuySellPage />} />
           <Route path="/earn" element={<PoolPage />} />
           <Route path="/send" element={<BridgePage />} />
           <Route path="/history" element={<div className="text-center py-20 text-black-400">Transaction history coming soon</div>} />

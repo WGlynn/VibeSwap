@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ethers } from 'ethers'
 import { useRecovery } from '../hooks/useRecovery'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import PaperBackup from './PaperBackup'
 import toast from 'react-hot-toast'
 
@@ -116,7 +117,8 @@ function InfoTooltip({ tradeoff, isVisible, onClose }) {
 }
 
 function RecoverySetup({ isOpen, onClose }) {
-  const { isConnected, account, signer, connect } = useWallet()
+  const { isConnected: isExternalConnected, account: externalAccount, signer, connect } = useWallet()
+  const { isConnected: isDeviceConnected, address: deviceAddress, signMessage: deviceSignMessage } = useDeviceWallet()
   const {
     guardians,
     addGuardian,
@@ -125,6 +127,23 @@ function RecoverySetup({ isOpen, onClose }) {
     behavioralScore,
     config,
   } = useRecovery()
+
+  // Combined wallet state - works with either wallet type
+  const isConnected = isExternalConnected || isDeviceConnected
+  const account = externalAccount || deviceAddress
+
+  // Universal sign function - works with both wallet types
+  const signMessageUniversal = async (message) => {
+    if (isDeviceConnected && deviceSignMessage) {
+      // Device wallet - use biometric signing
+      return await deviceSignMessage(message)
+    } else if (signer) {
+      // External wallet - use ethers signer
+      return await signer.signMessage(message)
+    } else {
+      throw new Error('No wallet connected')
+    }
+  }
 
   // Selected recovery options
   const [selectedOptions, setSelectedOptions] = useState(new Set())
@@ -261,7 +280,7 @@ Chain: Ethereum Mainnet`
       return
     }
 
-    if (!signer) {
+    if (!isConnected) {
       toast.error('Wallet not connected')
       return
     }
@@ -269,7 +288,7 @@ Chain: Ethereum Mainnet`
     setIsSigning(true)
     try {
       const message = generateGuardianMessage(pendingGuardians)
-      const signature = await signer.signMessage(message)
+      const signature = await signMessageUniversal(message)
 
       for (const guardian of pendingGuardians) {
         await addGuardian(guardian.address, guardian.label, {
@@ -295,7 +314,7 @@ Chain: Ethereum Mainnet`
 
   // Confirm time-lock
   const handleConfirmTimelock = async () => {
-    if (!signer) {
+    if (!isConnected) {
       toast.error('Wallet not connected')
       return
     }
@@ -309,7 +328,7 @@ I authorize a ${timelockDays}-day time-lock on all recovery attempts.
 Wallet: ${account}
 Timestamp: ${Math.floor(Date.now() / 1000)}`
 
-      await signer.signMessage(message)
+      await signMessageUniversal(message)
       await updateConfig({ timelockDays })
       toast.success('Time-lock confirmed!')
       nextStep()
@@ -336,7 +355,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
       return
     }
 
-    if (!signer) {
+    if (!isConnected) {
       toast.error('Wallet not connected')
       return
     }
@@ -351,7 +370,7 @@ Inactivity Period: 365 days
 Wallet: ${account}
 Timestamp: ${Math.floor(Date.now() / 1000)}`
 
-      const signature = await signer.signMessage(message)
+      const signature = await signMessageUniversal(message)
       await updateConfig({
         deadmanTimeout: 365 * 24 * 60 * 60,
         deadmanBeneficiary: beneficiaryAddress,
@@ -373,7 +392,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
 
   // Confirm jury arbitration
   const handleConfirmJury = async () => {
-    if (!signer) {
+    if (!isConnected) {
       toast.error('Wallet not connected')
       return
     }
@@ -388,7 +407,7 @@ Stake: ${juryStake} ETH
 Wallet: ${account}
 Timestamp: ${Math.floor(Date.now() / 1000)}`
 
-      await signer.signMessage(message)
+      await signMessageUniversal(message)
       await updateConfig({ juryEnabled: true, juryStake: parseFloat(juryStake) })
       toast.success('Jury arbitration enabled!')
       nextStep()
@@ -405,7 +424,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
 
   // Generate quantum backup
   const handleGenerateQuantum = async () => {
-    if (!signer) {
+    if (!isConnected) {
       toast.error('Wallet not connected')
       return
     }
@@ -419,7 +438,7 @@ I authorize generation of quantum-resistant backup keys.
 Wallet: ${account}
 Timestamp: ${Math.floor(Date.now() / 1000)}`
 
-      await signer.signMessage(message)
+      await signMessageUniversal(message)
 
       // Simulate key generation
       await new Promise(resolve => setTimeout(resolve, 1500))

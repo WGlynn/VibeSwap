@@ -1,10 +1,34 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from './useWallet'
+import { CONTRACTS, isProductionMode } from '../utils/constants'
 
-// Contract addresses (will be updated after deployment)
-const IDENTITY_ADDRESS = import.meta.env.VITE_IDENTITY_CONTRACT || '0x0000000000000000000000000000000000000000'
-const FORUM_ADDRESS = import.meta.env.VITE_FORUM_CONTRACT || '0x0000000000000000000000000000000000000000'
+// Contract addresses - use env vars with fallback to constants
+const getIdentityAddress = (chainId) => {
+  const envAddr = import.meta.env.VITE_IDENTITY_CONTRACT || import.meta.env.VITE_ETH_IDENTITY
+  if (envAddr && envAddr !== '0x0000000000000000000000000000000000000000') {
+    return envAddr
+  }
+  return CONTRACTS[chainId]?.identity || '0x0000000000000000000000000000000000000000'
+}
+
+const getForumAddress = (chainId) => {
+  const envAddr = import.meta.env.VITE_FORUM_CONTRACT
+  if (envAddr && envAddr !== '0x0000000000000000000000000000000000000000') {
+    return envAddr
+  }
+  return '0x0000000000000000000000000000000000000000' // Forum contract not yet deployed
+}
+
+// Check if dev mode is allowed (mock data)
+const isDevModeAllowed = () => {
+  return import.meta.env.VITE_PRODUCTION_MODE !== 'true'
+}
+
+// Check if contract is deployed (not zero address)
+const isContractDeployed = (address) => {
+  return address && address !== '0x0000000000000000000000000000000000000000'
+}
 
 // Simplified ABI for frontend
 const IDENTITY_ABI = [
@@ -75,13 +99,17 @@ const LEVEL_COLORS = [
 ]
 
 export function useIdentity() {
-  const { address, isConnected, signer, provider } = useWallet()
+  const { address, isConnected, signer, provider, chainId } = useWallet()
 
   const [identity, setIdentity] = useState(null)
   const [tokenId, setTokenId] = useState(null)
   const [hasIdentity, setHasIdentity] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // Get contract addresses for current chain
+  const IDENTITY_ADDRESS = getIdentityAddress(chainId)
+  const FORUM_ADDRESS = getForumAddress(chainId)
 
   // Parse identity from contract response
   const parseIdentity = (data) => {
@@ -124,16 +152,22 @@ export function useIdentity() {
         setIsLoading(true)
         setError(null)
 
-        // For demo/dev mode, use mock data
-        if (IDENTITY_ADDRESS === '0x0000000000000000000000000000000000000000') {
-          // Check localStorage for mock identity
-          const stored = localStorage.getItem(`vibeswap_identity_${address}`)
-          if (stored) {
-            const mockIdentity = JSON.parse(stored)
-            setIdentity(mockIdentity)
-            setTokenId(mockIdentity.tokenId || 1)
-            setHasIdentity(true)
+        // Check if contract is deployed
+        if (!isContractDeployed(IDENTITY_ADDRESS)) {
+          // Dev mode - use localStorage for mock identity (only if not in production)
+          if (isDevModeAllowed()) {
+            const stored = localStorage.getItem(`vibeswap_identity_${address}`)
+            if (stored) {
+              const mockIdentity = JSON.parse(stored)
+              setIdentity(mockIdentity)
+              setTokenId(mockIdentity.tokenId || 1)
+              setHasIdentity(true)
+            } else {
+              setHasIdentity(false)
+            }
           } else {
+            // Production mode but contracts not deployed - show error
+            setError('Identity contracts not yet deployed on this network')
             setHasIdentity(false)
           }
           setIsLoading(false)
@@ -161,14 +195,18 @@ export function useIdentity() {
     }
 
     loadIdentity()
-  }, [isConnected, address, provider])
+  }, [isConnected, address, provider, chainId, IDENTITY_ADDRESS])
 
   // Mint new identity
   const mintIdentity = useCallback(async (username) => {
     if (!signer || !address) throw new Error('Wallet not connected')
 
-    // Dev mode - use localStorage
-    if (IDENTITY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    // Check if contract is deployed
+    if (!isContractDeployed(IDENTITY_ADDRESS)) {
+      if (!isDevModeAllowed()) {
+        throw new Error('Identity contracts not yet deployed on this network')
+      }
+      // Dev mode - use localStorage
       // Check if username taken
       const allKeys = Object.keys(localStorage).filter(k => k.startsWith('vibeswap_identity_'))
       for (const key of allKeys) {
@@ -237,8 +275,12 @@ export function useIdentity() {
     if (!signer || !address) throw new Error('Wallet not connected')
     if (!quantumKeyRoot) throw new Error('Quantum key root required')
 
-    // Dev mode - use localStorage
-    if (IDENTITY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    // Check if contract is deployed
+    if (!isContractDeployed(IDENTITY_ADDRESS)) {
+      if (!isDevModeAllowed()) {
+        throw new Error('Identity contracts not yet deployed on this network')
+      }
+      // Dev mode - use localStorage
       // Check if username taken
       const allKeys = Object.keys(localStorage).filter(k => k.startsWith('vibeswap_identity_'))
       for (const key of allKeys) {

@@ -4,62 +4,88 @@ import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider, useDisconnect,
 import { BrowserProvider } from 'ethers'
 import toast from 'react-hot-toast'
 
-// WalletConnect Project ID
-// Get your own at https://cloud.walletconnect.com for production
-// This is a demo project ID - replace with your own for email login to work
-const projectId = '3a8170812b534d0ff9d794f19a901d64'
+// ============================================
+// PRODUCTION CONFIGURATION
+// ============================================
+// WalletConnect Project ID - get your own at https://cloud.walletconnect.com
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '3a8170812b534d0ff9d794f19a901d64'
 
-// Chain configurations
-const chains = [
+// Production mode flag - disables testnets when true
+const isProduction = import.meta.env.VITE_PRODUCTION_MODE === 'true'
+const disableTestnets = import.meta.env.VITE_DISABLE_TESTNETS === 'true'
+
+// App URL for metadata
+const appUrl = import.meta.env.VITE_APP_URL || 'https://vibeswap.io'
+
+// ============================================
+// MAINNET CHAINS
+// ============================================
+const mainnetChains = [
   {
     chainId: 1,
     name: 'Ethereum',
     currency: 'ETH',
     explorerUrl: 'https://etherscan.io',
-    rpcUrl: 'https://eth.llamarpc.com'
+    rpcUrl: import.meta.env.VITE_ETH_RPC_URL || 'https://eth.llamarpc.com'
   },
   {
     chainId: 42161,
     name: 'Arbitrum',
     currency: 'ETH',
     explorerUrl: 'https://arbiscan.io',
-    rpcUrl: 'https://arb1.arbitrum.io/rpc'
+    rpcUrl: import.meta.env.VITE_ARB_RPC_URL || 'https://arb1.arbitrum.io/rpc'
   },
   {
     chainId: 10,
     name: 'Optimism',
     currency: 'ETH',
     explorerUrl: 'https://optimistic.etherscan.io',
-    rpcUrl: 'https://mainnet.optimism.io'
+    rpcUrl: import.meta.env.VITE_OP_RPC_URL || 'https://mainnet.optimism.io'
   },
   {
     chainId: 8453,
     name: 'Base',
     currency: 'ETH',
     explorerUrl: 'https://basescan.org',
-    rpcUrl: 'https://mainnet.base.org'
+    rpcUrl: import.meta.env.VITE_BASE_RPC_URL || 'https://mainnet.base.org'
   },
   {
     chainId: 137,
     name: 'Polygon',
     currency: 'MATIC',
     explorerUrl: 'https://polygonscan.com',
-    rpcUrl: 'https://polygon-rpc.com'
+    rpcUrl: import.meta.env.VITE_POLYGON_RPC_URL || 'https://polygon-rpc.com'
   },
+]
+
+// ============================================
+// TESTNET CHAINS (disabled in production)
+// ============================================
+const testnetChains = [
   {
     chainId: 11155111,
     name: 'Sepolia',
     currency: 'ETH',
     explorerUrl: 'https://sepolia.etherscan.io',
     rpcUrl: 'https://rpc.sepolia.org'
-  }
+  },
+  {
+    chainId: 421614,
+    name: 'Arbitrum Sepolia',
+    currency: 'ETH',
+    explorerUrl: 'https://sepolia.arbiscan.io',
+    rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc'
+  },
 ]
+
+// Build chains array based on environment
+const chains = disableTestnets ? mainnetChains : [...mainnetChains, ...testnetChains]
 
 const metadata = {
   name: 'VibeSwap',
   description: 'MEV-Protected Omnichain DEX',
-  url: 'https://vibeswap.io',
-  icons: ['https://vibeswap.io/logo.png']
+  url: appUrl,
+  icons: [`${appUrl}/logo.png`]
 }
 
 // Initialize Web3Modal

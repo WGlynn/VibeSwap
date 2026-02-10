@@ -1,36 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from './useWallet'
+import { CONTRACTS, TOKENS, areContractsDeployed } from '../utils/constants'
 import VibeSwapCoreABI from '../abis/VibeSwapCore.json'
 import VibeAMMABI from '../abis/VibeAMM.json'
-
-// Contract addresses by chain ID
-const CONTRACT_ADDRESSES = {
-  // Sepolia testnet
-  11155111: {
-    vibeSwapCore: '0x0000000000000000000000000000000000000000', // Replace with actual deployment
-    vibeAMM: '0x0000000000000000000000000000000000000000',
-  },
-  // Arbitrum Sepolia
-  421614: {
-    vibeSwapCore: '0x0000000000000000000000000000000000000000',
-    vibeAMM: '0x0000000000000000000000000000000000000000',
-  },
-  // Local development
-  31337: {
-    vibeSwapCore: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    vibeAMM: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
-  },
-}
-
-// Common token addresses
-const TOKEN_ADDRESSES = {
-  11155111: {
-    WETH: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
-    USDC: '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8',
-    USDT: '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0',
-  },
-}
 
 // ERC20 ABI (minimal)
 const ERC20_ABI = [
@@ -50,12 +23,15 @@ export function useContracts() {
 
   // Get contract addresses for current chain
   const addresses = useMemo(() => {
-    return CONTRACT_ADDRESSES[chainId] || null
+    return CONTRACTS[chainId] || null
   }, [chainId])
 
   // Create contract instances
   const contracts = useMemo(() => {
     if (!provider || !addresses) return null
+
+    // Check if contracts are actually deployed (not zero address)
+    if (!areContractsDeployed(chainId)) return null
 
     const signerOrProvider = signer || provider
 
@@ -66,18 +42,17 @@ export function useContracts() {
         signerOrProvider
       ),
       vibeAMM: new ethers.Contract(
-        addresses.vibeAMM,
+        addresses.amm,
         VibeAMMABI,
         signerOrProvider
       ),
     }
-  }, [provider, signer, addresses])
+  }, [provider, signer, addresses, chainId])
 
   // Check if contracts are deployed
   const isContractsDeployed = useMemo(() => {
-    return addresses &&
-      addresses.vibeSwapCore !== '0x0000000000000000000000000000000000000000'
-  }, [addresses])
+    return areContractsDeployed(chainId)
+  }, [chainId])
 
   // Get current batch info
   const getCurrentBatch = useCallback(async () => {
@@ -379,8 +354,11 @@ export function useContracts() {
     addLiquidity,
     removeLiquidity,
 
-    // Token addresses
-    tokenAddresses: TOKEN_ADDRESSES[chainId] || {},
+    // Token addresses - convert TOKENS array to object by symbol
+    tokenAddresses: (TOKENS[chainId] || []).reduce((acc, token) => {
+      acc[token.symbol] = token.address
+      return acc
+    }, {}),
   }
 }
 

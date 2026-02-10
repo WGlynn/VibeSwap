@@ -61,11 +61,34 @@ contract DeployProduction is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // Configuration
-        owner = vm.envOr("OWNER_ADDRESS", deployer);
-        guardian = vm.envOr("GUARDIAN_ADDRESS", deployer);
-        multisig = vm.envOr("MULTISIG_ADDRESS", address(0));
-        oracleSigner = vm.envOr("ORACLE_SIGNER", deployer);
+        // Check if mainnet deployment
+        bool isMainnet = _isMainnet(block.chainid);
+
+        // Configuration - stricter requirements for mainnet
+        if (isMainnet) {
+            // Mainnet requires explicit addresses, no defaults to deployer
+            owner = vm.envOr("OWNER_ADDRESS", deployer);
+            guardian = vm.envAddress("GUARDIAN_ADDRESS"); // Required for mainnet
+            multisig = vm.envAddress("MULTISIG_ADDRESS"); // Required for mainnet
+            oracleSigner = vm.envAddress("ORACLE_SIGNER"); // Required for mainnet
+
+            require(guardian != address(0), "GUARDIAN_ADDRESS required for mainnet deployment");
+            require(multisig != address(0), "MULTISIG_ADDRESS required for mainnet deployment");
+            require(oracleSigner != address(0), "ORACLE_SIGNER required for mainnet deployment");
+            require(guardian != deployer, "GUARDIAN_ADDRESS should not be deployer on mainnet");
+
+            console.log("");
+            console.log("!!! MAINNET DEPLOYMENT !!!");
+            console.log("Double-check all addresses before broadcasting!");
+            console.log("");
+        } else {
+            // Testnet/local - allow defaults
+            owner = vm.envOr("OWNER_ADDRESS", deployer);
+            guardian = vm.envOr("GUARDIAN_ADDRESS", deployer);
+            multisig = vm.envOr("MULTISIG_ADDRESS", address(0));
+            oracleSigner = vm.envOr("ORACLE_SIGNER", deployer);
+        }
+
         lzEndpoint = _getLZEndpoint(block.chainid);
 
         // Generate deployment ID
@@ -374,6 +397,17 @@ contract DeployProduction is Script {
         console.log(string(abi.encodePacked("VIBESWAP_ROUTER=", vm.toString(router))));
         console.log(string(abi.encodePacked("TRUE_PRICE_ORACLE_ADDRESS=", vm.toString(truePriceOracle))));
         console.log(string(abi.encodePacked("STABLECOIN_REGISTRY_ADDRESS=", vm.toString(stablecoinRegistry))));
+    }
+
+    function _isMainnet(uint256 chainId) internal pure returns (bool) {
+        // Return true for production mainnets
+        return chainId == 1 ||      // Ethereum
+               chainId == 42161 ||  // Arbitrum
+               chainId == 10 ||     // Optimism
+               chainId == 137 ||    // Polygon
+               chainId == 8453 ||   // Base
+               chainId == 43114 ||  // Avalanche
+               chainId == 56;       // BSC
     }
 
     function _getLZEndpoint(uint256 chainId) internal pure returns (address) {

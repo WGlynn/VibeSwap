@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
  * @version 1.0.0
  */
 
-// Payment methods with their details
+// Payment methods with their details and support routing
 const PAYMENT_METHODS = [
   {
     id: 'venmo',
@@ -20,6 +20,12 @@ const PAYMENT_METHODS = [
     speed: 'Instant',
     limit: '$5,000/week',
     popular: true,
+    support: {
+      url: 'https://help.venmo.com',
+      phone: '1-855-812-4430',
+      hours: '24/7',
+      provider: 'Venmo Support',
+    },
   },
   {
     id: 'paypal',
@@ -30,6 +36,12 @@ const PAYMENT_METHODS = [
     speed: 'Instant',
     limit: '$10,000/week',
     popular: true,
+    support: {
+      url: 'https://www.paypal.com/us/smarthelp/contact-us',
+      phone: '1-888-221-1161',
+      hours: '24/7',
+      provider: 'PayPal Support',
+    },
   },
   {
     id: 'cashapp',
@@ -40,6 +52,12 @@ const PAYMENT_METHODS = [
     speed: 'Instant',
     limit: '$7,500/week',
     popular: true,
+    support: {
+      url: 'https://cash.app/help',
+      phone: '1-800-969-1940',
+      hours: '24/7',
+      provider: 'Cash App Support',
+    },
   },
   {
     id: 'zelle',
@@ -50,6 +68,12 @@ const PAYMENT_METHODS = [
     speed: '1-3 min',
     limit: '$2,000/day',
     popular: false,
+    support: {
+      url: 'https://www.zellepay.com/support',
+      phone: 'Contact your bank',
+      hours: '24/7 via bank',
+      provider: 'Your Bank + Zelle',
+    },
   },
   {
     id: 'applepay',
@@ -60,6 +84,12 @@ const PAYMENT_METHODS = [
     speed: 'Instant',
     limit: '$10,000/tx',
     popular: true,
+    support: {
+      url: 'https://support.apple.com/apple-pay',
+      phone: '1-800-275-2273',
+      hours: '24/7',
+      provider: 'Apple Support',
+    },
   },
   {
     id: 'googlepay',
@@ -70,6 +100,12 @@ const PAYMENT_METHODS = [
     speed: 'Instant',
     limit: '$10,000/tx',
     popular: false,
+    support: {
+      url: 'https://support.google.com/googlepay',
+      phone: '1-888-986-7944',
+      hours: '24/7',
+      provider: 'Google Pay Support',
+    },
   },
   {
     id: 'bank',
@@ -80,6 +116,12 @@ const PAYMENT_METHODS = [
     speed: '1-3 days',
     limit: '$100,000/tx',
     popular: false,
+    support: {
+      url: null,
+      phone: 'Contact your bank directly',
+      hours: 'Bank hours',
+      provider: 'Your Bank',
+    },
   },
   {
     id: 'card',
@@ -90,6 +132,12 @@ const PAYMENT_METHODS = [
     speed: 'Instant',
     limit: '$20,000/day',
     popular: false,
+    support: {
+      url: null,
+      phone: 'Contact your card issuer',
+      hours: '24/7 via card issuer',
+      provider: 'Your Card Issuer (Visa/Mastercard/Amex)',
+    },
   },
 ]
 
@@ -114,6 +162,7 @@ function BuySellPage() {
   const [paymentHandle, setPaymentHandle] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [step, setStep] = useState('amount') // 'amount', 'payment', 'confirm', 'processing', 'complete'
+  const [showSupport, setShowSupport] = useState(false)
 
   // Calculate crypto amount from fiat
   const cryptoAmount = amount && selectedCrypto
@@ -556,6 +605,25 @@ function BuySellPage() {
                     : `Sell for $${getTotal()}`
                 }
               </button>
+
+              {/* Contextual Support Link */}
+              {selectedPayment && (
+                <div className="text-center mt-3">
+                  <p className="text-xs text-black-500 mb-1">Having issues with {selectedPayment.name}?</p>
+                  {selectedPayment.support.url ? (
+                    <a
+                      href={selectedPayment.support.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-terminal-500 hover:text-terminal-400 transition-colors"
+                    >
+                      Contact {selectedPayment.support.provider} →
+                    </a>
+                  ) : (
+                    <span className="text-xs text-black-400">{selectedPayment.support.phone}</span>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -628,6 +696,25 @@ function BuySellPage() {
               >
                 Done
               </button>
+
+              {/* Support Link for completed transaction */}
+              {selectedPayment && (
+                <div className="text-center mt-4 p-3 rounded-xl bg-black-700/30">
+                  <p className="text-xs text-black-500 mb-1">Questions about your transaction?</p>
+                  {selectedPayment.support.url ? (
+                    <a
+                      href={selectedPayment.support.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-terminal-500 hover:text-terminal-400 transition-colors"
+                    >
+                      {selectedPayment.support.provider} ({selectedPayment.support.hours}) →
+                    </a>
+                  ) : (
+                    <span className="text-xs text-black-400">{selectedPayment.support.phone}</span>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -641,9 +728,15 @@ function BuySellPage() {
           </svg>
           <span className="text-xs text-black-300">Bank-level encryption</span>
         </div>
-        <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black-800 border border-black-700">
-          <span className="text-xs text-black-300">24/7 support</span>
-        </div>
+        <button
+          onClick={() => setShowSupport(true)}
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black-800 border border-black-700 hover:border-terminal-500/50 transition-colors"
+        >
+          <svg className="w-4 h-4 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <span className="text-xs text-black-300">Need help?</span>
+        </button>
       </div>
 
       {/* Crypto Select Modal */}
@@ -688,6 +781,86 @@ function BuySellPage() {
                   <span className="text-black-300">${crypto.price.toLocaleString()}</span>
                 </button>
               ))}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Support Modal - Routes to payment provider support */}
+      {showSupport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSupport(false)} />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 shadow-xl max-h-[90vh] overflow-hidden"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-black-700">
+              <h3 className="font-semibold">Get Help</h3>
+              <button
+                onClick={() => setShowSupport(false)}
+                className="p-2 rounded-lg hover:bg-black-700 transition-colors"
+              >
+                <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto allow-scroll">
+              {/* Explainer */}
+              <div className="p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/20 mb-4">
+                <p className="text-sm text-black-300">
+                  Payment support is handled directly by each provider's dedicated team. Select your payment method below for 24/7 assistance.
+                </p>
+              </div>
+
+              {/* Payment Provider Support Links */}
+              <div className="space-y-3">
+                {PAYMENT_METHODS.map((method) => (
+                  <div
+                    key={method.id}
+                    className="p-4 rounded-xl bg-black-700/50 border border-black-600"
+                  >
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-2xl">{method.icon}</span>
+                      <div>
+                        <div className="font-medium">{method.name}</div>
+                        <div className="text-xs text-black-500">{method.support.provider}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {method.support.url && (
+                        <a
+                          href={method.support.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 hover:bg-black-500 transition-colors text-sm"
+                        >
+                          <span className="text-black-300">Help Center</span>
+                          <svg className="w-4 h-4 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      )}
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm">
+                        <span className="text-black-300">Phone</span>
+                        <span className="text-black-200 font-mono text-xs">{method.support.phone}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm">
+                        <span className="text-black-300">Hours</span>
+                        <span className="text-terminal-400">{method.support.hours}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Disclaimer */}
+              <p className="text-xs text-black-500 text-center mt-4">
+                VibeSwap facilitates transactions but does not handle payment processing. All payment-related support is provided by the respective payment provider.
+              </p>
             </div>
           </motion.div>
         </div>

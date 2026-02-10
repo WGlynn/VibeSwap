@@ -326,22 +326,50 @@ input[type="number"] {
   50% { opacity: 0.7; }
 }
 
-@keyframes marquee {
+/* Marquee container */
+.marquee-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Marquee content - scrolls left */
+.marquee-content {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 25s linear infinite;
+}
+
+/* Marquee content - scrolls right */
+.marquee-content-reverse {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll-reverse 25s linear infinite;
+}
+
+@keyframes marquee-scroll {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
 
-.animate-marquee {
-  animation: marquee 30s linear infinite;
-}
-
-@keyframes marquee-reverse {
+@keyframes marquee-scroll-reverse {
   0% { transform: translateX(-50%); }
   100% { transform: translateX(0); }
 }
 
+/* Pause on hover */
+.marquee-container:hover .marquee-content,
+.marquee-container:hover .marquee-content-reverse {
+  animation-play-state: paused;
+}
+
+/* Legacy classes for backwards compatibility */
+.animate-marquee {
+  animation: marquee-scroll 30s linear infinite;
+}
+
 .animate-marquee-reverse {
-  animation: marquee-reverse 30s linear infinite;
+  animation: marquee-scroll-reverse 30s linear infinite;
 }
 
 @keyframes heartbeat {

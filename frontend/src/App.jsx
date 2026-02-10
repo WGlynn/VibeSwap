@@ -101,13 +101,23 @@ function App() {
 
   return (
     <ContributionsProvider>
-      <div className={`min-h-screen bg-black-900 ${isHomePage ? 'h-[100dvh] overflow-hidden' : ''}`}>
-        {/* Clean. Simple. Black void. */}
-        <HeaderMinimal />
-        <main className={isHomePage ? 'overflow-hidden' : ''}>
-          <AnimatedRoutes />
-        </main>
-      </div>
+      {isHomePage ? (
+        // Home page: completely fixed layout, no scroll possible
+        <div className="fixed inset-0 bg-black-900 flex flex-col">
+          <HeaderMinimal />
+          <main className="flex-1 overflow-hidden">
+            <AnimatedRoutes />
+          </main>
+        </div>
+      ) : (
+        // Other pages: normal scrolling
+        <div className="min-h-screen bg-black-900">
+          <HeaderMinimal />
+          <main>
+            <AnimatedRoutes />
+          </main>
+        </div>
+      )}
     </ContributionsProvider>
   )
 }

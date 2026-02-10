@@ -10,6 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - Frontend UI/UX improvements
 - Wallet connection flow for both external (MetaMask) and device (WebAuthn) wallets
+- Security-first design based on wallet security axioms
 
 ## Active Tasks
 - None currently in progress
@@ -22,6 +23,8 @@ This file maintains continuity between Claude Code sessions across devices.
 5. Created `useBalances` hook for balance tracking
 6. Deployed to Vercel: https://frontend-jade-five-87.vercel.app
 7. Set up auto-sync between devices (pull first, push last - no conflicts)
+8. Added Will's 2018 wallet security paper as project context
+9. Created wallet security axioms in CLAUDE.md (mandatory design principles)
 
 ## Known Issues / TODO
 - Large bundle size warning (2.8MB chunk) - consider code splitting

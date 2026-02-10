@@ -26,6 +26,57 @@ This ensures real-time sync between all sessions (desktop, mobile, any device).
 
 ---
 
+## WALLET SECURITY AXIOMS (MANDATORY DESIGN PRINCIPLES)
+
+These axioms are derived from Will's 2018 paper on wallet security fundamentals. They are **non-negotiable** and must be heavily weighted in ALL design decisions, code implementations, and documentation.
+
+See full paper: `docs/wallet-security-fundamentals-2018.md`
+
+### Core Axioms
+
+1. **"Your keys, your bitcoin. Not your keys, not your bitcoin."**
+   - Users MUST control their own private keys
+   - Never design systems that custody user keys on centralized servers
+   - VibeSwap's device wallet (WebAuthn) keeps keys in the user's Secure Element, never on our servers
+
+2. **Cold storage is king**
+   - Keys that never touch a network cannot be stolen remotely
+   - Signing should occur in isolated environments when possible
+   - Hardware wallets and Secure Elements are the gold standard
+
+3. **Web wallets are the least secure**
+   - Minimize trust in third-party servers
+   - If keys must be online, encrypt them client-side
+   - Never store private keys on servers we control
+
+4. **Centralized honeypots attract attackers**
+   - "It is more incentivizing for hackers to target centralized third party servers to steal many wallets than to target an individual's computer"
+   - Design for decentralization - no single point of compromise
+
+5. **Private keys must be encrypted and backed up**
+   - Always encrypt keys with strong passphrases
+   - Provide recovery mechanisms (but user-controlled, not custodial)
+   - Multiple backup copies in separate locations
+
+6. **Separation of concerns**
+   - Different wallets for different purposes (spending vs. storage)
+   - Hot wallet for daily use, cold storage for long-term holdings
+   - Limit exposure by limiting what's at risk
+
+7. **Offline generation is safest**
+   - Key generation should happen offline when possible
+   - Minimize network exposure during sensitive operations
+
+### Design Implications for VibeSwap
+
+- Device wallet uses Secure Element (keys never leave device)
+- No custodial key storage on our servers
+- Recovery via user-controlled mechanisms (iCloud backup with PIN encryption)
+- Encourage hardware wallet integration for large holdings
+- Transaction signing happens client-side, never server-side
+
+---
+
 ## Current Project: VibeSwap
 
 **Omnichain DEX** built on LayerZero V2 that eliminates MEV through commit-reveal batch auctions with uniform clearing prices.

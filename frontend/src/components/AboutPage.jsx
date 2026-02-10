@@ -1,10 +1,47 @@
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 
 /**
- * About page with scrolling slogans marquee
+ * About page with scrolling slogans marquee + cycling blurbs
  * Moved from the old homepage design before the Steve Jobs minimalist redesign
  */
+
+// Cycling blurbs - rotate through these with animation
+const manifestos = [
+  {
+    headline: ["no bank", "required."],
+    blurb: "just a phone and an internet connection. no credit check, no paperwork, no waiting for approval.",
+  },
+  {
+    headline: ["your money.", "your rules."],
+    blurb: "no one can freeze your account or tell you what you can buy. you're in control.",
+  },
+  {
+    headline: ["works", "everywhere."],
+    blurb: "from Lagos to Lima. if you have internet, you have access to the same financial tools as everyone else.",
+  },
+  {
+    headline: ["send money", "in seconds."],
+    blurb: "no 3-5 business days. no wire fees. send to anyone, anywhere, anytime.",
+  },
+  {
+    headline: ["beat", "inflation."],
+    blurb: "convert local currency to stable dollars. protect your savings when prices are rising.",
+  },
+  {
+    headline: ["fair prices,", "always."],
+    blurb: "everyone pays the same rate. no hidden fees, no tricks, no getting taken advantage of.",
+  },
+  {
+    headline: ["keep more", "of your money."],
+    blurb: "we protect you from hidden costs that other platforms charge. more money stays with you.",
+  },
+  {
+    headline: ["simple", "and safe."],
+    blurb: "easy enough for anyone to use. secure enough to trust with your savings.",
+  },
+]
 
 const slogans = [
   { text: "no bank required", highlight: true },
@@ -69,6 +106,20 @@ const team = [
 ]
 
 function AboutPage() {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isHovering, setIsHovering] = useState(false)
+
+  // Rotate through manifestos - slower when hovering
+  useEffect(() => {
+    const duration = isHovering ? 12000 : 6000 // 2x slower on hover
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % manifestos.length)
+    }, duration)
+    return () => clearInterval(interval)
+  }, [isHovering])
+
+  const current = manifestos[currentIndex]
+
   return (
     <div className="min-h-screen">
       {/* Scrolling Slogans Marquee */}
@@ -107,6 +158,72 @@ function AboutPage() {
                 </span>
                 <span className="mx-8 text-black-500">/</span>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Cycling Blurbs Section */}
+      <div className="py-12 md:py-16 border-b border-black-600">
+        <div className="max-w-4xl mx-auto px-4">
+          {/* Rotating Headline */}
+          <div
+            className="h-[120px] md:h-[140px] flex items-center justify-center mb-4 cursor-default"
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+          >
+            <AnimatePresence mode="wait">
+              <motion.h1
+                key={currentIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+                className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-center"
+              >
+                {current.headline.map((line, i) => (
+                  <span key={i} className="block">
+                    <span className={i === 0 ? 'text-matrix-500' : 'text-white'}>
+                      {line}
+                    </span>
+                  </span>
+                ))}
+              </motion.h1>
+            </AnimatePresence>
+          </div>
+
+          {/* Rotating Blurb */}
+          <div
+            className="relative h-[80px] md:h-[60px] mb-6"
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+          >
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={currentIndex}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                className="absolute inset-x-0 top-0 text-base md:text-lg text-black-300 max-w-2xl mx-auto leading-relaxed text-center px-4"
+              >
+                {current.blurb}
+              </motion.p>
+            </AnimatePresence>
+          </div>
+
+          {/* Progress Dots */}
+          <div className="flex items-center justify-center space-x-1.5">
+            {manifestos.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentIndex(i)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === currentIndex
+                    ? 'w-6 bg-matrix-500'
+                    : 'w-1.5 bg-black-500 hover:bg-black-400'
+                }`}
+              />
             ))}
           </div>
         </div>

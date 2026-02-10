@@ -702,33 +702,71 @@ function SwapCore() {
     isPlatformAuthenticatorAvailable().then(setDeviceWalletAvailable)
   }, [])
 
-  // Post-connection modal for first-time wallet creation
-  const [showWalletCreated, setShowWalletCreated] = useState(false)
-  const [showRecoverySetup, setShowRecoverySetup] = useState(false)
-  const [showICloudBackup, setShowICloudBackup] = useState(false)
+  // ============================================================
+  // MODAL STATE MANAGEMENT - Centralized to prevent display bugs
+  // ============================================================
+  // Rule: Only ONE modal can be shown at a time
+  // Priority: Welcome > WalletCreated > ICloudBackup > RecoverySetup
+  // ============================================================
+
+  const [modalState, setModalState] = useState({
+    welcome: true,        // Start true - assume not connected until proven otherwise
+    walletCreated: false,
+    icloudBackup: false,
+    recoverySetup: false,
+  })
 
   // Combined connection state: either WalletConnect or Device Wallet
   const isAnyWalletConnected = isConnected || deviceWallet.isConnected
   const activeAddress = account || deviceWallet.address
   const activeShortAddress = shortAddress || deviceWallet.shortAddress
 
-  // Welcome modal: show if NOT connected (persists on refresh)
-  const showWelcome = !isAnyWalletConnected
-
-  // Show "You're All Set" modal if connected but hasn't acknowledged
+  // Debug logging (only in development)
   useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SwapCore] Connection state:', {
+        isConnected,
+        deviceWalletConnected: deviceWallet.isConnected,
+        isAnyWalletConnected,
+        modalState,
+      })
+    }
+  }, [isConnected, deviceWallet.isConnected, isAnyWalletConnected, modalState])
+
+  // Master effect: Determine which modal should be shown
+  useEffect(() => {
+    // If wallet is connected, hide welcome and maybe show walletCreated
     if (isAnyWalletConnected) {
       const hasAcknowledged = localStorage.getItem('vibeswap_wallet_acknowledged')
-      if (!hasAcknowledged) {
-        setShowWalletCreated(true)
-      }
+      setModalState(prev => ({
+        ...prev,
+        welcome: false,
+        walletCreated: !hasAcknowledged && !prev.icloudBackup && !prev.recoverySetup,
+      }))
     } else {
-      setShowWalletCreated(false)
+      // No wallet connected - show welcome, hide others
+      setModalState({
+        welcome: true,
+        walletCreated: false,
+        icloudBackup: false,
+        recoverySetup: false,
+      })
     }
   }, [isAnyWalletConnected])
 
+  // Computed: which modal is currently active (only one at a time)
+  const showWelcome = modalState.welcome && !isAnyWalletConnected
+  const showWalletCreated = modalState.walletCreated && !modalState.icloudBackup && !modalState.recoverySetup
+  const showICloudBackup = modalState.icloudBackup
+  const showRecoverySetup = modalState.recoverySetup
+
+  // ============================================================
+  // MODAL HANDLERS - Update modalState to control display
+  // ============================================================
+
   const handleWelcomeClose = () => {
     // Just close it - will show again on refresh if still not connected
+    // Don't manually set welcome to false - let the useEffect handle it based on connection state
   }
 
   const handleWelcomeGetStarted = () => {
@@ -740,6 +778,7 @@ function SwapCore() {
     const result = await deviceWallet.createWallet()
     if (result) {
       toast.success('Device wallet created!')
+      // The useEffect will automatically show walletCreated modal when connection is detected
     } else if (deviceWallet.error) {
       toast.error(deviceWallet.error)
     }
@@ -748,32 +787,33 @@ function SwapCore() {
   const handleWalletCreatedClose = () => {
     // Only mark as acknowledged when they explicitly dismiss
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
-    setShowWalletCreated(false)
+    setModalState(prev => ({ ...prev, walletCreated: false }))
   }
 
   const handleSetupRecovery = () => {
     // Mark as acknowledged when they go to recovery setup
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
-    setShowWalletCreated(false)
-    setShowRecoverySetup(true)
+    setModalState(prev => ({ ...prev, walletCreated: false, recoverySetup: true }))
   }
 
   const handleSetupICloudBackup = () => {
     // Don't mark as acknowledged yet - do it after backup is complete
-    setShowWalletCreated(false)
-    setShowICloudBackup(true)
+    setModalState(prev => ({ ...prev, walletCreated: false, icloudBackup: true }))
   }
 
   const handleICloudBackupComplete = () => {
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
-    setShowICloudBackup(false)
+    setModalState(prev => ({ ...prev, icloudBackup: false }))
     toast.success('Backup saved! Your wallet is protected.')
   }
 
   const handleICloudBackupClose = () => {
     // If they skip, go back to the wallet created modal
-    setShowICloudBackup(false)
-    setShowWalletCreated(true)
+    setModalState(prev => ({ ...prev, icloudBackup: false, walletCreated: true }))
+  }
+
+  const handleRecoverySetupClose = () => {
+    setModalState(prev => ({ ...prev, recoverySetup: false }))
   }
 
   // Get device wallet data for backup
@@ -1072,7 +1112,7 @@ function SwapCore() {
       {/* Recovery Setup Modal */}
       <RecoverySetup
         isOpen={showRecoverySetup}
-        onClose={() => setShowRecoverySetup(false)}
+        onClose={handleRecoverySetupClose}
       />
     </div>
   )

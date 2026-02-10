@@ -10,13 +10,14 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "ethers": "^6.9.0",
+    "@headlessui/react": "^1.7.17",
+    "@web3modal/ethers": "^5.1.11",
+    "ethers": "^6.16.0",
+    "framer-motion": "^10.16.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
     "react-hot-toast": "^2.4.1",
-    "framer-motion": "^10.16.0",
-    "@headlessui/react": "^1.7.17"
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",

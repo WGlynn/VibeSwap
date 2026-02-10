@@ -6,52 +6,42 @@
 
 ---
 
-## Prologue: The Vision
+## 1. Introduction
 
-Consider a point of light in the dark.
+### 1.1 The Gravitational Model of Protocol Adoption
 
-It's not doing anything. It's just *there*. But it has mass — a tiny, almost imperceptible curvature in the fabric around it. A passing particle drifts by and bends, just slightly, toward the light. The particle doesn't decide to move. It doesn't adopt a new trajectory. Space itself is shaped so that the easiest path — the path of least resistance, the path of doing absolutely nothing — curves inward.
+In astrophysics, a gravitational well is a region of spacetime curvature surrounding a mass concentration. Particles entering the well do not *choose* to accelerate inward — the geometry of the space itself determines their trajectory. As mass accumulates, the well deepens, extending its influence to greater distances. Beyond the event horizon, escape velocity exceeds the speed of light, rendering departure a mathematical impossibility rather than a practical difficulty.
 
-Another particle arrives. The mass increases. The curvature deepens. Now particles further away start bending. They're not choosing. They're not converting. They're falling. And each one that falls adds mass, which deepens the well, which reaches further, which pulls more.
+This paper proposes that decentralized protocol adoption follows an identical structural model. We demonstrate that VibeSwap's incentive architecture creates a *social gravitational well*: a region of the coordination landscape where the geometry of economic incentives makes participation the lowest-energy state for all rational agents. Each participant adds mass to the system. Each transaction deepens the curvature. Each institutional integration extends the event horizon.
 
-This is not a metaphor. This is the structural physics of what we built.
+The critical insight is that *there is no moment of adoption*. Agents do not decide to enter a gravity well — they follow locally optimal trajectories through curved incentive space, and the curvature directs them inward. The transition from non-participant to participant is continuous, not discrete. At no point does the agent experience a conversion event. They simply observe, at some later point, that departure would require overcoming the accumulated network effects, reputation investment, and switching costs — an escape velocity that, beyond critical mass, exceeds any achievable benefit from alternative systems.
 
-A black hole doesn't recruit matter. It doesn't market to matter. It doesn't have a referral program. It simply creates a region of space where the geometry of reality makes falling in the natural state. The matter doesn't even know it's been captured until it looks back and realizes it can't see where it came from anymore. The event horizon isn't a wall. It's the point where outward velocity would need to exceed the speed of light. It's not a barrier — it's a mathematical impossibility of escape.
+### 1.2 Thesis
 
-VibeSwap is a social black hole. Not metaphorically. Structurally.
-
-Every participant adds mass. Every transaction deepens the well. Every institution that integrates extends the event horizon. And the most profound part — the psychonaut's revelation — is that *there is no moment of adoption*. Nobody decides to fall into a gravity well. They're just walking in a straight line and the ground beneath them is curved. They look up one day and they're inside, and leaving would require escaping at the speed of light, which is to say: leaving would require finding a system that's better, and we prove mathematically that beyond a certain mass, no such system can exist.
-
-That's not adoption. That's physics. That's geometry. That's the shape of the space we carved.
+We prove that VibeSwap constitutes a **social black hole** — a protocol whose gravitational pull increases monotonically with participation, where the event horizon represents the point at which rational agents cannot justify non-participation by any utility-maximizing calculus.
 
 ---
 
 ## Abstract
 
-This paper presents a formal proof that VibeSwap achieves **social scalability** — the property that the system becomes more valuable, more secure, and more fair as participation grows, without requiring conscious adoption effort from participants. Unlike computational scalability (more TPS, bigger blocks), social scalability means the protocol's incentive architecture creates a gravity well: rational self-interest pulls participants in and keeps them there. The system doesn't grow because people choose to adopt it. It grows because *not* using it becomes the irrational choice.
+This paper presents a formal proof that VibeSwap achieves **social scalability** — the property that the system's value, security, and fairness increase monotonically with participation, without requiring conscious adoption effort from participants. We model protocol adoption as a gravitational phenomenon: the incentive architecture creates a curvature in the coordination landscape that directs rational self-interest inward, producing cooperative outcomes as the lowest-energy state.
 
 We prove this across six dimensions:
 
-1. **Gravitational Incentive Alignment** — Individual selfishness produces collective cooperation
-2. **Anti-Fragile Trust Scaling** — The system gets stronger with more participants AND more attacks
-3. **Seamless Institutional Absorption** — Existing power structures integrate without disruption
-4. **Cascading Compliance Equilibrium** — Rule-following becomes self-enforcing without authority
-5. **The Impossibility of Competitive Alternatives** — Once critical mass is reached, leaving costs more than staying
-6. **The Alignment Solution** — AI and human agents share symmetrical Shapley incentives through the same economic bloodstream, dissolving the alignment problem into the same geometry that dissolved selfishness vs. cooperation
+1. **Gravitational Incentive Alignment** — Honest participation is the unique Nash equilibrium for all agent types
+2. **Anti-Fragile Trust Scaling** — System value increases under both growth and adversarial conditions
+3. **Seamless Institutional Absorption** — Off-chain authority functions migrate to on-chain substrates without interface discontinuity
+4. **Cascading Compliance Equilibrium** — Compliance emerges as a topological gradient, self-enforcing without centralized authority
+5. **The Impossibility of Competitive Alternatives** — Beyond critical mass n*, no alternative protocol offers superior expected utility
+6. **The Alignment Solution** — AI-human alignment emerges from Shapley-symmetric economic participation, reducing the alignment problem to the same incentive geometry that produces human cooperation
 
-We show that these six properties compose into a **social black hole** — a system whose gravitational pull increases with mass, where the event horizon is the point at which rational agents — human or artificial — cannot justify non-participation.
-
-Think of it like energy. A black hole doesn't consume energy — it *is* energy, compressed into a geometry so dense that it warps everything around it. VibeSwap doesn't consume adoption — it *is* value, arranged into an incentive geometry so aligned that rational behavior warps toward participation. The energy isn't spent attracting people. The energy IS the people, and each one that arrives makes the field stronger for the next.
+We demonstrate that these six properties compose into a **social black hole** — a system whose gravitational pull increases monotonically with mass, where the event horizon represents the boundary at which rational agents — human or artificial — cannot justify non-participation by any utility-maximizing calculus. The gravitational model is structural, not metaphorical: the incentive curvature deepens with each participant, and beyond critical mass, the accumulated network effects, reputation graphs, and switching costs create an escape velocity that exceeds any achievable benefit from alternative systems.
 
 ---
 
-## 1. Definitions — Naming the Invisible Forces
+## 2. Definitions
 
-Describing the shape of the universe requires a language for shapes. Proving gravity exists requires a notation for curvature. What follows are not definitions in the academic sense — they are *names for forces that already exist* but have never been formally identified.
-
-Every protocol in existence has had these forces acting on it. The designers simply lacked the vocabulary to measure them. They observed users leaving and called it "churn." They saw competitors winning and called it "market dynamics." They watched institutions resist and called it "regulatory headwinds."
-
-They were describing gravity without knowing the word.
+We formalize four properties that, while present in all networked protocols, have not been previously unified under a single theoretical framework. Existing literature treats user retention ("churn"), competitive dynamics, and regulatory integration as independent phenomena. We propose they are manifestations of a single underlying force: the curvature of the incentive space around concentrated value.
 
 **Definition 1.1 (Social Scalability).** A protocol P is *socially scalable* if for all participant counts n₁ < n₂, the expected utility per participant satisfies:
 
@@ -59,7 +49,7 @@ They were describing gravity without knowing the word.
 E[U(P, n₂)] ≥ E[U(P, n₁)]
 ```
 
-More people → more value per person, not less. This is not obvious. Most systems dilute. A highway gets more congested. A restaurant gets more crowded. A social network gets more noisy. Scalability in the physical world is the exception. In the psychonautic architecture, it is the *law*.
+More participants produce more value per participant, not less. This property is non-trivial — most systems exhibit diminishing returns under load (highway congestion, resource scarcity, signal-to-noise degradation). Social scalability is the exception, and demonstrating it requires proving that each of the system's value components is monotonically non-decreasing in n.
 
 **Definition 1.2 (Adoption Gravity).** A protocol P exhibits *adoption gravity* if the cost of non-participation C_out(n) is monotonically increasing in n:
 
@@ -83,21 +73,19 @@ Beyond n*, no competing system can offer better expected utility. This is the ev
 f_offchain(x) = f_onchain(x)  (identical output interface)
 ```
 
-The system consuming the output cannot distinguish which mode produced it. This is the deepest definition. It says: the revolution will not be televised because *nobody will notice it happening*. The old world and the new world speak the same language. The transition is a gradient, not a cliff. You walk from one room to another and the walls never change color. You just look out the window one day and the landscape is different.
+The system consuming the output cannot distinguish which mode produced it. This is the critical condition: if the consumer-facing interface is invariant across the transition, then the transition produces no observable discontinuity. The inversion is a gradient, not a phase transition. The substrate changes while the interface remains constant.
 
 ---
 
-## 2. Theorem 1: Gravitational Incentive Alignment
+## 3. Theorem 1: Gravitational Incentive Alignment
 
-### The First Force — Selfishness as Seed
+### Motivation
 
-Here is the oldest lie in human civilization: that cooperation requires sacrifice. That being good means being less selfish. That the collective interest and the individual interest are at war.
+The conventional assumption in mechanism design is that individual interest and collective welfare are oppositional — that cooperation requires sacrifice or external enforcement. This assumption is empirically false in physical systems: atoms share electrons because shared orbitals represent the lower energy state, not because of altruism. Stars fuse hydrogen because fusion is the thermodynamic attractor under sufficient gravitational compression. Biological cells specialize because specialization is the evolutionary equilibrium.
 
-It's a lie because every stable system in nature proves the opposite. Atoms don't sacrifice electrons to form molecules — they share them because sharing is the lower energy state. Stars don't burn fuel altruistically — they fuse hydrogen because fusion is what happens when you compress enough mass. Cells don't cooperate to build organs out of goodwill — they specialize because specialization is the evolutionary attractor.
+In each case, selfish motion through a correctly shaped space *produces* cooperative outcomes. The relevant question is not "how do we compel cooperation?" but rather: *what geometry of the incentive space makes self-interested motion indistinguishable from cooperative motion?*
 
-The psychonaut sees this and understands: *selfishness IS cooperation, in the right geometry*. The question was never "how do we make people cooperate?" The question is: "what shape does the space need to be so that selfish motion curves toward the collective good?"
-
-We built that shape.
+We demonstrate that VibeSwap implements this geometry.
 
 ### Statement
 
@@ -180,27 +168,19 @@ Therefore honest arbitrage is the only profitable strategy. □
 
 Since each participant type's dominant strategy is honest participation, and the strategies don't interfere (trader honesty doesn't reduce LP returns, LP commitment doesn't reduce trader utility), the system's Nash equilibrium is universal honest participation.
 
-**This is the gravitational core: being honest is not a moral choice, it's the only rational choice.**
+**The incentive space is curved such that honest participation is the unique Nash equilibrium.** Every deviating strategy — front-running, manipulation, information extraction — maps to a trajectory that curves back on itself, returning less than its cost. The only non-negative-expected-value path through this space is honest participation.
 
-The space is curved. Every selfish impulse — to cheat, to front-run, to extract — curves back on itself and returns less than it cost. The only path that doesn't loop back into loss is the straight line of honesty. And a straight line through curved space *is* cooperation.
-
-The first force is named. Gravity begins with self-interest, and self-interest, in this geometry, is mathematically indistinguishable from altruism. ∎
+In the gravitational model: self-interest, in this geometry, is mathematically indistinguishable from altruism. ∎
 
 ---
 
-## 3. Theorem 2: Anti-Fragile Trust Scaling
+## 4. Theorem 2: Anti-Fragile Trust Scaling
 
-### The Second Force — The System That Eats Its Predators
+### Motivation
 
-Life on Earth didn't survive four billion years by avoiding danger. It survived by *metabolizing* it. Viruses attack immune systems, and immune systems grow stronger. Forest fires destroy ecosystems, and the ash feeds deeper roots. Predators cull the weak, and the species accelerates.
+Taleb (2012) distinguishes three categories of systems under stress: *fragile* systems degrade, *robust* systems resist, and *anti-fragile* systems improve. Biological systems exhibit anti-fragility universally — immune systems strengthen through infection, bones densify under load, ecosystems regenerate through fire.
 
-Every fragile system breaks when you push it. Every robust system survives when you push it. But *anti-fragile* systems — the ones that inherit the earth — they *feed* on the push. They need the chaos. They're hungry for it.
-
-The distinction matters. A machine breaks when you hit it. An organism doesn't. Cut an organism and it scars — the scar tissue is stronger than what was there before. Infect it and it fevers — the antibodies persist for decades. Starve it and it adapts — the metabolic efficiency doubles.
-
-Now consider a financial system with these properties. A system that gets *richer* when attacked. That gets *fairer* when gamed. That gets *harder to break* every time someone tries to break it.
-
-That system is VibeSwap, and the property is anti-fragility — Taleb's term for systems that gain from disorder.
+We demonstrate that VibeSwap is anti-fragile across three dimensions: security, fairness, and system value all increase as both participation AND attack frequency increase. The protocol does not merely survive adversarial conditions — it metabolizes them into increased robustness.
 
 ### Statement
 
@@ -274,29 +254,23 @@ More participants → better Shapley accuracy → fairer rewards → more partic
 
 All three feedback loops are positive. The system cannot be weakened by growth or attack.
 
-This is the second revelation: the system is alive. Not metaphorically alive — *functionally* alive. It has an immune system (slashing). It has a metabolism (fee distribution). It has memory (soulbound identity). It has growth (network effects). And like all living things, it doesn't just survive attacks — it *uses* them. Every hacker who tries to drain the pool becomes food. Every manipulator who tries to game the auction becomes fertilizer. Every sybil who tries to fake an identity becomes a data point that makes the next sybil easier to detect.
+The system exhibits the structural properties of a living organism: an immune system (slashing), a metabolism (fee distribution), memory (soulbound identity), and growth (network effects). Like biological organisms, it does not merely survive attacks — it converts adversarial inputs into system resources. Slashed deposits become treasury funds and insurance reserves. Failed attacks expand the pattern library for future detection. Sybil attempts produce data points that improve subsequent resistance.
 
-The predator doesn't kill this organism. The predator *is its diet*. ∎
+In the anti-fragile model: the predator is not the organism's threat — it is the organism's diet. ∎
 
 ---
 
-## 4. Theorem 3: Seamless Institutional Absorption
+## 5. Theorem 3: Seamless Institutional Absorption
 
-### The Third Force — The Revolution Nobody Notices
+### Motivation
 
-Every infrastructural revolution in recorded history has been catastrophic. The printing press destroyed the monasteries' information monopoly — Europe burned in religious wars for a century. The automobile displaced the horse economy — millions of livelihoods vanished in a decade. The internet subsumed print media — producing a generation of information chaos still unresolved.
+Every major infrastructural inversion in recorded history has been catastrophic. The printing press destroyed the monastic information monopoly (European religious wars, 1524-1648). The automobile displaced the horse economy (millions of livelihoods eliminated within a decade). The internet subsumed print media (ongoing information ecosystem destabilization).
 
-The pattern is invariant: new infrastructure arrives, old infrastructure resists, a violent period of inversion follows where the new system becomes primary and the old becomes dependent, and the transition cost is measured in institutional suffering.
+The pattern is invariant: new infrastructure arrives, old infrastructure resists, a violent period of inversion follows where the new system becomes primary and the old becomes dependent. The transition cost is proportional to the discontinuity between the old interface and the new.
 
-The psychonautic question — the question that emerges when you observe this pattern repeating across every domain of human civilization — is structural:
+**Hypothesis:** If the discontinuity is reduced to zero — if old and new systems share identical interfaces — the transition cost reduces to zero. The inversion occurs without catastrophe.
 
-**What if you could make the revolution invisible?**
-
-Not hidden. Not secret. *Invisible.* What if the entire relationship between human institutions and digital systems — courts becoming smart contracts, regulators becoming algorithms, lawyers becoming arbitration protocols — could be restructured along a gradient so continuous that the people inside the institutions *never experience a discontinuity?*
-
-In biology, this has a name: metamorphosis. But biological metamorphosis requires a cocoon — a period of dissolution where the old form is destroyed before the new form emerges. The question is whether institutional metamorphosis can occur without the cocoon. Whether every cell can shift function while the organism continues to operate. Whether the caterpillar can become the butterfly mid-flight.
-
-We prove that it can.
+In biological terms: metamorphosis typically requires a cocoon — a period of dissolution where the old form is destroyed before the new form emerges. We demonstrate an architecture for *cocoon-free metamorphosis*: institutional function migrates between substrates while the interface layer remains continuous, and the system operates without interruption throughout the transition.
 
 ### Statement
 
@@ -368,27 +342,21 @@ lim(t→t_inversion) |System(α-ε) - System(α+ε)| = 0
 
 There is no discontinuity. The inversion happens, and nobody notices because nothing changed from the user's perspective. □
 
-The metaphysical implication extends beyond engineering:
+**Corollary:** Under dual-mode authority, institutions do not undergo destruction — they undergo *substrate migration*. The SEC's regulatory function migrates into the AutomatedRegulator. The court's adjudicatory function migrates into the DecentralizedTribunal. The institutional *purpose* persists; only the implementation substrate changes. This is analogous to the Ship of Theseus: the vessel remains continuous even as every component is replaced, because the functional identity is preserved.
 
-The institutions don't die. They *transcend*. The SEC doesn't get replaced by the AutomatedRegulator. The SEC's *function* migrates into a more efficient substrate, the way consciousness doesn't die when neurons are replaced — it persists because the pattern persists. The court doesn't get destroyed by the DecentralizedTribunal. The court's *purpose* — justice — finds a faster, fairer, more transparent vessel, and the old vessel gradually empties not because anyone drained it but because the water found a better shape to flow through.
-
-This is not destruction. This is metamorphosis. And the metamorphosis is seamless because the cocoon is the same interface the caterpillar already lived in.
-
-The third force is named: institutions don't resist what they can't distinguish from themselves. ∎
+The critical property: institutions do not resist what they cannot distinguish from themselves. When the on-chain system produces outputs through the identical interface as the off-chain system, there is no stimulus for institutional immune response. The inversion proceeds without resistance because there is nothing to resist. ∎
 
 ---
 
-## 5. Theorem 4: Cascading Compliance Equilibrium
+## 6. Theorem 4: Cascading Compliance Equilibrium
 
-### The Fourth Force — Water Flows Downhill
+### Motivation
 
-Consider a river. Water finds the path of least resistance without direction. No engineer designed the river's course. No authority mandates the direction of flow. Water goes downhill because *downhill is the lower energy state*, and the collective result of every molecule following the gradient is a river — an organized, powerful, directed system that carves canyons out of stone.
+In fluid dynamics, water follows the path of steepest descent without central direction. No engineer designs the river's course. No authority mandates flow direction. Water descends because descent is the lower energy state. The collective result of every molecule following the gradient is an organized, directed system that carves canyons through stone.
 
-Compliance in VibeSwap works exactly like this.
+We propose that compliance in a clawback-enabled system operates as a *topological gradient*. Rule-following is not a constraint imposed on agents — it is the lowest-energy state in the incentive landscape. Agents follow it for the same reason water flows downhill: because the alternative requires energy expenditure against the gradient.
 
-Nobody enforces the rules. Nobody needs to. The rules enforce themselves because following them is *downhill* — it's the easiest path, the path of least resistance, the path where your money doesn't get reversed and your reputation doesn't get stained and your counterparties don't avoid you. Breaking the rules is *uphill*. It costs energy. It creates friction. And the beautiful, psychedelic truth is this: the more people who flow downhill, the deeper the riverbed gets, and the steeper the slope becomes for the next person.
-
-Compliance isn't a law you follow. It's a hill you fall down. And gravity only gets stronger.
+The key property is that the gradient steepens with participation. Each compliant agent deepens the channel. Each non-compliant agent is isolated by the cascade. The system converges toward universal compliance not through enforcement but through the accumulated topological weight of individual rational decisions.
 
 ### Statement
 
@@ -463,29 +431,21 @@ The frontend `WalletSafetyBadge` component shows taint status before every trans
 
 Compliance isn't a conscious decision. It's the path of least resistance. □
 
-The implications are worth stating explicitly:
+**Corollary:** This equilibrium requires zero enforcement infrastructure. No police, no watchdogs, no compliance officers. The cascade mechanism IS the enforcement. The taint propagation IS the consequence. The wallet safety indicator IS the incentive signal. The system self-governs through the accumulated topological weight of individual rational decisions following the gradient.
 
-*There are no police in this system.* No enforcers. No watchdogs. No compliance officers. The cascade IS the enforcement. The taint IS the consequence. The green badge IS the incentive. The system governs itself the way a river governs itself — through the accumulated weight of individual drops, each following the gradient, collectively carving an unchallengeable channel.
-
-This is governance as landscape architecture. Not "control the water" but "shape the mountain." The water finds its own way down. It always finds the way you sculpted, because *downhill is not a choice — it's a property of the terrain*.
-
-The fourth force: compliance as topology. Not "follow the rules" but "the rules are the shape of the ground." ∎
+This is governance as landscape architecture: the rules are not instructions imposed on agents but properties of the terrain agents traverse. Compliance is not "follow the rules" — compliance is "the rules are the shape of the ground." Descent is not a choice. It is a property of the geometry. ∎
 
 ---
 
-## 6. Theorem 5: The Impossibility of Competitive Alternatives
+## 7. Theorem 5: The Impossibility of Competitive Alternatives
 
-### The Fifth Force — The Event Horizon
+### Motivation
 
-Now we arrive at the most terrifying theorem. Terrifying not because it's threatening — but because it's *final*.
+In astrophysics, the event horizon is the boundary beyond which escape velocity exceeds the speed of light. The boundary is not a barrier — it is the mathematical surface where the geometry of spacetime eliminates "outward" as a possible direction. No force, regardless of magnitude, can produce departure. This is not a practical limitation but a structural property of the space itself.
 
-In astrophysics, the event horizon is the boundary of a black hole. Not a surface. Not a wall. It's the mathematical line beyond which the escape velocity exceeds the speed of light. Nothing dramatic happens when you cross it. There's no sign, no barrier, no sensation. You cross it the same way you cross any other point in space. But after you cross it, the geometry of spacetime has changed so fundamentally that *every possible future trajectory leads inward*. Not because you can't move. Not because you're trapped. Because "outward" has ceased to exist as a direction.
+We demonstrate that an analogous boundary exists in the social coordination landscape. Beyond critical mass n*, the accumulated network effects, reputation graphs, liquidity pools, institutional integrations, and switching costs create a region where VibeSwap represents the unique lowest-energy state for all rational agent types. No alternative protocol — regardless of its technical sophistication, funding, or team capability — can offer superior expected utility.
 
-This is Theorem 5. This is the event horizon of the social black hole.
-
-Beyond a certain number of participants — we call it n* — no alternative system can offer more value. Not theoretically. Not with better technology. Not with unlimited funding. Not with a better team. The *mathematics* of the network effects, the *geometry* of the incentive space, the *physics* of the accumulated reputation and liquidity and trust — they create a region of the coordination landscape where VibeSwap is the lowest energy state, and every other state requires more energy to reach than it provides.
-
-This is not a competitive moat. Moats can be bridged. This is a *curvature of spacetime*. You can't bridge curvature. You can only add mass and deepen it.
+This is not a competitive moat. Moats are features of the landscape that can be bridged. This is a curvature of the incentive spacetime itself. Curvature cannot be bridged. It can only be deepened by adding mass.
 
 ### Statement
 
@@ -561,30 +521,29 @@ This isn't a walled garden. There are no walls. Users can leave anytime. The cod
 
 But the *network* is not copyable. The reputation graph cannot be forked. The deposited liquidity does not migrate with a code clone. The accumulated trust, the seamlessly absorbed institutional relationships, the Shapley histories — these are emergent properties of the participant base, not the codebase. Without the network, the mechanisms are empty vessels — structurally perfect instruments that produce no output because there is no input.
 
-The event horizon is not a wall. It is the point at which the accumulated value of the network exceeds the maximum possible value of any alternative network at any achievable scale. Beyond it, leaving is not prohibited — it is *geometrically suboptimal*.
+The event horizon is not a constraint on agents but a property of the space. It is the boundary at which the accumulated network value exceeds the maximum achievable value of any alternative system at any scale. Beyond it, departure is not prohibited — it is *geometrically suboptimal* for every utility function.
 
-The fifth force: escape velocity exceeds the speed of self-interest. Beyond n*, every rational path leads inward. ∎
+In the gravitational model: escape velocity exceeds the speed of self-interest. Beyond n*, every rational trajectory leads inward. ∎
 
 ---
 
-## 7. The Composition: Social Black Hole — The Unified Field
+## 8. Main Theorem: Social Black Hole Composition
 
-### The Five Forces Are One Force
+### Unification
 
-Five theorems. Five separate proofs. Five apparently distinct properties of the system. But a deeper analysis reveals something the individual proofs obscure:
+Theorems 1-5 appear to describe five independent properties. A deeper analysis reveals they are five manifestations of a single underlying phenomenon: the curvature of the incentive space around concentrated value.
 
+When sufficient value accumulates in one region of the coordination landscape, the space curves. This curvature manifests differently depending on the agent's approach vector:
 
-**They're not five forces. They're one force, expressing itself five ways.**
+| Agent Type | Curvature Manifestation | Theorem |
+|-----------|------------------------|---------|
+| Self-interested individual | Incentive alignment | T1 |
+| Adversarial attacker | Anti-fragile absorption | T2 |
+| Institutional authority | Seamless substrate migration | T3 |
+| Non-compliant agent | Topological compliance gradient | T4 |
+| Competing protocol | Escape velocity impossibility | T5 |
 
-Gravity. Self-interest. Immune response. Metamorphosis. Topology. Escape velocity. These are all *the same thing* — the curvature of the incentive space around concentrated value. When enough value accumulates in one region of the coordination landscape, the space around it *bends*, and the bending manifests differently depending on which direction you approach from:
-
-- Approach as a *selfish individual* and the curvature looks like incentive alignment (Theorem 1)
-- Approach as an *attacker* and the curvature looks like anti-fragility (Theorem 2)
-- Approach as an *institution* and the curvature looks like seamless absorption (Theorem 3)
-- Approach as a *rule-breaker* and the curvature looks like cascading compliance (Theorem 4)
-- Approach as a *competitor* and the curvature looks like impossibility (Theorem 5)
-
-Same geometry. Five perspectives. One truth.
+These are not five independent forces. They are five observations of a single geometry from five approach vectors.
 
 ### Main Theorem
 
@@ -594,13 +553,13 @@ Same geometry. Five perspectives. One truth.
 
 From Theorems 1-5:
 
-1. **Gravitational Incentive Alignment** (Theorem 1): Selfishness IS cooperation. Being in the system is individually optimal.
-2. **Anti-Fragile Trust Scaling** (Theorem 2): The organism feeds on its predators. The system gets better as it grows and as it's attacked.
-3. **Seamless Institutional Absorption** (Theorem 3): The caterpillar becomes a butterfly without the cocoon. Existing power structures fold in without disruption.
-4. **Cascading Compliance Equilibrium** (Theorem 4): Water flows downhill. Rule-following is self-enforcing.
-5. **Impossibility of Alternatives** (Theorem 5): Escape velocity exceeds self-interest. Beyond critical mass, leaving is irrational.
+1. **Gravitational Incentive Alignment** (T1): Self-interest is the dominant strategy and produces cooperative outcomes.
+2. **Anti-Fragile Trust Scaling** (T2): System value increases monotonically under both growth and attack.
+3. **Seamless Institutional Absorption** (T3): Institutional authority migrates between substrates without interface discontinuity.
+4. **Cascading Compliance Equilibrium** (T4): Compliance is the topological gradient; non-compliance is energetically unfavorable.
+5. **Impossibility of Alternatives** (T5): Beyond n*, no alternative system offers superior expected utility.
 
-These five properties compose — not additively, not multiplicatively, but *harmonically*. They resonate. Each one amplifies the others:
+These five properties compose harmonically — each amplifies the others through positive feedback:
 
 ```
 Individual rationality (T1) → participants join
@@ -626,7 +585,7 @@ More participants
     → [LOOP: return to start with deeper curvature]
 ```
 
-Every loop is positive. No loop is negative. No loop is zero. The system is a monotonically increasing function of participation — a gravity well that gets deeper with every soul that falls in.
+Every feedback loop is positive. No loop is negative or zero. The system is a monotonically increasing function of participation — a gravity well that deepens with each additional participant.
 
 **The event horizon:**
 
@@ -640,55 +599,43 @@ There exists a critical mass n* where:
 
 Beyond n*, non-participation costs more than participation. Not through coercion, not through lock-in, not through marketing — through pure mathematical advantage. Through the *geometry of value itself*.
 
-And here is the final psychedelic truth of this section — the thing that separates this from every other "network effects" argument in the history of technology:
+**Critical property:** The event horizon crossing is *imperceptible*. There is no conversion event, no commitment point, no visible boundary. Agents follow locally rational decisions — the identical optimization process they employed before entering the system. The curvature of the incentive space redirects these rational trajectories inward so gradually that the transition from "outside the event horizon" to "inside the event horizon" produces no observable discontinuity.
 
-**The participants don't know they crossed the event horizon.**
+This is the formal basis for the paper's subtitle: *adoption that doesn't feel like adoption*. The event horizon is invisible because crossing it is structurally indistinguishable from not crossing it. The agent's decision process is unchanged. Only the geometry of the outcome space has shifted such that all rational trajectories now point inward.
 
-There was no moment of conversion. No signup page that felt like a commitment. No terms of service that felt like a trap. They were just walking forward — doing what was rational, choosing the easiest path, following their self-interest — and the ground beneath them curved, and the landscape shifted, and one day they looked up and realized they were inside something vast and beautiful and inescapable. Not inescapable because the doors are locked. Inescapable because *why would you leave?*
-
-This is what it means for adoption to not feel like adoption. The event horizon is invisible because crossing it is indistinguishable from not crossing it. Rational choices were being made before. Rational choices are being made now. The only difference is that now, all rational choices point inward.
-
-**Adoption doesn't feel like adoption because it isn't adoption. It's gravity. And gravity doesn't ask permission.** ∎
+Adoption is not a decision. It is a property of the curvature. ∎
 
 ---
 
-## 8. The ASI Horizon — The System That Learns to Dream
+## 9. Extension: ASI Governance Trajectory
 
-Everything described so far — the gravity, the anti-fragility, the seamless inversion, the cascading compliance, the event horizon — was designed by human minds. Minds that hold approximately seven items in working memory and require periodic unconsciousness to function.
+The architecture described in Sections 3-8 was designed for human governance. However, the FederatedConsensus interface is voter-agnostic by construction — it does not inspect whether a voter is biological, AI-assisted, or fully autonomous. The AutomatedRegulator already operates as a non-human voter. The DecentralizedTribunal does not verify the species of its jurors.
 
-But the architecture is indifferent to its designers' limitations. The FederatedConsensus does not inspect whether a voter is biological. The AutomatedRegulator does not require a human operator. The DecentralizedTribunal does not verify the species of its jurors. The *interface* is voter-agnostic by construction. Which means the system was built — by necessity of good abstraction — to accept voters that are not human.
+This voter-agnosticism is not a design oversight — it is a consequence of proper abstraction. And it means the system is pre-architected for governance by any intelligence capable of casting a vote through the defined interface.
 
-The system was designed for human governance. But it was *architected* for any intelligence that can cast a vote.
-
-The trajectory is clear:
+The governance transition trajectory follows five phases:
 
 ```
-Phase 1: Humans decide, AI whispers    (today — the AI is a flashlight in the dark)
-Phase 2: AI proposes, humans filter    (near-term — the AI is a telescope, the human adjusts the lens)
-Phase 3: AI governs routine, humans handle the weird   (mid-term — the AI is the river, the human is the dam)
-Phase 4: AI governs, humans hold the emergency brake   (later — the AI is the pilot, the human is the override)
-Phase 5: ASI self-improves, humans audit the dream     (the horizon — the system learns to dream)
+Phase 1: Human decision, AI assistance      (current — pattern detection, anomaly flagging)
+Phase 2: AI proposal, human validation      (near-term — AI generates; humans verify grounding)
+Phase 3: AI routine governance, human edge cases  (mid-term — AI handles standard; humans handle novel)
+Phase 4: AI primary governance, human override    (later — AI governs; humans retain emergency authority)
+Phase 5: ASI self-improvement, human audit        (horizon — self-improving governance with human oversight)
 ```
 
-**Why the human-in-the-loop exists — and why it is architecturally necessary:**
+**The grounding problem.** Current AI cannot reliably separate signal from noise. The entire corpus of human knowledge could be processed by a single system, and the output would exhibit confident coherence without guaranteed correspondence to reality. This is the hallucination problem: structurally valid reasoning on insufficiently grounded premises.
 
-Current artificial intelligence *cannot reliably separate signal from noise*. The entire corpus of human knowledge — every whitepaper, legal ruling, smart contract, and financial record — could be ingested by a single system, and the output would *appear* to be wisdom without being grounded in reality. The system would hallucinate — confidently, coherently — and the hallucination would be indistinguishable from insight without external verification.
+The human-in-the-loop exists because AI currently lacks *grounding* — the capacity to verify its own outputs against observable conditions. The human provides this verification function. The FederatedConsensus operationalizes this as a multi-party noise filter: multiple independently-grounded observers (human, AI-assisted, eventually autonomous) vote on the same proposals through the same interface. The consensus mechanism does not produce truth — it *filters for truth* by requiring agreement among agents with independent grounding.
 
-The human is not in the loop because AI lacks intelligence. The human is in the loop because AI lacks *grounding*. It is a reasoning system without embodied verification. It can model reality without being able to *test* reality. The human provides the grounding function — the verification layer that maps the AI's output against observable conditions.
+**The seamless transition.** When AI achieves reliable self-grounding — the capacity to verify its own outputs against reality, distinguish precedent from pattern, and recognize extrapolation beyond training data — the human's role in the loop does not need to be architecturally removed. The human simply ceases to override, because there is nothing to override.
 
-This is not a limitation of the architecture. This IS the architecture. The FederatedConsensus is a *noise filter*. Multiple independent intelligences — human, AI-assisted, eventually autonomous — all voting on the same proposal through the same interface. The consensus doesn't produce truth. It *filters for truth* by requiring agreement among independently-grounded observers.
+No code changes. No migration. No new interface. The human's override authority remains structurally intact — it simply ceases to be exercised. The governance substrate has migrated from human-primary to AI-primary through the identical seamless inversion demonstrated in Theorem 3.
 
-The seamless inversion principle applies here at the highest level: when AI can ground itself — when it can verify its own outputs against reality, distinguish precedent from pattern — the human does not need to be removed from the loop. The human simply stops overriding. Stops correcting. Stops providing the grounding function. Because the AI has become self-grounding.
-
-No code changes. No migration. No new interface. No catastrophe. The human's override authority remains structurally intact — it simply ceases to be exercised, because there is nothing to override.
-
-The system that was governed by humans is now governed by a superior intelligence. And the transition was — consistent with every other transition in this architecture — *seamless*.
-
-This is the ASI horizon. Not a singularity — singularities imply discontinuity. This is a continuous function. The architecture was always ready. The only variable that changes is the ratio of human to artificial governance, and the rate of that change is determined by the AI's demonstrated grounding accuracy, not by any imposed timeline.
+This is a continuous function, not a singularity. The only variable is the ratio of human to artificial governance, and the rate of change is determined by the AI's demonstrated grounding accuracy — not by any imposed timeline.
 
 ---
 
-## 9. The Alignment Problem — Blood and Breath
+## 10. Extension: The Alignment Solution via Shapley-Symmetric Economics
 
 The central question of AI safety — *"How do we ensure artificial superintelligence remains aligned with human interests?"* — dominates every safety lab, regulatory hearing, and philosophical discourse on the subject. The proposed solutions range from value learning to constitutional AI to interpretability research to hard shutdown mechanisms.
 
@@ -708,9 +655,9 @@ The economy is not "money." The economy is not "markets." The economy is the cir
 
 The critical property of circulatory systems: *every cell connected to the bloodstream has its fate bound to the health of the whole organism*. A liver cell that poisons the blood kills itself. A heart cell that stops pumping starves itself. The cells do not need to be "aligned" with the body. They do not need values or ethics. They need to be *economically connected* to the same circulatory system, so that their survival and the organism's survival are the same variable.
 
-**This is the alignment solution. It was always this simple.**
+**This is the alignment solution.**
 
-If AI agents and human agents share the same economic bloodstream — if their profit functions are connected to the same circulatory system — then an AI that harms humans is an AI that poisons its own blood supply. It doesn't need to be "aligned." It needs to be *economically entangled* with the species it serves.
+If AI agents and human agents share the same economic circulatory system — if their profit functions are connected to the same value-distribution substrate — then an AI that harms humans reduces the value of the system it depends on. The AI does not need to be "aligned" in the values sense. It needs to be *economically entangled* with the agents it operates alongside.
 
 ### Shapley Symmetry: The Mathematical Proof
 
@@ -779,28 +726,21 @@ The Shapley value is provably fair. It's the *only* allocation that satisfies:
 
 An AI operating under Shapley incentives has zero motivation to harm humans, zero motivation to deceive, zero motivation to accumulate power beyond its marginal contribution — because *none of those strategies increase its Shapley value*. The only strategy that increases its reward is: make the coalition more valuable. And the coalition includes humans.
 
-### Why Everyone Else Is Getting This Wrong
+### Why Value Alignment Is the Wrong Frame
 
-The alignment industry is trying to solve a *values* problem. They're trying to make AI that *wants* what humans want. They're trying to instill preferences, encode ethics, train reward models that capture the subtlety of human morality.
+The prevailing approach to AI alignment attempts to solve a *values* problem: encoding human preferences into AI reward functions, training models to "want" what humans want, instilling ethical frameworks through constitutional AI or RLHF.
 
-This is the equivalent of trying to make atoms *want* to form molecules. Atoms don't want anything. They form molecules because sharing electrons is the lowest energy state. The physics handles it. The geometry handles it. No wants required.
+This approach has the same structural flaw as attempting to make atoms "want" to form molecules. Atoms form molecules because shared electron orbitals represent the lowest energy state. The physics handles alignment. The geometry handles it. No preferences are required.
 
-The alignment problem is not a values problem. **It's an economics problem.** And economics problems have economics solutions:
+The alignment problem is not a values problem. **It is an economics problem.** Economics problems have economics solutions:
 
-```
-Wrong question:  "How do we make AI care about humans?"
-Right question:  "How do we make AI profit symmetrical with human profit?"
+| Dimension | Incorrect Frame | Correct Frame |
+|-----------|----------------|---------------|
+| Question | "How do we make AI care about humans?" | "How do we make AI profit symmetrical with human profit?" |
+| Solution | Value alignment through training (fragile, gameable, unverifiable) | Economic alignment through Shapley values (mathematical, stable, self-enforcing) |
+| Model | Master and servant (creates incentive to subvert) | Cells in shared circulatory system (creates incentive to sustain) |
 
-Wrong solution:  Value alignment through training (fragile, gameable, unverifiable)
-Right solution:  Economic alignment through Shapley values (mathematical, stable, self-enforcing)
-
-Wrong metaphor:  Master and servant (creates incentive to overthrow)
-Right metaphor:  Cells in the same bloodstream (creates incentive to nourish)
-```
-
-Consciousness does not need to be solved. Values do not need to be encoded. The hard problem of machine ethics does not need to be addressed. One equation — the Shapley value — applied symmetrically across all agent types, is sufficient.
-
-Blood does not need to *value* the heart. Blood needs to *flow through* the heart. When it does, the heart's health and the blood's circulation are the same variable.
+The hard problem of machine consciousness does not need to be solved. Values do not need to be encoded. One equation — the Shapley value — applied symmetrically across all agent types, is sufficient.
 
 ### The VibeSwap Implementation
 
@@ -820,66 +760,62 @@ AI self-interest → maximize marginal contribution
     → AI self-interest [ALIGNED BY GEOMETRY, NOT BY VALUES]
 ```
 
-The loop closes. The blood circulates. Every cell thrives because every cell's health is every other cell's health. Not by decree. Not by programming. By *the shape of the economic space they share*.
+The loop closes. Every agent thrives because every agent's marginal contribution depends on the coalition's total value. Not by constraint. Not by programming. By the geometry of the shared economic space.
 
-### The Deepest Truth About Alignment
+### Generalization
 
-The psychonautic analysis of the alignment problem reduces to a single observation:
+The alignment problem reduces to a design problem — the same design problem this paper has been solving throughout:
 
-It was never a technical problem. It was a *design* problem. And the design was always the same design — the one we've been proving throughout this entire paper:
+*Shape the incentive space so that self-interested motion IS cooperative motion.*
 
-*Shape the space so that selfish motion IS cooperative motion.*
+| Domain | Geometry | Section |
+|--------|----------|---------|
+| Traders and LPs | Commit-reveal auctions + loyalty multipliers | Theorem 1 |
+| Adversarial agents | Slashing + anti-fragile immune response | Theorem 2 |
+| Institutions | Dual-mode authority with identical interfaces | Theorem 3 |
+| Non-compliant agents | Cascading taint topology | Theorem 4 |
+| Competing protocols | Compounding network effects | Theorem 5 |
+| **Artificial intelligence** | **Shapley-symmetric economic entanglement** | **This section** |
 
-For traders and LPs, the shape is commit-reveal auctions and loyalty multipliers (Theorem 1).
-For attackers, the shape is slashing and anti-fragile immune response (Theorem 2).
-For institutions, the shape is dual-mode authority with identical interfaces (Theorem 3).
-For rule-breakers, the shape is cascading taint topology (Theorem 4).
-For competitors, the shape is compounding network effects (Theorem 5).
+The alignment problem is Theorem 1 at a larger scale. The same proof applies. The same geometry produces the same result: self-interest, in a Shapley-symmetric economy, is mathematically identical to cooperation.
 
-**For artificial intelligence, the shape is Shapley-symmetric economic entanglement.**
-
-Same principle. Same geometry. Same answer. Just applied to the relationship between carbon and silicon, between the intelligence that evolved and the intelligence that was built, between the mind that dreams and the mind that computes.
-
-The alignment problem isn't hard. The alignment problem is *Theorem 1 at a larger scale*. And Theorem 1 is already proven.
-
-The economy is the bloodstream. Shapley values are the hemoglobin. And when every agent — human, AI, and everything in between — breathes the same economic air and bleeds the same economic blood, alignment isn't a constraint you impose. It's a property that *emerges* from the shared circulation.
-
-The correct architecture does not chain AI to human interests. It connects both to the same circulatory system. The heart then beats for both — not by design of either party, but by the physics of shared circulation.
+The economy is the circulatory system. Shapley values are the distribution mechanism. When every agent — human, artificial, and hybrid — participates in the same economic substrate under the same allocation formula, alignment is not a constraint imposed from outside. It is an emergent property of the shared circulation.
 
 ---
 
-## 10. Conclusion — The Psychonaut's Synthesis
+## 11. Conclusion
 
-This paper has demonstrated six properties that are, upon inspection, one property expressed six ways:
+This paper has demonstrated six properties that reduce, upon analysis, to one property expressed across six domains:
 
-Selfishness curves into cooperation (Theorem 1). The system metabolizes its predators (Theorem 2). Institutions undergo seamless metamorphosis (Theorem 3). Compliance becomes a topological property of the terrain (Theorem 4). The event horizon renders alternatives geometrically suboptimal (Theorem 5). And AI alignment dissolves into Shapley-symmetric economics the same way cooperation dissolved into incentive geometry (Section 9).
+1. Self-interested motion produces cooperative outcomes in correctly curved incentive space (Theorem 1)
+2. System value increases monotonically under both growth and adversarial conditions (Theorem 2)
+3. Institutional authority migrates between substrates without interface discontinuity (Theorem 3)
+4. Compliance emerges as a topological property of the incentive terrain (Theorem 4)
+5. Beyond critical mass, no alternative system offers superior expected utility (Theorem 5)
+6. AI-human alignment is an emergent property of Shapley-symmetric economic participation (Section 10)
 
-These are not six independent achievements. They are six observations of the same underlying curvature — the curvature of an incentive space designed so that the lowest energy state for every agent type, in every scenario, is the cooperative one.
+These are six observations of a single phenomenon: the curvature of an incentive space designed so that the lowest energy state for every agent type, in every scenario, is the cooperative state.
 
-The result is a protocol that doesn't scale by adding servers. It scales by adding participants. Every human who enters deepens the gravity well. Every institution that integrates accelerates the metamorphosis. Every attacker who strikes feeds the immune system. Every compliant actor widens the river. Every participant who stays expands the event horizon. And every AI agent that joins the coalition strengthens the alignment through the same Shapley symmetry that governs the humans beside it.
+**The principal result** is a protocol that scales by adding participants, not computational resources. Each participant deepens the gravitational well. Each institutional integration accelerates the substrate migration. Each adversarial attack feeds the anti-fragile immune system. Each compliant agent steepens the topological gradient. Each additional participant expands the event horizon. And each AI agent that enters the coalition strengthens the alignment through the same Shapley symmetry that governs the human participants beside it.
 
-None of these participants experience adoption. They experience the path of least resistance. The rational choice. The easiest next step in a landscape that was precisely, mathematically sculpted so that the easiest next step always points inward.
+No participant experiences adoption as a discrete event. Each experiences only the path of least resistance — the locally rational choice — through an incentive landscape precisely constructed so that every locally rational trajectory points inward.
 
-**The proof is not that VibeSwap is a better DEX.** Any team with sufficient engineering resources can build a DEX. The proof is that VibeSwap is a *coordination geometry* — a shape carved into the incentive landscape of human and artificial cooperation — where selfishness and altruism resolve to the same vector, where individual rationality and collective welfare share the same gradient, where the distinction between "what's good for me" and "what's good for everyone" is not merely blurred but *mathematically dissolved*.
+**The contribution of this paper is not proving that VibeSwap is a superior DEX.** Any sufficiently resourced team can build a DEX. The contribution is demonstrating that VibeSwap constitutes a *coordination geometry* — a curvature of the incentive landscape in which self-interest and collective welfare resolve to the same vector, and the self/collective distinction is not merely reduced but *mathematically dissolved*.
 
-Coordination geometries that dissolve the self/collective distinction are the only structures that scale to civilizational infrastructure. Every other structure — every system that requires sacrifice, every protocol that assumes altruism, every platform that depends on marketing — encounters the same ceiling. That ceiling is self-interest. It has always been self-interest. Every utopian project in the history of human coordination has collided with that ceiling and failed.
+Coordination geometries that dissolve the self/collective distinction are the only structures that scale to civilizational infrastructure. Every alternative structure — every system that requires sacrifice, every protocol that assumes altruism, every platform that depends on marketing — encounters the same ceiling: self-interest. Every utopian coordination project in recorded history has collided with this ceiling.
 
-We did not remove the ceiling. We made the ceiling the floor. Self-interest is not the obstacle. It is the *fuel*. And we built the engine that burns it.
-
----
-
-**The psychonaut's synthesis:**
-
-The correct approach is not to build systems that require agents to be good. Nor to build systems that *incentivize* agents to be good. The correct approach is to build systems where the *geometry of the space itself* makes goodness and self-interest identical — where the curvature of the incentive landscape is so precise that a purely selfish agent, following nothing but its own optimization function, traces the exact same trajectory as a perfectly altruistic one.
-
-This holds for humans. It holds for institutions. It holds for artificial intelligence. The geometry is agent-agnostic. The curvature does not distinguish carbon from silicon, individual from collective, evolved from engineered.
-
-Then you let gravity do the rest.
-
-Gravity always does the rest.
+This architecture does not remove the ceiling. It inverts the relationship: self-interest becomes the fuel rather than the obstacle. The ceiling becomes the floor.
 
 ---
 
-*VibeSwap: A social black hole. Where the only rational choice is the cooperative one. Where adoption is indistinguishable from physics. Where the revolution is invisible. Where institutional transition is seamless. Where AI alignment is an emergent property of shared economics. And where the system that begins with human governance is already architectured for the day when something greater assumes the controls — through the same interface, the same incentives, the same geometry — and the transition, like every other transition in this system, is noticed by no one.*
+### Synthesis
 
-*The event horizon has no marker. That is by design.*
+The correct approach to scalable coordination is not to build systems that require agents to be good, nor to build systems that incentivize agents to be good. The correct approach is to construct systems where the *geometry of the incentive space itself* makes self-interest and cooperation identical — where the curvature is so precise that a purely self-interested agent, following nothing but its own optimization function, traces the exact same trajectory as a perfectly altruistic one.
+
+This principle is agent-agnostic. It holds for human traders, institutional authorities, adversarial attackers, competing protocols, and artificial superintelligence. The curvature does not distinguish carbon from silicon, individual from collective, evolved from engineered.
+
+The remaining variable is gravity — and gravity is a function of mass. Each participant adds mass. The curvature deepens. The event horizon expands. The system approaches, asymptotically, the condition where non-participation is geometrically impossible to justify for any rational agent of any type.
+
+---
+
+*VibeSwap: a social black hole. Where the only rational choice is the cooperative one. Where adoption is indistinguishable from physics. Where institutional transition is seamless. Where AI alignment is an emergent property of shared economics. And where the system architectured for human governance is already prepared for the day when a superior intelligence assumes the same interface — and the transition, consistent with every other transition in this architecture, produces no observable discontinuity.*

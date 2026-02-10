@@ -55,7 +55,7 @@ function PoolPage() {
         </div>
         <button
           onClick={() => setShowAddLiquidity(true)}
-          className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all"
+          className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold border border-matrix-500 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -163,7 +163,7 @@ function PoolPage() {
             <p className="text-dark-400 mb-4">Deposit to start earning passive income</p>
             <button
               onClick={() => setShowAddLiquidity(true)}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all"
+              className="px-5 py-2.5 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold border border-matrix-500 transition-colors"
             >
               Start Earning
             </button>
@@ -304,7 +304,7 @@ function AddLiquidityModal({ pool, onClose }) {
           <button
             onClick={handleAddLiquidity}
             disabled={!amount0 || !amount1 || isLoading}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold border border-matrix-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {!isConnected ? 'Get Started' : isLoading ? 'Depositing...' : 'Deposit & Start Earning'}
           </button>

@@ -56,7 +56,7 @@ function RewardsPage() {
           </p>
           <button
             onClick={connect}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all"
+            className="px-6 py-3 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-semibold transition-all"
           >
             Get Started
           </button>
@@ -391,7 +391,7 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
           <button
             onClick={onClaim}
             disabled={isClaiming || shapleyRewards.pendingClaim === 0}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-medium text-sm transition-all disabled:opacity-50"
+            className="px-4 py-2 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-medium text-sm transition-all disabled:opacity-50"
           >
             {isClaiming ? 'Claiming...' : `Claim $${shapleyRewards.pendingClaim.toFixed(2)}`}
           </button>
@@ -483,7 +483,7 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
             <button
               onClick={onClaim}
               disabled={isClaiming}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-medium text-sm transition-all disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-medium text-sm transition-all disabled:opacity-50"
             >
               {isClaiming ? 'Claiming...' : `Claim $${ilProtection.claimableAmount.toFixed(2)}`}
             </button>
@@ -645,7 +645,7 @@ function LoyaltyTab({ loyalty }) {
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${loyalty.tierProgress}%` }}
-                className="h-full bg-gradient-to-r from-vibe-500 to-purple-500"
+                className="h-full bg-matrix-500"
               />
             </div>
             <div className="text-xs text-void-500 mt-2">

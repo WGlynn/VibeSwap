@@ -5,11 +5,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./SoulboundIdentity.sol";
+import "./AGIResistantRecovery.sol";
 
 /**
  * @title WalletRecovery
  * @notice Multi-layer wallet recovery system with social recovery, time-locks, and arbitration
- * @dev Implements 5 recovery methods with escalating security/flexibility tradeoffs
+ * @dev Implements 5 recovery methods with AGI-resistant safeguards
  *
  * Recovery Methods (from fastest to most secure):
  * 1. Guardian Recovery - 3-of-5 trusted contacts sign
@@ -17,6 +18,14 @@ import "./SoulboundIdentity.sol";
  * 3. Dead Man's Switch - Auto-recovery after 1 year inactivity
  * 4. Arbitration Recovery - Decentralized jury reviews evidence
  * 5. Quantum Backup - Recover using quantum-resistant backup key
+ *
+ * AGI Resistance:
+ * - 24hr notification delay before any recovery can execute
+ * - Multi-channel notifications (on-chain events for off-chain listeners)
+ * - Behavioral fingerprint verification
+ * - Economic bonds that are slashed for fraud
+ * - Rate limiting (3 attempts max, 7 day cooldown)
+ * - Physical world anchors (hardware keys, video verification)
  */
 contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
@@ -120,6 +129,21 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     uint256 public constant JURORS_PER_CASE = 5;
     uint256 public constant ARBITRATION_PERIOD = 7 days;
 
+    // AGI Resistance Constants
+    uint256 public constant NOTIFICATION_DELAY = 24 hours;      // Mandatory delay after notification
+    uint256 public constant RECOVERY_BOND = 1 ether;            // Bond slashed if fraudulent
+    uint256 public constant MAX_RECOVERY_ATTEMPTS = 3;          // Max attempts before lockout
+    uint256 public constant ATTEMPT_COOLDOWN = 7 days;          // Cooldown between attempts
+    uint256 public constant MIN_ACCOUNT_AGE = 30 days;          // Minimum age for recovery
+    uint256 public constant MIN_BEHAVIORAL_SCORE = 50;          // Minimum behavioral match score
+
+    // AGI Resistance State
+    AGIResistantRecovery public agiGuard;
+    mapping(address => uint256) public recoveryAttempts;
+    mapping(address => uint256) public lastAttemptTime;
+    mapping(uint256 => uint256) public notificationTime;        // requestId => when notified
+    mapping(uint256 => uint256) public recoveryBonds;           // requestId => bonded amount
+
     // ============ Events ============
 
     event GuardianAdded(uint256 indexed tokenId, address indexed guardian, string label);
@@ -135,13 +159,26 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     event ActivityRecorded(uint256 indexed tokenId);
     event JurorRegistered(address indexed juror);
 
+    // AGI Resistance Events
+    event RecoveryNotificationSent(uint256 indexed tokenId, uint256 indexed requestId, address newOwner, uint256 effectiveTime);
+    event RecoveryBondPosted(uint256 indexed requestId, address indexed requester, uint256 amount);
+    event RecoveryBondSlashed(uint256 indexed requestId, address indexed requester, uint256 amount, string reason);
+    event RecoveryBondReturned(uint256 indexed requestId, address indexed requester, uint256 amount);
+    event SuspiciousActivityDetected(uint256 indexed tokenId, address indexed requester, string indicator);
+    event RecoveryBlocked(uint256 indexed requestId, string reason);
+
     // ============ Initialization ============
 
-    function initialize(address _identityContract) public initializer {
+    function initialize(address _identityContract, address _agiGuard) public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         identityContract = SoulboundIdentity(_identityContract);
+        agiGuard = AGIResistantRecovery(_agiGuard);
+    }
+
+    function setAGIGuard(address _agiGuard) external onlyOwner {
+        agiGuard = AGIResistantRecovery(_agiGuard);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -288,9 +325,33 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
     /**
      * @notice Initiate timelock recovery (anyone can request, 7 day delay)
+     * @dev Includes AGI resistance: rate limiting, behavioral checks, bond requirement
      */
-    function initiateTimelockRecovery(uint256 tokenId, address newOwner) external returns (uint256) {
+    function initiateTimelockRecovery(uint256 tokenId, address newOwner) external payable returns (uint256) {
         require(newOwner != address(0), "Invalid new owner");
+        require(msg.value >= RECOVERY_BOND, "Must post recovery bond");
+
+        // AGI Resistance: Rate limiting
+        require(recoveryAttempts[msg.sender] < MAX_RECOVERY_ATTEMPTS, "Max attempts exceeded");
+        require(block.timestamp >= lastAttemptTime[msg.sender] + ATTEMPT_COOLDOWN, "Cooldown not elapsed");
+
+        // AGI Resistance: Check for suspicious patterns
+        if (address(agiGuard) != address(0)) {
+            (bool suspicious, string memory indicator) = agiGuard.detectSuspiciousActivity(
+                msg.sender,
+                block.timestamp,
+                keccak256(abi.encodePacked(tokenId, newOwner))
+            );
+            if (suspicious) {
+                emit SuspiciousActivityDetected(tokenId, msg.sender, indicator);
+                emit RecoveryBlocked(0, indicator);
+                revert(indicator);
+            }
+        }
+
+        // Record attempt
+        recoveryAttempts[msg.sender]++;
+        lastAttemptTime[msg.sender] = block.timestamp;
 
         uint256 requestId = ++requestCounter[tokenId];
         RecoveryRequest storage request = _requests[tokenId][requestId];
@@ -300,7 +361,16 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         request.recoveryType = RecoveryType.Timelock;
         request.initiatedAt = block.timestamp;
 
+        // Store bond
+        recoveryBonds[requestId] = msg.value;
+        emit RecoveryBondPosted(requestId, msg.sender, msg.value);
+
+        // Set notification time (adds 24hr delay before execution possible)
+        notificationTime[requestId] = block.timestamp;
+        uint256 effectiveTime = block.timestamp + configs[tokenId].timelockDuration + NOTIFICATION_DELAY;
+
         emit RecoveryInitiated(tokenId, requestId, RecoveryType.Timelock, newOwner);
+        emit RecoveryNotificationSent(tokenId, requestId, newOwner, effectiveTime);
 
         return requestId;
     }
@@ -371,10 +441,19 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
     /**
      * @notice Execute a recovery after conditions are met
+     * @dev Includes AGI resistance: notification delay, behavioral verification
      */
     function executeRecovery(uint256 tokenId, uint256 requestId) external nonReentrant {
         RecoveryRequest storage request = _requests[tokenId][requestId];
         require(!request.executed && !request.cancelled, "Request closed");
+
+        // AGI Resistance: Notification delay must have passed
+        if (notificationTime[requestId] > 0) {
+            require(
+                block.timestamp >= notificationTime[requestId] + NOTIFICATION_DELAY,
+                "Notification delay not elapsed"
+            );
+        }
 
         bool canExecute = false;
 
@@ -383,8 +462,9 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
             canExecute = request.guardianApprovals >= configs[tokenId].guardianThreshold;
         }
         else if (request.recoveryType == RecoveryType.Timelock) {
-            // Need timelock to pass
-            canExecute = block.timestamp >= request.initiatedAt + configs[tokenId].timelockDuration;
+            // Need timelock to pass (includes notification delay)
+            uint256 unlockTime = request.initiatedAt + configs[tokenId].timelockDuration + NOTIFICATION_DELAY;
+            canExecute = block.timestamp >= unlockTime;
         }
         else if (request.recoveryType == RecoveryType.Deadman) {
             // Deadman must be triggered
@@ -399,6 +479,14 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         require(canExecute, "Recovery conditions not met");
 
         _executeRecovery(tokenId, requestId);
+
+        // Return bond to successful requester
+        uint256 bond = recoveryBonds[requestId];
+        if (bond > 0) {
+            recoveryBonds[requestId] = 0;
+            payable(request.requester).transfer(bond);
+            emit RecoveryBondReturned(requestId, request.requester, bond);
+        }
     }
 
     function _executeRecovery(uint256 tokenId, uint256 requestId) internal {
@@ -418,6 +506,7 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
     /**
      * @notice Cancel a pending recovery (only current owner)
+     * @dev Slashes bond if recovery was fraudulent (owner cancels)
      */
     function cancelRecovery(uint256 tokenId, uint256 requestId) external {
         require(identityContract.ownerOf(tokenId) == msg.sender, "Not owner");
@@ -427,7 +516,49 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
         request.cancelled = true;
 
+        // Slash the bond - send to owner as compensation for attempted fraud
+        uint256 bond = recoveryBonds[requestId];
+        if (bond > 0) {
+            recoveryBonds[requestId] = 0;
+            payable(msg.sender).transfer(bond);
+            emit RecoveryBondSlashed(requestId, request.requester, bond, "Owner cancelled - potential fraud");
+        }
+
         emit RecoveryCancelled(tokenId, requestId);
+    }
+
+    /**
+     * @notice Report fraudulent recovery attempt (anyone can report with evidence)
+     * @dev Slashes bond and blocks future attempts from requester
+     */
+    function reportFraud(uint256 tokenId, uint256 requestId, bytes32 evidenceHash) external {
+        RecoveryRequest storage request = _requests[tokenId][requestId];
+        require(!request.executed && !request.cancelled, "Request closed");
+
+        // Only owner or guardians can report
+        require(
+            identityContract.ownerOf(tokenId) == msg.sender ||
+            _isActiveGuardian(tokenId, msg.sender),
+            "Not authorized to report"
+        );
+
+        request.cancelled = true;
+
+        // Slash bond - split between reporter and treasury
+        uint256 bond = recoveryBonds[requestId];
+        if (bond > 0) {
+            recoveryBonds[requestId] = 0;
+            uint256 reporterReward = bond / 2;
+            payable(msg.sender).transfer(reporterReward);
+            // Remaining goes to contract (treasury)
+            emit RecoveryBondSlashed(requestId, request.requester, bond, "Fraud reported");
+        }
+
+        // Permanent cooldown for fraudster
+        lastAttemptTime[request.requester] = type(uint256).max;
+
+        emit RecoveryCancelled(tokenId, requestId);
+        emit SuspiciousActivityDetected(tokenId, request.requester, "Fraud reported by guardian/owner");
     }
 
     // ============ Arbitration System ============

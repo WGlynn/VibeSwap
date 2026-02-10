@@ -329,6 +329,65 @@ Your crypto. Your people. Your safety net.`,
     isKeyInsight: true,
     isFounding: true,
   },
+  // ============================================
+  // Bill & Faraday1 Collaboration
+  // Topic: Mechanism Insulation (Fee/Governance Separation)
+  // 50/50 Shapley credit - Bill requested, Faraday1 explained
+  // ============================================
+  {
+    id: 'contrib-017',
+    author: 'Bill',
+    type: 'feedback',
+    title: 'Why Not a Legal Pool from Exchange Fees?',
+    content: `Asked an important question: why don't we add a pool to sustain lawyers from exchange fees?
+
+This question forced the articulation of a critical design principle that wasn't explicitly documented.
+
+The question itself revealed a gap in our documentation - we hadn't explained WHY fees and governance rewards must be separate. Sometimes the best contributions are the questions that force clarity.`,
+    tags: ['mechanism-design', 'governance', 'fees', 'game-theory', 'question'],
+    timestamp: Date.now() - 3600000 * 2, // 2 hours ago
+    upvotes: 34,
+    replies: 1,
+    implemented: true,
+    rewardPoints: 250, // 50% of 500 total
+    isKeyInsight: true,
+    threadId: 'thread-002',
+    threadOrder: 1,
+  },
+  {
+    id: 'contrib-018',
+    author: 'Faraday1',
+    type: 'context',
+    title: 'Mechanism Insulation: Why Fees and Governance Must Be Separate',
+    content: `Responding to Bill's question about a legal pool from fees, articulated a core design principle:
+
+**The Insulation Principle:**
+- Exchange fees → 100% to LPs (capital providers)
+- Token rewards → Governance/Arbitration (protocol stewards)
+
+**Why they must NOT mix:**
+
+1. **Conflict of Interest** - If arbitrators are paid from fees, they're incentivized to favor high-volume traders
+
+2. **Capture Attack** - Become LP + arbitrator = pay yourself with others' money
+
+3. **Liquidity Death Spiral** - Legal costs spike → fees diverted → LP yields drop → LPs leave → less liquidity → death spiral
+
+4. **Fee Manipulation** - Control fees = control governance via wash trading
+
+**TL;DR:** Fees reward capital. Tokens reward stewards. Mixing creates circular incentives where dispute judges profit from disputes. That's regulatory capture, not decentralized justice.
+
+Added to docs as "Mechanism Design" section with PDF/Word exports.`,
+    tags: ['mechanism-design', 'governance', 'fees', 'game-theory', 'insulation', 'documentation'],
+    timestamp: Date.now() - 3600000, // 1 hour ago
+    upvotes: 47,
+    replies: 3,
+    implemented: true,
+    rewardPoints: 250, // 50% of 500 total
+    isKeyInsight: true,
+    threadId: 'thread-002',
+    threadOrder: 2,
+  },
   {
     id: 'contrib-006',
     author: 'Faraday1',

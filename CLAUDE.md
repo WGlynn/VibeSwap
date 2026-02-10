@@ -2,20 +2,25 @@
 
 ## AUTO-SYNC INSTRUCTIONS (MANDATORY)
 
-**On session start**: Read `.claude/SESSION_STATE.md` for context from previous sessions.
+**At START of each response**:
+```bash
+git pull origin master
+```
+Then read `.claude/SESSION_STATE.md` for latest context.
 
-**At the END of each response** (after completing the user's request):
+**At END of each response** (after completing the user's request):
 1. Update `.claude/SESSION_STATE.md` if anything meaningful changed
 2. Commit all changes with descriptive message
 3. Push to BOTH remotes: `git push origin master && git push stealth master`
 
-**Sync once per prompt->response cycle**, not after every internal step.
+**Pull first, push last = no conflicts ever.**
 
 Example:
-1. User: "Fix the login bug and update the header"
-2. Claude fixes bug, updates header (multiple tool calls)
-3. At the END of response: update SESSION_STATE.md, commit, push
-4. Done - one sync per response
+1. User: "Fix the login bug"
+2. `git pull origin master` (get latest)
+3. Fix bug (multiple tool calls)
+4. Update SESSION_STATE.md, commit, push to both remotes
+5. Done
 
 This ensures real-time sync between all sessions (desktop, mobile, any device).
 

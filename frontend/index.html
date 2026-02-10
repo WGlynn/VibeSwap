@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Build: v1770764327704 -->
+<!-- Build: v1770764685181 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -115,19 +115,68 @@
     </script>
     <div id="root"></div>
     <script>
-      // Catch and display fatal JavaScript errors
+      // ============ PREVENTION MEASURES ============
+
+      // 1. Unregister stale service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          registrations.forEach(function(registration) {
+            registration.unregister();
+            console.log('[VibeSwap] Cleared stale service worker');
+          });
+        });
+      }
+
+      // 2. Clear old caches
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          names.forEach(function(name) {
+            caches.delete(name);
+            console.log('[VibeSwap] Cleared cache:', name);
+          });
+        });
+      }
+
+      // 3. Display error helper
+      function showError(title, detail) {
+        var root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = '<div style="color:#ff4444;font-family:\'JetBrains Mono\',monospace;padding:40px;text-align:center;max-width:600px;margin:0 auto;">' +
+            '<h2 style="color:#00ff41;margin-bottom:20px;">' + title + '</h2>' +
+            '<p style="color:#888;margin:20px 0;">' + detail + '</p>' +
+            '<button onclick="location.reload(true)" style="background:#00ff41;color:#000;border:none;padding:12px 24px;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;margin-top:20px;">Reload</button>' +
+            '<p style="color:#555;font-size:12px;margin-top:30px;">Or try: Ctrl+Shift+R (hard refresh)</p>' +
+            '</div>';
+        }
+      }
+
+      // 4. Catch JavaScript errors
       window.onerror = function(msg, url, line, col, error) {
         var root = document.getElementById('root');
         if (root && !root.hasChildNodes()) {
-          root.innerHTML = '<div style="color:#ff4444;font-family:monospace;padding:40px;text-align:center;">' +
-            '<h2>Failed to load</h2>' +
-            '<p style="color:#888;margin:20px 0;">Try hard refresh: Ctrl+Shift+R</p>' +
-            '<pre style="text-align:left;background:#111;padding:20px;border-radius:8px;overflow:auto;max-width:600px;margin:0 auto;">' +
-            msg + '\n' + url + ':' + line +
-            '</pre></div>';
+          showError('JavaScript Error', msg + '<br><span style="color:#555;font-size:12px;">' + url + ':' + line + '</span>');
         }
         return false;
       };
+
+      // 5. Catch unhandled promise rejections
+      window.onunhandledrejection = function(event) {
+        var root = document.getElementById('root');
+        if (root && !root.hasChildNodes()) {
+          showError('Load Error', event.reason ? event.reason.message || String(event.reason) : 'Unknown error');
+        }
+      };
+
+      // 6. Loading timeout - if app doesn't render in 15s, show error
+      window.__vibeswapLoaded = false;
+      setTimeout(function() {
+        if (!window.__vibeswapLoaded) {
+          var root = document.getElementById('root');
+          if (root && !root.hasChildNodes()) {
+            showError('Loading Timeout', 'The app is taking too long to load.<br>This may be a network issue.');
+          }
+        }
+      }, 15000);
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>

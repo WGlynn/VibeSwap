@@ -57,10 +57,86 @@ export default {
           800: '#080808',
           900: '#000000',
         },
+        // Legacy dark-* (maps to black-*)
+        dark: {
+          200: '#707070',
+          300: '#505050',
+          400: '#353535',
+          500: '#252525',
+          600: '#181818',
+          700: '#0d0d0d',
+          800: '#080808',
+          900: '#000000',
+        },
+        // Legacy vibe-* (maps to matrix-*)
+        vibe: {
+          300: '#4dff94',
+          400: '#1aff76',
+          500: '#00ff41',
+          600: '#00cc34',
+          700: '#009927',
+        },
+        // Legacy cyber-* (maps to terminal-*)
+        cyber: {
+          400: '#1ae0ff',
+          500: '#00d4ff',
+          600: '#00a8cc',
+        },
+        // Legacy glow-* (maps to matrix-*)
+        glow: {
+          400: '#1aff76',
+          500: '#00ff41',
+          600: '#00cc34',
+        },
         // Success/warning/error
         success: '#00ff41',
         warning: '#ffaa00',
         error: '#ff3366',
+        // Standard colors for compatibility
+        green: {
+          400: '#4ade80',
+          500: '#22c55e',
+          600: '#16a34a',
+        },
+        red: {
+          400: '#f87171',
+          500: '#ef4444',
+          600: '#dc2626',
+        },
+        yellow: {
+          400: '#facc15',
+          500: '#eab308',
+        },
+        purple: {
+          400: '#c084fc',
+          500: '#a855f7',
+          600: '#9333ea',
+        },
+        blue: {
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+        },
+        cyan: {
+          400: '#22d3ee',
+          500: '#06b6d4',
+        },
+        orange: {
+          400: '#fb923c',
+          500: '#f97316',
+        },
+        amber: {
+          400: '#fbbf24',
+          500: '#f59e0b',
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
+        },
+        gray: {
+          300: '#d1d5db',
+          400: '#9ca3af',
+        },
       },
       fontFamily: {
         sans: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],

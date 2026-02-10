@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Build: v1770724136436 -->
+<!-- Build: v1770724457527 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -9,12 +9,19 @@
     <meta name="theme-color" content="#000000" />
     <title>VibeSwap | MEV-Protected Trading</title>
 
+    <!-- iOS Native App Feel -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VibeSwap" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+
     <!-- Preconnect for faster font loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <!-- Fonts - Space Grotesk for body, Orbitron for display, JetBrains Mono for numbers -->
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Open Graph -->
     <meta property="og:title" content="VibeSwap - MEV-Protected DEX" />
@@ -22,12 +29,29 @@
     <meta property="og:type" content="website" />
 
     <style>
-      /* Prevent flash of unstyled content */
-      html {
+      /* NUCLEAR OPTION: Kill ALL scrolling on iOS Safari */
+      html, body {
+        position: fixed;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        height: -webkit-fill-available;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: none;
+        touch-action: none;
         background: #000000;
       }
 
-      /* Initial loading state */
+      #root {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+      }
+
+      /* Loading spinner */
       #root:empty::after {
         content: '';
         position: fixed;
@@ -46,8 +70,24 @@
         to { transform: rotate(360deg); }
       }
     </style>
+
+    <!-- IMMEDIATE scroll prevention - runs before React -->
+    <script>
+      document.addEventListener('touchmove', function(e) {
+        if (!e.target.closest('.allow-scroll')) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      document.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+
+      // Prevent pull-to-refresh
+      document.body.style.overscrollBehavior = 'none';
+    </script>
   </head>
-  <body class="bg-void-950 text-white antialiased">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -1,22 +1,29 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { ethers } from 'ethers'
-import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 
 /**
- * Device Wallet Hook
+ * Device Wallet Hook with React Context
  * Creates and manages a wallet secured by the device's Secure Element via WebAuthn/Passkeys
+ *
+ * IMPORTANT: Uses React Context so all components share the same state.
+ * When one component calls createWallet(), all other components see the update.
  *
  * How it works:
  * 1. Uses WebAuthn to create a passkey (stored in Secure Element)
  * 2. The passkey credential ID is used to derive an Ethereum private key
  * 3. Biometric auth (Face ID, Touch ID) required to sign transactions
  *
- * @version 1.0.0
+ * @version 2.0.0 - Now uses React Context for shared state
  */
 
 const STORAGE_KEY = 'vibeswap_device_wallet'
 const APP_NAME = 'VibeSwap'
 const RP_ID = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+
+// ============================================
+// CONTEXT
+// ============================================
+const DeviceWalletContext = createContext(null)
 
 // Check if WebAuthn is supported
 export const isWebAuthnSupported = () => {
@@ -112,7 +119,10 @@ const base64ToArrayBuffer = (base64) => {
   return bytes.buffer
 }
 
-export function useDeviceWallet() {
+// ============================================
+// PROVIDER COMPONENT
+// ============================================
+export function DeviceWalletProvider({ children }) {
   const [isSupported, setIsSupported] = useState(false)
   const [isAvailable, setIsAvailable] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
@@ -135,8 +145,8 @@ export function useDeviceWallet() {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         try {
-          const { address } = JSON.parse(stored)
-          setAddress(address)
+          const { address: storedAddress } = JSON.parse(stored)
+          setAddress(storedAddress)
           setIsConnected(true)
         } catch (e) {
           console.error('Failed to parse stored wallet:', e)
@@ -189,6 +199,7 @@ export function useDeviceWallet() {
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(walletData))
 
+      // Update state - this will propagate to ALL components using this context
       setAddress(wallet.address)
       setIsConnected(true)
       setIsLoading(false)
@@ -283,7 +294,7 @@ export function useDeviceWallet() {
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : null
 
-  return {
+  const value = {
     // State
     isSupported,
     isAvailable,
@@ -300,6 +311,23 @@ export function useDeviceWallet() {
     signTransaction,
     disconnect,
   }
+
+  return (
+    <DeviceWalletContext.Provider value={value}>
+      {children}
+    </DeviceWalletContext.Provider>
+  )
+}
+
+// ============================================
+// HOOK
+// ============================================
+export function useDeviceWallet() {
+  const context = useContext(DeviceWalletContext)
+  if (!context) {
+    throw new Error('useDeviceWallet must be used within a DeviceWalletProvider')
+  }
+  return context
 }
 
 export default useDeviceWallet

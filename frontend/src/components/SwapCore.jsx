@@ -785,7 +785,14 @@ function SwapCore() {
     const result = await deviceWallet.createWallet()
     if (result) {
       toast.success('Device wallet created!')
-      // The useEffect will automatically show walletCreated modal when connection is detected
+      // Explicitly show the walletCreated modal (belt-and-suspenders with useEffect)
+      // This ensures the modal shows even if there's a race condition with state updates
+      setModalState({
+        welcome: false,
+        walletCreated: true,
+        icloudBackup: false,
+        recoverySetup: false,
+      })
     } else if (deviceWallet.error) {
       toast.error(deviceWallet.error)
     }

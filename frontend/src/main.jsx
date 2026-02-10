@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { WalletProvider } from './hooks/useWallet'
+import { DeviceWalletProvider } from './hooks/useDeviceWallet'
 import { BalanceProvider } from './hooks/useBalances'
 import { VaultProvider } from './hooks/useVault'
 import { BatchProvider } from './hooks/useBatchState'
@@ -18,12 +19,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <WalletProvider>
-        <BalanceProvider>
-          <VaultProvider>
-            <BatchProvider>
-            <IncentivesProvider>
-              <TransactionsProvider>
-                <App />
+        <DeviceWalletProvider>
+          <BalanceProvider>
+            <VaultProvider>
+              <BatchProvider>
+                <IncentivesProvider>
+                  <TransactionsProvider>
+                    <App />
         <Toaster
           position="bottom-right"
           toastOptions={{
@@ -46,11 +48,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             },
           }}
         />
-              </TransactionsProvider>
-            </IncentivesProvider>
-            </BatchProvider>
-          </VaultProvider>
-        </BalanceProvider>
+                  </TransactionsProvider>
+                </IncentivesProvider>
+              </BatchProvider>
+            </VaultProvider>
+          </BalanceProvider>
+        </DeviceWalletProvider>
       </WalletProvider>
     </BrowserRouter>
   </React.StrictMode>,

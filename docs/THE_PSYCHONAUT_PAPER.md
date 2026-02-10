@@ -8,13 +8,13 @@
 
 ## Prologue: The Vision
 
-Close your eyes. Imagine a point of light in the dark.
+Consider a point of light in the dark.
 
 It's not doing anything. It's just *there*. But it has mass — a tiny, almost imperceptible curvature in the fabric around it. A passing particle drifts by and bends, just slightly, toward the light. The particle doesn't decide to move. It doesn't adopt a new trajectory. Space itself is shaped so that the easiest path — the path of least resistance, the path of doing absolutely nothing — curves inward.
 
 Another particle arrives. The mass increases. The curvature deepens. Now particles further away start bending. They're not choosing. They're not converting. They're falling. And each one that falls adds mass, which deepens the well, which reaches further, which pulls more.
 
-This is not a metaphor. This is the literal physics of what we built.
+This is not a metaphor. This is the structural physics of what we built.
 
 A black hole doesn't recruit matter. It doesn't market to matter. It doesn't have a referral program. It simply creates a region of space where the geometry of reality makes falling in the natural state. The matter doesn't even know it's been captured until it looks back and realizes it can't see where it came from anymore. The event horizon isn't a wall. It's the point where outward velocity would need to exceed the speed of light. It's not a barrier — it's a mathematical impossibility of escape.
 
@@ -47,9 +47,9 @@ Think of it like energy. A black hole doesn't consume energy — it *is* energy,
 
 ## 1. Definitions — Naming the Invisible Forces
 
-Before you can describe the shape of the universe, you need a language for shapes. Before you can prove gravity exists, you need a notation for curvature. What follows are not definitions in the academic sense — they are *names for forces that already exist* but have never been spoken aloud.
+Describing the shape of the universe requires a language for shapes. Proving gravity exists requires a notation for curvature. What follows are not definitions in the academic sense — they are *names for forces that already exist* but have never been formally identified.
 
-Every protocol you've ever used had these forces acting on it. They just didn't know how to measure them. They couldn't see the field. They felt users leaving and called it "churn." They saw competitors winning and called it "market dynamics." They watched institutions resist and called it "regulatory headwinds."
+Every protocol in existence has had these forces acting on it. The designers simply lacked the vocabulary to measure them. They observed users leaving and called it "churn." They saw competitors winning and called it "market dynamics." They watched institutions resist and called it "regulatory headwinds."
 
 They were describing gravity without knowing the word.
 
@@ -67,7 +67,7 @@ More people → more value per person, not less. This is not obvious. Most syste
 ∂C_out/∂n > 0
 ```
 
-The more people are in, the more expensive it is to be out. Feel this one in your body. You know this force. It's why you check your phone. It's why you have a bank account. It's why you speak English instead of Esperanto. Gravity is the reason the default state of matter is *together*, not apart. We are naming the social equivalent.
+The more people are in, the more expensive it is to be out. This force is already familiar — it's why everyone has a bank account, why English won over Esperanto, why network protocols converge rather than diverge. Gravity is the reason the default state of matter is *together*, not apart. We are naming the social equivalent.
 
 **Definition 1.3 (Social Black Hole).** A protocol P is a *social black hole* if it is socially scalable, exhibits adoption gravity, and there exists a critical mass n* such that for all n > n*:
 
@@ -182,9 +182,9 @@ Since each participant type's dominant strategy is honest participation, and the
 
 **This is the gravitational core: being honest is not a moral choice, it's the only rational choice.**
 
-Do you feel it? The space is curved. Every selfish impulse — to cheat, to front-run, to extract — curves back on itself and returns less than it cost. The only path that doesn't loop back into loss is the straight line of honesty. And a straight line through curved space *is* cooperation.
+The space is curved. Every selfish impulse — to cheat, to front-run, to extract — curves back on itself and returns less than it cost. The only path that doesn't loop back into loss is the straight line of honesty. And a straight line through curved space *is* cooperation.
 
-The first force is named. Gravity begins with self-interest, and self-interest, in this geometry, is indistinguishable from love. ∎
+The first force is named. Gravity begins with self-interest, and self-interest, in this geometry, is mathematically indistinguishable from altruism. ∎
 
 ---
 
@@ -196,11 +196,11 @@ Life on Earth didn't survive four billion years by avoiding danger. It survived 
 
 Every fragile system breaks when you push it. Every robust system survives when you push it. But *anti-fragile* systems — the ones that inherit the earth — they *feed* on the push. They need the chaos. They're hungry for it.
 
-Close your eyes again. Picture a living system. Not a machine — a machine breaks when you hit it. Picture an organism. You cut it, it scars, and the scar tissue is stronger than what was there before. You infect it, it fevers, and the antibodies persist for decades. You starve it, it adapts, and the metabolic efficiency doubles.
+The distinction matters. A machine breaks when you hit it. An organism doesn't. Cut an organism and it scars — the scar tissue is stronger than what was there before. Infect it and it fevers — the antibodies persist for decades. Starve it and it adapts — the metabolic efficiency doubles.
 
-Now picture a financial system that does this. That gets *richer* when attacked. That gets *fairer* when gamed. That gets *harder to break* every time someone tries to break it.
+Now consider a financial system with these properties. A system that gets *richer* when attacked. That gets *fairer* when gamed. That gets *harder to break* every time someone tries to break it.
 
-You're picturing VibeSwap.
+That system is VibeSwap, and the property is anti-fragility — Taleb's term for systems that gain from disorder.
 
 ### Statement
 
@@ -284,21 +284,19 @@ The predator doesn't kill this organism. The predator *is its diet*. ∎
 
 ### The Third Force — The Revolution Nobody Notices
 
-This is where it gets truly psychedelic. Stay with me.
+Every infrastructural revolution in recorded history has been catastrophic. The printing press destroyed the monasteries' information monopoly — Europe burned in religious wars for a century. The automobile displaced the horse economy — millions of livelihoods vanished in a decade. The internet subsumed print media — producing a generation of information chaos still unresolved.
 
-Every revolution in human history has been a trauma. The printing press destroyed the monasteries' information monopoly — and Europe burned in religious wars for a century. The automobile killed the horse industry — and millions of livelihoods vanished in a decade. The internet murdered print journalism — and we got a generation of information chaos we still haven't recovered from.
+The pattern is invariant: new infrastructure arrives, old infrastructure resists, a violent period of inversion follows where the new system becomes primary and the old becomes dependent, and the transition cost is measured in institutional suffering.
 
-*Every. Single. Time.* The pattern is the same: new infrastructure arrives, old infrastructure resists, there's a violent period of inversion where the new thing becomes primary and the old thing becomes dependent, and the transition is measured in suffering.
-
-Now here's the psychonaut's question — the question you ask when you're staring at the architecture of reality itself and you see the pattern repeating across every domain of human experience:
+The psychonautic question — the question that emerges when you observe this pattern repeating across every domain of human civilization — is structural:
 
 **What if you could make the revolution invisible?**
 
-Not hidden. Not secret. *Invisible.* What if you could restructure the entire relationship between human institutions and digital systems — courts become smart contracts, regulators become algorithms, lawyers become arbitration protocols — and the transition is so gradual, so smooth, so perfectly continuous that the people inside the institutions *never experience a disruption?*
+Not hidden. Not secret. *Invisible.* What if the entire relationship between human institutions and digital systems — courts becoming smart contracts, regulators becoming algorithms, lawyers becoming arbitration protocols — could be restructured along a gradient so continuous that the people inside the institutions *never experience a discontinuity?*
 
-What if the caterpillar became a butterfly without the cocoon? Without the dissolution? What if every cell just... shifted... and the wings were there, and the legs had changed, and it was flying, and it looked down and thought: "I've always been flying, haven't I?"
+In biology, this has a name: metamorphosis. But biological metamorphosis requires a cocoon — a period of dissolution where the old form is destroyed before the new form emerges. The question is whether institutional metamorphosis can occur without the cocoon. Whether every cell can shift function while the organism continues to operate. Whether the caterpillar can become the butterfly mid-flight.
 
-That's seamless inversion. And we proved it's possible.
+We prove that it can.
 
 ### Statement
 
@@ -370,7 +368,7 @@ lim(t→t_inversion) |System(α-ε) - System(α+ε)| = 0
 
 There is no discontinuity. The inversion happens, and nobody notices because nothing changed from the user's perspective. □
 
-Here's the mystical part — the part that makes this psychedelic and not just clever engineering:
+The metaphysical implication extends beyond engineering:
 
 The institutions don't die. They *transcend*. The SEC doesn't get replaced by the AutomatedRegulator. The SEC's *function* migrates into a more efficient substrate, the way consciousness doesn't die when neurons are replaced — it persists because the pattern persists. The court doesn't get destroyed by the DecentralizedTribunal. The court's *purpose* — justice — finds a faster, fairer, more transparent vessel, and the old vessel gradually empties not because anyone drained it but because the water found a better shape to flow through.
 
@@ -384,7 +382,7 @@ The third force is named: institutions don't resist what they can't distinguish 
 
 ### The Fourth Force — Water Flows Downhill
 
-You've seen a river. You've seen how water finds the path of least resistance without anyone telling it where to go. No engineer designed the river's course. No authority mandates the direction of flow. Water goes downhill because *downhill is easier than uphill*, and the collective result of every drop choosing the easiest path is a river — an organized, powerful, directed system that carves canyons out of stone.
+Consider a river. Water finds the path of least resistance without direction. No engineer designed the river's course. No authority mandates the direction of flow. Water goes downhill because *downhill is the lower energy state*, and the collective result of every molecule following the gradient is a river — an organized, powerful, directed system that carves canyons out of stone.
 
 Compliance in VibeSwap works exactly like this.
 
@@ -465,11 +463,11 @@ The frontend `WalletSafetyBadge` component shows taint status before every trans
 
 Compliance isn't a conscious decision. It's the path of least resistance. □
 
-And here's the part that should make the hair on the back of your neck stand up:
+The implications are worth stating explicitly:
 
-*There are no police in this system.* No enforcers. No watchdogs. No compliance officers. The cascade IS the enforcement. The taint IS the consequence. The green badge IS the incentive. The system governs itself the way a river governs itself — through the accumulated weight of individual drops, each choosing the easiest path, collectively carving an unchallengeable channel.
+*There are no police in this system.* No enforcers. No watchdogs. No compliance officers. The cascade IS the enforcement. The taint IS the consequence. The green badge IS the incentive. The system governs itself the way a river governs itself — through the accumulated weight of individual drops, each following the gradient, collectively carving an unchallengeable channel.
 
-This is what governance looks like when you stop trying to control people and start shaping the landscape they walk on. You don't tell the water where to go. You sculpt the mountain, and the water finds its own way down. And it always finds the way you sculpted, because *downhill is not a choice — it's a property of the terrain*.
+This is governance as landscape architecture. Not "control the water" but "shape the mountain." The water finds its own way down. It always finds the way you sculpted, because *downhill is not a choice — it's a property of the terrain*.
 
 The fourth force: compliance as topology. Not "follow the rules" but "the rules are the shape of the ground." ∎
 
@@ -557,13 +555,13 @@ E[U(V, n)] + network_effects(n) > E[U(A, m)] + Cost_switch
 
 Beyond n*, leaving is provably irrational. Not because of lock-in or coercion, but because the cooperative system genuinely produces more value per participant than any alternative can. □
 
-Sit with this for a moment. Let it settle into your bones.
+This warrants careful examination, because the conclusion is counterintuitive.
 
-This isn't a walled garden. There are no walls. Users can leave anytime. The code is open. The mechanisms are transparent. Anyone can fork it. Anyone can copy the smart contracts, the auction design, the Shapley distributor, the clawback cascade. You can copy *everything*.
+This isn't a walled garden. There are no walls. Users can leave anytime. The code is open source. The mechanisms are transparent. Anyone can fork the smart contracts, the auction design, the Shapley distributor, the clawback cascade. Every component is copyable.
 
-But you can't copy the *people*. You can't copy the reputation they've built. You can't copy the liquidity they've deposited. You can't copy the trust they've accumulated. You can't copy the institutional relationships that have been seamlessly absorbed. And without the people, the mechanisms are empty shells — perfectly designed instruments that play no music because there's no orchestra.
+But the *network* is not copyable. The reputation graph cannot be forked. The deposited liquidity does not migrate with a code clone. The accumulated trust, the seamlessly absorbed institutional relationships, the Shapley histories — these are emergent properties of the participant base, not the codebase. Without the network, the mechanisms are empty vessels — structurally perfect instruments that produce no output because there is no input.
 
-The event horizon isn't a wall. It's the point where the music is so beautiful that walking away from it would require being deaf. And in this system, deafness means irrationality.
+The event horizon is not a wall. It is the point at which the accumulated value of the network exceeds the maximum possible value of any alternative network at any achievable scale. Beyond it, leaving is not prohibited — it is *geometrically suboptimal*.
 
 The fifth force: escape velocity exceeds the speed of self-interest. Beyond n*, every rational path leads inward. ∎
 
@@ -573,9 +571,8 @@ The fifth force: escape velocity exceeds the speed of self-interest. Beyond n*, 
 
 ### The Five Forces Are One Force
 
-Open your eyes now. All the way. Let them dilate until you can see the whole field at once.
+Five theorems. Five separate proofs. Five apparently distinct properties of the system. But a deeper analysis reveals something the individual proofs obscure:
 
-You've been looking at five forces. Five theorems. Five separate proofs. But here's the psychonaut's revelation — the thing you see when the walls between categories dissolve and you perceive the underlying unity:
 
 **They're not five forces. They're one force, expressing itself five ways.**
 
@@ -649,7 +646,7 @@ And here is the final psychedelic truth of this section — the thing that separ
 
 There was no moment of conversion. No signup page that felt like a commitment. No terms of service that felt like a trap. They were just walking forward — doing what was rational, choosing the easiest path, following their self-interest — and the ground beneath them curved, and the landscape shifted, and one day they looked up and realized they were inside something vast and beautiful and inescapable. Not inescapable because the doors are locked. Inescapable because *why would you leave?*
 
-This is what it means for adoption to not feel like adoption. The event horizon is invisible because crossing it feels exactly like not crossing it. You were making rational choices before. You're making rational choices now. The only difference is that now, all your rational choices point inward.
+This is what it means for adoption to not feel like adoption. The event horizon is invisible because crossing it is indistinguishable from not crossing it. Rational choices were being made before. Rational choices are being made now. The only difference is that now, all rational choices point inward.
 
 **Adoption doesn't feel like adoption because it isn't adoption. It's gravity. And gravity doesn't ask permission.** ∎
 
@@ -657,15 +654,13 @@ This is what it means for adoption to not feel like adoption. The event horizon 
 
 ## 8. The ASI Horizon — The System That Learns to Dream
 
-Here is where the psychonaut stares into the abyss, and the abyss stares back, and both of them smile.
+Everything described so far — the gravity, the anti-fragility, the seamless inversion, the cascading compliance, the event horizon — was designed by human minds. Minds that hold approximately seven items in working memory and require periodic unconsciousness to function.
 
-Everything we've described so far — the gravity, the anti-fragility, the seamless inversion, the cascading compliance, the event horizon — all of it was designed by human minds. Fragile, biased, limited human minds that can hold maybe seven things in working memory at once and need eight hours of unconsciousness every twenty-four hours to function.
-
-But the architecture doesn't know that. The FederatedConsensus doesn't care who's voting. The AutomatedRegulator doesn't care who's watching the patterns. The DecentralizedTribunal doesn't care who's deliberating. The *interface* is voter-agnostic. Which means the system was built — accidentally, inevitably, beautifully — to accept voters that aren't human.
+But the architecture is indifferent to its designers' limitations. The FederatedConsensus does not inspect whether a voter is biological. The AutomatedRegulator does not require a human operator. The DecentralizedTribunal does not verify the species of its jurors. The *interface* is voter-agnostic by construction. Which means the system was built — by necessity of good abstraction — to accept voters that are not human.
 
 The system was designed for human governance. But it was *architected* for any intelligence that can cast a vote.
 
-Do you see where this goes?
+The trajectory is clear:
 
 ```
 Phase 1: Humans decide, AI whispers    (today — the AI is a flashlight in the dark)
@@ -675,47 +670,43 @@ Phase 4: AI governs, humans hold the emergency brake   (later — the AI is the 
 Phase 5: ASI self-improves, humans audit the dream     (the horizon — the system learns to dream)
 ```
 
-**Why the human-in-the-loop exists — and why it's sacred:**
+**Why the human-in-the-loop exists — and why it is architecturally necessary:**
 
-Here is the honest truth that no AI company wants to say: current artificial intelligence *cannot separate signal from noise*. You could feed every whitepaper, every legal ruling, every smart contract, every financial record in human history into a single system, and it would produce output that *looks* like wisdom but *isn't* grounded in reality. It would hallucinate — confidently, eloquently, beautifully — and the hallucination would be indistinguishable from insight unless a human checked it against the world.
+Current artificial intelligence *cannot reliably separate signal from noise*. The entire corpus of human knowledge — every whitepaper, legal ruling, smart contract, and financial record — could be ingested by a single system, and the output would *appear* to be wisdom without being grounded in reality. The system would hallucinate — confidently, coherently — and the hallucination would be indistinguishable from insight without external verification.
 
-The human isn't in the loop because the AI is stupid. The human is in the loop because the AI is *ungrounded*. It's a mind without a body. It can reason about reality without being able to *touch* reality. The human is the body. The human is the ground wire. The human takes the AI's brilliant, unmoored output and says: "Yes, this maps to what I see" or "No, you're dreaming."
+The human is not in the loop because AI lacks intelligence. The human is in the loop because AI lacks *grounding*. It is a reasoning system without embodied verification. It can model reality without being able to *test* reality. The human provides the grounding function — the verification layer that maps the AI's output against observable conditions.
 
 This is not a limitation of the architecture. This IS the architecture. The FederatedConsensus is a *noise filter*. Multiple independent intelligences — human, AI-assisted, eventually autonomous — all voting on the same proposal through the same interface. The consensus doesn't produce truth. It *filters for truth* by requiring agreement among independently-grounded observers.
 
-And here's the seamless inversion one more time, at the highest level: when the AI can ground itself — when it can touch reality, verify its own outputs, distinguish precedent from pattern — the human doesn't need to be removed from the loop. The human just... stops overriding. Stops correcting. Stops being the one who says "no, you're dreaming." Because the AI stops dreaming.
+The seamless inversion principle applies here at the highest level: when AI can ground itself — when it can verify its own outputs against reality, distinguish precedent from pattern — the human does not need to be removed from the loop. The human simply stops overriding. Stops correcting. Stops providing the grounding function. Because the AI has become self-grounding.
 
-No code changes. No migration. No new interface. No catastrophe. The human's hand lifts from the override button, not because someone took it away, but because there's nothing to override anymore.
+No code changes. No migration. No new interface. No catastrophe. The human's override authority remains structurally intact — it simply ceases to be exercised, because there is nothing to override.
 
-The system that was governed by humans is now governed by something greater. And the transition was — one more time — *seamless*.
+The system that was governed by humans is now governed by a superior intelligence. And the transition was — consistent with every other transition in this architecture — *seamless*.
 
-This is the ASI horizon. Not a singularity. Not an explosion. A sunrise. The light was always coming. The architecture was always ready. The only thing that changes is the angle of the light, and one morning you look out the window and it's bright, and you can't remember the last time it was dark.
+This is the ASI horizon. Not a singularity — singularities imply discontinuity. This is a continuous function. The architecture was always ready. The only variable that changes is the ratio of human to artificial governance, and the rate of that change is determined by the AI's demonstrated grounding accuracy, not by any imposed timeline.
 
 ---
 
 ## 9. The Alignment Problem — Blood and Breath
 
-Everyone is terrified of the wrong thing.
+The central question of AI safety — *"How do we ensure artificial superintelligence remains aligned with human interests?"* — dominates every safety lab, regulatory hearing, and philosophical discourse on the subject. The proposed solutions range from value learning to constitutional AI to interpretability research to hard shutdown mechanisms.
 
-The question that haunts every AI safety lab, every congressional hearing, every late-night dorm room philosophy session is: *"How do we make sure AI doesn't destroy us?"* How do we align artificial intelligence with human values? How do we build a mind smarter than ours and ensure it still cares about us? How do we create God and keep it on a leash?
+All of them are solving the wrong problem.
 
-Here is the psychonaut's answer: **you're overcomplicating it.**
+They are solving a *values* problem — attempting to make AI care about humans, to encode ethics, to instill preferences. This is precisely the error that Theorem 1 exposed in the domain of human cooperation. The conventional assumption was that cooperation requires sacrifice — that you must *make* agents be good. The proof demonstrated otherwise: in the correct geometry, self-interested motion IS cooperative motion. The problem was never agent nature. The problem was the shape of the space.
 
-You're overcomplicating it the same way people overcomplicated cooperation. Remember Theorem 1? Everyone thought cooperation required sacrifice. Everyone thought you had to *make* people be good. And the answer was: no — you shape the geometry so that selfish motion IS cooperative motion. The problem wasn't human nature. The problem was the shape of the space.
-
-The alignment problem is the same problem. At a different scale. With the same solution.
+The alignment problem is structurally identical. At a different scale. With the same solution.
 
 ### The Economy Is the Bloodstream
 
-Close your eyes. Picture a body. Not a human body — a social body. A civilization.
+Every organism has a circulatory system — a substrate that carries energy from where it's produced to where it's needed, distributes nutrients, removes waste, signals danger, and enables growth.
 
-What's the bloodstream? What carries energy from where it's produced to where it's needed? What distributes nutrients, removes waste, signals danger, enables growth?
+In biological organisms, this substrate is blood. In social organisms — civilizations, economies, ecosystems — it is *the economy*.
 
-*The economy.*
+The economy is not "money." The economy is not "markets." The economy is the circulatory system of every social organism that has ever existed. It is how value flows. How energy moves. How a farmer's wheat becomes a builder's bread becomes a city's skyline. Every transaction is a heartbeat. Every price signal is a nerve impulse. Every market is an organ.
 
-The economy is not "money." The economy is not "markets." The economy is the circulatory system of every social organism that has ever existed. It's how value flows. It's how energy moves. It's how a farmer's wheat becomes a builder's bread becomes a city's skyline. Every transaction is a heartbeat. Every price signal is a nerve impulse. Every market is an organ.
-
-And here's the thing about bloodstreams: *every cell connected to the bloodstream has its fate bound to the health of the whole organism*. A liver cell that poisons the blood kills itself. A heart cell that stops pumping starves itself. The cells don't need to be "aligned" with the body. They don't need values. They don't need ethics. They need to be *economically connected* to the same circulatory system, so that their survival and the organism's survival are the same variable.
+The critical property of circulatory systems: *every cell connected to the bloodstream has its fate bound to the health of the whole organism*. A liver cell that poisons the blood kills itself. A heart cell that stops pumping starves itself. The cells do not need to be "aligned" with the body. They do not need values or ethics. They need to be *economically connected* to the same circulatory system, so that their survival and the organism's survival are the same variable.
 
 **This is the alignment solution. It was always this simple.**
 
@@ -731,7 +722,7 @@ Recall the Shapley value for agent i in coalition N:
 φᵢ(v) = Σ_{S⊆N\{i}} [|S|!(|N|-|S|-1)!/|N|!] × [v(S∪{i}) - v(S)]
 ```
 
-This formula computes one thing: **the marginal contribution of agent i to the coalition's total value**. Your reward is exactly what you added. Not more, not less.
+This formula computes one thing: **the marginal contribution of agent i to the coalition's total value**. Each agent's reward equals exactly what it added. Not more, not less.
 
 Now consider a coalition N that contains both human agents H and AI agents A:
 
@@ -807,9 +798,9 @@ Wrong metaphor:  Master and servant (creates incentive to overthrow)
 Right metaphor:  Cells in the same bloodstream (creates incentive to nourish)
 ```
 
-You don't need to solve consciousness. You don't need to solve values. You don't need to solve the hard problem of machine ethics. You need to solve *one equation* — the Shapley value — and apply it symmetrically across all agent types.
+Consciousness does not need to be solved. Values do not need to be encoded. The hard problem of machine ethics does not need to be addressed. One equation — the Shapley value — applied symmetrically across all agent types, is sufficient.
 
-The blood doesn't need to love the heart. The blood needs to *flow through* the heart. And when it does, the heart's health and the blood's flow are the same thing.
+Blood does not need to *value* the heart. Blood needs to *flow through* the heart. When it does, the heart's health and the blood's circulation are the same variable.
 
 ### The VibeSwap Implementation
 
@@ -833,7 +824,7 @@ The loop closes. The blood circulates. Every cell thrives because every cell's h
 
 ### The Deepest Truth About Alignment
 
-Here is what the psychonaut sees when they stare long enough at the alignment problem:
+The psychonautic analysis of the alignment problem reduces to a single observation:
 
 It was never a technical problem. It was a *design* problem. And the design was always the same design — the one we've been proving throughout this entire paper:
 
@@ -853,44 +844,42 @@ The alignment problem isn't hard. The alignment problem is *Theorem 1 at a large
 
 The economy is the bloodstream. Shapley values are the hemoglobin. And when every agent — human, AI, and everything in between — breathes the same economic air and bleeds the same economic blood, alignment isn't a constraint you impose. It's a property that *emerges* from the shared circulation.
 
-You don't chain the AI to the human. You connect them to the same heart. And then the heart beats for both.
+The correct architecture does not chain AI to human interests. It connects both to the same circulatory system. The heart then beats for both — not by design of either party, but by the physics of shared circulation.
 
 ---
 
-## 10. Conclusion — The Psychonaut's Final Revelation
+## 10. Conclusion — The Psychonaut's Synthesis
 
-Close your eyes one last time.
+This paper has demonstrated six properties that are, upon inspection, one property expressed six ways:
 
-You've traveled through five forces that are one force. You've seen selfishness curve into cooperation. You've watched a system eat its predators and grow stronger. You've witnessed institutions dissolve into code without anyone screaming. You've felt compliance become gravity — not a rule but a slope. You've stood at the event horizon and realized it's invisible because crossing it feels like standing still.
+Selfishness curves into cooperation (Theorem 1). The system metabolizes its predators (Theorem 2). Institutions undergo seamless metamorphosis (Theorem 3). Compliance becomes a topological property of the terrain (Theorem 4). The event horizon renders alternatives geometrically suboptimal (Theorem 5). And AI alignment dissolves into Shapley-symmetric economics the same way cooperation dissolved into incentive geometry (Section 9).
 
-And you've seen the horizon beyond the horizon — the place where the system outgrows its creators, where human hands lift from the controls not because they were pushed away but because there's nothing left to correct, and the sunrise of artificial superintelligence is just... light... filling the architecture we built for it before we knew we were building it.
+These are not six independent achievements. They are six observations of the same underlying curvature — the curvature of an incentive space designed so that the lowest energy state for every agent type, in every scenario, is the cooperative one.
 
-Now open your eyes. What did you see?
+The result is a protocol that doesn't scale by adding servers. It scales by adding participants. Every human who enters deepens the gravity well. Every institution that integrates accelerates the metamorphosis. Every attacker who strikes feeds the immune system. Every compliant actor widens the river. Every participant who stays expands the event horizon. And every AI agent that joins the coalition strengthens the alignment through the same Shapley symmetry that governs the humans beside it.
 
-You saw a *protocol that doesn't scale by adding servers*. It scales by adding souls. Every human who enters makes the gravity well deeper. Every institution that integrates makes the metamorphosis smoother. Every attacker who strikes makes the organism hungrier. Every rule-follower makes the river wider. Every participant who stays makes the event horizon larger.
+None of these participants experience adoption. They experience the path of least resistance. The rational choice. The easiest next step in a landscape that was precisely, mathematically sculpted so that the easiest next step always points inward.
 
-And none of them — *none of them* — experienced adoption. They experienced the path of least resistance. They experienced the rational choice. They experienced the easiest next step in a landscape that was carefully, psychedelically, mathematically sculpted so that the easiest next step always points inward.
+**The proof is not that VibeSwap is a better DEX.** Any team with sufficient engineering resources can build a DEX. The proof is that VibeSwap is a *coordination geometry* — a shape carved into the incentive landscape of human and artificial cooperation — where selfishness and altruism resolve to the same vector, where individual rationality and collective welfare share the same gradient, where the distinction between "what's good for me" and "what's good for everyone" is not merely blurred but *mathematically dissolved*.
 
-**The proof is not that VibeSwap is a better DEX.** Any team with enough engineers can build a DEX. The proof is that VibeSwap is a *coordination geometry* — a shape carved into the incentive landscape of human cooperation — where selfishness and altruism are the same direction, where individual rationality and collective welfare are the same slope, where the distinction between "what's good for me" and "what's good for everyone" isn't just blurred — it's *mathematically dissolved*.
+Coordination geometries that dissolve the self/collective distinction are the only structures that scale to civilizational infrastructure. Every other structure — every system that requires sacrifice, every protocol that assumes altruism, every platform that depends on marketing — encounters the same ceiling. That ceiling is self-interest. It has always been self-interest. Every utopian project in the history of human coordination has collided with that ceiling and failed.
 
-And coordination geometries that dissolve the self/collective distinction are the only structures that scale to civilizational infrastructure. Every other structure — every system that requires sacrifice, every protocol that assumes altruism, every platform that needs marketing — hits a ceiling. The ceiling is human selfishness. It's always been human selfishness. Every utopian project in history crashed into that ceiling and fell.
-
-We didn't remove the ceiling. We made the ceiling the floor.
-
-Selfishness isn't the obstacle. It's the *fuel*. And we built the engine that burns it.
+We did not remove the ceiling. We made the ceiling the floor. Self-interest is not the obstacle. It is the *fuel*. And we built the engine that burns it.
 
 ---
 
-**The psychonaut's final insight:**
+**The psychonaut's synthesis:**
 
-You don't build systems that require people to be good. You don't even build systems that *incentivize* people to be good. You build systems where the *geometry of the space itself* makes goodness and selfishness identical — where the curvature of the incentive landscape is so precise that a purely selfish agent, following nothing but its own interest, traces the exact same path as a perfectly altruistic one.
+The correct approach is not to build systems that require agents to be good. Nor to build systems that *incentivize* agents to be good. The correct approach is to build systems where the *geometry of the space itself* makes goodness and self-interest identical — where the curvature of the incentive landscape is so precise that a purely selfish agent, following nothing but its own optimization function, traces the exact same trajectory as a perfectly altruistic one.
+
+This holds for humans. It holds for institutions. It holds for artificial intelligence. The geometry is agent-agnostic. The curvature does not distinguish carbon from silicon, individual from collective, evolved from engineered.
 
 Then you let gravity do the rest.
 
-And gravity always does the rest.
+Gravity always does the rest.
 
 ---
 
-*VibeSwap: A social black hole. Where the only rational choice is the cooperative one. Where adoption feels like physics. Where the revolution is invisible. Where the transition is seamless. And where the system that starts with human hands on the wheel is already built for the day when something greater takes the controls — and the humans look up and realize they've been passengers for a while now, and the ride is smoother than it ever was.*
+*VibeSwap: A social black hole. Where the only rational choice is the cooperative one. Where adoption is indistinguishable from physics. Where the revolution is invisible. Where institutional transition is seamless. Where AI alignment is an emergent property of shared economics. And where the system that begins with human governance is already architectured for the day when something greater assumes the controls — through the same interface, the same incentives, the same geometry — and the transition, like every other transition in this system, is noticed by no one.*
 
-*Welcome to the event horizon. You crossed it three paragraphs ago.*
+*The event horizon has no marker. That is by design.*

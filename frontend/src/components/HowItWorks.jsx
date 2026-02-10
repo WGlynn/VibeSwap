@@ -37,7 +37,7 @@ function HowItWorks() {
               className="absolute bottom-full right-0 mb-2 w-80 p-4 rounded-2xl bg-void-800 border border-void-600 shadow-2xl z-50"
             >
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-display font-bold text-white">MEV-Protected Swaps</h4>
+                <h4 className="font-display font-bold text-white">How Fair Pricing Works</h4>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="p-1 rounded-lg hover:bg-void-700 transition-colors"
@@ -56,11 +56,11 @@ function HowItWorks() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-glow-500 text-sm">COMMIT</span>
+                      <span className="font-medium text-glow-500 text-sm">SUBMIT</span>
                       <span className="text-xs text-void-500">8 seconds</span>
                     </div>
                     <p className="text-xs text-void-400 leading-relaxed">
-                      Your order is encrypted and submitted as a hash. Bots see only random data - they can't frontrun what they can't read.
+                      Your exchange request is protected and private. No one can see it until everyone else has submitted.
                     </p>
                   </div>
                 </div>
@@ -72,11 +72,11 @@ function HowItWorks() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-yellow-400 text-sm">REVEAL</span>
+                      <span className="font-medium text-yellow-400 text-sm">PROCESS</span>
                       <span className="text-xs text-void-500">2 seconds</span>
                     </div>
                     <p className="text-xs text-void-400 leading-relaxed">
-                      All orders are revealed simultaneously. The batch is sealed - no new orders can enter or manipulate the queue.
+                      All requests are processed together as a group. No one can cut in line or manipulate prices.
                     </p>
                   </div>
                 </div>
@@ -88,11 +88,11 @@ function HowItWorks() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-vibe-400 text-sm">SETTLE</span>
+                      <span className="font-medium text-vibe-400 text-sm">COMPLETE</span>
                       <span className="text-xs text-void-500">~1 second</span>
                     </div>
                     <p className="text-xs text-void-400 leading-relaxed">
-                      All orders execute at a single uniform clearing price. No sandwich attacks possible - there's no "before" or "after" price.
+                      Everyone gets the same fair price. No middlemen taking a cut from your exchange.
                     </p>
                   </div>
                 </div>
@@ -104,7 +104,7 @@ function HowItWorks() {
                       <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                     <span className="text-glow-500 font-medium">Result:</span>
-                    <span className="text-void-300">Fair price, no MEV extraction</span>
+                    <span className="text-void-300">Fair price, no hidden fees</span>
                   </div>
                 </div>
               </div>

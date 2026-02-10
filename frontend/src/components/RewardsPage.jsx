@@ -50,15 +50,15 @@ function RewardsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-display font-bold mb-3">Connect to View Rewards</h2>
+          <h2 className="text-2xl font-display font-bold mb-3">Connect to See Your Earnings</h2>
           <p className="text-void-400 mb-6 max-w-md mx-auto">
-            Connect your wallet to see your LP positions, Shapley rewards, IL protection, and loyalty bonuses.
+            Connect to see how much you've earned, your savings, and bonus rewards.
           </p>
           <button
             onClick={connect}
             className="px-6 py-3 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all"
           >
-            Connect Wallet
+            Get Started
           </button>
         </div>
       </div>
@@ -69,22 +69,22 @@ function RewardsPage() {
     <div className="max-w-6xl mx-auto px-4">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold">Rewards</h1>
-        <p className="text-void-400 mt-1">Track your earnings and incentives</p>
+        <h1 className="text-2xl font-display font-bold">Your Earnings</h1>
+        <p className="text-void-400 mt-1">Track what you've earned and your bonus rewards</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <SummaryCard
-          label="Total Position Value"
+          label="Your Balance"
           value={`$${totalValue.toLocaleString()}`}
-          icon="💰"
+          icon="◇"
           color="text-white"
         />
         <SummaryCard
-          label="Pending Rewards"
+          label="Ready to Claim"
           value={`$${totalPendingRewards.toFixed(2)}`}
-          icon="🎁"
+          icon="+"
           color="text-glow-500"
           action={totalPendingRewards > 0 ? () => handleClaim('shapley') : null}
           actionLabel="Claim"
@@ -93,13 +93,13 @@ function RewardsPage() {
         <SummaryCard
           label="Total Earned"
           value={`$${totalEarnedAllTime.toFixed(2)}`}
-          icon="📈"
+          icon="↗"
           color="text-cyber-400"
         />
         <SummaryCard
-          label="Loyalty Multiplier"
+          label="Bonus Multiplier"
           value={`${loyalty.currentMultiplier.toFixed(2)}x`}
-          icon="⭐"
+          icon="×"
           color="text-yellow-400"
           sublabel={loyalty.tier}
         />
@@ -118,9 +118,9 @@ function RewardsPage() {
             }`}
           >
             {tab === 'overview' && 'Overview'}
-            {tab === 'shapley' && 'Shapley Rewards'}
-            {tab === 'il-protection' && 'IL Protection'}
-            {tab === 'loyalty' && 'Loyalty'}
+            {tab === 'shapley' && 'Fair Share'}
+            {tab === 'il-protection' && 'Protection'}
+            {tab === 'loyalty' && 'Bonuses'}
           </button>
         ))}
       </div>
@@ -195,17 +195,17 @@ function SummaryCard({ label, value, icon, color, sublabel, action, actionLabel,
 function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuarantee, rewardsHistory }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* LP Positions */}
+      {/* Your Deposits */}
       <div className="swap-card rounded-2xl p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
-          <span>📊</span>
-          <span>Your LP Positions</span>
+          <span className="text-matrix-500">≡</span>
+          <span>Your Deposits</span>
         </h3>
 
         {lpPositions.length === 0 ? (
           <div className="text-center py-8 text-void-400">
-            <p>No LP positions yet</p>
-            <p className="text-sm mt-1">Add liquidity to start earning</p>
+            <p>No deposits yet</p>
+            <p className="text-sm mt-1">Deposit to start earning</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -224,15 +224,15 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <span className="text-void-400">Fees Earned</span>
+                    <span className="text-void-400">Earned</span>
                     <div className="font-mono text-glow-500">${position.earnedFees.toFixed(2)}</div>
                   </div>
                   <div>
-                    <span className="text-void-400">IL Loss</span>
+                    <span className="text-void-400">Market Change</span>
                     <div className="font-mono text-red-400">${Math.abs(position.ilLoss).toFixed(2)}</div>
                   </div>
                   <div>
-                    <span className="text-void-400">IL Covered</span>
+                    <span className="text-void-400">Protected</span>
                     <div className="font-mono text-glow-500">${position.ilCovered.toFixed(2)}</div>
                   </div>
                 </div>
@@ -242,11 +242,11 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
         )}
       </div>
 
-      {/* Recent Shapley Batches */}
+      {/* Recent Earnings */}
       <div className="swap-card rounded-2xl p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
-          <span>⚖️</span>
-          <span>Recent Batch Rewards</span>
+          <span className="text-matrix-500">≡</span>
+          <span>Recent Earnings</span>
         </h3>
 
         <div className="space-y-2">
@@ -272,11 +272,11 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
         </div>
       </div>
 
-      {/* Slippage Guarantee */}
+      {/* Price Protection */}
       <div className="swap-card rounded-2xl p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
-          <span>🛡️</span>
-          <span>Slippage Guarantee</span>
+          <span className="text-matrix-500">◇</span>
+          <span>Price Protection</span>
         </h3>
 
         <div className="mb-4">
@@ -295,7 +295,7 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
         </div>
 
         <div className="text-xs text-void-400">
-          Up to 2% of trade value protected if execution deviates from expected price.
+          Up to 2% of your exchange value is protected if prices move unexpectedly.
         </div>
       </div>
 
@@ -319,16 +319,16 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
                   reward.type === 'il_claim' ? 'bg-vibe-500/20 text-vibe-400' :
                   'bg-yellow-500/20 text-yellow-400'
                 }`}>
-                  {reward.type === 'fee' ? '💰' :
-                   reward.type === 'shapley' ? '⚖️' :
-                   reward.type === 'il_claim' ? '🛡️' : '⭐'}
+                  {reward.type === 'fee' ? '◇' :
+                   reward.type === 'shapley' ? '≡' :
+                   reward.type === 'il_claim' ? '◈' : '×'}
                 </div>
                 <div>
                   <div className="text-sm font-medium">
-                    {reward.type === 'fee' && 'Trading Fee'}
-                    {reward.type === 'shapley' && 'Shapley Reward'}
-                    {reward.type === 'il_claim' && 'IL Coverage'}
-                    {reward.type === 'loyalty' && 'Loyalty Bonus'}
+                    {reward.type === 'fee' && 'Exchange Fee'}
+                    {reward.type === 'shapley' && 'Fair Share Reward'}
+                    {reward.type === 'il_claim' && 'Protection Payout'}
+                    {reward.type === 'loyalty' && 'Bonus Reward'}
                   </div>
                   <div className="text-xs text-void-400">
                     {reward.pool || 'Protocol-wide'}
@@ -351,35 +351,35 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
   const total = breakdown.direct + breakdown.enabling + breakdown.scarcity + breakdown.stability
 
   const components = [
-    { key: 'direct', label: 'Direct Contribution', weight: '40%', description: 'Your raw liquidity provided to pools', color: 'bg-vibe-500' },
-    { key: 'enabling', label: 'Enabling Value', weight: '30%', description: 'Time in pool that enabled others to trade', color: 'bg-cyber-500' },
-    { key: 'scarcity', label: 'Scarcity Premium', weight: '20%', description: 'Provided the scarce side of the market', color: 'bg-glow-500' },
-    { key: 'stability', label: 'Stability Bonus', weight: '10%', description: 'Stayed during high volatility periods', color: 'bg-yellow-500' },
+    { key: 'direct', label: 'Your Contribution', weight: '40%', description: 'Money you put into the community pool', color: 'bg-vibe-500' },
+    { key: 'enabling', label: 'Time Invested', weight: '30%', description: 'How long you helped enable exchanges for others', color: 'bg-cyber-500' },
+    { key: 'scarcity', label: 'Supply Bonus', weight: '20%', description: 'You provided what was needed most', color: 'bg-glow-500' },
+    { key: 'stability', label: 'Loyalty Bonus', weight: '10%', description: 'You stayed when markets were volatile', color: 'bg-yellow-500' },
   ]
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Explanation */}
       <div className="swap-card rounded-2xl p-5">
-        <h3 className="font-display font-bold text-lg mb-4">What is Shapley Value Distribution?</h3>
+        <h3 className="font-display font-bold text-lg mb-4">Fair Share Earnings</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
-          Traditional LP rewards are proportional to liquidity size. But that ignores <span className="text-white">when</span> you provided it,
-          <span className="text-white"> what side</span> of the market needed it, and whether you <span className="text-white">stayed during volatility</span>.
+          Most platforms just pay based on how much money you put in. We pay based on <span className="text-white">when</span> you contributed,
+          <span className="text-white"> what was needed</span>, and whether you <span className="text-white">stayed loyal</span>.
         </p>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
-          Shapley values from game theory calculate your <span className="text-glow-500">marginal contribution</span> — the value you added
-          given everyone else's contributions. It's mathematically fair.
+          This means even smaller contributors can earn well if they <span className="text-glow-500">help the community</span> when it matters most.
+          It's designed to be fair.
         </p>
 
         <div className="p-3 rounded-xl bg-void-800/50 border border-void-700/50">
-          <div className="text-xs text-void-400 mb-2">The Glove Game Intuition</div>
+          <div className="text-xs text-void-400 mb-2">Simple Example</div>
           <div className="text-sm text-void-300">
-            A left glove alone = worthless<br />
-            A right glove alone = worthless<br />
-            Together = a $10 pair<br />
-            <span className="text-glow-500">Shapley splits it: $5 each</span>
+            One person has dollars, another has euros.<br />
+            Alone, neither can exchange.<br />
+            Together, both can trade.<br />
+            <span className="text-glow-500">Fair share: they split the benefit equally</span>
           </div>
         </div>
       </div>
@@ -442,13 +442,13 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
 function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* How IL Protection Works */}
+      {/* How Protection Works */}
       <div className="swap-card rounded-2xl p-5">
-        <h3 className="font-display font-bold text-lg mb-4">How IL Protection Works</h3>
+        <h3 className="font-display font-bold text-lg mb-4">How Protection Works</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
-          Impermanent Loss (IL) happens when token prices diverge from when you deposited.
-          VibeSwap's IL Protection Vault covers <span className="text-glow-500">25-80%</span> of your IL based on how long you've been providing liquidity.
+          When market prices change, your deposit value can shift. We protect you from
+          <span className="text-glow-500"> 25-80%</span> of these losses depending on how long you've been with us.
         </p>
 
         <div className="space-y-3">
@@ -471,14 +471,14 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
         </div>
 
         <p className="text-xs text-void-500 mt-4">
-          Coverage funded by protocol fees. Claims processed when you withdraw.
+          Coverage funded by fees. Claims paid when you withdraw.
         </p>
       </div>
 
       {/* Your Coverage */}
       <div className="swap-card rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-lg">Your IL Coverage</h3>
+          <h3 className="font-display font-bold text-lg">Your Coverage</h3>
           {ilProtection.claimableAmount > 0 && (
             <button
               onClick={onClaim}
@@ -511,15 +511,15 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
               </div>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div>
-                  <span className="text-void-400">IL Loss</span>
+                  <span className="text-void-400">Market Loss</span>
                   <div className="font-mono text-red-400">-${pos.ilLoss.toFixed(2)}</div>
                 </div>
                 <div>
-                  <span className="text-void-400">Covered</span>
+                  <span className="text-void-400">We Cover</span>
                   <div className="font-mono text-glow-500">${pos.covered.toFixed(2)}</div>
                 </div>
                 <div>
-                  <span className="text-void-400">To Max</span>
+                  <span className="text-void-400">Days to Max</span>
                   <div className="font-mono text-void-300">{pos.daysRemaining}d</div>
                 </div>
               </div>
@@ -552,13 +552,13 @@ function LoyaltyTab({ loyalty }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* How Loyalty Works */}
+      {/* How Bonuses Work */}
       <div className="swap-card rounded-2xl p-5">
-        <h3 className="font-display font-bold text-lg mb-4">Loyalty Rewards Program</h3>
+        <h3 className="font-display font-bold text-lg mb-4">Bonus Rewards Program</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
-          The longer you provide liquidity, the higher your reward multiplier. This incentivizes
-          <span className="text-glow-500"> stable, long-term liquidity</span> that benefits all traders.
+          The longer you stay with us, the more you earn. This rewards
+          <span className="text-glow-500"> loyal community members</span> who help everyone.
         </p>
 
         <div className="space-y-2">
@@ -606,7 +606,7 @@ function LoyaltyTab({ loyalty }) {
 
       {/* Your Status */}
       <div className="swap-card rounded-2xl p-5">
-        <h3 className="font-display font-bold text-lg mb-4">Your Loyalty Status</h3>
+        <h3 className="font-display font-bold text-lg mb-4">Your Bonus Status</h3>
 
         {/* Current tier display */}
         <div className="p-6 rounded-2xl bg-gradient-to-br from-vibe-500/20 to-purple-600/20 border border-vibe-500/30 text-center mb-6">

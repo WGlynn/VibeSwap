@@ -50,8 +50,8 @@ function PoolPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Pools</h1>
-          <p className="text-dark-400 mt-1">Provide liquidity and earn fees</p>
+          <h1 className="text-2xl font-bold">Earn</h1>
+          <p className="text-dark-400 mt-1">Put your money to work and earn passive income</p>
         </div>
         <button
           onClick={() => setShowAddLiquidity(true)}
@@ -60,7 +60,7 @@ function PoolPage() {
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-          <span>New Position</span>
+          <span>Start Earning</span>
         </button>
       </div>
 
@@ -74,7 +74,7 @@ function PoolPage() {
               : 'text-dark-400 hover:text-white'
           }`}
         >
-          All Pools
+          Opportunities
         </button>
         <button
           onClick={() => setActiveTab('my')}
@@ -84,24 +84,24 @@ function PoolPage() {
               : 'text-dark-400 hover:text-white'
           }`}
         >
-          My Positions
+          My Earnings
         </button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="p-4 rounded-2xl bg-dark-800/50 border border-dark-700">
-          <p className="text-sm text-dark-400">Total Value Locked</p>
+          <p className="text-sm text-dark-400">Community Savings</p>
           <p className="text-2xl font-bold mt-1">$24.8M</p>
           <p className="text-sm text-green-500 mt-1">+5.2% (24h)</p>
         </div>
         <div className="p-4 rounded-2xl bg-dark-800/50 border border-dark-700">
-          <p className="text-sm text-dark-400">24h Volume</p>
+          <p className="text-sm text-dark-400">Exchanged Today</p>
           <p className="text-2xl font-bold mt-1">$4.29M</p>
           <p className="text-sm text-green-500 mt-1">+12.8% (24h)</p>
         </div>
         <div className="p-4 rounded-2xl bg-dark-800/50 border border-dark-700">
-          <p className="text-sm text-dark-400">24h Fees</p>
+          <p className="text-sm text-dark-400">Earnings Paid Out</p>
           <p className="text-2xl font-bold mt-1">$12,870</p>
           <p className="text-sm text-green-500 mt-1">+8.3% (24h)</p>
         </div>
@@ -111,11 +111,11 @@ function PoolPage() {
       <div className="swap-card rounded-2xl overflow-hidden">
         {/* Table Header */}
         <div className="grid grid-cols-6 gap-4 px-4 py-3 text-sm text-dark-400 border-b border-dark-700">
-          <div className="col-span-2">Pool</div>
-          <div className="text-right">TVL</div>
-          <div className="text-right">Volume (24h)</div>
-          <div className="text-right">APR</div>
-          <div className="text-right">My Liquidity</div>
+          <div className="col-span-2">Currency Pair</div>
+          <div className="text-right">Pool Size</div>
+          <div className="text-right">Daily Activity</div>
+          <div className="text-right">Annual Return</div>
+          <div className="text-right">My Balance</div>
         </div>
 
         {/* Pool Rows */}
@@ -159,13 +159,13 @@ function PoolPage() {
             <svg className="w-16 h-16 mx-auto text-dark-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
-            <h3 className="text-lg font-medium mb-2">No positions yet</h3>
-            <p className="text-dark-400 mb-4">Open a new position to start earning fees</p>
+            <h3 className="text-lg font-medium mb-2">No earnings yet</h3>
+            <p className="text-dark-400 mb-4">Deposit to start earning passive income</p>
             <button
               onClick={() => setShowAddLiquidity(true)}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all"
             >
-              Add Liquidity
+              Start Earning
             </button>
           </div>
         )}
@@ -214,7 +214,7 @@ function AddLiquidityModal({ pool, onClose }) {
       <div className="relative w-full max-w-md bg-dark-800 rounded-3xl border border-dark-600 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-dark-700">
-          <h3 className="text-lg font-semibold">Add Liquidity</h3>
+          <h3 className="text-lg font-semibold">Deposit & Earn</h3>
           <button
             onClick={onClose}
             className="p-2 rounded-xl hover:bg-dark-700 transition-colors"
@@ -287,16 +287,16 @@ function AddLiquidityModal({ pool, onClose }) {
           {/* Pool info */}
           <div className="p-4 rounded-2xl bg-dark-700/50 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-dark-400">Pool Rate</span>
+              <span className="text-dark-400">Exchange Rate</span>
               <span>1 ETH = 2,000 USDC</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-dark-400">Share of Pool</span>
+              <span className="text-dark-400">Your Share</span>
               <span>0.05%</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-dark-400">Fee Tier</span>
-              <span>0.3%</span>
+              <span className="text-dark-400">Earnings Rate</span>
+              <span>0.3% per exchange</span>
             </div>
           </div>
 
@@ -306,7 +306,7 @@ function AddLiquidityModal({ pool, onClose }) {
             disabled={!amount0 || !amount1 || isLoading}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-vibe-500 to-purple-600 hover:from-vibe-600 hover:to-purple-700 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {!isConnected ? 'Connect Wallet' : isLoading ? 'Adding...' : 'Add Liquidity'}
+            {!isConnected ? 'Get Started' : isLoading ? 'Depositing...' : 'Deposit & Start Earning'}
           </button>
         </div>
       </div>

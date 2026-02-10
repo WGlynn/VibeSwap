@@ -11,6 +11,9 @@ import { IncentivesProvider } from './hooks/useIncentives'
 import { TransactionsProvider } from './hooks/useTransactions'
 import './index.css'
 
+// Signal successful load to prevent timeout error
+window.__vibeswapLoaded = true
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

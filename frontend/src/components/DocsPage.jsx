@@ -20,6 +20,7 @@ function getSections(cryptoLevel) {
     const advancedSections = [
       { id: 'fibonacci', label: 'Fibonacci Scaling', icon: '∞' },
       { id: 'shapley', label: 'Fair Rewards', icon: '≡' },
+      { id: 'mechanism-insulation', label: 'Mechanism Design', icon: '⊗' },
       { id: 'halving', label: 'Halving Schedule', icon: '↓' },
       { id: 'build-frontend', label: 'Build Your Own', icon: '⌘' },
     ]
@@ -168,6 +169,7 @@ function DocsPage() {
               {activeSection === 'key-concepts' && <KeyConcepts cryptoLevel={cryptoLevel} />}
               {activeSection === 'fibonacci' && <FibonacciSection />}
               {activeSection === 'shapley' && <ShapleySection />}
+              {activeSection === 'mechanism-insulation' && <MechanismInsulationSection />}
               {activeSection === 'halving' && <HalvingSection />}
               {activeSection === 'build-frontend' && <BuildFrontendSection />}
               {activeSection === 'faq' && <FAQSection cryptoLevel={cryptoLevel} />}
@@ -769,6 +771,157 @@ function ShapleySection() {
           <span className="text-purple-400 font-semibold">Triple penalty:</span> Extractive actors don't just fail to profit —
           they lose collateral, waste gas, AND go into debt to the cooperative.
           Extraction becomes <span className="text-red-400">anti-profitable</span>.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function MechanismInsulationSection() {
+  return (
+    <div className="glass-strong rounded-2xl p-8 space-y-8">
+      <div>
+        <h2 className="text-3xl font-display font-bold text-white mb-4">Mechanism Insulation</h2>
+        <p className="text-void-300 text-lg">
+          Why exchange fees and governance rewards must remain separate to prevent game-breaking exploits.
+        </p>
+      </div>
+
+      {/* The Two Mechanisms */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-vibe-500/10 border border-vibe-500/30 rounded-xl p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-vibe-500/20 flex items-center justify-center">
+              <span className="text-vibe-400 text-xl">$</span>
+            </div>
+            <h3 className="text-lg font-semibold text-vibe-400">Exchange Fees</h3>
+          </div>
+          <div className="space-y-3 text-void-300">
+            <p><span className="text-white font-semibold">100% → LPs</span></p>
+            <p className="text-sm">Direct incentive: provide liquidity, earn proportional to volume. Simple, measurable, predictable returns.</p>
+            <p className="text-sm text-void-400">LPs can calculate expected yield and commit capital accordingly.</p>
+          </div>
+        </div>
+
+        <div className="bg-terminal-500/10 border border-terminal-500/30 rounded-xl p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-terminal-500/20 flex items-center justify-center">
+              <span className="text-terminal-400 text-xl">⚖</span>
+            </div>
+            <h3 className="text-lg font-semibold text-terminal-400">Token Rewards</h3>
+          </div>
+          <div className="space-y-3 text-void-300">
+            <p><span className="text-white font-semibold">→ Governance / Arbitration</span></p>
+            <p className="text-sm">Shapley value distribution rewards contribution to protocol health. Token value depends on long-term protocol success.</p>
+            <p className="text-sm text-void-400">Arbitrators, sybil hunters, governance participants earn tokens.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Why Not a Legal Pool? */}
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-red-400 mb-4">
+          "Why not add a pool to sustain lawyers?"
+        </h3>
+        <p className="text-void-300 mb-4">
+          This is a common question. The answer involves game theory and attack surface analysis.
+        </p>
+      </div>
+
+      {/* Game Breaking Scenarios */}
+      <div>
+        <h3 className="text-xl font-semibold text-white mb-4">Game-Breaking Scenarios If Combined</h3>
+        <div className="space-y-4">
+          <div className="bg-void-800/50 rounded-xl p-5 border border-void-600/30">
+            <h4 className="font-semibold text-red-400 mb-2">1. Conflict of Interest</h4>
+            <p className="text-void-300 text-sm mb-3">If arbitrators were paid from trading fees:</p>
+            <ul className="space-y-1 text-void-400 text-sm ml-4">
+              <li>• Incentive to rule in favor of high-volume traders (they generate more fees)</li>
+              <li>• Incentive to maximize disputes (more work = more pay from pool)</li>
+              <li>• Incentive to <span className="text-red-400">not</span> ban bad actors if they trade a lot</li>
+            </ul>
+          </div>
+
+          <div className="bg-void-800/50 rounded-xl p-5 border border-void-600/30">
+            <h4 className="font-semibold text-red-400 mb-2">2. Capture Attack</h4>
+            <div className="bg-void-900/50 rounded-lg p-4 font-mono text-sm text-void-300">
+              <div className="text-void-500 mb-2">// Attacker strategy:</div>
+              <div>1. Become large LP (earn fees)</div>
+              <div>2. Become arbitrator (paid from same pool)</div>
+              <div>3. Rule in your own favor in disputes</div>
+              <div className="text-red-400">4. You're paying yourself with other LPs' money</div>
+            </div>
+          </div>
+
+          <div className="bg-void-800/50 rounded-xl p-5 border border-void-600/30">
+            <h4 className="font-semibold text-red-400 mb-2">3. Liquidity Death Spiral</h4>
+            <div className="flex items-center space-x-2 text-sm text-void-300 flex-wrap">
+              <span className="bg-void-700 px-2 py-1 rounded">Legal costs spike</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-void-700 px-2 py-1 rounded">Fees diverted to lawyers</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-void-700 px-2 py-1 rounded">LP yields drop</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded">LPs withdraw</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded">Less liquidity</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded">Worse prices</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded">Less volume</span>
+              <span className="text-void-500">→</span>
+              <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded">Can't pay lawyers</span>
+            </div>
+          </div>
+
+          <div className="bg-void-800/50 rounded-xl p-5 border border-void-600/30">
+            <h4 className="font-semibold text-red-400 mb-2">4. Fee Manipulation</h4>
+            <p className="text-void-300 text-sm">
+              If governance is funded by fees, controlling fees = controlling governance:
+            </p>
+            <ul className="space-y-1 text-void-400 text-sm ml-4 mt-2">
+              <li>• Whale does massive wash trading</li>
+              <li>• Generates huge fees</li>
+              <li>• Uses fee-funded governance to vote themselves more power</li>
+              <li>• <span className="text-red-400">Circular extraction loop</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* The Insulation Principle */}
+      <div className="bg-gradient-to-r from-vibe-500/10 to-terminal-500/10 rounded-xl p-6 border border-vibe-500/20">
+        <h3 className="text-lg font-semibold text-white mb-4">The Insulation Principle</h3>
+        <div className="bg-void-900/50 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+          <pre className="text-void-300">{`┌─────────────────┐     ┌─────────────────┐
+│   TRADING FEES  │     │  TOKEN REWARDS  │
+│                 │     │                 │
+│  100% → LPs     │     │  → Arbitrators  │
+│                 │     │  → Governance   │
+│  Incentive:     │     │  → Sybil hunters│
+│  Provide        │     │                 │
+│  liquidity      │     │  Incentive:     │
+│                 │     │  Protocol health│
+└─────────────────┘     └─────────────────┘
+        │                       │
+        │    INSULATED          │
+        │    No cross-flow      │
+        └───────────────────────┘`}</pre>
+        </div>
+        <div className="mt-4 space-y-2 text-void-300 text-sm">
+          <p><span className="text-vibe-400 font-semibold">LPs are mercenary</span> — they go where yield is. Predictable fees keep them.</p>
+          <p><span className="text-terminal-400 font-semibold">Governance must be incorruptible</span> — token rewards align with long-term protocol value, not short-term extraction.</p>
+        </div>
+      </div>
+
+      {/* TL;DR */}
+      <div className="bg-void-800/30 rounded-xl p-6 border border-void-600/20">
+        <h3 className="text-lg font-semibold text-void-300 mb-3">TL;DR</h3>
+        <p className="text-void-300">
+          Fees reward capital providers. Tokens reward protocol stewards.
+          Mixing them creates circular incentives where the people judging disputes
+          profit from the disputes themselves. That's how you get regulatory capture,
+          not decentralized justice.
         </p>
       </div>
     </div>

@@ -14,6 +14,17 @@ import toast from 'react-hot-toast'
 // Recovery options with plain-English explanations (Grandma-friendly)
 const RECOVERY_OPTIONS = [
   {
+    id: 'icloud',
+    icon: '☁️',
+    title: 'iCloud Notes Backup',
+    desc: 'Save an encrypted backup to your iCloud',
+    recommended: true,
+    tradeoff: {
+      title: 'How it works',
+      explanation: 'Create a 6-digit PIN and save an encrypted code to your iCloud Notes. If you lose your device, enter the code and your PIN to restore access. Works across all your Apple devices. Best for: iPhone/Mac users who want a simple backup.',
+    },
+  },
+  {
     id: 'guardians',
     icon: '👨‍👩‍👧',
     title: 'Trusted Contacts',
@@ -127,6 +138,12 @@ function RecoverySetup({ isOpen, onClose }) {
   // Quantum state
   const [quantumKeyGenerated, setQuantumKeyGenerated] = useState(false)
 
+  // iCloud backup state
+  const [icloudPin, setIcloudPin] = useState('')
+  const [icloudConfirmPin, setIcloudConfirmPin] = useState('')
+  const [icloudBackupCode, setIcloudBackupCode] = useState('')
+  const [icloudStep, setIcloudStep] = useState('pin') // pin, confirm, backup
+
   // Signing state
   const [isSigning, setIsSigning] = useState(false)
 
@@ -149,6 +166,7 @@ function RecoverySetup({ isOpen, onClose }) {
     if (!isConnected && selectedOptions.size > 0) {
       steps.push('connect')
     }
+    if (selectedOptions.has('icloud')) steps.push('icloud')
     if (selectedOptions.has('guardians')) steps.push('guardians')
     if (selectedOptions.has('timelock')) steps.push('timelock')
     if (selectedOptions.has('deadman')) steps.push('deadman')
@@ -551,7 +569,14 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
 
                         {/* Text */}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{option.title}</div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-sm">{option.title}</span>
+                            {option.recommended && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500/20 text-blue-400 rounded">
+                                RECOMMENDED
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-black-500 truncate">{option.desc}</div>
                         </div>
 
@@ -660,6 +685,175 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     Continue
                   </button>
                 </div>
+              </motion.div>
+            )}
+
+            {/* iCloud Backup Step */}
+            {step === 'icloud' && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">☁️</span>
+                    <h3 className="text-lg font-bold">iCloud Notes Backup</h3>
+                  </div>
+                  <p className="text-black-400 text-sm">
+                    Create an encrypted backup protected by a 6-digit PIN.
+                  </p>
+                </div>
+
+                {icloudStep === 'pin' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-black-300 mb-2">Create a 6-digit PIN</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={icloudPin}
+                        onChange={(e) => setIcloudPin(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter PIN"
+                        className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-lg focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-xs text-amber-400">
+                        ⚠️ Remember this PIN! Without it, your backup cannot be decrypted.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => icloudPin.length === 6 && setIcloudStep('confirm')}
+                      disabled={icloudPin.length !== 6}
+                      className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-black-600 disabled:text-black-500 text-white font-semibold transition-colors"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                )}
+
+                {icloudStep === 'confirm' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-black-300 mb-2">Confirm your PIN</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={icloudConfirmPin}
+                        onChange={(e) => setIcloudConfirmPin(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Confirm PIN"
+                        className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-lg focus:border-blue-500 focus:outline-none"
+                      />
+                      {icloudConfirmPin.length === 6 && icloudConfirmPin !== icloudPin && (
+                        <p className="text-red-400 text-sm mt-2 text-center">PINs do not match</p>
+                      )}
+                    </div>
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => { setIcloudStep('pin'); setIcloudConfirmPin('') }}
+                        className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (icloudConfirmPin === icloudPin) {
+                            // Generate encrypted backup
+                            const walletData = localStorage.getItem('vibeswap_device_wallet')
+                            if (walletData) {
+                              try {
+                                const encoder = new TextEncoder()
+                                const dataBytes = encoder.encode(walletData)
+                                const pinBytes = encoder.encode(icloudPin)
+                                const salt = encoder.encode('vibeswap-backup-v1')
+                                const keyMaterial = await crypto.subtle.importKey('raw', pinBytes, 'PBKDF2', false, ['deriveBits', 'deriveKey'])
+                                const key = await crypto.subtle.deriveKey(
+                                  { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+                                  keyMaterial,
+                                  { name: 'AES-GCM', length: 256 },
+                                  false,
+                                  ['encrypt']
+                                )
+                                const iv = crypto.getRandomValues(new Uint8Array(12))
+                                const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, dataBytes)
+                                const combined = new Uint8Array(iv.length + encrypted.byteLength)
+                                combined.set(iv)
+                                combined.set(new Uint8Array(encrypted), iv.length)
+                                setIcloudBackupCode(btoa(String.fromCharCode(...combined)))
+                                setIcloudStep('backup')
+                              } catch (err) {
+                                toast.error('Failed to create backup')
+                              }
+                            }
+                          }
+                        }}
+                        disabled={icloudConfirmPin !== icloudPin || icloudConfirmPin.length !== 6}
+                        className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-black-600 disabled:text-black-500 text-white font-semibold transition-colors"
+                      >
+                        Create Backup
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {icloudStep === 'backup' && (
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(icloudBackupCode)
+                        toast.success('Backup code copied!')
+                      }}
+                      className="w-full p-4 rounded-lg bg-black-700 border border-black-600 hover:border-blue-500/50 transition-colors group"
+                    >
+                      <div className="font-mono text-xs text-blue-400 break-all leading-relaxed">
+                        {icloudBackupCode.slice(0, 60)}...
+                      </div>
+                      <div className="text-sm text-black-300 mt-3 group-hover:text-black-200">
+                        Tap to copy
+                      </div>
+                    </button>
+
+                    <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-sm text-black-200 font-medium mb-2">Save to iCloud Notes:</p>
+                      <ol className="text-xs text-black-300 space-y-1 list-decimal list-inside">
+                        <li>Open the Notes app on your iPhone/Mac</li>
+                        <li>Create a new note titled "VibeSwap Backup"</li>
+                        <li>Paste the code you just copied</li>
+                        <li>Make sure it syncs to iCloud</li>
+                      </ol>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-matrix-500/10 border border-matrix-500/20">
+                      <p className="text-xs text-matrix-400 text-center">
+                        ✓ Your backup is encrypted. Only your 6-digit PIN can decrypt it.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('vibeswap_icloud_backup_created', 'true')
+                        nextStep()
+                      }}
+                      className="w-full py-3 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold transition-colors"
+                    >
+                      ✓ I've Saved It
+                    </button>
+                  </div>
+                )}
+
+                {icloudStep === 'pin' && (
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={prevStep}
+                      className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
+                    >
+                      Back
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
 

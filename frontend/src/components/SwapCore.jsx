@@ -134,7 +134,7 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
 }
 
 // Post-connection modal explaining what happened
-function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, walletAddress, isDeviceWallet }) {
+function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBackup, walletAddress, isDeviceWallet }) {
   if (!isOpen) return null
 
   const copyAddress = () => {
@@ -259,12 +259,30 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, walletAddress, i
 
           {/* CTAs */}
           <div className="space-y-3">
-            <button
-              onClick={onSetupRecovery}
-              className="w-full py-3.5 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-base transition-colors"
-            >
-              🛡️ Protect My Account
-            </button>
+            {isDeviceWallet ? (
+              <>
+                {/* Primary: iCloud backup for device wallets */}
+                <button
+                  onClick={onSetupICloudBackup}
+                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base transition-colors"
+                >
+                  ☁️ Back Up to iCloud Notes
+                </button>
+                <button
+                  onClick={onSetupRecovery}
+                  className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-200 font-medium text-base transition-colors"
+                >
+                  Other backup options
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onSetupRecovery}
+                className="w-full py-3.5 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-base transition-colors"
+              >
+                🛡️ Protect My Account
+              </button>
+            )}
             <button
               onClick={onClose}
               className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-200 font-medium text-base transition-colors"
@@ -275,9 +293,340 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, walletAddress, i
 
           <p className="text-center text-sm text-black-300 mt-4">
             {isDeviceWallet
-              ? 'Recovery is especially important for device wallets'
+              ? 'If you lose this device without a backup, your wallet is gone'
               : 'We recommend setting up recovery so you never lose access'}
           </p>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+// PIN-encrypted iCloud backup modal
+function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
+  const [step, setStep] = useState('intro') // intro, pin, confirm, backup, done
+  const [pin, setPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [encryptedBackup, setEncryptedBackup] = useState('')
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  if (!isOpen) return null
+
+  // Simple encryption using PIN as key (for demo - production would use stronger KDF)
+  const encryptWithPin = async (data, pin) => {
+    const encoder = new TextEncoder()
+    const dataBytes = encoder.encode(JSON.stringify(data))
+
+    // Derive key from PIN using PBKDF2
+    const pinBytes = encoder.encode(pin)
+    const salt = encoder.encode('vibeswap-backup-v1')
+
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', pinBytes, 'PBKDF2', false, ['deriveBits', 'deriveKey']
+    )
+
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    )
+
+    // Generate IV
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+
+    // Encrypt
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      dataBytes
+    )
+
+    // Combine IV + encrypted data and encode as base64
+    const combined = new Uint8Array(iv.length + encrypted.byteLength)
+    combined.set(iv)
+    combined.set(new Uint8Array(encrypted), iv.length)
+
+    return btoa(String.fromCharCode(...combined))
+  }
+
+  const handlePinSubmit = () => {
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      setError('Please enter a 6-digit PIN')
+      return
+    }
+    setError('')
+    setStep('confirm')
+  }
+
+  const handleConfirmSubmit = async () => {
+    if (pin !== confirmPin) {
+      setError('PINs do not match')
+      return
+    }
+
+    setError('')
+
+    try {
+      const backup = await encryptWithPin(walletData, pin)
+      setEncryptedBackup(backup)
+      setStep('backup')
+    } catch (err) {
+      setError('Failed to create backup')
+      console.error(err)
+    }
+  }
+
+  const copyBackup = () => {
+    navigator.clipboard.writeText(encryptedBackup)
+    setCopied(true)
+    toast.success('Backup code copied!')
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleComplete = () => {
+    localStorage.setItem('vibeswap_icloud_backup_created', 'true')
+    onComplete()
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
+        >
+          {/* Intro Step */}
+          {step === 'intro' && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                  <span className="text-3xl">☁️</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Back Up to iCloud</h2>
+                <p className="text-black-200 text-base">
+                  Save an encrypted backup to your iCloud Notes. If you lose this device, you can recover your wallet.
+                </p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-start space-x-3 p-3 rounded-lg bg-black-700/50">
+                  <span className="text-xl mt-0.5">1️⃣</span>
+                  <div>
+                    <div className="font-medium text-base">Create a 6-digit PIN</div>
+                    <div className="text-sm text-black-300">This PIN encrypts your backup</div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3 p-3 rounded-lg bg-black-700/50">
+                  <span className="text-xl mt-0.5">2️⃣</span>
+                  <div>
+                    <div className="font-medium text-base">Save to iCloud Notes</div>
+                    <div className="text-sm text-black-300">We'll give you a code to paste</div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3 p-3 rounded-lg bg-black-700/50">
+                  <span className="text-xl mt-0.5">3️⃣</span>
+                  <div>
+                    <div className="font-medium text-base">Recover anytime</div>
+                    <div className="text-sm text-black-300">Enter your PIN to restore access</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-terminal-500/10 border border-terminal-500/20 mb-6">
+                <p className="text-sm text-black-200 text-center">
+                  <strong className="text-terminal-400">Why iCloud Notes?</strong> It syncs across all your Apple devices and is protected by your Apple ID.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => setStep('pin')}
+                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base transition-colors"
+                >
+                  ☁️ Create Backup
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-200 font-medium text-base transition-colors"
+                >
+                  Skip for now
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* PIN Entry Step */}
+          {step === 'pin' && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                  <span className="text-3xl">🔢</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Create Your PIN</h2>
+                <p className="text-black-200 text-base">
+                  Choose a 6-digit PIN you'll remember. You'll need it to restore your wallet.
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pin}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '')
+                    setPin(v)
+                    setError('')
+                  }}
+                  placeholder="Enter 6-digit PIN"
+                  className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-xl focus:border-blue-500 focus:outline-none"
+                />
+                {error && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
+              </div>
+
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-6">
+                <p className="text-sm text-amber-300 text-center">
+                  ⚠️ <strong>Remember this PIN!</strong> Without it, your backup cannot be decrypted.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handlePinSubmit}
+                  disabled={pin.length !== 6}
+                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors"
+                >
+                  Continue
+                </button>
+                <button
+                  onClick={() => { setStep('intro'); setPin(''); setError('') }}
+                  className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-200 font-medium text-base transition-colors"
+                >
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Confirm PIN Step */}
+          {step === 'confirm' && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                  <span className="text-3xl">🔢</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Confirm Your PIN</h2>
+                <p className="text-black-200 text-base">
+                  Enter your PIN again to confirm.
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={confirmPin}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '')
+                    setConfirmPin(v)
+                    setError('')
+                  }}
+                  placeholder="Confirm 6-digit PIN"
+                  className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-xl focus:border-blue-500 focus:outline-none"
+                />
+                {error && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleConfirmSubmit}
+                  disabled={confirmPin.length !== 6}
+                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors"
+                >
+                  Create Backup
+                </button>
+                <button
+                  onClick={() => { setStep('pin'); setConfirmPin(''); setError('') }}
+                  className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-200 font-medium text-base transition-colors"
+                >
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Backup Code Step */}
+          {step === 'backup' && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-matrix-500/20 border border-matrix-500/30 flex items-center justify-center">
+                  <span className="text-3xl">✅</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Your Backup Code</h2>
+                <p className="text-black-200 text-base">
+                  Copy this code and save it in your iCloud Notes app.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <button
+                  onClick={copyBackup}
+                  className="w-full p-4 rounded-xl bg-black-700 border border-black-600 hover:border-matrix-500/50 transition-colors group"
+                >
+                  <div className="font-mono text-xs text-matrix-400 break-all leading-relaxed">
+                    {encryptedBackup.slice(0, 60)}...
+                  </div>
+                  <div className="text-sm text-black-300 mt-3 group-hover:text-black-200">
+                    {copied ? '✓ Copied!' : 'Tap to copy'}
+                  </div>
+                </button>
+              </div>
+
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 mb-6">
+                <p className="text-sm text-black-200 font-medium mb-2">How to save to iCloud Notes:</p>
+                <ol className="text-sm text-black-300 space-y-1 list-decimal list-inside">
+                  <li>Open the <strong>Notes</strong> app on your iPhone/Mac</li>
+                  <li>Create a new note titled "VibeSwap Backup"</li>
+                  <li>Paste the code you just copied</li>
+                  <li>Make sure it syncs to iCloud (check the folder)</li>
+                </ol>
+              </div>
+
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-6">
+                <p className="text-sm text-amber-300 text-center">
+                  ⚠️ Don't share this code with anyone. Combined with your PIN, it gives full access to your wallet.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleComplete}
+                  className="w-full py-3.5 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-base transition-colors"
+                >
+                  ✓ I've Saved It
+                </button>
+                <button
+                  onClick={copyBackup}
+                  className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-200 font-medium text-base transition-colors"
+                >
+                  Copy Again
+                </button>
+              </div>
+            </>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -306,6 +655,7 @@ function SwapCore() {
   // Post-connection modal for first-time wallet creation
   const [showWalletCreated, setShowWalletCreated] = useState(false)
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
+  const [showICloudBackup, setShowICloudBackup] = useState(false)
 
   // Combined connection state: either WalletConnect or Device Wallet
   const isAnyWalletConnected = isConnected || deviceWallet.isConnected
@@ -356,6 +706,37 @@ function SwapCore() {
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
     setShowWalletCreated(false)
     setShowRecoverySetup(true)
+  }
+
+  const handleSetupICloudBackup = () => {
+    // Don't mark as acknowledged yet - do it after backup is complete
+    setShowWalletCreated(false)
+    setShowICloudBackup(true)
+  }
+
+  const handleICloudBackupComplete = () => {
+    localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
+    setShowICloudBackup(false)
+    toast.success('Backup saved! Your wallet is protected.')
+  }
+
+  const handleICloudBackupClose = () => {
+    // If they skip, go back to the wallet created modal
+    setShowICloudBackup(false)
+    setShowWalletCreated(true)
+  }
+
+  // Get device wallet data for backup
+  const getDeviceWalletData = () => {
+    const stored = localStorage.getItem('vibeswap_device_wallet')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        return null
+      }
+    }
+    return null
   }
 
   // Calculate conversion and savings
@@ -625,8 +1006,17 @@ function SwapCore() {
         isOpen={showWalletCreated}
         onClose={handleWalletCreatedClose}
         onSetupRecovery={handleSetupRecovery}
+        onSetupICloudBackup={handleSetupICloudBackup}
         walletAddress={activeAddress || ''}
         isDeviceWallet={deviceWallet.isConnected && !isConnected}
+      />
+
+      {/* iCloud Backup Modal */}
+      <ICloudBackupModal
+        isOpen={showICloudBackup}
+        onClose={handleICloudBackupClose}
+        onComplete={handleICloudBackupComplete}
+        walletData={getDeviceWalletData()}
       />
 
       {/* Recovery Setup Modal */}

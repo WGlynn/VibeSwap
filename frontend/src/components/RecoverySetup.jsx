@@ -249,7 +249,7 @@ By signing this message, I confirm that:
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-lg bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+          className="relative w-full max-w-lg bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto allow-scroll"
         >
           {/* Header */}
           <div className="sticky top-0 bg-black-800 border-b border-black-700 p-4 flex items-center justify-between z-10">

@@ -131,7 +131,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xs bg-black-800 border-l border-black-600 overflow-y-auto"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xs bg-black-800 border-l border-black-600 overflow-y-auto allow-scroll"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-black-700">

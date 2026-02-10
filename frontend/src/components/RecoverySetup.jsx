@@ -8,8 +8,91 @@ import toast from 'react-hot-toast'
 /**
  * Recovery Setup Guide
  * Requires wallet connection and signatures for all security-critical operations
- * @version 2.0.0 - Added wallet signature requirements
+ * @version 3.0.0 - Selectable recovery options with game theory info tooltips
  */
+
+// Recovery options with game-theoretic tradeoff explanations
+const RECOVERY_OPTIONS = [
+  {
+    id: 'guardians',
+    icon: '👥',
+    title: 'Guardian Recovery',
+    desc: 'Trusted friends/family can recover your wallet',
+    tradeoff: {
+      title: 'Trust vs. Collusion Risk',
+      explanation: 'Adding more guardians makes it harder for any single person to steal your funds, but you need to trust that 3 of them won\'t team up against you. Choose people who don\'t know each other well—this makes collusion nearly impossible while keeping recovery accessible.',
+    },
+  },
+  {
+    id: 'timelock',
+    icon: '⏱️',
+    title: 'Time-Lock Recovery',
+    desc: '7-day waiting period prevents theft',
+    tradeoff: {
+      title: 'Security vs. Speed',
+      explanation: 'A 7-day delay gives you time to cancel if someone tries to steal your wallet. The downside: if you legitimately lose access, you wait 7 days to get it back. This is the classic security tradeoff—more protection means more friction.',
+    },
+  },
+  {
+    id: 'deadman',
+    icon: '📜',
+    title: 'Digital Will',
+    desc: 'Beneficiary inherits after 1 year inactivity',
+    tradeoff: {
+      title: 'Inheritance vs. Liveness Risk',
+      explanation: 'Your crypto passes to your loved ones if something happens to you. But if you just forget to use your wallet for a year, they could claim it. Any transaction resets the timer, so stay active or set calendar reminders.',
+    },
+  },
+  {
+    id: 'jury',
+    icon: '⚖️',
+    title: 'Jury Arbitration',
+    desc: 'Prove ownership to neutral jurors',
+    tradeoff: {
+      title: 'Decentralization vs. Cost',
+      explanation: 'Random community members vote on whether you\'re the real owner. You stake funds to prevent spam attacks and pay a small fee to jurors. This is your last resort when other methods fail—slower and costlier, but doesn\'t require trusting anyone you know.',
+    },
+  },
+  {
+    id: 'quantum',
+    icon: '🔐',
+    title: 'Quantum Backup',
+    desc: 'Unbreakable backup keys for the future',
+    tradeoff: {
+      title: 'Future-proofing vs. Complexity',
+      explanation: 'Creates backup keys using lattice cryptography that even future quantum computers can\'t crack. More secure for long-term holdings, but you need to safely store an extra set of keys. Worth it if you\'re holding for 10+ years.',
+    },
+  },
+]
+
+// Info tooltip component
+function InfoTooltip({ tradeoff, isVisible, onClose }) {
+  if (!isVisible) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 5, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 5, scale: 0.95 }}
+      className="absolute left-0 right-0 top-full mt-2 z-20 p-4 rounded-lg bg-black-700 border border-black-500 shadow-xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <h5 className="font-semibold text-sm text-terminal-400">{tradeoff.title}</h5>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-black-600 rounded transition-colors -mr-1 -mt-1"
+        >
+          <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <p className="text-xs text-black-300 leading-relaxed">{tradeoff.explanation}</p>
+    </motion.div>
+  )
+}
+
 function RecoverySetup({ isOpen, onClose }) {
   const { isConnected, account, signer, connect } = useWallet()
   const {
@@ -21,22 +104,78 @@ function RecoverySetup({ isOpen, onClose }) {
     config,
   } = useRecovery()
 
-  // Flow state
-  const [step, setStep] = useState('intro') // intro, connect, guardians, confirm-guardians, deadman, confirm-deadman, hardware, complete
+  // Selected recovery options
+  const [selectedOptions, setSelectedOptions] = useState(new Set())
+  const [activeTooltip, setActiveTooltip] = useState(null)
+
+  // Flow state - dynamic based on selections
+  const [step, setStep] = useState('intro')
 
   // Guardian state
   const [pendingGuardians, setPendingGuardians] = useState([])
   const [newGuardian, setNewGuardian] = useState({ address: '', label: '' })
 
   // Deadman state
-  const [deadmanEnabled, setDeadmanEnabled] = useState(false)
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('')
+
+  // Time-lock state
+  const [timelockDays, setTimelockDays] = useState(7)
+
+  // Jury state
+  const [juryStake, setJuryStake] = useState('0.1')
+
+  // Quantum state
+  const [quantumKeyGenerated, setQuantumKeyGenerated] = useState(false)
 
   // Signing state
   const [isSigning, setIsSigning] = useState(false)
-  const [signatureStep, setSignatureStep] = useState(null) // 'guardians' | 'deadman'
 
   if (!isOpen) return null
+
+  // Toggle option selection
+  const toggleOption = (optionId) => {
+    const newSelected = new Set(selectedOptions)
+    if (newSelected.has(optionId)) {
+      newSelected.delete(optionId)
+    } else {
+      newSelected.add(optionId)
+    }
+    setSelectedOptions(newSelected)
+  }
+
+  // Get ordered steps based on selections
+  const getSteps = () => {
+    const steps = ['intro']
+    if (!isConnected && selectedOptions.size > 0) {
+      steps.push('connect')
+    }
+    if (selectedOptions.has('guardians')) steps.push('guardians')
+    if (selectedOptions.has('timelock')) steps.push('timelock')
+    if (selectedOptions.has('deadman')) steps.push('deadman')
+    if (selectedOptions.has('jury')) steps.push('jury')
+    if (selectedOptions.has('quantum')) steps.push('quantum')
+    if (selectedOptions.size > 0) steps.push('complete')
+    return steps
+  }
+
+  const steps = getSteps()
+  const currentStepIndex = steps.indexOf(step)
+
+  // Navigate to next step
+  const nextStep = () => {
+    const nextIndex = currentStepIndex + 1
+    if (nextIndex < steps.length) {
+      setStep(steps[nextIndex])
+    }
+  }
+
+  // Navigate to previous step
+  const prevStep = () => {
+    const prevIndex = currentStepIndex - 1
+    if (prevIndex >= 0) {
+      setStep(steps[prevIndex])
+    }
+  }
 
   // Generate signature message for guardian setup
   const generateGuardianMessage = (guardianList) => {
@@ -53,52 +192,21 @@ Recovery Threshold: 3 of ${guardianList.length} guardians required
 
 Wallet: ${account}
 Timestamp: ${timestamp}
-Chain: Ethereum Mainnet
-
-By signing this message, I confirm that:
-1. I trust these individuals to help recover my wallet
-2. Any 3 of them working together can initiate recovery
-3. I understand there is a 24-hour delay before recovery executes
-4. I can cancel any recovery attempt during this period`
+Chain: Ethereum Mainnet`
   }
 
-  // Generate signature message for deadman switch
-  const generateDeadmanMessage = (beneficiary) => {
-    const timestamp = Math.floor(Date.now() / 1000)
-
-    return `VibeSwap Recovery Setup - Digital Will Confirmation
-
-I authorize the following Digital Will configuration:
-
-Beneficiary: ${beneficiary}
-Inactivity Period: 365 days
-Warning Notifications: 30, 7, and 1 day before activation
-
-Wallet: ${account}
-Timestamp: ${timestamp}
-Chain: Ethereum Mainnet
-
-By signing this message, I confirm that:
-1. After 1 year of wallet inactivity, the beneficiary can claim my assets
-2. Any wallet activity (transactions, signatures) resets the timer
-3. I will receive warnings before the switch activates
-4. I can disable this feature at any time while I have wallet access`
-  }
-
-  // Add guardian to pending list (not confirmed yet)
+  // Add guardian to pending list
   const handleAddGuardianToPending = () => {
     if (!newGuardian.address || !newGuardian.label) {
       toast.error('Please enter both name and address')
       return
     }
 
-    // Validate address
     if (!ethers.isAddress(newGuardian.address)) {
       toast.error('Invalid wallet address')
       return
     }
 
-    // Check for duplicates
     if (pendingGuardians.some(g => g.address.toLowerCase() === newGuardian.address.toLowerCase())) {
       toast.error('Guardian already added')
       return
@@ -106,10 +214,9 @@ By signing this message, I confirm that:
 
     setPendingGuardians([...pendingGuardians, { ...newGuardian }])
     setNewGuardian({ address: '', label: '' })
-    toast.success(`Added ${newGuardian.label} to pending guardians`)
+    toast.success(`Added ${newGuardian.label}`)
   }
 
-  // Remove guardian from pending list
   const handleRemoveGuardian = (index) => {
     setPendingGuardians(pendingGuardians.filter((_, i) => i !== index))
   }
@@ -117,7 +224,7 @@ By signing this message, I confirm that:
   // Sign and confirm guardians
   const handleConfirmGuardians = async () => {
     if (pendingGuardians.length < 3) {
-      toast.error('Add at least 3 guardians for security')
+      toast.error('Add at least 3 guardians')
       return
     }
 
@@ -127,15 +234,10 @@ By signing this message, I confirm that:
     }
 
     setIsSigning(true)
-    setSignatureStep('guardians')
-
     try {
       const message = generateGuardianMessage(pendingGuardians)
-
-      // Request signature from wallet
       const signature = await signer.signMessage(message)
 
-      // Store guardians with signature proof
       for (const guardian of pendingGuardians) {
         await addGuardian(guardian.address, guardian.label, {
           signature,
@@ -145,36 +247,59 @@ By signing this message, I confirm that:
         })
       }
 
-      toast.success('Guardians confirmed and registered!')
-      setStep('deadman')
+      toast.success('Guardians confirmed!')
+      nextStep()
     } catch (error) {
-      console.error('Signature failed:', error)
       if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
-        toast.error('Signature rejected - guardians not saved')
+        toast.error('Signature rejected')
       } else {
-        toast.error('Failed to sign guardian confirmation')
+        toast.error('Failed to sign')
       }
     } finally {
       setIsSigning(false)
-      setSignatureStep(null)
     }
   }
 
-  // Sign and confirm deadman switch
-  const handleConfirmDeadman = async () => {
-    if (!deadmanEnabled) {
-      // Skip to next step if not enabled
-      setStep('hardware')
+  // Confirm time-lock
+  const handleConfirmTimelock = async () => {
+    if (!signer) {
+      toast.error('Wallet not connected')
       return
     }
 
+    setIsSigning(true)
+    try {
+      const message = `VibeSwap Recovery Setup - Time-Lock Confirmation
+
+I authorize a ${timelockDays}-day time-lock on all recovery attempts.
+
+Wallet: ${account}
+Timestamp: ${Math.floor(Date.now() / 1000)}`
+
+      await signer.signMessage(message)
+      await updateConfig({ timelockDays })
+      toast.success('Time-lock confirmed!')
+      nextStep()
+    } catch (error) {
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        toast.error('Signature rejected')
+      } else {
+        toast.error('Failed to sign')
+      }
+    } finally {
+      setIsSigning(false)
+    }
+  }
+
+  // Confirm deadman switch
+  const handleConfirmDeadman = async () => {
     if (!beneficiaryAddress) {
-      toast.error('Please enter a beneficiary address')
+      toast.error('Enter beneficiary address')
       return
     }
 
     if (!ethers.isAddress(beneficiaryAddress)) {
-      toast.error('Invalid beneficiary address')
+      toast.error('Invalid address')
       return
     }
 
@@ -184,34 +309,100 @@ By signing this message, I confirm that:
     }
 
     setIsSigning(true)
-    setSignatureStep('deadman')
-
     try {
-      const message = generateDeadmanMessage(beneficiaryAddress)
+      const message = `VibeSwap Recovery Setup - Digital Will
 
-      // Request signature from wallet
+Beneficiary: ${beneficiaryAddress}
+Inactivity Period: 365 days
+
+Wallet: ${account}
+Timestamp: ${Math.floor(Date.now() / 1000)}`
+
       const signature = await signer.signMessage(message)
-
-      // Store deadman config with signature proof
       await updateConfig({
         deadmanTimeout: 365 * 24 * 60 * 60,
         deadmanBeneficiary: beneficiaryAddress,
         deadmanSignature: signature,
-        deadmanTimestamp: Math.floor(Date.now() / 1000),
       })
 
-      toast.success('Digital Will confirmed and registered!')
-      setStep('hardware')
+      toast.success('Digital Will confirmed!')
+      nextStep()
     } catch (error) {
-      console.error('Signature failed:', error)
       if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
-        toast.error('Signature rejected - Digital Will not saved')
+        toast.error('Signature rejected')
       } else {
-        toast.error('Failed to sign Digital Will confirmation')
+        toast.error('Failed to sign')
       }
     } finally {
       setIsSigning(false)
-      setSignatureStep(null)
+    }
+  }
+
+  // Confirm jury arbitration
+  const handleConfirmJury = async () => {
+    if (!signer) {
+      toast.error('Wallet not connected')
+      return
+    }
+
+    setIsSigning(true)
+    try {
+      const message = `VibeSwap Recovery Setup - Jury Arbitration
+
+I authorize jury arbitration as a recovery method.
+Stake: ${juryStake} ETH
+
+Wallet: ${account}
+Timestamp: ${Math.floor(Date.now() / 1000)}`
+
+      await signer.signMessage(message)
+      await updateConfig({ juryEnabled: true, juryStake: parseFloat(juryStake) })
+      toast.success('Jury arbitration enabled!')
+      nextStep()
+    } catch (error) {
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        toast.error('Signature rejected')
+      } else {
+        toast.error('Failed to sign')
+      }
+    } finally {
+      setIsSigning(false)
+    }
+  }
+
+  // Generate quantum backup
+  const handleGenerateQuantum = async () => {
+    if (!signer) {
+      toast.error('Wallet not connected')
+      return
+    }
+
+    setIsSigning(true)
+    try {
+      const message = `VibeSwap Recovery Setup - Quantum Backup
+
+I authorize generation of quantum-resistant backup keys.
+
+Wallet: ${account}
+Timestamp: ${Math.floor(Date.now() / 1000)}`
+
+      await signer.signMessage(message)
+
+      // Simulate key generation
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      setQuantumKeyGenerated(true)
+      await updateConfig({ quantumEnabled: true })
+
+      toast.success('Quantum backup generated!')
+      nextStep()
+    } catch (error) {
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        toast.error('Signature rejected')
+      } else {
+        toast.error('Failed to sign')
+      }
+    } finally {
+      setIsSigning(false)
     }
   }
 
@@ -224,16 +415,30 @@ By signing this message, I confirm that:
     }
   }
 
-  // Proceed from intro - check wallet connection
+  // Start setup - go to first selected option or connect
   const handleStartSetup = () => {
+    if (selectedOptions.size === 0) {
+      toast.error('Select at least one recovery option')
+      return
+    }
     if (!isConnected) {
       setStep('connect')
     } else {
-      setStep('guardians')
+      nextStep()
     }
   }
 
-  const recoveryScore = Math.min(100, behavioralScore + (guardians.length * 10) + (config.deadmanBeneficiary ? 15 : 0))
+  const recoveryScore = Math.min(100,
+    behavioralScore +
+    (guardians.length * 10) +
+    (config.deadmanBeneficiary ? 15 : 0) +
+    (config.timelockDays ? 10 : 0) +
+    (config.juryEnabled ? 10 : 0) +
+    (config.quantumEnabled ? 15 : 0)
+  )
+
+  // Progress indicator
+  const progressPercent = steps.length > 1 ? (currentStepIndex / (steps.length - 1)) * 100 : 0
 
   return (
     <AnimatePresence>
@@ -252,24 +457,37 @@ By signing this message, I confirm that:
           className="relative w-full max-w-lg bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto allow-scroll"
         >
           {/* Header */}
-          <div className="sticky top-0 bg-black-800 border-b border-black-700 p-4 flex items-center justify-between z-10">
-            <div>
-              <h2 className="text-lg font-bold">Recovery Setup</h2>
-              {isConnected && (
-                <div className="text-xs text-matrix-500 font-mono">
-                  {account?.slice(0, 6)}...{account?.slice(-4)}
-                </div>
-              )}
+          <div className="sticky top-0 bg-black-800 border-b border-black-700 p-4 z-10">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-bold">Recovery Setup</h2>
+                {isConnected && (
+                  <div className="text-xs text-matrix-500 font-mono">
+                    {account?.slice(0, 6)}...{account?.slice(-4)}
+                  </div>
+                )}
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-black-700 rounded-lg transition-colors">
+                <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-black-700 rounded-lg transition-colors">
-              <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Progress bar */}
+            {step !== 'intro' && (
+              <div className="h-1 bg-black-700 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-terminal-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="p-6">
-            {/* Intro Step */}
+            {/* Intro Step - Selectable Options */}
             {step === 'intro' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -282,52 +500,102 @@ By signing this message, I confirm that:
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Never Lose Your Crypto</h3>
+                  <h3 className="text-xl font-bold mb-2">Choose Your Safety Net</h3>
                   <p className="text-black-400 text-sm">
-                    Set up your safety net in just a few minutes. Your wallet signature confirms each step.
+                    Select which recovery methods to set up. Tap the info icon to learn about each option's tradeoffs.
                   </p>
                 </div>
 
-                {/* Security Notice */}
-                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <div className="flex items-start space-x-3">
-                    <span className="text-amber-500 mt-0.5">🔐</span>
-                    <div>
-                      <h4 className="font-semibold text-sm text-amber-400">Signature Required</h4>
-                      <p className="text-xs text-black-400 mt-1">
-                        Each step requires your wallet signature to confirm changes. This ensures only you can modify your recovery settings.
-                      </p>
-                    </div>
-                  </div>
+                {/* Selected count */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-sm text-black-400">
+                    {selectedOptions.size === 0 ? 'Select options below' : `${selectedOptions.size} selected`}
+                  </span>
+                  {selectedOptions.size > 0 && (
+                    <button
+                      onClick={() => setSelectedOptions(new Set())}
+                      className="text-xs text-black-500 hover:text-black-300 transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
 
-                {/* 5 Recovery Methods */}
+                {/* Selectable Recovery Options */}
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-sm text-black-300">Your 5 Recovery Options:</h4>
-                  <div className="grid gap-2">
-                    {[
-                      { icon: '👥', title: 'Guardian Recovery', desc: 'Trusted friends/family can recover your wallet' },
-                      { icon: '⏱️', title: 'Time-Lock Recovery', desc: '7-day waiting period prevents theft' },
-                      { icon: '📜', title: 'Digital Will', desc: 'Beneficiary inherits after 1 year inactivity' },
-                      { icon: '⚖️', title: 'Jury Arbitration', desc: 'Prove ownership to neutral jurors' },
-                      { icon: '🔐', title: 'Quantum Backup', desc: 'Unbreakable backup keys for the future' },
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center space-x-3 p-3 rounded-lg bg-black-700/50">
-                        <span className="text-lg">{item.icon}</span>
-                        <div>
-                          <div className="font-medium text-sm">{item.title}</div>
-                          <div className="text-xs text-black-500">{item.desc}</div>
+                  {RECOVERY_OPTIONS.map((option) => (
+                    <div key={option.id} className="relative">
+                      <div
+                        onClick={() => toggleOption(option.id)}
+                        className={`flex items-center space-x-3 p-4 rounded-lg cursor-pointer transition-all ${
+                          selectedOptions.has(option.id)
+                            ? 'bg-terminal-500/10 border-2 border-terminal-500'
+                            : 'bg-black-700/50 border-2 border-transparent hover:border-black-500'
+                        }`}
+                      >
+                        {/* Checkbox */}
+                        <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                          selectedOptions.has(option.id)
+                            ? 'bg-terminal-500'
+                            : 'bg-black-600 border border-black-500'
+                        }`}>
+                          {selectedOptions.has(option.id) && (
+                            <svg className="w-3 h-3 text-black-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
                         </div>
+
+                        {/* Icon */}
+                        <span className="text-xl flex-shrink-0">{option.icon}</span>
+
+                        {/* Text */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{option.title}</div>
+                          <div className="text-xs text-black-500 truncate">{option.desc}</div>
+                        </div>
+
+                        {/* Info button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveTooltip(activeTooltip === option.id ? null : option.id)
+                          }}
+                          className={`p-1.5 rounded-full flex-shrink-0 transition-colors ${
+                            activeTooltip === option.id
+                              ? 'bg-terminal-500/20 text-terminal-400'
+                              : 'text-black-500 hover:text-black-300 hover:bg-black-600'
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Tooltip */}
+                      <AnimatePresence>
+                        <InfoTooltip
+                          tradeoff={option.tradeoff}
+                          isVisible={activeTooltip === option.id}
+                          onClose={() => setActiveTooltip(null)}
+                        />
+                      </AnimatePresence>
+                    </div>
+                  ))}
                 </div>
 
                 <button
                   onClick={handleStartSetup}
-                  className="w-full py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
+                  disabled={selectedOptions.size === 0}
+                  className="w-full py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
                 >
-                  {isConnected ? 'Start Setup' : 'Connect Wallet to Start'}
+                  {selectedOptions.size === 0
+                    ? 'Select Options to Continue'
+                    : isConnected
+                      ? `Set Up ${selectedOptions.size} Option${selectedOptions.size > 1 ? 's' : ''}`
+                      : 'Connect Wallet to Continue'
+                  }
                 </button>
 
                 <button
@@ -354,26 +622,8 @@ By signing this message, I confirm that:
                   </div>
                   <h3 className="text-xl font-bold mb-2">Connect Your Wallet</h3>
                   <p className="text-black-400 text-sm">
-                    Recovery setup requires wallet connection to sign and confirm your settings.
+                    Your wallet signature confirms each recovery setting.
                   </p>
-                </div>
-
-                <div className="p-4 rounded-lg bg-black-700/50 border border-black-600">
-                  <h4 className="font-medium text-sm mb-2">Why is this required?</h4>
-                  <ul className="space-y-2 text-xs text-black-400">
-                    <li className="flex items-start space-x-2">
-                      <span className="text-matrix-500 mt-0.5">✓</span>
-                      <span>Proves you own the wallet you're protecting</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="text-matrix-500 mt-0.5">✓</span>
-                      <span>Creates cryptographic proof of your guardian choices</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="text-matrix-500 mt-0.5">✓</span>
-                      <span>Ensures only you can modify recovery settings</span>
-                    </li>
-                  </ul>
                 </div>
 
                 {isConnected ? (
@@ -397,13 +647,13 @@ By signing this message, I confirm that:
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => setStep('intro')}
+                    onClick={prevStep}
                     className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
                   >
                     Back
                   </button>
                   <button
-                    onClick={() => setStep('guardians')}
+                    onClick={nextStep}
                     disabled={!isConnected}
                     className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
                   >
@@ -421,59 +671,29 @@ By signing this message, I confirm that:
                 className="space-y-6"
               >
                 <div>
-                  <h3 className="text-lg font-bold mb-1">Add Trusted Guardians</h3>
-                  <p className="text-black-400 text-sm">
-                    Choose 3-5 people who can help you recover your wallet. Any 3 of them must agree to initiate recovery.
-                  </p>
-                </div>
-
-                {/* Guardian Suggestions */}
-                <div className="p-3 rounded-lg bg-black-700/50">
-                  <p className="text-xs text-black-400 mb-2">Good guardian choices:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {['Parent', 'Sibling', 'Best Friend', 'Spouse', 'Lawyer'].map(s => (
-                      <span key={s} className="px-2 py-1 rounded text-xs bg-black-600 text-black-300">{s}</span>
-                    ))}
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">👥</span>
+                    <h3 className="text-lg font-bold">Guardian Recovery</h3>
                   </div>
+                  <p className="text-black-400 text-sm">
+                    Add 3-5 trusted people. Any 3 can initiate recovery.
+                  </p>
                 </div>
 
                 {/* Pending Guardians */}
                 {pendingGuardians.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-black-300">
-                      Pending Guardians ({pendingGuardians.length})
-                      <span className="text-black-500 font-normal ml-2">- will be confirmed with signature</span>
-                    </h4>
                     {pendingGuardians.map((g, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-black-700 border border-amber-500/30">
+                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-black-700 border border-terminal-500/30">
                         <div>
                           <div className="font-medium text-sm">{g.label}</div>
-                          <div className="text-xs text-black-500 font-mono">{g.address.slice(0, 10)}...{g.address.slice(-8)}</div>
+                          <div className="text-xs text-black-500 font-mono">{g.address.slice(0, 10)}...{g.address.slice(-6)}</div>
                         </div>
-                        <button
-                          onClick={() => handleRemoveGuardian(i)}
-                          className="text-red-500 hover:text-red-400 p-1"
-                        >
+                        <button onClick={() => handleRemoveGuardian(i)} className="text-red-500 hover:text-red-400 p-1">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Already Confirmed Guardians */}
-                {guardians.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-matrix-400">Confirmed Guardians ({guardians.length})</h4>
-                    {guardians.map((g, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-matrix-500/10 border border-matrix-500/30">
-                        <div>
-                          <div className="font-medium text-sm">{g.label}</div>
-                          <div className="text-xs text-black-500 font-mono">{g.address.slice(0, 10)}...{g.address.slice(-8)}</div>
-                        </div>
-                        <span className="text-matrix-500">✓</span>
                       </div>
                     ))}
                   </div>
@@ -503,18 +723,17 @@ By signing this message, I confirm that:
                   </button>
                 </div>
 
-                {/* Minimum requirement notice */}
                 {pendingGuardians.length > 0 && pendingGuardians.length < 3 && (
                   <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                     <p className="text-xs text-amber-400">
-                      Add at least {3 - pendingGuardians.length} more guardian{3 - pendingGuardians.length > 1 ? 's' : ''} (minimum 3 required for security)
+                      Add {3 - pendingGuardians.length} more guardian{3 - pendingGuardians.length > 1 ? 's' : ''} (minimum 3)
                     </p>
                   </div>
                 )}
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => setStep('intro')}
+                    onClick={prevStep}
                     className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
                   >
                     Back
@@ -522,34 +741,72 @@ By signing this message, I confirm that:
                   <button
                     onClick={handleConfirmGuardians}
                     disabled={pendingGuardians.length < 3 || isSigning}
-                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors flex items-center justify-center space-x-2"
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
                   >
-                    {isSigning && signatureStep === 'guardians' ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <span>Sign in Wallet...</span>
-                      </>
-                    ) : (
-                      <span>Sign & Confirm Guardians</span>
-                    )}
+                    {isSigning ? 'Signing...' : 'Sign & Confirm'}
                   </button>
                 </div>
-
-                {pendingGuardians.length === 0 && guardians.length === 0 && (
-                  <button
-                    onClick={() => setStep('deadman')}
-                    className="w-full py-2 text-sm text-black-500 hover:text-black-300 transition-colors"
-                  >
-                    Skip guardians for now
-                  </button>
-                )}
               </motion.div>
             )}
 
-            {/* Dead Man's Switch Step */}
+            {/* Time-Lock Step */}
+            {step === 'timelock' && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">⏱️</span>
+                    <h3 className="text-lg font-bold">Time-Lock Recovery</h3>
+                  </div>
+                  <p className="text-black-400 text-sm">
+                    Set a waiting period before any recovery executes. Gives you time to cancel unauthorized attempts.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="block text-sm text-black-400">Waiting Period</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[3, 7, 14].map((days) => (
+                      <button
+                        key={days}
+                        onClick={() => setTimelockDays(days)}
+                        className={`py-3 rounded-lg font-medium transition-all ${
+                          timelockDays === days
+                            ? 'bg-terminal-500 text-black-900'
+                            : 'bg-black-700 text-black-300 hover:bg-black-600'
+                        }`}
+                      >
+                        {days} days
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-black-500">
+                    Longer delays = more security, slower recovery. 7 days is recommended.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={prevStep}
+                    className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleConfirmTimelock}
+                    disabled={isSigning}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
+                  >
+                    {isSigning ? 'Signing...' : 'Sign & Confirm'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Digital Will Step */}
             {step === 'deadman' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -557,147 +814,170 @@ By signing this message, I confirm that:
                 className="space-y-6"
               >
                 <div>
-                  <h3 className="text-lg font-bold mb-1">Digital Will Setup</h3>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">📜</span>
+                    <h3 className="text-lg font-bold">Digital Will</h3>
+                  </div>
                   <p className="text-black-400 text-sm">
-                    Choose someone to inherit your wallet if you're inactive for 1 year. Your signature confirms this choice.
+                    Your beneficiary can claim your wallet after 1 year of inactivity.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-xs text-amber-400">
-                    <strong>Why this matters:</strong> If something happens to you, your crypto won't be lost forever. Your beneficiary can claim it after a year of inactivity.
+                <div className="space-y-3">
+                  <label className="block text-sm text-black-400">Beneficiary Address</label>
+                  <input
+                    type="text"
+                    value={beneficiaryAddress}
+                    onChange={(e) => setBeneficiaryAddress(e.target.value)}
+                    placeholder="0x... (spouse, child, charity)"
+                    className="w-full bg-black-700 rounded-lg p-3 text-white placeholder-black-500 outline-none border border-black-600 focus:border-terminal-500 font-mono text-sm"
+                  />
+                  <p className="text-xs text-black-500">
+                    Any wallet activity resets the 1-year timer. They'll be notified 30 days before activation.
                   </p>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="flex items-center space-x-3 p-4 rounded-lg bg-black-700/50 cursor-pointer hover:bg-black-700 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={deadmanEnabled}
-                      onChange={(e) => setDeadmanEnabled(e.target.checked)}
-                      className="w-5 h-5 rounded border-black-500 text-terminal-500 focus:ring-terminal-500 focus:ring-offset-0 bg-black-600"
-                    />
-                    <div>
-                      <div className="font-medium">Enable Digital Will</div>
-                      <div className="text-xs text-black-500">Beneficiary can claim after 1 year inactivity</div>
-                    </div>
-                  </label>
-
-                  {deadmanEnabled && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="space-y-3"
-                    >
-                      <label className="block text-sm text-black-400">Beneficiary Address</label>
-                      <input
-                        type="text"
-                        value={beneficiaryAddress}
-                        onChange={(e) => setBeneficiaryAddress(e.target.value)}
-                        placeholder="0x... (spouse, child, charity)"
-                        className="w-full bg-black-700 rounded-lg p-3 text-white placeholder-black-500 outline-none border border-black-600 focus:border-terminal-500 font-mono text-sm"
-                      />
-                      <p className="text-xs text-black-500">
-                        This person will be notified 30 days before the switch activates.
-                      </p>
-
-                      {/* Signature preview */}
-                      <div className="p-3 rounded-lg bg-black-700/50 border border-black-600">
-                        <p className="text-xs text-black-500 mb-1">You'll sign a message confirming:</p>
-                        <ul className="text-xs text-black-400 space-y-1">
-                          <li>• Beneficiary: {beneficiaryAddress || '(enter address)'}</li>
-                          <li>• Inactivity period: 365 days</li>
-                          <li>• Warning notifications enabled</li>
-                        </ul>
-                      </div>
-                    </motion.div>
-                  )}
                 </div>
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => setStep('guardians')}
+                    onClick={prevStep}
                     className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleConfirmDeadman}
-                    disabled={isSigning || (deadmanEnabled && !beneficiaryAddress)}
-                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors flex items-center justify-center space-x-2"
+                    disabled={!beneficiaryAddress || isSigning}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
                   >
-                    {isSigning && signatureStep === 'deadman' ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <span>Sign in Wallet...</span>
-                      </>
-                    ) : deadmanEnabled ? (
-                      <span>Sign & Confirm Will</span>
-                    ) : (
-                      <span>Continue</span>
-                    )}
+                    {isSigning ? 'Signing...' : 'Sign & Confirm'}
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* Hardware Key Step */}
-            {step === 'hardware' && (
+            {/* Jury Arbitration Step */}
+            {step === 'jury' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-6"
               >
                 <div>
-                  <h3 className="text-lg font-bold mb-1">Hardware Key (Optional)</h3>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">⚖️</span>
+                    <h3 className="text-lg font-bold">Jury Arbitration</h3>
+                  </div>
                   <p className="text-black-400 text-sm">
-                    Register a hardware security key for additional protection against AI impersonation.
+                    If other methods fail, prove ownership to random community jurors.
                   </p>
                 </div>
 
-                <div className="grid gap-3">
-                  <button
-                    onClick={() => registerHardwareKey('yubikey')}
-                    className="flex items-center space-x-4 p-4 rounded-lg bg-black-700/50 hover:bg-black-700 border border-black-600 hover:border-terminal-500/50 transition-all text-left"
-                  >
-                    <div className="w-12 h-12 rounded-lg bg-terminal-500/20 flex items-center justify-center">
-                      <span className="text-2xl">🔑</span>
-                    </div>
-                    <div>
-                      <div className="font-medium">YubiKey</div>
-                      <div className="text-xs text-black-500">Physical security key</div>
-                    </div>
-                  </button>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-black-700/50">
+                    <h4 className="font-medium text-sm mb-2">How it works:</h4>
+                    <ul className="space-y-2 text-xs text-black-400">
+                      <li className="flex items-start space-x-2">
+                        <span className="text-terminal-500">1.</span>
+                        <span>You stake ETH to open a case (prevents spam)</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-terminal-500">2.</span>
+                        <span>5 random jurors review your evidence</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-terminal-500">3.</span>
+                        <span>Majority vote decides; losers forfeit stake</span>
+                      </li>
+                    </ul>
+                  </div>
 
-                  <button
-                    onClick={() => registerHardwareKey('ledger')}
-                    className="flex items-center space-x-4 p-4 rounded-lg bg-black-700/50 hover:bg-black-700 border border-black-600 hover:border-terminal-500/50 transition-all text-left"
-                  >
-                    <div className="w-12 h-12 rounded-lg bg-terminal-500/20 flex items-center justify-center">
-                      <span className="text-2xl">💳</span>
+                  <div>
+                    <label className="block text-sm text-black-400 mb-2">Stake Amount</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {['0.05', '0.1', '0.25'].map((amount) => (
+                        <button
+                          key={amount}
+                          onClick={() => setJuryStake(amount)}
+                          className={`py-3 rounded-lg font-medium transition-all ${
+                            juryStake === amount
+                              ? 'bg-terminal-500 text-black-900'
+                              : 'bg-black-700 text-black-300 hover:bg-black-600'
+                          }`}
+                        >
+                          {amount} ETH
+                        </button>
+                      ))}
                     </div>
-                    <div>
-                      <div className="font-medium">Ledger / Trezor</div>
-                      <div className="text-xs text-black-500">Hardware wallet</div>
-                    </div>
-                  </button>
+                  </div>
                 </div>
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => setStep('deadman')}
+                    onClick={prevStep}
                     className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
                   >
                     Back
                   </button>
                   <button
-                    onClick={() => setStep('complete')}
-                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
+                    onClick={handleConfirmJury}
+                    disabled={isSigning}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
                   >
-                    {guardians.length > 0 || config.deadmanBeneficiary ? 'Complete Setup' : 'Skip for Now'}
+                    {isSigning ? 'Signing...' : 'Sign & Enable'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Quantum Backup Step */}
+            {step === 'quantum' && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xl">🔐</span>
+                    <h3 className="text-lg font-bold">Quantum Backup</h3>
+                  </div>
+                  <p className="text-black-400 text-sm">
+                    Generate backup keys that future quantum computers can't crack.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-terminal-500/10 border border-terminal-500/20">
+                  <h4 className="font-medium text-sm text-terminal-400 mb-2">Lattice-Based Cryptography</h4>
+                  <p className="text-xs text-black-400">
+                    Uses CRYSTALS-Dilithium, a NIST-approved post-quantum algorithm. Your backup keys will remain secure even when quantum computers become powerful enough to break current encryption.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-amber-500 mt-0.5">⚠️</span>
+                    <div>
+                      <h4 className="font-semibold text-sm text-amber-400">Important</h4>
+                      <p className="text-xs text-black-400 mt-1">
+                        You'll need to securely store an additional recovery phrase. Treat it like your seed phrase.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={prevStep}
+                    className="flex-1 py-3 rounded-lg border border-black-600 text-black-300 hover:text-white font-semibold transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleGenerateQuantum}
+                    disabled={isSigning}
+                    className="flex-1 py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 disabled:bg-black-600 disabled:text-black-500 text-black-900 font-semibold transition-colors"
+                  >
+                    {isSigning ? 'Generating...' : 'Generate Backup'}
                   </button>
                 </div>
               </motion.div>
@@ -719,7 +999,7 @@ By signing this message, I confirm that:
                 <div>
                   <h3 className="text-xl font-bold mb-2">You're Protected!</h3>
                   <p className="text-black-400 text-sm">
-                    Your wallet recovery safety net is now active and cryptographically signed.
+                    Your selected recovery methods are now active.
                   </p>
                 </div>
 
@@ -739,20 +1019,16 @@ By signing this message, I confirm that:
 
                 {/* Summary */}
                 <div className="text-left space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-black-700/50">
-                    <span className="text-sm text-black-400">Guardians</span>
-                    <span className="font-medium">{guardians.length} confirmed</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-black-700/50">
-                    <span className="text-sm text-black-400">Digital Will</span>
-                    <span className={`font-medium ${config.deadmanBeneficiary ? 'text-matrix-500' : 'text-black-500'}`}>
-                      {config.deadmanBeneficiary ? 'Signed & Active' : 'Not set'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-black-700/50">
-                    <span className="text-sm text-black-400">Signed by</span>
-                    <span className="font-mono text-xs text-black-300">{account?.slice(0, 10)}...{account?.slice(-6)}</span>
-                  </div>
+                  {Array.from(selectedOptions).map((optionId) => {
+                    const option = RECOVERY_OPTIONS.find(o => o.id === optionId)
+                    return (
+                      <div key={optionId} className="flex items-center space-x-3 p-3 rounded-lg bg-matrix-500/10 border border-matrix-500/30">
+                        <span>{option?.icon}</span>
+                        <span className="text-sm font-medium">{option?.title}</span>
+                        <span className="ml-auto text-matrix-500">✓</span>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 <button

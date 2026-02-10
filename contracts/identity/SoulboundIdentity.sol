@@ -84,6 +84,12 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     // Authorized contribution recorders (forum contract, etc.)
     mapping(address => bool) public authorizedRecorders;
 
+    // Recovery contract address (can transfer soulbound tokens)
+    address public recoveryContract;
+
+    // Flag to allow recovery transfers (bypasses soulbound check)
+    bool private _isRecoveryTransfer;
+
     // ============ Events ============
 
     event IdentityMinted(address indexed owner, uint256 indexed tokenId, string username, bool quantumEnabled);
@@ -473,6 +479,40 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     }
 
     /**
+     * @notice Set the recovery contract address
+     */
+    function setRecoveryContract(address _recoveryContract) external onlyOwner {
+        recoveryContract = _recoveryContract;
+    }
+
+    /**
+     * @notice Transfer identity to new owner (only callable by recovery contract)
+     * @dev This is the ONLY way to transfer a soulbound token
+     */
+    function recoveryTransfer(uint256 tokenId, address newOwner) external {
+        require(msg.sender == recoveryContract, "Only recovery contract");
+        require(newOwner != address(0), "Invalid new owner");
+        require(addressToTokenId[newOwner] == 0, "New owner already has identity");
+
+        address oldOwner = _ownerOf(tokenId);
+        require(oldOwner != address(0), "Token does not exist");
+
+        // Clear old owner mapping
+        delete addressToTokenId[oldOwner];
+
+        // Set new owner mapping
+        addressToTokenId[newOwner] = tokenId;
+
+        // Transfer the token (bypasses soulbound check via internal flag)
+        _isRecoveryTransfer = true;
+        _transfer(oldOwner, newOwner, tokenId);
+        _isRecoveryTransfer = false;
+
+        // Update last active
+        identities[tokenId].lastActive = block.timestamp;
+    }
+
+    /**
      * @notice Award XP directly (for off-chain contributions, trades, etc.)
      */
     function awardXP(address user, uint256 amount, string calldata reason) external {
@@ -488,12 +528,13 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
 
     /**
      * @notice Prevent all transfers - this is a soulbound token
+     * @dev Exception: recovery transfers are allowed via the recovery contract
      */
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
 
-        // Allow minting (from == address(0)) but not transfers
-        if (from != address(0) && to != address(0)) {
+        // Allow minting (from == address(0)) and recovery transfers
+        if (from != address(0) && to != address(0) && !_isRecoveryTransfer) {
             revert SoulboundNoTransfer();
         }
 

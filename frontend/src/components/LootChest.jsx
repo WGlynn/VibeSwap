@@ -209,8 +209,17 @@ function LootChest({ isConnected }) {
                   <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
-              <p className="text-xs text-black-500">No loot available</p>
-              <p className="text-[10px] text-black-600 mt-1">Trade and provide liquidity to earn</p>
+              <p className="text-sm text-black-400 font-medium">No rewards yet</p>
+              <p className="text-xs text-black-500 mt-1 mb-4">Complete your first exchange to start earning</p>
+              <a
+                href="/swap"
+                className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-medium text-sm transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+                </svg>
+                <span>Start Trading</span>
+              </a>
             </div>
           ) : (
             pendingLoot.map((loot) => {

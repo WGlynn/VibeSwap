@@ -50,12 +50,19 @@ function PlayerStats({ isConnected }) {
   if (!isConnected) {
     return (
       <div className="surface rounded-lg p-6 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black-700 border border-black-500 flex items-center justify-center">
-          <svg className="w-8 h-8 text-black-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-matrix-500/20 border border-matrix-500/30 flex items-center justify-center">
+          <svg className="w-8 h-8 text-matrix-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
-        <p className="text-sm text-black-400">Connect wallet to view stats</p>
+        <p className="text-sm font-medium text-white mb-1">Track Your Progress</p>
+        <p className="text-xs text-black-400 mb-4">See how much you've saved and earned</p>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('connect-wallet'))}
+          className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-medium text-sm transition-colors"
+        >
+          <span>Get Started</span>
+        </button>
       </div>
     )
   }
@@ -113,6 +120,24 @@ function PlayerStats({ isConnected }) {
         </div>
       </div>
 
+      {/* Real Value Banner - Your actual earnings */}
+      <div className="px-4 pt-4">
+        <div className="p-4 rounded-lg bg-matrix-500/10 border border-matrix-500/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-black-400">You've saved</div>
+              <div className="text-2xl font-bold font-mono text-matrix-500">${PLAYER_DATA.savingsTotal}</div>
+              <div className="text-[10px] text-black-500">vs traditional exchanges</div>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-matrix-500/20 flex items-center justify-center">
+              <svg className="w-6 h-6 text-matrix-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Quick Stats */}
       <div className="p-4 grid grid-cols-2 gap-3">
         <div className="p-3 rounded-lg bg-black-700/50">
@@ -123,13 +148,13 @@ function PlayerStats({ isConnected }) {
           <div className="text-[10px] text-black-500 uppercase">Volume</div>
           <div className="text-lg font-bold font-mono">${(PLAYER_DATA.volumeUsd / 1000).toFixed(1)}K</div>
         </div>
-        <div className="p-3 rounded-lg bg-matrix-500/10 border border-matrix-500/30">
-          <div className="text-[10px] text-black-500 uppercase">Total Saved</div>
-          <div className="text-lg font-bold font-mono text-matrix-500">${PLAYER_DATA.savingsTotal}</div>
+        <div className="p-3 rounded-lg bg-black-700/50">
+          <div className="text-[10px] text-black-500 uppercase">Success Rate</div>
+          <div className="text-lg font-bold font-mono">{PLAYER_DATA.winRate}%</div>
         </div>
         <div className="p-3 rounded-lg bg-black-700/50">
-          <div className="text-[10px] text-black-500 uppercase">Win Rate</div>
-          <div className="text-lg font-bold font-mono">{PLAYER_DATA.winRate}%</div>
+          <div className="text-[10px] text-black-500 uppercase">Avg Position</div>
+          <div className="text-lg font-bold font-mono">#{PLAYER_DATA.avgBatchPosition.toFixed(0)}</div>
         </div>
       </div>
 

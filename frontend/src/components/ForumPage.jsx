@@ -2,8 +2,16 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useContributions, CONTRIBUTION_TYPES, RESERVED_USERNAMES } from '../contexts/ContributionsContext'
+import { useWallet } from '../hooks/useWallet'
+import { useIdentity } from '../hooks/useIdentity'
+import SoulboundAvatar from './SoulboundAvatar'
+import CreateIdentityModal from './CreateIdentityModal'
+import ContributionGraph from './ContributionGraph'
 
 function ForumPage() {
+  const { isConnected, connect } = useWallet()
+  const { identity, hasIdentity, isLoading: identityLoading, getLevelTitle, getLevelColor, addContribution: addIdentityContribution } = useIdentity()
+
   const {
     contributions,
     addContribution,
@@ -17,6 +25,8 @@ function ForumPage() {
   const [filterType, setFilterType] = useState('all')
   const [filterTag, setFilterTag] = useState(null)
   const [showNewPost, setShowNewPost] = useState(false)
+  const [showIdentityModal, setShowIdentityModal] = useState(false)
+  const [showContribGraph, setShowContribGraph] = useState(false)
 
   const leaderboard = useMemo(() => getLeaderboard(), [contributions])
   const allTags = useMemo(() => getAllTags(), [contributions])
@@ -32,18 +42,72 @@ function ForumPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
+      {/* Header with Identity */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        className="mb-8"
       >
-        <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-3">
-          Build <span className="text-matrix-500">Together</span>
-        </h1>
-        <p className="text-lg text-black-400 max-w-2xl mx-auto">
-          Contribute context, ideas, and feedback. Earn rewards when your contributions get implemented.
-        </p>
+        <div className="flex items-start justify-between">
+          <div className="text-center flex-1">
+            <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-3">
+              Build <span className="text-matrix-500">Together</span>
+            </h1>
+            <p className="text-lg text-black-400 max-w-2xl mx-auto">
+              Contribute context, ideas, and feedback. Earn rewards when your contributions get implemented.
+            </p>
+          </div>
+
+          {/* Identity Card */}
+          {isConnected && hasIdentity && identity && (
+            <button
+              onClick={() => setShowContribGraph(true)}
+              className="hidden lg:flex surface rounded-lg p-3 items-center space-x-3 hover:border-matrix-500/50 transition-colors"
+            >
+              <SoulboundAvatar identity={identity} size={48} />
+              <div className="text-left">
+                <div className="font-semibold">{identity.username}</div>
+                <div className="flex items-center space-x-2 text-xs">
+                  <span
+                    className="px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: getLevelColor(identity.level) + '30', color: getLevelColor(identity.level) }}
+                  >
+                    Lv.{identity.level}
+                  </span>
+                  <span className="text-black-400">{identity.xp} XP</span>
+                </div>
+              </div>
+            </button>
+          )}
+
+          {/* Create Identity CTA */}
+          {isConnected && !hasIdentity && !identityLoading && (
+            <button
+              onClick={() => setShowIdentityModal(true)}
+              className="hidden lg:flex items-center space-x-2 px-4 py-2 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold transition-colors"
+            >
+              <span>Create Identity</span>
+            </button>
+          )}
+        </div>
+
+        {/* Mobile identity prompt */}
+        {isConnected && !hasIdentity && !identityLoading && (
+          <div className="lg:hidden mt-4 p-4 rounded-lg bg-matrix-500/10 border border-matrix-500/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-sm">Claim Your Identity</div>
+                <div className="text-xs text-black-400">Mint a soulbound NFT to track contributions</div>
+              </div>
+              <button
+                onClick={() => setShowIdentityModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-sm transition-colors"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Tabs */}
@@ -252,9 +316,62 @@ function ForumPage() {
             onClose={() => setShowNewPost(false)}
             onSubmit={(contrib) => {
               addContribution(contrib)
+              // Also track in identity if user has one
+              if (hasIdentity) {
+                addIdentityContribution('post')
+              }
               setShowNewPost(false)
             }}
+            identity={identity}
+            hasIdentity={hasIdentity}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Create Identity Modal */}
+      <CreateIdentityModal
+        isOpen={showIdentityModal}
+        onClose={() => setShowIdentityModal(false)}
+      />
+
+      {/* Contribution Graph Modal */}
+      <AnimatePresence>
+        {showContribGraph && identity && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowContribGraph(false)} />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-2xl bg-black-800 rounded-2xl border border-black-600 shadow-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="sticky top-0 flex items-center justify-between p-4 border-b border-black-700 bg-black-800">
+                <div className="flex items-center space-x-3">
+                  <SoulboundAvatar identity={identity} size={40} />
+                  <div>
+                    <h3 className="font-semibold">{identity.username}</h3>
+                    <div className="text-xs text-black-400">Soulbound Identity #{identity.tokenId || 1}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowContribGraph(false)}
+                  className="p-2 rounded-lg hover:bg-black-700"
+                >
+                  <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4">
+                <ContributionGraph identity={identity} />
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -546,12 +663,16 @@ function LeaderboardView({ leaderboard }) {
   )
 }
 
-function NewContributionModal({ onClose, onSubmit }) {
+function NewContributionModal({ onClose, onSubmit, identity, hasIdentity }) {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [type, setType] = useState('context')
   const [tags, setTags] = useState('')
   const [author, setAuthor] = useState(() => {
+    // Use soulbound identity username if available
+    if (hasIdentity && identity?.username) {
+      return identity.username
+    }
     const saved = localStorage.getItem('vibeswap_personality')
     if (saved) {
       try {
@@ -596,13 +717,21 @@ function NewContributionModal({ onClose, onSubmit }) {
           {/* Author */}
           <div>
             <label className="block text-sm text-black-400 mb-1">Username</label>
-            <input
-              type="text"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder="your username"
-              className="w-full px-3 py-2 rounded-lg bg-black-900 border border-black-600 text-white placeholder-black-500 focus:border-matrix-500 focus:outline-none"
-            />
+            {hasIdentity && identity ? (
+              <div className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-black-900 border border-matrix-500/30">
+                <SoulboundAvatar identity={identity} size={24} showLevel={false} />
+                <span className="text-matrix-500 font-medium">{identity.username}</span>
+                <span className="text-xs text-black-500 px-1.5 py-0.5 rounded bg-matrix-500/10">Verified</span>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder="your username"
+                className="w-full px-3 py-2 rounded-lg bg-black-900 border border-black-600 text-white placeholder-black-500 focus:border-matrix-500 focus:outline-none"
+              />
+            )}
           </div>
 
           {/* Type */}

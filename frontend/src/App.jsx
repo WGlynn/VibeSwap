@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
@@ -52,9 +53,19 @@ function App() {
   const location = useLocation()
   const isHomePage = location.pathname === '/'
 
+  // Lock body scroll on home page (mobile browser fix)
+  useEffect(() => {
+    if (isHomePage) {
+      document.body.classList.add('no-scroll')
+    } else {
+      document.body.classList.remove('no-scroll')
+    }
+    return () => document.body.classList.remove('no-scroll')
+  }, [isHomePage])
+
   return (
     <ContributionsProvider>
-      <div className={`min-h-screen bg-black-900 ${isHomePage ? 'h-screen overflow-hidden' : ''}`}>
+      <div className={`min-h-screen bg-black-900 ${isHomePage ? 'h-[100dvh] overflow-hidden' : ''}`}>
         {/* Clean. Simple. Black void. */}
         <HeaderMinimal />
         <main className={isHomePage ? 'overflow-hidden' : ''}>

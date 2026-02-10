@@ -137,6 +137,13 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
 function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBackup, walletAddress, isDeviceWallet }) {
   const [expandedBox, setExpandedBox] = useState(null) // 'howItWorks', 'compare', 'recovery'
 
+  // Reset expanded state when modal opens/closes to ensure clean state
+  useEffect(() => {
+    if (isOpen) {
+      setExpandedBox(null) // Always start with boxes collapsed
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const toggleBox = (boxId) => {

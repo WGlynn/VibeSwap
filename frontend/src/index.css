@@ -335,6 +335,15 @@ input[type="number"] {
   animation: marquee 30s linear infinite;
 }
 
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-marquee-reverse {
+  animation: marquee-reverse 30s linear infinite;
+}
+
 @keyframes heartbeat {
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }

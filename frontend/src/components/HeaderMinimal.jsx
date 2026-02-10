@@ -127,6 +127,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
     { path: '/forum', label: 'Community', icon: '💬' },
     { path: '/docs', label: 'Learn', icon: '📚' },
+    { path: '/about', label: 'About', icon: '💡' },
   ]
 
   // Admin items - TODO: Add proper role check

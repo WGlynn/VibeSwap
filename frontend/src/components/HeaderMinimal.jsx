@@ -214,24 +214,20 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         </div>
 
         {/* Security Section - Recovery Setup */}
-        {isConnected && (
-          <>
-            <div className="mx-4 h-px bg-black-700" />
-            <div className="p-2">
-              <div className="px-4 py-2 text-xs text-black-500 uppercase">Security</div>
-              <button
-                onClick={onOpenRecoverySetup}
-                className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors hover:bg-black-700/50 text-black-400 hover:text-matrix-400"
-              >
-                <span>🛡️</span>
-                <div className="text-left">
-                  <div>Recovery Setup</div>
-                  <div className="text-xs text-black-500">Never lose access to your wallet</div>
-                </div>
-              </button>
+        <div className="mx-4 h-px bg-black-700" />
+        <div className="p-2">
+          <div className="px-4 py-2 text-xs text-black-500 uppercase">Security</div>
+          <button
+            onClick={onOpenRecoverySetup}
+            className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors hover:bg-black-700/50 text-black-400 hover:text-matrix-400"
+          >
+            <span>🛡️</span>
+            <div className="text-left">
+              <div>Recovery Setup</div>
+              <div className="text-xs text-black-500">Never lose access to your wallet</div>
             </div>
-          </>
-        )}
+          </button>
+        </div>
 
         {/* Settings & Disconnect */}
         {isConnected && (

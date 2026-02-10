@@ -11,6 +11,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend UI/UX improvements
 - Wallet connection flow for both external (MetaMask) and device (WebAuthn) wallets
 - Security-first design based on wallet security axioms
+- Axiom alignment gaps: Savings Vault (separation of concerns), hardware wallet prompts, paper backup
 
 ## Active Tasks
 - None currently in progress

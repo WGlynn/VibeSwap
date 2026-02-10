@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import SoulboundAvatar from './SoulboundAvatar'
+import RecoverySetup from './RecoverySetup'
 
 /**
  * Minimal header - Logo, wallet, and hidden drawer for power users
@@ -14,6 +15,7 @@ function HeaderMinimal() {
   const { isConnected, shortAddress, connect, disconnect, isConnecting } = useWallet()
   const { identity, hasIdentity } = useIdentity()
   const [showDrawer, setShowDrawer] = useState(false)
+  const [showRecoverySetup, setShowRecoverySetup] = useState(false)
 
   return (
     <>
@@ -79,14 +81,23 @@ function HeaderMinimal() {
             hasIdentity={hasIdentity}
             isConnected={isConnected}
             disconnect={disconnect}
+            onOpenRecoverySetup={() => {
+              setShowDrawer(false)
+              setShowRecoverySetup(true)
+            }}
           />
         )}
       </AnimatePresence>
+
+      {/* Recovery Setup Modal */}
+      {showRecoverySetup && (
+        <RecoverySetup isOpen={showRecoverySetup} onClose={() => setShowRecoverySetup(false)} />
+      )}
     </>
   )
 }
 
-function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect }) {
+function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect, onOpenRecoverySetup }) {
   const location = useLocation()
 
   const navItems = [
@@ -201,6 +212,26 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             </Link>
           ))}
         </div>
+
+        {/* Security Section - Recovery Setup */}
+        {isConnected && (
+          <>
+            <div className="mx-4 h-px bg-black-700" />
+            <div className="p-2">
+              <div className="px-4 py-2 text-xs text-black-500 uppercase">Security</div>
+              <button
+                onClick={onOpenRecoverySetup}
+                className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors hover:bg-black-700/50 text-black-400 hover:text-matrix-400"
+              >
+                <span>🛡️</span>
+                <div className="text-left">
+                  <div>Recovery Setup</div>
+                  <div className="text-xs text-black-500">Never lose access to your wallet</div>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Settings & Disconnect */}
         {isConnected && (

@@ -222,6 +222,26 @@ function OnboardingModal({ isOpen, onClose, onComplete }) {
                   </ul>
                 </div>
 
+                {/* Recovery Safety Net - For users worried about losing access */}
+                <div className="p-4 rounded-lg bg-terminal-500/10 border border-terminal-500/20 text-left">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-terminal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-4 h-4 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm text-terminal-400 mb-1">Never Lose Access</h4>
+                      <p className="text-xs text-black-400 leading-relaxed">
+                        Worried about losing your wallet? VibeSwap includes <strong className="text-terminal-400">5 ways to recover</strong> your identity—trusted friends, time-delayed recovery, a digital will, jury arbitration, and quantum-proof backup keys.
+                      </p>
+                      <p className="text-xs text-black-500 mt-2">
+                        You can set these up after creating your identity.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   onClick={() => setStep('account-type')}
                   className="w-full py-3 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold transition-colors"
@@ -562,7 +582,23 @@ function OnboardingModal({ isOpen, onClose, onComplete }) {
                         <span>{keyCount} quantum-resistant signature keys</span>
                       </li>
                     )}
+                    <li className="flex items-center space-x-2">
+                      <span className="text-terminal-500">✓</span>
+                      <span>5-layer wallet recovery system</span>
+                    </li>
                   </ul>
+                </div>
+
+                {/* Recovery Reminder */}
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-start space-x-2">
+                    <svg className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p className="text-xs text-amber-400">
+                      <strong>After setup:</strong> Add trusted guardians (friends, family) who can help you recover access if you ever lose your wallet. This takes 2 minutes and could save your crypto forever.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex space-x-3">

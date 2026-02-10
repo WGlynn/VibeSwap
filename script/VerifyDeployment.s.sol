@@ -244,11 +244,15 @@ contract VerifyDeployment is Script {
             console.log("WARNING: EOA requirement is disabled (contracts can swap)");
         }
 
-        // Check Auction timing
+        // Check Auction timing (PROTOCOL CONSTANTS)
         uint256 commitDuration = CommitRevealAuction(payable(auction)).COMMIT_DURATION();
         uint256 revealDuration = CommitRevealAuction(payable(auction)).REVEAL_DURATION();
-        console.log("Auction commit duration:", commitDuration, "seconds");
-        console.log("Auction reveal duration:", revealDuration, "seconds");
+        uint256 slashRate = CommitRevealAuction(payable(auction)).SLASH_RATE_BPS();
+        uint256 collateralBps = CommitRevealAuction(payable(auction)).COLLATERAL_BPS();
+        console.log("Auction commit duration:", commitDuration, "seconds (CONSTANT)");
+        console.log("Auction reveal duration:", revealDuration, "seconds (CONSTANT)");
+        console.log("Slash rate:", slashRate, "bps (CONSTANT)");
+        console.log("Collateral requirement:", collateralBps, "bps (CONSTANT)");
     }
 
     function _verifyInterconnections() internal view {

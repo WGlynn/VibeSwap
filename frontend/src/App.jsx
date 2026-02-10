@@ -53,18 +53,49 @@ function App() {
   const location = useLocation()
   const isHomePage = location.pathname === '/'
 
-  // Lock scroll on home page (Safari iOS fix)
+  // Lock scroll on home page (Safari iOS fix) - Build v2
   useEffect(() => {
     if (isHomePage) {
+      // CSS classes
       document.documentElement.classList.add('no-scroll')
       document.body.classList.add('no-scroll')
+
+      // JavaScript touch prevention for iOS Safari
+      const preventScroll = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        return false
+      }
+
+      const preventTouchMove = (e) => {
+        // Allow scrolling inside modals/token selectors
+        if (e.target.closest('.allow-scroll')) return
+        e.preventDefault()
+      }
+
+      // Prevent all scroll events
+      document.addEventListener('touchmove', preventTouchMove, { passive: false })
+      document.addEventListener('scroll', preventScroll, { passive: false })
+      window.addEventListener('scroll', preventScroll, { passive: false })
+
+      // Set body style directly
+      document.body.style.cssText = 'overflow:hidden!important;position:fixed!important;width:100%!important;height:100%!important;'
+      document.documentElement.style.cssText = 'overflow:hidden!important;'
+
+      return () => {
+        document.removeEventListener('touchmove', preventTouchMove)
+        document.removeEventListener('scroll', preventScroll)
+        window.removeEventListener('scroll', preventScroll)
+        document.body.style.cssText = ''
+        document.documentElement.style.cssText = ''
+        document.documentElement.classList.remove('no-scroll')
+        document.body.classList.remove('no-scroll')
+      }
     } else {
       document.documentElement.classList.remove('no-scroll')
       document.body.classList.remove('no-scroll')
-    }
-    return () => {
-      document.documentElement.classList.remove('no-scroll')
-      document.body.classList.remove('no-scroll')
+      document.body.style.cssText = ''
+      document.documentElement.style.cssText = ''
     }
   }, [isHomePage])
 

@@ -299,7 +299,7 @@ function TokenSelector({ isOpen, onClose, tokens, selected, onSelect }) {
               </button>
             </div>
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto allow-scroll">
             {tokens.map((token) => (
               <button
                 key={token.symbol}

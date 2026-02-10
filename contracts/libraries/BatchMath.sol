@@ -10,6 +10,13 @@ import "./FibonacciScaling.sol";
  *      Enhanced with Fibonacci-weighted price determination
  */
 library BatchMath {
+    // ============ Custom Errors ============
+    error InvalidReserves();
+    error InsufficientInput();
+    error InsufficientLiquidity();
+    error InvalidAmounts();
+    error InsufficientInitialLiquidity();
+
     uint256 constant PRECISION = 1e18;
     uint256 constant MAX_ITERATIONS = 100;
     uint256 constant CONVERGENCE_THRESHOLD = 1e6; // 0.0001% precision
@@ -33,7 +40,7 @@ library BatchMath {
         uint256 reserve0,
         uint256 reserve1
     ) internal pure returns (uint256 clearingPrice, uint256 fillableVolume) {
-        require(reserve0 > 0 && reserve1 > 0, "Invalid reserves");
+        if (reserve0 == 0 || reserve1 == 0) revert InvalidReserves();
 
         // Calculate spot price from AMM
         uint256 spotPrice = (reserve1 * PRECISION) / reserve0;
@@ -212,8 +219,8 @@ library BatchMath {
         uint256 reserveOut,
         uint256 feeRate
     ) internal pure returns (uint256 amountOut) {
-        require(amountIn > 0, "Insufficient input amount");
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
+        if (amountIn == 0) revert InsufficientInput();
+        if (reserveIn == 0 || reserveOut == 0) revert InsufficientLiquidity();
 
         uint256 amountInWithFee = amountIn * (10000 - feeRate);
         uint256 numerator = amountInWithFee * reserveOut;
@@ -236,9 +243,9 @@ library BatchMath {
         uint256 reserveOut,
         uint256 feeRate
     ) internal pure returns (uint256 amountIn) {
-        require(amountOut > 0, "Insufficient output amount");
-        require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
-        require(amountOut < reserveOut, "Insufficient liquidity");
+        if (amountOut == 0) revert InsufficientInput();
+        if (reserveIn == 0 || reserveOut == 0) revert InsufficientLiquidity();
+        if (amountOut >= reserveOut) revert InsufficientLiquidity();
 
         uint256 numerator = reserveIn * amountOut * 10000;
         uint256 denominator = (reserveOut - amountOut) * (10000 - feeRate);
@@ -271,7 +278,7 @@ library BatchMath {
             return (amount0Desired, amount1Optimal);
         } else {
             uint256 amount0Optimal = (amount1Desired * reserve0) / reserve1;
-            require(amount0Optimal <= amount0Desired, "Invalid amounts");
+            if (amount0Optimal > amount0Desired) revert InvalidAmounts();
             return (amount0Optimal, amount1Desired);
         }
     }
@@ -295,7 +302,7 @@ library BatchMath {
         if (totalSupply == 0) {
             // Initial liquidity: sqrt(amount0 * amount1)
             liquidity = sqrt(amount0 * amount1);
-            require(liquidity > 1000, "Insufficient initial liquidity");
+            if (liquidity <= 1000) revert InsufficientInitialLiquidity();
             liquidity -= 1000; // Lock minimum liquidity
         } else {
             // Proportional to existing liquidity
@@ -341,7 +348,7 @@ library BatchMath {
         uint256 reserve0,
         uint256 reserve1
     ) internal pure returns (uint256 clearingPrice, uint256 confidence) {
-        require(reserve0 > 0 && reserve1 > 0, "Invalid reserves");
+        if (reserve0 == 0 || reserve1 == 0) revert InvalidReserves();
 
         uint256 spotPrice = (reserve1 * PRECISION) / reserve0;
 

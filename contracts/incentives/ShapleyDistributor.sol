@@ -47,6 +47,12 @@ contract ShapleyDistributor is
 {
     using SafeERC20 for IERC20;
 
+    // ============ Custom Errors (Gas Optimized) ============
+
+    error ETHTransferFailed();
+    error ScoreExceedsMax();
+    error InvalidGamesPerEra();
+
     // ============ Constants ============
 
     uint256 public constant PRECISION = 1e18;
@@ -329,7 +335,7 @@ contract ShapleyDistributor is
         // Transfer reward
         if (game.token == address(0)) {
             (bool success, ) = msg.sender.call{value: amount}("");
-            require(success, "ETH transfer failed");
+            if (!success) revert ETHTransferFailed();
         } else {
             IERC20(game.token).safeTransfer(msg.sender, amount);
         }
@@ -468,9 +474,9 @@ contract ShapleyDistributor is
         uint256 economicScore
     ) external onlyAuthorized {
         // Validate scores are within bounds (0-10000 bps)
-        require(activityScore <= BPS_PRECISION, "Activity score exceeds max");
-        require(reputationScore <= BPS_PRECISION, "Reputation score exceeds max");
-        require(economicScore <= BPS_PRECISION, "Economic score exceeds max");
+        if (activityScore > BPS_PRECISION || reputationScore > BPS_PRECISION || economicScore > BPS_PRECISION) {
+            revert ScoreExceedsMax();
+        }
 
         qualityWeights[participant] = QualityWeight({
             activityScore: activityScore,
@@ -618,7 +624,7 @@ contract ShapleyDistributor is
      * @param _gamesPerEra New games per era value
      */
     function setGamesPerEra(uint256 _gamesPerEra) external onlyOwner {
-        require(_gamesPerEra > 0, "Games per era must be > 0");
+        if (_gamesPerEra == 0) revert InvalidGamesPerEra();
         gamesPerEra = _gamesPerEra;
     }
 

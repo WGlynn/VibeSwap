@@ -41,7 +41,15 @@ The result is a market where honest revelation is the dominant strategy, prices 
 
 ## 1. Introduction: The Price Discovery Problem
 
-### 1.1 What Markets Are Supposed to Do
+### 1.1 The Central Question
+
+> **"The question isn't whether markets work, but who they work for."**
+
+Every market "works" in the sense that trades occur. The real question is: who captures the value created by exchange? In extractive markets, value flows from traders to intermediaries. In cooperative markets, value stays with the participants who create it.
+
+VibeSwap is built on a radical premise: markets should work for **everyone**, not just the fastest or most sophisticated actors.
+
+### 1.2 What Markets Are Supposed to Do
 
 Markets exist to answer a fundamental question: **What is this worth?**
 
@@ -53,7 +61,7 @@ The theoretical ideal:
 
 This elegant mechanism has coordinated human economic activity for millennia. But digital markets have broken it.
 
-### 1.2 What Markets Actually Do
+### 1.3 What Markets Actually Do
 
 Modern financial markets, particularly in DeFi, have become **extraction games**:
 
@@ -126,6 +134,39 @@ VibeSwap implements what we call **Cooperative Capitalism**:
 - **Individual participation**: Voluntary entry and exit
 
 The invisible hand still operates—we just point it somewhere useful.
+
+### 2.4 Multilevel Selection: Why the Collective Benefits the Individual
+
+From evolutionary biology: **multilevel selection theory** explains how cooperation emerges despite individual incentives to defect.
+
+| Level | Traditional Market | VibeSwap |
+|-------|-------------------|----------|
+| **Individual** | Extract from others if possible | Cannot extract (mechanism prevents it) |
+| **Group** | Extractors drain the pool | Everyone benefits from deep liquidity |
+| **Ecosystem** | Race to bottom, trust erosion | Positive-sum, growing participation |
+
+**The mathematical proof:**
+
+In extractive markets:
+```
+E[V_individual] = V_trade - E_lost_to_extraction
+```
+
+In cooperative markets:
+```
+E[V_individual] = V_trade (full value, no extraction)
+```
+
+For every participant except pure extractors:
+```
+E[V_cooperative] > E[V_extractive]
+```
+
+**The key insight:** VibeSwap doesn't ask individuals to be altruistic. It makes defection impossible. When extraction cannot occur, individual and collective interests automatically align.
+
+What's good for the market becomes what's good for each trader—not through altruism, but through architecture.
+
+See `COOPERATIVE_MARKETS_PHILOSOPHY.md` for the complete mathematical framework and proofs.
 
 ---
 
@@ -754,6 +795,48 @@ VibeSwap is a **protocol**, not a product. The smart contracts are:
 - **Immutable**: Once deployed, core logic cannot be changed
 - **Permissionless**: Anyone can interact directly with contracts
 - **Ownerless**: No admin keys, no special privileges (after initial setup)
+
+### Uniform Safety, Flexible Access
+
+VibeSwap separates **safety parameters** (must be uniform) from **access control** (can vary):
+
+**Protocol Constants (Same for All)**:
+```
+COMMIT_DURATION  = 8 seconds
+REVEAL_DURATION  = 2 seconds
+COLLATERAL_BPS   = 500 (5%)
+SLASH_RATE_BPS   = 5000 (50%)
+MIN_DEPOSIT      = 0.001 ETH
+Flash loan protection = ALWAYS ON
+```
+
+**Flash Loan Protection**: Prevents same-block manipulation by blocking users from interacting twice in the same block. Flash loans allow borrowing millions with zero collateral (returned within one transaction), which would let attackers commit with borrowed funds they never actually owned. By requiring one block between interactions, flash loan attacks become impossible. This is always on—no pool can disable it.
+
+**Pool Access Control (Can Vary)**:
+
+| Pool Type | Who Can Trade | Requirements |
+|-----------|---------------|--------------|
+| **OPEN** | Anyone | No KYC required |
+| **RETAIL** | Verified users | KYC, tier 2+ |
+| **ACCREDITED** | Accredited investors | KYC + accreditation, tier 3+ |
+| **INSTITUTIONAL** | QIBs | KYC + QIB status, tier 4+ |
+
+**Why Uniform Safety Parameters?**
+
+We initially considered per-pool safety configurations (different collateral, slashing for different pools). We rejected this because:
+
+1. **Race to the Bottom**: Pools would compete on "easier" terms
+2. **Fragmented Liquidity**: Multiple pools with different rules = shallow markets
+3. **Gaming Opportunities**: Sophisticated actors exploit parameter differences
+4. **Weakened Commitments**: Low-penalty pools undermine the mechanism
+
+The commit-reveal auction only works because EVERYONE faces the same incentives. See `DESIGN_PHILOSOPHY_CONFIGURABILITY.md` for the full analysis.
+
+**What Access Control Achieves**:
+- Regulatory compliance (different pools for different investor classes)
+- Geographic restrictions (blocked jurisdictions)
+- Trade size limits (regulatory caps)
+- All WITHOUT affecting execution fairness
 
 **Anyone can build their own frontend.** This matters for:
 

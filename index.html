@@ -86,10 +86,30 @@
       // Prevent pull-to-refresh
       document.body.style.overscrollBehavior = 'none';
     </script>
-    <script type="module" crossorigin src="/VibeSwap/assets/index-ORDQ-Lzf.js"></script>
+    <script type="module" crossorigin src="/VibeSwap/assets/index-gH7_INj8.js"></script>
     <link rel="stylesheet" crossorigin href="/VibeSwap/assets/index-DdcBnHpi.css">
   </head>
   <body>
+    <!-- GitHub Pages SPA redirect handler -->
+    <script>
+      (function(){
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+        // Handle ?/ redirect from 404.html
+        var l = window.location;
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>

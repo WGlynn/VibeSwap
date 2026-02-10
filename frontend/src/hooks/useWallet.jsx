@@ -1,11 +1,13 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { createWeb3Modal, defaultConfig } from '@web3modal/ethers/react'
-import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider, useDisconnect } from '@web3modal/ethers/react'
+import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider, useDisconnect, useWeb3ModalEvents } from '@web3modal/ethers/react'
 import { BrowserProvider } from 'ethers'
 import toast from 'react-hot-toast'
 
-// WalletConnect Project ID - get yours at https://cloud.walletconnect.com
-const projectId = 'c4f79cc821944d9680842e34466bfb'
+// WalletConnect Project ID
+// Get your own at https://cloud.walletconnect.com for production
+// This is a demo project ID - replace with your own for email login to work
+const projectId = '3a8170812b534d0ff9d794f19a901d64'
 
 // Chain configurations
 const chains = [
@@ -61,8 +63,13 @@ const metadata = {
 }
 
 // Initialize Web3Modal
-createWeb3Modal({
-  ethersConfig: defaultConfig({ metadata }),
+const modal = createWeb3Modal({
+  ethersConfig: defaultConfig({
+    metadata,
+    enableEIP6963: true,
+    enableInjected: true,
+    enableCoinbase: true,
+  }),
   chains,
   projectId,
   enableAnalytics: false,
@@ -72,27 +79,61 @@ createWeb3Modal({
     '--w3m-color-mix-strength': 20,
     '--w3m-accent': '#00ff41',
     '--w3m-border-radius-master': '8px'
-  }
+  },
+  // Featured wallets - prioritize these
+  featuredWalletIds: [
+    'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
+    '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust
+    'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa', // Coinbase
+  ],
+  // Only show wallet options, no email/social for now
+  // Email login requires WalletConnect Cloud project configuration
+  allWallets: 'SHOW',
 })
 
 const WalletContext = createContext(null)
 
 export function WalletProvider({ children }) {
-  const { open } = useWeb3Modal()
+  const { open, close } = useWeb3Modal()
   const { address, chainId, isConnected } = useWeb3ModalAccount()
   const { walletProvider } = useWeb3ModalProvider()
   const { disconnect: web3Disconnect } = useDisconnect()
+  const events = useWeb3ModalEvents()
 
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState(null)
+  const hasShownConnectToast = useRef(false)
 
   // Supported chains lookup
   const supportedChains = chains.reduce((acc, chain) => {
     acc[chain.chainId] = chain
     return acc
   }, {})
+
+  // Listen for connection events and handle auto-close
+  useEffect(() => {
+    if (events.data?.event === 'CONNECT_SUCCESS' || events.data?.event === 'MODAL_CLOSE') {
+      setIsConnecting(false)
+      // Force close modal after successful connection
+      if (isConnected) {
+        close()
+      }
+    }
+  }, [events, isConnected, close])
+
+  // Show toast when wallet connects
+  useEffect(() => {
+    if (isConnected && address && !hasShownConnectToast.current) {
+      hasShownConnectToast.current = true
+      toast.success(`Connected: ${address.slice(0, 6)}...${address.slice(-4)}`)
+      setIsConnecting(false)
+    }
+    if (!isConnected) {
+      hasShownConnectToast.current = false
+    }
+  }, [isConnected, address])
 
   // Update provider and signer when wallet connects
   useEffect(() => {

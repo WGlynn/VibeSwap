@@ -33,7 +33,7 @@ function SwapCore() {
   // Calculate conversion and savings
   const rate = fromToken.price / toToken.price
   const uniswapFee = 0.003 // 0.3%
-  const vibeswapFee = 0.001 // 0.1%
+  const vibeswapFee = 0.0005 // 0.05% - negligible for all socioeconomic classes
   const mevSavings = 0.005 // ~0.5% MEV protection savings
 
   useEffect(() => {
@@ -240,7 +240,7 @@ function SwapCore() {
 
         {/* Subtle info - no clutter */}
         <div className="mt-4 text-center text-sm text-black-500">
-          MEV protected · Fair pricing · 0.1% fee
+          MEV protected · Fair pricing · 0.05% fee
         </div>
       </div>
 

@@ -52,13 +52,13 @@ contract SetupMVP is Script {
         // Create pools
         console.log("Creating pools...");
 
-        // ETH/USDC - Primary pool, 0.3% fee
-        bytes32 ethUsdcPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.usdc, 30, "ETH/USDC");
+        // ETH/USDC - Primary pool, 0.05% fee
+        bytes32 ethUsdcPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.usdc, 5, "ETH/USDC");
 
-        // ETH/USDT - Secondary stablecoin pair, 0.3% fee
+        // ETH/USDT - Secondary stablecoin pair, 0.05% fee
         bytes32 ethUsdtPool;
         if (tokens.usdt != address(0)) {
-            ethUsdtPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.usdt, 30, "ETH/USDT");
+            ethUsdtPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.usdt, 5, "ETH/USDT");
         }
 
         // USDC/USDT - Stablecoin pair, 0.01% fee (Curve-style)
@@ -67,16 +67,16 @@ contract SetupMVP is Script {
             usdcUsdtPool = _createPool(vibeCore, vibeAMM, tokens.usdc, tokens.usdt, 1, "USDC/USDT");
         }
 
-        // WBTC/USDC - BTC exposure, 0.3% fee
+        // WBTC/USDC - BTC exposure, 0.05% fee
         bytes32 wbtcUsdcPool;
         if (tokens.wbtc != address(0)) {
-            wbtcUsdcPool = _createPool(vibeCore, vibeAMM, tokens.wbtc, tokens.usdc, 30, "WBTC/USDC");
+            wbtcUsdcPool = _createPool(vibeCore, vibeAMM, tokens.wbtc, tokens.usdc, 5, "WBTC/USDC");
         }
 
-        // ETH/WBTC - Major pair, 0.3% fee
+        // ETH/WBTC - Major pair, 0.05% fee
         bytes32 ethWbtcPool;
         if (tokens.wbtc != address(0)) {
-            ethWbtcPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.wbtc, 30, "ETH/WBTC");
+            ethWbtcPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.wbtc, 5, "ETH/WBTC");
         }
 
         console.log("");

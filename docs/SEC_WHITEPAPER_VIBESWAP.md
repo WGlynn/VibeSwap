@@ -215,7 +215,7 @@ The following information is available for Form ATS filing:
 | Order types | Market with slippage protection |
 | Matching methodology | Uniform clearing price |
 | Trading hours | Continuous (24/7/365) |
-| Fee schedule | 0.30% base, configurable |
+| Fee schedule | 0.05% base, configurable |
 | Priority mechanism | Optional auction (disclosed) |
 
 ---

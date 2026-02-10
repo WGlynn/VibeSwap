@@ -332,7 +332,7 @@ Pool-level configuration does NOT include:
 **Source**: `VibeAMM.sol` lines 43-50
 
 ```solidity
-uint256 public constant DEFAULT_FEE_RATE = 30;      // 0.30% for all
+uint256 public constant DEFAULT_FEE_RATE = 5;       // 0.05% for all
 uint256 public constant PROTOCOL_FEE_SHARE = 0;     // 0% protocol take
 ```
 
@@ -495,7 +495,7 @@ We examined all value flows:
 
 | Value Source | Destination | Leakage? |
 |--------------|-------------|----------|
-| Trading fees (0.30%) | Liquidity providers | None |
+| Trading fees (0.05%) | Liquidity providers | None |
 | Slash penalties (50%) | DAO treasury + user | None |
 | Priority bids | DAO treasury | None (voluntary) |
 | Collateral deposits | Returned to users | None |

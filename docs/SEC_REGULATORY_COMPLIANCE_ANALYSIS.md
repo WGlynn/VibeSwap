@@ -113,7 +113,7 @@ ATSs must disclose operational details on Form ATS.
 |-----------------|---------------|
 | Trading hours | 24/7/365 (blockchain-native) |
 | Order types | Market orders with slippage protection |
-| Fee structure | 0.30% base fee, 100% to LPs |
+| Fee structure | 0.05% base fee, 100% to LPs |
 | Priority mechanism | Optional priority auction (ETH or PoW) |
 | Settlement cycle | T+0 (same batch, ~10 seconds) |
 | Matching methodology | Uniform clearing price algorithm |

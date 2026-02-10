@@ -478,8 +478,8 @@ contract VibeSwapIntegrationTest is Test {
     function test_quoteAccuracy() public view {
         uint256 quoted = core.getQuote(address(weth), address(usdc), 1 ether);
 
-        // With 100 WETH and 200000 USDC reserves (18 decimals), 1 WETH should get ~1980 USDC
-        // (accounting for 0.3% fee and slippage)
+        // With 100 WETH and 200000 USDC reserves (18 decimals), 1 WETH should get ~1990 USDC
+        // (accounting for 0.05% fee and slippage)
         assertGt(quoted, 1900 ether); // 1900 USDC (18 decimals)
         assertLt(quoted, 2000 ether); // 2000 USDC (18 decimals)
     }

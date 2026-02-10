@@ -421,11 +421,11 @@ contract VibeAMMTest is Test {
             1 ether,    // amountIn
             100 ether,  // reserveIn
             100 ether,  // reserveOut
-            30          // 0.3% fee
+            5           // 0.05% fee
         );
 
-        // With 0.3% fee: 0.997 * 1 * 100 / (100 + 0.997) ≈ 0.987
-        assertApproxEqRel(amountOut, 0.987 ether, 0.01e18);
+        // With 0.05% fee: 0.9995 * 1 * 100 / (100 + 0.9995) ≈ 0.989
+        assertApproxEqRel(amountOut, 0.989 ether, 0.01e18);
     }
 
     function test_batchMath_getAmountIn() public pure {
@@ -433,7 +433,7 @@ contract VibeAMMTest is Test {
             1 ether,    // amountOut
             100 ether,  // reserveIn
             100 ether,  // reserveOut
-            30          // 0.3% fee
+            5           // 0.05% fee
         );
 
         // Should need slightly more than 1 ETH input to get 1 ETH output

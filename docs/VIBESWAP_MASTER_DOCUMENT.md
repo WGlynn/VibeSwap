@@ -3888,10 +3888,10 @@ The fund is capitalized by protocol revenue and maintains reserves per token. Cl
 During high volatility, dynamic fees increase. The excess above base fees flows to the insurance pool:
 
 ```
-Base Fee: 0.30%
+Base Fee: 0.05%
 Volatility Tier: EXTREME (2.0x multiplier)
-Execution Fee: 0.60%
-Insurance Premium: 0.30% (the excess)
+Execution Fee: 0.10%
+Insurance Premium: 0.05% (the excess)
 ```
 
 ### 16.2 Volatility Tiers
@@ -3927,10 +3927,10 @@ Maximum payout per event is capped at 50% of reserves to prevent fund depletion.
 ### 17.1 Base Fee Structure
 
 ```
-Base Trading Fee: 0.30% (30 bps)
+Base Trading Fee: 0.05% (5 bps)
   └── 100% → LP Pool Reserves (via Shapley distribution)
 
-Dynamic Volatility Fee: (excess above 0.30% during high volatility)
+Dynamic Volatility Fee: (excess above 0.05% during high volatility)
   └── 100% → Volatility Insurance Pool
 
 Zero protocol extraction. Zero founder allocation.
@@ -3950,7 +3950,7 @@ The VolatilityOracle monitors realized volatility using a rolling window of pric
 ```
 Total Dynamic Fee
       ↓
-  ├── Base portion (0.30%) → Standard LP/Treasury split
+  ├── Base portion (0.05%) → Standard LP/Treasury split
   └── Excess portion → Volatility Insurance Pool
 ```
 
@@ -7177,10 +7177,10 @@ The fund is capitalized by protocol revenue and maintains reserves per token. Cl
 During high volatility, dynamic fees increase. The excess above base fees flows to the insurance pool:
 
 ```
-Base Fee: 0.30%
+Base Fee: 0.05%
 Volatility Tier: EXTREME (2.0x multiplier)
-Execution Fee: 0.60%
-Insurance Premium: 0.30% (the excess)
+Execution Fee: 0.10%
+Insurance Premium: 0.05% (the excess)
 ```
 
 ### 8.2 Volatility Tiers
@@ -7280,10 +7280,10 @@ False positives are handleable through governance:
 ### 10.1 Base Fee Structure
 
 ```
-Base Trading Fee: 0.30% (30 bps)
+Base Trading Fee: 0.05% (5 bps)
   └── 100% → LP Pool Reserves (via Shapley distribution)
 
-Dynamic Volatility Fee: (excess above 0.30% during high volatility)
+Dynamic Volatility Fee: (excess above 0.05% during high volatility)
   └── 100% → Volatility Insurance Pool
 
 Zero protocol extraction. Zero founder allocation.
@@ -7302,7 +7302,7 @@ The VolatilityOracle monitors realized volatility using a rolling window of pric
 ```
 Total Dynamic Fee
       ↓
-  ├── Base portion (0.30%) → Standard LP/Treasury split
+  ├── Base portion (0.05%) → Standard LP/Treasury split
   └── Excess portion → Volatility Insurance Pool
 ```
 
@@ -12352,7 +12352,7 @@ Pool-level configuration does NOT include:
 **Source**: `VibeAMM.sol` lines 43-50
 
 ```solidity
-uint256 public constant DEFAULT_FEE_RATE = 30;      // 0.30% for all
+uint256 public constant DEFAULT_FEE_RATE = 5;       // 0.05% for all
 uint256 public constant PROTOCOL_FEE_SHARE = 0;     // 0% protocol take
 ```
 
@@ -12515,7 +12515,7 @@ We examined all value flows:
 
 | Value Source | Destination | Leakage? |
 |--------------|-------------|----------|
-| Trading fees (0.30%) | Liquidity providers | None |
+| Trading fees (0.05%) | Liquidity providers | None |
 | Slash penalties (50%) | DAO treasury + user | None |
 | Priority bids | DAO treasury | None (voluntary) |
 | Collateral deposits | Returned to users | None |
@@ -13065,7 +13065,7 @@ The following information is available for Form ATS filing:
 | Order types | Market with slippage protection |
 | Matching methodology | Uniform clearing price |
 | Trading hours | Continuous (24/7/365) |
-| Fee schedule | 0.30% base, configurable |
+| Fee schedule | 0.05% base, configurable |
 | Priority mechanism | Optional auction (disclosed) |
 
 ---
@@ -13494,7 +13494,7 @@ ATSs must disclose operational details on Form ATS.
 |-----------------|---------------|
 | Trading hours | 24/7/365 (blockchain-native) |
 | Order types | Market orders with slippage protection |
-| Fee structure | 0.30% base fee, 100% to LPs |
+| Fee structure | 0.05% base fee, 100% to LPs |
 | Priority mechanism | Optional priority auction (ETH or PoW) |
 | Settlement cycle | T+0 (same batch, ~10 seconds) |
 | Matching methodology | Uniform clearing price algorithm |
@@ -13892,7 +13892,7 @@ If the SEC determines ATS registration is required:
 | Securities traded | As permitted by frontend operator |
 | Hours of operation | 24/7/365 |
 | Types of orders | Market with slippage protection |
-| Fees | 0.30% base, disclosed |
+| Fees | 0.05% base, disclosed |
 | Priority mechanism | Auction-based, transparent |
 
 **Timeline:**

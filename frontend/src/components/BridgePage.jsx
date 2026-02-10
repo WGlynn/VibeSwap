@@ -61,10 +61,10 @@ function BridgePage() {
     setAmount('')
   }
 
-  // Estimate bridge time and fee
+  // Estimate bridge time and fee (0.05% = 0.0005)
   const estimatedTime = '~2-5 min'
-  const bridgeFee = amount ? (parseFloat(amount) * 0.001).toFixed(4) : '0'
-  const receiveAmount = amount ? (parseFloat(amount) * 0.999).toFixed(4) : '0'
+  const bridgeFee = amount ? (parseFloat(amount) * 0.0005).toFixed(4) : '0'
+  const receiveAmount = amount ? (parseFloat(amount) * 0.9995).toFixed(4) : '0'
 
   return (
     <div className="max-w-lg mx-auto px-4">
@@ -81,7 +81,7 @@ function BridgePage() {
             <span className="text-[10px] text-matrix-500 font-medium">secure transfer</span>
           </div>
           <div className="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-black-600 border border-black-500">
-            <span className="text-[10px] text-black-300 font-medium">0.1% fee</span>
+            <span className="text-[10px] text-black-300 font-medium">0.05% fee</span>
           </div>
         </div>
       </div>

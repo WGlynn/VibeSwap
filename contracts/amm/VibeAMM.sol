@@ -17,6 +17,7 @@ import "../libraries/VWAPOracle.sol";
 import "../libraries/TruePriceLib.sol";
 import "../libraries/LiquidityProtection.sol";
 import "../libraries/FibonacciScaling.sol";
+import "../libraries/ProofOfWorkLib.sol";
 import "../oracles/interfaces/ITruePriceOracle.sol";
 
 /**
@@ -39,8 +40,11 @@ contract VibeAMM is
 
     // ============ Constants ============
 
-    /// @notice Default fee rate (0.3%)
-    uint256 public constant DEFAULT_FEE_RATE = 30;
+    /// @notice Default fee rate (0.05% - 5 basis points)
+    /// @dev Optimized for socioeconomic equality: negligible for all trade sizes
+    ///      while still compensating LPs. Lower than traditional AMMs because
+    ///      batch auctions reduce impermanent loss from MEV extraction.
+    uint256 public constant DEFAULT_FEE_RATE = 5;
 
     /// @notice Protocol's share of base fees (0% - all base fees to LPs)
     /// @dev Pure economics model: 100% of base trading fees go to LPs.
@@ -62,6 +66,29 @@ contract VibeAMM is
 
     /// @notice Maximum single trade as percentage of reserves (10%)
     uint256 public constant MAX_TRADE_SIZE_BPS = 1000;
+
+    // ============ Structs for Parameter Bundling ============
+
+    /// @notice Parameters for basic swap to reduce stack depth
+    struct SwapParams {
+        bytes32 poolId;
+        address tokenIn;
+        uint256 amountIn;
+        uint256 minAmountOut;
+        address recipient;
+    }
+
+    /// @notice Parameters for PoW swap to reduce stack depth
+    struct PoWSwapParams {
+        bytes32 poolId;
+        address tokenIn;
+        uint256 amountIn;
+        uint256 minAmountOut;
+        address recipient;
+        bytes32 powNonce;
+        uint8 powAlgorithm;
+        uint8 claimedDifficulty;
+    }
 
     // ============ State ============
 
@@ -99,22 +126,26 @@ contract VibeAMM is
     /// @notice Flash loan protection - users who interacted this block
     mapping(bytes32 => bool) internal sameBlockInteraction;
 
-    /// @notice Whether flash loan protection is enabled
-    bool public flashLoanProtectionEnabled;
-
-    /// @notice Whether TWAP validation is enabled
-    bool public twapValidationEnabled;
-
     /// @notice Custom max trade size per pool (0 = use default)
     mapping(bytes32 => uint256) public poolMaxTradeSize;
+
+    // ============ Gas-Optimized Packed Flags ============
+    // Pack 5 bools into single uint8 slot (saves ~4 storage slots = 80,000 gas on deployment)
+
+    /// @notice Packed protection flags (bit 0=flash, 1=twap, 2=truePrice, 3=liquidity, 4=fibonacci)
+    uint8 public protectionFlags;
+
+    // Flag bit positions
+    uint8 private constant FLAG_FLASH_LOAN = 1 << 0;      // bit 0
+    uint8 private constant FLAG_TWAP = 1 << 1;            // bit 1
+    uint8 private constant FLAG_TRUE_PRICE = 1 << 2;      // bit 2
+    uint8 private constant FLAG_LIQUIDITY = 1 << 3;       // bit 3
+    uint8 private constant FLAG_FIBONACCI = 1 << 4;       // bit 4
 
     // ============ True Price Oracle Integration ============
 
     /// @notice True Price Oracle for manipulation-resistant price validation
     ITruePriceOracle public truePriceOracle;
-
-    /// @notice Whether True Price validation is enabled
-    bool public truePriceValidationEnabled;
 
     /// @notice Maximum staleness for True Price data (default 5 minutes)
     uint256 public truePriceMaxStaleness = 5 minutes;
@@ -127,9 +158,6 @@ contract VibeAMM is
     /// @notice Liquidity protection config per pool
     mapping(bytes32 => LiquidityProtection.ProtectionConfig) public poolProtectionConfig;
 
-    /// @notice Whether liquidity protection is enabled globally
-    bool public liquidityProtectionEnabled;
-
     /// @notice Price oracle for USD value calculations (e.g., Chainlink)
     address public priceOracle;
 
@@ -137,9 +165,6 @@ contract VibeAMM is
     mapping(address => uint256) public tokenUsdPrices;
 
     // ============ Fibonacci Scaling State ============
-
-    /// @notice Whether Fibonacci scaling is enabled
-    bool public fibonacciScalingEnabled;
 
     /// @notice User throughput tracking per pool (user => pool => volume in window)
     mapping(address => mapping(bytes32 => uint256)) public userPoolVolume;
@@ -159,6 +184,14 @@ contract VibeAMM is
     /// @notice Fibonacci volume window duration (default 1 hour)
     uint256 public fibonacciWindowDuration = 1 hours;
 
+    // ============ Proof-of-Work Fee Discount State ============
+
+    /// @notice Maximum fee discount from PoW (basis points, e.g., 5000 = 50%)
+    uint256 public maxPoWFeeDiscount = 5000;
+
+    /// @notice Used PoW proofs for fee discounts (prevents replay)
+    mapping(bytes32 => bool) public usedFeePoWProofs;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
@@ -174,6 +207,7 @@ contract VibeAMM is
     event FibonacciTierReached(bytes32 indexed poolId, address indexed user, uint8 tier, uint256 volume);
     event FibonacciPriceLevelDetected(bytes32 indexed poolId, uint256 price, uint256 fibLevel, bool isSupport);
     event FibonacciFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 fibFee, uint8 tier);
+    event PoWFeeDiscountApplied(bytes32 indexed poolId, address indexed user, uint8 difficulty, uint256 discountBps);
 
     // ============ Security Errors ============
 
@@ -186,21 +220,44 @@ contract VibeAMM is
     error InsufficientPoolLiquidity(uint256 current, uint256 minimum);
     error FibonacciRateLimitExceeded(uint256 requested, uint256 allowed, uint256 cooldownSeconds);
 
+    // ============ Gas-Optimized Custom Errors ============
+
+    error NotAuthorized();
+    error PoolNotFound();
+    error InvalidToken();
+    error IdenticalTokens();
+    error PoolAlreadyExists();
+    error FeeTooHigh();
+    error InvalidTreasury();
+    error InsufficientToken0();
+    error InsufficientToken1();
+    error InitialLiquidityTooLow();
+    error InsufficientLiquidityMinted();
+    error InvalidLiquidity();
+    error InsufficientLiquidityBalance();
+    error InsufficientOutput();
+    error NoFeesToCollect();
+    error InvalidPoWProof();
+    error PoWProofAlreadyUsed();
+    error InvalidBaseUnit();
+    error InvalidDuration();
+    error InvalidDiscount();
+
     // ============ Modifiers ============
 
     modifier onlyAuthorizedExecutor() {
-        require(authorizedExecutors[msg.sender], "Not authorized");
+        if (!authorizedExecutors[msg.sender]) revert NotAuthorized();
         _;
     }
 
     modifier poolExists(bytes32 poolId) {
-        require(pools[poolId].initialized, "Pool does not exist");
+        if (!pools[poolId].initialized) revert PoolNotFound();
         _;
     }
 
     /// @notice Prevents flash loan attacks by blocking same-block interactions
     modifier noFlashLoan(bytes32 poolId) {
-        if (flashLoanProtectionEnabled) {
+        if ((protectionFlags & FLAG_FLASH_LOAN) != 0) {
             bytes32 interactionKey = keccak256(abi.encodePacked(msg.sender, poolId, block.number));
             if (sameBlockInteraction[interactionKey]) {
                 emit FlashLoanAttemptBlocked(msg.sender, poolId);
@@ -214,7 +271,7 @@ contract VibeAMM is
     /// @notice Validates price against TWAP to prevent manipulation
     modifier validatePrice(bytes32 poolId) {
         _;
-        if (twapValidationEnabled && poolOracles[poolId].cardinality >= 2) {
+        if ((protectionFlags & FLAG_TWAP) != 0 && poolOracles[poolId].cardinality >= 2) {
             _validatePriceAgainstTWAP(poolId);
         }
     }
@@ -238,12 +295,11 @@ contract VibeAMM is
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
 
-        require(_treasury != address(0), "Invalid treasury");
+        if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
 
-        // Enable security features by default
-        flashLoanProtectionEnabled = true;
-        twapValidationEnabled = true;
+        // Enable security features by default (gas-optimized packed flags)
+        protectionFlags = FLAG_FLASH_LOAN | FLAG_TWAP;
 
         // Configure default circuit breakers
         _configureDefaultBreakers();
@@ -292,17 +348,17 @@ contract VibeAMM is
         address token1,
         uint256 feeRate
     ) external returns (bytes32 poolId) {
-        require(token0 != address(0) && token1 != address(0), "Invalid token");
-        require(token0 != token1, "Identical tokens");
+        if (token0 == address(0) || token1 == address(0)) revert InvalidToken();
+        if (token0 == token1) revert IdenticalTokens();
 
         // Ensure consistent ordering
         (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
 
         poolId = getPoolId(token0, token1);
-        require(!pools[poolId].initialized, "Pool exists");
+        if (pools[poolId].initialized) revert PoolAlreadyExists();
 
         uint256 actualFeeRate = feeRate == 0 ? DEFAULT_FEE_RATE : feeRate;
-        require(actualFeeRate <= 1000, "Fee too high"); // Max 10%
+        if (actualFeeRate > 1000) revert FeeTooHigh(); // Max 10%
 
         pools[poolId] = Pool({
             token0: token0,
@@ -357,8 +413,8 @@ contract VibeAMM is
             pool.reserve1
         );
 
-        require(amount0 >= amount0Min, "Insufficient token0");
-        require(amount1 >= amount1Min, "Insufficient token1");
+        if (amount0 < amount0Min) revert InsufficientToken0();
+        if (amount1 < amount1Min) revert InsufficientToken1();
 
         // Transfer tokens
         IERC20(pool.token0).safeTransferFrom(msg.sender, address(this), amount0);
@@ -377,9 +433,9 @@ contract VibeAMM is
         // FIRST DEPOSITOR ATTACK PROTECTION
         // Lock minimum liquidity to prevent share inflation attacks
         if (isFirstDeposit) {
-            require(liquidity > MINIMUM_LIQUIDITY, "Initial liquidity too low");
+            if (liquidity <= MINIMUM_LIQUIDITY) revert InitialLiquidityTooLow();
             // Burn minimum liquidity to dead address (prevents share manipulation)
-            liquidity -= MINIMUM_LIQUIDITY;
+            unchecked { liquidity -= MINIMUM_LIQUIDITY; } // Safe: checked above
             VibeLP(lpTokens[poolId]).mint(address(0xdead), MINIMUM_LIQUIDITY);
             pool.totalLiquidity += MINIMUM_LIQUIDITY;
 
@@ -391,12 +447,14 @@ contract VibeAMM is
             poolVWAP[poolId].initialize(initialPrice);
         }
 
-        require(liquidity > 0, "Insufficient liquidity minted");
+        if (liquidity == 0) revert InsufficientLiquidityMinted();
 
-        // Update reserves
-        pool.reserve0 += amount0;
-        pool.reserve1 += amount1;
-        pool.totalLiquidity += liquidity;
+        // Update reserves (use unchecked - amounts bounded by token supply)
+        unchecked {
+            pool.reserve0 += amount0;
+            pool.reserve1 += amount1;
+            pool.totalLiquidity += liquidity;
+        }
 
         // Update tracked balances for donation detection
         trackedBalances[pool.token0] += amount0;
@@ -434,18 +492,18 @@ contract VibeAMM is
         Pool storage pool = pools[poolId];
         address lpToken = lpTokens[poolId];
 
-        require(liquidity > 0, "Invalid liquidity");
-        require(pool.totalLiquidity >= liquidity, "Insufficient liquidity");
+        if (liquidity == 0) revert InvalidLiquidity();
+        if (pool.totalLiquidity < liquidity) revert InvalidLiquidity();
 
         // Verify user has the LP tokens (check actual balance, not internal tracking)
-        require(IERC20(lpToken).balanceOf(msg.sender) >= liquidity, "Insufficient LP balance");
+        if (IERC20(lpToken).balanceOf(msg.sender) < liquidity) revert InsufficientLiquidityBalance();
 
         // Calculate amounts
         amount0 = (liquidity * pool.reserve0) / pool.totalLiquidity;
         amount1 = (liquidity * pool.reserve1) / pool.totalLiquidity;
 
-        require(amount0 >= amount0Min, "Insufficient token0 output");
-        require(amount1 >= amount1Min, "Insufficient token1 output");
+        if (amount0 < amount0Min) revert InsufficientToken0();
+        if (amount1 < amount1Min) revert InsufficientToken1();
 
         // Check withdrawal circuit breaker (percentage of TVL)
         uint256 withdrawalValueBps = pool.totalLiquidity > 0
@@ -454,21 +512,26 @@ contract VibeAMM is
         _updateBreaker(WITHDRAWAL_BREAKER, withdrawalValueBps);
 
         // Update state before external calls (CEI pattern)
-        pool.reserve0 -= amount0;
-        pool.reserve1 -= amount1;
-        pool.totalLiquidity -= liquidity;
+        // Use unchecked - amounts verified above, can't underflow
+        unchecked {
+            pool.reserve0 -= amount0;
+            pool.reserve1 -= amount1;
+            pool.totalLiquidity -= liquidity;
+        }
 
         // Update tracked balances
         if (trackedBalances[pool.token0] >= amount0) {
-            trackedBalances[pool.token0] -= amount0;
+            unchecked { trackedBalances[pool.token0] -= amount0; }
         }
         if (trackedBalances[pool.token1] >= amount1) {
-            trackedBalances[pool.token1] -= amount1;
+            unchecked { trackedBalances[pool.token1] -= amount1; }
         }
 
         // Update internal tracking (use min to prevent underflow if LP was transferred)
         uint256 tracked = liquidityBalance[poolId][msg.sender];
-        liquidityBalance[poolId][msg.sender] = tracked >= liquidity ? tracked - liquidity : 0;
+        unchecked {
+            liquidityBalance[poolId][msg.sender] = tracked >= liquidity ? tracked - liquidity : 0;
+        }
 
         // Burn LP tokens
         VibeLP(lpToken).burn(msg.sender, liquidity);
@@ -586,120 +649,157 @@ contract VibeAMM is
     ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) whenNotGloballyPaused
       whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(PRICE_BREAKER)
       validatePrice(poolId) returns (uint256 amountOut) {
-        Pool storage pool = pools[poolId];
+        return _executeSwap(SwapParams(poolId, tokenIn, amountIn, minAmountOut, recipient));
+    }
 
-        require(
-            tokenIn == pool.token0 || tokenIn == pool.token1,
-            "Invalid token"
-        );
+    /// @dev Internal swap implementation to avoid stack-too-deep
+    function _executeSwap(SwapParams memory p) internal returns (uint256 amountOut) {
+        Pool storage pool = pools[p.poolId];
+        if (p.tokenIn != pool.token0 && p.tokenIn != pool.token1) revert InvalidToken();
 
-        bool isToken0 = tokenIn == pool.token0;
-        address tokenOut = isToken0 ? pool.token1 : pool.token0;
-
-        uint256 reserveIn = isToken0 ? pool.reserve0 : pool.reserve1;
-        uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-
-        // ============ Liquidity Protection ============
+        bool isToken0 = p.tokenIn == pool.token0;
         uint256 feeRate = pool.feeRate;
-        uint256 effectiveReserveIn = reserveIn;
-        uint256 effectiveReserveOut = reserveOut;
 
-        if (liquidityProtectionEnabled && poolProtectionConfig[poolId].amplificationFactor > 0) {
-            uint256 tradeValueUsd = _getTradeValueUsd(tokenIn, amountIn);
+        // Calculate output with protections
+        {
+            uint256 reserveIn = isToken0 ? pool.reserve0 : pool.reserve1;
+            uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
+            uint256 effResIn = reserveIn;
+            uint256 effResOut = reserveOut;
 
-            // This will revert if liquidity is too low or impact too high
-            (uint256 adjustedFee, uint256 effRes0, uint256 effRes1) = _applyLiquidityProtection(
-                poolId,
-                amountIn,
-                tradeValueUsd
-            );
-
-            feeRate = adjustedFee;
-            effectiveReserveIn = isToken0 ? effRes0 : effRes1;
-            effectiveReserveOut = isToken0 ? effRes1 : effRes0;
-
-            // Emit if fee was adjusted
-            if (adjustedFee != pool.feeRate) {
-                emit DynamicFeeApplied(poolId, pool.feeRate, adjustedFee);
+            // Liquidity Protection
+            if ((protectionFlags & FLAG_LIQUIDITY) != 0 && poolProtectionConfig[p.poolId].amplificationFactor > 0) {
+                (uint256 adjustedFee, uint256 effRes0, uint256 effRes1) = _applyLiquidityProtection(
+                    p.poolId, p.amountIn, _getTradeValueUsd(p.tokenIn, p.amountIn)
+                );
+                feeRate = adjustedFee;
+                effResIn = isToken0 ? effRes0 : effRes1;
+                effResOut = isToken0 ? effRes1 : effRes0;
+                if (adjustedFee != pool.feeRate) emit DynamicFeeApplied(p.poolId, pool.feeRate, adjustedFee);
             }
-        }
 
-        // ============ Fibonacci Scaling ============
-        if (fibonacciScalingEnabled) {
-            feeRate = _applyFibonacciScaling(poolId, msg.sender, amountIn, feeRate);
-        }
-
-        // TRADE SIZE LIMIT - prevent large trades that could manipulate price
-        uint256 maxTradeSize = poolMaxTradeSize[poolId] > 0
-            ? poolMaxTradeSize[poolId]
-            : (reserveIn * MAX_TRADE_SIZE_BPS) / 10000;
-        if (amountIn > maxTradeSize) {
-            emit LargeTradeLimited(poolId, amountIn, maxTradeSize);
-            revert TradeTooLarge(maxTradeSize);
-        }
-
-        // Calculate output using effective reserves (virtual liquidity)
-        // But actual transfers use real reserves
-        amountOut = BatchMath.getAmountOut(
-            amountIn,
-            effectiveReserveIn,
-            effectiveReserveOut,
-            feeRate
-        );
-
-        // Scale output back to actual reserves if using virtual liquidity
-        if (effectiveReserveIn != reserveIn) {
-            // Virtual reserves dampened the price impact
-            // Actual output is limited by real reserves
-            uint256 maxOutput = reserveOut * 99 / 100; // Max 99% of reserves
-            if (amountOut > maxOutput) {
-                amountOut = maxOutput;
+            // Fibonacci Scaling
+            if ((protectionFlags & FLAG_FIBONACCI) != 0) {
+                feeRate = _applyFibonacciScaling(p.poolId, msg.sender, p.amountIn, feeRate);
             }
+
+            // Trade size limit
+            uint256 maxTradeSize = poolMaxTradeSize[p.poolId] > 0 ? poolMaxTradeSize[p.poolId] : (reserveIn * MAX_TRADE_SIZE_BPS) / 10000;
+            if (p.amountIn > maxTradeSize) { emit LargeTradeLimited(p.poolId, p.amountIn, maxTradeSize); revert TradeTooLarge(maxTradeSize); }
+
+            amountOut = BatchMath.getAmountOut(p.amountIn, effResIn, effResOut, feeRate);
+            if (effResIn != reserveIn && amountOut > reserveOut * 99 / 100) amountOut = reserveOut * 99 / 100;
         }
 
-        require(amountOut >= minAmountOut, "Insufficient output");
+        if (amountOut < p.minAmountOut) revert InsufficientOutput();
 
-        // Calculate fees using adjusted rate
-        (uint256 protocolFee, ) = BatchMath.calculateFees(
-            amountIn,
-            feeRate,
-            PROTOCOL_FEE_SHARE
-        );
+        // Execute transfers and update state
+        _executeSwapTransfers(pool, p.tokenIn, isToken0, p.amountIn, amountOut, p.recipient);
+        _updateSwapState(pool, p.poolId, p.tokenIn, isToken0, p.amountIn, amountOut, feeRate);
+    }
 
-        // Transfer tokens
+    /**
+     * @notice Execute a swap with proof-of-work for fee discount
+     * @dev Users can reduce trading fees by submitting valid PoW proofs
+     * @param params Bundled swap parameters (see PoWSwapParams struct)
+     * @return amountOut Output amount
+     */
+    function swapWithPoW(PoWSwapParams calldata params) external nonReentrant
+      poolExists(params.poolId) noFlashLoan(params.poolId) whenNotGloballyPaused
+      whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(PRICE_BREAKER)
+      validatePrice(params.poolId) returns (uint256 amountOut) {
+        return _executePoWSwap(params);
+    }
+
+    /// @dev Internal implementation for PoW swap to avoid stack-too-deep
+    function _executePoWSwap(PoWSwapParams memory p) internal returns (uint256 amountOut) {
+        Pool storage pool = pools[p.poolId];
+        if (p.tokenIn != pool.token0 && p.tokenIn != pool.token1) revert InvalidToken();
+
+        bool isToken0 = p.tokenIn == pool.token0;
+        uint256 adjustedFeeRate = pool.feeRate;
+
+        // Apply PoW discount
+        if (p.claimedDifficulty > 0 && p.powNonce != bytes32(0)) {
+            bytes32 challenge = ProofOfWorkLib.generateChallenge(msg.sender, 0, p.poolId);
+            if (!ProofOfWorkLib.verify(
+                ProofOfWorkLib.PoWProof({challenge: challenge, nonce: p.powNonce, algorithm: ProofOfWorkLib.Algorithm(p.powAlgorithm)}),
+                p.claimedDifficulty
+            )) revert InvalidPoWProof();
+            bytes32 proofHash = ProofOfWorkLib.computeProofHash(challenge, p.powNonce);
+            if (usedFeePoWProofs[proofHash]) revert PoWProofAlreadyUsed();
+            usedFeePoWProofs[proofHash] = true;
+            uint256 discount = ProofOfWorkLib.difficultyToFeeDiscount(p.claimedDifficulty, maxPoWFeeDiscount);
+            adjustedFeeRate = adjustedFeeRate * (10000 - discount) / 10000;
+            emit PoWFeeDiscountApplied(p.poolId, msg.sender, p.claimedDifficulty, discount);
+        }
+
+        // Calculate output with protections
+        {
+            uint256 reserveIn = isToken0 ? pool.reserve0 : pool.reserve1;
+            uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
+            if ((protectionFlags & FLAG_LIQUIDITY) != 0 && poolProtectionConfig[p.poolId].amplificationFactor > 0) {
+                (uint256 protectionFee, , ) = _applyLiquidityProtection(p.poolId, p.amountIn, _getTradeValueUsd(p.tokenIn, p.amountIn));
+                if (protectionFee > adjustedFeeRate) adjustedFeeRate = protectionFee;
+            }
+            if ((protectionFlags & FLAG_FIBONACCI) != 0) {
+                adjustedFeeRate = _applyFibonacciScaling(p.poolId, msg.sender, p.amountIn, adjustedFeeRate);
+            }
+            uint256 maxTradeSize = poolMaxTradeSize[p.poolId] > 0 ? poolMaxTradeSize[p.poolId] : (reserveIn * MAX_TRADE_SIZE_BPS) / 10000;
+            if (p.amountIn > maxTradeSize) { emit LargeTradeLimited(p.poolId, p.amountIn, maxTradeSize); revert TradeTooLarge(maxTradeSize); }
+            amountOut = BatchMath.getAmountOut(p.amountIn, reserveIn, reserveOut, adjustedFeeRate);
+        }
+
+        if (amountOut < p.minAmountOut) revert InsufficientOutput();
+
+        // Execute swap
+        _executeSwapTransfers(pool, p.tokenIn, isToken0, p.amountIn, amountOut, p.recipient);
+        _updateSwapState(pool, p.poolId, p.tokenIn, isToken0, p.amountIn, amountOut, adjustedFeeRate);
+    }
+
+    /// @dev Internal helper to execute swap token transfers
+    function _executeSwapTransfers(
+        Pool storage pool,
+        address tokenIn,
+        bool isToken0,
+        uint256 amountIn,
+        uint256 amountOut,
+        address recipient
+    ) internal {
+        address tokenOut = isToken0 ? pool.token1 : pool.token0;
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         IERC20(tokenOut).safeTransfer(recipient, amountOut);
+    }
 
-        // Update reserves (actual, not virtual)
-        if (isToken0) {
-            pool.reserve0 += amountIn;
-            pool.reserve1 -= amountOut;
-        } else {
-            pool.reserve1 += amountIn;
-            pool.reserve0 -= amountOut;
-        }
+    /// @dev Internal helper to update state after swap
+    function _updateSwapState(
+        Pool storage pool,
+        bytes32 poolId,
+        address tokenIn,
+        bool isToken0,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 feeRate
+    ) internal {
+        address tokenOut = isToken0 ? pool.token1 : pool.token0;
 
-        // Update tracked balances
-        trackedBalances[tokenIn] += amountIn;
-        if (trackedBalances[tokenOut] >= amountOut) {
-            trackedBalances[tokenOut] -= amountOut;
-        }
-
-        // Update circuit breakers
-        _updateBreaker(VOLUME_BREAKER, amountIn);
-
-        // Track price movement for price breaker
-        _checkAndUpdatePriceBreaker(poolId);
-
-        // Track protocol fees
+        // Calculate and track fees
+        (uint256 protocolFee, ) = BatchMath.calculateFees(amountIn, feeRate, PROTOCOL_FEE_SHARE);
         accumulatedFees[tokenIn] += protocolFee;
 
-        // Update TWAP oracle
-        _updateOracle(poolId);
+        // Update reserves unchecked
+        unchecked {
+            if (isToken0) { pool.reserve0 += amountIn; pool.reserve1 -= amountOut; }
+            else { pool.reserve1 += amountIn; pool.reserve0 -= amountOut; }
+            trackedBalances[tokenIn] += amountIn;
+            if (trackedBalances[tokenOut] >= amountOut) trackedBalances[tokenOut] -= amountOut;
+        }
 
-        // Update VWAP oracle with trade data
-        uint256 executionPrice = pool.reserve0 > 0 ? (pool.reserve1 * 1e18) / pool.reserve0 : 0;
-        _updateVWAP(poolId, executionPrice, amountIn);
+        // Update oracles and breakers
+        _updateBreaker(VOLUME_BREAKER, amountIn);
+        _checkAndUpdatePriceBreaker(poolId);
+        _updateOracle(poolId);
+        _updateVWAP(poolId, pool.reserve0 > 0 ? (pool.reserve1 * 1e18) / pool.reserve0 : 0, amountIn);
 
         emit SwapExecuted(poolId, msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
@@ -712,9 +812,9 @@ contract VibeAMM is
      * @param token Token address to collect fees for
      */
     function collectFees(address token) external {
-        require(msg.sender == treasury || msg.sender == owner(), "Only treasury or owner");
+        if (msg.sender != treasury && msg.sender != owner()) revert NotAuthorized();
         uint256 amount = accumulatedFees[token];
-        require(amount > 0, "No fees to collect");
+        if (amount == 0) revert NoFeesToCollect();
 
         accumulatedFees[token] = 0;
         IERC20(token).safeTransfer(treasury, amount);
@@ -795,7 +895,7 @@ contract VibeAMM is
      * @notice Update treasury address
      */
     function setTreasury(address _treasury) external onlyOwner {
-        require(_treasury != address(0), "Invalid treasury");
+        if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
     }
 
@@ -803,9 +903,14 @@ contract VibeAMM is
 
     /**
      * @notice Enable/disable global liquidity protection
+     * @dev Gas-optimized: uses packed uint8 flags
      */
     function setLiquidityProtection(bool enabled) external onlyOwner {
-        liquidityProtectionEnabled = enabled;
+        if (enabled) {
+            protectionFlags |= FLAG_LIQUIDITY;
+        } else {
+            protectionFlags &= ~FLAG_LIQUIDITY;
+        }
     }
 
     /**
@@ -848,7 +953,7 @@ contract VibeAMM is
      * @param priceUsd Price in USD (18 decimals)
      */
     function updateTokenPrice(address token, uint256 priceUsd) external {
-        require(msg.sender == owner() || msg.sender == priceOracle, "Not authorized");
+        if (msg.sender != owner() && msg.sender != priceOracle) revert NotAuthorized();
         tokenUsdPrices[token] = priceUsd;
     }
 
@@ -1152,7 +1257,7 @@ contract VibeAMM is
         uint256 amountIn,
         uint256 tradeValueUsd
     ) internal view returns (uint256 adjustedFee, uint256 effectiveReserve0, uint256 effectiveReserve1) {
-        if (!liquidityProtectionEnabled) {
+        if ((protectionFlags & FLAG_LIQUIDITY) == 0) {
             Pool storage pool = pools[poolId];
             return (pool.feeRate, pool.reserve0, pool.reserve1);
         }
@@ -1255,16 +1360,51 @@ contract VibeAMM is
 
     /**
      * @notice Enable/disable flash loan protection
+     * @dev Gas-optimized: uses packed uint8 flags
      */
     function setFlashLoanProtection(bool enabled) external onlyOwner {
-        flashLoanProtectionEnabled = enabled;
+        if (enabled) {
+            protectionFlags |= FLAG_FLASH_LOAN;
+        } else {
+            protectionFlags &= ~FLAG_FLASH_LOAN;
+        }
     }
 
     /**
      * @notice Enable/disable TWAP validation
+     * @dev Gas-optimized: uses packed uint8 flags
      */
     function setTWAPValidation(bool enabled) external onlyOwner {
-        twapValidationEnabled = enabled;
+        if (enabled) {
+            protectionFlags |= FLAG_TWAP;
+        } else {
+            protectionFlags &= ~FLAG_TWAP;
+        }
+    }
+
+    /// @notice Check if flash loan protection is enabled
+    function flashLoanProtectionEnabled() public view returns (bool) {
+        return (protectionFlags & FLAG_FLASH_LOAN) != 0;
+    }
+
+    /// @notice Check if TWAP validation is enabled
+    function twapValidationEnabled() public view returns (bool) {
+        return (protectionFlags & FLAG_TWAP) != 0;
+    }
+
+    /// @notice Check if true price validation is enabled
+    function truePriceValidationEnabled() public view returns (bool) {
+        return (protectionFlags & FLAG_TRUE_PRICE) != 0;
+    }
+
+    /// @notice Check if liquidity protection is enabled
+    function liquidityProtectionEnabled() public view returns (bool) {
+        return (protectionFlags & FLAG_LIQUIDITY) != 0;
+    }
+
+    /// @notice Check if Fibonacci scaling is enabled
+    function fibonacciScalingEnabled() public view returns (bool) {
+        return (protectionFlags & FLAG_FIBONACCI) != 0;
     }
 
     /**
@@ -1386,7 +1526,7 @@ contract VibeAMM is
     function getEffectiveFee(bytes32 poolId, uint256 amountIn) external view returns (uint256 fee) {
         Pool storage pool = pools[poolId];
 
-        if (!liquidityProtectionEnabled || poolProtectionConfig[poolId].amplificationFactor == 0) {
+        if ((protectionFlags & FLAG_LIQUIDITY) == 0 || poolProtectionConfig[poolId].amplificationFactor == 0) {
             return pool.feeRate;
         }
 
@@ -1404,9 +1544,14 @@ contract VibeAMM is
 
     /**
      * @notice Enable/disable Fibonacci scaling
+     * @dev Gas-optimized: uses packed uint8 flags
      */
     function setFibonacciScaling(bool enabled) external onlyOwner {
-        fibonacciScalingEnabled = enabled;
+        if (enabled) {
+            protectionFlags |= FLAG_FIBONACCI;
+        } else {
+            protectionFlags &= ~FLAG_FIBONACCI;
+        }
     }
 
     /**
@@ -1415,7 +1560,7 @@ contract VibeAMM is
      * @param baseUnit Base unit for tier calculation
      */
     function setFibonacciBaseUnit(bytes32 poolId, uint256 baseUnit) external onlyOwner {
-        require(baseUnit > 0, "Base unit must be > 0");
+        if (baseUnit == 0) revert InvalidBaseUnit();
         fibonacciBaseUnit[poolId] = baseUnit;
     }
 
@@ -1424,7 +1569,7 @@ contract VibeAMM is
      * @param duration Window duration in seconds
      */
     function setFibonacciWindowDuration(uint256 duration) external onlyOwner {
-        require(duration >= 1 minutes && duration <= 24 hours, "Invalid duration");
+        if (duration < 1 minutes || duration > 24 hours) revert InvalidDuration();
         fibonacciWindowDuration = duration;
     }
 
@@ -1439,6 +1584,17 @@ contract VibeAMM is
             recentHighPrice[poolId] = currentPrice;
             recentLowPrice[poolId] = currentPrice;
         }
+    }
+
+    // ============ Proof-of-Work Admin Functions ============
+
+    /**
+     * @notice Set maximum fee discount from PoW
+     * @param _maxDiscount Maximum discount in basis points (e.g., 5000 = 50%)
+     */
+    function setMaxPoWFeeDiscount(uint256 _maxDiscount) external onlyOwner {
+        if (_maxDiscount > 10000) revert InvalidDiscount();
+        maxPoWFeeDiscount = _maxDiscount;
     }
 
     // ============ Fibonacci Scaling View Functions ============

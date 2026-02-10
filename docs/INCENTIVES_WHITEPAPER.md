@@ -459,10 +459,10 @@ The fund is capitalized by protocol revenue and maintains reserves per token. Cl
 During high volatility, dynamic fees increase. The excess above base fees flows to the insurance pool:
 
 ```
-Base Fee: 0.30%
+Base Fee: 0.05%
 Volatility Tier: EXTREME (2.0x multiplier)
-Execution Fee: 0.60%
-Insurance Premium: 0.30% (the excess)
+Execution Fee: 0.10%
+Insurance Premium: 0.05% (the excess)
 ```
 
 ### 8.2 Volatility Tiers
@@ -562,10 +562,10 @@ False positives are handleable through governance:
 ### 10.1 Base Fee Structure
 
 ```
-Base Trading Fee: 0.30% (30 bps)
+Base Trading Fee: 0.05% (5 bps)
   └── 100% → LP Pool Reserves (via Shapley distribution)
 
-Dynamic Volatility Fee: (excess above 0.30% during high volatility)
+Dynamic Volatility Fee: (excess above 0.05% during high volatility)
   └── 100% → Volatility Insurance Pool
 
 Zero protocol extraction. Zero founder allocation.
@@ -584,7 +584,7 @@ The VolatilityOracle monitors realized volatility using a rolling window of pric
 ```
 Total Dynamic Fee
       ↓
-  ├── Base portion (0.30%) → Standard LP/Treasury split
+  ├── Base portion (0.05%) → Standard LP/Treasury split
   └── Excess portion → Volatility Insurance Pool
 ```
 

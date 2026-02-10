@@ -1097,7 +1097,7 @@ function FAQSection({ cryptoLevel }) {
     },
     {
       q: "What are the fees?",
-      a: "The fee is 0.30% of your trade. So if you trade $100, you pay 30 cents. This goes to the people who make trading possible, not to us."
+      a: "The fee is 0.05% of your trade. So if you trade $100, you pay just 5 cents. This goes to the people who make trading possible, not to us."
     },
     {
       q: "What's a 'wallet'?",
@@ -1126,8 +1126,8 @@ function FAQSection({ cryptoLevel }) {
     {
       q: "What's the trading fee?",
       a: isAdvanced
-        ? "Base fee: 0.30%. Dynamic adjustment during high volatility. 100% of base fees distributed to LPs via Shapley value calculation. Dynamic excess funds the IL protection pool. Zero protocol take."
-        : "The fee is 0.30% of your trade. All fees go to the people who provide tokens for trading - none goes to the company."
+        ? "Base fee: 0.05% (5 basis points). Dynamic adjustment during high volatility. 100% of base fees distributed to LPs via Shapley value calculation. Dynamic excess funds the IL protection pool. Zero protocol take. Lower than traditional AMMs because batch auctions reduce impermanent loss."
+        : "The fee is 0.05% of your trade - that's just 5 cents per $100. All fees go to the people who provide tokens for trading - none goes to the company."
     },
     {
       q: "How long does a swap take?",

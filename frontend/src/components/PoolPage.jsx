@@ -147,7 +147,7 @@ function PoolPage() {
               </div>
               <div>
                 <span className="font-medium">{pool.token0.symbol}/{pool.token1.symbol}</span>
-                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-vibe-500/20 text-vibe-400">0.3%</span>
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-vibe-500/20 text-vibe-400">0.05%</span>
               </div>
             </div>
             <div className="text-right font-medium">{pool.tvl}</div>
@@ -308,7 +308,7 @@ function AddLiquidityModal({ pool, onClose }) {
             </div>
             <div className="flex justify-between">
               <span className="text-dark-400">Earnings Rate</span>
-              <span>0.3% per exchange</span>
+              <span>0.05% per exchange</span>
             </div>
           </div>
 

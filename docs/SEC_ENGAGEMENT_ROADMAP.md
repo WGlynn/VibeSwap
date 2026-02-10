@@ -137,7 +137,7 @@ If the SEC determines ATS registration is required:
 | Securities traded | As permitted by frontend operator |
 | Hours of operation | 24/7/365 |
 | Types of orders | Market with slippage protection |
-| Fees | 0.30% base, disclosed |
+| Fees | 0.05% base, disclosed |
 | Priority mechanism | Auction-based, transparent |
 
 **Timeline:**

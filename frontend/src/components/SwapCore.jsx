@@ -135,7 +135,13 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
 
 // Post-connection modal explaining what happened
 function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBackup, walletAddress, isDeviceWallet }) {
+  const [expandedBox, setExpandedBox] = useState(null) // 'howItWorks', 'compare', 'recovery'
+
   if (!isOpen) return null
+
+  const toggleBox = (boxId) => {
+    setExpandedBox(expandedBox === boxId ? null : boxId)
+  }
 
   const copyAddress = () => {
     navigator.clipboard.writeText(walletAddress)
@@ -188,55 +194,99 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
             </button>
           </div>
 
-          {/* Device Wallet Explanation */}
+          {/* Device Wallet Explanation - Collapsible boxes */}
           {isDeviceWallet && (
             <div className="space-y-3 mb-5">
-              {/* How it works */}
-              <div className="p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/20">
-                <div className="flex items-start space-x-3">
-                  <span className="text-xl">🔐</span>
-                  <div className="text-sm text-black-200">
-                    <p className="font-semibold text-terminal-400 mb-1">How Your Device Wallet Works</p>
-                    <p>
-                      Your wallet is protected by your device's security chip (Secure Element).
-                      Every transaction requires your biometrics (Face ID, Touch ID, or fingerprint) to approve.
-                    </p>
+              {/* How it works - Collapsible */}
+              <button
+                onClick={() => toggleBox('howItWorks')}
+                className="w-full p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/20 text-left transition-colors hover:bg-terminal-500/15"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xl">🔐</span>
+                    <span className="text-sm text-black-200">
+                      Your phone protects your money with Face ID or fingerprint.
+                    </span>
                   </div>
+                  <svg
+                    className={`w-4 h-4 text-black-400 transition-transform ${expandedBox === 'howItWorks' ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              </div>
+                {expandedBox === 'howItWorks' && (
+                  <div className="mt-3 pt-3 border-t border-terminal-500/20 text-sm text-black-300">
+                    Your wallet is protected by your device's security chip (Secure Element).
+                    Every transaction requires your biometrics (Face ID, Touch ID, or fingerprint) to approve.
+                  </div>
+                )}
+              </button>
 
-              {/* Comparison with other options */}
-              <div className="p-4 rounded-xl bg-black-700/50 border border-black-600">
-                <p className="text-sm text-black-300 mb-3 font-medium">How this compares to other options:</p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start space-x-2">
+              {/* Comparison with other options - Collapsible */}
+              <button
+                onClick={() => toggleBox('compare')}
+                className="w-full p-4 rounded-xl bg-black-700/50 border border-black-600 text-left transition-colors hover:bg-black-700"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
                     <span className="text-matrix-500">✓</span>
-                    <span className="text-black-200"><strong>Device Wallet:</strong> Keys stored in your phone/computer's security chip. Biometric auth required.</span>
+                    <span className="text-sm text-black-200">
+                      This is the most secure option — your keys stay on your device.
+                    </span>
                   </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="text-black-400">○</span>
-                    <span className="text-black-300"><strong>Email/Google:</strong> Keys managed by a secure service. Login with email.</span>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="text-black-400">○</span>
-                    <span className="text-black-300"><strong>External Wallet:</strong> You manage your own keys (MetaMask, etc).</span>
-                  </div>
+                  <svg
+                    className={`w-4 h-4 text-black-400 transition-transform ${expandedBox === 'compare' ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              </div>
+                {expandedBox === 'compare' && (
+                  <div className="mt-3 pt-3 border-t border-black-600 space-y-2 text-sm">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-matrix-500">✓</span>
+                      <span className="text-black-200"><strong>Device Wallet:</strong> Keys stored in your phone/computer's security chip. Biometric auth required.</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-black-400">○</span>
+                      <span className="text-black-300"><strong>Email/Google:</strong> Keys managed by a secure service. Login with email.</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-black-400">○</span>
+                      <span className="text-black-300"><strong>External Wallet:</strong> You manage your own keys (MetaMask, etc).</span>
+                    </div>
+                  </div>
+                )}
+              </button>
 
-              {/* Recovery importance */}
-              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                <div className="flex items-start space-x-3">
-                  <span className="text-xl">⚠️</span>
-                  <div className="text-sm text-black-200">
-                    <p className="font-semibold text-amber-400 mb-1">Important: Set Up Recovery</p>
-                    <p>
-                      If you lose this device or it breaks, you'll need a recovery method to access your wallet.
-                      Add trusted contacts or other backup options now.
-                    </p>
+              {/* Recovery importance - Collapsible */}
+              <button
+                onClick={() => toggleBox('recovery')}
+                className="w-full p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-left transition-colors hover:bg-amber-500/15"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xl">⚠️</span>
+                    <span className="text-sm text-black-200">
+                      If you lose your phone, you lose your money. Back up now.
+                    </span>
                   </div>
+                  <svg
+                    className={`w-4 h-4 text-black-400 transition-transform ${expandedBox === 'recovery' ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              </div>
+                {expandedBox === 'recovery' && (
+                  <div className="mt-3 pt-3 border-t border-amber-500/20 text-sm text-black-300">
+                    If you lose this device or it breaks, you'll need a recovery method to access your wallet.
+                    Add trusted contacts or other backup options now.
+                  </div>
+                )}
+              </button>
             </div>
           )}
 

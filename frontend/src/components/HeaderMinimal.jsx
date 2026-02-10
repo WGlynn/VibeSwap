@@ -20,7 +20,7 @@ function HeaderMinimal() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-black-900/80 backdrop-blur-md border-b border-black-700/50">
+      <header className="sticky top-0 z-40 bg-black-900/80 backdrop-blur-md border-b border-black-700/50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-14">
             {/* Logo - simple */}

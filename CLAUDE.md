@@ -1,5 +1,17 @@
 # Claude Code Memory
 
+## AUTO-SYNC INSTRUCTIONS (READ FIRST)
+
+**On session start**: Always read `.claude/SESSION_STATE.md` for context from previous sessions.
+
+**On session end** (when user says goodbye, signs off, or asks to commit):
+1. Update `.claude/SESSION_STATE.md` with current state
+2. Commit and push to BOTH remotes: `git push origin master && git push stealth master`
+
+This ensures all sessions (desktop, mobile, any device) share the same context.
+
+---
+
 ## Current Project: VibeSwap
 
 **Omnichain DEX** built on LayerZero V2 that eliminates MEV through commit-reveal batch auctions with uniform clearing prices.

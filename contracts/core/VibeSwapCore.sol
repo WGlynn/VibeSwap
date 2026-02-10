@@ -14,6 +14,7 @@ import "./interfaces/IDAOTreasury.sol";
 import "./CircuitBreaker.sol";
 import "../messaging/CrossChainRouter.sol";
 import "../libraries/SecurityLib.sol";
+import "../compliance/ClawbackRegistry.sol";
 
 /**
  * @title VibeSwapCore
@@ -102,6 +103,9 @@ contract VibeSwapCore is
     /// @notice Emergency guardian who can pause
     address public guardian;
 
+    /// @notice Clawback registry for taint checking
+    ClawbackRegistry public clawbackRegistry;
+
     // ============ Events ============
 
     event SwapCommitted(
@@ -154,6 +158,7 @@ contract VibeSwapCore is
     error NotEOA();
     error CommitCooldownActive();
     error NotGuardian();
+    error WalletTainted();
 
     // ============ Modifiers ============
 
@@ -184,6 +189,13 @@ contract VibeSwapCore is
 
     modifier onlyGuardianOrOwner() {
         if (msg.sender != guardian && msg.sender != owner()) revert NotGuardian();
+        _;
+    }
+
+    modifier notTainted() {
+        if (address(clawbackRegistry) != address(0) && clawbackRegistry.isBlocked(msg.sender)) {
+            revert WalletTainted();
+        }
         _;
     }
 
@@ -248,7 +260,7 @@ contract VibeSwapCore is
         uint256 amountIn,
         uint256 minAmountOut,
         bytes32 secret
-    ) external payable whenNotPaused nonReentrant notBlacklisted onlyEOAOrWhitelisted
+    ) external payable whenNotPaused nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
       onlySupported(tokenIn) onlySupported(tokenOut) returns (bytes32 commitId) {
         require(amountIn > 0, "Zero amount");
         require(tokenIn != tokenOut, "Same token");
@@ -597,6 +609,16 @@ contract VibeSwapCore is
                 totalVolume += result.totalTokenInSwapped;
                 lastClearingPrice = result.clearingPrice;
                 deposits[order.trader][order.tokenIn] -= order.amountIn;
+
+                // Record transaction for clawback taint tracking
+                if (address(clawbackRegistry) != address(0)) {
+                    clawbackRegistry.recordTransaction(
+                        order.trader,
+                        address(amm),
+                        order.amountIn,
+                        order.tokenIn
+                    );
+                }
             } else {
                 // Swap failed, return tokens to this contract (they're still here since AMM didn't take them)
                 // Note: AMM should return unfilled tokens, but currently doesn't - this is a simplified model
@@ -709,6 +731,13 @@ contract VibeSwapCore is
     function setGuardian(address newGuardian) external onlyOwner {
         emit GuardianUpdated(guardian, newGuardian);
         guardian = newGuardian;
+    }
+
+    /**
+     * @notice Set clawback registry for taint checking
+     */
+    function setClawbackRegistry(address _registry) external onlyOwner {
+        clawbackRegistry = ClawbackRegistry(_registry);
     }
 
     /**

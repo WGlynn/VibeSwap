@@ -49,12 +49,15 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  const location = useLocation()
+  const isHomePage = location.pathname === '/'
+
   return (
     <ContributionsProvider>
-      <div className="min-h-screen bg-black-900">
+      <div className={`min-h-screen bg-black-900 ${isHomePage ? 'h-screen overflow-hidden' : ''}`}>
         {/* Clean. Simple. Black void. */}
         <HeaderMinimal />
-        <main>
+        <main className={isHomePage ? 'overflow-hidden' : ''}>
           <AnimatedRoutes />
         </main>
       </div>

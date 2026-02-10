@@ -110,7 +110,7 @@ function SwapCore() {
   }
 
   return (
-    <div className="h-[calc(100dvh-56px)] flex items-center justify-center px-4 overflow-hidden touch-none">
+    <div className="swap-container flex items-center justify-center px-4 overflow-hidden touch-none">
       <div className="w-full max-w-[420px]">
         {/* Main swap card */}
         <motion.div

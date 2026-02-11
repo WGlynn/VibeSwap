@@ -710,173 +710,93 @@ function SwapCore() {
   }, [])
 
   // ============================================================
-  // MODAL STATE MANAGEMENT - Centralized to prevent display bugs
+  // MODAL STATE - Simple, explicit, no magic
   // ============================================================
-  // Rule: Only ONE modal can be shown at a time
-  // Priority: Welcome > WalletCreated > ICloudBackup > RecoverySetup
-  //
-  // ROOT CAUSE FIX: Previously, the useEffect would race with handleUseDevice
-  // and sometimes set walletCreated: false based on stale localStorage.
-  // Now: useEffect ONLY controls welcome modal. All other modals are
-  // controlled EXPLICITLY by handlers. No automatic transitions.
-  // ============================================================
-
-  const [modalState, setModalState] = useState(() => {
-    // Initialize based on current connection state
-    // This runs once on mount, before any effects
+  // Which modal is open: 'welcome' | 'walletCreated' | 'icloudBackup' | 'recoverySetup' | null
+  const [activeModal, setActiveModal] = useState(() => {
+    // On mount: decide which modal to show
     const hasStoredWallet = localStorage.getItem('vibeswap_device_wallet')
     const hasAcknowledged = localStorage.getItem('vibeswap_wallet_acknowledged')
 
     if (hasStoredWallet && !hasAcknowledged) {
-      // Returning user with unfinished setup - show walletCreated
-      return {
-        welcome: false,
-        walletCreated: true,
-        icloudBackup: false,
-        recoverySetup: false,
-      }
+      return 'walletCreated' // Returning user, unfinished setup
     }
-
-    // Default: show welcome for new users, hide for acknowledged users
-    return {
-      welcome: !hasStoredWallet,
-      walletCreated: false,
-      icloudBackup: false,
-      recoverySetup: false,
+    if (!hasStoredWallet) {
+      return 'welcome' // New user
     }
+    return null // Returning user, already acknowledged
   })
 
-  // Track if we're in the middle of wallet creation
-  // Prevents useEffect from interfering during async operations
-  const [isCreatingWallet, setIsCreatingWallet] = useState(false)
-
-  // Combined connection state: either WalletConnect or Device Wallet
+  // Combined connection state
   const isAnyWalletConnected = isConnected || deviceWallet.isConnected
   const activeAddress = account || deviceWallet.address
   const activeShortAddress = shortAddress || deviceWallet.shortAddress
 
-  // Debug logging (only in development)
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[SwapCore] Modal state:', {
-        isConnected,
-        deviceWalletConnected: deviceWallet.isConnected,
-        isAnyWalletConnected,
-        isCreatingWallet,
-        modalState,
-      })
-    }
-  }, [isConnected, deviceWallet.isConnected, isAnyWalletConnected, isCreatingWallet, modalState])
-
-  // Effect: ONLY controls the welcome modal visibility
-  // Does NOT touch walletCreated/icloudBackup/recoverySetup
-  useEffect(() => {
-    // Skip during wallet creation - let handler manage the flow
-    if (isCreatingWallet) return
-
-    // If disconnected and no modals in progress, show welcome
-    if (!isAnyWalletConnected && !modalState.walletCreated && !modalState.icloudBackup && !modalState.recoverySetup) {
-      setModalState(prev => ({ ...prev, welcome: true }))
-    }
-
-    // If connected, hide welcome (but don't touch other modals)
-    if (isAnyWalletConnected && modalState.welcome) {
-      setModalState(prev => ({ ...prev, welcome: false }))
-    }
-  }, [isAnyWalletConnected, isCreatingWallet, modalState.walletCreated, modalState.icloudBackup, modalState.recoverySetup, modalState.welcome])
-
-  // Computed: which modal is currently active (only one at a time)
-  const showWelcome = modalState.welcome && !isAnyWalletConnected && !isCreatingWallet
-  const showWalletCreated = modalState.walletCreated && !modalState.icloudBackup && !modalState.recoverySetup
-  const showICloudBackup = modalState.icloudBackup
-  const showRecoverySetup = modalState.recoverySetup
+  // Simple booleans for which modal to show
+  const showWelcome = activeModal === 'welcome'
+  const showWalletCreated = activeModal === 'walletCreated'
+  const showICloudBackup = activeModal === 'icloudBackup'
+  const showRecoverySetup = activeModal === 'recoverySetup'
 
   // ============================================================
-  // MODAL HANDLERS - Update modalState to control display
+  // MODAL HANDLERS - Simple state transitions
   // ============================================================
 
   const handleWelcomeClose = () => {
-    // Just close it - will show again on refresh if still not connected
-    // Don't manually set welcome to false - let the useEffect handle it based on connection state
+    // Do nothing - they need to choose an option
   }
 
   const handleWelcomeGetStarted = () => {
     connect()
+    setActiveModal(null) // Close welcome, WalletConnect modal will open
   }
 
-  // Handle device wallet creation (Secure Element / biometric)
+  // Handle device wallet creation
   const handleUseDevice = async () => {
-    // CRITICAL: Set this BEFORE the async call to prevent useEffect interference
-    setIsCreatingWallet(true)
+    // Clear any stale acknowledged flag
+    localStorage.removeItem('vibeswap_wallet_acknowledged')
 
     try {
       const result = await deviceWallet.createWallet()
 
-      if (result) {
+      if (result && result.address) {
         toast.success('Device wallet created!')
-        // Explicitly transition to walletCreated modal
-        // The isCreatingWallet flag prevents useEffect from overriding this
-        setModalState({
-          welcome: false,
-          walletCreated: true,
-          icloudBackup: false,
-          recoverySetup: false,
-        })
-      } else if (deviceWallet.error) {
-        toast.error(deviceWallet.error)
-        // Reset to welcome on failure
-        setModalState({
-          welcome: true,
-          walletCreated: false,
-          icloudBackup: false,
-          recoverySetup: false,
-        })
+        setActiveModal('walletCreated') // <-- THE IMPORTANT LINE
+      } else {
+        toast.error(deviceWallet.error || 'Failed to create wallet')
       }
     } catch (err) {
       console.error('Device wallet creation failed:', err)
       toast.error('Failed to create device wallet')
-      setModalState({
-        welcome: true,
-        walletCreated: false,
-        icloudBackup: false,
-        recoverySetup: false,
-      })
-    } finally {
-      // Always clear the flag when done
-      setIsCreatingWallet(false)
     }
   }
 
   const handleWalletCreatedClose = () => {
-    // Only mark as acknowledged when they explicitly dismiss
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
-    setModalState(prev => ({ ...prev, walletCreated: false }))
+    setActiveModal(null)
   }
 
   const handleSetupRecovery = () => {
-    // Mark as acknowledged when they go to recovery setup
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
-    setModalState(prev => ({ ...prev, walletCreated: false, recoverySetup: true }))
+    setActiveModal('recoverySetup')
   }
 
   const handleSetupICloudBackup = () => {
-    // Don't mark as acknowledged yet - do it after backup is complete
-    setModalState(prev => ({ ...prev, walletCreated: false, icloudBackup: true }))
+    setActiveModal('icloudBackup')
   }
 
   const handleICloudBackupComplete = () => {
     localStorage.setItem('vibeswap_wallet_acknowledged', 'true')
-    setModalState(prev => ({ ...prev, icloudBackup: false }))
+    setActiveModal(null)
     toast.success('Backup saved! Your wallet is protected.')
   }
 
   const handleICloudBackupClose = () => {
-    // If they skip, go back to the wallet created modal
-    setModalState(prev => ({ ...prev, icloudBackup: false, walletCreated: true }))
+    setActiveModal('walletCreated') // Go back
   }
 
   const handleRecoverySetupClose = () => {
-    setModalState(prev => ({ ...prev, recoverySetup: false }))
+    setActiveModal(null)
   }
 
   // Get device wallet data for backup

@@ -8,15 +8,37 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- Frontend UI/UX improvements
-- Wallet connection flow for both external (MetaMask) and device (WebAuthn) wallets
-- Security-first design based on wallet security axioms
-- Axiom alignment: Vault + Paper Backup complete, hardware wallet prompts added
+- Solidity smart contract work (compile → tests → audit money paths)
+- Sleek minimalist cypherpunk frontend redesign (plan in .claude/plans/)
+- Documentation and formal proofs publication
 
 ## Active Tasks
-- None currently in progress
+- Tomorrow: Solidity sprint (Phase 0-3 in TOMORROW_PLAN.md)
+- Frontend: Cypherpunk redesign implementation
 
-## Recently Completed
+## Recently Completed (Feb 10, 2025)
+12. Created formal proofs documentation:
+    - VIBESWAP_FORMAL_PROOFS.md: Core formal proofs
+    - VIBESWAP_FORMAL_PROOFS_ACADEMIC.md: Academic publication format
+    - Title page, TOC, abstract, 8 sections, 14 references
+    - Appendices: Notation, Proof Classification, Glossary, Index
+    - PDF versions generated for both
+13. Added Trilemmas and Quadrilemmas to PROOF_INDEX.md:
+    - 5 trilemmas (Blockchain, Stablecoin, DeFi Composability, Oracle, Regulatory)
+    - 4 quadrilemmas (Exchange, Liquidity, Governance, Privacy)
+    - Total: 27 problems formally addressed
+14. Created JarvisxWill_CKB.md (Common Knowledge Base):
+    - Persistent memory across all sessions
+    - 7 tiers: Knowledge Classification → Session Recovery
+    - Epistemic operators from modal logic
+    - Hot/Cold separation as permanent architectural constraint
+15. Created "In a Cave, With a Box of Scraps" thesis:
+    - Vibe coding philosophy document
+    - Added to AboutPage.jsx
+    - PDF and DOCX versions generated
+16. Fixed personality quiz routing (added ErrorBoundary)
+
+## Previously Completed
 1. Fixed wallet detection across all pages (combined external + device wallet state)
 2. BridgePage layout fixes (overflow issues resolved)
 3. BridgePage "Send" button (was showing "Get Started")
@@ -26,17 +48,8 @@ This file maintains continuity between Claude Code sessions across devices.
 7. Set up auto-sync between devices (pull first, push last - no conflicts)
 8. Added Will's 2018 wallet security paper as project context
 9. Created wallet security axioms in CLAUDE.md (mandatory design principles)
-10. Built Savings Vault feature (separation of concerns axiom):
-    - useVault.jsx hook with 30-day timelock, guardian requirements
-    - VaultPage.jsx with deposit/withdraw UI
-    - Hardware wallet recommendation when balance > $1000
-    - Pending withdrawal management with cancel option
-11. Built Paper Backup feature (offline generation axiom):
-    - PaperBackup.jsx with 24-word BIP39-style recovery phrase
-    - Offline check recommendation before generating
-    - Verification step (user confirms 3 random words)
-    - Print-friendly output with security warnings
-    - Integrated into RecoverySetup.jsx
+10. Built Savings Vault feature (separation of concerns axiom)
+11. Built Paper Backup feature (offline generation axiom)
 
 ## Known Issues / TODO
 - Large bundle size warning (2.8MB chunk) - consider code splitting
@@ -71,6 +84,11 @@ const isConnected = isExternalConnected || isDeviceConnected
 | `frontend/src/components/VaultPage.jsx` | Savings vault (separation of concerns) |
 | `frontend/src/components/PaperBackup.jsx` | Offline recovery phrase backup |
 | `frontend/src/components/RecoverySetup.jsx` | Account protection options |
+| `docs/PROOF_INDEX.md` | Catalog of all lemmas, theorems, dilemmas |
+| `docs/VIBESWAP_FORMAL_PROOFS_ACADEMIC.md` | Academic publication format |
+| `.claude/JarvisxWill_CKB.md` | Common Knowledge Base (persistent soul) |
+| `.claude/TOMORROW_PLAN.md` | Solidity sprint phases |
+| `.claude/plans/memoized-cooking-hamster.md` | Cypherpunk redesign plan |
 
 ### Git Setup
 ```bash

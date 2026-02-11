@@ -1,11 +1,24 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
+import { useMessagingContext } from '../contexts/MessagingContext'
 
 /**
  * GitHub-style contribution graph showing activity over time
- * Bound to soulbound identity contributions
+ * Pulls REAL data from MessagingContext when available, falls back to mock.
+ * The messaging board is the first live piece — this graph reflects that.
  */
 function ContributionGraph({ identity }) {
+  // Pull real activity data from the messaging core
+  let dailyActivity = {}
+  try {
+    const messaging = useMessagingContext()
+    dailyActivity = messaging.getDailyActivity(identity?.username || null)
+  } catch {
+    // MessagingProvider not mounted — use empty (mock will fill in)
+  }
+
+  const hasRealData = Object.keys(dailyActivity).length > 0
+
   // Generate 52 weeks x 7 days of contribution data
   const { weeks, maxCount, totalContributions, currentStreak, longestStreak } = useMemo(() => {
     const now = new Date()
@@ -16,8 +29,6 @@ function ContributionGraph({ identity }) {
     let longestStreak = 0
     let tempStreak = 0
 
-    // Mock contribution data based on identity
-    // In production, this would come from the blockchain/API
     const seed = identity?.contributions || 0
     const createdAt = identity?.createdAt ? new Date(identity.createdAt * 1000) : new Date()
 
@@ -27,29 +38,32 @@ function ContributionGraph({ identity }) {
         const date = new Date(now)
         date.setDate(date.getDate() - (w * 7 + (6 - d)))
 
-        // Don't show contributions before account creation
         const isBeforeCreation = date < createdAt
-
-        // Generate pseudo-random contribution count based on date and identity
         const dateStr = date.toISOString().split('T')[0]
-        let hash = 0
-        for (let i = 0; i < dateStr.length; i++) {
-          hash = ((hash << 5) - hash) + dateStr.charCodeAt(i) + seed
-          hash = hash & hash
-        }
 
-        // Higher chance of contributions for more active users
-        const activityMultiplier = Math.min((identity?.contributions || 0) / 10, 3)
-        const random = Math.abs(hash % 100) / 100
         let count = 0
 
-        if (!isBeforeCreation && random < 0.3 + (activityMultiplier * 0.1)) {
-          count = Math.floor(Math.abs(hash % 5) * (1 + activityMultiplier * 0.5))
-        }
+        if (hasRealData) {
+          // Use REAL messaging activity data
+          count = dailyActivity[dateStr] || 0
+        } else {
+          // Fallback: mock data based on identity seed
+          let hash = 0
+          for (let i = 0; i < dateStr.length; i++) {
+            hash = ((hash << 5) - hash) + dateStr.charCodeAt(i) + seed
+            hash = hash & hash
+          }
 
-        // Recent days more likely to have activity
-        if (w < 4 && random < 0.5) {
-          count = Math.max(count, Math.floor(Math.abs(hash % 3)))
+          const activityMultiplier = Math.min((identity?.contributions || 0) / 10, 3)
+          const random = Math.abs(hash % 100) / 100
+
+          if (!isBeforeCreation && random < 0.3 + (activityMultiplier * 0.1)) {
+            count = Math.floor(Math.abs(hash % 5) * (1 + activityMultiplier * 0.5))
+          }
+
+          if (w < 4 && random < 0.5) {
+            count = Math.max(count, Math.floor(Math.abs(hash % 3)))
+          }
         }
 
         if (count > max) max = count
@@ -78,7 +92,7 @@ function ContributionGraph({ identity }) {
     if (tempStreak > longestStreak) longestStreak = tempStreak
 
     return { weeks, maxCount: max, totalContributions: total, currentStreak, longestStreak }
-  }, [identity])
+  }, [identity, dailyActivity, hasRealData])
 
   // Get color intensity based on count
   const getColor = (count) => {
@@ -198,7 +212,7 @@ function ContributionGraph({ identity }) {
         <h4 className="text-sm font-semibold text-black-300 mb-3">Contribution Types</h4>
         <div className="space-y-2">
           {[
-            { type: 'Posts', count: Math.floor((identity?.contributions || 0) * 0.3), color: 'matrix' },
+            { type: 'Posts', count: hasRealData ? Object.values(dailyActivity).reduce((s, c) => s + c, 0) : Math.floor((identity?.contributions || 0) * 0.3), color: 'matrix' },
             { type: 'Replies', count: Math.floor((identity?.contributions || 0) * 0.5), color: 'terminal' },
             { type: 'Proposals', count: Math.floor((identity?.contributions || 0) * 0.1), color: 'purple' },
             { type: 'Trades', count: Math.floor((identity?.contributions || 0) * 0.1), color: 'amber' },

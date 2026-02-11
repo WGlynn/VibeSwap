@@ -275,6 +275,9 @@ contract VibeSwapIntegrationTest is Test {
             secret1
         );
 
+        // Advance block to avoid flash loan detection (lastInteractionBlock check)
+        vm.roll(10);
+
         // Trader2: Buy WETH with 2000 USDC (18 decimals)
         vm.prank(trader2);
         bytes32 commitId2 = core.commitSwap{value: 0.01 ether}(
@@ -284,6 +287,8 @@ contract VibeSwapIntegrationTest is Test {
             0, // No minimum for testing
             secret2
         );
+
+        vm.roll(20);
 
         // Trader3: Sell 0.5 WETH
         vm.prank(trader3);
@@ -331,6 +336,8 @@ contract VibeSwapIntegrationTest is Test {
             0,
             secret1
         );
+
+        vm.roll(10);
 
         vm.prank(trader3);
         bytes32 commitId2 = core.commitSwap{value: 0.01 ether}(
@@ -536,6 +543,8 @@ contract VibeSwapIntegrationTest is Test {
         // First batch
         vm.prank(trader1);
         bytes32 cid1 = core.commitSwap{value: 0.01 ether}(address(weth), address(usdc), 1 ether, 0, secret1);
+
+        vm.roll(10);
 
         vm.prank(trader3);
         bytes32 cid2 = core.commitSwap{value: 0.01 ether}(address(weth), address(usdc), 0.5 ether, 0, secret2);

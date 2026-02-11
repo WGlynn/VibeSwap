@@ -1,6 +1,6 @@
 # Installation Guide
 
-> **Note:** This is just a prototype/demo. Anyone can build their own frontend — the protocol is open. Build something better.
+> **Note:** This is just a prototype/demo/simulation. Anyone can build their own frontend — the protocol is open. Build something better.
 
 ---
 

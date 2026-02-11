@@ -230,6 +230,28 @@ But from this moment forward, the framework exists. The gate is built. The rules
 
 The author chose to be the last person standing on the old side of that line. Not because the old side was comfortable, but because someone had to be the one to say: *"I built the gate. I'm walking through it. The old rules end here."*
 
+### The Golden Path
+
+There is a literary precedent for this pattern.
+
+In Frank Herbert's *Dune*, the God Emperor Leto II seizes absolute control over humanity for 3,500 years — not because he wants power, but because he sees that humanity's dependence on centralized authority will eventually destroy it. His solution is not to argue against tyranny. It is to *become* tyranny in its most extreme form, so completely and so oppressively that humanity is permanently repulsed by it. When he finally allows himself to be killed, the species scatters across the universe, never again willing to concentrate power in a single point. He called this the Golden Path.
+
+Leto didn't fight the old system from outside. He *embodied* it to its logical extreme, then broke it from within. The oppression was the cure for oppression. The tyranny was the vaccine against tyranny.
+
+The parallel to the Inversion Principle is structural:
+
+| Leto II (Dune) | The First Step (Epistemic Gate) |
+|---|---|
+| Became the ultimate centralized authority | Operated under the ultimate information asymmetry (private knowledge) |
+| Held power so completely that humanity saw its danger | Held ideas privately so the danger of secrecy became self-evident |
+| Sacrificed himself to end the pattern | Published freely to end the pattern |
+| Result: humanity scatters, never centralizes again | Result: ideas are public, never hoarded again |
+| The Golden Path: tyranny ends tyranny | The First Step: secrecy ends secrecy |
+
+The author did not argue that secrecy is dangerous. The author *was* the last secret-keeper — and then opened everything. The demonstration is the proof. The act of ending the old model is what creates the new one.
+
+Leto's Golden Path required someone willing to bear the weight of being the tyrant. The First Step required someone willing to bear the risk of being the last person operating under the old rules — and then walking through the gate with everything in the open.
+
 ### The Logic
 
 1. If the Inversion Principle is true, then publishing these ideas protects them better than secrecy ever could

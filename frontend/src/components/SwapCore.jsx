@@ -127,6 +127,24 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
               )}
             </p>
           </div>
+
+          {/* Rabbit Hole - Documentation */}
+          <a
+            href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-4 p-3 rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border border-matrix-500/40 hover:border-matrix-500 transition-all group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-matrix-500">↓</span>
+                <span className="text-sm font-medium text-matrix-500">down the rabbit hole</span>
+              </div>
+              <svg className="w-4 h-4 text-matrix-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </a>
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -205,6 +223,24 @@ function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isS
           <p className="text-center text-xs text-black-500 mt-4">
             Your wallet is secured by this device's security chip
           </p>
+
+          {/* Rabbit Hole - Documentation */}
+          <a
+            href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-4 p-3 rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border border-matrix-500/40 hover:border-matrix-500 transition-all group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-matrix-500">↓</span>
+                <span className="text-sm font-medium text-matrix-500">down the rabbit hole</span>
+              </div>
+              <svg className="w-4 h-4 text-matrix-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </a>
         </motion.div>
       </motion.div>
     </AnimatePresence>

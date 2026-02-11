@@ -255,6 +255,7 @@ docs/THE_INVERSION_PRINCIPLE.md      → Paper 3 (game-theoretic inversion)
 docs/THE_INVERSION_PRINCIPLE.pdf     → PDF version
 docs/THE_INVERSION_PRINCIPLE.docx    → DOCX version
 docs/ARCHETYPE_PRIMITIVES.md         → Cognitive primitives (quick sync layer)
+docs/THE_HARD_LINE.md                → Privacy boundary (contributions ≠ personal data)
 ```
 
 ---

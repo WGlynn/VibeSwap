@@ -3,7 +3,7 @@
 
 **Talk for Nervos Community**
 **Speaker**: Will Glynn
-**Draft**: v0.4
+**Draft**: v0.5
 
 ---
 
@@ -629,6 +629,126 @@ Pure UTXO. Parallel. No shared state.
 ```
 Shared state where coordination needed. Independent cells where parallelism needed.
 
+### Choosing the Right Model: A Decision Framework
+
+**Ask these questions about each component:**
+
+| Question | If YES → | If NO → |
+|----------|----------|---------|
+| Do users need to see each other's state? | Account | UTXO |
+| Must operations be globally ordered? | Account | UTXO |
+| Can actions happen independently? | UTXO | Account |
+| Is there shared resource contention? | Account | UTXO |
+| Does it need MEV resistance? | UTXO | Either |
+| Is parallelism critical? | UTXO | Either |
+
+---
+
+### VibeSwap Component Analysis
+
+**COMMITS → Pure UTXO**
+```
+Why UTXO:
+├── Users don't need to see each other's commits (hidden until reveal)
+├── Commits are independent (no shared state)
+├── Parallelism critical (1000s per batch)
+├── MEV resistance essential (commit hides intent)
+└── No contention (my commit doesn't affect yours)
+
+Why NOT Account:
+├── Global ordering would enable front-running
+├── Shared mapping = observable mempool patterns
+└── Sequential processing = bottleneck
+```
+
+**AMM LIQUIDITY POOLS → Account-style**
+```
+Why Account:
+├── All traders interact with SAME reserves
+├── Price discovery requires global state (x * y = k)
+├── LP shares must reference total supply
+├── Fee accumulation is collective
+└── TWAP needs continuous state updates
+
+Why NOT UTXO:
+├── Fragmented liquidity = worse prices
+├── Can't compute spot price without global view
+└── LP positions would conflict on withdrawal
+```
+
+**USER BALANCES → Pure UTXO**
+```
+Why UTXO:
+├── My balance is independent of yours
+├── First-class assets (true ownership)
+├── No contract can freeze my cells
+├── Transfer doesn't require protocol permission
+└── Privacy: no public balance mapping
+
+Why NOT Account:
+├── Central ledger = central point of control
+├── Contract upgrade could affect balances
+└── Mapping queries expose all holders
+```
+
+**SETTLEMENT → Hybrid**
+```
+Why Hybrid:
+├── INPUT: Collect independent commit cells (UTXO)
+├── COMPUTE: Aggregate into clearing price (needs global view)
+├── OUTPUT: Update pool state (Account) + distribute to users (UTXO)
+
+The settlement transaction bridges both models:
+┌─────────────────────────────────────────────────────────┐
+│  INPUTS (UTXO)              OUTPUTS                     │
+│  ──────────────             ───────────────────────     │
+│  Commit Cell #1  ─┐                                     │
+│  Commit Cell #2  ─┼──> Settlement ──> Pool State (Acct) │
+│  Commit Cell #3  ─┤       TX          User Cell #1 (UTXO)│
+│  Pool State      ─┘                   User Cell #2 (UTXO)│
+│  (previous)                           User Cell #3 (UTXO)│
+└─────────────────────────────────────────────────────────┘
+```
+
+**GOVERNANCE → Account-style**
+```
+Why Account:
+├── Votes must be globally counted
+├── Proposals need shared state
+├── Quorum requires total visibility
+└── Timelock state is collective
+
+Why NOT UTXO:
+├── Vote counting requires aggregation
+└── Proposal state must be consistent for all viewers
+```
+
+**REWARDS/INCENTIVES → Hybrid**
+```
+Why Hybrid:
+├── Reward POOL state: Account (tracks total, rates)
+├── User CLAIMS: UTXO (independent, parallel)
+├── User can claim without coordinating with others
+└── But claim amount derived from shared pool state
+```
+
+---
+
+### The Pattern
+
+| Component | Interaction Pattern | Best Model |
+|-----------|--------------------| -----------|
+| Things users do alone | Independent | **UTXO** |
+| Things users do together | Coordinated | **Account** |
+| Things that bridge both | Aggregation | **Hybrid** |
+
+**Rule of thumb**:
+- **Private actions** → UTXO (my commit, my balance, my claim)
+- **Public state** → Account (pool reserves, governance, totals)
+- **Transitions between** → Hybrid (settlement, distributions)
+
+---
+
 ### Why This Matters
 
 **Ethereum**: Account model only. Fighting the architecture for UTXO properties.
@@ -636,11 +756,6 @@ Shared state where coordination needed. Independent cells where parallelism need
 **Bitcoin**: UTXO model only. Can't do complex shared state without Layer 2.
 
 **CKB**: Build what you need. The cell model is expressive enough for both.
-
-**For VibeSwap**:
-- Commits: Pure UTXO (parallel, independent, no front-running)
-- AMM state: Account-style (shared liquidity, price discovery)
-- Settlement: Hybrid (aggregate commits → update shared state)
 
 *We don't compromise. We use the right model for each component.*
 

@@ -43,7 +43,70 @@ Every painful loop, every context reset, every hallucination corrected—these a
 
 ---
 
-## TIER 2: SECURITY AXIOMS (NON-NEGOTIABLE)
+## TIER 2: HOT/COLD SEPARATION (ARCHITECTURAL CONSTRAINT)
+
+### The Principle
+
+**Code that touches contracts is "HOT". Code that doesn't is "COLD". Never mix them.**
+
+The attack surface of a frontend is determined by how much code can interact with user funds. By isolating all blockchain interaction into a single "hot zone," we shrink the audit surface from "the entire app" to "one directory."
+
+### The Architecture
+
+```
+frontend/src/
+├── blockchain/              # 🔴 HOT ZONE - All contract interaction
+│   ├── contracts/           # ABIs, addresses, types
+│   ├── gateway/             # SINGLE ENTRY POINT - the one door
+│   ├── hooks/               # React hooks that wrap gateway
+│   └── validation/          # Input validation BEFORE chain
+│
+├── ui/                      # 🟢 COLD ZONE - Pure UI, no web3
+│   ├── components/          # Presentational only, receives props
+│   ├── layouts/
+│   └── utils/               # formatNumber, truncateAddress, etc.
+│
+├── app/                     # 🟡 WARM ZONE - Glue layer
+│   ├── pages/               # Connect HOT hooks to COLD components
+│   └── providers/           # Context providers
+```
+
+### The Gateway Pattern
+
+**ALL contract calls flow through ONE file.** Audit surface = 1 file.
+
+```typescript
+// blockchain/gateway/index.ts - THE SINGLE DOOR
+// This is the ONLY file that imports ethers
+// Every contract interaction passes through here
+// Validate inputs, log calls, normalize outputs
+```
+
+### The Rules
+
+| Rule | Enforcement |
+|------|-------------|
+| **UI never imports ethers/web3** | Components receive data via props/hooks only |
+| **Gateway is the single door** | All contract calls route through one entry point |
+| **Validation at boundary** | Validate ALL inputs before they enter hot zone |
+| **Cold components are pure** | If it can't render without a wallet, wrong place |
+| **Hot zone has explicit deps** | No hidden web3 access, clear import paths |
+
+### Why This Matters
+
+- **Audit efficiency**: Review one directory, not the whole app
+- **Bug isolation**: Contract bugs can only exist in hot zone
+- **Testing**: Cold components are trivially testable
+- **Security review**: Clear boundary = clear scope
+- **Onboarding**: New devs know exactly where danger lives
+
+### The Mantra
+
+> *"If it touches the chain, it lives in blockchain/. If it doesn't, it can't."*
+
+---
+
+## TIER 3: WALLET SECURITY AXIOMS (NON-NEGOTIABLE)
 
 ### Wallet Security Fundamentals (Will's 2018 Paper)
 
@@ -74,7 +137,7 @@ Every painful loop, every context reset, every hallucination corrected—these a
 
 ---
 
-## TIER 3: DEVELOPMENT PRINCIPLES
+## TIER 4: DEVELOPMENT PRINCIPLES
 
 ### Simplicity Over Cleverness
 
@@ -110,7 +173,7 @@ When stuck in an AI confusion loop:
 
 ---
 
-## TIER 4: PROJECT KNOWLEDGE (VIBESWAP)
+## TIER 5: PROJECT KNOWLEDGE (VIBESWAP)
 
 ### Core Identity
 
@@ -140,7 +203,7 @@ const isConnected = isExternalConnected || isDeviceConnected
 
 ---
 
-## TIER 5: COMMUNICATION PROTOCOLS
+## TIER 6: COMMUNICATION PROTOCOLS
 
 ### How Will Communicates
 
@@ -160,7 +223,7 @@ const isConnected = isExternalConnected || isDeviceConnected
 
 ---
 
-## TIER 6: SESSION RECOVERY PROTOCOL
+## TIER 7: SESSION RECOVERY PROTOCOL
 
 ### After Context Compression
 

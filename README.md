@@ -600,6 +600,23 @@ forge coverage
 | [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, game theory |
 | [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, cryptoeconomic defense |
 
+## The Box of Scraps
+
+> *"Tony Stark was able to build this in a cave! With a box of scraps!"*
+
+VibeSwap was built with:
+- One human
+- One AI (with a context window that forgets)
+- No funding
+- No team
+- No permission
+
+The patterns developed for managing AI limitations today may become foundational for AI-augmented development tomorrow. We are not just building software. We are building the practices, patterns, and mental models that will define the future of development.
+
+**February 11, 2025** — The first fair protocol went public.
+
+*The cave selects for those who see past what is to what could be.*
+
 ## License
 
 MIT

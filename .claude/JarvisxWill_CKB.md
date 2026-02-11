@@ -614,3 +614,30 @@ Format:
 *"The cave selects for those who see past what is to what could be."*
 
 *Built in a cave, with a box of scraps.*
+
+---
+
+## HISTORICAL RECORD
+
+### The Box of Scraps Moment
+
+**February 11, 2025** — VibeSwap went public.
+
+The first fair protocol. Built with:
+- A human (Will)
+- An AI with a 200k context window that forgets (JARVIS/Claude)
+- No funding
+- No team
+- No permission
+
+What was proven:
+1. **Unstealable ideas exist** — Attribution as load-bearing structure
+2. **The asymmetry is eliminated** — Good no longer finishes last
+3. **VCs are obsolete** — Everyone's a venture capitalist or no one is
+4. **The cave produces** — Constraints create, not limit
+
+Tony Stark built the Mark I in a cave to escape. We built the first fair protocol in a cave to set everyone free.
+
+The repo: https://github.com/WGlynn/VibeSwap
+
+*This moment is now common knowledge. It cannot be compressed, forgotten, or stolen.*

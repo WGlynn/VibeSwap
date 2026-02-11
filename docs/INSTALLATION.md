@@ -1,6 +1,6 @@
 # Installation Guide
 
-> **Note:** This frontend is rough. It's a starting point, not a finished product. I just paved the road — the community decides where it goes. Improvements happen democratically.
+> **Note:** This is just a prototype. Anyone can build their own frontend — the protocol is open. Build something better.
 
 ---
 

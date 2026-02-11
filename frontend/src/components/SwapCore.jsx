@@ -714,14 +714,41 @@ function SwapCore() {
   // ============================================================
   // Rule: Only ONE modal can be shown at a time
   // Priority: Welcome > WalletCreated > ICloudBackup > RecoverySetup
+  //
+  // ROOT CAUSE FIX: Previously, the useEffect would race with handleUseDevice
+  // and sometimes set walletCreated: false based on stale localStorage.
+  // Now: useEffect ONLY controls welcome modal. All other modals are
+  // controlled EXPLICITLY by handlers. No automatic transitions.
   // ============================================================
 
-  const [modalState, setModalState] = useState({
-    welcome: true,        // Start true - assume not connected until proven otherwise
-    walletCreated: false,
-    icloudBackup: false,
-    recoverySetup: false,
+  const [modalState, setModalState] = useState(() => {
+    // Initialize based on current connection state
+    // This runs once on mount, before any effects
+    const hasStoredWallet = localStorage.getItem('vibeswap_device_wallet')
+    const hasAcknowledged = localStorage.getItem('vibeswap_wallet_acknowledged')
+
+    if (hasStoredWallet && !hasAcknowledged) {
+      // Returning user with unfinished setup - show walletCreated
+      return {
+        welcome: false,
+        walletCreated: true,
+        icloudBackup: false,
+        recoverySetup: false,
+      }
+    }
+
+    // Default: show welcome for new users, hide for acknowledged users
+    return {
+      welcome: !hasStoredWallet,
+      walletCreated: false,
+      icloudBackup: false,
+      recoverySetup: false,
+    }
   })
+
+  // Track if we're in the middle of wallet creation
+  // Prevents useEffect from interfering during async operations
+  const [isCreatingWallet, setIsCreatingWallet] = useState(false)
 
   // Combined connection state: either WalletConnect or Device Wallet
   const isAnyWalletConnected = isConnected || deviceWallet.isConnected
@@ -731,38 +758,35 @@ function SwapCore() {
   // Debug logging (only in development)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[SwapCore] Connection state:', {
+      console.log('[SwapCore] Modal state:', {
         isConnected,
         deviceWalletConnected: deviceWallet.isConnected,
         isAnyWalletConnected,
+        isCreatingWallet,
         modalState,
       })
     }
-  }, [isConnected, deviceWallet.isConnected, isAnyWalletConnected, modalState])
+  }, [isConnected, deviceWallet.isConnected, isAnyWalletConnected, isCreatingWallet, modalState])
 
-  // Master effect: Determine which modal should be shown
+  // Effect: ONLY controls the welcome modal visibility
+  // Does NOT touch walletCreated/icloudBackup/recoverySetup
   useEffect(() => {
-    // If wallet is connected, hide welcome and maybe show walletCreated
-    if (isAnyWalletConnected) {
-      const hasAcknowledged = localStorage.getItem('vibeswap_wallet_acknowledged')
-      setModalState(prev => ({
-        ...prev,
-        welcome: false,
-        walletCreated: !hasAcknowledged && !prev.icloudBackup && !prev.recoverySetup,
-      }))
-    } else {
-      // No wallet connected - show welcome, hide others
-      setModalState({
-        welcome: true,
-        walletCreated: false,
-        icloudBackup: false,
-        recoverySetup: false,
-      })
+    // Skip during wallet creation - let handler manage the flow
+    if (isCreatingWallet) return
+
+    // If disconnected and no modals in progress, show welcome
+    if (!isAnyWalletConnected && !modalState.walletCreated && !modalState.icloudBackup && !modalState.recoverySetup) {
+      setModalState(prev => ({ ...prev, welcome: true }))
     }
-  }, [isAnyWalletConnected])
+
+    // If connected, hide welcome (but don't touch other modals)
+    if (isAnyWalletConnected && modalState.welcome) {
+      setModalState(prev => ({ ...prev, welcome: false }))
+    }
+  }, [isAnyWalletConnected, isCreatingWallet, modalState.walletCreated, modalState.icloudBackup, modalState.recoverySetup, modalState.welcome])
 
   // Computed: which modal is currently active (only one at a time)
-  const showWelcome = modalState.welcome && !isAnyWalletConnected
+  const showWelcome = modalState.welcome && !isAnyWalletConnected && !isCreatingWallet
   const showWalletCreated = modalState.walletCreated && !modalState.icloudBackup && !modalState.recoverySetup
   const showICloudBackup = modalState.icloudBackup
   const showRecoverySetup = modalState.recoverySetup
@@ -782,19 +806,44 @@ function SwapCore() {
 
   // Handle device wallet creation (Secure Element / biometric)
   const handleUseDevice = async () => {
-    const result = await deviceWallet.createWallet()
-    if (result) {
-      toast.success('Device wallet created!')
-      // Explicitly show the walletCreated modal (belt-and-suspenders with useEffect)
-      // This ensures the modal shows even if there's a race condition with state updates
+    // CRITICAL: Set this BEFORE the async call to prevent useEffect interference
+    setIsCreatingWallet(true)
+
+    try {
+      const result = await deviceWallet.createWallet()
+
+      if (result) {
+        toast.success('Device wallet created!')
+        // Explicitly transition to walletCreated modal
+        // The isCreatingWallet flag prevents useEffect from overriding this
+        setModalState({
+          welcome: false,
+          walletCreated: true,
+          icloudBackup: false,
+          recoverySetup: false,
+        })
+      } else if (deviceWallet.error) {
+        toast.error(deviceWallet.error)
+        // Reset to welcome on failure
+        setModalState({
+          welcome: true,
+          walletCreated: false,
+          icloudBackup: false,
+          recoverySetup: false,
+        })
+      }
+    } catch (err) {
+      console.error('Device wallet creation failed:', err)
+      toast.error('Failed to create device wallet')
       setModalState({
-        welcome: false,
-        walletCreated: true,
+        welcome: true,
+        walletCreated: false,
         icloudBackup: false,
         recoverySetup: false,
       })
-    } else if (deviceWallet.error) {
-      toast.error(deviceWallet.error)
+    } finally {
+      // Always clear the flag when done
+      setIsCreatingWallet(false)
     }
   }
 

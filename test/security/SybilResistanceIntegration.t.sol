@@ -422,7 +422,7 @@ contract SybilResistanceIntegrationTest is Test {
         registry.executeClawback(caseId);
 
         // Step 7: Verify resolution
-        (, , , , CaseStatus status, , , , , , ) = registry.cases(caseId);
+        (, , , , ClawbackRegistry.CaseStatus status, , , , , , ) = registry.cases(caseId);
         assertEq(uint256(status), uint256(ClawbackRegistry.CaseStatus.RESOLVED));
 
         // All wallets in the chain are frozen

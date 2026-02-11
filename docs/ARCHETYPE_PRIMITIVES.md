@@ -206,7 +206,31 @@ Instead, they were published. Freely. With no IP protection. No patent filing. N
 
 This was not naivety. It was the first-mover application of the very principle being described.
 
-**The logic:**
+### Why It Was Private First
+
+A fair question: if publication is protection, why were these ideas private at any point?
+
+Because the framework didn't exist yet.
+
+Before the Inversion Principle was articulated, there was no argument for why publishing was safe. Before the Provenance Thesis, there was no model for how contribution graphs replace IP. Before the Transparency Theorem, there was no proof that code privacy was collapsing. The ideas that *create* the new model cannot be protected *by* the new model until the model exists. You cannot walk through a gate you haven't built yet.
+
+So the ideas were developed privately — under the old rules, because those were the only rules that existed. This is not a contradiction. It is a necessity. Every new system is bootstrapped from within the old one. Bitcoin was developed privately before being published. The Constitution was drafted behind closed doors before being ratified publicly. The old model protects the work of building the new model. Then the new model replaces the old one.
+
+But there is a line. And crossing it matters.
+
+### The Last One Through
+
+By publishing these ideas freely and irrevocably, the author certifies one thing:
+
+**This is the last time someone takes private knowledge and claims it as their own before going public.**
+
+Everything before this moment operated under the old rules — where ideas were developed in private, and provenance was disputable. Under those rules, anyone could have been quietly influenced by someone else's thinking and published it as original work. There was no cryptographic record to prove otherwise. That's the world we all lived in. That ambiguity is unavoidable for anything that predates the framework.
+
+But from this moment forward, the framework exists. The gate is built. The rules are inverted. Anyone who publishes through the Epistemic Gate has cryptographic provenance from the moment of posting. And anyone who *doesn't* publish — who hoards, who operates in private, who claims ideas without timestamps — is now operating at a disadvantage that the Inversion Principle makes explicit.
+
+The author chose to be the last person standing on the old side of that line. Not because the old side was comfortable, but because someone had to be the one to say: *"I built the gate. I'm walking through it. The old rules end here."*
+
+### The Logic
 
 1. If the Inversion Principle is true, then publishing these ideas protects them better than secrecy ever could
 2. If it is false, then the ideas have no value anyway — because the framework they describe doesn't work

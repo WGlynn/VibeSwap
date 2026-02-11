@@ -3,7 +3,7 @@
 
 **Talk for Nervos Community**
 **Speaker**: Will Glynn
-**Draft**: v0.2
+**Draft**: v0.3
 
 ---
 
@@ -156,7 +156,78 @@ No hidden state. No ordering games. Verifiable by anyone.
 
 ---
 
-## Advantage 4: Natural Commit-Reveal (3 min)
+## Advantage 4: Physical Realism in Digital Space (2 min)
+
+UTXOs behave like physical objects. Account balances don't.
+
+### The Physics of Money
+
+**Physical cash**:
+- A $20 bill can only be in ONE place
+- To give it away, you must LOSE it
+- It can't be copied (counterfeiting aside)
+- Its history is embedded in its existence
+
+**Account model** (violates physical intuition):
+```
+Alice.balance = 100
+Bob.balance = 0
+
+transfer(Alice → Bob, 100)
+
+Alice.balance = 0    // Number changed
+Bob.balance = 100    // Different number changed
+```
+Numbers in a database. No "thing" moved. Just arithmetic on shared state.
+
+**UTXO model** (preserves physical intuition):
+```
+┌─────────────┐         ┌─────────────┐
+│ Alice's $20 │  ──>    │ Bob's $20   │
+│ (UTXO #123) │  spend  │ (UTXO #456) │
+└─────────────┘         └─────────────┘
+       │
+       └── DESTROYED. Gone. Consumed.
+```
+A "thing" moved. The old one ceased to exist. A new one was created.
+
+### Why Physical Realism Matters
+
+**Conservation laws hold**:
+- Inputs consumed = outputs created (minus fees)
+- No value appears from nowhere
+- No value vanishes without trace
+- Auditable like physical inventory
+
+**Causality is preserved**:
+- UTXO #456 exists BECAUSE UTXO #123 was spent
+- Every coin has a traceable history
+- Provenance is built into the model
+
+**Intuition transfers**:
+- Users understand "I have a coin" better than "I have a balance"
+- "Spending" means giving something up
+- "Receiving" means getting something new
+- Mental model matches physical experience
+
+### For VibeSwap
+
+```
+Your commit = a physical thing in the batch
+Your deposit = a physical asset you control
+Settlement = physical transformation of inputs to outputs
+
+Not: "we updated your balance in our database"
+But: "your old coins were consumed, new coins were created"
+```
+
+**Digital scarcity with physical intuition.**
+
+The same determinism that makes physical systems predictable makes UTXO systems provable.
+
+---
+
+## Advantage 5: Natural Commit-Reveal (2 min)
 
 ### Why Commit-Reveal is Hard on Account Model
 
@@ -213,7 +284,7 @@ REVEAL PHASE:
 
 ---
 
-## Advantage 5: Formal Verification (2 min)
+## Advantage 6: Formal Verification (2 min)
 
 ### Account Model Complexity
 ```
@@ -244,7 +315,7 @@ Proving properties on UTXO model: "for these specific inputs..."
 
 ---
 
-## Advantage 6: Privacy Potential (1 min)
+## Advantage 7: Privacy Potential (1 min)
 
 ### Account Model
 ```

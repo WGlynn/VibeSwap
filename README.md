@@ -45,6 +45,44 @@ Anyone who provides liquidity is allocating capital. Anyone who uses the protoco
 
 The VC class doesn't get abolished—it gets *universalized*. And when everyone's a VC, no one is.
 
+### 5. Why Sharing Wins: Personal-Social Alignment
+
+In traditional systems, sharing creates a conflict:
+- **Personal**: Sharing = giving away your advantage
+- **Social**: Sharing = collective benefit
+- **Result**: Rational actors hoard. Society loses.
+
+VibeSwap eliminates this conflict through structural alignment:
+
+| Action | Personal Outcome | Social Outcome | Aligned? |
+|--------|------------------|----------------|----------|
+| **Share idea** | Attribution → Credit → Shapley rewards | Knowledge compounds | ✓ Yes |
+| **Provide liquidity** | Earn fees proportional to contribution | Deeper markets for all | ✓ Yes |
+| **Use protocol** | Better execution (no MEV) | More volume → more rewards for LPs | ✓ Yes |
+| **Hoard/extract** | Broken copy (unstealable ideas) | No benefit | ✗ Disincentivized |
+
+**The mechanism:**
+1. **Shapley values** reward marginal contribution, not just presence
+2. **Attribution is structural** — your contribution is permanently recorded
+3. **Copying without credit** produces a broken version (unstealable ideas)
+4. **No extraction** means no incentive to defect
+
+**Why this matters:**
+
+In game theory terms, VibeSwap transforms a **Prisoner's Dilemma** (where defection is rational) into an **Assurance Game** (where cooperation is rational if others cooperate).
+
+```
+Traditional:     Cooperate = Sucker's payoff (exploited)
+                 Defect    = Dominant strategy (extract value)
+
+VibeSwap:        Cooperate = Highest payoff (attributed, rewarded)
+                 Defect    = Lowest payoff (broken copy, no credit)
+```
+
+**Being good is no longer a sacrifice. It's the optimal strategy.**
+
+When personal incentives align with social good, you don't need to appeal to morality. Selfishness and altruism produce the same behavior. The protocol makes virtue *rational*.
+
 ---
 
 An omnichain decentralized exchange built on LayerZero V2 featuring Sidepit-inspired fair price discovery with a hybrid commit-reveal + auction system.

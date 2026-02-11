@@ -3,7 +3,7 @@
 
 **Talk for Nervos Community**
 **Speaker**: Will Glynn
-**Draft**: v0.3
+**Draft**: v0.4
 
 ---
 
@@ -556,6 +556,93 @@ This isn't optimization. It's architecture.
 - **Type validation**: Settlement must follow clearing rules
 
 **Smart contract logic with UTXO guarantees. First-class assets with programmable rules.**
+
+---
+
+### The Flexibility Secret: UTXO/Account Hybrids
+
+CKB's low-level primitives don't force a choice. You can build EITHER model—or BOTH.
+
+**The Abstraction Ladder**:
+```
+┌─────────────────────────────────────────────────────────┐
+│  HIGH LEVEL: Developer chooses paradigm                 │
+│  ─────────────────────────────────────────────────────  │
+│                                                         │
+│  "Account-style"          "UTXO-style"      "Hybrid"   │
+│   Smart Contract           Pure Cells        Both       │
+│        │                       │               │        │
+│        ▼                       ▼               ▼        │
+│  ┌───────────┐           ┌─────────┐    ┌──────────┐   │
+│  │ State in  │           │ State   │    │ Shared   │   │
+│  │ one cell  │           │ per     │    │ state +  │   │
+│  │ (global)  │           │ user    │    │ user     │   │
+│  │           │           │ cell    │    │ cells    │   │
+│  └───────────┘           └─────────┘    └──────────┘   │
+│        │                       │               │        │
+│        └───────────────────────┴───────────────┘        │
+│                          │                              │
+│                          ▼                              │
+│  ─────────────────────────────────────────────────────  │
+│  LOW LEVEL: All just cells with lock/type scripts       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Account-style on CKB** (when you need it):
+```
+┌─────────────────────────────────────────┐
+│  Global State Cell                      │
+│  ─────────────────────────────────────  │
+│  data: {                                │
+│    balances: { alice: 100, bob: 50 },   │
+│    total_supply: 150,                   │
+│    admin: 0x123...                      │
+│  }                                      │
+│  lock: governance_multisig              │
+│  type: amm_state_type                   │
+└─────────────────────────────────────────┘
+```
+Looks like Ethereum. Still a cell underneath. Still auditable.
+
+**UTXO-style on CKB** (when you need guarantees):
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ Alice's cell │  │ Bob's cell   │  │ Carol's cell │
+│ 100 tokens   │  │ 50 tokens    │  │ 75 tokens    │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+Pure UTXO. Parallel. No shared state.
+
+**Hybrid on CKB** (best of both):
+```
+┌─────────────────────────────────────────┐
+│  AMM Pool State Cell (shared)           │
+│  - Reserve ratios                       │
+│  - Fee parameters                       │
+│  - TWAP accumulator                     │
+└─────────────────────────────────────────┘
+            +
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ User commit  │  │ User commit  │  │ User commit  │
+│ (independent)│  │ (independent)│  │ (independent)│
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+Shared state where coordination needed. Independent cells where parallelism needed.
+
+### Why This Matters
+
+**Ethereum**: Account model only. Fighting the architecture for UTXO properties.
+
+**Bitcoin**: UTXO model only. Can't do complex shared state without Layer 2.
+
+**CKB**: Build what you need. The cell model is expressive enough for both.
+
+**For VibeSwap**:
+- Commits: Pure UTXO (parallel, independent, no front-running)
+- AMM state: Account-style (shared liquidity, price discovery)
+- Settlement: Hybrid (aggregate commits → update shared state)
+
+*We don't compromise. We use the right model for each component.*
 
 Best of all worlds.
 

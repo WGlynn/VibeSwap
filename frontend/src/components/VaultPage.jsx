@@ -153,7 +153,7 @@ function VaultPage() {
             </div>
             <h1 className="text-xl font-bold mb-2">Create Your Savings Vault</h1>
             <p className="text-black-400 text-sm">
-              Your paper said it best: "Generate a different wallet for expenses... and use different ones for long term storage."
+              Separate your spending from your savings. Different wallets for different purposes.
             </p>
           </div>
 

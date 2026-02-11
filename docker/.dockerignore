@@ -1,0 +1,14 @@
+node_modules
+.git
+.github
+*.md
+.env
+.env.*
+!.env.example
+test/
+tests/
+docs/
+cache/
+out/
+broadcast/
+*.log

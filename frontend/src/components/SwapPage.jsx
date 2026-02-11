@@ -703,6 +703,34 @@ function SwapPage() {
                 <span>for shortcuts</span>
               </button>
             </div>
+
+            {/* Rabbit Hole - Documentation */}
+            <a
+              href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mt-6"
+            >
+              <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border-2 border-matrix-500/50 hover:border-matrix-500 p-4 transition-all duration-300 group">
+                <div className="absolute inset-0 bg-matrix-500/5 animate-pulse" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-matrix-500/20 border border-matrix-500/50 flex items-center justify-center text-matrix-500">
+                      <svg className="w-5 h-5 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-matrix-500">down the rabbit hole</h3>
+                      <p className="text-[10px] text-black-400">whitepapers · mechanism design · philosophy</p>
+                    </div>
+                  </div>
+                  <svg className="w-5 h-5 text-matrix-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </div>
+              </div>
+            </a>
           </motion.div>
 
           {/* Keyboard Shortcuts Modal */}

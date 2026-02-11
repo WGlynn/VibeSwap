@@ -383,53 +383,6 @@ function HomePage() {
         </motion.div>
       </motion.div>
 
-      {/* RABBIT HOLE - Documentation CTA */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.15 }}
-        className="mb-12"
-      >
-        <a
-          href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block group"
-        >
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border-2 border-matrix-500/50 hover:border-matrix-500 p-6 md:p-8 transition-all duration-300">
-            {/* Animated background pulse */}
-            <div className="absolute inset-0 bg-matrix-500/5 animate-pulse" />
-
-            <div className="relative flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-matrix-500/20 border border-matrix-500/50 flex items-center justify-center text-matrix-500">
-                  <svg className="w-7 h-7 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold text-matrix-500 mb-1">
-                    down the rabbit hole
-                  </h3>
-                  <p className="text-sm text-black-300">
-                    whitepapers · mechanism design · security architecture · philosophy
-                  </p>
-                </div>
-              </div>
-              <motion.div
-                whileHover={{ x: 5 }}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg bg-matrix-500 text-black-900 font-bold text-sm"
-              >
-                <span>read the docs</span>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </motion.div>
-            </div>
-          </div>
-        </a>
-      </motion.div>
-
       {/* Stats Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

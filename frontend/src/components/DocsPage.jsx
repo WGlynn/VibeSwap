@@ -29,6 +29,9 @@ function getSections(cryptoLevel) {
     baseSections.splice(faqIndex, 0, ...advancedSections)
   }
 
+  // Always show research papers
+  baseSections.push({ id: 'papers', label: 'Research Papers', icon: '◎' })
+
   return baseSections
 }
 
@@ -173,6 +176,7 @@ function DocsPage() {
               {activeSection === 'halving' && <HalvingSection />}
               {activeSection === 'build-frontend' && <BuildFrontendSection />}
               {activeSection === 'faq' && <FAQSection cryptoLevel={cryptoLevel} />}
+              {activeSection === 'papers' && <PapersSection />}
             </motion.div>
           </AnimatePresence>
         </motion.div>
@@ -1222,6 +1226,74 @@ function CodeBlock({ title, language, code }) {
       <pre className="p-4 overflow-x-auto text-sm">
         <code className="text-void-300">{code}</code>
       </pre>
+    </div>
+  )
+}
+
+function PapersSection() {
+  return (
+    <div className="glass-strong rounded-2xl p-8 space-y-8">
+      <div>
+        <h2 className="text-3xl font-display font-bold text-white mb-4">Research Papers</h2>
+        <p className="text-void-300 text-lg">
+          The theoretical foundations behind VibeSwap's mechanism design.
+        </p>
+      </div>
+
+      {/* Psychonaut Paper */}
+      <div className="bg-gradient-to-br from-vibe-500/10 to-cyber-500/10 rounded-xl p-6 border border-vibe-500/20">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1">
+            <h3 className="text-xl font-semibold text-white mb-2">The Psychonaut Paper</h3>
+            <p className="text-sm text-vibe-400 font-medium mb-3">
+              A Formal Proof That VibeSwap Scales Socially — Not Just Computationally
+            </p>
+            <p className="text-void-300 text-sm leading-relaxed mb-4">
+              Proves that VibeSwap constitutes a "social black hole" — a protocol whose gravitational pull increases monotonically with participation, where the event horizon represents the point at which rational agents cannot justify non-participation. Covers gravitational incentive alignment, anti-fragile trust scaling, seamless institutional absorption, cascading compliance, the impossibility of competitive alternatives, and AI alignment via Shapley-symmetric economics.
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">Game Theory</span>
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">Mechanism Design</span>
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">Nash Equilibrium</span>
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">AI Alignment</span>
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">Shapley Values</span>
+            </div>
+          </div>
+          <a
+            href="/THE_PSYCHONAUT_PAPER.pdf"
+            download="The_Psychonaut_Paper_VibeSwap.pdf"
+            className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-xl bg-vibe-500/20 border border-vibe-500/30 text-vibe-400 hover:bg-vibe-500/30 hover:text-vibe-300 transition-colors font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            <span>Download PDF</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Wallet Security Paper */}
+      <div className="bg-void-800/50 rounded-xl p-6 border border-void-600/30">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1">
+            <h3 className="text-xl font-semibold text-white mb-2">Wallet Security Fundamentals</h3>
+            <p className="text-sm text-void-400 font-medium mb-3">
+              Core axioms for self-custodial wallet design (2018)
+            </p>
+            <p className="text-void-300 text-sm leading-relaxed mb-4">
+              Establishes the security principles underlying VibeSwap's device wallet architecture: user-controlled keys, cold storage primacy, minimized server trust, and encrypted backup mechanisms.
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">Security</span>
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">Self-Custody</span>
+              <span className="bg-void-700/50 text-void-300 px-2 py-1 rounded">WebAuthn</span>
+            </div>
+          </div>
+          <span className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-xl bg-void-700/30 border border-void-600/30 text-void-500 font-medium cursor-default">
+            <span>Coming Soon</span>
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

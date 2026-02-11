@@ -133,6 +133,84 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
   )
 }
 
+// Existing wallet detected modal
+function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isSigningIn }) {
+  if (!isOpen) return null
+
+  const shortAddress = walletAddress
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    : '...'
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 p-6 shadow-2xl"
+        >
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
+              <span className="text-3xl">🔐</span>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Wallet Found</h2>
+            <p className="text-black-200 text-base">
+              We found an existing wallet on this device.
+            </p>
+          </div>
+
+          {/* Wallet address display */}
+          <div className="mb-6 p-4 rounded-xl bg-black-700 border border-black-600">
+            <div className="text-sm text-black-400 mb-1">Wallet Address</div>
+            <div className="font-mono text-matrix-400 text-lg">{shortAddress}</div>
+          </div>
+
+          {/* Options */}
+          <div className="space-y-3">
+            <button
+              onClick={onSignIn}
+              disabled={isSigningIn}
+              className="w-full py-3.5 rounded-xl bg-matrix-600 hover:bg-matrix-500 disabled:opacity-70 text-black-900 font-semibold transition-colors"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <span>📱</span>
+                <span>{isSigningIn ? 'Signing in...' : 'Sign In to This Wallet'}</span>
+              </div>
+              <div className="text-sm font-normal mt-0.5 opacity-80">
+                Use Face ID / Touch ID to unlock
+              </div>
+            </button>
+
+            <button
+              onClick={onCreateNew}
+              className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-white font-medium transition-colors border border-black-600"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <span>✨</span>
+                <span>Create New Wallet</span>
+              </div>
+              <div className="text-sm font-normal mt-0.5 text-black-400">
+                This will replace your existing wallet
+              </div>
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-black-500 mt-4">
+            Your wallet is secured by this device's security chip
+          </p>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
 // Post-connection modal explaining what happened
 function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBackup, walletAddress, isDeviceWallet }) {
   const [expandedBox, setExpandedBox] = useState(null) // 'howItWorks', 'compare', 'recovery'
@@ -706,26 +784,30 @@ function SwapCore() {
 
   // Check if device wallet (Secure Element) is available
   useEffect(() => {
-    isPlatformAuthenticatorAvailable().then(setDeviceWalletAvailable)
+    isPlatformAuthenticatorAvailable().then(available => {
+      console.log('[SwapCore] deviceWalletAvailable:', available)
+      setDeviceWalletAvailable(available)
+    })
   }, [])
 
   // ============================================================
   // MODAL STATE - Simple, explicit, no magic
   // ============================================================
-  // Which modal is open: 'welcome' | 'walletCreated' | 'icloudBackup' | 'recoverySetup' | null
+  // Which modal is open: 'welcome' | 'existingWallet' | 'walletCreated' | 'icloudBackup' | 'recoverySetup' | null
   const [activeModal, setActiveModal] = useState(() => {
     // On mount: decide which modal to show
     const hasStoredWallet = localStorage.getItem('vibeswap_device_wallet')
-    const hasAcknowledged = localStorage.getItem('vibeswap_wallet_acknowledged')
 
-    if (hasStoredWallet && !hasAcknowledged) {
-      return 'walletCreated' // Returning user, unfinished setup
+    if (hasStoredWallet) {
+      console.log('[SwapCore] INIT -> existingWallet (found stored wallet)')
+      return 'existingWallet' // Show sign-in or create new options
     }
-    if (!hasStoredWallet) {
-      return 'welcome' // New user
-    }
-    return null // Returning user, already acknowledged
+    console.log('[SwapCore] INIT -> welcome (no wallet)')
+    return 'welcome' // New user
   })
+
+  // Track signing in state
+  const [isSigningIn, setIsSigningIn] = useState(false)
 
   // Combined connection state
   const isAnyWalletConnected = isConnected || deviceWallet.isConnected
@@ -734,9 +816,23 @@ function SwapCore() {
 
   // Simple booleans for which modal to show
   const showWelcome = activeModal === 'welcome'
+  const showExistingWallet = activeModal === 'existingWallet'
   const showWalletCreated = activeModal === 'walletCreated'
   const showICloudBackup = activeModal === 'icloudBackup'
   const showRecoverySetup = activeModal === 'recoverySetup'
+
+  // Get stored wallet address for display
+  const getStoredWalletAddress = () => {
+    const stored = localStorage.getItem('vibeswap_device_wallet')
+    if (stored) {
+      try {
+        return JSON.parse(stored).address
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
 
   // ============================================================
   // MODAL HANDLERS - Simple state transitions
@@ -751,22 +847,77 @@ function SwapCore() {
     setActiveModal(null) // Close welcome, WalletConnect modal will open
   }
 
-  // Handle device wallet creation
+  // Handle signing into existing wallet
+  const handleSignInExisting = async () => {
+    setIsSigningIn(true)
+    try {
+      const wallet = await deviceWallet.authenticate()
+      if (wallet) {
+        toast.success('Signed in successfully!')
+        setActiveModal(null) // Close modal, user is now signed in
+      } else {
+        toast.error('Failed to sign in')
+      }
+    } catch (err) {
+      console.error('Sign in failed:', err)
+      toast.error('Sign in failed')
+    } finally {
+      setIsSigningIn(false)
+    }
+  }
+
+  // Handle creating new wallet (replacing existing)
+  const handleCreateNewWallet = async () => {
+    // Warn user this will replace their wallet
+    const confirmed = window.confirm(
+      'This will create a new wallet and replace your existing one. Make sure you have a backup! Continue?'
+    )
+    if (!confirmed) return
+
+    // Clear old wallet data
+    localStorage.removeItem('vibeswap_device_wallet')
+    localStorage.removeItem('vibeswap_wallet_acknowledged')
+
+    // Now create new wallet
+    try {
+      const result = await deviceWallet.createWallet()
+      if (result && result.address) {
+        toast.success('New wallet created!')
+        setActiveModal('walletCreated')
+      } else {
+        toast.error(deviceWallet.error || 'Failed to create wallet')
+        setActiveModal('welcome') // Go back to welcome
+      }
+    } catch (err) {
+      console.error('Wallet creation failed:', err)
+      toast.error('Failed to create wallet')
+      setActiveModal('welcome')
+    }
+  }
+
+  // Handle device wallet creation (from welcome modal)
   const handleUseDevice = async () => {
+    console.log('[handleUseDevice] CALLED')
+
     // Clear any stale acknowledged flag
     localStorage.removeItem('vibeswap_wallet_acknowledged')
 
     try {
+      console.log('[handleUseDevice] calling createWallet...')
       const result = await deviceWallet.createWallet()
+      console.log('[handleUseDevice] createWallet result:', result)
 
       if (result && result.address) {
+        console.log('[handleUseDevice] SUCCESS - setting activeModal to walletCreated')
         toast.success('Device wallet created!')
-        setActiveModal('walletCreated') // <-- THE IMPORTANT LINE
+        setActiveModal('walletCreated')
+        console.log('[handleUseDevice] setActiveModal called')
       } else {
+        console.log('[handleUseDevice] FAILED - no address in result')
         toast.error(deviceWallet.error || 'Failed to create wallet')
       }
     } catch (err) {
-      console.error('Device wallet creation failed:', err)
+      console.error('[handleUseDevice] EXCEPTION:', err)
       toast.error('Failed to create device wallet')
     }
   }
@@ -1072,6 +1223,15 @@ function SwapCore() {
         onUseDevice={handleUseDevice}
         deviceWalletAvailable={deviceWalletAvailable}
         isCreatingDeviceWallet={deviceWallet.isLoading}
+      />
+
+      {/* Existing wallet detected modal */}
+      <ExistingWalletModal
+        isOpen={showExistingWallet}
+        onSignIn={handleSignInExisting}
+        onCreateNew={handleCreateNewWallet}
+        walletAddress={getStoredWalletAddress()}
+        isSigningIn={isSigningIn}
       />
 
       {/* Post-connection modal explaining wallet creation */}

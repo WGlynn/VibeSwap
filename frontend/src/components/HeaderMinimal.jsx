@@ -126,6 +126,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
   const secondaryItems = [
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
     { path: '/forum', label: 'Community', icon: '💬' },
+    { path: '/prompts', label: 'Prompt Feed', icon: '>' },
     { path: '/docs', label: 'Learn', icon: '📚' },
     { path: '/about', label: 'About', icon: '💡' },
   ]

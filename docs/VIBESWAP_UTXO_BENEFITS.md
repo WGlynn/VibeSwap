@@ -11,9 +11,41 @@ The UTXO model enforces a fundamental constraint: the sum of outputs must equal 
 
 For VibeSwap, this property is foundational to batch auction integrity. When users commit deposits to a batch, those deposits exist as discrete UTXOs with defined values. During settlement, the protocol transforms input UTXOs (commits + deposits) into output UTXOs (settled positions + change). The conservation law guarantees that no value is created or destroyed in this transformation—only redistributed according to the clearing price.
 
-This gives VibeSwap users a guarantee that account-model DEXes cannot provide: mathematical proof that settlement is zero-sum. Every token that leaves one user arrives at another. The protocol cannot leak value, hide fees, or silently extract from users. Conservation is enforced at the protocol level, not by auditing contract logic.
+This gives VibeSwap users what we call a **value-preserving settlement guarantee**: mathematical proof that settlement conserves all value. Every token that enters the batch exits the batch. The protocol cannot leak value, hide fees, or silently extract from users. Conservation is enforced at the protocol level, not by auditing contract logic.
 
-Traditional DEXes on account models update balances through addition and subtraction—operations that could, through bugs or exploits, create or destroy value without detection. The UTXO conservation law makes such errors structurally impossible.
+To be precise about what this means:
+
+```
+INPUTS:
+  Alice's deposit:  1000 USDC
+  Bob's deposit:    500 USDC
+  Carol's deposit:  2 ETH
+  Pool liquidity:   existing reserves
+
+OUTPUTS:
+  Alice receives:   X ETH
+  Bob receives:     Y ETH
+  Carol receives:   Z USDC
+  Pool state:       updated reserves
+  LP fees:          distributed
+
+CONSTRAINT: All USDC in = All USDC out
+            All ETH in = All ETH out
+```
+
+In the UTXO model, every transaction must satisfy: `inputs = outputs + fees`. This is enforced at the protocol level—transactions that violate conservation are invalid and rejected by nodes. The settlement transaction literally cannot be valid unless outputs equal inputs. It's not a check we implement—it's a physics-like constraint at the protocol layer.
+
+Traditional DEXes on account models update balances through arithmetic on shared state:
+
+```solidity
+balances[alice] -= 1000;
+balances[pool] += 1000;
+// Bug could make these not equal
+// Rounding could leak value
+// Exploit could create value from nothing
+```
+
+There's no protocol-level enforcement that debits equal credits. Bugs, rounding errors, or exploits could silently create or destroy value. The UTXO conservation law makes such errors structurally impossible.
 
 ### No Arbitrary State Access: Eliminating Bug Classes
 
@@ -152,7 +184,7 @@ The UTXO properties described in the paper aren't abstract theoretical advantage
 
 | Property | VibeSwap Benefit |
 |----------|------------------|
-| Conservation law | Zero-sum settlement guarantee |
+| Conservation law | Value-preserving settlement guarantee |
 | No arbitrary state access | Reduced attack surface |
 | Lock script ownership | True self-custody during trading |
 | Parallelism | Scalable batch processing |

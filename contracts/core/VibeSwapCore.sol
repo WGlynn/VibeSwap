@@ -146,6 +146,16 @@ contract VibeSwapCore is
     event RateLimitExceeded(address indexed user, uint256 requested, uint256 limit);
     event GuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
 
+    // FIX #5: Events for order failures (no more silent failures)
+    event OrderFailed(
+        uint64 indexed batchId,
+        address indexed trader,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        string reason
+    );
+
     // ============ Errors ============
 
     error ContractPaused();
@@ -577,7 +587,15 @@ contract VibeSwapCore is
             // Verify we have the deposit
             uint256 userDeposit = deposits[order.trader][order.tokenIn];
             if (userDeposit < order.amountIn) {
-                // Skip orders without sufficient deposit
+                // FIX #5: Emit event instead of silently skipping
+                emit OrderFailed(
+                    batchId,
+                    order.trader,
+                    order.tokenIn,
+                    order.tokenOut,
+                    order.amountIn,
+                    "Insufficient deposit"
+                );
                 continue;
             }
 
@@ -620,8 +638,17 @@ contract VibeSwapCore is
                     );
                 }
             } else {
-                // Swap failed, return tokens to this contract (they're still here since AMM didn't take them)
-                // Note: AMM should return unfilled tokens, but currently doesn't - this is a simplified model
+                // FIX #6: Swap failed - AMM returned tokens to us (msg.sender)
+                // Tokens are back in VibeSwapCore, deposit accounting unchanged
+                // User can withdraw via withdrawDeposit() - no double-spend possible
+                emit OrderFailed(
+                    batchId,
+                    order.trader,
+                    order.tokenIn,
+                    order.tokenOut,
+                    order.amountIn,
+                    "Swap execution failed"
+                );
             }
         }
 

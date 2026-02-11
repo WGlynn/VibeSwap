@@ -46,7 +46,8 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             CommitRevealAuction.initialize.selector,
             owner,
-            treasury
+            treasury,
+            address(0) // complianceRegistry
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         auction = CommitRevealAuction(payable(address(proxy)));

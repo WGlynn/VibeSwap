@@ -63,6 +63,7 @@ contract CrossChainRouter is
         address depositor;
         uint256 depositAmount;
         uint32 srcChainId;
+        uint32 dstChainId;    // FIX #1: Destination chain for replay prevention
         uint256 srcTimestamp; // Timestamp from source chain for consistent commit ID
     }
 
@@ -117,6 +118,14 @@ contract CrossChainRouter is
     /// @notice Cross-chain liquidity state
     mapping(bytes32 => LiquiditySync) public liquidityState;
 
+    // ============ Security: Bridged Deposit Tracking (Fix #2) ============
+
+    /// @notice Verified bridged deposits per commit (prevents deposit theft)
+    mapping(bytes32 => uint256) public bridgedDeposits;
+
+    /// @notice Total bridged deposits awaiting processing
+    uint256 public totalBridgedDeposits;
+
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
 
@@ -131,6 +140,8 @@ contract CrossChainRouter is
     event BatchResultReceived(uint64 indexed batchId, uint32 indexed srcEid);
     event LiquiditySynced(bytes32 indexed poolId, uint32 indexed srcEid);
     event MessageRateLimited(uint32 indexed srcEid, bytes32 guid);
+    event CrossChainRevealFailed(bytes32 indexed commitId, uint32 indexed srcEid, string reason);
+    event BridgedDepositFunded(bytes32 indexed commitId, uint256 amount);
 
     // ============ Errors ============
 
@@ -205,10 +216,12 @@ contract CrossChainRouter is
 
         uint256 srcTimestamp = block.timestamp;
 
+        // FIX #1: Include destination chain in commit ID to prevent cross-chain replay
         bytes32 commitId = keccak256(abi.encodePacked(
             msg.sender,
             commitHash,
             block.chainid,
+            dstEid,           // Destination chain prevents replay on other chains
             srcTimestamp
         ));
 
@@ -217,6 +230,7 @@ contract CrossChainRouter is
             depositor: msg.sender,
             depositAmount: msg.value,
             srcChainId: uint32(block.chainid),
+            dstChainId: dstEid,  // FIX #1: Include destination chain
             srcTimestamp: srcTimestamp
         });
 
@@ -394,54 +408,94 @@ contract CrossChainRouter is
     function _handleCommit(bytes memory payload, uint32 srcEid) internal {
         CrossChainCommit memory commit = abi.decode(payload, (CrossChainCommit));
 
-        // Use srcTimestamp from source chain for consistent commit ID
+        // FIX #1: Include destination chain in commit ID (must match sendCommit)
         bytes32 commitId = keccak256(abi.encodePacked(
             commit.depositor,
             commit.commitHash,
             commit.srcChainId,
+            commit.dstChainId,    // Must match destination
             commit.srcTimestamp
         ));
+
+        // FIX #1: Verify this message is intended for THIS chain
+        require(commit.dstChainId == uint32(block.chainid), "Wrong destination chain");
 
         // Store for local processing
         pendingCommits[commitId] = commit;
 
-        // Forward to auction contract (use contract's ETH balance for cross-chain commits)
-        // Note: In production, the LZ message should carry value or we need a deposit mechanism
-        if (address(this).balance >= commit.depositAmount) {
-            ICommitRevealAuction(auction).commitOrder{value: commit.depositAmount}(
-                commit.commitHash
-            );
-        }
+        // FIX #2: Track bridged deposit separately instead of using router balance
+        // The deposit must be bridged via a separate asset bridge (LayerZero OFT, etc.)
+        // For now, record the expected deposit amount - actual bridging happens via fundBridgedDeposit()
+        bridgedDeposits[commitId] = commit.depositAmount;
+        totalBridgedDeposits += commit.depositAmount;
 
         emit CrossChainCommitReceived(commitId, srcEid, commit.depositor);
+    }
+
+    /**
+     * @notice Fund a bridged deposit after asset bridge completes
+     * @dev Called by authorized bridge receiver after OFT/bridge transfer arrives
+     * @param commitId The commit ID to fund
+     */
+    function fundBridgedDeposit(bytes32 commitId) external payable onlyAuthorized {
+        CrossChainCommit memory commit = pendingCommits[commitId];
+        require(commit.depositor != address(0), "Unknown commit");
+        require(msg.value >= commit.depositAmount, "Insufficient deposit");
+        require(bridgedDeposits[commitId] > 0, "Already funded or not pending");
+
+        // Clear the pending bridged deposit
+        bridgedDeposits[commitId] = 0;
+        totalBridgedDeposits -= commit.depositAmount;
+
+        // Now forward to auction with verified funds
+        ICommitRevealAuction(auction).commitOrder{value: commit.depositAmount}(
+            commit.commitHash
+        );
+
+        // Refund excess
+        if (msg.value > commit.depositAmount) {
+            (bool success, ) = msg.sender.call{value: msg.value - commit.depositAmount}("");
+            require(success, "Refund failed");
+        }
     }
 
     function _handleReveal(bytes memory payload, uint32 srcEid) internal {
         CrossChainReveal memory reveal = abi.decode(payload, (CrossChainReveal));
 
+        // FIX: Get the original depositor from pending commits for ownership verification
+        CrossChainCommit memory commit = pendingCommits[reveal.commitId];
+
+        // FIX #2: Only process reveals for commits we've received and funded
+        // If commit.depositor is zero, this reveal is invalid
+        if (commit.depositor == address(0)) {
+            emit CrossChainRevealFailed(reveal.commitId, srcEid, "Unknown commit");
+            return;
+        }
+
         // Determine how much ETH we can send for priority bid
-        // Cross-chain reveals may not have ETH available, so we cap at contract balance
-        uint256 availableEth = address(this).balance;
+        // Exclude totalBridgedDeposits to avoid using pending bridge funds
+        uint256 availableEth = address(this).balance > totalBridgedDeposits
+            ? address(this).balance - totalBridgedDeposits
+            : 0;
         uint256 priorityBidToSend = reveal.priorityBid > availableEth ? availableEth : reveal.priorityBid;
 
-        // Use cross-chain reveal function that skips msg.sender check
-        // The auction contract needs a special function for this
         ICommitRevealAuction auctionContract = ICommitRevealAuction(auction);
 
-        // Try to use cross-chain reveal if available, otherwise skip priority bid
-        try auctionContract.revealOrder{value: priorityBidToSend}(
+        // FIX: Use revealOrderCrossChain which allows revealing on behalf of original depositor
+        try auctionContract.revealOrderCrossChain{value: priorityBidToSend}(
             reveal.commitId,
+            commit.depositor,     // Original depositor from our records
             reveal.tokenIn,
             reveal.tokenOut,
             reveal.amountIn,
             reveal.minAmountOut,
             reveal.secret,
-            priorityBidToSend // Use actual amount sent, not claimed amount
+            priorityBidToSend
         ) {
             // Success
         } catch {
             // If reveal fails, log but don't revert the whole message
-            // This prevents a single bad reveal from blocking all messages
+            emit CrossChainRevealFailed(reveal.commitId, srcEid, "Reveal rejected");
         }
 
         emit CrossChainRevealReceived(reveal.commitId, srcEid);

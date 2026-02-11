@@ -110,7 +110,8 @@ contract AuctionAMMIntegrationTest is Test {
         bytes memory auctionInit = abi.encodeWithSelector(
             CommitRevealAuction.initialize.selector,
             owner,
-            address(treasury)
+            address(treasury),
+            address(0) // complianceRegistry
         );
         auction = CommitRevealAuction(payable(address(new ERC1967Proxy(address(auctionImpl), auctionInit))));
 

@@ -209,6 +209,17 @@ contract VibeAMM is
     event FibonacciFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 fibFee, uint8 tier);
     event PoWFeeDiscountApplied(bytes32 indexed poolId, address indexed user, uint8 difficulty, uint256 discountBps);
 
+    // FIX #5: Event for swap failures
+    event SwapFailed(
+        bytes32 indexed poolId,
+        address indexed trader,
+        address tokenIn,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 minAmountOut,
+        string reason
+    );
+
     // ============ Security Errors ============
 
     error FlashLoanDetected();
@@ -1065,16 +1076,37 @@ contract VibeAMM is
 
         // Check minimum output after fees
         if (amountOut < order.minAmountOut) {
-            // Order not fillable at this price - return tokens to trader
-            IERC20(order.tokenIn).safeTransfer(order.trader, amountIn);
+            // FIX #5: Emit failure event instead of silent return
+            emit SwapFailed(
+                getPoolId(pool.token0, pool.token1),
+                order.trader,
+                order.tokenIn,
+                amountIn,
+                amountOut,
+                order.minAmountOut,
+                "Slippage exceeded"
+            );
+            // FIX #6: Return unfilled tokens to CALLER (VibeSwapCore), not trader
+            // VibeSwapCore manages deposit accounting and handles refunds to traders
+            IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
             return (0, 0, 0);
         }
 
         // Verify we have enough output tokens
         uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
         if (amountOut > reserveOut) {
-            // Insufficient liquidity - return tokens to trader
-            IERC20(order.tokenIn).safeTransfer(order.trader, amountIn);
+            // FIX #5: Emit failure event
+            emit SwapFailed(
+                getPoolId(pool.token0, pool.token1),
+                order.trader,
+                order.tokenIn,
+                amountIn,
+                amountOut,
+                order.minAmountOut,
+                "Insufficient liquidity"
+            );
+            // FIX #6: Return unfilled tokens to CALLER (VibeSwapCore), not trader
+            IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
             return (0, 0, 0);
         }
 

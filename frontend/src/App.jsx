@@ -16,6 +16,7 @@ const ForumPage = lazy(() => import('./components/ForumPage'))
 const ActivityPage = lazy(() => import('./components/ActivityPage'))
 const AdminSybilDetection = lazy(() => import('./components/AdminSybilDetection'))
 const AboutPage = lazy(() => import('./components/AboutPage'))
+const PersonalityPage = lazy(() => import('./components/PersonalityPage'))
 
 // Minimal page transitions - subtle, fast
 const pageVariants = {
@@ -54,6 +55,7 @@ function AnimatedRoutes() {
             <Route path="/forum" element={<ForumPage />} />
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/personality" element={<PersonalityPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
           </Routes>

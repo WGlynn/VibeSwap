@@ -501,7 +501,273 @@ The Shapley null player axiom ensures zero contribution = zero reward. You canno
 
 ---
 
-## Part III: The Unified Framework
+## Part III: Trilemmas Navigated
+
+### TRI1. The Blockchain Trilemma (Buterin's Trilemma)
+
+**The trilemma:** A blockchain can optimize for at most two of three properties:
+- **Scalability** — High transaction throughput
+- **Security** — Resistance to attacks and manipulation
+- **Decentralization** — No single point of control or failure
+
+Traditional L1s sacrifice one: Bitcoin sacrifices scalability, EOS sacrifices decentralization, early Solana sacrificed security.
+
+**How VibeSwap navigates it:** Architectural separation across layers:
+
+| Property | How Achieved |
+|----------|--------------|
+| **Scalability** | Batch auctions compress N trades into O(1) state updates. L2 processing handles throughput. |
+| **Security** | L1 settlement provides finality. Cryptographic commit-reveal provides MEV resistance. |
+| **Decentralization** | No privileged sequencer can extract value. Fisher-Yates shuffle uses participant-contributed entropy. |
+
+**Key insight:** The trilemma applies to monolithic systems. VibeSwap's layered architecture achieves all three by *separating concerns* — scalability at L2, security at L1, decentralization in the mechanism itself.
+
+**Source:** `NERVOS_PROPOSAL.md`; `SECURITY_MECHANISM_DESIGN.md`
+
+---
+
+### TRI2. The Stablecoin Trilemma
+
+**The trilemma:** A stablecoin can optimize for at most two of three properties:
+- **Price Stability** — Maintains peg reliably
+- **Capital Efficiency** — Not over-collateralized
+- **Decentralization** — No central issuer or controller
+
+USDC: stable + efficient, but centralized. DAI: stable + decentralized, but capital inefficient (150%+ collateral). Algorithmic stables attempted all three and failed catastrophically (UST).
+
+**How VibeSwap navigates it:** VibeSwap doesn't issue stablecoins — it *trades* them. But the mechanism design provides stability guarantees:
+
+| Property | How Achieved |
+|----------|--------------|
+| **Price Stability** | Batch auctions prevent manipulation. Kalman filter oracle smooths noise. TWAP validation rejects outliers. |
+| **Capital Efficiency** | No protocol-level collateral requirements. LPs provide liquidity voluntarily with IL protection. |
+| **Decentralization** | Uniform clearing price. No privileged price-setters. Oracle is computational, not custodial. |
+
+**Key insight:** The trilemma is about *issuance*. VibeSwap operates at the *exchange* layer, where the relevant properties are fair pricing (achieved), efficient liquidity (achieved), and decentralized settlement (achieved).
+
+**Source:** `TRUE_PRICE_DISCOVERY.md`; `PRICE_INTELLIGENCE_ORACLE.md`
+
+---
+
+### TRI3. The DeFi Composability Trilemma
+
+**The trilemma:** A DeFi protocol can optimize for at most two of three properties:
+- **Composability** — Other protocols can build on top
+- **Security** — Resistant to exploits and economic attacks
+- **Upgradeability** — Can fix bugs and add features
+
+Immutable contracts: secure + composable, but can't fix bugs. Upgradeable proxies: secure + upgradeable, but composability risk (rug pull). Fully open: composable + upgradeable, but security nightmare.
+
+**How VibeSwap navigates it:**
+
+| Property | How Achieved |
+|----------|--------------|
+| **Composability** | Standard interfaces (ERC-20, ERC-721 for LP tokens). Clear integration points. |
+| **Security** | Timelock on upgrades. Multi-sig governance. Circuit breakers. Formal verification of core invariants. |
+| **Upgradeability** | UUPS proxy pattern. Upgrade proposals require governance approval + timelock delay. |
+
+**The architecture:**
+```
+Immutable: Core invariants (constant product, Shapley axioms, commit-reveal timing)
+Upgradeable: Parameters, fee structures, new pool types
+Governance-controlled: Upgrade authorization with timelock
+```
+
+**Key insight:** The trilemma assumes upgradeability is binary. VibeSwap uses *layered upgradeability* — immutable core, upgradeable periphery, governance-controlled transitions.
+
+**Source:** `SECURITY_MECHANISM_DESIGN.md`; `DESIGN_PHILOSOPHY_CONFIGURABILITY.md`
+
+---
+
+### TRI4. The Oracle Trilemma
+
+**The trilemma:** An oracle can optimize for at most two of three properties:
+- **Accuracy** — Reflects true market price
+- **Manipulation Resistance** — Cannot be attacked
+- **Freshness** — Up-to-date information
+
+Spot price oracles: fresh + accurate, but manipulable. TWAP oracles: manipulation-resistant + accurate, but stale. Centralized oracles: fresh + manipulation-resistant, but trust-dependent (not truly accurate).
+
+**How VibeSwap navigates it:**
+
+| Property | How Achieved |
+|----------|--------------|
+| **Accuracy** | Kalman filter separates signal from noise. Multi-source aggregation. |
+| **Manipulation Resistance** | TWAP validation (max 5% deviation). Batch settlement prevents single-block manipulation. |
+| **Freshness** | Continuous Kalman updates. Per-batch price snapshots. |
+
+**The innovation:** The Kalman filter is a *state estimator* that explicitly models measurement noise. It doesn't just average prices — it computes the *most likely true price* given noisy observations.
+
+```
+Traditional: price = average(observations)
+VibeSwap: price = Kalman.estimate(observations, noise_model, prior_state)
+```
+
+**Source:** `PRICE_INTELLIGENCE_ORACLE.md`; `TRUE_PRICE_ORACLE.md`
+
+---
+
+### TRI5. The Regulatory Trilemma
+
+**The trilemma:** A protocol can optimize for at most two of three properties:
+- **Permissionlessness** — Anyone can participate
+- **Compliance** — Meets regulatory requirements
+- **Privacy** — User data is protected
+
+KYC'd platforms: compliant + private-ish, but permissioned. Fully anonymous DEXs: permissionless + private, but non-compliant. Public chain DeFi: permissionless + compliant (public ledger), but zero privacy.
+
+**How VibeSwap navigates it:**
+
+| Property | How Achieved |
+|----------|--------------|
+| **Permissionlessness** | Base layer is open. Anyone can commit orders. No KYC for basic trading. |
+| **Compliance** | Tiered access via soulbound identity. Clawback cascade for tainted funds (T4). Institutional integration path. |
+| **Privacy** | Commit-reveal hides order details. Batch settlement obscures individual positions. Optional privacy pool integration. |
+
+**The architecture:**
+```
+Tier 0: Permissionless, limited amounts, public ledger
+Tier 1: Verified identity, higher limits, compliance benefits
+Tier 2: Institutional, full compliance, optional privacy features
+```
+
+**Key insight:** The trilemma assumes uniform treatment. VibeSwap uses *graduated access* — permissionless base layer, compliant upper tiers, privacy as an opt-in feature.
+
+**Source:** `SEC_REGULATORY_COMPLIANCE_ANALYSIS.md`; `THE_PSYCHONAUT_PAPER.md` — Section 6
+
+---
+
+## Part IV: Quadrilemmas Navigated
+
+### QUAD1. The Exchange Quadrilemma
+
+**The quadrilemma:** An exchange can optimize for at most three of four properties:
+- **Speed** — Fast execution
+- **Fairness** — Equal treatment of participants
+- **Decentralization** — No central operator
+- **Capital Efficiency** — Low collateral requirements
+
+| Exchange Type | Speed | Fairness | Decentralization | Capital Efficiency |
+|---------------|-------|----------|------------------|-------------------|
+| Centralized (Binance) | ✓ | ✗ | ✗ | ✓ |
+| Order Book DEX | ✓ | ✗ | ✓ | ✗ |
+| Traditional AMM | ✓ | ✗ | ✓ | ✓ |
+| VibeSwap | ○ | ✓ | ✓ | ✓ |
+
+**How VibeSwap navigates it:**
+
+| Property | How Achieved | Tradeoff |
+|----------|--------------|----------|
+| **Speed** | 10-second batches (not instant, but predictable) | Sacrifices sub-second execution for fairness |
+| **Fairness** | Commit-reveal + uniform clearing + random shuffle | Achieved fully |
+| **Decentralization** | Participant-contributed entropy. No privileged sequencer. | Achieved fully |
+| **Capital Efficiency** | Standard AMM liquidity provision. IL protection reduces required risk premium. | Achieved fully |
+
+**The innovation:** VibeSwap redefines "speed" as *predictable finality* rather than *lowest latency*. For most users, knowing your trade will execute fairly in 10 seconds is better than racing bots for millisecond advantages.
+
+**Key insight:** The quadrilemma assumes speed means latency. For fairness-seeking participants, speed means *certainty of fair execution* — and VibeSwap optimizes for that.
+
+**Source:** `VIBESWAP_WHITEPAPER.md`; `MEDIUM_ARTICLE.md`
+
+---
+
+### QUAD2. The Liquidity Quadrilemma
+
+**The quadrilemma:** A liquidity provision system can optimize for at most three of four properties:
+- **Deep Liquidity** — Large trades don't move price much
+- **LP Profitability** — Liquidity providers earn positive returns
+- **Low Slippage** — Traders get good execution
+- **Stability** — Liquidity doesn't flee during volatility
+
+| System | Deep Liquidity | LP Profitability | Low Slippage | Stability |
+|--------|---------------|-----------------|--------------|-----------|
+| Order Books | ✓ | ✗ (HFT extracts) | ✓ | ✗ (flash crashes) |
+| Uniswap v2 | ✓ | ✗ (IL) | ✓ | ✗ (IL flight) |
+| Uniswap v3 | ✓ | ✗ (concentrated IL) | ✓ | ✗ (range exit) |
+| VibeSwap | ✓ | ✓ | ✓ | ✓ |
+
+**How VibeSwap achieves all four:**
+
+| Property | Mechanism |
+|----------|-----------|
+| **Deep Liquidity** | Shapley rewards + loyalty multiplier incentivize long-term provision |
+| **LP Profitability** | 100% of base fees to LPs (T18). IL protection up to 80%. No MEV extraction from LPs. |
+| **Low Slippage** | Batch settlement aggregates liquidity. Treasury-backed slippage guarantee (2%). |
+| **Stability** | Loyalty multiplier rewards staying through volatility. IL protection funded by treasury. Leaving forfeits accrued benefits. |
+
+**The innovation:** Traditional AMMs treat LPs as passive capital. VibeSwap treats LPs as *coalition members* whose contribution is measured (Shapley) and rewarded proportionally. This converts LP provision from a "necessary cost" to a "rewarded service."
+
+**Key insight:** The quadrilemma exists because traditional systems extract value from LPs. Eliminate extraction, and all four properties become achievable.
+
+**Source:** `INCENTIVES_WHITEPAPER.md`; `THE_PSYCHONAUT_PAPER.md` — Theorems 1-2
+
+---
+
+### QUAD3. The Governance Quadrilemma
+
+**The quadrilemma:** A governance system can optimize for at most three of four properties:
+- **Legitimacy** — Decisions are accepted as valid
+- **Efficiency** — Decisions are made quickly
+- **Security** — Decisions can't be attacked or manipulated
+- **Decentralization** — No single entity controls outcomes
+
+| System | Legitimacy | Efficiency | Security | Decentralization |
+|--------|------------|------------|----------|------------------|
+| Founder control | ✗ | ✓ | ✓ | ✗ |
+| Token voting | ✓ | ✓ | ✗ (plutocracy) | ✓ |
+| Time-locked multisig | ✓ | ✗ | ✓ | ✗ |
+| VibeSwap | ✓ | ○ | ✓ | ✓ |
+
+**How VibeSwap navigates it:**
+
+| Property | Mechanism |
+|----------|-----------|
+| **Legitimacy** | Soulbound identity prevents Sybil voting. Reputation-weighted influence. Shapley-based contribution recognition. |
+| **Efficiency** | Tiered proposal system — minor changes are fast, major changes require deliberation. Timelock provides predictability. |
+| **Security** | Quadratic voting resists plutocracy. Timelock prevents flash governance attacks. Circuit breakers halt suspicious proposals. |
+| **Decentralization** | No founder veto. No privileged addresses. Governance power accrues through contribution, not capital. |
+
+**The innovation:** VibeSwap replaces "one token, one vote" with "contribution-weighted voice." Voting power reflects *what you've done for the system*, not *how much capital you control*.
+
+**Key insight:** The quadrilemma assumes voting power is transferable. Soulbound reputation makes governance rights non-transferable, breaking the plutocracy failure mode.
+
+**Source:** `INCENTIVES_WHITEPAPER.md`; `VIBESWAP_COMPLETE_MECHANISM_DESIGN.md`
+
+---
+
+### QUAD4. The Privacy Quadrilemma
+
+**The quadrilemma:** A financial system can optimize for at most three of four properties:
+- **Privacy** — Transaction details are hidden
+- **Auditability** — Regulators can verify compliance
+- **Fungibility** — All units are interchangeable
+- **Accountability** — Bad actors face consequences
+
+| System | Privacy | Auditability | Fungibility | Accountability |
+|--------|---------|--------------|-------------|----------------|
+| Cash | ✓ | ✗ | ✓ | ✗ |
+| Bitcoin | ✗ | ✓ | ✗ (taint) | ✓ |
+| Monero | ✓ | ✗ | ✓ | ✗ |
+| VibeSwap | ○ | ✓ | ○ | ✓ |
+
+**How VibeSwap navigates it:**
+
+| Property | Mechanism |
+|----------|-----------|
+| **Privacy** | Commit-reveal hides order details during trading. Batch settlement obscures individual positions. Optional privacy pool integration for enhanced privacy. |
+| **Auditability** | On-chain settlement is transparent. Compliance registry tracks flagged addresses. Institutional tier has full audit trails. |
+| **Fungibility** | Base layer tokens remain fungible. Taint cascade applies to *wallets*, not tokens. |
+| **Accountability** | Soulbound identity links actions to persistent reputation. Taint cascade (T4) creates economic consequences for bad actors. |
+
+**The innovation:** VibeSwap separates *trading privacy* (hidden during commit phase) from *settlement transparency* (visible on-chain). You get privacy *when it matters* (during order submission) and accountability *when it matters* (after settlement).
+
+**Key insight:** The quadrilemma assumes privacy is all-or-nothing. VibeSwap uses *temporal privacy* — hidden during execution, transparent after settlement.
+
+**Source:** `THE_PSYCHONAUT_PAPER.md` — Section 6; `SEC_REGULATORY_COMPLIANCE_ANALYSIS.md`
+
+---
+
+## Part V: The Unified Framework
 
 These lemmas, theorems, dilemmas, and paradoxes are not independent results. They are observations of a single phenomenon from different approach vectors:
 
@@ -572,11 +838,18 @@ n → ∞:      AI alignment emerges from shared economics (T6, T9)
 | **Extension theorems proved** | 1 (AI Alignment, T6) |
 | **Supporting theorems proved** | 12 (T7-T18) |
 | **Shapley axioms verified** | 4 (2 satisfied, 1 approximated, 1 intentionally violated) |
-| **Dilemmas dissolved** | 10 (D1-D6, D8, D10, D13, D14) |
-| **Paradoxes dissolved** | 4 (D3, D6, D14, D15) |
-| **Impossibilities dissolved** | 3 (D7, D12, D17) |
-| **Tradeoffs dissolved** | 1 (D16) |
-| **Total problems addressed** | 18 |
+| **Dilemmas dissolved** | 18 (D1-D18) |
+| **Trilemmas navigated** | 5 (TRI1-TRI5) |
+| **Quadrilemmas navigated** | 4 (QUAD1-QUAD4) |
+| **Total problems addressed** | 27 |
+
+### Classification Key
+
+| Term | Meaning |
+|------|---------|
+| **Proved** | Mathematically demonstrated with formal rigor |
+| **Dissolved** | Problem structure eliminated by mechanism design |
+| **Navigated** | All horns of the multi-lemma achieved through architectural innovation |
 
 ---
 

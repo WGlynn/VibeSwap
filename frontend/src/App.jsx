@@ -1,8 +1,44 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, Component } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
 import { ContributionsProvider } from './contexts/ContributionsContext'
+
+// Error boundary to catch React errors
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('React Error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-md">
+            <h2 className="text-xl font-bold text-red-500 mb-4">Something went wrong</h2>
+            <p className="text-black-400 text-sm mb-4">{this.state.error?.message || 'Unknown error'}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-matrix-500 text-black rounded"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // Lazy-load route components - each becomes its own chunk
 const SwapCore = lazy(() => import('./components/SwapCore'))
@@ -42,8 +78,9 @@ function AnimatedRoutes() {
         variants={pageVariants}
         transition={pageTransition}
       >
-        <Suspense fallback={<div className="flex-1" />}>
-          <Routes location={location}>
+        <ErrorBoundary>
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="text-matrix-500">Loading...</div></div>}>
+            <Routes location={location}>
             {/* Landing IS the swap - Steve's vision */}
             <Route path="/" element={<SwapCore />} />
             <Route path="/buy" element={<BuySellPage />} />
@@ -58,8 +95,9 @@ function AnimatedRoutes() {
             <Route path="/personality" element={<PersonalityPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </motion.div>
     </AnimatePresence>
   )

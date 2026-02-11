@@ -85,7 +85,7 @@ contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeabl
     error CategoryNotFound();
     error CategoryInactive();
     error PostNotFound();
-    error PostLocked();
+    error PostIsLocked();
     error ReplyNotFound();
     error CooldownActive();
     error NotModerator();
@@ -223,7 +223,7 @@ contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeabl
     ) external requireIdentity nonReentrant returns (uint256) {
         if (postId == 0 || postId >= _nextPostId) revert PostNotFound();
         Post storage post = posts[postId];
-        if (post.locked) revert PostLocked();
+        if (post.locked) revert PostIsLocked();
         if (contentHash == bytes32(0)) revert EmptyContent();
 
         // Validate parent reply if provided

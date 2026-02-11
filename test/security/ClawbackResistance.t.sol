@@ -333,7 +333,7 @@ contract ClawbackResistanceTest is Test {
         // Should execute successfully
         registry.executeClawback(caseId);
 
-        (, , , , CaseStatus status, , , , , , ) = registry.cases(caseId);
+        (, , , , ClawbackRegistry.CaseStatus status, , , , , , ) = registry.cases(caseId);
         assertEq(uint256(status), uint256(ClawbackRegistry.CaseStatus.RESOLVED));
     }
 

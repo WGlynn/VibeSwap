@@ -1,6 +1,7 @@
 const startTime = Date.now();
 
-export async function getSystemHealth() {
+export async function getSystemHealth(deps = {}) {
+  const { priceFeed, wss } = deps;
   const issues = [];
   const checks = {};
 
@@ -32,6 +33,32 @@ export async function getSystemHealth() {
 
   // Environment
   checks.environment = process.env.NODE_ENV || 'development';
+
+  // Price feed freshness
+  if (priceFeed) {
+    const status = priceFeed.getStatus();
+    const staleThreshold = 5 * 60 * 1000; // 5 minutes
+    const isStale = !status.lastFetchSuccess || (Date.now() - status.lastFetchSuccess > staleThreshold);
+    checks.priceFeed = {
+      lastFetchSuccess: status.lastFetchSuccess ? new Date(status.lastFetchSuccess).toISOString() : null,
+      cachedSymbols: status.cachedSymbols,
+      hasFallbackData: status.hasFallbackData,
+      stale: isStale,
+    };
+    if (isStale) {
+      issues.push('Price feed data is stale (>5min since last successful fetch)');
+    }
+    if (status.hasFallbackData) {
+      issues.push('Price feed is using hardcoded fallback data');
+    }
+  }
+
+  // WebSocket connections
+  if (wss && typeof wss.getClientCount === 'function') {
+    checks.websocket = {
+      connections: wss.getClientCount(),
+    };
+  }
 
   const status = issues.length === 0 ? 'healthy' : 'degraded';
 

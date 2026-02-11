@@ -20,8 +20,7 @@ jobs:
           node-version: "20"
       - name: Audit frontend dependencies
         working-directory: frontend
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        run: npm audit --audit-level=high --production
 
   audit-backend:
     name: Backend Dependency Audit
@@ -33,13 +32,13 @@ jobs:
           node-version: "20"
       - name: Audit backend dependencies
         working-directory: backend
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        run: npm audit --audit-level=high --production
 
   # ============ Smart Contract Security ============
   slither:
     name: Slither Static Analysis
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,4 +61,3 @@ jobs:
 
       - name: Run Slither
         run: slither . --config-file slither.config.json || true
-        continue-on-error: true

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PriceFeedService } from '../services/priceFeed.js';
+import { validateSymbol } from '../middleware/validate.js';
 
 const router = Router();
 const priceFeed = new PriceFeedService();
@@ -7,9 +8,10 @@ const priceFeed = new PriceFeedService();
 // GET /api/prices - Get all tracked token prices
 router.get('/', async (_req, res, next) => {
   try {
-    const prices = await priceFeed.getAllPrices();
+    const result = await priceFeed.getAllPrices();
     res.json({
-      prices,
+      prices: result.prices,
+      lastFetchSuccess: result.lastFetchSuccess ? new Date(result.lastFetchSuccess).toISOString() : null,
       updatedAt: new Date().toISOString(),
       source: 'aggregated',
     });
@@ -19,7 +21,7 @@ router.get('/', async (_req, res, next) => {
 });
 
 // GET /api/prices/:symbol - Get price for a specific token
-router.get('/:symbol', async (req, res, next) => {
+router.get('/:symbol', validateSymbol('symbol'), async (req, res, next) => {
   try {
     const { symbol } = req.params;
     const price = await priceFeed.getPrice(symbol.toUpperCase());
@@ -40,7 +42,7 @@ router.get('/:symbol', async (req, res, next) => {
 });
 
 // GET /api/prices/pairs/:base/:quote - Get pair price
-router.get('/pairs/:base/:quote', async (req, res, next) => {
+router.get('/pairs/:base/:quote', validateSymbol('base'), validateSymbol('quote'), async (req, res, next) => {
   try {
     const { base, quote } = req.params;
     const pairPrice = await priceFeed.getPairPrice(

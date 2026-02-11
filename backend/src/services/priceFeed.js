@@ -1,6 +1,8 @@
 // ============ Price Feed Service ============
 // Aggregates prices from multiple sources with caching
 
+import { logger } from '../utils/logger.js';
+
 const CACHE_TTL = parseInt(process.env.PRICE_CACHE_TTL || '30', 10) * 1000;
 
 // CoinGecko IDs mapping
@@ -21,6 +23,7 @@ export class PriceFeedService {
   constructor() {
     this.cache = new Map();
     this.lastFetch = 0;
+    this.lastFetchSuccess = 0;
   }
 
   async fetchPrices() {
@@ -57,6 +60,7 @@ export class PriceFeedService {
             change24h: priceData.usd_24h_change,
             volume24h: priceData.usd_24h_vol,
             marketCap: priceData.usd_market_cap,
+            isFallback: false,
           });
         }
       }
@@ -64,13 +68,14 @@ export class PriceFeedService {
       // Stablecoins default to $1 if not fetched
       for (const stable of ['USDC', 'USDT', 'DAI']) {
         if (!this.cache.has(stable)) {
-          this.cache.set(stable, { price: 1.0, change24h: 0, volume24h: 0, marketCap: 0 });
+          this.cache.set(stable, { price: 1.0, change24h: 0, volume24h: 0, marketCap: 0, isFallback: false });
         }
       }
 
       this.lastFetch = now;
+      this.lastFetchSuccess = now;
     } catch (err) {
-      console.error('[PriceFeed] Error fetching prices:', err.message);
+      logger.error({ error: err.message }, 'Price feed fetch failed');
       // Return cached data on error - stale data is better than no data
       if (this.cache.size === 0) {
         // Provide fallback prices if cache is empty
@@ -85,9 +90,10 @@ export class PriceFeedService {
       USDC: 1, USDT: 1, DAI: 1, MATIC: 0.8, ARB: 1.2, OP: 2.5,
     };
     for (const [symbol, price] of Object.entries(fallbacks)) {
-      this.cache.set(symbol, { price, change24h: 0, volume24h: 0, marketCap: 0 });
+      this.cache.set(symbol, { price, change24h: 0, volume24h: 0, marketCap: 0, isFallback: true });
     }
-    this.lastFetch = Date.now();
+    // Don't update lastFetch to current time — keep it at 0 so next request retries
+    // Don't update lastFetchSuccess — no successful fetch occurred
   }
 
   async getAllPrices() {
@@ -96,7 +102,10 @@ export class PriceFeedService {
     for (const [symbol, data] of this.cache.entries()) {
       prices[symbol] = data;
     }
-    return prices;
+    return {
+      prices,
+      lastFetchSuccess: this.lastFetchSuccess || null,
+    };
   }
 
   async getPrice(symbol) {
@@ -113,6 +122,15 @@ export class PriceFeedService {
       rate: basePrice.price / quotePrice.price,
       basePrice: basePrice.price,
       quotePrice: quotePrice.price,
+    };
+  }
+
+  // Expose freshness info for health checks
+  getStatus() {
+    return {
+      lastFetchSuccess: this.lastFetchSuccess || null,
+      cachedSymbols: this.cache.size,
+      hasFallbackData: [...this.cache.values()].some(d => d.isFallback),
     };
   }
 }

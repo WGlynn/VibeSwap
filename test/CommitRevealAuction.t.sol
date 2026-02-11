@@ -104,13 +104,13 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash = keccak256("hash");
 
         vm.prank(trader1);
-        vm.expectRevert("Insufficient deposit");
+        vm.expectRevert(CommitRevealAuction.InsufficientDeposit.selector);
         auction.commitOrder{value: 0.0001 ether}(commitHash);
     }
 
     function test_commitOrder_zeroHash() public {
         vm.prank(trader1);
-        vm.expectRevert("Invalid hash");
+        vm.expectRevert(CommitRevealAuction.InvalidHash.selector);
         auction.commitOrder{value: 0.01 ether}(bytes32(0));
     }
 
@@ -121,7 +121,7 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash = keccak256("hash");
 
         vm.prank(trader1);
-        vm.expectRevert("Invalid phase");
+        vm.expectRevert(CommitRevealAuction.InvalidPhase.selector);
         auction.commitOrder{value: 0.01 ether}(commitHash);
     }
 
@@ -218,7 +218,7 @@ contract CommitRevealAuctionTest is Test {
 
         // Still in commit phase
         vm.prank(trader1);
-        vm.expectRevert("Invalid phase");
+        vm.expectRevert(CommitRevealAuction.InvalidPhase.selector);
         auction.revealOrder(commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret, 0);
     }
 
@@ -425,7 +425,7 @@ contract CommitRevealAuctionTest is Test {
         auction.settleBatch();
 
         // Should fail because it was revealed
-        vm.expectRevert("Not slashable");
+        vm.expectRevert(CommitRevealAuction.NotSlashable.selector);
         auction.slashUnrevealedCommitment(commitId);
     }
 
@@ -437,7 +437,7 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
 
         // Try to slash before batch is settled
-        vm.expectRevert("Batch not settled");
+        vm.expectRevert(CommitRevealAuction.BatchNotSettled.selector);
         auction.slashUnrevealedCommitment(commitId);
     }
 

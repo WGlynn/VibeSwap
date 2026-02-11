@@ -315,8 +315,8 @@ contract CommitRevealAuction is
      */
     function commitOrder(
         bytes32 commitHash
-    ) external payable nonReentrant inPhase(BatchPhase.COMMIT) returns (bytes32 commitId) {
-        // Use default open pool (poolId = 0)
+    ) external payable returns (bytes32 commitId) {
+        // Delegates to commitOrderToPool which has nonReentrant + inPhase guards
         return commitOrderToPool(bytes32(0), commitHash, 0);
     }
 

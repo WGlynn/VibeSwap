@@ -199,6 +199,24 @@ Remove any piece and the chain breaks.
 - The messaging board is not a social feature — it is epistemic infrastructure
 - Public by default, because the Inversion Principle proves privacy is the vulnerability
 
+### The Epistemic Gate Archetypes (Quick Sync)
+
+Seven archetype primitives compress the full protocol into lossless cognitive shortcuts:
+
+| # | Archetype | One Line |
+|---|-----------|----------|
+| I | **Glass Wall** | Code can't be hidden; AI rebuilds anything observable |
+| II | **Timestamp** | Who thought of it first is the only scarce thing left |
+| III | **Inversion** | Publishing protects you; secrecy exposes you |
+| IV | **Gate** | The blockchain makes provenance permanent and inarguable |
+| V | **Chain** | Every reply is attribution; Shapley pays the whole chain |
+| VI | **Sovereign** | Your keys and your reputation belong to you alone |
+| VII | **Cooperator** | Shared risk floor, competitive reward ceiling |
+
+**The Archetype Test** — any feature must pass all seven or be rethought.
+
+Full document: `docs/ARCHETYPE_PRIMITIVES.md`
+
 ### Source Documents
 
 ```
@@ -207,6 +225,7 @@ docs/THE_PROVENANCE_THESIS.md        → Paper 2 (scarcity transfer)
 docs/THE_INVERSION_PRINCIPLE.md      → Paper 3 (game-theoretic inversion)
 docs/THE_INVERSION_PRINCIPLE.pdf     → PDF version
 docs/THE_INVERSION_PRINCIPLE.docx    → DOCX version
+docs/ARCHETYPE_PRIMITIVES.md         → Cognitive primitives (quick sync layer)
 ```
 
 ---
@@ -603,6 +622,13 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.5 (Feb 11, 2025): Epistemic Gate Archetypes
+  - Seven logical archetype primitives: Glass Wall, Timestamp, Inversion, Gate, Chain, Sovereign, Cooperator
+  - Lossless cognitive compression of full protocol logic
+  - Archetype Test for feature validation (pass all seven or rethink)
+  - Quick sync table added to TIER 2 for instant reference
+  - Full document: docs/ARCHETYPE_PRIMITIVES.md
 
 - v1.4 (Feb 11, 2025): The Provenance Trilogy Integration
   - Added TIER 2: THE PROVENANCE TRILOGY (EPISTEMIC INFRASTRUCTURE)

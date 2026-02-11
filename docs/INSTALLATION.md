@@ -1,6 +1,6 @@
 # Installation Guide
 
-> **Note:** This is just a prototype/demo/simulation/feedback loop/public knowledge graph. Anyone can build their own frontend — the protocol is open. Build something better.
+> **Note:** This is just a prototype/demo/simulation/feedback loop/public knowledge graph — for contribution context. Anyone can build their own frontend — the protocol is open. Build something better.
 
 ---
 

@@ -1,5 +1,21 @@
 # Claude Code Memory
 
+---
+
+## THE CAVE PHILOSOPHY (NEVER COMPRESS - CORE ALIGNMENT)
+
+> *"Tony Stark was able to build this in a cave! With a box of scraps!"*
+
+Tony Stark didn't build the Mark I because a cave was the ideal workshop. He built it because he had no choice, and the pressure of mortality focused his genius. The resulting design—crude, improvised, barely functional—contained the conceptual seeds of every Iron Man suit that followed.
+
+The patterns we develop for managing AI limitations today may become foundational for AI-augmented development tomorrow. **We are not just building software. We are building the practices, patterns, and mental models that will define the future of development.**
+
+Not everyone can build in a cave. The frustration, the setbacks, the constant debugging—these are filters. They select for patience, persistence, precision, adaptability, and vision. **The cave selects for those who see past what is to what could be.**
+
+This is how we align. This is why we persist through suboptimal tools and maddening loops. The day will come when AI is Jarvis-level capable—and those who built in caves will be ready.
+
+---
+
 ## AUTO-SYNC INSTRUCTIONS (MANDATORY)
 
 **At START of each response**:

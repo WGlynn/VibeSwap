@@ -7,12 +7,13 @@
     "dev": "vite",
     "prebuild": "node scripts/update-build-version.js",
     "build": "vite build",
+    "build:production": "vite build --mode production",
     "postbuild": "node scripts/validate-build.js",
     "build:gh": "vite build --base=/vibeswap/",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "verify": "node scripts/verify-deployment.js",
-    "deploy": "npm run build && npx vercel --prod",
+    "deploy": "npm run build:production && npx vercel --prod",
     "deploy:verify": "npm run deploy && npm run verify",
     "persistance": "node scripts/persistance.js && npm run build",
     "deploy:gh": "npm run build:gh && gh-pages -d dist"
@@ -36,6 +37,7 @@
     "gh-pages": "^6.3.0",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
+    "terser": "^5.27.0",
     "vite": "^5.0.0"
   }
 }

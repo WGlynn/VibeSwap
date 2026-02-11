@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "docx": "^9.5.1"
+  }
+}

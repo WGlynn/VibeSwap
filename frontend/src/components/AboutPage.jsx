@@ -2,6 +2,62 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 
+// Thesis content - In a Cave, With a Box of Scraps
+const thesisSections = [
+  {
+    title: "The Cave",
+    quote: '"Tony Stark was able to build this in a cave! With a box of scraps!"',
+    quoteAuthor: "— Obadiah Stane, Iron Man (2008)",
+    content: `The line is meant as an insult. But embedded within it is a profound truth about innovation: sometimes the most transformative technologies are born not in pristine laboratories with unlimited resources, but in caves, with scraps, under pressure, by those stubborn enough to believe that constraints are merely suggestions.
+
+In 2025, those of us building with AI-assisted development tools—what has come to be known as "vibe coding"—find ourselves in our own cave. The scraps we work with are large language models that hallucinate, lose context, and occasionally produce code that would make a junior developer wince. Our cave is the gap between what AI could be and what it currently is: a brilliant but unreliable partner prone to confident mistakes.
+
+And yet, we build anyway.`
+  },
+  {
+    title: "The Limitations",
+    content: `Current LLMs operate within fixed context windows—a limited amount of text they can "remember" at once. The result is an AI that forgets. It forgets the patterns you established. It forgets the bug you just fixed three messages ago.
+
+LLMs do not know what they do not know. They confidently generate plausible-looking code that uses functions that don't exist, parameters that were deprecated, or patterns that are subtly wrong in ways that only manifest at runtime.
+
+The most frustrating pattern is the loop: the AI makes a mistake, you correct it, it overcorrects, you correct again, it reverts to the original mistake. You're four messages deep in a circular argument with a machine that has lost the thread.`
+  },
+  {
+    title: "The Jarvis Thesis",
+    content: `The capabilities of large language models have improved at an exponential rate. The pattern is unmistakable: what is frustratingly limited today will be remarkably capable tomorrow.
+
+Within the foreseeable future, AI development assistants will achieve a level of capability where they can autonomously handle complex software engineering tasks with minimal human oversight—understanding entire codebases, maintaining perfect context, making zero hallucination errors, and anticipating developer needs before they are expressed.
+
+This is not science fiction. It is the obvious extrapolation of current trends. The question is not if but when.
+
+Those who learn to work with AI tools in their primitive state develop skills that will be invaluable when the tools mature: prompt engineering intuition, AI output evaluation, human-AI workflow design, context management, and pattern recognition for common AI failure modes.`
+  },
+  {
+    title: "The Philosophy of Constraint",
+    content: `Tony Stark didn't build the Mark I because a cave was the ideal workshop. He built it because he had no choice, and the pressure of mortality focused his genius. The resulting design—crude, improvised, barely functional—contained the conceptual seeds of every Iron Man suit that followed.
+
+The patterns we develop for managing AI limitations today may become foundational for AI-augmented development tomorrow. We are not just building software. We are building the practices, patterns, and mental models that will define the future of development.
+
+Not everyone can build in a cave. The frustration, the setbacks, the constant debugging—these are filters. They select for patience, persistence, precision, adaptability, and vision. The cave selects for those who see past what is to what could be.`
+  },
+  {
+    title: "The First Suit",
+    content: `VibeSwap is my Mark I.
+
+It is crude in places. The debugging sessions were painful. There are scars in the codebase where the AI and I fought and compromised. But it works. It trades. It bridges. It protects users from MEV. It runs.
+
+The day will come—perhaps sooner than we think—when AI development assistants are so capable that solo developers can build systems that would today require teams of dozens. On that day, those who dismissed vibe coding as "not ready" will scramble to learn what we already know.
+
+Until then, we continue. We debug. We persist. We believe.
+
+Because greatness can overcome limitation.`,
+    closingQuotes: [
+      { text: '"I am Iron Man."', author: '— Tony Stark' },
+      { text: '"I am a vibe coder."', author: '— Solo builders everywhere, 2025' },
+    ]
+  },
+]
+
 /**
  * About page with scrolling slogans marquee + cycling blurbs
  * Moved from the old homepage design before the Steve Jobs minimalist redesign
@@ -326,11 +382,72 @@ function AboutPage() {
           </div>
         </motion.div>
 
+        {/* Thesis: In a Cave, With a Box of Scraps */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mb-16"
+        >
+          <div className="border-t border-black-600 pt-12 mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-center mb-2">
+              In a Cave, With a <span className="text-matrix-500">Box of Scraps</span>
+            </h2>
+            <p className="text-sm text-black-400 text-center mb-8">
+              A Thesis on Solo Building with Vibe Coding in the Pre-Jarvis Era
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            {thesisSections.map((section, i) => (
+              <motion.div
+                key={section.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 + i * 0.1 }}
+                className="p-6 rounded-lg bg-black-800 border border-black-600"
+              >
+                <h3 className="text-lg font-bold mb-4 text-matrix-500">
+                  {i + 1}. {section.title}
+                </h3>
+
+                {section.quote && (
+                  <div className="mb-4 pl-4 border-l-2 border-matrix-500/30">
+                    <p className="text-black-300 italic">{section.quote}</p>
+                    <p className="text-xs text-black-500 mt-1">{section.quoteAuthor}</p>
+                  </div>
+                )}
+
+                <div className="space-y-3 text-sm text-black-300 leading-relaxed">
+                  {section.content.split('\n\n').map((paragraph, j) => (
+                    <p key={j}>{paragraph}</p>
+                  ))}
+                </div>
+
+                {section.closingQuotes && (
+                  <div className="mt-6 pt-4 border-t border-black-600 text-center space-y-3">
+                    {section.closingQuotes.map((q, j) => (
+                      <div key={j}>
+                        <p className="text-white italic">{q.text}</p>
+                        <p className="text-xs text-black-500">{q.author}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+
+          <p className="text-xs text-black-500 text-center mt-6 italic">
+            Written with Claude Code, in a cave, with a box of scraps.
+          </p>
+        </motion.div>
+
         {/* CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 1.2 }}
           className="text-center"
         >
           <Link to="/">

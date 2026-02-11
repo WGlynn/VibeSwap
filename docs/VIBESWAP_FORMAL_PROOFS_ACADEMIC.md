@@ -203,6 +203,48 @@ th {
   color: #555;
 }
 
+sup.fn a {
+  color: #4444aa;
+  text-decoration: none;
+  font-size: 8pt;
+  font-weight: 600;
+}
+
+sup.fn a:hover {
+  text-decoration: underline;
+}
+
+.endnotes {
+  font-size: 10pt;
+  margin: 2em 0;
+  page-break-before: always;
+}
+
+.endnotes h2 {
+  text-align: center;
+  border: none;
+  font-size: 14pt;
+}
+
+.endnotes ol {
+  padding-left: 2em;
+  line-height: 1.8;
+}
+
+.endnotes li {
+  margin: 0.5em 0;
+}
+
+.endnotes li a.back {
+  color: #4444aa;
+  text-decoration: none;
+  font-size: 9pt;
+}
+
+.endnotes li a.back:hover {
+  text-decoration: underline;
+}
+
 .page-header {
   font-size: 9pt;
   color: #666;
@@ -260,17 +302,17 @@ Version 1.0
 
 ## Abstract
 
-We present a comprehensive formal treatment of VibeSwap, a decentralized exchange protocol that eliminates maximal extractable value (MEV) through commit-reveal batch auctions with uniform clearing prices. This paper catalogs nineteen (19) theorems proven, eighteen (18) game-theoretic dilemmas dissolved, five (5) trilemmas navigated, and four (4) quadrilemmas resolved through mechanism design.
+We present a comprehensive formal treatment of VibeSwap, a decentralized exchange protocol that eliminates maximal extractable value<sup class="fn"><a href="#fn1" id="fnref1">1</a></sup> (MEV) through commit-reveal batch auctions<sup class="fn"><a href="#fn2" id="fnref2">2</a></sup> with uniform clearing prices<sup class="fn"><a href="#fn3" id="fnref3">3</a></sup>. This paper catalogs nineteen (19) theorems proven, eighteen (18) game-theoretic dilemmas dissolved, five (5) trilemmas navigated, and four (4) quadrilemmas resolved through mechanism design.
 
-We demonstrate that the protocol achieves a unique Nash equilibrium where honest participation is the dominant strategy for all participant types. The central contribution is the identification of a unifying structural principle: when incentive space is shaped such that self-interested motion coincides with cooperative motion, classical coordination failures dissolve not through enforcement but through geometry.
+We demonstrate that the protocol achieves a unique Nash equilibrium<sup class="fn"><a href="#fn4" id="fnref4">4</a></sup> where honest participation is the dominant strategy<sup class="fn"><a href="#fn5" id="fnref5">5</a></sup> for all participant types. The central contribution is the identification of a unifying structural principle: when incentive space is shaped such that self-interested motion coincides with cooperative motion, classical coordination failures dissolve not through enforcement but through geometry.
 
-We formalize the concept of a *social black hole*—a system whose gravitational pull increases monotonically with participation, creating an event horizon beyond which rational departure becomes geometrically unjustifiable. This framework has implications beyond decentralized exchange, suggesting a general approach to coordination mechanism design.
+We formalize the concept of a *social black hole*<sup class="fn"><a href="#fn6" id="fnref6">6</a></sup>—a system whose gravitational pull increases monotonically with participation, creating an event horizon<sup class="fn"><a href="#fn7" id="fnref7">7</a></sup> beyond which rational departure becomes geometrically unjustifiable. This framework has implications beyond decentralized exchange, suggesting a general approach to coordination mechanism design.
 
 </div>
 
 <div class="keywords">
 
-**Keywords:** mechanism design; game theory; decentralized exchange; MEV resistance; Shapley value; Nash equilibrium; batch auctions; cooperative markets; social scalability; incentive compatibility
+**Keywords:** mechanism design<sup class="fn"><a href="#fn8" id="fnref8">8</a></sup>; game theory; decentralized exchange; MEV resistance; Shapley value; Nash equilibrium; batch auctions; cooperative markets; social scalability; incentive compatibility
 
 **JEL Classification:** D47 (Market Design), D82 (Information and Mechanism Design), G14 (Market Efficiency), C72 (Noncooperative Games)
 
@@ -330,7 +372,8 @@ We formalize the concept of a *social black hole*—a system whose gravitational
 <li class="subsection">8.1 Summary of Results <span>38</span></li>
 <li class="subsection">8.2 Limitations and Future Work <span>39</span></li>
 
-<li class="section">References <span>40</span></li>
+<li class="section">Endnotes <span>40</span></li>
+<li class="section">References <span>43</span></li>
 
 <li class="section">Appendix A: Complete Notation Reference <span>43</span></li>
 <li class="section">Appendix B: Proof Status Classification <span>44</span></li>
@@ -348,17 +391,17 @@ We formalize the concept of a *social black hole*—a system whose gravitational
 
 ### 1.1 Motivation and Problem Statement
 
-Decentralized exchanges (DEXs) have emerged as critical infrastructure for cryptocurrency markets, facilitating over $1 trillion in annual trading volume as of 2024. Yet these systems suffer from fundamental mechanism design failures that undermine their purported benefits of trustlessness and fairness.
+Decentralized exchanges (DEXs) have emerged as critical infrastructure for cryptocurrency markets, facilitating over $1 trillion in annual trading volume as of 2024. Yet these systems suffer from fundamental mechanism design failures that undermine their purported benefits of trustlessness<sup class="fn"><a href="#fn9" id="fnref9">9</a></sup> and fairness.
 
-*Maximal extractable value* (MEV)—the profit available to miners, validators, and sophisticated actors through transaction reordering, insertion, and censorship—extracts over $1 billion annually from users (Daian et al., 2020). This extraction represents a multi-player prisoner's dilemma: individually rational behavior (extracting value from others) produces collectively suboptimal outcomes (negative-sum markets).
+*Maximal extractable value* (MEV)—the profit available to miners, validators, and sophisticated actors through transaction reordering, insertion, and censorship—extracts over $1 billion annually from users (Daian et al., 2020). This extraction represents a multi-player prisoner's dilemma<sup class="fn"><a href="#fn10" id="fnref10">10</a></sup>: individually rational behavior (extracting value from others) produces collectively suboptimal outcomes (negative-sum markets).
 
 > "The tragedy of the blockchain commons is not that coordination fails, but that the architecture makes defection profitable." — Szabo (2017)
 
 Previous attempts to address MEV have focused on three approaches:
 
-1. **Deterrence mechanisms** — Economic penalties (slashing) for detected extraction
-2. **Obfuscation** — Private mempools, encrypted transactions
-3. **Auction-based ordering** — MEV auctions, proposer-builder separation
+1. **Deterrence mechanisms** — Economic penalties (slashing<sup class="fn"><a href="#fn11" id="fnref11">11</a></sup>) for detected extraction
+2. **Obfuscation** — Private mempools<sup class="fn"><a href="#fn12" id="fnref12">12</a></sup>, encrypted transactions
+3. **Auction-based ordering** — MEV auctions, proposer-builder separation<sup class="fn"><a href="#fn13" id="fnref13">13</a></sup>
 
 These approaches *minimize* extraction but do not *eliminate* it. The fundamental problem remains: as long as the information required for extraction exists and is accessible during a window of opportunity, sophisticated actors will find ways to exploit it.
 
@@ -421,9 +464,9 @@ We adopt the following notation throughout this paper:
 | $n^*$ | Critical mass threshold | $\mathbb{Z}^+$ |
 | $\mathcal{P} = \{p_1, \ldots, p_n\}$ | Participant set | — |
 | $o_i = (d_i, a_i, \ell_i, t_i)$ | Order tuple | Direction × Amount × Limit × Pair |
-| $s_i$ | Secret nonce | $\{0,1\}^{256}$ |
+| $s_i$ | Secret nonce<sup class="fn"><a href="#fn14" id="fnref14">14</a></sup> | $\{0,1\}^{256}$ |
 | $c_i = H(o_i \| s_i)$ | Commitment hash | $\{0,1\}^{256}$ |
-| $\sigma \in S_n$ | Execution permutation | Symmetric group |
+| $\sigma \in S_n$ | Execution permutation | Symmetric group<sup class="fn"><a href="#fn15" id="fnref15">15</a></sup> |
 | $p^*$ | Uniform clearing price | $\mathbb{R}^+$ |
 | $\phi_i(v)$ | Shapley value | $\mathbb{R}$ |
 | $U_i(s)$ | Utility function | $\mathbb{R}$ |
@@ -432,7 +475,7 @@ We adopt the following notation throughout this paper:
 
 | Symbol | Definition |
 |--------|------------|
-| $H: \{0,1\}^* \to \{0,1\}^{256}$ | Cryptographic hash (Keccak-256) |
+| $H: \{0,1\}^* \to \{0,1\}^{256}$ | Cryptographic hash (Keccak-256<sup class="fn"><a href="#fn16" id="fnref16">16</a></sup>) |
 | $\oplus$ | Bitwise XOR operation |
 | $\mathbb{E}[\cdot]$ | Expectation operator |
 | $\Pr[\cdot]$ | Probability measure |
@@ -442,7 +485,7 @@ We adopt the following notation throughout this paper:
 
 **Conventions:**
 - All logarithms are base 2 unless otherwise specified
-- "Polynomial time" refers to probabilistic polynomial time (PPT)
+- "Polynomial time" refers to probabilistic polynomial time<sup class="fn"><a href="#fn17" id="fnref17">17</a></sup> (PPT)
 - Proofs conclude with the symbol ∎
 - Sub-proofs conclude with □
 
@@ -454,7 +497,7 @@ The VibeSwap protocol operates in discrete *batches* of duration $\tau$ (default
 
 **Definition 2.1 (Commit Phase).** During the interval $t \in [0, \tau_c]$ where $\tau_c = 0.8\tau$, participants submit:
 - A cryptographic commitment $c_i = H(o_i \| s_i)$
-- A collateral deposit $d_i \geq d_{min}$
+- A collateral deposit<sup class="fn"><a href="#fn18" id="fnref18">18</a></sup> $d_i \geq d_{min}$
 
 The commitment binds the participant to their order without revealing its contents.
 
@@ -474,7 +517,7 @@ Participants who fail to reveal, or whose reveal does not match their commitment
 **Definition 2.3 (Settlement Phase).** Upon batch close, the protocol executes:
 
 1. **Seed computation:** $\xi = \bigoplus_{i=1}^{n} s_i$
-2. **Order shuffling:** $\sigma = \text{FisherYates}(\xi, n)$
+2. **Order shuffling:** $\sigma = \text{FisherYates}$<sup class="fn"><a href="#fn19" id="fnref19">19</a></sup>$(\xi, n)$
 3. **Price discovery:** $p^* = \text{UniformClear}(\{o_{\sigma(i)}\}_{i=1}^{n})$
 4. **Atomic execution:** All valid orders execute at price $p^*$
 
@@ -502,7 +545,7 @@ where $s_{-i}^*$ denotes the strategies of all participants except $i$.
 
 <div class="definition">
 
-**Definition 2.6 (Shapley Value).** For a cooperative game $(N, v)$ with player set $N$ and characteristic function $v: 2^N \to \mathbb{R}$, the Shapley value of player $i$ is:
+**Definition 2.6 (Shapley Value<sup class="fn"><a href="#fn20" id="fnref20">20</a></sup>).** For a cooperative game $(N, v)$ with player set $N$ and characteristic function $v: 2^N \to \mathbb{R}$, the Shapley value of player $i$ is:
 $$\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!(|N|-|S|-1)!}{|N|!} \left[ v(S \cup \{i\}) - v(S) \right]$$
 
 This represents the expected marginal contribution of player $i$ across all possible coalition formation orderings.
@@ -511,7 +554,7 @@ This represents the expected marginal contribution of player $i$ across all poss
 
 <div class="definition">
 
-**Definition 2.7 (Common Knowledge).** A proposition $X$ is *common knowledge* among a set of agents $\mathcal{A}$ if:
+**Definition 2.7 (Common Knowledge<sup class="fn"><a href="#fn21" id="fnref21">21</a></sup>).** A proposition $X$ is *common knowledge* among a set of agents $\mathcal{A}$ if:
 
 1. All agents know $X$: $\forall i \in \mathcal{A}: K_i(X)$
 2. All agents know that all agents know $X$: $\forall i \in \mathcal{A}: K_i(\forall j \in \mathcal{A}: K_j(X))$
@@ -523,7 +566,7 @@ Formally: $C(X) \equiv \bigwedge_{k=1}^{\infty} E^k(X)$ where $E(X) = \bigwedge_
 
 <div class="definition">
 
-**Definition 2.8 (Anti-fragility).** A system $S$ is *anti-fragile* with respect to perturbation class $\mathcal{P}$ if for all $p \in \mathcal{P}$:
+**Definition 2.8 (Anti-fragility<sup class="fn"><a href="#fn22" id="fnref22">22</a></sup>).** A system $S$ is *anti-fragile* with respect to perturbation class $\mathcal{P}$ if for all $p \in \mathcal{P}$:
 $$V(S \text{ after } p) > V(S \text{ before } p)$$
 where $V(\cdot)$ denotes system value. That is, the system gains from disorder within the specified class.
 
@@ -550,11 +593,11 @@ $$\Pr[\mathcal{A}(c_i) = o_i] \leq 2^{-256} + \text{negl}(\lambda)$$
 
 The commitment scheme $c_i = H(o_i \| s_i)$ employs Keccak-256 as the hash function $H$, with $s_i$ sampled uniformly from $\{0,1\}^{256}$.
 
-By the preimage resistance property of Keccak-256, any algorithm recovering $o_i \| s_i$ from $c_i$ requires expected time $\Omega(2^{256})$. Since $s_i$ is independent of $o_i$ and uniformly distributed, knowledge of the order structure provides no advantage—the commitment is information-theoretically hiding with respect to the order parameters.
+By the preimage resistance<sup class="fn"><a href="#fn23" id="fnref23">23</a></sup> property of Keccak-256, any algorithm recovering $o_i \| s_i$ from $c_i$ requires expected time $\Omega(2^{256})$. Since $s_i$ is independent of $o_i$ and uniformly distributed, knowledge of the order structure provides no advantage—the commitment is information-theoretically hiding<sup class="fn"><a href="#fn24" id="fnref24">24</a></sup> with respect to the order parameters.
 
 More precisely, for any two orders $o, o'$ and random $s \leftarrow \{0,1\}^{256}$:
 $$\{H(o \| s)\} \approx_c \{H(o' \| s)\}$$
-where $\approx_c$ denotes computational indistinguishability. <span class="qed">∎</span>
+where $\approx_c$ denotes computational indistinguishability<sup class="fn"><a href="#fn25" id="fnref25">25</a></sup>. <span class="qed">∎</span>
 
 </div>
 
@@ -573,13 +616,13 @@ Since XOR with a uniform random value is a bijection on $\{0,1\}^{256}$, and $s_
 
 Formally, for any fixed $\xi_{-j}$:
 $$H_\infty(\xi \mid \xi_{-j}) = H_\infty(s_j) = 256$$
-where $H_\infty$ denotes min-entropy. <span class="qed">∎</span>
+where $H_\infty$ denotes min-entropy<sup class="fn"><a href="#fn26" id="fnref26">26</a></sup>. <span class="qed">∎</span>
 
 </div>
 
 <div class="corollary">
 
-**Corollary 3.3 (Coalition Resistance).** *The protocol is secure against coalitions of up to $n-1$ malicious participants, provided at least one participant generates their secret honestly.*
+**Corollary 3.3 (Coalition Resistance<sup class="fn"><a href="#fn27" id="fnref27">27</a></sup>).** *The protocol is secure against coalitions of up to $n-1$ malicious participants, provided at least one participant generates their secret honestly.*
 
 </div>
 
@@ -635,7 +678,7 @@ All operations are pure functions of their inputs. Identical seeds produce ident
 
 <div class="theorem">
 
-**Theorem 3.6 (Frontrunning Impossibility).** *Frontrunning is impossible in the VibeSwap mechanism.*
+**Theorem 3.6 (Frontrunning<sup class="fn"><a href="#fn28" id="fnref28">28</a></sup> Impossibility).** *Frontrunning is impossible in the VibeSwap mechanism.*
 
 </div>
 
@@ -660,7 +703,7 @@ The conjunction of these three results establishes that frontrunning is not mere
 
 <div class="theorem">
 
-**Theorem 3.7 (Pareto Efficiency).** *The uniform clearing price mechanism is Pareto efficient.*
+**Theorem 3.7 (Pareto Efficiency<sup class="fn"><a href="#fn29" id="fnref29">29</a></sup>).** *The uniform clearing price mechanism is Pareto efficient.*
 
 </div>
 
@@ -680,7 +723,7 @@ In either case, unrealized gains from trade exist. Only at $p = p^*$ are all mut
 
 <div class="theorem">
 
-**Theorem 3.8 (AMM Invariant Conservation).** *For the constant product AMM, the invariant $k = x \cdot y$ is strictly non-decreasing after each swap.*
+**Theorem 3.8 (AMM Invariant Conservation).** *For the constant product AMM<sup class="fn"><a href="#fn30" id="fnref30">30</a></sup>, the invariant $k = x \cdot y$ is strictly non-decreasing after each swap.*
 
 </div>
 
@@ -709,7 +752,7 @@ Therefore $k_1 > k_0$. <span class="qed">∎</span>
 
 <div class="theorem">
 
-**Theorem 3.9 (LP Share Proportionality).** *LP tokens represent exactly proportional ownership of pool reserves.*
+**Theorem 3.9 (LP Share Proportionality).** *LP tokens<sup class="fn"><a href="#fn31" id="fnref31">31</a></sup> represent exactly proportional ownership of pool reserves.*
 
 </div>
 
@@ -852,12 +895,12 @@ By continuity, there exists $n^*$ such that $U_V(n) > U_A(m) + C_{switch}$ for a
 
 *Null Player* is enforced programmatically: participants with zero trading volume, zero liquidity provision, and zero governance participation receive zero rewards.
 
-*Symmetry* is approximated via Monte Carlo Shapley estimation. For $m$ samples, approximation error is $O(1/\sqrt{m})$ with high probability.
+*Symmetry* is approximated via Monte Carlo<sup class="fn"><a href="#fn32" id="fnref32">32</a></sup> Shapley estimation. For $m$ samples, approximation error is $O(1/\sqrt{m})$ with high probability.
 
 *Additivity* is intentionally violated. The reward function includes a halving schedule:
 $$R(t) = R_0 \cdot 2^{-\lfloor t/T_{half} \rfloor}$$
 
-This creates time-dependent incentives that bootstrap early participation but decay toward long-run equilibrium. <span class="qed">∎</span>
+This creates time-dependent incentives — a halving schedule<sup class="fn"><a href="#fn33" id="fnref33">33</a></sup> — that bootstrap early participation but decay toward long-run equilibrium. <span class="qed">∎</span>
 
 </div>
 
@@ -903,7 +946,7 @@ The choice is no longer (cooperate, defect) but simply (participate, abstain). T
 
 <div class="definition">
 
-**Dilemma D2 (Free Rider Problem).** Public goods (liquidity, price discovery) benefit all participants. Contribution is voluntary. Non-contributors cannot be excluded. Rational agents free-ride.
+**Dilemma D2 (Free Rider Problem<sup class="fn"><a href="#fn34" id="fnref34">34</a></sup>).** Public goods (liquidity, price discovery) benefit all participants. Contribution is voluntary. Non-contributors cannot be excluded. Rational agents free-ride.
 
 </div>
 
@@ -931,7 +974,7 @@ Free-riding is strictly dominated. <span class="qed">∎</span>
 
 <div class="definition">
 
-**Dilemma D4 (Information Asymmetry).** Sophisticated actors (HFT firms, MEV bots) possess informational advantages over retail traders through faster data feeds, colocated servers, and mempool access.
+**Dilemma D4 (Information Asymmetry).** Sophisticated actors (HFT firms<sup class="fn"><a href="#fn35" id="fnref35">35</a></sup>, MEV bots) possess informational advantages over retail traders through faster data feeds, colocated servers, and mempool access.
 
 </div>
 
@@ -964,7 +1007,7 @@ Information symmetry is enforced by cryptography, not policy. <span class="qed">
 | D5 | Flash Crash | Panic-first is rational | No speed advantage in batches |
 | D6 | Impermanent Loss | LP provision has negative EV | IL protection + loyalty rewards |
 | D7 | Trust Elimination | TTPs required for exchange | Cryptographic trustlessness |
-| D8 | Sandwich Attacks | Profitable attack vector | Uniform clearing nullifies |
+| D8 | Sandwich Attacks<sup class="fn"><a href="#fn36" id="fnref36">36</a></sup> | Profitable attack vector | Uniform clearing nullifies |
 | D9 | Just-in-Time Liquidity | Profitable parasitic strategy | Batch settlement prevents |
 | D10 | Unfair Distribution | Pro-rata ignores contribution | Shapley measures marginal value |
 | D11 | Price Discovery Noise | MEV injects signal noise | Zero extraction = pure signal |
@@ -974,7 +1017,7 @@ Information symmetry is enforced by cryptography, not policy. <span class="qed">
 | D15 | Institutional Resistance | Visible transition triggers resistance | Seamless interface inversion |
 | D16 | Liveness vs. Censorship | Coordination vs. resistance tradeoff | L1/L2 split architecture |
 | D17 | AI Alignment | Values encoding is fragile | Economic alignment via Shapley |
-| D18 | Zero Accountability | Anonymous attack vectors | Soulbound identity + reputation |
+| D18 | Zero Accountability | Anonymous attack vectors | Soulbound<sup class="fn"><a href="#fn37" id="fnref37">37</a></sup> identity + reputation |
 
 ---
 
@@ -986,7 +1029,7 @@ Information symmetry is enforced by cryptography, not policy. <span class="qed">
 
 <div class="definition">
 
-**Trilemma TRI1 (Buterin, 2017).** A blockchain system can optimize for at most two of three properties: *scalability*, *security*, and *decentralization*.
+**Trilemma TRI1<sup class="fn"><a href="#fn38" id="fnref38">38</a></sup> (Buterin, 2017).** A blockchain system can optimize for at most two of three properties: *scalability*, *security*, and *decentralization*.
 
 </div>
 
@@ -1000,7 +1043,7 @@ Information symmetry is enforced by cryptography, not policy. <span class="qed">
 
 | Property | Mechanism | Layer |
 |----------|-----------|-------|
-| Scalability | Batch processing compresses $N$ trades to $O(1)$ state updates | L2 |
+| Scalability | Batch processing compresses $N$ trades to $O(1)$ state updates | L2<sup class="fn"><a href="#fn39" id="fnref39">39</a></sup> |
 | Security | Cryptographic commit-reveal; L1 settlement finality | L1 + Protocol |
 | Decentralization | Participant-contributed entropy; no privileged sequencer | Mechanism |
 
@@ -1026,7 +1069,7 @@ No single layer must achieve all three. <span class="qed">∎</span>
 
 <div class="theorem">
 
-**Navigation TRI2.** *The Kalman filter oracle achieves all three through state estimation.*
+**Navigation TRI2.** *The Kalman filter<sup class="fn"><a href="#fn40" id="fnref40">40</a></sup> oracle achieves all three through state estimation.*
 
 </div>
 
@@ -1105,7 +1148,7 @@ The theorems, dissolved dilemmas, and navigated multi-lemmas presented in this p
 
 <div class="definition">
 
-**Principle 7.1 (Incentive Geometry).** *Shape the incentive space such that self-interested motion coincides with cooperative motion. When this geometric condition is satisfied, coordination failures dissolve not through enforcement but through the structure of the space itself.*
+**Principle 7.1 (Incentive Geometry<sup class="fn"><a href="#fn41" id="fnref41">41</a></sup>).** *Shape the incentive space such that self-interested motion coincides with cooperative motion. When this geometric condition is satisfied, coordination failures dissolve not through enforcement but through the structure of the space itself.*
 
 </div>
 
@@ -1154,7 +1197,7 @@ $$\to \text{Institutional absorption} \to \text{Event horizon} \to \text{[loop d
 
 <div class="theorem">
 
-**Theorem 7.2 (Shapley-Symmetric AI Alignment).** *In a Shapley-symmetric economy, AI alignment emerges as an economic property rather than a values property.*
+**Theorem 7.2 (Shapley-Symmetric<sup class="fn"><a href="#fn42" id="fnref42">42</a></sup> AI Alignment).** *In a Shapley-symmetric economy, AI alignment emerges as an economic property rather than a values property.*
 
 </div>
 
@@ -1213,13 +1256,158 @@ The central insight is that coordination failures arise from *mechanism architec
 
 **Future Work:**
 
-1. Formal verification of smart contracts against theorem specifications using Coq/Isabelle
+1. Formal verification<sup class="fn"><a href="#fn43" id="fnref43">43</a></sup> of smart contracts against theorem specifications using Coq/Isabelle<sup class="fn"><a href="#fn44" id="fnref44">44</a></sup>
 
 2. Empirical measurement of realized MEV on testnet deployments
 
 3. Extension of social black hole framework to other coordination domains (governance, public goods)
 
 4. Implementation of Shapley-symmetric AI alignment in production agent systems
+
+---
+
+<div class="page-break"></div>
+
+<div class="endnotes">
+
+## Endnotes
+
+<ol>
+<li id="fn1">
+<strong>Maximal extractable value (MEV)</strong> — Profit that miners or validators can extract by reordering, inserting, or censoring transactions in a block. Analogous to a stock exchange employee peeking at pending orders and trading ahead of customers. <a class="back" href="#fnref1">↩</a>
+</li>
+<li id="fn2">
+<strong>Commit-reveal batch auctions</strong> — A two-step process: first, everyone submits sealed bids (commit); then all bids are opened simultaneously (reveal). Orders are processed in groups (batches) rather than one at a time, preventing anyone from reacting to others' orders. <a class="back" href="#fnref2">↩</a>
+</li>
+<li id="fn3">
+<strong>Uniform clearing price</strong> — A single price at which all trades in a batch execute — like an auction where everyone pays the same fair market rate, regardless of when or how they bid. <a class="back" href="#fnref3">↩</a>
+</li>
+<li id="fn4">
+<strong>Nash equilibrium</strong> — A state where no player can improve their outcome by unilaterally changing their strategy while others keep theirs fixed. Named after mathematician John Nash; famously depicted in the film <em>A Beautiful Mind</em>. <a class="back" href="#fnref4">↩</a>
+</li>
+<li id="fn5">
+<strong>Dominant strategy</strong> — A strategy that is optimal regardless of what other players do. If honesty pays best no matter what anyone else does, then honesty is the dominant strategy. <a class="back" href="#fnref5">↩</a>
+</li>
+<li id="fn6">
+<strong>Social black hole</strong> — The authors' metaphor: a system so economically attractive that, past a critical adoption size, no rational participant would leave — like a gravitational black hole, but for economic participation. <a class="back" href="#fnref6">↩</a>
+</li>
+<li id="fn7">
+<strong>Event horizon</strong> — In astrophysics, the boundary around a black hole beyond which nothing can escape. Here, the adoption threshold beyond which switching to a competitor becomes economically irrational. <a class="back" href="#fnref7">↩</a>
+</li>
+<li id="fn8">
+<strong>Mechanism design</strong> — The engineering of rules and incentive structures to achieve desired outcomes among self-interested participants. Sometimes called "reverse game theory" — instead of analyzing an existing game, you design the game to produce the outcome you want. <a class="back" href="#fnref8">↩</a>
+</li>
+<li id="fn9">
+<strong>Trustlessness</strong> — Systems that function correctly without requiring participants to trust each other or a central authority. Enforcement comes from mathematics and code, not from reputation or legal contracts. <a class="back" href="#fnref9">↩</a>
+</li>
+<li id="fn10">
+<strong>Prisoner's dilemma</strong> — The classic game theory scenario: two prisoners each benefit individually from betraying the other, but mutual betrayal leaves both worse off than mutual cooperation. Models why rational self-interest can produce collectively terrible outcomes. <a class="back" href="#fnref10">↩</a>
+</li>
+<li id="fn11">
+<strong>Slashing</strong> — Automatic confiscation of a participant's staked collateral as punishment for protocol violations — the system's built-in enforcement mechanism, requiring no courts or authorities. <a class="back" href="#fnref11">↩</a>
+</li>
+<li id="fn12">
+<strong>Mempool</strong> — Short for "memory pool": the waiting room where submitted blockchain transactions sit before being included in a block. Visible mempools let sophisticated actors see — and exploit — pending trades before they execute. <a class="back" href="#fnref12">↩</a>
+</li>
+<li id="fn13">
+<strong>Proposer-builder separation (PBS)</strong> — An Ethereum design where the roles of choosing which transactions to include (building) and finalizing blocks (proposing) are split between different parties, to reduce the concentration of MEV extraction power. <a class="back" href="#fnref13">↩</a>
+</li>
+<li id="fn14">
+<strong>Nonce</strong> — A "number used once" — a random value added to data before hashing to ensure the output is unpredictable, even if the underlying data is known or guessable. <a class="back" href="#fnref14">↩</a>
+</li>
+<li id="fn15">
+<strong>Symmetric group</strong> — In mathematics, the set of all possible orderings (permutations) of <em>n</em> objects. For example, 3 items have 3! = 6 possible orderings. Written as <em>S<sub>n</sub></em>. <a class="back" href="#fnref15">↩</a>
+</li>
+<li id="fn16">
+<strong>Keccak-256</strong> — The cryptographic hash function used by Ethereum, selected as the SHA-3 standard. It converts any input into a fixed 256-bit output that is practically impossible to reverse-engineer — like a one-way fingerprint for data. <a class="back" href="#fnref16">↩</a>
+</li>
+<li id="fn17">
+<strong>Probabilistic polynomial time (PPT)</strong> — An algorithm that runs in "reasonable" time (polynomial in input size, not exponential) and may use randomness. This is the standard model for what a real-world attacker could feasibly compute. <a class="back" href="#fnref17">↩</a>
+</li>
+<li id="fn18">
+<strong>Collateral deposit</strong> — Funds locked up as a security bond when placing an order. If the trader follows through honestly, the collateral is returned; if they misbehave or abandon their commitment, some or all is forfeited (slashed). <a class="back" href="#fnref18">↩</a>
+</li>
+<li id="fn19">
+<strong>Fisher-Yates shuffle</strong> — An algorithm that produces a perfectly uniform random ordering of a list — every possible arrangement is equally likely. The gold standard for unbiased shuffling, used since 1938. <a class="back" href="#fnref19">↩</a>
+</li>
+<li id="fn20">
+<strong>Shapley value</strong> — A method from cooperative game theory that fairly divides a total payoff among players based on each player's average marginal contribution across all possible coalition orderings. Named after Nobel laureate Lloyd Shapley. <a class="back" href="#fnref20">↩</a>
+</li>
+<li id="fn21">
+<strong>Common knowledge</strong> — Not just "everyone knows X" but "everyone knows that everyone knows that everyone knows X…" ad infinitum. A precise game-theoretic concept with profound implications for coordination — many cooperation failures stem from lacking common knowledge. <a class="back" href="#fnref21">↩</a>
+</li>
+<li id="fn22">
+<strong>Anti-fragility</strong> — Coined by Nassim Nicholas Taleb: systems that don't just resist stress but actually <em>get stronger</em> from it. Beyond "robust" (unchanged by stress) — actively improved by disorder and volatility. <a class="back" href="#fnref22">↩</a>
+</li>
+<li id="fn23">
+<strong>Preimage resistance</strong> — The property that, given a hash output, it is computationally infeasible to find <em>any</em> input that produces it — like knowing a fingerprint but being unable to reconstruct the person it belongs to. <a class="back" href="#fnref23">↩</a>
+</li>
+<li id="fn24">
+<strong>Information-theoretically hiding</strong> — A commitment scheme where even an adversary with unlimited computational power cannot determine the hidden value. The strongest possible form of secrecy — not just "hard to break" but "impossible regardless of technology." <a class="back" href="#fnref24">↩</a>
+</li>
+<li id="fn25">
+<strong>Computational indistinguishability</strong> — Two distributions are computationally indistinguishable if no efficient algorithm can tell them apart with meaningful probability. For practical purposes, the data "looks identical" to any realistic observer or computer. <a class="back" href="#fnref25">↩</a>
+</li>
+<li id="fn26">
+<strong>Min-entropy</strong> — A measure of unpredictability that captures the worst case: how likely is the single most probable outcome? High min-entropy (256 bits here) means even the best possible guess has a negligible 1-in-2<sup>256</sup> chance. <a class="back" href="#fnref26">↩</a>
+</li>
+<li id="fn27">
+<strong>Coalition resistance</strong> — The ability of a protocol to remain secure even when multiple participants conspire together. Here, even <em>n</em>−1 colluding attackers cannot compromise the system if just one participant is honest. <a class="back" href="#fnref27">↩</a>
+</li>
+<li id="fn28">
+<strong>Frontrunning</strong> — Placing a trade ahead of a known pending order to profit from the anticipated price movement. Illegal in traditional finance (insider trading), but rampant in unregulated blockchain markets where the mempool is visible. <a class="back" href="#fnref28">↩</a>
+</li>
+<li id="fn29">
+<strong>Pareto efficiency</strong> — Named after economist Vilfredo Pareto: a state where no one can be made better off without making someone else worse off. The economic gold standard — it means all mutually beneficial trades have been exhausted. <a class="back" href="#fnref29">↩</a>
+</li>
+<li id="fn30">
+<strong>Constant product AMM</strong> — An Automated Market Maker that maintains the rule <em>x × y = k</em> (reserves of token A times reserves of token B equals a constant). Popularized by Uniswap. Prices adjust automatically as people trade. <a class="back" href="#fnref30">↩</a>
+</li>
+<li id="fn31">
+<strong>LP tokens</strong> — Liquidity Provider tokens: receipts representing a provider's share of a trading pool. Redeemable at any time for the proportional underlying assets plus accumulated trading fees. <a class="back" href="#fnref31">↩</a>
+</li>
+<li id="fn32">
+<strong>Monte Carlo sampling</strong> — A statistical technique that uses repeated random sampling to approximate mathematical quantities that are too complex to compute exactly. Named (with some irony) after the Monte Carlo casino. <a class="back" href="#fnref32">↩</a>
+</li>
+<li id="fn33">
+<strong>Halving schedule</strong> — A reward structure where payouts are cut in half at regular intervals — modeled after Bitcoin's block reward halving. Creates urgency for early participation while ensuring long-term sustainability. <a class="back" href="#fnref33">↩</a>
+</li>
+<li id="fn34">
+<strong>Free rider problem</strong> — When individuals benefit from a shared resource without contributing to it — like enjoying public parks while evading taxes. Eventually, rational non-contribution leads to the resource's collapse. <a class="back" href="#fnref34">↩</a>
+</li>
+<li id="fn35">
+<strong>HFT firms</strong> — High-Frequency Trading firms that use ultra-fast computers and co-located servers to trade in microseconds. In crypto, their equivalent are MEV bots — automated programs that scan the mempool for extraction opportunities. <a class="back" href="#fnref35">↩</a>
+</li>
+<li id="fn36">
+<strong>Sandwich attack</strong> — An MEV strategy where an attacker places one trade <em>before</em> and one trade <em>after</em> a victim's trade, profiting from the price movement they artificially created. The victim gets a worse price; the attacker pockets the difference. <a class="back" href="#fnref36">↩</a>
+</li>
+<li id="fn37">
+<strong>Soulbound</strong> — A non-transferable token or credential permanently attached to one identity — it cannot be sold or transferred. The term comes from items in <em>World of Warcraft</em> that bind to the player who picks them up. <a class="back" href="#fnref37">↩</a>
+</li>
+<li id="fn38">
+<strong>Blockchain trilemma</strong> — Vitalik Buterin's influential observation that blockchains typically can only optimize for two of three properties: <em>scalability</em> (handling many transactions), <em>security</em> (resistance to attacks), and <em>decentralization</em> (no single point of control). <a class="back" href="#fnref38">↩</a>
+</li>
+<li id="fn39">
+<strong>L1/L2</strong> — Layer 1 is the base blockchain (e.g., Ethereum mainnet); Layer 2 is a secondary framework built on top for faster and cheaper transactions, with L1 providing final security guarantees. Think of L1 as the courthouse and L2 as the everyday handshake deals — you only go to court if there's a dispute. <a class="back" href="#fnref39">↩</a>
+</li>
+<li id="fn40">
+<strong>Kalman filter</strong> — A mathematical algorithm that estimates the true state of a system from noisy, uncertain measurements. Widely used in GPS navigation, autopilots, and spacecraft — here applied to estimating true asset prices from noisy market data. <a class="back" href="#fnref40">↩</a>
+</li>
+<li id="fn41">
+<strong>Incentive geometry</strong> — The authors' framework: treating incentive structures as geometric spaces where participant behavior follows "paths of least resistance." Correct geometry makes cooperation the natural, effortless path — like water flowing downhill. <a class="back" href="#fnref41">↩</a>
+</li>
+<li id="fn42">
+<strong>Shapley-symmetric</strong> — A system where rewards are distributed via Shapley values, meaning every participant (human or AI) is compensated exactly for their marginal contribution — no more, no less. This makes "being helpful" and "being profitable" mathematically identical. <a class="back" href="#fnref42">↩</a>
+</li>
+<li id="fn43">
+<strong>Formal verification</strong> — Using mathematical proof techniques (not just testing) to guarantee that software behaves exactly as specified under <em>all</em> possible conditions. The gold standard for mission-critical systems. <a class="back" href="#fnref43">↩</a>
+</li>
+<li id="fn44">
+<strong>Coq/Isabelle</strong> — Proof assistant software that allows programmers to write mathematical proofs that a computer can verify. Used to guarantee correctness of critical systems — from operating system kernels to financial smart contracts. <a class="back" href="#fnref44">↩</a>
+</li>
+</ol>
+
+</div>
 
 ---
 

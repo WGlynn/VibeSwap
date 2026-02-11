@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
 import { ContributionsProvider } from './contexts/ContributionsContext'
+import { MessagingProvider } from './contexts/MessagingContext'
 
 // Error boundary to catch React errors
 class ErrorBoundary extends Component {
@@ -53,6 +54,7 @@ const ActivityPage = lazy(() => import('./components/ActivityPage'))
 const AdminSybilDetection = lazy(() => import('./components/AdminSybilDetection'))
 const AboutPage = lazy(() => import('./components/AboutPage'))
 const PersonalityPage = lazy(() => import('./components/PersonalityPage'))
+const MessageBoard = lazy(() => import('./components/MessageBoard'))
 
 // Minimal page transitions - subtle, fast
 const pageVariants = {
@@ -90,6 +92,7 @@ function AnimatedRoutes() {
             <Route path="/history" element={<ActivityPage />} />
             <Route path="/rewards" element={<RewardsPage />} />
             <Route path="/forum" element={<ForumPage />} />
+            <Route path="/board" element={<MessageBoard />} />
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/personality" element={<PersonalityPage />} />
@@ -110,6 +113,7 @@ function App() {
   // Scroll is now prevented globally in index.html for native iOS feel
 
   return (
+    <MessagingProvider>
     <ContributionsProvider>
       {isHomePage ? (
         // Home page: completely fixed layout, no scroll possible
@@ -129,6 +133,7 @@ function App() {
         </div>
       )}
     </ContributionsProvider>
+    </MessagingProvider>
   )
 }
 

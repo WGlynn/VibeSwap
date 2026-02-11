@@ -1,6 +1,39 @@
 # Tomorrow's Plan: Solidity Sprint
 **Created**: February 10, 2025
-**Goal**: Compile → Pass Tests → Audit Money Paths
+**Goal**: Map Hot Zone → Compile → Pass Tests → Audit Money Paths
+
+---
+
+## Phase 0: MAP THE HOT ZONE (Frontend Attack Surface)
+
+Before touching Solidity, document exactly which frontend files can touch contracts.
+
+### Task
+```bash
+# Find every file that imports ethers, web3, or contract-related code
+cd C:/Users/Will/vibeswap/frontend/src
+grep -r "from 'ethers'" --include="*.js" --include="*.jsx" -l
+grep -r "from 'ethers'" --include="*.ts" --include="*.tsx" -l
+grep -r "useContract" --include="*.js" --include="*.jsx" -l
+grep -r "\.connect\(" --include="*.js" --include="*.jsx" -l
+```
+
+### Output
+Create `docs/audit/FRONTEND_HOT_ZONE.md` with:
+- List of every file that touches blockchain
+- Current attack surface size (file count, line count)
+- Dependency graph (which components import hot hooks)
+- Migration notes for Hot/Cold separation
+
+### The Standard (from KNOWLEDGE_BASE.md)
+
+```
+blockchain/     → 🔴 HOT - Only place ethers exists
+ui/             → 🟢 COLD - Pure UI, no web3
+app/            → 🟡 WARM - Glue layer
+```
+
+**Rule**: If it touches the chain, it lives in blockchain/. If it doesn't, it can't.
 
 ---
 

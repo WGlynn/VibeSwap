@@ -233,6 +233,19 @@ The same structure applies: Will operated under the old model (secrecy, private 
 
 > *"I built the gate. I'm walking through it. The old rules end here."*
 
+### The Hard Line: Contributions ≠ Personal Data
+
+**The Inversion Principle applies to intellectual contributions. It does NOT apply to personal privacy.**
+
+- **What we break**: The toxic contribution cycle (idea hoarding, IP gatekeeping, secrecy-as-strategy)
+- **What we protect**: The fundamental human right to privacy (search history, personal messages, location, browsing, financial data)
+
+The gate is voluntary. You *choose* to publish a contribution. No one is forced through. Personal behavior (browsing, searching, reading) is never recorded. The graph tracks what you *say*, not what you *do*. Right to pseudonymity is preserved.
+
+**Design rule**: Opt-in only. No data harvesting. Contribution ≠ surveillance. This is liberation from the toxic IP model, not a new form of surveillance.
+
+> *"We break the cycle where sharing ideas is punished. We do not break the right to keep your thoughts your own."*
+
 ### Source Documents
 
 ```
@@ -638,6 +651,13 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.7 (Feb 11, 2025): The Hard Line (Contributions ≠ Personal Data)
+  - Absolute boundary: Inversion Principle applies to contributions, NOT personal privacy
+  - What we break: toxic contribution cycle (hoarding, IP gatekeeping)
+  - What we protect: personal privacy (search history, messages, browsing, financial data)
+  - Design rules: opt-in only, no data harvesting, right to pseudonymity
+  - "We break the cycle where sharing ideas is punished. We do not break the right to keep your thoughts your own."
 
 - v1.6 (Feb 11, 2025): The First Step & The Golden Path
   - Bootstrapping paradox: new models must be built under old rules

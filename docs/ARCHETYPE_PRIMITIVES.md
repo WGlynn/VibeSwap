@@ -266,6 +266,60 @@ This is the first step. The gate is open. Everyone who publishes after this walk
 
 ---
 
+## The Hard Line: Contributions Are Not Personal Data
+
+This must be said clearly, because it will be misunderstood otherwise.
+
+**The Inversion Principle applies to intellectual contributions. It does NOT apply to personal privacy.**
+
+There is a boundary, and it is absolute:
+
+| PUBLIC (Contributions) | PRIVATE (Personal Data) |
+|---|---|
+| Ideas you choose to share | Your search history |
+| Code you write for a project | Your private messages |
+| Questions you post to a forum | Your location data |
+| Votes you cast on proposals | Your medical records |
+| Reviews and feedback you give | Your browsing habits |
+| Bug reports and suggestions | Your financial details |
+| Designs and architecture proposals | Your personal relationships |
+
+The Epistemic Gate is about **voluntary contribution provenance** — the record of ideas you *choose* to put through the gate. It is not a surveillance system. It is not a transparency mandate for human beings. It is not an argument that people should have no privacy.
+
+### What We Break vs. What We Protect
+
+**What we break**: The toxic contribution cycle — where ideas are hoarded, stolen, disputed, and gatekept behind lawyers and NDAs. Where the person who had the idea gets nothing and the person who filed the patent gets everything. Where secrecy is rewarded and sharing is punished.
+
+**What we protect**: The fundamental human right to privacy. Your thoughts are yours until you choose to share them. Your search history is yours. Your private conversations are yours. Your personal data is yours. No system — not even this one — has the right to compel transparency over personal information.
+
+### The Principle of Voluntary Passage
+
+The gate is not a checkpoint. It is a door you walk through by choice.
+
+When you post a message to the contribution graph, you are *choosing* to create a provenance record. That choice is what makes the system work. The Inversion Principle says this choice is *rational* — that you benefit from making it. But it is still a choice. No one is forced through the gate. No one's private thoughts are dragged into the light.
+
+This is the difference between:
+- **"Everything should be transparent"** — surveillance ideology, which we reject
+- **"Contributions should be transparent"** — provenance infrastructure, which we build
+
+The Epistemic Gate makes it *advantageous* to share ideas publicly. It does not make it *mandatory*. The incentive structure replaces coercion. Rational self-interest replaces compelled disclosure.
+
+### Why This Matters for Design
+
+Every feature built on the Epistemic Gate must respect this boundary:
+
+1. **Opt-in only** — Nothing is published without the user's explicit action
+2. **No data harvesting** — Personal behavior (browsing, searching, reading) is never recorded in the contribution graph
+3. **Contribution ≠ surveillance** — The graph records what you *say*, not what you *do*
+4. **Right to pseudonymity** — You can contribute under any identity; the graph tracks the identity, not the person behind it
+5. **Personal data stays personal** — Wallet security axioms (TIER 4) apply: your keys, your data, your choice
+
+The Inversion Principle is a liberation from the toxic IP model. It is not — and must never become — a new form of surveillance dressed in the language of transparency.
+
+> *"We break the cycle where sharing ideas is punished. We do not break the right to keep your thoughts your own."*
+
+---
+
 ```
 Glynn, W. (2025). "The Epistemic Gate Archetypes: Logical Archetype
 Primitives for the VibeSwap Protocol." VibeSwap Protocol Documentation.

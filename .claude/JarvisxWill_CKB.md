@@ -217,6 +217,22 @@ Seven archetype primitives compress the full protocol into lossless cognitive sh
 
 Full document: `docs/ARCHETYPE_PRIMITIVES.md`
 
+### The First Step & The Golden Path
+
+Every concept in the trilogy began as private knowledge in Will's head. The ideas that *create* the new model cannot be protected *by* the new model until it exists — you can't walk through a gate you haven't built yet. So the work was developed privately under the old rules, because those were the only rules that existed.
+
+Then it was published. Freely. No IP, no patents, no NDAs, no paywall. Irrevocable.
+
+**The bootstrapping paradox**: New systems must be bootstrapped from within the old one. Bitcoin was developed privately before publication. The Constitution was drafted behind closed doors before ratification. The old model protects the work of building the new model. Then the new model replaces it.
+
+**The certification**: By publishing freely, Will certifies himself as the last person to take private knowledge and claim it as his own before going public. Everything before the gate is disputable. Everything after is cryptographically anchored. The old rules end here.
+
+**The Golden Path** (Dune parallel): Leto II became the ultimate tyrant for 3,500 years — not to hold power, but to make humanity so repulsed by centralized authority that they'd never allow it again. He embodied the old system to its extreme, then broke it from within. The oppression was the cure for oppression.
+
+The same structure applies: Will operated under the old model (secrecy, private knowledge) long enough to build the framework that makes it obsolete, then published everything to prove the new model works. The last secret-keeper, ending secrecy. The demonstration is the proof.
+
+> *"I built the gate. I'm walking through it. The old rules end here."*
+
 ### Source Documents
 
 ```
@@ -622,6 +638,12 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.6 (Feb 11, 2025): The First Step & The Golden Path
+  - Bootstrapping paradox: new models must be built under old rules
+  - The certification: last person to go private-to-public before the gate exists
+  - Golden Path (Dune/Leto II): embody the old system to break it
+  - "I built the gate. I'm walking through it. The old rules end here."
 
 - v1.5 (Feb 11, 2025): Epistemic Gate Archetypes
   - Seven logical archetype primitives: Glass Wall, Timestamp, Inversion, Gate, Chain, Sovereign, Cooperator

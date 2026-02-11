@@ -13,8 +13,23 @@ This file maintains continuity between Claude Code sessions across devices.
 - Documentation and formal proofs publication
 
 ## Active Tasks
-- Tomorrow: Solidity sprint (Phase 0-3 in TOMORROW_PLAN.md)
+- Solidity sprint Phase 3: Audit money paths (VibeAMM, CrossChainRouter)
+- Fix test infrastructure (CommitRevealAuction setUp, NotActiveAuthority setup)
 - Frontend: Cypherpunk redesign implementation
+
+## Recently Completed (Feb 11, 2025)
+17. Solidity Sprint Phase 0-2:
+    - Phase 0: Frontend Hot Zone Audit (docs/audit/FRONTEND_HOT_ZONE.md)
+      - 19 files touch blockchain (24% of codebase)
+      - Target: reduce to ~5 files with Hot/Cold separation
+    - Phase 1: Fixed compile errors
+      - Forum.sol: PostLocked → PostIsLocked (duplicate identifier)
+      - ClawbackResistance.t.sol, SybilResistanceIntegration.t.sol: CaseStatus fix
+    - Phase 2: Test results
+      - DAOTreasury: 24/24 pass (money paths secure)
+      - VibeAMM: 16/22 pass (6 error format sync issues)
+      - Security: 23/36 pass (13 NotActiveAuthority setup issues)
+      - CommitRevealAuction: setUp failure (needs fix)
 
 ## Recently Completed (Feb 10, 2025)
 12. Created formal proofs documentation:

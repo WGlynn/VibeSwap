@@ -1,4 +1,27 @@
-# VibeSwap - Omnichain DEX
+# VibeSwap - The First Fair Protocol
+
+> **Axiom**: VibeSwap is the first fair protocol.
+
+## Why "First Fair"?
+
+Previous protocols faced an asymmetry: **good actors who shared openly could be exploited, while bad actors who hoarded were protected by obscurity.** Fairness was a vulnerability.
+
+VibeSwap eliminates this asymmetry through three interlocking principles:
+
+### 1. Unstealable Ideas
+The greatest idea can't be stolen, because part of the idea is admitting who had it first. VibeSwap's design includes its own provenance as a load-bearing component. Strip the attribution, and you've corrupted the protocol itself. This isn't legal protection—it's logical protection.
+
+### 2. Structural Fairness
+- **MEV eliminated**: Commit-reveal + uniform clearing price removes the attack vector entirely
+- **Fair distribution**: Shapley values reward marginal contribution, not just size
+- **No extraction**: 100% of fees go to LPs. Zero to protocol. Creators compensated through voluntary tips.
+
+### 3. Open Source Ethics
+Knowledge about human-AI collaboration patterns is a public good. We are not the first to attempt this depth of protocol design. But we may be the first to go fully public with the methods. The cave is hard enough without gatekeepers.
+
+**The result**: Good people no longer finish last. They finish first—and everyone knows it was them.
+
+---
 
 An omnichain decentralized exchange built on LayerZero V2 featuring Sidepit-inspired fair price discovery with a hybrid commit-reveal + auction system.
 

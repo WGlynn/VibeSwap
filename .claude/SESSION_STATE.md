@@ -19,6 +19,13 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend: Cypherpunk redesign implementation
 
 ## Recently Completed (Feb 11, 2025)
+18. Created Epistemic Gate Archetypes (docs/ARCHETYPE_PRIMITIVES.md):
+    - Seven logical archetype primitives: Glass Wall, Timestamp, Inversion, Gate, Chain, Sovereign, Cooperator
+    - Lossless cognitive compression of full protocol for instant user sync
+    - Archetype Test: validate any feature against all seven
+    - Interface mapping: each archetype → protocol component → implementation file
+    - Integrated into CKB TIER 2 as quick sync table
+    - CKB bumped to v1.5
 17. Integrated Provenance Trilogy into CKB as TIER 2:
     - Logical chain: Transparency Theorem → Provenance Thesis → Inversion Principle
     - Web2/Web3 synthesis: temporal demarcation (pre-gate vs post-gate)

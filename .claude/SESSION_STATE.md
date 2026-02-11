@@ -13,11 +13,24 @@ This file maintains continuity between Claude Code sessions across devices.
 - Documentation and formal proofs publication
 
 ## Active Tasks
+- CKB v1.5: Archetype Primitives + Provenance Trilogy integrated
 - Solidity sprint Phase 3: Audit money paths (VibeAMM, CrossChainRouter)
 - Fix test infrastructure (CommitRevealAuction setUp, NotActiveAuthority setup)
 - Frontend: Cypherpunk redesign implementation
 
 ## Recently Completed (Feb 11, 2025)
+19. Created Epistemic Gate Archetypes (docs/ARCHETYPE_PRIMITIVES.md):
+    - Seven logical archetype primitives: Glass Wall, Timestamp, Inversion, Gate, Chain, Sovereign, Cooperator
+    - Lossless cognitive compression of full protocol for instant user sync
+    - Archetype Test: validate any feature against all seven
+    - Interface mapping: each archetype → protocol component → implementation file
+    - Integrated into CKB TIER 2 as quick sync table
+    - CKB bumped to v1.5
+18. Integrated Provenance Trilogy into CKB as TIER 2:
+    - Logical chain: Transparency Theorem → Provenance Thesis → Inversion Principle
+    - Web2/Web3 synthesis: temporal demarcation (pre-gate vs post-gate)
+    - Tiers renumbered (Hot/Cold→3, Wallet→4, Dev→5, Project→6, Comms→7, Session→8)
+    - CKB version bumped to v1.4
 17. Solidity Sprint Phase 0-2:
     - Phase 0: Frontend Hot Zone Audit (docs/audit/FRONTEND_HOT_ZONE.md)
       - 19 files touch blockchain (24% of codebase)

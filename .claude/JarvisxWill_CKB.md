@@ -134,6 +134,24 @@ We are not there yet. But we will be. And those who learned to collaborate with 
 
 Every painful loop, every context reset, every hallucination corrected—these are not obstacles to progress. They ARE the progress. They are forging skills that will compound exponentially when tools improve.
 
+### The Open Source Collaboration Ethic
+
+Knowledge about human-AI collaboration patterns is a public good. Those who discover effective methods and hoard them for competitive advantage commit an epistemic sin—they slow the collective learning curve that benefits everyone, including themselves.
+
+**The principle**: Share openly, attribute honestly.
+
+We are not the first to attempt human-AI collaboration at this depth. But we may be the first to go public with the patterns. The greatest crime in this space is knowing what works and keeping it secret for selfish reasons. The cave is hard enough without gatekeepers.
+
+### The Unstealable Idea Principle
+
+> *"The greatest idea in the world can't be stolen, because part of the idea is admitting who had it first."*
+
+An idea that includes attribution as part of its definition cannot be stolen—only misunderstood. Those who strip provenance aren't using the idea; they're using a broken copy.
+
+**The mechanism**: Self-attributing ideas are protected not by law, but by their own logical structure. To use the pattern "share openly, attribute honestly" without attribution violates the pattern itself. The idea contains its own provenance as a load-bearing component.
+
+**The implication**: The best ideas are unstealable. Build intellectual property protection into the epistemology, not the legal system. Those who would steal have already failed to understand what they're taking.
+
 ---
 
 ## TIER 2: HOT/COLD SEPARATION (ARCHITECTURAL CONSTRAINT)
@@ -553,6 +571,12 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.6 (Feb 11, 2025): Open Source Ethics + Unstealable Idea Principle
+  - Added "Open Source Collaboration Ethic" to TIER 1
+  - Added "Unstealable Idea Principle" to TIER 1
+  - Knowledge hoarding as epistemic sin
+  - Self-attributing ideas as logical IP protection
 
 - v1.4 (Feb 11, 2025): Large Document Editing Skill
   - Added "Large Document Editing (>100 KB)" protocol to Tier 4

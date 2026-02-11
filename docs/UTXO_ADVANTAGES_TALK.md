@@ -3,7 +3,7 @@
 
 **Talk for Nervos Community**
 **Speaker**: Will Glynn
-**Draft**: v0.1
+**Draft**: v0.2
 
 ---
 
@@ -273,16 +273,182 @@ For VibeSwap: commit phase can hide order sizes until reveal.
 
 ---
 
-## CKB's Cell Model: UTXO++ (2 min)
+## CKB's Cell Model: UTXO++ (5 min)
 
-Nervos CKB enhances UTXO:
+Nervos CKB doesn't just copy UTXO. It fixes its limitations while keeping its guarantees.
 
 | Feature | Bitcoin UTXO | CKB Cell |
 |---------|--------------|----------|
 | Data | Just value | Arbitrary data |
-| Lock | Script hash | Programmable lock |
+| Lock | Script hash | Programmable lock scripts |
 | Type | None | Type scripts (validation) |
 | State | Stateless | State in cell data |
+| Assets | Native only | First-class assets |
+
+---
+
+### The First-Class Asset Principle
+
+**Ethereum's Problem**: Assets are ledger entries.
+
+```solidity
+// ERC-20: Your tokens are a NUMBER in someone else's CONTRACT
+contract USDC {
+    mapping(address => uint256) balances;  // ← Your "tokens" live here
+}
+// You don't own tokens. You own a row in their database.
+// Contract upgrade = your balance can change
+// Contract bug = your balance can vanish
+```
+
+**CKB's Solution**: Assets are cells you own.
+
+```
+┌─────────────────────────────────────────┐
+│  YOUR USDC Cell                         │
+│  ─────────────────────────────────────  │
+│  capacity: 142 CKB                      │
+│  data: 1000 USDC                        │
+│  lock: YOUR_LOCK (only you can spend)   │
+│  type: USDC_type (validates USDC rules) │
+└─────────────────────────────────────────┘
+    │
+    └── This cell is YOURS. Not an entry in someone's mapping.
+        No contract can take it. No upgrade can change it.
+        To move it, YOU must sign.
+```
+
+**First-class assets mean**:
+- **True ownership**: The asset IS the cell, not a pointer to state
+- **Permissionless transfer**: No contract call needed, just spend the cell
+- **Upgrade immunity**: Token issuer can't change YOUR cells
+- **Composability**: Any script can interact with any asset
+
+For VibeSwap: User deposits are THEIR cells. We can't rug them. Structurally impossible.
+
+---
+
+### Lock Scripts: Programmable Spending Conditions
+
+Every cell has a lock script that defines WHO can spend it.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Lock Script Examples                                   │
+│  ─────────────────────────────────────────────────────  │
+│                                                         │
+│  SECP256K1:     "Owner's signature required"           │
+│  MULTISIG:      "2 of 3 signatures required"           │
+│  TIMELOCK:      "Spendable after block 1000000"        │
+│  HTLC:          "Hash preimage OR timeout + signature" │
+│  COMMIT_REVEAL: "Only spendable during reveal phase"   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**For VibeSwap Commit-Reveal**:
+
+```
+Commit Cell Lock Script:
+┌─────────────────────────────────────────────────────────┐
+│  IF reveal_phase:                                       │
+│      require(hash(witness.order, witness.secret)        │
+│              == cell.data.commitment)                   │
+│      require(batch_id == current_batch)                 │
+│      → Allow spend to settlement                        │
+│  ELSE IF timeout:                                       │
+│      require(owner_signature)                           │
+│      → Allow refund to owner                            │
+│  ELSE:                                                  │
+│      → Reject (locked during commit phase)              │
+└─────────────────────────────────────────────────────────┘
+```
+
+The lock script IS the commit-reveal logic. Not a contract call. The cell itself enforces the rules.
+
+---
+
+### Type Scripts: Validation Logic
+
+Type scripts validate WHAT can be done with a cell.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Type Script: vibeswap_commit_type                      │
+│  ─────────────────────────────────────────────────────  │
+│  On CREATE:                                             │
+│    - Verify commitment format                           │
+│    - Verify deposit amount meets minimum                │
+│    - Verify batch_id is current or next                 │
+│                                                         │
+│  On SPEND:                                              │
+│    - Verify outputs follow settlement rules             │
+│    - Verify uniform clearing price applied              │
+│    - Verify no value extracted (conservation)           │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Lock script**: Who can spend (authorization)
+**Type script**: What spending means (validation)
+
+Separation of concerns at the protocol level.
+
+---
+
+### Inherent Parallelism: Not Theoretical, Structural
+
+**Why Ethereum can't parallelize well**:
+```
+TX1: DEX.swap(ETH→USDC)    ─┐
+TX2: DEX.swap(ETH→USDC)    ─┼─> Same contract state
+TX3: DEX.swap(ETH→USDC)    ─┘   Must be sequential
+```
+All three touch `DEX.reserves`. State conflict. Sequential execution.
+
+**Why CKB parallelizes naturally**:
+```
+TX1: Spend Alice's commit cell    ─┐
+TX2: Spend Bob's commit cell      ─┼─> Different cells
+TX3: Spend Carol's commit cell    ─┘   Parallel execution
+```
+Each transaction touches ONLY its input cells. No conflicts. True parallelism.
+
+**VibeSwap batch processing**:
+```
+┌─────────────────────────────────────────────────────────┐
+│  BATCH WITH 1000 COMMITS                                │
+│  ─────────────────────────────────────────────────────  │
+│                                                         │
+│  Ethereum approach:                                     │
+│    for commit in commits:                               │
+│        process(commit)  // Sequential: O(n) time        │
+│                                                         │
+│  CKB approach:                                          │
+│    parallel_process(all_commits)  // Parallel: O(1)*    │
+│    aggregate_and_settle()                               │
+│                                                         │
+│  *With sufficient nodes                                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+This isn't optimization. It's architecture.
+
+---
+
+### Security Model: Defense in Depth
+
+| Attack Vector | Account Model | CKB Cell Model |
+|---------------|---------------|----------------|
+| Reentrancy | Possible (requires guards) | **Impossible** (cells consumed) |
+| State manipulation | Global state attackable | **No global state** |
+| Contract upgrade rug | Owner can change logic | **Your cells, your rules** |
+| Flash loan exploitation | Borrow → attack → repay | **Atomic cells prevent** |
+| Front-running | Mempool visible | **Commit hides intent** |
+| Sandwich attacks | Shared liquidity pool | **Independent cells** |
+
+**The security isn't bolted on. It's structural.**
+
+---
 
 ### For VibeSwap on CKB
 
@@ -290,35 +456,53 @@ Nervos CKB enhances UTXO:
 ┌─────────────────────────────────────────┐
 │  Commit Cell                            │
 │  ─────────────────────────────────────  │
-│  capacity: 100 CKB                      │
+│  capacity: 142 CKB                      │
 │  data: {                                │
 │    commitment: hash(order || secret),   │
 │    batch_id: 12345,                     │
-│    deposit: 1000 USDC                   │
+│    deposit_amount: 1000,                │
+│    deposit_asset: USDC_type_hash        │
 │  }                                      │
 │  lock: commit_reveal_lock               │
 │  type: vibeswap_commit_type             │
 └─────────────────────────────────────────┘
+         │
+         │ User's deposit is a SEPARATE cell (first-class asset)
+         ▼
+┌─────────────────────────────────────────┐
+│  Deposit Cell                           │
+│  ─────────────────────────────────────  │
+│  capacity: 142 CKB                      │
+│  data: 1000 USDC                        │
+│  lock: commit_cell_lock (bound)         │
+│  type: USDC_type                        │
+└─────────────────────────────────────────┘
 ```
 
-**Smart contract logic with UTXO guarantees.**
+- **Commit cell**: Contains order commitment
+- **Deposit cell**: Contains actual assets (first-class)
+- **Lock binding**: Deposit can only move with valid reveal
+- **Type validation**: Settlement must follow clearing rules
 
-Best of both worlds.
+**Smart contract logic with UTXO guarantees. First-class assets with programmable rules.**
+
+Best of all worlds.
 
 ---
 
-## The VibeSwap + UTXO Synergy (1 min)
+## The VibeSwap + CKB Synergy (2 min)
 
-| VibeSwap Feature | UTXO Advantage |
-|------------------|----------------|
-| Commit-reveal | Natural fit, atomic commits |
-| Batch auctions | Parallel processing of commits |
-| Uniform clearing | Deterministic from inputs |
-| MEV resistance | No ordering games |
-| Formal proofs | Bounded state space |
-| Security | No reentrancy possible |
+| VibeSwap Feature | CKB Advantage |
+|------------------|---------------|
+| Commit-reveal | Lock scripts enforce phases natively |
+| Batch auctions | Inherent parallelism processes 1000s of commits |
+| Uniform clearing | Type scripts validate settlement rules |
+| MEV resistance | No global state to front-run |
+| User deposits | First-class assets—we CAN'T rug |
+| Formal proofs | Bounded state space, cell-level verification |
+| Security | Reentrancy impossible, no upgrade rugs |
 
-**We didn't choose UTXO arbitrarily. UTXO makes our guarantees provable.**
+**We didn't choose UTXO arbitrarily. CKB's cell model makes our guarantees provable AND enforceable.**
 
 ---
 
@@ -356,7 +540,9 @@ CKB Docs: [nervos docs]
 
 ---
 
-## Appendix: UTXO vs Account Comparison
+## Appendix: Model Comparison
+
+### UTXO vs Account
 
 | Property | Account Model | UTXO Model |
 |----------|---------------|------------|
@@ -369,19 +555,50 @@ CKB Docs: [nervos docs]
 | Smart contracts | Native | Via extensions (CKB) |
 | Developer familiarity | Higher (Ethereum) | Lower |
 
-### When Account Model Wins
-- Complex interdependent state
-- Familiar developer tooling
-- Existing ecosystem
+### CKB Cell Model Specifics
 
-### When UTXO Model Wins
-- Parallelism matters
-- Security guarantees matter
-- Formal verification needed
-- Privacy features planned
-- Fairness is a requirement
+| Feature | Description | VibeSwap Use |
+|---------|-------------|--------------|
+| **First-class assets** | Tokens are cells you own, not ledger entries | User deposits can't be rugged |
+| **Lock scripts** | Programmable spending conditions | Commit-reveal phase enforcement |
+| **Type scripts** | Validation logic for cell operations | Settlement rule verification |
+| **Cell consumption** | Inputs destroyed, outputs created | Atomic commits, no reentrancy |
+| **Data field** | Arbitrary data storage in cells | Order commitments, batch IDs |
+| **Capacity model** | State rent via CKB locking | Spam prevention built-in |
+
+### CKB Lock Script Patterns for VibeSwap
+
+```
+COMMIT_LOCK:
+  - During commit phase: locked (no spend)
+  - During reveal phase: spendable with valid preimage
+  - After timeout: refundable to owner
+
+SETTLEMENT_LOCK:
+  - Requires batch settlement transaction
+  - Validates uniform clearing price
+  - Ensures conservation of value
+
+LP_LOCK:
+  - Time-weighted withdrawal rights
+  - IL protection claim conditions
+  - Loyalty reward accumulation
+```
+
+### When Account Model Wins
+- Complex interdependent state (DeFi composability with existing protocols)
+- Familiar developer tooling (Solidity ecosystem)
+- Existing liquidity and users
+
+### When CKB Cell Model Wins
+- Parallelism is critical (high-throughput batching)
+- Security guarantees are non-negotiable (no reentrancy, no upgrade rugs)
+- Formal verification required (provable properties)
+- First-class asset ownership matters (true self-custody)
+- Fairness is a core requirement (deterministic execution)
 
 ---
 
 *The right model makes the right properties natural.*
-*UTXO makes fairness natural.*
+*CKB's cell model makes fairness natural.*
+*First-class assets make true ownership possible.*

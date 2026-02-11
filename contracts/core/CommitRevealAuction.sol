@@ -160,6 +160,23 @@ contract CommitRevealAuction is
     /// @notice Mapping of used PoW proof hashes (prevents replay)
     mapping(bytes32 => bool) public usedPoWProofs;
 
+    // ============ Security Fix #3: Shuffle Seed Entropy ============
+
+    /// @notice Block number when reveal phase ended (for secure shuffle seed)
+    mapping(uint64 => uint256) public batchRevealEndBlock;
+
+    // ============ Security Fix #4: Slashed Funds Recovery ============
+
+    /// @notice Slashed funds held when treasury transfer fails
+    uint256 public pendingSlashedFunds;
+
+    /// @notice Slashed amounts per user (for recovery if treasury was broken)
+    mapping(address => uint256) public userSlashedAmounts;
+
+    // ============ Security Fix #7: Excess ETH Refund ============
+
+    event ExcessETHRefundFailed(address indexed user, uint256 amount);
+
     // ============ Modifiers ============
 
     modifier onlyAuthorizedSettler() {
@@ -430,6 +447,16 @@ contract CommitRevealAuction is
         // Store secret for shuffle seed
         batchSecrets[currentBatchId].push(secret);
 
+        // FIX #7: Refund excess ETH beyond priority bid
+        uint256 excess = msg.value - priorityBid;
+        if (excess > 0) {
+            (bool refundSuccess, ) = msg.sender.call{value: excess}("");
+            // If refund fails, excess stays in contract (user's problem if they use a non-receivable contract)
+            if (!refundSuccess) {
+                emit ExcessETHRefundFailed(msg.sender, excess);
+            }
+        }
+
         emit OrderRevealed(
             commitId,
             msg.sender,
@@ -575,9 +602,11 @@ contract CommitRevealAuction is
 
             emit BatchPhaseChanged(currentBatchId, oldPhase, currentPhase);
 
-            // If moving to SETTLING, generate shuffle seed
+            // If moving to SETTLING, record reveal end block for secure seed generation
             if (currentPhase == BatchPhase.SETTLING && !batch.isSettled) {
-                batch.shuffleSeed = batchSecrets[currentBatchId].generateSeed();
+                // FIX #3: Record block number for unpredictable entropy
+                batchRevealEndBlock[currentBatchId] = block.number;
+                // Seed will be generated in settleBatch with block entropy
             }
         }
     }
@@ -592,9 +621,30 @@ contract CommitRevealAuction is
         if (phase != BatchPhase.SETTLING && phase != BatchPhase.SETTLED) revert BatchNotReady();
         if (batch.isSettled) revert AlreadySettled();
 
-        // Generate shuffle seed if not done
+        // FIX #3: Generate shuffle seed with unpredictable block entropy
+        // This prevents last revealer from computing favorable shuffle position
         if (batch.shuffleSeed == bytes32(0)) {
-            batch.shuffleSeed = batchSecrets[currentBatchId].generateSeed();
+            uint256 revealEndBlock = batchRevealEndBlock[currentBatchId];
+
+            // Get block entropy from after reveal phase ended
+            // If we're in the same block, use previous block hash
+            bytes32 blockEntropy;
+            if (revealEndBlock > 0 && block.number > revealEndBlock) {
+                // Use blockhash of reveal end block (unpredictable during reveal)
+                blockEntropy = blockhash(revealEndBlock);
+            } else {
+                // Fallback: use previous block hash + current block data
+                blockEntropy = keccak256(abi.encodePacked(
+                    blockhash(block.number - 1),
+                    block.timestamp,
+                    block.prevrandao  // Beacon chain randomness (post-merge)
+                ));
+            }
+
+            batch.shuffleSeed = batchSecrets[currentBatchId].generateSeedSecure(
+                blockEntropy,
+                currentBatchId
+            );
         }
 
         batch.phase = BatchPhase.SETTLED;
@@ -1117,7 +1167,7 @@ contract CommitRevealAuction is
 
     /**
      * @notice Slash an invalid commitment
-     * @dev Treasury transfer failure doesn't block user refund
+     * @dev FIX #4: Treasury failure holds funds in contract instead of refunding user
      *      Uses PROTOCOL CONSTANT slash rate (uniform for all)
      */
     function _slashCommitment(bytes32 commitId) internal {
@@ -1131,21 +1181,29 @@ contract CommitRevealAuction is
 
         uint256 actualSlashed = 0;
 
-        // Send slashed amount to treasury (don't revert if fails, track actual amount)
-        if (slashAmount > 0 && treasury != address(0)) {
-            (bool success, ) = treasury.call{value: slashAmount}("");
-            if (success) {
-                actualSlashed = slashAmount;
+        // FIX #4: Always slash - never refund slash amount to user
+        if (slashAmount > 0) {
+            if (treasury != address(0)) {
+                (bool success, ) = treasury.call{value: slashAmount}("");
+                if (success) {
+                    actualSlashed = slashAmount;
+                } else {
+                    // FIX #4: Treasury failed - hold funds in contract, not refund to user
+                    pendingSlashedFunds += slashAmount;
+                    userSlashedAmounts[commitment.depositor] += slashAmount;
+                    actualSlashed = slashAmount; // Still counts as slashed
+                    emit SlashedFundsHeld(commitId, commitment.depositor, slashAmount);
+                }
             } else {
-                // If treasury transfer fails, refund the slash amount to user
-                refundAmount += slashAmount;
+                // No treasury configured - hold in contract
+                pendingSlashedFunds += slashAmount;
+                userSlashedAmounts[commitment.depositor] += slashAmount;
+                actualSlashed = slashAmount;
+                emit SlashedFundsHeld(commitId, commitment.depositor, slashAmount);
             }
-        } else {
-            // No treasury configured, refund to user
-            refundAmount += slashAmount;
         }
 
-        // Refund remainder to user
+        // Refund non-slashed portion to user
         if (refundAmount > 0) {
             (bool success, ) = commitment.depositor.call{value: refundAmount}("");
             // If refund fails, funds stay in contract (user can try again)
@@ -1157,6 +1215,27 @@ contract CommitRevealAuction is
         }
 
         emit OrderSlashed(commitId, commitment.depositor, actualSlashed);
+    }
+
+    /**
+     * @notice Withdraw pending slashed funds to treasury (admin function)
+     * @dev FIX #4: Allows retry of treasury transfer for held funds
+     */
+    function withdrawPendingSlashedFunds() external onlyOwner {
+        require(treasury != address(0), "No treasury configured");
+        require(pendingSlashedFunds > 0, "No pending funds");
+
+        uint256 amount = pendingSlashedFunds;
+        pendingSlashedFunds = 0;
+
+        (bool success, ) = treasury.call{value: amount}("");
+        if (!success) {
+            // Restore the pending amount if transfer fails
+            pendingSlashedFunds = amount;
+            revert TransferFailed();
+        }
+
+        emit PendingSlashedFundsWithdrawn(amount);
     }
 
     /**

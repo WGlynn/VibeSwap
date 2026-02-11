@@ -100,6 +100,15 @@ interface ICommitRevealAuction {
         uint256 powValue
     );
 
+    // FIX #4: Events for slash fund handling
+    event SlashedFundsHeld(
+        bytes32 indexed commitId,
+        address indexed trader,
+        uint256 amount
+    );
+
+    event PendingSlashedFundsWithdrawn(uint256 amount);
+
     // Note: PoolConfigCreated event is defined in PoolComplianceConfig library
 
     // ============ Functions ============

@@ -11,6 +11,8 @@ library DeterministicShuffle {
      * @notice Generate shuffle seed from array of secrets
      * @param secrets Array of revealed order secrets
      * @return seed Combined seed for shuffle
+     * @dev SECURITY NOTE: This uses pure XOR which allows last revealer to predict outcome.
+     *      Use generateSeedSecure() for production which adds unpredictable entropy.
      */
     function generateSeed(bytes32[] memory secrets) internal pure returns (bytes32 seed) {
         seed = bytes32(0);
@@ -19,6 +21,37 @@ library DeterministicShuffle {
         }
         // Add length to prevent empty array issues
         seed = keccak256(abi.encodePacked(seed, secrets.length));
+    }
+
+    /**
+     * @notice Generate shuffle seed with additional unpredictable entropy (FIX #3)
+     * @param secrets Array of revealed order secrets
+     * @param blockEntropy Additional entropy from block data (blockhash, timestamp)
+     * @param batchId Batch identifier for uniqueness
+     * @return seed Combined seed that last revealer cannot predict
+     * @dev The blockEntropy should be from a FUTURE block (after reveal phase ends)
+     *      This prevents the last revealer from computing the final seed before revealing
+     */
+    function generateSeedSecure(
+        bytes32[] memory secrets,
+        bytes32 blockEntropy,
+        uint64 batchId
+    ) internal pure returns (bytes32 seed) {
+        // Step 1: XOR all secrets (commits to all participants)
+        seed = bytes32(0);
+        for (uint256 i = 0; i < secrets.length; i++) {
+            seed = seed ^ secrets[i];
+        }
+
+        // Step 2: Add unpredictable entropy that wasn't known during reveal phase
+        // blockEntropy should be blockhash(revealEndBlock) which is unknown until AFTER reveals
+        // This makes it impossible for last revealer to compute favorable position
+        seed = keccak256(abi.encodePacked(
+            seed,
+            blockEntropy,      // Unpredictable at reveal time
+            batchId,           // Unique per batch
+            secrets.length     // Prevent empty array issues
+        ));
     }
 
     /**

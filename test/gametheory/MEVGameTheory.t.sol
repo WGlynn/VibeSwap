@@ -57,8 +57,7 @@ contract MEVGameTheoryTest is Test {
             CommitRevealAuction.initialize.selector,
             owner,
             treasury,
-            8,  // commit duration
-            2   // reveal duration
+            address(0) // complianceRegistry (durations are now protocol constants)
         );
         ERC1967Proxy auctionProxy = new ERC1967Proxy(address(auctionImpl), auctionInit);
         auction = CommitRevealAuction(payable(address(auctionProxy)));

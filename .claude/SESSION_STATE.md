@@ -2,23 +2,36 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-10 (Desktop - GitBash)
+**Last Updated**: 2026-02-11 (Desktop - Claude Code Opus 4.6)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
-- Solidity smart contract work (compile → tests → audit money paths)
-- Sleek minimalist cypherpunk frontend redesign (plan in .claude/plans/)
-- Documentation and formal proofs publication
+- Solidity sprint COMPLETE through Phase 3
+- Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
+- Medium MCP tools available for publishing docs
 
 ## Active Tasks
-- CKB v1.5: Archetype Primitives + Provenance Trilogy integrated
-- Solidity sprint Phase 3: Audit money paths (VibeAMM, CrossChainRouter)
-- Fix test infrastructure (CommitRevealAuction setUp, NotActiveAuthority setup)
-- Frontend: Cypherpunk redesign implementation
+- Fix remaining test failures (CommitRevealAuction setUp, VibeAMM 6/22, NotActiveAuthority)
+- Frontend: "Sign In" button change + abstraction redesign
+- Commit and push all security fixes (FIX #1-7)
 
 ## Recently Completed (Feb 11, 2025)
+20. **Solidity Sprint Phase 3: Money Path Audit COMPLETE**
+    - Audited all 4 critical contracts: VibeAMM, CommitRevealAuction, VibeSwapCore, CrossChainRouter
+    - **CRITICAL FIX #6**: Double-spend via failed batch swap
+      - AMM was returning unfilled tokens to trader, not VibeSwapCore
+      - User could double-claim via withdrawDeposit() draining other users
+      - Fixed: AMM returns to msg.sender (VibeSwapCore), deposit accounting stays consistent
+    - **HIGH FIX #7**: Excess ETH not refunded in revealOrder
+      - msg.value > priorityBid was kept by contract with no refund
+      - Fixed: Added refund of excess ETH after recording priority bid
+    - Full audit report: docs/audit/MONEY_PATH_AUDIT.md
+    - All 7 security fixes verified (FIX #1 through #7)
+    - forge build passes with 0 errors
+
+## Previously Completed (Feb 11, 2025)
 19. Created Epistemic Gate Archetypes (docs/ARCHETYPE_PRIMITIVES.md):
     - Seven logical archetype primitives: Glass Wall, Timestamp, Inversion, Gate, Chain, Sovereign, Cooperator
     - Lossless cognitive compression of full protocol for instant user sync

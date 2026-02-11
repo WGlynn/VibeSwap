@@ -55,7 +55,8 @@ contract StressTest is Test {
         bytes memory auctionInit = abi.encodeWithSelector(
             CommitRevealAuction.initialize.selector,
             owner,
-            treasury
+            treasury,
+            address(0) // complianceRegistry
         );
         ERC1967Proxy auctionProxy = new ERC1967Proxy(address(auctionImpl), auctionInit);
         auction = CommitRevealAuction(payable(address(auctionProxy)));

@@ -1,0 +1,24 @@
+version: "3.9"
+
+# Development overrides - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  frontend:
+    build:
+      args:
+        VITE_PRODUCTION_MODE: "false"
+    ports:
+      - "3000:80"
+
+  backend:
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      - ./backend/src:/app/src:ro
+
+  nginx:
+    ports:
+      - "8080:80"

@@ -10,7 +10,11 @@ import { VaultProvider } from './hooks/useVault'
 import { BatchProvider } from './hooks/useBatchState'
 import { IncentivesProvider } from './hooks/useIncentives'
 import { TransactionsProvider } from './hooks/useTransactions'
+import { validateEnvironment } from './utils/envValidation'
 import './index.css'
+
+// Validate environment on startup
+validateEnvironment()
 
 // Signal successful load to prevent timeout error
 window.__vibeswapLoaded = true

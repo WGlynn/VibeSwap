@@ -127,6 +127,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
     { path: '/board', label: 'Discussions', icon: '📢' },
     { path: '/forum', label: 'Community', icon: '💬' },
+    { path: '/prompts', label: 'Prompt Feed', icon: '>' },
     { path: '/docs', label: 'Learn', icon: '📚' },
     { path: '/about', label: 'About', icon: '💡' },
   ]

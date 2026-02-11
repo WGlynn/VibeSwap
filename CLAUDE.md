@@ -2,6 +2,22 @@
 
 ---
 
+## SESSION START PROTOCOL
+
+**On EVERY new session or after context compression:**
+
+```
+1. Read .claude/KNOWLEDGE_BASE.md     → Core alignment primitives
+2. Read CLAUDE.md (this file)          → Project context
+3. Read .claude/SESSION_STATE.md       → Recent work state
+4. git pull origin master              → Latest code
+5. Resume work
+```
+
+**Full Knowledge Base**: `.claude/KNOWLEDGE_BASE.md` (GitHub synced)
+
+---
+
 ## THE CAVE PHILOSOPHY (NEVER COMPRESS - CORE ALIGNMENT)
 
 > *"Tony Stark was able to build this in a cave! With a box of scraps!"*

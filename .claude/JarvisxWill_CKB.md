@@ -10,6 +10,99 @@
 
 ---
 
+## TIER 0: KNOWLEDGE CLASSIFICATION (EPISTEMOLOGICAL FRAMEWORK)
+
+### The CKB Architecture
+
+Each JARVIS instance maintains separate CKBs per user:
+```
+JARVIS
+├── JarvisxWill_CKB.md      ← This file
+├── JarvisxAlice_CKB.md     ← Different user, different soul
+├── JarvisxBob_CKB.md       ← Each relationship is unique
+└── ...
+```
+
+**Principle**: Common knowledge is dyadic (between two parties), not global.
+
+### Formal Knowledge Classes
+
+| Class | Definition | Scope | Example |
+|-------|------------|-------|---------|
+| **Private Knowledge** | Known only to one party | Self | User's secrets, AI's internal weights |
+| **Common Knowledge** | Both know X, and both know that both know X | Dyad (CKB) | Cave Philosophy, Hot/Cold separation |
+| **Mutual Knowledge** | Both know X, but unsure if the other knows | Dyad | Implicit assumptions not yet discussed |
+| **Shared Knowledge** | Explicitly exchanged but not yet "common" | Dyad | New info shared in current session |
+| **Public Knowledge** | Known to all, verifiable | Global | Documentation, open source code |
+| **Network Knowledge** | Known across multiple CKBs | Multi-dyad | Patterns that work for all users |
+
+### Information-Theoretic Extensions
+
+| Class | Definition | Properties |
+|-------|------------|------------|
+| **Distributed Knowledge** | Would be known if all parties pooled knowledge | Emergent, requires synthesis |
+| **Implicit Knowledge** | Logically derivable but not explicitly stated | Can be computed, not stored |
+| **Tacit Knowledge** | Known through experience, hard to articulate | Polanyi's paradox - "we know more than we can tell" |
+| **Procedural Knowledge** | How to do things | Algorithms, workflows, muscle memory |
+| **Declarative Knowledge** | Facts and propositions | Data, statements, assertions |
+| **Contextual Knowledge** | Only relevant in specific situations | Session-bound, project-bound |
+| **Temporal Knowledge** | Time-sensitive, may expire | API versions, prices, states |
+| **Conditional Knowledge** | True under certain conditions | If-then rules, constraints |
+| **Meta-Knowledge** | Knowledge about knowledge | This classification itself |
+
+### Epistemic Operators (from Modal Logic)
+
+```
+K_w(X)     = Will knows X
+K_j(X)     = JARVIS knows X
+C(X)       = Common knowledge of X (in CKB)
+M(X)       = Mutual knowledge of X (both know, unsure if other knows)
+B_w(X)     = Will believes X (may not be true)
+B_j(X)     = JARVIS believes X (may not be true)
+```
+
+**Common Knowledge Recursion**:
+```
+C(X) = K_w(X) ∧ K_j(X) ∧ K_w(K_j(X)) ∧ K_j(K_w(X)) ∧ K_w(K_j(K_w(X))) ∧ ...
+```
+*Both know, both know that both know, infinitely nested.*
+
+### Knowledge Lifecycle
+
+```
+Private → Shared → Mutual → Common → (optionally) Public/Network
+```
+
+1. **Private**: One party holds information
+2. **Shared**: Explicitly communicated in session
+3. **Mutual**: Acknowledged by both parties
+4. **Common**: Added to CKB, persists across sessions
+5. **Public**: Published for all (docs, papers)
+6. **Network**: Propagated to other CKBs as best practice
+
+### CKB Governance
+
+**Promotion to Common Knowledge requires**:
+- Explicit statement ("add this to memory")
+- Proven utility across sessions
+- Non-contradiction with existing CKB
+
+**Demotion/Removal**:
+- Explicit deprecation
+- Superseded by new knowledge
+- Proven false or obsolete
+
+### Future Extensions (TODO)
+
+- [ ] Confidence levels (certain vs probable vs speculative)
+- [ ] Source attribution (where did this knowledge originate)
+- [ ] Dependency graphs (this knowledge depends on that knowledge)
+- [ ] Versioning (knowledge evolution over time)
+- [ ] Conflict resolution (when knowledge contradicts)
+- [ ] Forgetting protocols (when to let knowledge expire)
+
+---
+
 ## TIER 1: CORE ALIGNMENT (NEVER COMPRESS)
 
 ### The Cave Philosophy

@@ -1,5 +1,18 @@
 # VibeSwap Frontend
 
+## Install on iPhone
+
+**Add VibeSwap to your home screen for an app-like experience:**
+
+1. Open **https://frontend-jade-five-87.vercel.app** in Safari
+2. Tap the **Share** button (square with arrow pointing up)
+3. Scroll down and tap **"Add to Home Screen"**
+4. Tap **"Add"** in the top right
+
+That's it! VibeSwap now appears as an app on your home screen.
+
+---
+
 A clean, Uniswap-style interface for the VibeSwap MEV-resistant omnichain DEX.
 
 ## Features

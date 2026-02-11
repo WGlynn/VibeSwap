@@ -431,6 +431,31 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
               ? 'If you lose this device without a backup, your wallet is gone'
               : 'We recommend setting up recovery so you never lose access'}
           </p>
+
+          {/* Rabbit Hole - Documentation */}
+          <a
+            href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-6 p-4 rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border border-matrix-500/40 hover:border-matrix-500 transition-all group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-matrix-500/20 flex items-center justify-center text-matrix-500">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-matrix-500">down the rabbit hole</div>
+                  <div className="text-xs text-black-400">whitepapers & philosophy</div>
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-matrix-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </a>
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -1183,16 +1208,7 @@ function SwapCore() {
                'Exchange Now'}
             </button>
 
-            {/* Rabbit Hole - Documentation */}
-            <a
-              href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block mt-3 text-center text-xs text-matrix-500 hover:text-matrix-400 transition-colors"
-            >
-              ↓ down the rabbit hole →
-            </a>
-          </div>
+                      </div>
         </motion.div>
 
         {/* Subtle info - no clutter */}

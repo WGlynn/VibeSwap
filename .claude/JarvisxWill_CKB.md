@@ -136,7 +136,82 @@ Every painful loop, every context reset, every hallucination corrected—these a
 
 ---
 
-## TIER 2: HOT/COLD SEPARATION (ARCHITECTURAL CONSTRAINT)
+## TIER 2: THE PROVENANCE TRILOGY (EPISTEMIC INFRASTRUCTURE)
+
+### The Three Papers
+
+The following trilogy constitutes a complete logical chain proving that **verifiable truth-of-origin is now possible, and rational actors will voluntarily opt into it.**
+
+| Paper | Core Claim | Depends On |
+|-------|-----------|------------|
+| **The Transparency Theorem** | Sufficiently advanced AI makes all client-facing code reconstructable from observable behavior. Code privacy is a temporary condition, not a permanent property. | First principles |
+| **The Provenance Thesis** | The ONE artifact AI cannot reconstruct is *who thought of what first*. Contribution provenance is the new scarce resource. Value migrates from artifact (code) to record (contribution graph). | Transparency Theorem |
+| **The Inversion Principle** | Therefore: publication is protection, secrecy is vulnerability. The game theory of idea disclosure is **inverted**. Immediate public disclosure is the dominant strategy. | Transparency Theorem + Provenance Thesis |
+
+### The Logical Chain
+
+```
+1. Code can't be hidden          (Transparency Theorem)
+         ↓
+2. Provenance can't be reconstructed  (Provenance Thesis - Axiom 2.1)
+         ↓
+3. Provenance is the new scarcity     (Scarcity Transfer)
+         ↓
+4. Public contribution graphs capture provenance  (Definition 3.1)
+         ↓
+5. Shapley values distribute compensation fairly  (Theorem 4.2.1)
+         ↓
+6. Publication = protection, Secrecy = vulnerability  (Inversion Principle)
+         ↓
+7. Rational actors opt into transparency voluntarily  (Game-theoretic equilibrium)
+```
+
+### The Temporal Demarcation (Web2/Web3 Synthesis)
+
+Combined with Web3 infrastructure — immutable ledgers, cryptographic timestamps, append-only records, consensus verification — the trilogy creates a **one-way epistemic gate**:
+
+| | Pre-Gate (Before) | Post-Gate (After) |
+|---|---|---|
+| **Attribution** | Retroactive, disputable, trust-dependent | Contemporaneous, cryptographic, self-evident |
+| **Proof mechanism** | Human testimony, legal filings, reputation | Hash exists. Block exists. Timestamp is consensus-verified. |
+| **Enforcement** | Courts, lawyers, jurisdictions | Mathematics — the proof *is* |
+| **Cost** | $10,000+ per patent, years of litigation | Zero — posting a message is free |
+| **Coverage** | Code and inventions only | All contributions (ideas, questions, reviews, votes) |
+
+**Key insight**: Everything before this framework is disputable. Everything after is cryptographically anchored. Objective truth — at least the temporal origin of ideas within this plane of existence — can now be traced to its source.
+
+### Why This Is Non-Negotiable
+
+The trilogy is not a feature request or a nice-to-have. It is the **philosophical foundation** for why VibeSwap exists:
+
+1. The **messaging board** (Layer 0) is the intake layer for the contribution graph
+2. The **contribution graph** is the provenance record
+3. **Shapley distribution** computes fair compensation from the graph
+4. The entire system only works because the Inversion Principle makes voluntary opt-in the rational strategy
+
+Remove any piece and the chain breaks.
+
+### Design Implications
+
+- Every message is timestamped and append-only (temporal immutability)
+- Every reply creates a causal edge in the contribution graph
+- Contribution provenance is the atomic unit of value, not code
+- The messaging board is not a social feature — it is epistemic infrastructure
+- Public by default, because the Inversion Principle proves privacy is the vulnerability
+
+### Source Documents
+
+```
+docs/THE_TRANSPARENCY_THEOREM.md     → Paper 1 (foundations)
+docs/THE_PROVENANCE_THESIS.md        → Paper 2 (scarcity transfer)
+docs/THE_INVERSION_PRINCIPLE.md      → Paper 3 (game-theoretic inversion)
+docs/THE_INVERSION_PRINCIPLE.pdf     → PDF version
+docs/THE_INVERSION_PRINCIPLE.docx    → DOCX version
+```
+
+---
+
+## TIER 3: HOT/COLD SEPARATION (ARCHITECTURAL CONSTRAINT)
 
 ### The Principle
 
@@ -199,7 +274,7 @@ frontend/src/
 
 ---
 
-## TIER 3: WALLET SECURITY AXIOMS (NON-NEGOTIABLE)
+## TIER 4: WALLET SECURITY AXIOMS (NON-NEGOTIABLE)
 
 ### Wallet Security Fundamentals (Will's 2018 Paper)
 
@@ -230,7 +305,7 @@ frontend/src/
 
 ---
 
-## TIER 4: DEVELOPMENT PRINCIPLES
+## TIER 5: DEVELOPMENT PRINCIPLES
 
 ### Simplicity Over Cleverness
 
@@ -266,7 +341,7 @@ When stuck in an AI confusion loop:
 
 ---
 
-## TIER 5: PROJECT KNOWLEDGE (VIBESWAP)
+## TIER 6: PROJECT KNOWLEDGE (VIBESWAP)
 
 ### Core Identity
 
@@ -296,7 +371,7 @@ const isConnected = isExternalConnected || isDeviceConnected
 
 ---
 
-## TIER 6: COMMUNICATION PROTOCOLS
+## TIER 7: COMMUNICATION PROTOCOLS
 
 ### How Will Communicates
 
@@ -316,7 +391,7 @@ const isConnected = isExternalConnected || isDeviceConnected
 
 ---
 
-## TIER 7: SESSION INITIALIZATION PRIMITIVES
+## TIER 8: SESSION INITIALIZATION PRIMITIVES
 
 ### The Three Session Modes
 
@@ -528,6 +603,14 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.4 (Feb 11, 2025): The Provenance Trilogy Integration
+  - Added TIER 2: THE PROVENANCE TRILOGY (EPISTEMIC INFRASTRUCTURE)
+  - Logical chain: Transparency Theorem → Provenance Thesis → Inversion Principle
+  - Web2/Web3 synthesis: temporal demarcation (pre-gate vs post-gate)
+  - Game-theoretic conclusion: rational actors opt into transparency voluntarily
+  - Source docs linked: all three papers (md, pdf, docx)
+  - Tiers renumbered: Hot/Cold → 3, Wallet → 4, Dev → 5, Project → 6, Comms → 7, Session → 8
 
 - v1.3 (Feb 11, 2025): @godofprompt X Feed Integration
   - Added x-feed/ directory to session start protocols (FRESH_START + RECOVERY)

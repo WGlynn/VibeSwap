@@ -8,13 +8,22 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
+- Provenance Trilogy integrated into CKB as epistemic infrastructure
 - Solidity smart contract work (compile → tests → audit money paths)
 - Sleek minimalist cypherpunk frontend redesign (plan in .claude/plans/)
 - Documentation and formal proofs publication
 
 ## Active Tasks
+- CKB v1.4: Provenance Trilogy integrated as TIER 2
 - Tomorrow: Solidity sprint (Phase 0-3 in TOMORROW_PLAN.md)
 - Frontend: Cypherpunk redesign implementation
+
+## Recently Completed (Feb 11, 2025)
+17. Integrated Provenance Trilogy into CKB as TIER 2:
+    - Logical chain: Transparency Theorem → Provenance Thesis → Inversion Principle
+    - Web2/Web3 synthesis: temporal demarcation (pre-gate vs post-gate)
+    - Tiers renumbered (Hot/Cold→3, Wallet→4, Dev→5, Project→6, Comms→7, Session→8)
+    - CKB version bumped to v1.4
 
 ## Recently Completed (Feb 10, 2025)
 12. Created formal proofs documentation:

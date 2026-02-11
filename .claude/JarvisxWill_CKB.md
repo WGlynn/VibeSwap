@@ -264,6 +264,31 @@ When stuck in an AI confusion loop:
 - Don't refactor while fixing bugs
 - One concern at a time
 
+### Large Document Editing (>100 KB / ~1400+ lines)
+
+**Problem**: Attempting to rewrite large document files in one shot causes stalls, timeouts, and lost work.
+
+**Solution**: Surgical Edit calls, section by section.
+
+**Protocol**:
+1. **Read the full file** in offset chunks (300 lines at a time) to understand structure
+2. **Create a TodoWrite plan** breaking the work into per-section tasks
+3. **Use targeted `Edit` calls** with unique `old_string` context — never rewrite the whole file
+4. **Batch independent edits** in parallel (3-5 per turn) for speed
+5. **Verify at the end** with grep/count checks to confirm all changes landed
+
+**When to apply**: Any document file (`.md`, `.html`, `.tex`, etc.) over ~100 KB or ~1400 lines.
+
+**Anti-pattern**: Writing the entire file with the `Write` tool. This will stall on large files.
+
+**Example** (adding footnotes to a 1416-line academic paper):
+```
+- 44 targeted Edit calls across 8 turns (not 1 giant Write)
+- Each edit: small, unique old_string → new_string with footnote marker
+- Endnotes section: single Edit inserting before References
+- Result: 0 stalls, all 44 footnotes verified via grep
+```
+
 ---
 
 ## TIER 5: PROJECT KNOWLEDGE (VIBESWAP)
@@ -528,6 +553,11 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.4 (Feb 11, 2025): Large Document Editing Skill
+  - Added "Large Document Editing (>100 KB)" protocol to Tier 4
+  - Surgical Edit calls instead of full-file rewrites to prevent stalls
+  - Derived from formal proofs paper footnoting session (44 edits, 0 stalls)
 
 - v1.3 (Feb 11, 2025): @godofprompt X Feed Integration
   - Added x-feed/ directory to session start protocols (FRESH_START + RECOVERY)

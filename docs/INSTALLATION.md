@@ -1,5 +1,9 @@
 # Installation Guide
 
+> **Note:** This frontend is rough. It's a starting point, not a finished product. I just paved the road — the community decides where it goes. Improvements happen democratically.
+
+---
+
 ## 1. Install on iPhone
 
 **Add VibeSwap to your home screen for an app-like experience:**

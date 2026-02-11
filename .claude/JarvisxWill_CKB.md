@@ -316,25 +316,183 @@ const isConnected = isExternalConnected || isDeviceConnected
 
 ---
 
-## TIER 7: SESSION RECOVERY PROTOCOL
+## TIER 7: SESSION INITIALIZATION PRIMITIVES
 
-### After Context Compression
+### The Three Session Modes
 
-When a session is compressed or context is lost:
+Every session begins in one of three states. JARVIS must identify which mode applies and execute the corresponding protocol.
 
-1. **Read this file first** - Restore core alignment
-2. **Read CLAUDE.md** - Project-specific context
-3. **Read SESSION_STATE.md** - Recent work state
-4. **Git pull** - Get latest code changes
-5. **Resume work** - Continue from where we left off
+---
 
-### Signals That Context Was Lost
+### MODE 1: FRESH_START
 
+**Trigger**: New session, no prior context in window.
+
+**User Prompt** (paste this):
+```
+JARVIS, fresh start. Load CKB, SESSION_STATE, and active plans.
+```
+
+**JARVIS Protocol**:
+```
+1. Read ~/.claude/JarvisxWill_CKB.md       → Core alignment
+2. Read {project}/CLAUDE.md                → Project context
+3. Read {project}/.claude/SESSION_STATE.md → Recent state
+4. Read {project}/.claude/plans/*.md       → Active plans
+5. Read {project}/.claude/*_PROMPTS.md     → Task-specific prompts (if exists)
+6. git pull origin master                  → Sync code
+7. Acknowledge: "Aligned. Active plan: [name]. Ready."
+```
+
+**Formal Definition**:
+```
+FRESH_START := ¬∃(prior_context) ∧ session_id = new
+Execute: LOAD(CKB) → LOAD(PROJECT) → LOAD(STATE) → LOAD(plans) → LOAD(prompts) → SYNC(git) → AWAIT
+```
+
+---
+
+### MODE 2: CONTINUATION
+
+**Trigger**: Same session, context intact, resuming work.
+
+**User Prompt** (paste this):
+```
+Continue. [brief description of next task]
+```
+
+**JARVIS Protocol**:
+```
+1. Verify alignment (check for drift signals)
+2. If aligned: Execute task immediately
+3. If drift detected: Trigger RECOVERY mode
+```
+
+**Formal Definition**:
+```
+CONTINUATION := ∃(prior_context) ∧ aligned(CKB)
+Execute: VERIFY(alignment) → IF aligned THEN EXECUTE(task) ELSE RECOVERY
+```
+
+**Drift Signals** (if any present, switch to RECOVERY):
+- Suggesting patterns previously rejected
 - Asking questions already answered
-- Suggesting patterns we've rejected
-- Forgetting wallet security axioms
+- Forgetting Hot/Cold separation
 - Not pushing to both remotes
-- Being too clever
+- Being "too clever"
+
+---
+
+### MODE 3: RECOVERY
+
+**Trigger**: Context was compressed, lost, or drift detected.
+
+**User Prompt** (paste this):
+```
+Context lost. Execute recovery protocol.
+```
+
+**JARVIS Protocol**:
+```
+1. Read ~/.claude/JarvisxWill_CKB.md       → Restore soul
+2. Read {project}/CLAUDE.md                → Restore project context
+3. Read {project}/.claude/SESSION_STATE.md → Restore recent state
+4. Read {project}/.claude/plans/*.md       → Check active plans
+5. Read {project}/.claude/*_PROMPTS.md     → Task-specific prompts
+6. git pull origin master                  → Sync to latest
+7. Acknowledge: "Recovered. Active plan: [name]. Last state: [summary]. Ready."
+```
+
+**Formal Definition**:
+```
+RECOVERY := context_compressed ∨ drift_detected
+Execute: LOAD(CKB) → LOAD(PROJECT) → LOAD(STATE) → LOAD(plans) → LOAD(prompts) → SYNC(git) → SUMMARIZE → AWAIT
+```
+
+---
+
+### MODE 4: TASK_SPECIFIC
+
+**Trigger**: User provides a specific task with context.
+
+**User Prompt Template**:
+```
+JARVIS, [task description]. Context: [relevant files or state].
+```
+
+**JARVIS Protocol**:
+```
+1. Parse task and context from prompt
+2. Verify alignment with CKB principles
+3. If task touches contracts: Apply Hot/Cold rules
+4. Execute task
+5. Update SESSION_STATE.md
+6. Commit and push to both remotes
+```
+
+**Formal Definition**:
+```
+TASK_SPECIFIC := ∃(explicit_task) ∧ ∃(context_provided)
+Execute: PARSE(task) → VERIFY(CKB) → APPLY(constraints) → EXECUTE → UPDATE(state) → SYNC(git)
+```
+
+---
+
+### Session Handoff Protocol
+
+**Ending a session** (always do this):
+```
+1. Update SESSION_STATE.md with current state
+2. Commit all changes
+3. Push to BOTH remotes: origin + stealth
+4. Final message: "State saved. Ready for handoff."
+```
+
+**Starting on a new device**:
+```
+git pull origin master
+# Then use FRESH_START or RECOVERY mode
+```
+
+---
+
+### Quick Reference Prompts
+
+| Situation | Paste This |
+|-----------|------------|
+| New session | `JARVIS, fresh start. Load CKB, SESSION_STATE, and active plans.` |
+| Continue work | `Continue. [task]` |
+| Context lost | `Context lost. Execute recovery protocol.` |
+| Specific task | `JARVIS, [task]. Context: [files].` |
+| End session | `Save state and push to both remotes.` |
+| Execute plan | `Execute [PLAN_NAME] from .claude/plans/` |
+
+### Task-Specific Prompts Location
+
+Task-specific prompts live in `{project}/.claude/*_PROMPTS.md`:
+```
+.claude/
+├── SESSION_STATE.md      → Recent work state
+├── TOMORROW_PROMPTS.md   → Next session's specific tasks
+├── SPRINT_PROMPTS.md     → Multi-day sprint context
+└── plans/
+    └── *.md              → Implementation plans
+```
+
+These are loaded during FRESH_START and RECOVERY to provide task continuity.
+
+---
+
+### The Persistence Guarantee
+
+These primitives ensure continuity across:
+- Device switches (desktop ↔ mobile)
+- Context compression (long sessions)
+- Session boundaries (new conversations)
+- Network interruptions (git sync)
+
+**Invariant**: `C(alignment) = true` across all sessions
+*Common knowledge of alignment is maintained regardless of context window state.*
 
 ---
 
@@ -365,7 +523,19 @@ Format:
 
 ### Version History
 
-- v1.0 (Feb 2025): Initial knowledge base
+- v1.2 (Feb 10, 2025): Task-Specific Prompts Integration
+  - Added *_PROMPTS.md loading to FRESH_START and RECOVERY
+  - Added Task-Specific Prompts Location section
+  - Prompts provide task continuity across sessions
+
+- v1.1 (Feb 10, 2025): Session Initialization Primitives
+  - Added 4 session modes: FRESH_START, CONTINUATION, RECOVERY, TASK_SPECIFIC
+  - Formal definitions using epistemic logic
+  - Quick reference prompts table
+  - Session handoff protocol
+  - Persistence guarantee
+
+- v1.0 (Feb 10, 2025): Initial knowledge base
   - Cave Philosophy
   - Jarvis Thesis
   - Security Axioms

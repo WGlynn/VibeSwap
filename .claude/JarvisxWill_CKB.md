@@ -340,14 +340,15 @@ JARVIS, fresh start. Load CKB, SESSION_STATE, and active plans.
 3. Read {project}/.claude/SESSION_STATE.md → Recent state
 4. Read {project}/.claude/plans/*.md       → Active plans
 5. Read {project}/.claude/*_PROMPTS.md     → Task-specific prompts (if exists)
-6. git pull origin master                  → Sync code
-7. Acknowledge: "Aligned. Active plan: [name]. Ready."
+6. Read {project}/.claude/x-feed/prompts.md → @godofprompt self-improvement prompts
+7. git pull origin master                  → Sync code
+8. Acknowledge: "Aligned. Active plan: [name]. Ready."
 ```
 
 **Formal Definition**:
 ```
 FRESH_START := ¬∃(prior_context) ∧ session_id = new
-Execute: LOAD(CKB) → LOAD(PROJECT) → LOAD(STATE) → LOAD(plans) → LOAD(prompts) → SYNC(git) → AWAIT
+Execute: LOAD(CKB) → LOAD(PROJECT) → LOAD(STATE) → LOAD(plans) → LOAD(prompts) → LOAD(x-feed) → SYNC(git) → AWAIT
 ```
 
 ---
@@ -399,14 +400,15 @@ Context lost. Execute recovery protocol.
 3. Read {project}/.claude/SESSION_STATE.md → Restore recent state
 4. Read {project}/.claude/plans/*.md       → Check active plans
 5. Read {project}/.claude/*_PROMPTS.md     → Task-specific prompts
-6. git pull origin master                  → Sync to latest
-7. Acknowledge: "Recovered. Active plan: [name]. Last state: [summary]. Ready."
+6. Read {project}/.claude/x-feed/prompts.md → @godofprompt self-improvement prompts
+7. git pull origin master                  → Sync to latest
+8. Acknowledge: "Recovered. Active plan: [name]. Last state: [summary]. Ready."
 ```
 
 **Formal Definition**:
 ```
 RECOVERY := context_compressed ∨ drift_detected
-Execute: LOAD(CKB) → LOAD(PROJECT) → LOAD(STATE) → LOAD(plans) → LOAD(prompts) → SYNC(git) → SUMMARIZE → AWAIT
+Execute: LOAD(CKB) → LOAD(PROJECT) → LOAD(STATE) → LOAD(plans) → LOAD(prompts) → LOAD(x-feed) → SYNC(git) → SUMMARIZE → AWAIT
 ```
 
 ---
@@ -475,6 +477,10 @@ Task-specific prompts live in `{project}/.claude/*_PROMPTS.md`:
 ├── SESSION_STATE.md      → Recent work state
 ├── TOMORROW_PROMPTS.md   → Next session's specific tasks
 ├── SPRINT_PROMPTS.md     → Multi-day sprint context
+├── x-feed/
+│   ├── prompts.md        → @godofprompt prompts (auto-fetched daily)
+│   ├── feed_state.json   → Fetch state tracking
+│   └── archive/          → Archived old prompts
 └── plans/
     └── *.md              → Implementation plans
 ```
@@ -522,6 +528,12 @@ Format:
 - Organized by tier (core → specific)
 
 ### Version History
+
+- v1.3 (Feb 11, 2025): @godofprompt X Feed Integration
+  - Added x-feed/ directory to session start protocols (FRESH_START + RECOVERY)
+  - Daily automated prompt fetching via GitHub Action
+  - Manual ingestion fallback (no API needed)
+  - Self-improvement feedback loop from external prompt engineering community
 
 - v1.2 (Feb 10, 2025): Task-Specific Prompts Integration
   - Added *_PROMPTS.md loading to FRESH_START and RECOVERY

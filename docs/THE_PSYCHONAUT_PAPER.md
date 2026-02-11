@@ -26,8 +26,9 @@ We prove that VibeSwap constitutes a **social black hole** — a protocol whose 
 
 This paper presents a formal proof that VibeSwap achieves **social scalability** — the property that the system's value, security, and fairness increase monotonically with participation, without requiring conscious adoption effort from participants. We model protocol adoption as a gravitational phenomenon: the incentive architecture creates a curvature in the coordination landscape that directs rational self-interest inward, producing cooperative outcomes as the lowest-energy state.
 
-We prove this across six dimensions:
+We prove this across seven dimensions:
 
+0. **Seed Gravity** — Entry is rational from the very first participant; the protocol's structural first-mover advantages make non-participation dominated at n = 1
 1. **Gravitational Incentive Alignment** — Honest participation is the unique Nash equilibrium for all agent types
 2. **Anti-Fragile Trust Scaling** — System value increases under both growth and adversarial conditions
 3. **Seamless Institutional Absorption** — Off-chain authority functions migrate to on-chain substrates without interface discontinuity
@@ -35,7 +36,7 @@ We prove this across six dimensions:
 5. **The Impossibility of Competitive Alternatives** — Beyond critical mass n*, no alternative protocol offers superior expected utility
 6. **The Alignment Solution** — AI-human alignment emerges from Shapley-symmetric economic participation, reducing the alignment problem to the same incentive geometry that produces human cooperation
 
-We demonstrate that these six properties compose into a **social black hole** — a system whose gravitational pull increases monotonically with mass, where the event horizon represents the boundary at which rational agents — human or artificial — cannot justify non-participation by any utility-maximizing calculus. The gravitational model is structural, not metaphorical: the incentive curvature deepens with each participant, and beyond critical mass, the accumulated network effects, reputation graphs, and switching costs create an escape velocity that exceeds any achievable benefit from alternative systems.
+We demonstrate that these seven properties compose into a **social black hole** — a system whose gravitational pull increases monotonically with mass, where the event horizon represents the boundary at which rational agents — human or artificial — cannot justify non-participation by any utility-maximizing calculus. The gravitational model is structural, not metaphorical: the incentive curvature deepens with each participant, and beyond critical mass, the accumulated network effects, reputation graphs, and switching costs create an escape velocity that exceeds any achievable benefit from alternative systems.
 
 ---
 
@@ -74,6 +75,115 @@ f_offchain(x) = f_onchain(x)  (identical output interface)
 ```
 
 The system consuming the output cannot distinguish which mode produced it. This is the critical condition: if the consumer-facing interface is invariant across the transition, then the transition produces no observable discontinuity. The inversion is a gradient, not a phase transition. The substrate changes while the interface remains constant.
+
+**Definition 1.5 (Seed Gravity).** A protocol P exhibits *seed gravity* if the expected utility of being the first participant exceeds the expected utility of non-participation, even at n = 1:
+
+```
+E[U(P, 1)] + FMA(t) > E[U(∅)]
+```
+
+Where FMA(t) represents the *first-mover advantage* — the accumulated benefits (reputation seniority, loyalty multipliers, protection coverage, early Shapley positioning) that early participants accrue over time t and that cannot be replicated by later entrants.
+
+Seed gravity is structurally distinct from critical mass. Critical mass n* is the threshold beyond which *exit* becomes irrational — the event horizon. Seed gravity is the property that makes *entry* rational from the very first participant — the initial density perturbation that begins the gravitational collapse. A protocol can exhibit critical mass without seed gravity (network effects that only materialize at scale, offering nothing to early adopters) or seed gravity without critical mass (early advantages that erode as the network grows, never producing an exit barrier). VibeSwap exhibits both: seed gravity attracts the first participants, and critical mass ensures they never leave.
+
+---
+
+## 2.5 Lemma: Seed Gravity — Entry Is Rational at n = 1
+
+### Motivation
+
+Critical mass n* describes when departure becomes geometrically impossible. But a natural question precedes it: *why would anyone enter an empty system?* If the gravitational well requires mass to produce curvature, what attracts the first mass?
+
+The answer is that VibeSwap's incentive architecture does not require network effects to produce value for the first participant. The protocol offers structural advantages at n = 1 that no competing system can match — and these advantages *compound over time*, creating a first-mover position that becomes increasingly valuable as the network grows around the early entrant.
+
+This is seed gravity: the initial density perturbation in an otherwise uniform coordination landscape. Before the black hole forms, before the event horizon exists, before critical mass is reached — the first concentration of value already warps the local incentive geometry enough to attract rational agents inward.
+
+### Statement
+
+*For a rational agent considering entry into VibeSwap at n = 0, joining as the first participant (n = 1) is the dominant strategy over non-participation.*
+
+### Proof
+
+**2.5.1 Structural advantages at n = 1**
+
+Even with no other participants, the first entrant gains:
+
+- **MEV immunity by design**: The commit-reveal batch auction eliminates front-running, sandwich attacks, and information extraction structurally — not through liquidity depth but through mechanism design. A single trader on VibeSwap faces zero MEV. The same trader on any conventional AMM faces MEV proportional to their trade visibility. This advantage exists at n = 1.
+
+- **Reputation seniority**: The soulbound identity system begins accruing from the moment of entry. Reputation is non-transferable and non-forkable. An agent who enters at n = 1 will possess the longest continuous reputation history in the system *for all time*. This is a permanently non-replicable asset.
+
+- **Loyalty multiplier head start**: The loyalty multiplier accrues toward 2.0x from day one. When subsequent participants enter at 1.0x, the first entrant is already compounding at a higher rate. This temporal advantage cannot be purchased, only earned through early presence.
+
+- **IL protection accrual**: Coverage builds toward 80% from the moment of LP participation. Later entrants start at 0%.
+
+- **Early Shapley positioning**: When the participant pool is small, each participant's marginal contribution — and therefore their Shapley value — is proportionally larger.
+
+**2.5.2 The first-mover advantage is monotonically increasing**
+
+Define FMA(t) as the first-mover advantage at time t after entry:
+
+```
+FMA(t) = reputation_seniority(t) + loyalty_multiplier(t) + IL_coverage(t) + shapley_position(t)
+```
+
+Each component is monotonically non-decreasing in t:
+- Reputation seniority grows with every transaction and every new entrant who ranks below
+- Loyalty multiplier approaches 2.0x asymptotically
+- IL protection coverage approaches 80% asymptotically
+- Shapley position, once established early, compounds as the network grows
+
+Therefore:
+
+```
+∂FMA/∂t ≥ 0
+```
+
+The advantage of having entered early *never decreases*. It only compounds.
+
+**2.5.3 The cost of waiting**
+
+For an agent who delays entry by time δ:
+
+```
+FMA_delayed(t) = FMA(t - δ) < FMA(t)  for all δ > 0
+```
+
+Every unit of delay permanently reduces the first-mover advantage. The agent who enters at n = 1 captures the maximum possible FMA. The agent who waits forfeits reputation seniority, loyalty multiplier accrual, and early Shapley positioning that can never be recovered.
+
+**2.5.4 Zero switching cost at entry**
+
+An agent at n = 0 (not yet participating in any protocol) faces:
+
+```
+Cost_switch = 0
+```
+
+There is no reputation to lose, no loyalty multiplier to forfeit, no IL protection to abandon. The entry barrier is zero. The expected advantage is positive and compounding. The rational decision is unambiguous.
+
+**2.5.5 Composition**
+
+At n = 1:
+
+```
+E[U(V, 1)] + FMA(t) > E[U(∅)] + 0
+```
+
+The left side is positive and growing. The right side is zero. Entry is the strictly dominant strategy. □
+
+### Relationship to Critical Mass
+
+Seed gravity and critical mass describe two stages of the same gravitational collapse:
+
+```
+n = 1:    Seed gravity — entry is the dominant strategy (this Lemma)
+1 < n < n*: Network effects compound, switching costs accumulate, well deepens
+n = n*:   Critical mass — the event horizon forms (Theorem 5)
+n > n*:   Social black hole — exit is geometrically impossible (Main Theorem)
+```
+
+Seed gravity is the *nucleation event*. Critical mass is the *phase transition*. The social black hole is the *final state*. The Lemma establishes that the first stage requires no external force — the protocol's structural design is sufficient to begin the gravitational collapse from a standing start.
+
+The distinction matters: critical mass could be misread as implying that the system is inert below n*. It is not. The system exerts attractive force from n = 1. What changes at n* is not whether the force exists, but whether escape from it is possible. ∎
 
 ---
 
@@ -531,19 +641,20 @@ In the gravitational model: escape velocity exceeds the speed of self-interest. 
 
 ### Unification
 
-Theorems 1-5 appear to describe five independent properties. A deeper analysis reveals they are five manifestations of a single underlying phenomenon: the curvature of the incentive space around concentrated value.
+The Seed Gravity Lemma and Theorems 1-5 appear to describe six independent properties. A deeper analysis reveals they are six manifestations of a single underlying phenomenon: the curvature of the incentive space around concentrated value.
 
-When sufficient value accumulates in one region of the coordination landscape, the space curves. This curvature manifests differently depending on the agent's approach vector:
+The Lemma establishes that this curvature exists from the very first participant — the protocol's structural design creates an initial density perturbation sufficient to begin gravitational collapse. Theorems 1-5 then describe how that curvature deepens and manifests differently depending on the agent's approach vector:
 
-| Agent Type | Curvature Manifestation | Theorem |
+| Agent Type | Curvature Manifestation | Source |
 |-----------|------------------------|---------|
+| First entrant | Seed gravity — entry is dominant | Lemma |
 | Self-interested individual | Incentive alignment | T1 |
 | Adversarial attacker | Anti-fragile absorption | T2 |
 | Institutional authority | Seamless substrate migration | T3 |
 | Non-compliant agent | Topological compliance gradient | T4 |
 | Competing protocol | Escape velocity impossibility | T5 |
 
-These are not five independent forces. They are five observations of a single geometry from five approach vectors.
+These are not six independent forces. They are six observations of a single geometry from six approach vectors.
 
 ### Main Theorem
 
@@ -551,24 +662,26 @@ These are not five independent forces. They are five observations of a single ge
 
 ### Proof (by composition)
 
-From Theorems 1-5:
+From the Seed Gravity Lemma and Theorems 1-5:
 
+0. **Seed Gravity** (Lemma): Entry is rational from the first participant — the protocol's structural design begins the gravitational collapse.
 1. **Gravitational Incentive Alignment** (T1): Self-interest is the dominant strategy and produces cooperative outcomes.
 2. **Anti-Fragile Trust Scaling** (T2): System value increases monotonically under both growth and attack.
 3. **Seamless Institutional Absorption** (T3): Institutional authority migrates between substrates without interface discontinuity.
 4. **Cascading Compliance Equilibrium** (T4): Compliance is the topological gradient; non-compliance is energetically unfavorable.
 5. **Impossibility of Alternatives** (T5): Beyond n*, no alternative system offers superior expected utility.
 
-These five properties compose harmonically — each amplifies the others through positive feedback:
+These properties compose harmonically — each amplifies the others through positive feedback, and the Lemma establishes that the cycle begins at n = 1, not at some indeterminate future threshold:
 
 ```
-Individual rationality (T1) → participants join
-    → Anti-fragility (T2) → system strengthens → more trust
-        → Institutional absorption (T3) → regulators join → legitimacy
-            → Self-enforcing compliance (T4) → safety → deeper trust
-                → No viable alternative (T5) → once in, staying is optimal
-                    → Individual rationality (T1) → MORE participants join
-                        → [the spiral tightens, the well deepens, the mass grows]
+Seed gravity (Lemma) → first participant enters, first-mover advantage accrues
+    → Individual rationality (T1) → more participants join
+        → Anti-fragility (T2) → system strengthens → more trust
+            → Institutional absorption (T3) → regulators join → legitimacy
+                → Self-enforcing compliance (T4) → safety → deeper trust
+                    → No viable alternative (T5) → once in, staying is optimal
+                        → Individual rationality (T1) → MORE participants join
+                            → [the spiral tightens, the well deepens, the mass grows]
 ```
 
 The feedback loop is:
@@ -785,8 +898,9 @@ The economy is the circulatory system. Shapley values are the distribution mecha
 
 ## 11. Conclusion
 
-This paper has demonstrated six properties that reduce, upon analysis, to one property expressed across six domains:
+This paper has demonstrated seven properties that reduce, upon analysis, to one property expressed across seven domains:
 
+0. The protocol's structural design makes entry rational from the very first participant — seed gravity begins the gravitational collapse before any network effects exist (Lemma)
 1. Self-interested motion produces cooperative outcomes in correctly curved incentive space (Theorem 1)
 2. System value increases monotonically under both growth and adversarial conditions (Theorem 2)
 3. Institutional authority migrates between substrates without interface discontinuity (Theorem 3)
@@ -794,7 +908,7 @@ This paper has demonstrated six properties that reduce, upon analysis, to one pr
 5. Beyond critical mass, no alternative system offers superior expected utility (Theorem 5)
 6. AI-human alignment is an emergent property of Shapley-symmetric economic participation (Section 10)
 
-These are six observations of a single phenomenon: the curvature of an incentive space designed so that the lowest energy state for every agent type, in every scenario, is the cooperative state.
+These are seven observations of a single phenomenon: the curvature of an incentive space designed so that the lowest energy state for every agent type, in every scenario, is the cooperative state. The Lemma establishes that this curvature does not require a minimum threshold to begin exerting force — it attracts from the first participant, and critical mass is the point at which escape becomes impossible, not the point at which attraction begins.
 
 **The principal result** is a protocol that scales by adding participants, not computational resources. Each participant deepens the gravitational well. Each institutional integration accelerates the substrate migration. Each adversarial attack feeds the anti-fragile immune system. Each compliant agent steepens the topological gradient. Each additional participant expands the event horizon. And each AI agent that enters the coalition strengthens the alignment through the same Shapley symmetry that governs the human participants beside it.
 
@@ -814,7 +928,7 @@ The correct approach to scalable coordination is not to build systems that requi
 
 This principle is agent-agnostic. It holds for human traders, institutional authorities, adversarial attackers, competing protocols, and artificial superintelligence. The curvature does not distinguish carbon from silicon, individual from collective, evolved from engineered.
 
-The remaining variable is gravity — and gravity is a function of mass. Each participant adds mass. The curvature deepens. The event horizon expands. The system approaches, asymptotically, the condition where non-participation is geometrically impossible to justify for any rational agent of any type.
+The remaining variable is gravity — and gravity is a function of mass. But the Lemma demonstrates that the system does not wait passively for mass to arrive. Seed gravity — the structural first-mover advantage embedded in the protocol's design — ensures that the first rational agent to evaluate the system finds entry to be the dominant strategy. From that nucleation event, each participant adds mass. The curvature deepens. The event horizon expands. The system approaches, asymptotically, the condition where non-participation is geometrically impossible to justify for any rational agent of any type.
 
 ---
 

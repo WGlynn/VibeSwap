@@ -324,6 +324,7 @@ contract MoneyFlowTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             bytes32 secret = keccak256(abi.encodePacked("secret", i));
 
+            vm.roll(100 + i * 100);
             vm.prank(trader1);
             bytes32 cid = core.commitSwap{value: 0.01 ether}(
                 address(weth), address(usdc), 0.5 ether, 0, secret
@@ -364,6 +365,8 @@ contract MoneyFlowTest is Test {
         bytes32 cid1 = core.commitSwap{value: 0.01 ether}(
             address(weth), address(usdc), 0.5 ether, 0, secret1
         );
+
+        vm.roll(10);
 
         vm.prank(trader2);
         bytes32 cid2 = core.commitSwap{value: 0.01 ether}(

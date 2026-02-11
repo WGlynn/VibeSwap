@@ -205,7 +205,10 @@ contract ReentrancyTest is Test {
         // Commit
         bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
 
-        // Try to commit again in same tx (should work, different commit)
+        // Advance block so second commit doesn't trigger flash loan detection
+        vm.roll(10);
+
+        // Commit again (different commit, different block)
         bytes32 secret2 = keccak256("secret2");
         bytes32 commitHash2 = keccak256(abi.encodePacked(
             address(this),

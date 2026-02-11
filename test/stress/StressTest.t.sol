@@ -234,6 +234,9 @@ contract StressTest is Test {
         uint256 currentTime = block.timestamp;
 
         for (uint256 i = 0; i < 10; i++) {
+            // Advance block to avoid flash loan detection
+            vm.roll(100 + i * 100);
+
             // Commit phase
             bytes32 secret = keccak256(abi.encodePacked("secret", i, currentTime));
             bytes32 commitHash = keccak256(abi.encodePacked(

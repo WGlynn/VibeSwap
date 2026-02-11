@@ -502,15 +502,17 @@ function ContributionCard({ contribution, onUpvote, isThreaded = false, isLastIn
 }
 
 function KnowledgeGraphView({ graph, contributions }) {
+  const [selectedContribution, setSelectedContribution] = useState(null)
+
   return (
     <div className="p-6 rounded-lg bg-black-800 border border-black-600">
       <h2 className="text-xl font-bold text-white mb-4">Knowledge Graph</h2>
       <p className="text-sm text-black-400 mb-6">
-        Contributions connected by shared tags and concepts
+        Contributions connected by shared tags and concepts. Click a bubble to view details.
       </p>
 
       {/* Simple visual representation */}
-      <div className="relative min-h-[400px] bg-black-900 rounded-lg p-6 overflow-hidden">
+      <div className="relative min-h-[400px] bg-black-900 rounded-lg p-6">
         {/* Nodes */}
         <div className="flex flex-wrap gap-4 justify-center">
           {graph.nodes.map((node, i) => {
@@ -518,6 +520,11 @@ function KnowledgeGraphView({ graph, contributions }) {
             const type = CONTRIBUTION_TYPES[node.type] || CONTRIBUTION_TYPES.feedback
             const angle = (i / graph.nodes.length) * 2 * Math.PI
             const radius = 120 + (i % 3) * 40
+
+            // Truncate title for tooltip
+            const shortTitle = contrib?.title?.length > 25
+              ? contrib.title.slice(0, 25) + '...'
+              : contrib?.title
 
             return (
               <motion.div
@@ -531,19 +538,30 @@ function KnowledgeGraphView({ graph, contributions }) {
                 }}
               >
                 <div
-                  className={`w-${Math.min(node.size / 2, 16)} h-${Math.min(node.size / 2, 16)} min-w-12 min-h-12 rounded-full bg-${type.color}-500/30 border-2 border-${type.color}-500/50 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform`}
+                  onClick={() => setSelectedContribution(contrib)}
+                  className={`min-w-12 min-h-12 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-all hover:ring-2 hover:ring-matrix-500`}
                   style={{
                     width: Math.max(48, node.size * 2),
                     height: Math.max(48, node.size * 2),
+                    backgroundColor: type.color === 'matrix' ? 'rgba(0, 255, 65, 0.2)' :
+                                    type.color === 'terminal' ? 'rgba(0, 212, 255, 0.2)' :
+                                    type.color === 'amber' ? 'rgba(245, 158, 11, 0.2)' :
+                                    type.color === 'purple' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(100, 100, 100, 0.2)',
+                    borderWidth: 2,
+                    borderStyle: 'solid',
+                    borderColor: type.color === 'matrix' ? 'rgba(0, 255, 65, 0.5)' :
+                                type.color === 'terminal' ? 'rgba(0, 212, 255, 0.5)' :
+                                type.color === 'amber' ? 'rgba(245, 158, 11, 0.5)' :
+                                type.color === 'purple' ? 'rgba(168, 85, 247, 0.5)' : 'rgba(100, 100, 100, 0.5)',
                   }}
                 >
                   <span className="text-xl">{type.icon}</span>
                 </div>
 
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black-700 rounded-lg text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                  <div className="font-semibold">{contrib?.title}</div>
-                  <div className="text-black-400">by @{node.author}</div>
+                {/* Tooltip - condensed and properly positioned */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1.5 bg-black-700 border border-black-500 rounded text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-[150px]">
+                  <div className="font-medium truncate">{shortTitle}</div>
+                  <div className="text-black-400 text-[10px]">@{node.author}</div>
                 </div>
               </motion.div>
             )
@@ -587,6 +605,103 @@ function KnowledgeGraphView({ graph, contributions }) {
           </div>
         </div>
       )}
+
+      {/* Contribution Detail Modal */}
+      <AnimatePresence>
+        {selectedContribution && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedContribution(null)}
+          >
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg bg-black-800 rounded-2xl border border-black-600 shadow-2xl max-h-[80vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="sticky top-0 flex items-center justify-between p-4 border-b border-black-700 bg-black-800">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xl">{CONTRIBUTION_TYPES[selectedContribution.type]?.icon || '📝'}</span>
+                  <span className="px-2 py-0.5 rounded text-xs bg-matrix-500/20 text-matrix-400">
+                    {CONTRIBUTION_TYPES[selectedContribution.type]?.label || 'Contribution'}
+                  </span>
+                  {selectedContribution.implemented && (
+                    <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                      ✓ Implemented
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelectedContribution(null)}
+                  className="p-2 rounded-lg hover:bg-black-700"
+                >
+                  <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-white mb-2">{selectedContribution.title}</h2>
+                <p className="text-black-300 mb-6 leading-relaxed">{selectedContribution.content}</p>
+
+                {/* Metadata */}
+                <div className="space-y-4">
+                  {/* Author & Time */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-black-500">Author:</span>
+                      <span className="text-white font-medium">@{selectedContribution.author}</span>
+                      {selectedContribution.author === 'Faraday1' && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-matrix-500/20 text-matrix-400">FOUNDER</span>
+                      )}
+                    </div>
+                    <span className="text-black-500">{getTimeAgo(selectedContribution.timestamp)}</span>
+                  </div>
+
+                  {/* Tags */}
+                  {selectedContribution.tags?.length > 0 && (
+                    <div>
+                      <span className="text-xs text-black-500 block mb-2">Tags</span>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedContribution.tags.map(tag => (
+                          <span key={tag} className="px-2 py-1 rounded text-xs bg-black-700 text-black-300">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-black-700">
+                    <div className="text-center p-3 rounded-lg bg-black-900">
+                      <div className="text-xl font-bold text-matrix-500">{selectedContribution.upvotes || 0}</div>
+                      <div className="text-xs text-black-500">Upvotes</div>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-black-900">
+                      <div className="text-xl font-bold text-terminal-500">{selectedContribution.rewardPoints || 0}</div>
+                      <div className="text-xs text-black-500">Reward Points</div>
+                    </div>
+                  </div>
+
+                  {/* ID */}
+                  <div className="pt-4 border-t border-black-700">
+                    <span className="text-xs text-black-600 font-mono">ID: {selectedContribution.id}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

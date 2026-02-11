@@ -8,16 +8,36 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- Solidity sprint COMPLETE through Phase 3
+- Backend production hardening COMPLETE (10 phases)
+- CommitRevealAuction + VibeAMM tests FIXED (41/41 pass)
+- 34 remaining test failures across integration/security/oracle tests
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
-- Medium MCP tools available for publishing docs
 
 ## Active Tasks
-- Fix remaining test failures (CommitRevealAuction setUp, VibeAMM 6/22, NotActiveAuthority)
+- Fix remaining 34 test failures (FlashLoanDetected, NotActiveAuthority, string→custom errors, oracle assertions)
 - Frontend: "Sign In" button change + abstraction redesign
-- Commit and push all security fixes (FIX #1-7)
+- Testnet deployment preparation
 
-## Recently Completed (Feb 11, 2025)
+## Recently Completed (Feb 11, 2026)
+22. **CommitRevealAuction + VibeAMM Test Fixes**
+    - CommitRevealAuction: Fixed double-nonReentrant (commitOrder wrapper + commitOrderToPool both had nonReentrant)
+    - CommitRevealAuction.t.sol: Updated all expectRevert to custom error selectors
+    - VibeAMM.t.sol: Fixed DEFAULT_FEE_RATE (30→5), string→custom errors, fee tests for PROTOCOL_FEE_SHARE=0
+    - Result: 19/19 CommitRevealAuction, 22/22 VibeAMM
+21. **Backend Production Hardening (10 phases)**
+    - Phase 1: Environment validation at startup (validateEnv.js)
+    - Phase 2: Structured logging with pino (replaced morgan)
+    - Phase 3: Input validation middleware (symbol, chainId)
+    - Phase 4: WebSocket hardening (connection limits, origin check, rate limiting)
+    - Phase 5: Fallback price flagging (isFallback field, no fake freshness)
+    - Phase 6: Health check enhancement (priceFeed freshness, WS count)
+    - Phase 7: Request timeouts + graceful shutdown
+    - Phase 8: nginx CSP fix (removed unsafe-eval)
+    - Phase 9: CI security checks fix (audit jobs now block merges)
+    - Phase 10: Deploy script hardening (SSL required, rollback support)
+    - All 7 backend tests pass, 0 npm vulnerabilities
+
+## Previously Completed (Feb 11, 2025)
 20. **Solidity Sprint Phase 3: Money Path Audit COMPLETE**
     - Audited all 4 critical contracts: VibeAMM, CommitRevealAuction, VibeSwapCore, CrossChainRouter
     - **CRITICAL FIX #6**: Double-spend via failed batch swap

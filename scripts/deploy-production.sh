@@ -15,7 +15,33 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Pre-flight checks
+# Flags
+ALLOW_HTTP=false
+for arg in "$@"; do
+  case "$arg" in
+    --allow-http) ALLOW_HTTP=true ;;
+  esac
+done
+
+# ============ Rollback Support ============
+PREV_CONTAINERS=""
+
+rollback() {
+  echo -e "\n${RED}Deployment failed! Rolling back...${NC}"
+  docker compose down 2>/dev/null || true
+  if [ -n "$PREV_CONTAINERS" ]; then
+    echo -e "${YELLOW}Restoring previous containers...${NC}"
+    for container in $PREV_CONTAINERS; do
+      docker start "$container" 2>/dev/null || true
+    done
+    echo -e "${GREEN}Rollback complete.${NC}"
+  else
+    echo -e "${YELLOW}No previous containers to restore.${NC}"
+  fi
+  exit 1
+}
+
+# ============ Pre-flight Checks ============
 echo -e "\n${YELLOW}Running pre-flight checks...${NC}"
 
 # 1. Check Docker
@@ -39,37 +65,62 @@ if [ ! -f backend/.env ]; then
 fi
 echo -e "${GREEN}  Backend .env: OK${NC}"
 
-# 4. Check SSL certs
+# 4. Check SSL certs (required unless --allow-http)
 if [ ! -f docker/nginx/ssl/cert.pem ] || [ ! -f docker/nginx/ssl/key.pem ]; then
-    echo -e "${YELLOW}  SSL certs not found in docker/nginx/ssl/ - using HTTP only${NC}"
-    echo -e "${YELLOW}  For production, add cert.pem and key.pem${NC}"
+    if [ "$ALLOW_HTTP" = true ]; then
+        echo -e "${YELLOW}  SSL certs not found — running HTTP-only (--allow-http)${NC}"
+    else
+        echo -e "${RED}  SSL certs not found in docker/nginx/ssl/${NC}"
+        echo -e "${RED}  Production requires cert.pem and key.pem${NC}"
+        echo -e "${RED}  Use --allow-http to explicitly opt in to HTTP-only (dev/staging only)${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}  SSL certs: OK${NC}"
 fi
 
-# Build
+# ============ Save Current State for Rollback ============
+PREV_CONTAINERS=$(docker compose ps -q 2>/dev/null || true)
+
+# ============ Build ============
 echo -e "\n${YELLOW}Building Docker images...${NC}"
 docker compose build --no-cache
 
-# Deploy
+# ============ Deploy ============
 echo -e "\n${YELLOW}Starting services...${NC}"
 docker compose up -d
 
-# Health check
+# ============ Health Check (with timeout) ============
 echo -e "\n${YELLOW}Waiting for services to be healthy...${NC}"
-sleep 10
+HEALTH_TIMEOUT=60
+HEALTH_INTERVAL=5
+ELAPSED=0
 
-# Check health
+while [ "$ELAPSED" -lt "$HEALTH_TIMEOUT" ]; do
+  sleep "$HEALTH_INTERVAL"
+  ELAPSED=$((ELAPSED + HEALTH_INTERVAL))
+
+  BACKEND_HEALTH=$(curl -sf http://localhost:3001/api/health/live 2>/dev/null || echo "failed")
+  if echo "$BACKEND_HEALTH" | grep -q "alive"; then
+    echo -e "${GREEN}  Backend: Healthy (${ELAPSED}s)${NC}"
+    break
+  fi
+
+  echo -e "${YELLOW}  Backend: Not ready yet (${ELAPSED}s/${HEALTH_TIMEOUT}s)...${NC}"
+done
+
+# Final health verification
 BACKEND_HEALTH=$(curl -sf http://localhost:3001/api/health/live 2>/dev/null || echo "failed")
-if echo "$BACKEND_HEALTH" | grep -q "alive"; then
-    echo -e "${GREEN}  Backend: Healthy${NC}"
-else
-    echo -e "${RED}  Backend: Unhealthy${NC}"
+if ! echo "$BACKEND_HEALTH" | grep -q "alive"; then
+    echo -e "${RED}  Backend: Failed health check after ${HEALTH_TIMEOUT}s${NC}"
+    rollback
 fi
 
 FRONTEND_HEALTH=$(curl -sf http://localhost:80/ 2>/dev/null || echo "failed")
 if [ "$FRONTEND_HEALTH" != "failed" ]; then
     echo -e "${GREEN}  Frontend: Healthy${NC}"
 else
-    echo -e "${YELLOW}  Frontend: Checking...${NC}"
+    echo -e "${YELLOW}  Frontend: Not responding (may need more time or check logs)${NC}"
 fi
 
 echo -e "\n${GREEN}============================================${NC}"

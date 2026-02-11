@@ -121,18 +121,18 @@ contract VibeAMMTest is Test {
         poolId = amm.createPool(address(tokenA), address(tokenB), 0);
 
         IVibeAMM.Pool memory pool = amm.getPool(poolId);
-        assertEq(pool.feeRate, 30); // Default 0.3%
+        assertEq(pool.feeRate, 5); // DEFAULT_FEE_RATE = 5 bps (0.05%)
     }
 
     function test_createPool_sameToken() public {
-        vm.expectRevert("Identical tokens");
+        vm.expectRevert(VibeAMM.IdenticalTokens.selector);
         amm.createPool(address(tokenA), address(tokenA), 30);
     }
 
     function test_createPool_duplicate() public {
         amm.createPool(address(tokenA), address(tokenB), 30);
 
-        vm.expectRevert("Pool exists");
+        vm.expectRevert(VibeAMM.PoolAlreadyExists.selector);
         amm.createPool(address(tokenA), address(tokenB), 30);
     }
 
@@ -273,7 +273,7 @@ contract VibeAMMTest is Test {
         uint256 expectedOut = amm.quote(poolId, address(tokenA), 10 ether);
 
         vm.prank(trader);
-        vm.expectRevert("Insufficient output");
+        vm.expectRevert(VibeAMM.InsufficientOutput.selector);
         amm.swap(
             poolId,
             address(tokenA),
@@ -356,19 +356,31 @@ contract VibeAMMTest is Test {
     // ============ Fee Tests ============
 
     function test_fees_collected() public {
+        // With PROTOCOL_FEE_SHARE = 0, all fees go to LPs through reserves (k increase)
+        // Verify fees are reflected in the constant product increase
         poolId = amm.createPool(address(tokenA), address(tokenB), 30);
 
         vm.prank(lp1);
         amm.addLiquidity(poolId, 100 ether, 100 ether, 0, 0);
 
+        IVibeAMM.Pool memory poolBefore = amm.getPool(poolId);
+        uint256 kBefore = poolBefore.reserve0 * poolBefore.reserve1;
+
         vm.prank(trader);
         amm.swap(poolId, address(tokenA), 10 ether, 0, trader);
 
-        uint256 accumulatedFees = amm.accumulatedFees(address(tokenA));
-        assertGt(accumulatedFees, 0);
+        IVibeAMM.Pool memory poolAfter = amm.getPool(poolId);
+        uint256 kAfter = poolAfter.reserve0 * poolAfter.reserve1;
+
+        // k increases because fees stay in reserves for LPs
+        assertGt(kAfter, kBefore);
+
+        // With PROTOCOL_FEE_SHARE = 0, no protocol fees accumulate
+        assertEq(amm.accumulatedFees(address(tokenA)), 0);
     }
 
     function test_collectFees() public {
+        // With PROTOCOL_FEE_SHARE = 0, collectFees should revert
         poolId = amm.createPool(address(tokenA), address(tokenB), 30);
 
         vm.prank(lp1);
@@ -377,12 +389,9 @@ contract VibeAMMTest is Test {
         vm.prank(trader);
         amm.swap(poolId, address(tokenA), 10 ether, 0, trader);
 
-        uint256 treasuryBalanceBefore = tokenA.balanceOf(treasury);
-
+        // No protocol fees accumulated, so collectFees reverts
+        vm.expectRevert(VibeAMM.NoFeesToCollect.selector);
         amm.collectFees(address(tokenA));
-
-        assertGt(tokenA.balanceOf(treasury), treasuryBalanceBefore);
-        assertEq(amm.accumulatedFees(address(tokenA)), 0);
     }
 
     // ============ Quote Tests ============

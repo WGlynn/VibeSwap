@@ -1,13 +1,17 @@
 import 'dotenv/config';
+import { validateEnv } from './utils/validateEnv.js';
+validateEnv();
+
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import morgan from 'morgan';
 import { createServer } from 'http';
+import { logger, httpLogger } from './utils/logger.js';
 import { setupWebSocket } from './services/websocket.js';
+import { PriceFeedService } from './services/priceFeed.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import healthRoutes from './routes/health.js';
+import { createHealthRoutes } from './routes/health.js';
 import priceRoutes from './routes/prices.js';
 import tokenRoutes from './routes/tokens.js';
 import chainRoutes from './routes/chains.js';
@@ -16,6 +20,9 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// ============ Shared Services ============
+const priceFeed = new PriceFeedService();
 
 // ============ Security Middleware ============
 app.use(helmet({
@@ -55,11 +62,7 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 
 // ============ Logging ============
-if (NODE_ENV === 'production') {
-  app.use(morgan('combined'));
-} else {
-  app.use(morgan('dev'));
-}
+app.use(httpLogger);
 
 // ============ Rate Limiting ============
 app.use('/api/', apiLimiter);
@@ -68,7 +71,7 @@ app.use('/api/', apiLimiter);
 app.set('trust proxy', 1);
 
 // ============ API Routes ============
-app.use('/api/health', healthRoutes);
+app.use('/api/health', createHealthRoutes(priceFeed));
 app.use('/api/prices', priceRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/chains', chainRoutes);
@@ -88,25 +91,42 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ============ WebSocket Setup ============
-setupWebSocket(server);
+const wss = setupWebSocket(server, { priceFeed, allowedOrigins });
+
+// ============ Request Timeouts ============
+server.timeout = 30000;
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 // ============ Start Server ============
 server.listen(PORT, () => {
-  console.log(`VibeSwap API server running on port ${PORT} (${NODE_ENV})`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-  console.log(`WebSocket: ws://localhost:${PORT}/ws`);
+  logger.info({ port: PORT, env: NODE_ENV }, 'VibeSwap API server started');
+  logger.info({ url: `http://localhost:${PORT}/api/health` }, 'Health check endpoint');
+  logger.info({ url: `ws://localhost:${PORT}/ws` }, 'WebSocket endpoint');
 });
 
 // ============ Graceful Shutdown ============
 const shutdown = (signal) => {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  logger.info({ signal }, 'Shutdown signal received');
+
+  // Close WebSocket server first
+  if (wss) {
+    wss.clients.forEach((client) => {
+      client.close(1001, 'Server shutting down');
+    });
+    wss.close(() => {
+      logger.info('WebSocket server closed');
+    });
+  }
+
   server.close(() => {
-    console.log('Server closed.');
+    logger.info('HTTP server closed');
     process.exit(0);
   });
+
   // Force close after 10s
   setTimeout(() => {
-    console.error('Forced shutdown after timeout');
+    logger.error('Forced shutdown after timeout');
     process.exit(1);
   }, 10000);
 };

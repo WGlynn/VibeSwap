@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { SUPPORTED_CHAINS } from '../utils/tokenRegistry.js';
+import { validateChainId } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.get('/', (_req, res) => {
 });
 
 // GET /api/chains/:chainId - Get specific chain info
-router.get('/:chainId', (req, res) => {
+router.get('/:chainId', validateChainId('chainId'), (req, res) => {
   const chainId = parseInt(req.params.chainId, 10);
   const chain = SUPPORTED_CHAINS.find(c => c.id === chainId);
   if (!chain) {

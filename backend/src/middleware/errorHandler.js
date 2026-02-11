@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+
 export function notFoundHandler(req, res) {
   res.status(404).json({
     error: 'Not Found',
@@ -12,11 +14,11 @@ export function errorHandler(err, _req, res, _next) {
     ? 'Internal server error'
     : err.message;
 
-  console.error(`[ERROR] ${err.message}`, {
+  logger.error({
     status,
+    error: err.message,
     stack: err.stack,
-    timestamp: new Date().toISOString(),
-  });
+  }, 'Request error');
 
   res.status(status).json({
     error: status === 500 ? 'Internal Server Error' : err.message,

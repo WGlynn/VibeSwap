@@ -1,0 +1,29 @@
+# ============ Oracle Service ============
+FROM python:3.11-slim
+
+RUN groupadd -r vibeswap && useradd -r -g vibeswap vibeswap
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY oracle/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy oracle source
+COPY oracle/ ./oracle/
+COPY oracle/pyproject.toml .
+
+# Install the oracle package
+RUN pip install --no-cache-dir -e .
+
+USER vibeswap
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD python -c "import oracle; print('ok')" || exit 1
+
+CMD ["python", "-m", "oracle.main"]

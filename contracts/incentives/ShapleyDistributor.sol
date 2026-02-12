@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../libraries/PairwiseFairness.sol";
 
 /**
  * @title ShapleyDistributor
@@ -20,25 +21,26 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * - Recognize enabling contributions (the "glove game")
  * - Event-based games keep computation manageable
  *
- * The Shapley value satisfies:
+ * The Shapley value satisfies five axioms:
  * - Efficiency: all value is distributed
  * - Symmetry: equal contributors get equal rewards
  * - Null player: no contribution = no reward
- * - Additivity: consistent across combined games
+ * - Pairwise Proportionality: reward ratio = contribution ratio for any pair
+ * - Time Neutrality: identical contributions yield identical rewards regardless of when
  *
- * Bitcoin Halving Schedule:
- * - Rewards follow Bitcoin's deflationary emission model
- * - Halving occurs every epoch (configurable, default ~1 year equivalent)
- * - Era 0: 100% of computed Shapley value
- * - Era 1: 50% of computed Shapley value
- * - Era 2: 25% of computed Shapley value
- * - ... continues until rewards approach 0 (~32 halvings)
+ * Two-Track Distribution:
  *
- * This ensures:
- * - Early participants are rewarded for bootstrapping
- * - Long-term sustainability without inflation
- * - Predictable, transparent emission schedule
- * - No rent-seeking - just fair, diminishing rewards
+ * Track 1 — FEE_DISTRIBUTION (Time-Neutral):
+ * - Trading fees distributed via pure proportional Shapley
+ * - NO halving applied — same work earns same reward regardless of era
+ * - Satisfies all five axioms including Time Neutrality
+ *
+ * Track 2 — TOKEN_EMISSION (Scheduled):
+ * - Protocol token emissions follow Bitcoin-style halving schedule
+ * - Halving occurs every era (configurable, default ~1 year equivalent)
+ * - Intentionally NOT time-neutral (bootstrapping incentive, like Bitcoin block rewards)
+ *
+ * See: docs/TIME_NEUTRAL_TOKENOMICS.md for formal proofs
  */
 contract ShapleyDistributor is
     OwnableUpgradeable,
@@ -76,6 +78,20 @@ contract ShapleyDistributor is
     /// @notice Initial emission multiplier (100% = PRECISION)
     uint256 public constant INITIAL_EMISSION = PRECISION;
 
+    // ============ Enums ============
+
+    /**
+     * @notice Type of cooperative game — determines halving behavior
+     * @dev FEE_DISTRIBUTION: Time-neutral. Pure Shapley, no halving. Same work = same reward.
+     *      TOKEN_EMISSION: Halving applies. Like Bitcoin block rewards — bootstrapping incentive.
+     *
+     * See: docs/TIME_NEUTRAL_TOKENOMICS.md §4.1 "Two-Track Distribution"
+     */
+    enum GameType {
+        FEE_DISTRIBUTION,   // Time-neutral: no halving, pure proportional Shapley
+        TOKEN_EMISSION      // Scheduled: halving applies (like Bitcoin block rewards)
+    }
+
     // ============ Structs ============
 
     /**
@@ -99,13 +115,14 @@ contract ShapleyDistributor is
      * @param gameId Unique identifier for this game
      * @param totalValue Total value to distribute
      * @param token Token to distribute (address(0) for ETH)
-     * @param participants Array of participants
+     * @param gameType FEE_DISTRIBUTION (time-neutral) or TOKEN_EMISSION (halving)
      * @param settled Whether the game has been settled
      */
     struct CooperativeGame {
         bytes32 gameId;
         uint256 totalValue;
         address token;
+        GameType gameType;
         bool settled;
     }
 
@@ -132,6 +149,12 @@ contract ShapleyDistributor is
 
     // Game ID => Participant address => Claimed
     mapping(bytes32 => mapping(address => bool)) public claimed;
+
+    // Game ID => Participant address => Weighted contribution (stored for pairwise verification)
+    mapping(bytes32 => mapping(address => uint256)) public weightedContributions;
+
+    // Game ID => Total weighted contribution (stored for pairwise verification tolerance)
+    mapping(bytes32 => uint256) public totalWeightedContrib;
 
     // Participant => Quality weights
     mapping(address => QualityWeight) public qualityWeights;
@@ -172,6 +195,7 @@ contract ShapleyDistributor is
     event QualityWeightUpdated(address indexed participant, uint256 activity, uint256 reputation, uint256 economic);
     event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
     event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
+    event FairnessVerified(bytes32 indexed gameId, address indexed participant1, address indexed participant2, bool fair, uint256 deviation);
 
     // ============ Errors ============
 
@@ -233,16 +257,49 @@ contract ShapleyDistributor is
         address token,
         Participant[] calldata participants
     ) external onlyAuthorized {
+        // Default to FEE_DISTRIBUTION (time-neutral)
+        _createGameInternal(gameId, totalValue, token, GameType.FEE_DISTRIBUTION, participants);
+    }
+
+    /**
+     * @notice Create a game with explicit type (fee distribution or token emission)
+     * @dev FEE_DISTRIBUTION: Time-neutral, no halving. Same work = same reward.
+     *      TOKEN_EMISSION: Halving applies. Like Bitcoin block rewards.
+     * @param gameId Unique identifier
+     * @param totalValue Total value to distribute
+     * @param token Token to distribute (address(0) for ETH)
+     * @param gameType FEE_DISTRIBUTION or TOKEN_EMISSION
+     * @param participants Array of participants with contribution data
+     */
+    function createGameTyped(
+        bytes32 gameId,
+        uint256 totalValue,
+        address token,
+        GameType gameType,
+        Participant[] calldata participants
+    ) external onlyAuthorized {
+        _createGameInternal(gameId, totalValue, token, gameType, participants);
+    }
+
+    function _createGameInternal(
+        bytes32 gameId,
+        uint256 totalValue,
+        address token,
+        GameType gameType,
+        Participant[] calldata participants
+    ) internal {
         if (games[gameId].totalValue != 0) revert GameAlreadyExists();
         if (totalValue == 0) revert InvalidValue();
         if (participants.length < minParticipants) revert TooFewParticipants();
         if (participants.length > maxParticipants) revert TooManyParticipants();
 
-        // Apply Bitcoin halving schedule
+        // Apply halving ONLY for TOKEN_EMISSION games (not fee distribution)
+        // Fee distribution is time-neutral: same work = same reward regardless of era
+        // See: docs/TIME_NEUTRAL_TOKENOMICS.md §4.1
         uint256 adjustedValue = totalValue;
         uint8 currentEra = getCurrentHalvingEra();
 
-        if (halvingEnabled && currentEra > 0) {
+        if (gameType == GameType.TOKEN_EMISSION && halvingEnabled && currentEra > 0) {
             uint256 emissionMultiplier = getEmissionMultiplier(currentEra);
             adjustedValue = (totalValue * emissionMultiplier) / PRECISION;
 
@@ -253,6 +310,7 @@ contract ShapleyDistributor is
             gameId: gameId,
             totalValue: adjustedValue,
             token: token,
+            gameType: gameType,
             settled: false
         });
 
@@ -288,16 +346,23 @@ contract ShapleyDistributor is
         uint256 n = participants.length;
 
         // Step 1: Calculate total weighted contributions
-        uint256[] memory weightedContributions = new uint256[](n);
-        uint256 totalWeightedContribution = 0;
+        uint256[] memory weights = new uint256[](n);
+        uint256 totalWeight = 0;
 
         for (uint256 i = 0; i < n; i++) {
-            weightedContributions[i] = _calculateWeightedContribution(participants[i]);
-            totalWeightedContribution += weightedContributions[i];
+            weights[i] = _calculateWeightedContribution(participants[i]);
+            totalWeight += weights[i];
+
+            // Store for pairwise verification (anyone can audit fairness on-chain)
+            weightedContributions[gameId][participants[i].participant] = weights[i];
         }
 
+        // Store total weight for pairwise verification tolerance
+        totalWeightedContrib[gameId] = totalWeight;
+
         // Step 2: Distribute value proportional to weighted contribution
-        // This is an approximation of Shapley that satisfies efficiency
+        // This satisfies Efficiency, Pairwise Proportionality, and Time Neutrality
+        // See: docs/TIME_NEUTRAL_TOKENOMICS.md §3.1-3.3
         uint256 distributed = 0;
         for (uint256 i = 0; i < n; i++) {
             uint256 share;
@@ -305,7 +370,7 @@ contract ShapleyDistributor is
                 // Last participant gets remainder (prevents dust)
                 share = game.totalValue - distributed;
             } else {
-                share = (game.totalValue * weightedContributions[i]) / totalWeightedContribution;
+                share = (game.totalValue * weights[i]) / totalWeight;
             }
 
             shapleyValues[gameId][participants[i].participant] = share;
@@ -591,6 +656,94 @@ contract ShapleyDistributor is
         if (!games[gameId].settled) return 0;
         if (claimed[gameId][participant]) return 0;
         return shapleyValues[gameId][participant];
+    }
+
+    // ============ Fairness Verification (Public — anyone can audit) ============
+
+    /**
+     * @notice Verify pairwise proportionality between two participants in a game
+     * @dev Checks: reward_A / reward_B ≈ weight_A / weight_B
+     *      Uses cross-multiplication to avoid division: |φA×wB - φB×wA| ≤ ε
+     *      See: docs/TIME_NEUTRAL_TOKENOMICS.md §3.2
+     * @param gameId Game identifier
+     * @param participant1 First participant address
+     * @param participant2 Second participant address
+     * @return fair True if pairwise proportionality holds within rounding tolerance
+     * @return deviation Absolute deviation from perfect proportionality
+     */
+    function verifyPairwiseFairness(
+        bytes32 gameId,
+        address participant1,
+        address participant2
+    ) external view returns (bool fair, uint256 deviation) {
+        // Tolerance: cross-multiplication produces values on order of reward × weight.
+        // Integer division rounding error in reward ≈ totalWeight, so
+        // deviation = |rewardA×wB - rewardB×wA| can be up to max(wA,wB) ≤ totalWeight.
+        uint256 tolerance = totalWeightedContrib[gameId];
+
+        PairwiseFairness.FairnessResult memory result = PairwiseFairness.verifyPairwiseProportionality(
+            shapleyValues[gameId][participant1],
+            shapleyValues[gameId][participant2],
+            weightedContributions[gameId][participant1],
+            weightedContributions[gameId][participant2],
+            tolerance
+        );
+
+        return (result.fair, result.deviation);
+    }
+
+    /**
+     * @notice Verify time neutrality across two games for a participant
+     * @dev For FEE_DISTRIBUTION games with identical contributions and total values,
+     *      rewards must be equal. See: docs/TIME_NEUTRAL_TOKENOMICS.md §3.3
+     * @param gameId1 First game identifier
+     * @param gameId2 Second game identifier
+     * @param participant Participant address (must be in both games)
+     * @return neutral True if allocations are equal within tolerance
+     * @return deviation Absolute difference between the two allocations
+     */
+    function verifyTimeNeutrality(
+        bytes32 gameId1,
+        bytes32 gameId2,
+        address participant
+    ) external view returns (bool neutral, uint256 deviation) {
+        // Both games must be fee distribution (time-neutral track)
+        require(
+            games[gameId1].gameType == GameType.FEE_DISTRIBUTION &&
+            games[gameId2].gameType == GameType.FEE_DISTRIBUTION,
+            "Time neutrality only applies to FEE_DISTRIBUTION games"
+        );
+
+        uint256 reward1 = shapleyValues[gameId1][participant];
+        uint256 reward2 = shapleyValues[gameId2][participant];
+
+        // Tolerance: max of both games' participant counts
+        uint256 tolerance = gameParticipants[gameId1].length > gameParticipants[gameId2].length
+            ? gameParticipants[gameId1].length
+            : gameParticipants[gameId2].length;
+
+        PairwiseFairness.FairnessResult memory result = PairwiseFairness.verifyTimeNeutrality(
+            reward1,
+            reward2,
+            tolerance
+        );
+
+        return (result.fair, result.deviation);
+    }
+
+    /**
+     * @notice Get the weighted contribution stored for a participant in a game
+     * @dev Stored during computeShapleyValues for post-hoc fairness verification
+     */
+    function getWeightedContribution(bytes32 gameId, address participant) external view returns (uint256) {
+        return weightedContributions[gameId][participant];
+    }
+
+    /**
+     * @notice Get the game type (FEE_DISTRIBUTION or TOKEN_EMISSION)
+     */
+    function getGameType(bytes32 gameId) external view returns (GameType) {
+        return games[gameId].gameType;
     }
 
     // ============ Admin Functions ============

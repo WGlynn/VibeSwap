@@ -76,7 +76,7 @@ contract ShapleyDistributorTest is Test {
 
         distributor.createGame(GAME_ID, 100 ether, address(token), participants);
 
-        (bytes32 gameId, uint256 totalValue, address gameToken, bool settled) = distributor.games(GAME_ID);
+        (bytes32 gameId, uint256 totalValue, address gameToken,, bool settled) = distributor.games(GAME_ID);
         assertEq(gameId, GAME_ID);
         assertEq(totalValue, 100 ether);
         assertEq(gameToken, address(token));
@@ -90,7 +90,7 @@ contract ShapleyDistributorTest is Test {
 
         distributor.createGame(GAME_ID, 10 ether, address(0), participants);
 
-        (, uint256 totalValue, address gameToken,) = distributor.games(GAME_ID);
+        (, uint256 totalValue, address gameToken,,) = distributor.games(GAME_ID);
         assertEq(totalValue, 10 ether);
         assertEq(gameToken, address(0));
     }
@@ -671,16 +671,13 @@ contract ShapleyDistributorTest is Test {
         distributor.createGame(GAME_ID, 100 ether, address(token), participants);
 
         // Game value should be unchanged in Era 0
-        (, uint256 totalValue,,) = distributor.games(GAME_ID);
+        (, uint256 totalValue,,,) = distributor.games(GAME_ID);
         assertEq(totalValue, 100 ether);
         assertEq(distributor.totalGamesCreated(), 1);
     }
 
     function test_halving_era1_halfValue() public {
-        // Fast-forward to Era 1 by creating gamesPerEra games
-        uint256 gamesPerEra = distributor.gamesPerEra();
-
-        // First, let's use a smaller gamesPerEra for testing
+        // Use a smaller gamesPerEra for testing
         distributor.setGamesPerEra(10); // 10 games per era for testing
 
         ShapleyDistributor.Participant[] memory participants = _createParticipants();
@@ -695,12 +692,12 @@ contract ShapleyDistributorTest is Test {
         // Now we should be in Era 1
         assertEq(distributor.getCurrentHalvingEra(), 1);
 
-        // Create a game in Era 1
+        // Create a TOKEN_EMISSION game in Era 1 (halving applies to emissions, not fees)
         bytes32 era1Game = keccak256("era1-game");
-        distributor.createGame(era1Game, 100 ether, address(token), participants);
+        distributor.createGameTyped(era1Game, 100 ether, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, participants);
 
         // Game value should be halved
-        (, uint256 totalValue,,) = distributor.games(era1Game);
+        (, uint256 totalValue,,,) = distributor.games(era1Game);
         assertEq(totalValue, 50 ether); // 50% of 100 ether
     }
 
@@ -720,12 +717,12 @@ contract ShapleyDistributorTest is Test {
         // Should be in Era 2
         assertEq(distributor.getCurrentHalvingEra(), 2);
 
-        // Create a game in Era 2
+        // Create a TOKEN_EMISSION game in Era 2 (halving applies to emissions, not fees)
         bytes32 era2Game = keccak256("era2-game");
-        distributor.createGame(era2Game, 100 ether, address(token), participants);
+        distributor.createGameTyped(era2Game, 100 ether, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, participants);
 
         // Game value should be 25%
-        (, uint256 totalValue,,) = distributor.games(era2Game);
+        (, uint256 totalValue,,,) = distributor.games(era2Game);
         assertEq(totalValue, 25 ether); // 25% of 100 ether
     }
 
@@ -793,7 +790,7 @@ contract ShapleyDistributorTest is Test {
         bytes32 testGame = keccak256("test-game");
         distributor.createGame(testGame, 100 ether, address(token), participants);
 
-        (, uint256 totalValue,,) = distributor.games(testGame);
+        (, uint256 totalValue,,,) = distributor.games(testGame);
         assertEq(totalValue, 100 ether); // Full value, no halving applied
     }
 

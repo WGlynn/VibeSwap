@@ -19,6 +19,7 @@ import "../libraries/LiquidityProtection.sol";
 import "../libraries/FibonacciScaling.sol";
 import "../libraries/ProofOfWorkLib.sol";
 import "../oracles/interfaces/ITruePriceOracle.sol";
+import "../incentives/IPriorityRegistry.sol";
 
 /**
  * @title VibeAMM
@@ -185,6 +186,9 @@ contract VibeAMM is
     uint256 public fibonacciWindowDuration = 1 hours;
 
     // ============ Proof-of-Work Fee Discount State ============
+
+    /// @notice PriorityRegistry for recording pool creation pioneers
+    IPriorityRegistry public priorityRegistry;
 
     /// @notice Maximum fee discount from PoW (basis points, e.g., 5000 = 50%)
     uint256 public maxPoWFeeDiscount = 5000;
@@ -384,6 +388,11 @@ contract VibeAMM is
         // Deploy LP token
         VibeLP lpToken = new VibeLP(token0, token1, address(this));
         lpTokens[poolId] = address(lpToken);
+
+        // Record pool creation priority (if registry configured)
+        if (address(priorityRegistry) != address(0)) {
+            try IPriorityRecorder(address(priorityRegistry)).recordPoolCreation(poolId, msg.sender) {} catch {}
+        }
 
         emit PoolCreated(poolId, token0, token1, actualFeeRate);
     }
@@ -973,6 +982,13 @@ contract VibeAMM is
      */
     function setPriceOracle(address oracle) external onlyOwner {
         priceOracle = oracle;
+    }
+
+    /**
+     * @notice Set priority registry for recording pool creation pioneers
+     */
+    function setPriorityRegistry(address _registry) external onlyOwner {
+        priorityRegistry = IPriorityRegistry(_registry);
     }
 
     /**

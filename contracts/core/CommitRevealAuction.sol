@@ -11,6 +11,7 @@ import "./interfaces/ICommitRevealAuction.sol";
 import "./PoolComplianceConfig.sol";
 import "../libraries/DeterministicShuffle.sol";
 import "../libraries/ProofOfWorkLib.sol";
+import "../oracle/IReputationOracle.sol";
 
 /// @notice Minimal interface for ComplianceRegistry tier lookups
 interface IComplianceRegistry {
@@ -116,6 +117,10 @@ contract CommitRevealAuction is
     /// @notice Compliance registry for user tier/KYC lookups
     /// @dev Only used for reading user data, not for admin control
     address public complianceRegistry;
+
+    /// @notice ReputationOracle for trust-based tier fallback
+    /// @dev When ComplianceRegistry returns tier 0, falls back to reputation tier
+    IReputationOracle public reputationOracle;
 
     /// @notice Pool counter for generating unique pool IDs
     uint256 public poolCount;
@@ -912,6 +917,14 @@ contract CommitRevealAuction is
         powBaseValue = _baseValue;
     }
 
+    /**
+     * @notice Set reputation oracle for trust-based tier lookups
+     * @param _oracle ReputationOracle address (address(0) to disable)
+     */
+    function setReputationOracle(address _oracle) external onlyOwner {
+        reputationOracle = IReputationOracle(_oracle);
+    }
+
     // ============ Pool View Functions ============
 
     /**
@@ -1057,25 +1070,35 @@ contract CommitRevealAuction is
      * @return tier User tier (0-5)
      */
     function _getUserTier(address user) internal view returns (uint8) {
-        if (complianceRegistry == address(0)) {
-            return 0; // No registry = tier 0 (open)
+        uint8 tier = 0;
+
+        // Try ComplianceRegistry first
+        if (complianceRegistry != address(0)) {
+            try IComplianceRegistry(complianceRegistry).getUserProfile(user) returns (
+                uint8 complianceTier,
+                uint8,
+                uint64,
+                uint64,
+                bytes2,
+                uint256,
+                uint256,
+                string memory,
+                bytes32
+            ) {
+                tier = complianceTier;
+            } catch {}
         }
 
-        try IComplianceRegistry(complianceRegistry).getUserProfile(user) returns (
-            uint8 tier,
-            uint8,
-            uint64,
-            uint64,
-            bytes2,
-            uint256,
-            uint256,
-            string memory,
-            bytes32
-        ) {
-            return tier;
-        } catch {
-            return 0; // Default to tier 0 on error
+        // Fall back to ReputationOracle if compliance tier is 0
+        if (tier == 0 && address(reputationOracle) != address(0)) {
+            try reputationOracle.getTrustTier(user) returns (uint8 trustTier) {
+                if (trustTier > tier) {
+                    tier = trustTier;
+                }
+            } catch {}
         }
+
+        return tier;
     }
 
     /**

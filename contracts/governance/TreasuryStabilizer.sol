@@ -255,9 +255,17 @@ contract TreasuryStabilizer is
 
         if (deployed == 0) revert InvalidAmount();
 
-        // Get pool info and calculate token1 amount
-        // Simplified: would need to query pool for proper ratio
-        uint256 token1Amount = deployed; // Placeholder - should calculate based on pool ratio
+        // Calculate token1 amount from pool ratio
+        uint256 token1Amount;
+        try vibeAMM.getPool(poolId) returns (IVibeAMM.Pool memory pool) {
+            if (pool.reserve0 > 0) {
+                token1Amount = (deployed * pool.reserve1) / pool.reserve0;
+            } else {
+                token1Amount = deployed; // First deposit: 1:1 ratio
+            }
+        } catch {
+            token1Amount = deployed; // Fallback: 1:1 ratio
+        }
 
         // Request treasury to provide liquidity
         // This requires treasury to have authorized this contract
@@ -289,11 +297,12 @@ contract TreasuryStabilizer is
         bytes32 poolId,
         uint256 lpAmount
     ) external override onlyOwner nonReentrant returns (uint256 received) {
-        // Request treasury to remove liquidity
-        // This would call daoTreasury.removeBackstopLiquidity
-
-        // For now, simplified implementation
-        received = lpAmount; // Placeholder
+        // Request treasury to remove backstop liquidity
+        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount) returns (uint256 amount) {
+            received = amount;
+        } catch {
+            received = 0;
+        }
 
         emit BackstopWithdrawn(token, poolId, received);
     }
@@ -334,18 +343,30 @@ contract TreasuryStabilizer is
      * @return trend Trend in basis points (negative = declining)
      */
     function _calculateTrend(bytes32 poolId) internal view returns (int256 trend) {
-        // Get volatility data which includes price information
-        (uint256 volatility, , ) = volatilityOracle.getVolatilityData(poolId);
+        // Compare short-term vs long-term price via AMM TWAP
+        try vibeAMM.getTWAP(poolId, shortTermPeriod) returns (uint256 shortTWAP) {
+            try vibeAMM.getTWAP(poolId, longTermPeriod) returns (uint256 longTWAP) {
+                if (longTWAP > 0 && shortTWAP > 0) {
+                    // Trend = (shortTWAP - longTWAP) / longTWAP as BPS
+                    if (shortTWAP >= longTWAP) {
+                        trend = int256(((shortTWAP - longTWAP) * 10000) / longTWAP);
+                    } else {
+                        trend = -int256(((longTWAP - shortTWAP) * 10000) / longTWAP);
+                    }
+                    return trend;
+                }
+            } catch {}
+        } catch {}
 
-        // In production, would compare short-term vs long-term TWAP
-        // For now, use volatility as proxy (high volatility often accompanies bear markets)
-        // This is simplified - real implementation would use actual price trend
-
-        // Mock calculation: if volatility > 50% annualized, consider bearish tendency
-        if (volatility > 5000) {
-            trend = -int256((volatility - 5000) * 2); // Scale volatility to trend
-        } else {
-            trend = int256(5000 - volatility); // Lower volatility = bullish
+        // Fallback: use volatility as proxy when TWAP unavailable
+        try volatilityOracle.getVolatilityData(poolId) returns (uint256 volatility, IVolatilityOracle.VolatilityTier, uint64) {
+            if (volatility > 5000) {
+                trend = -int256((volatility - 5000) * 2);
+            } else {
+                trend = int256(5000 - volatility);
+            }
+        } catch {
+            trend = 0;
         }
     }
 

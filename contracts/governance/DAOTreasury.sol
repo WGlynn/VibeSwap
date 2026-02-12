@@ -202,6 +202,27 @@ contract DAOTreasury is
     }
 
     /**
+     * @notice Remove backstop liquidity from AMM pool
+     * @param poolId Pool to remove liquidity from
+     * @param lpAmount LP tokens to burn
+     * @return received Total token value received
+     */
+    function removeBackstopLiquidity(
+        bytes32 poolId,
+        uint256 lpAmount
+    ) external onlyOwner nonReentrant returns (uint256 received) {
+        IVibeAMM amm = IVibeAMM(vibeAMM);
+        (uint256 amount0, uint256 amount1) = amm.removeLiquidity(
+            poolId,
+            lpAmount,
+            0, // min amount0
+            0  // min amount1
+        );
+        lpPositions[poolId] -= lpAmount;
+        received = amount0 + amount1;
+    }
+
+    /**
      * @notice Queue a withdrawal (timelock)
      * @param recipient Address to receive funds
      * @param token Token to withdraw (address(0) for ETH)

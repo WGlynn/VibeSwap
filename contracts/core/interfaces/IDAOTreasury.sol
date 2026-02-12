@@ -123,6 +123,17 @@ interface IDAOTreasury {
     ) external;
 
     /**
+     * @notice Remove backstop liquidity from AMM pool
+     * @param poolId Pool to remove liquidity from
+     * @param lpAmount LP tokens to burn
+     * @return received Amount of tokens received
+     */
+    function removeBackstopLiquidity(
+        bytes32 poolId,
+        uint256 lpAmount
+    ) external returns (uint256 received);
+
+    /**
      * @notice Queue a withdrawal (timelock)
      * @param recipient Address to receive funds
      * @param token Token to withdraw

@@ -167,4 +167,12 @@ interface IVibeAMM {
      * @notice Get spot price for a pool (token1 per token0)
      */
     function getSpotPrice(bytes32 poolId) external view returns (uint256);
+
+    /**
+     * @notice Get TWAP price for a pool
+     * @param poolId Pool identifier
+     * @param period TWAP period in seconds
+     * @return TWAP price (0 if insufficient history)
+     */
+    function getTWAP(bytes32 poolId, uint32 period) external view returns (uint256);
 }

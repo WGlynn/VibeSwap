@@ -10,3 +10,8 @@ interface IPriorityRegistry {
     function getPioneerScore(address participant, bytes32 scopeId) external view returns (uint256);
     function isPioneer(address participant, bytes32 scopeId) external view returns (bool);
 }
+
+/// @notice Extended interface for authorized recorders
+interface IPriorityRecorder {
+    function recordPoolCreation(bytes32 scopeId, address pioneer) external;
+}

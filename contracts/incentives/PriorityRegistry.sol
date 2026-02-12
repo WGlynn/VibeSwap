@@ -26,6 +26,7 @@ import "./IPriorityRegistry.sol";
  */
 contract PriorityRegistry is
     IPriorityRegistry,
+    IPriorityRecorder,
     OwnableUpgradeable,
     UUPSUpgradeable
 {
@@ -241,6 +242,30 @@ contract PriorityRegistry is
         if (cat == Category.STRATEGY_AUTHOR) return STRATEGY_AUTHOR_WEIGHT;
         if (cat == Category.INFRASTRUCTURE) return INFRASTRUCTURE_WEIGHT;
         return 0;
+    }
+
+    // ============ IPriorityRecorder ============
+
+    /**
+     * @notice Convenience wrapper for recording pool creation priority
+     * @dev Called by VibeAMM.createPool() via IPriorityRecorder interface
+     */
+    function recordPoolCreation(bytes32 scopeId, address pioneer) external override onlyAuthorized {
+        if (pioneer == address(0)) revert ZeroAddress();
+
+        Record storage record = records[scopeId][Category.POOL_CREATION];
+        if (record.pioneer != address(0)) revert PriorityAlreadyClaimed();
+
+        record.pioneer = pioneer;
+        record.timestamp = block.timestamp;
+        record.blockNumber = block.number;
+        record.category = Category.POOL_CREATION;
+        record.active = true;
+
+        isPioneerOf[pioneer][scopeId] = true;
+        pioneerRecordCount[pioneer]++;
+
+        emit PriorityRecorded(scopeId, Category.POOL_CREATION, pioneer, block.timestamp);
     }
 
     // ============ Admin ============

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../compliance/FederatedConsensus.sol";
+import "./DecentralizedTribunal.sol";
 
 /**
  * @title DisputeResolver
@@ -86,6 +87,9 @@ contract DisputeResolver is
 
     /// @notice FederatedConsensus contract
     FederatedConsensus public consensus;
+
+    /// @notice DecentralizedTribunal for appeal escalation
+    DecentralizedTribunal public tribunal;
 
     /// @notice Disputes by ID
     mapping(bytes32 => Dispute) public disputes;
@@ -363,7 +367,11 @@ contract DisputeResolver is
         dispute.phase = DisputePhase.APPEALED;
         dispute.resolution = Resolution.ESCALATED;
 
-        // If this appeal overturns the ruling, arbitrator reputation decreases
+        // Open trial in DecentralizedTribunal if configured
+        if (address(tribunal) != address(0)) {
+            tribunal.openTrial(dispute.caseId, dispute.consensusProposalId);
+        }
+
         emit DisputeEscalated(disputeId);
     }
 
@@ -374,7 +382,8 @@ contract DisputeResolver is
     function recordAppealOutcome(
         bytes32 disputeId,
         bool rulingOverturned
-    ) external onlyOwner {
+    ) external {
+        require(msg.sender == owner() || msg.sender == address(tribunal), "Not authorized");
         Dispute storage dispute = disputes[disputeId];
         Arbitrator storage arb = arbitrators[dispute.assignedArbitrator];
 
@@ -453,6 +462,10 @@ contract DisputeResolver is
     function setFees(uint256 _filingFee, uint256 _minArbitratorStake) external onlyOwner {
         filingFee = _filingFee;
         minArbitratorStake = _minArbitratorStake;
+    }
+
+    function setTribunal(address _tribunal) external onlyOwner {
+        tribunal = DecentralizedTribunal(payable(_tribunal));
     }
 
     function setDurations(uint256 _responseDuration, uint256 _arbitrationDuration) external onlyOwner {

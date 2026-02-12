@@ -331,7 +331,8 @@ contract StablecoinFlowRegistry is
 
         uint256 sum = 0;
         for (uint8 i = 0; i < historyCount; i++) {
-            sum += flowRatioHistory[i].ratio;
+            uint8 idx = (historyIndex + HISTORY_SIZE - i) % HISTORY_SIZE;
+            sum += flowRatioHistory[idx].ratio;
         }
 
         return sum / historyCount;

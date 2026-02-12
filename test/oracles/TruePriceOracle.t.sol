@@ -459,15 +459,17 @@ contract TruePriceOracleTest is Test {
     }
 
     function test_isFresh() public {
+        // Price submitted at timestamp 1 (Foundry default)
         _submitPrice(poolId, 2000 * PRECISION, ITruePriceOracle.RegimeType.NORMAL, 0);
 
         assertTrue(oracle.isFresh(poolId, 5 minutes));
 
-        vm.warp(block.timestamp + 3 minutes);
+        // Use absolute timestamps to avoid vm.warp(block.timestamp + x) nightly bug
+        vm.warp(181); // 3 minutes after timestamp 1
         assertTrue(oracle.isFresh(poolId, 5 minutes));
         assertFalse(oracle.isFresh(poolId, 2 minutes));
 
-        vm.warp(block.timestamp + 3 minutes);
+        vm.warp(361); // 6 minutes after timestamp 1
         assertFalse(oracle.isFresh(poolId, 5 minutes));
     }
 
@@ -566,6 +568,9 @@ contract TruePriceOracleTest is Test {
     // ============ Stablecoin Context Tests ============
 
     function test_updateStablecoinContext() public {
+        // Disconnect registry so oracle uses local stablecoin context
+        oracle.setStablecoinRegistry(address(0));
+
         uint256 nonce = oracle.getNonce(signer);
         uint256 deadline = block.timestamp + 1 hours;
 
@@ -591,7 +596,8 @@ contract TruePriceOracleTest is Test {
     }
 
     function test_stablecoinContext_fromRegistry() public {
-        // Update registry directly
+        // Update registry directly (must prank as authorized updater)
+        vm.prank(signer);
         registry.updateFlowRatio(3e18); // 3.0 ratio (USDT dominant)
 
         ITruePriceOracle.StablecoinContext memory ctx = oracle.getStablecoinContext();
@@ -604,6 +610,7 @@ contract TruePriceOracleTest is Test {
 
     function test_getPriceBounds_usdtDominant() public {
         // Set USDT dominant via registry
+        vm.prank(signer);
         registry.updateFlowRatio(3e18);
 
         _submitPrice(poolId, 2000 * PRECISION, ITruePriceOracle.RegimeType.NORMAL, 0);
@@ -618,6 +625,7 @@ contract TruePriceOracleTest is Test {
 
     function test_getPriceBounds_usdcDominant() public {
         // Set USDC dominant via registry
+        vm.prank(signer);
         registry.updateFlowRatio(4e17); // 0.4 ratio
 
         _submitPrice(poolId, 2000 * PRECISION, ITruePriceOracle.RegimeType.NORMAL, 0);

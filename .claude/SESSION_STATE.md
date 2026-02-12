@@ -2,23 +2,36 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-11 (Desktop - Claude Code Opus 4.6)
+**Last Updated**: 2026-02-12 (Desktop - Claude Code Opus 4.6)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
-- Backend production hardening COMPLETE (10 phases)
-- CommitRevealAuction + VibeAMM tests FIXED (41/41 pass)
-- 34 remaining test failures across integration/security/oracle tests
+- Protocol security hardening in progress
+- **537 tests passing, 0 failures, 0 skipped** (full suite green)
+- All previously-skipped test files now activated and passing
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Fix remaining 34 test failures (FlashLoanDetected, NotActiveAuthority, string→custom errors, oracle assertions)
+- Continue protocol security hardening (contract-level fixes, formal verification)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
-## Recently Completed (Feb 11, 2026)
+## Recently Completed (Feb 12, 2026)
+23. **Activated Skipped Security + Cross-Chain Tests (43 new tests)**
+    - CrossChainRouter.t.sol: 21 tests (peer mgmt, commit/reveal, rate limiting, replay prevention)
+    - SecurityAttacks.t.sol: 22 tests (flash loan, first depositor, donation, price manipulation, circuit breakers, commit-reveal, reentrancy, fuzz)
+    - Fixed: struct field mismatches, string→custom errors, CommitRevealAuction 3-param init, donation test scope
+    - Total suite: 537 tests, 0 failures
+24. **MoneyPathAdversarial.t.sol (18 adversarial money path tests)**
+    - AMM fund safety (LP sandwich, first depositor, rounding theft, donation manipulation)
+    - Auction fund safety (double spend, slash accounting, wrong secret, priority bid)
+    - Treasury fund safety (double commitment, timelock, double execute, recipient immutability)
+    - Reward distribution safety (double claim, overpay, non-participant)
+    - Oracle/price safety (TWAP deviation, flash loan same block, trade size limit)
+
+## Previously Completed (Feb 11, 2026)
 22. **CommitRevealAuction + VibeAMM Test Fixes**
     - CommitRevealAuction: Fixed double-nonReentrant (commitOrder wrapper + commitOrderToPool both had nonReentrant)
     - CommitRevealAuction.t.sol: Updated all expectRevert to custom error selectors

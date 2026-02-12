@@ -212,7 +212,11 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
         uint256 amount,
         address token,
         string calldata reason
-    ) external onlyActiveAuthority returns (bytes32 proposalId) {
+    ) external returns (bytes32 proposalId) {
+        // Allow executor (ClawbackRegistry) or active authorities to create proposals
+        if (msg.sender != executor && msg.sender != owner() && !authorities[msg.sender].active) {
+            revert NotActiveAuthority();
+        }
         proposalCount++;
         proposalId = keccak256(abi.encodePacked(caseId, targetWallet, proposalCount, block.timestamp));
 

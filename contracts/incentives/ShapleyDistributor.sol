@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../libraries/PairwiseFairness.sol";
+import "./IPriorityRegistry.sol";
 
 /**
  * @title ShapleyDistributor
@@ -65,6 +66,10 @@ contract ShapleyDistributor is
     uint256 public constant ENABLING_WEIGHT = 3000;    // 30% - Time-based enabling
     uint256 public constant SCARCITY_WEIGHT = 2000;    // 20% - Providing scarce side
     uint256 public constant STABILITY_WEIGHT = 1000;   // 10% - Staying during volatility
+
+    // Pioneer bonus: max 50% extra weight for full pioneer score (10000 BPS)
+    // Applied as multiplier: 1.0x (non-pioneer) to 1.5x (max pioneer)
+    uint256 public constant PIONEER_BONUS_MAX_BPS = 5000;
 
     // ============ Bitcoin Halving Schedule Constants ============
 
@@ -167,6 +172,14 @@ contract ShapleyDistributor is
     uint256 public maxParticipants;
     bool public useQualityWeights;
 
+    // ============ Pioneer Priority State ============
+
+    /// @notice Optional PriorityRegistry for first-to-publish bonus (address(0) = disabled)
+    IPriorityRegistry public priorityRegistry;
+
+    /// @notice Game ID => scope ID (typically poolId) for pioneer lookup
+    mapping(bytes32 => bytes32) public gameScopeId;
+
     // ============ Bitcoin Halving State ============
 
     /// @notice Genesis timestamp (when halving schedule started)
@@ -257,8 +270,8 @@ contract ShapleyDistributor is
         address token,
         Participant[] calldata participants
     ) external onlyAuthorized {
-        // Default to FEE_DISTRIBUTION (time-neutral)
-        _createGameInternal(gameId, totalValue, token, GameType.FEE_DISTRIBUTION, participants);
+        // Default to FEE_DISTRIBUTION (time-neutral), no scope
+        _createGameInternal(gameId, totalValue, token, GameType.FEE_DISTRIBUTION, bytes32(0), participants);
     }
 
     /**
@@ -278,7 +291,29 @@ contract ShapleyDistributor is
         GameType gameType,
         Participant[] calldata participants
     ) external onlyAuthorized {
-        _createGameInternal(gameId, totalValue, token, gameType, participants);
+        _createGameInternal(gameId, totalValue, token, gameType, bytes32(0), participants);
+    }
+
+    /**
+     * @notice Create a game with explicit type AND scope for pioneer lookup
+     * @dev When scopeId is set and priorityRegistry is configured, participants who are
+     *      pioneers for that scope receive a bonus multiplier on their weighted contribution.
+     * @param gameId Unique identifier
+     * @param totalValue Total value to distribute
+     * @param token Token to distribute (address(0) for ETH)
+     * @param gameType FEE_DISTRIBUTION or TOKEN_EMISSION
+     * @param scopeId Scope identifier (typically poolId) for pioneer lookup
+     * @param participants Array of participants with contribution data
+     */
+    function createGameFull(
+        bytes32 gameId,
+        uint256 totalValue,
+        address token,
+        GameType gameType,
+        bytes32 scopeId,
+        Participant[] calldata participants
+    ) external onlyAuthorized {
+        _createGameInternal(gameId, totalValue, token, gameType, scopeId, participants);
     }
 
     function _createGameInternal(
@@ -286,6 +321,7 @@ contract ShapleyDistributor is
         uint256 totalValue,
         address token,
         GameType gameType,
+        bytes32 scopeId,
         Participant[] calldata participants
     ) internal {
         if (games[gameId].totalValue != 0) revert GameAlreadyExists();
@@ -313,6 +349,11 @@ contract ShapleyDistributor is
             gameType: gameType,
             settled: false
         });
+
+        // Store scope for pioneer lookup
+        if (scopeId != bytes32(0)) {
+            gameScopeId[gameId] = scopeId;
+        }
 
         // Store participants
         for (uint256 i = 0; i < participants.length; i++) {
@@ -350,7 +391,7 @@ contract ShapleyDistributor is
         uint256 totalWeight = 0;
 
         for (uint256 i = 0; i < n; i++) {
-            weights[i] = _calculateWeightedContribution(participants[i]);
+            weights[i] = _calculateWeightedContribution(participants[i], gameId);
             totalWeight += weights[i];
 
             // Store for pairwise verification (anyone can audit fairness on-chain)
@@ -419,9 +460,11 @@ contract ShapleyDistributor is
      * - Enabling: Time in pool (enabled others to trade)
      * - Scarcity: Provided the scarce side of the market
      * - Stability: Stayed during volatility (enabled survival)
+     * - Pioneer bonus: multiplier from PriorityRegistry (1.0x to 1.5x)
      */
     function _calculateWeightedContribution(
-        Participant memory p
+        Participant memory p,
+        bytes32 gameId
     ) internal view returns (uint256) {
         // Normalize each component to PRECISION scale
         uint256 directScore = p.directContribution;
@@ -453,7 +496,25 @@ contract ShapleyDistributor is
             (stabilityNorm * STABILITY_WEIGHT)
         ) / BPS_PRECISION;
 
-        return (weighted * qualityMultiplier) / PRECISION;
+        weighted = (weighted * qualityMultiplier) / PRECISION;
+
+        // Pioneer bonus: query PriorityRegistry if configured
+        // Only activates when BOTH registry and scopeId are set — zero overhead otherwise
+        bytes32 scopeId = gameScopeId[gameId];
+        if (address(priorityRegistry) != address(0) && scopeId != bytes32(0)) {
+            uint256 pioneerScore = priorityRegistry.getPioneerScore(p.participant, scopeId);
+            if (pioneerScore > 0) {
+                // Linear scaling: score / (2 * BPS_PRECISION) gives bonus fraction
+                // score 5000  → 25% bonus (1.25x)
+                // score 10000 → 50% bonus (1.5x) — pool creator
+                // score 17500 → 87.5% bonus (1.875x) — pool creator + first LP
+                // score 27500 → 137.5% bonus (2.375x) — all 4 categories (extremely rare)
+                uint256 pioneerMultiplier = PRECISION + (pioneerScore * PRECISION) / (2 * BPS_PRECISION);
+                weighted = (weighted * pioneerMultiplier) / PRECISION;
+            }
+        }
+
+        return weighted;
     }
 
     /**
@@ -746,6 +807,13 @@ contract ShapleyDistributor is
         return games[gameId].gameType;
     }
 
+    /**
+     * @notice Get the scope ID associated with a game (for pioneer lookup)
+     */
+    function getGameScopeId(bytes32 gameId) external view returns (bytes32) {
+        return gameScopeId[gameId];
+    }
+
     // ============ Admin Functions ============
 
     function setAuthorizedCreator(address creator, bool authorized) external onlyOwner {
@@ -759,6 +827,17 @@ contract ShapleyDistributor is
 
     function setUseQualityWeights(bool _use) external onlyOwner {
         useQualityWeights = _use;
+    }
+
+    // ============ Pioneer Admin Functions ============
+
+    /**
+     * @notice Set the PriorityRegistry for pioneer bonus lookup
+     * @dev address(0) disables pioneer bonus (default)
+     * @param _registry PriorityRegistry address
+     */
+    function setPriorityRegistry(address _registry) external onlyOwner {
+        priorityRegistry = IPriorityRegistry(_registry);
     }
 
     // ============ Halving Admin Functions ============

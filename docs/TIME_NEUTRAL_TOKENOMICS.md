@@ -394,6 +394,83 @@ VibeSwap's fee distribution should follow the same principle:
 
 This aligns with Bitcoin's proven economic model while ensuring time-neutral fairness for active participants.
 
+## 5. First-to-Publish Priority
+
+### 5.1 Definition
+
+A **Priority Record** is an immutable on-chain timestamp proving chronological first publication:
+
+```
+PriorityRecord = {
+    pioneer:     address    // Who published first
+    timestamp:   uint256    // When (block.timestamp)
+    blockNumber: uint256    // Block number (additional proof)
+    category:    Category   // What type of foundational act
+    active:      bool       // Deactivatable only for fraud
+}
+```
+
+Categories of foundational acts:
+- **POOL_CREATION** (weight: 10000) — First to create a trading pair
+- **LIQUIDITY_BOOTSTRAP** (weight: 7500) — First to provide significant liquidity
+- **STRATEGY_AUTHOR** (weight: 5000) — First to publish a verified strategy
+- **INFRASTRUCTURE** (weight: 5000) — First to deploy supporting infrastructure
+
+### 5.2 Pioneer Bonus Mechanism
+
+The pioneer score feeds into the Shapley weighted contribution as a **multiplier**:
+
+```
+pioneerMultiplier = 1.0 + pioneerScore / (2 × BPS_PRECISION)
+weightedContribution = baseWeight × qualityMultiplier × pioneerMultiplier
+```
+
+| Pioneer Score | Bonus | Multiplier | Typical Pioneer |
+|---------------|-------|------------|-----------------|
+| 0             | 0%    | 1.0x       | Non-pioneer |
+| 5000          | 25%   | 1.25x      | Strategy author |
+| 10000         | 50%   | 1.5x       | Pool creator |
+| 17500         | 87.5% | 1.875x     | Pool creator + first LP |
+| 27500         | 137.5%| 2.375x     | All 4 categories (rare) |
+
+### 5.3 Compatibility with Shapley Axioms
+
+**Theorem 6 (Pioneer Preserves Pairwise Proportionality):**
+For any pair (i, j) where i is a pioneer and j is not:
+
+```
+φᵢ/φⱼ = (wᵢ × pioneerMultiplierᵢ) / (wⱼ × pioneerMultiplierⱼ)
+```
+
+The multiplier is applied uniformly to all weight components (direct, enabling, scarcity, stability), so pairwise proportionality holds between the *adjusted* weights. The pioneer bonus is transparent and auditable — anyone can verify it on-chain by calling `getPioneerScore()`. ∎
+
+**Theorem 7 (Pioneer Bonus is Time-Neutral):**
+For a participant P with pioneer score S in scope X, creating two FEE_DISTRIBUTION games G₁ (Era 0) and G₂ (Era 1) with identical parameters:
+
+```
+φ(G₁, P) = φ(G₂, P)
+```
+
+Proof: Pioneer score is determined by the PriorityRegistry, which is independent of era. The multiplier `1 + S/(2×10000)` is constant across eras. Since FEE_DISTRIBUTION games apply no halving, and contributions are identical, rewards are identical. ∎
+
+### 5.4 The Cave Theorem, Strengthened
+
+**Corollary 5.1:** A foundational contributor (high marginal contribution AND pioneer status) earns more via *both* mechanisms:
+1. Shapley marginal contribution captures the *quality* of their work
+2. Pioneer bonus captures the *chronological priority* of their innovation
+
+Neither mechanism is time-biased: the pioneer bonus rewards being *first to publish a specific innovation*, not being early in general. A late pioneer (first to create a new pool in Year 5) receives the same bonus as an early pioneer (first to create a pool in Year 1).
+
+### 5.5 Governance Roadmap
+
+The admin functions controlling PriorityRegistry and ShapleyDistributor parameters follow a credible neutrality progression:
+
+1. **Phase 1 (Current):** Owner-controlled — necessary during development and initial deployment
+2. **Phase 2 (DAO Governance):** Transfer ownership to DAOTreasury — community-controlled parameter changes via governance proposals with time-locked execution
+3. **Phase 3 (Renouncement):** Renounce ownership entirely — parameters become immutable, the protocol runs autonomously
+
+This progression ensures the protocol achieves credible neutrality: no single party can change the rules after renouncement.
+
 ---
 
 *Document authored for VibeSwap Protocol*

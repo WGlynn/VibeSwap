@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "../../contracts/compliance/ClawbackRegistry.sol";
 import "../../contracts/compliance/FederatedConsensus.sol";
 import "../../contracts/compliance/ComplianceRegistry.sol";
+import "../../contracts/compliance/ClawbackVault.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -115,8 +116,20 @@ contract SybilResistanceIntegrationTest is Test {
         ERC1967Proxy complianceProxy = new ERC1967Proxy(address(complianceImpl), complianceInit);
         compliance = ComplianceRegistry(payable(address(complianceProxy)));
 
+        // Deploy ClawbackVault
+        ClawbackVault vaultImpl = new ClawbackVault();
+        bytes memory vaultInit = abi.encodeWithSelector(
+            ClawbackVault.initialize.selector,
+            owner,
+            address(0)
+        );
+        ERC1967Proxy vaultProxy = new ERC1967Proxy(address(vaultImpl), vaultInit);
+        ClawbackVault vault = ClawbackVault(payable(address(vaultProxy)));
+
         // Wire up
         consensus.setExecutor(address(registry));
+        vault.setRegistry(address(registry));
+        registry.setVault(address(vault));
         registry.setAuthorizedTracker(address(this), true);
 
         // Add authorities - each represents a real-world off-chain entity
@@ -286,22 +299,24 @@ contract SybilResistanceIntegrationTest is Test {
 
         (, , , , , , , , , bytes32 proposalId, ) = registry.cases(caseId);
 
-        // Government, lawyer, court approve (3/5 met)
+        // Government and lawyer approve (2/5)
         vm.prank(government);
         consensus.vote(proposalId, true);
         vm.prank(lawyer);
         consensus.vote(proposalId, true);
+
+        // SEC reviews and disagrees (still pending, 2 approve 1 reject)
+        vm.prank(sec);
+        consensus.vote(proposalId, false);
+
+        // Court provides the 3rd approval -> threshold met, APPROVED
         vm.prank(court);
         consensus.vote(proposalId, true);
 
         // Approved, but grace period active (7 days)
         assertFalse(consensus.isExecutable(proposalId));
 
-        // SEC reviews during grace period and can still vote (for record)
-        vm.prank(sec);
-        consensus.vote(proposalId, false); // SEC disagrees but it's already approved
-
-        // Still approved - majority rule stands
+        // Majority rule stands despite SEC's dissent
         FederatedConsensus.Proposal memory proposal = consensus.getProposal(proposalId);
         assertEq(uint256(proposal.status), uint256(FederatedConsensus.ProposalStatus.APPROVED));
     }

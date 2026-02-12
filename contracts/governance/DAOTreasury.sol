@@ -110,7 +110,7 @@ contract DAOTreasury is
         address token,
         uint256 amount,
         uint64 batchId
-    ) external onlyAuthorizedFeeSender {
+    ) external onlyAuthorizedFeeSender nonReentrant {
         require(amount > 0, "Zero amount");
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);

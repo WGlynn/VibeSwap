@@ -55,7 +55,8 @@ contract CrossChainRouterTest is Test {
         bytes memory auctionInit = abi.encodeWithSelector(
             CommitRevealAuction.initialize.selector,
             owner,
-            treasury
+            treasury,
+            address(0) // complianceRegistry (not needed for this test)
         );
         ERC1967Proxy auctionProxy = new ERC1967Proxy(address(auctionImpl), auctionInit);
         auction = CommitRevealAuction(payable(address(auctionProxy)));
@@ -117,20 +118,21 @@ contract CrossChainRouterTest is Test {
         vm.prank(authorized);
         router.sendCommit{value: 0.1 ether}(CHAIN_B, commitHash, options);
 
-        // Verify pending commit stored
+        // Verify pending commit stored (commitId includes dstEid and srcTimestamp)
         bytes32 commitId = keccak256(abi.encodePacked(
             authorized,
             commitHash,
             block.chainid,
-            block.timestamp
+            CHAIN_B,        // dstEid
+            block.timestamp // srcTimestamp
         ));
 
-        CrossChainRouter.CrossChainCommit memory commit;
-        (commit.commitHash, commit.depositor, commit.depositAmount, commit.srcChainId) =
+        // pendingCommits returns all 6 struct fields
+        (bytes32 storedHash, address depositor, , , , ) =
             router.pendingCommits(commitId);
 
-        assertEq(commit.commitHash, commitHash);
-        assertEq(commit.depositor, authorized);
+        assertEq(storedHash, commitHash);
+        assertEq(depositor, authorized);
     }
 
     function test_sendCommit_invalidPeer() public {
@@ -144,6 +146,7 @@ contract CrossChainRouterTest is Test {
     function test_sendCommit_unauthorized() public {
         bytes32 commitHash = keccak256("order1");
 
+        vm.deal(treasury, 1 ether);
         vm.prank(treasury);
         vm.expectRevert(CrossChainRouter.Unauthorized.selector);
         router.sendCommit{value: 0.1 ether}(CHAIN_B, commitHash, "");
@@ -224,7 +227,9 @@ contract CrossChainRouterTest is Test {
             commitHash: keccak256("order"),
             depositor: authorized,
             depositAmount: 0.01 ether,
-            srcChainId: CHAIN_B
+            srcChainId: CHAIN_B,
+            dstChainId: uint32(block.chainid),
+            srcTimestamp: block.timestamp
         });
 
         bytes memory message = abi.encode(
@@ -236,7 +241,7 @@ contract CrossChainRouterTest is Test {
 
         // Call from endpoint
         vm.prank(address(endpoint));
-        router.lzReceive{value: 0.01 ether}(origin, guid, message, address(0), "");
+        router.lzReceive(origin, guid, message, address(0), "");
 
         // Verify message processed
         assertTrue(router.isProcessed(guid));
@@ -253,7 +258,9 @@ contract CrossChainRouterTest is Test {
             commitHash: keccak256("order"),
             depositor: authorized,
             depositAmount: 0.01 ether,
-            srcChainId: CHAIN_B
+            srcChainId: CHAIN_B,
+            dstChainId: uint32(block.chainid),
+            srcTimestamp: block.timestamp
         });
 
         bytes memory message = abi.encode(
@@ -265,12 +272,12 @@ contract CrossChainRouterTest is Test {
 
         // First receive
         vm.prank(address(endpoint));
-        router.lzReceive{value: 0.01 ether}(origin, guid, message, address(0), "");
+        router.lzReceive(origin, guid, message, address(0), "");
 
         // Replay attempt
         vm.prank(address(endpoint));
         vm.expectRevert(CrossChainRouter.AlreadyProcessed.selector);
-        router.lzReceive{value: 0.01 ether}(origin, guid, message, address(0), "");
+        router.lzReceive(origin, guid, message, address(0), "");
     }
 
     function test_lzReceive_invalidPeer() public {
@@ -286,7 +293,9 @@ contract CrossChainRouterTest is Test {
                 commitHash: keccak256("order"),
                 depositor: authorized,
                 depositAmount: 0.01 ether,
-                srcChainId: CHAIN_B
+                srcChainId: CHAIN_B,
+                dstChainId: CHAIN_A,
+                srcTimestamp: block.timestamp
             }))
         );
 

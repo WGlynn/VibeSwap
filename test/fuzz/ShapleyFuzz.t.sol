@@ -233,7 +233,7 @@ contract ShapleyFuzzTest is Test {
         activity = bound(activity, 10001, type(uint256).max);
 
         vm.prank(authorizedCreator);
-        vm.expectRevert("Activity score exceeds max");
+        vm.expectRevert(ShapleyDistributor.ScoreExceedsMax.selector);
         distributor.updateQualityWeight(
             makeAddr("participant"),
             activity,

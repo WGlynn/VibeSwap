@@ -238,9 +238,11 @@ contract CommitRevealAuctionAdvancedTest is Test {
         vm.prank(alice);
         bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
 
+        vm.roll(10);
         vm.prank(eve);
         bytes32 eveFrontCommitId = auction.commitOrder{value: 0.01 ether}(eveFrontHash);
 
+        vm.roll(20);
         vm.prank(eve);
         bytes32 eveBackCommitId = auction.commitOrder{value: 0.01 ether}(eveBackHash);
 
@@ -520,7 +522,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         vm.warp(block.timestamp + 9); // Move to reveal phase of batch 2
 
         vm.prank(alice);
-        vm.expectRevert("Wrong batch");
+        vm.expectRevert(CommitRevealAuction.WrongBatch.selector);
         auction.revealOrder(commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret, 0);
     }
 
@@ -587,7 +589,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         auction.advancePhase();
         auction.settleBatch();
 
-        vm.expectRevert("Not slashable");
+        vm.expectRevert(CommitRevealAuction.NotSlashable.selector);
         auction.slashUnrevealedCommitment(commitId);
     }
 

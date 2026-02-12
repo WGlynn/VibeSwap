@@ -123,8 +123,14 @@ contract CrossChainRouter is
     /// @notice Verified bridged deposits per commit (prevents deposit theft)
     mapping(bytes32 => uint256) public bridgedDeposits;
 
+    /// @notice Timestamp when bridged deposit was created
+    mapping(bytes32 => uint256) public bridgedDepositTimestamp;
+
     /// @notice Total bridged deposits awaiting processing
     uint256 public totalBridgedDeposits;
+
+    /// @notice Expiry duration for bridged deposits (default 24 hours)
+    uint256 public bridgedDepositExpiry;
 
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
@@ -142,6 +148,7 @@ contract CrossChainRouter is
     event MessageRateLimited(uint32 indexed srcEid, bytes32 guid);
     event CrossChainRevealFailed(bytes32 indexed commitId, uint32 indexed srcEid, string reason);
     event BridgedDepositFunded(bytes32 indexed commitId, uint256 amount);
+    event BridgedDepositRecovered(bytes32 indexed commitId, address indexed depositor, uint256 amount);
 
     // ============ Errors ============
 
@@ -151,6 +158,8 @@ contract CrossChainRouter is
     error RateLimited();
     error Unauthorized();
     error InvalidMessage();
+    error DepositNotExpired();
+    error NoDepositToRecover();
 
     // ============ Modifiers ============
 
@@ -196,6 +205,7 @@ contract CrossChainRouter is
         lzEndpoint = _lzEndpoint;
         auction = _auction;
         maxMessagesPerHour = 1000; // Default rate limit
+        bridgedDepositExpiry = 24 hours; // Default: deposits expire after 24h
     }
 
     // ============ Cross-Chain Order Submission ============
@@ -326,6 +336,13 @@ contract CrossChainRouter is
 
             emit BatchResultSent(result.batchId, dstEids[i]);
         }
+
+        // Refund fee remainder from integer division
+        uint256 remainder = msg.value - (feePerChain * dstEids.length);
+        if (remainder > 0) {
+            (bool success, ) = msg.sender.call{value: remainder}("");
+            require(success, "Fee refund failed");
+        }
     }
 
     /**
@@ -362,6 +379,13 @@ contract CrossChainRouter is
             });
 
             _lzSend(params, feePerChain);
+        }
+
+        // Refund fee remainder from integer division
+        uint256 remainder = msg.value - (feePerChain * dstEids.length);
+        if (remainder > 0) {
+            (bool success, ) = msg.sender.call{value: remainder}("");
+            require(success, "Fee refund failed");
         }
     }
 
@@ -427,6 +451,7 @@ contract CrossChainRouter is
         // The deposit must be bridged via a separate asset bridge (LayerZero OFT, etc.)
         // For now, record the expected deposit amount - actual bridging happens via fundBridgedDeposit()
         bridgedDeposits[commitId] = commit.depositAmount;
+        bridgedDepositTimestamp[commitId] = block.timestamp;
         totalBridgedDeposits += commit.depositAmount;
 
         emit CrossChainCommitReceived(commitId, srcEid, commit.depositor);
@@ -627,6 +652,43 @@ contract CrossChainRouter is
     function setAuction(address _auction) external onlyOwner {
         require(_auction != address(0), "Invalid auction");
         auction = _auction;
+    }
+
+    /**
+     * @notice Update bridged deposit expiry duration
+     * @param _expiry New expiry duration in seconds (min 1 hour)
+     */
+    function setBridgedDepositExpiry(uint256 _expiry) external onlyOwner {
+        require(_expiry >= 1 hours, "Expiry too short");
+        bridgedDepositExpiry = _expiry;
+    }
+
+    /**
+     * @notice Recover an expired bridged deposit
+     * @dev Only the original depositor or owner can recover. Cleans up totalBridgedDeposits.
+     * @param commitId The commit ID whose deposit expired
+     */
+    function recoverExpiredDeposit(bytes32 commitId) external nonReentrant {
+        uint256 depositAmount = bridgedDeposits[commitId];
+        if (depositAmount == 0) revert NoDepositToRecover();
+
+        uint256 createdAt = bridgedDepositTimestamp[commitId];
+        if (block.timestamp < createdAt + bridgedDepositExpiry) revert DepositNotExpired();
+
+        CrossChainCommit memory commit = pendingCommits[commitId];
+        // Only original depositor or owner can recover
+        require(
+            msg.sender == commit.depositor || msg.sender == owner(),
+            "Not authorized to recover"
+        );
+
+        // Clean up state
+        bridgedDeposits[commitId] = 0;
+        bridgedDepositTimestamp[commitId] = 0;
+        totalBridgedDeposits -= depositAmount;
+        delete pendingCommits[commitId];
+
+        emit BridgedDepositRecovered(commitId, commit.depositor, depositAmount);
     }
 
     // ============ Receive ============

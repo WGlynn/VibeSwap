@@ -9,7 +9,7 @@ This file maintains continuity between Claude Code sessions across devices.
 
 ## Current Focus
 - Protocol security hardening in progress
-- **537 tests passing, 0 failures, 0 skipped** (full suite green)
+- **543 tests passing, 0 failures, 0 skipped** (full suite green)
 - All previously-skipped test files now activated and passing
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
@@ -19,6 +19,13 @@ This file maintains continuity between Claude Code sessions across devices.
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 12, 2026)
+25. **Contract Security Hardening (4 fixes, 6 new tests)**
+    - DAOTreasury: Added `nonReentrant` to `receiveProtocolFees` (external token call reentrancy protection)
+    - CrossChainRouter: Added bridged deposit expiration system (24h default, `recoverExpiredDeposit()`, `setBridgedDepositExpiry()`)
+    - CrossChainRouter: Added fee remainder refund in `broadcastBatchResult` and `syncLiquidity` (integer division dust)
+    - 6 new CrossChainRouter tests: expiry default, set expiry, expiry too short, recover expired deposit, auth check, no deposit revert
+    - Verified 2 assessment findings as false positives (updateTokenPrice already has ACL, ShapleyDistributor already validates participants)
+    - Total suite: 543 tests, 0 failures
 23. **Activated Skipped Security + Cross-Chain Tests (43 new tests)**
     - CrossChainRouter.t.sol: 21 tests (peer mgmt, commit/reveal, rate limiting, replay prevention)
     - SecurityAttacks.t.sol: 22 tests (flash loan, first depositor, donation, price manipulation, circuit breakers, commit-reveal, reentrancy, fuzz)

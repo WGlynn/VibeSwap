@@ -455,4 +455,128 @@ contract CrossChainRouterTest is Test {
         router.setAuction(newAuction);
         assertEq(router.auction(), newAuction);
     }
+
+    // ============ Bridged Deposit Expiration Tests ============
+
+    function test_bridgedDepositExpiry_default() public view {
+        assertEq(router.bridgedDepositExpiry(), 24 hours);
+    }
+
+    function test_setBridgedDepositExpiry() public {
+        router.setBridgedDepositExpiry(48 hours);
+        assertEq(router.bridgedDepositExpiry(), 48 hours);
+    }
+
+    function test_setBridgedDepositExpiry_tooShort() public {
+        vm.expectRevert("Expiry too short");
+        router.setBridgedDepositExpiry(30 minutes);
+    }
+
+    function test_recoverExpiredDeposit() public {
+        // Simulate receiving a commit from chain B
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B,
+            sender: PEER_B,
+            nonce: 1
+        });
+
+        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+            commitHash: keccak256("order"),
+            depositor: authorized,
+            depositAmount: 1 ether,
+            srcChainId: CHAIN_B,
+            dstChainId: uint32(block.chainid),
+            srcTimestamp: block.timestamp
+        });
+
+        bytes memory message = abi.encode(
+            CrossChainRouter.MessageType.ORDER_COMMIT,
+            abi.encode(commit)
+        );
+
+        // Receive the commit (creates bridged deposit)
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("guid-expire"), message, address(0), "");
+
+        // Compute commitId
+        bytes32 commitId = keccak256(abi.encodePacked(
+            commit.depositor,
+            commit.commitHash,
+            commit.srcChainId,
+            commit.dstChainId,
+            commit.srcTimestamp
+        ));
+
+        // Verify deposit exists
+        assertEq(router.bridgedDeposits(commitId), 1 ether);
+        assertEq(router.totalBridgedDeposits(), 1 ether);
+
+        // Try to recover before expiry - should fail
+        vm.prank(authorized);
+        vm.expectRevert(CrossChainRouter.DepositNotExpired.selector);
+        router.recoverExpiredDeposit(commitId);
+
+        // Warp past expiry
+        vm.warp(block.timestamp + 24 hours + 1);
+
+        // Recover as depositor
+        vm.prank(authorized);
+        router.recoverExpiredDeposit(commitId);
+
+        // Verify cleanup
+        assertEq(router.bridgedDeposits(commitId), 0);
+        assertEq(router.totalBridgedDeposits(), 0);
+    }
+
+    function test_recoverExpiredDeposit_onlyDepositorOrOwner() public {
+        // Simulate receiving a commit
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B,
+            sender: PEER_B,
+            nonce: 1
+        });
+
+        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+            commitHash: keccak256("order2"),
+            depositor: authorized,
+            depositAmount: 1 ether,
+            srcChainId: CHAIN_B,
+            dstChainId: uint32(block.chainid),
+            srcTimestamp: block.timestamp
+        });
+
+        bytes memory message = abi.encode(
+            CrossChainRouter.MessageType.ORDER_COMMIT,
+            abi.encode(commit)
+        );
+
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("guid-auth"), message, address(0), "");
+
+        bytes32 commitId = keccak256(abi.encodePacked(
+            commit.depositor,
+            commit.commitHash,
+            commit.srcChainId,
+            commit.dstChainId,
+            commit.srcTimestamp
+        ));
+
+        // Warp past expiry
+        vm.warp(block.timestamp + 24 hours + 1);
+
+        // Random address cannot recover
+        address attacker = makeAddr("attacker");
+        vm.prank(attacker);
+        vm.expectRevert("Not authorized to recover");
+        router.recoverExpiredDeposit(commitId);
+
+        // Owner can recover
+        router.recoverExpiredDeposit(commitId);
+        assertEq(router.bridgedDeposits(commitId), 0);
+    }
+
+    function test_recoverExpiredDeposit_noDeposit() public {
+        vm.expectRevert(CrossChainRouter.NoDepositToRecover.selector);
+        router.recoverExpiredDeposit(keccak256("nonexistent"));
+    }
 }

@@ -289,11 +289,15 @@ contract DisputeResolver is
         address assigned = activeArbitrators[assignmentIndex % activeArbitrators.length];
         assignmentIndex++;
 
-        // Skip suspended arbitrators
-        while (arbitrators[assigned].suspended && assignmentIndex < activeArbitrators.length * 2) {
+        // Skip suspended arbitrators (bounded by array length to prevent infinite loop)
+        uint256 maxAttempts = activeArbitrators.length;
+        uint256 attempts = 0;
+        while (arbitrators[assigned].suspended && attempts < maxAttempts) {
             assigned = activeArbitrators[assignmentIndex % activeArbitrators.length];
             assignmentIndex++;
+            attempts++;
         }
+        require(!arbitrators[assigned].suspended, "No available arbitrators");
 
         dispute.assignedArbitrator = assigned;
         dispute.phase = DisputePhase.ARBITRATION;

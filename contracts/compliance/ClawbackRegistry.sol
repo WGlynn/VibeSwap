@@ -100,6 +100,9 @@ contract ClawbackRegistry is
     /// @notice Maximum cascade depth (prevents gas griefing)
     uint256 public maxCascadeDepth;
 
+    /// @notice Maximum wallets per case (prevents unbounded array gas DoS)
+    uint256 public constant MAX_CASE_WALLETS = 1000;
+
     /// @notice Minimum amount to propagate taint (dust filter)
     uint256 public minTaintAmount;
 
@@ -497,8 +500,8 @@ contract ClawbackRegistry is
         // Flag the recipient as tainted
         _flagWallet(to, TaintLevel.TAINTED, caseId, from, amount, token, newDepth);
 
-        // Add to case wallets if not already there
-        if (caseId != bytes32(0)) {
+        // Add to case wallets if not already there (bounded to prevent gas DoS)
+        if (caseId != bytes32(0) && caseWallets[caseId].length < MAX_CASE_WALLETS) {
             caseWallets[caseId].push(to);
             cases[caseId].cascadeCount++;
         }

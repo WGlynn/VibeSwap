@@ -245,6 +245,12 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         require(timelockDuration >= MIN_TIMELOCK && timelockDuration <= MAX_TIMELOCK, "Invalid timelock");
         require(deadmanTimeout >= MIN_DEADMAN, "Deadman too short");
 
+        // Validate guardian threshold against active guardian count
+        if (guardianThreshold > 0) {
+            uint256 activeCount = getActiveGuardianCount(tokenId);
+            require(guardianThreshold <= activeCount, "Threshold exceeds active guardians");
+        }
+
         configs[tokenId] = RecoveryConfig({
             guardianThreshold: guardianThreshold,
             timelockDuration: timelockDuration,
@@ -704,7 +710,7 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         return guardians[tokenId];
     }
 
-    function getActiveGuardianCount(uint256 tokenId) external view returns (uint256) {
+    function getActiveGuardianCount(uint256 tokenId) public view returns (uint256) {
         uint256 count = 0;
         Guardian[] storage guards = guardians[tokenId];
         for (uint i = 0; i < guards.length; i++) {

@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/ICommitRevealAuction.sol";
 import "./interfaces/IVibeAMM.sol";
 import "./interfaces/IDAOTreasury.sol";
+import "./interfaces/IwBAR.sol";
 import "./CircuitBreaker.sol";
 import "../messaging/CrossChainRouter.sol";
 import "../libraries/SecurityLib.sol";
@@ -105,6 +106,12 @@ contract VibeSwapCore is
 
     /// @notice Clawback registry for taint checking
     ClawbackRegistry public clawbackRegistry;
+
+    /// @notice Wrapped Batch Auction Receipts contract
+    IwBAR public wbar;
+
+    /// @notice Mapping of batchId => trader => commitId (for wBAR output routing)
+    mapping(uint64 => mapping(address => bytes32)) public batchTraderCommitId;
 
     // ============ Events ============
 
@@ -316,7 +323,14 @@ contract VibeSwapCore is
         // Track ownership for reveal verification
         commitOwners[commitId] = msg.sender;
 
-        emit SwapCommitted(commitId, msg.sender, auction.getCurrentBatchId());
+        uint64 currentBatchId = auction.getCurrentBatchId();
+        emit SwapCommitted(commitId, msg.sender, currentBatchId);
+
+        // Mint wBAR receipt if enabled
+        if (address(wbar) != address(0)) {
+            wbar.mint(commitId, currentBatchId, msg.sender, tokenIn, tokenOut, amountIn, minAmountOut);
+        }
+        batchTraderCommitId[currentBatchId][msg.sender] = commitId;
     }
 
     /// @notice Mapping of commitId to original committer
@@ -580,6 +594,31 @@ contract VibeSwapCore is
         if (_router != address(0)) router = CrossChainRouter(payable(_router));
     }
 
+    // ============ wBAR Functions ============
+
+    /**
+     * @notice Set wBAR contract address
+     * @param _wbar wBAR contract address (address(0) to disable)
+     */
+    function setWBAR(address _wbar) external onlyOwner {
+        wbar = IwBAR(_wbar);
+    }
+
+    /**
+     * @notice Release failed deposit to wBAR holder
+     * @dev Only callable by wBAR contract for failed swap reclaims
+     * @param commitId The commit that failed
+     * @param to Address to receive the tokens
+     * @param token Token to release
+     * @param amount Amount to release
+     */
+    function releaseFailedDeposit(bytes32 commitId, address to, address token, uint256 amount) external {
+        require(msg.sender == address(wbar), "Only wBAR");
+        require(deposits[commitOwners[commitId]][token] >= amount, "Insufficient deposit");
+        deposits[commitOwners[commitId]][token] -= amount;
+        IERC20(token).safeTransfer(to, amount);
+    }
+
     // ============ Internal Functions ============
 
     /**
@@ -619,10 +658,23 @@ contract VibeSwapCore is
             // Transfer tokens to AMM before swap
             IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
 
+            // Determine recipient: if wBAR position was transferred, route output to wBAR contract
+            address recipient = order.trader;
+            bytes32 traderCommitId;
+            if (address(wbar) != address(0)) {
+                traderCommitId = batchTraderCommitId[batchId][order.trader];
+                if (traderCommitId != bytes32(0)) {
+                    address wbarHolder = wbar.holderOf(traderCommitId);
+                    if (wbarHolder != order.trader) {
+                        recipient = address(wbar);
+                    }
+                }
+            }
+
             // Prepare swap order
             IVibeAMM.SwapOrder[] memory swapOrders = new IVibeAMM.SwapOrder[](1);
             swapOrders[0] = IVibeAMM.SwapOrder({
-                trader: order.trader,
+                trader: recipient,
                 tokenIn: order.tokenIn,
                 tokenOut: order.tokenOut,
                 amountIn: order.amountIn,
@@ -642,6 +694,11 @@ contract VibeSwapCore is
                 totalVolume += result.totalTokenInSwapped;
                 lastClearingPrice = result.clearingPrice;
                 deposits[order.trader][order.tokenIn] -= order.amountIn;
+
+                // Settle wBAR position with actual output amount
+                if (address(wbar) != address(0) && traderCommitId != bytes32(0)) {
+                    wbar.settle(traderCommitId, result.totalTokenOutSwapped);
+                }
 
                 // Record transaction for clawback taint tracking
                 if (address(clawbackRegistry) != address(0)) {

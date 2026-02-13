@@ -190,9 +190,9 @@ contract SlippageGuaranteeFund is
             userState.lastClaimDay = uint64(currentDay);
         }
 
-        // Calculate remaining daily allowance
-        // For simplicity, using absolute limit rather than % of volume
-        uint256 dailyLimit = 1e18; // 1 token unit limit per day (configurable)
+        // Calculate remaining daily allowance as % of fund reserves
+        uint256 dailyLimit = (reserves[claim.token] * config.userDailyLimitBps) / BPS_PRECISION;
+        if (dailyLimit == 0) dailyLimit = 1; // Minimum 1 wei to prevent permanent lockout
         if (userState.claimedToday >= dailyLimit) {
             revert UserLimitExceeded();
         }

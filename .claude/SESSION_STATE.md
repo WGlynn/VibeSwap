@@ -8,17 +8,24 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- **Protocol security hardening COMPLETE** — 6 full audit passes, 30+ findings fixed across 11 commits
+- **Protocol security hardening COMPLETE** — 7 full audit passes (including cross-contract), 35+ findings fixed across 14 commits
 - **550 tests passing, 0 failures, 0 skipped** (full suite green)
 - All contracts audited: core, AMM, governance, incentives, messaging, libraries, identity, compliance, quantum, oracles
+- Cross-contract interaction audit complete — verified EVM atomicity protects most interaction patterns
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
-- Consider additional adversarial tests for edge cases
 
 ## Recently Completed (Feb 12, 2026)
+34. **Cross-contract interaction audit + DAOTreasury slippage protection**
+    - Audited all cross-contract call chains (Core→AMM, IncentiveController→sub-contracts, Auction→Core settlement, Treasury→AMM, CrossChainRouter→Core)
+    - Confirmed most findings were false positives (EVM atomicity, admin-only access)
+    - **HIGH**: DAOTreasury provideBackstopLiquidity had zero slippage → 95% min protection
+    - **HIGH**: DAOTreasury removeBackstopLiquidity had zero slippage → caller-specified minimums
+    - Updated IDAOTreasury interface and TreasuryStabilizer caller
+    - Total suite: 550 tests, 0 failures
 33. **SlippageGuaranteeFund daily limit fix**
     - **MEDIUM**: Daily claim limit was hardcoded to 1e18, ignoring config.userDailyLimitBps
     - Now uses configurable BPS percentage of fund reserves per user per day

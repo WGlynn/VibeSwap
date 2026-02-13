@@ -298,7 +298,7 @@ contract TreasuryStabilizer is
         uint256 lpAmount
     ) external override onlyOwner nonReentrant returns (uint256 received) {
         // Request treasury to remove backstop liquidity
-        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount) returns (uint256 amount) {
+        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount, 0, 0) returns (uint256 amount) {
             received = amount;
         } catch {
             received = 0;

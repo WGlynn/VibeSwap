@@ -10,7 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - Protocol security hardening in progress — comprehensive audit complete
 - **550 tests passing, 0 failures, 0 skipped** (full suite green)
-- Comprehensive audit of ALL contracts complete — 16 findings fixed across 7 commits
+- Comprehensive audit of ALL contracts complete — 23+ findings fixed across 8 commits
 - All previously-skipped test files now activated and passing
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
@@ -20,6 +20,15 @@ This file maintains continuity between Claude Code sessions across devices.
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 12, 2026)
+30. **Peripheral Contract Audit Fixes (7 fixes across 6 contracts)**
+    - **CRITICAL**: DisputeResolver excess ETH refund in escalateToTribunal + registerArbitrator
+    - **CRITICAL**: WalletRecovery replaced unsafe .transfer() with .call{value:}() (3 bond paths)
+    - **HIGH**: SlippageGuaranteeFund token address validation
+    - **HIGH**: ClawbackRegistry executeClawback attempts actual transferFrom with try/catch
+    - **HIGH**: SoulboundIdentity recovery contract change now uses 2-day timelock
+    - **HIGH**: QuantumVault key exhaustion now reverts instead of just emitting
+    - Full peripheral audit complete: 13 contracts reviewed, libraries clean
+    - Total suite: 550 tests, 0 failures
 29. **Remaining Audit Fixes: Tribunal, Vault, Insurance, Consensus (5 fixes)**
     - **CRITICAL**: DecentralizedTribunal._settleStakes() → pull pattern (one reverting juror blocked all settlements)
     - **CRITICAL**: DecentralizedTribunal.volunteerAsJuror() → SoulboundIdentity checks (sybil resistance)

@@ -164,9 +164,9 @@ contract IncentiveController is
             IERC20(token).safeTransferFrom(msg.sender, address(this), toVolatilityPool);
 
             // Approve and deposit to volatility pool
-            IERC20(token).approve(volatilityInsurancePool, toVolatilityPool);
+            IERC20(token).forceApprove(volatilityInsurancePool, toVolatilityPool);
 
-            // Call deposit on volatility insurance pool
+            // Deposit into volatility insurance pool — revert on failure to prevent tokens getting stuck
             (bool success, ) = volatilityInsurancePool.call(
                 abi.encodeWithSignature(
                     "depositFees(bytes32,address,uint256)",
@@ -175,10 +175,9 @@ contract IncentiveController is
                     toVolatilityPool
                 )
             );
+            require(success, "Volatility pool deposit failed");
 
-            if (success) {
-                emit VolatilityFeeRouted(poolId, token, toVolatilityPool);
-            }
+            emit VolatilityFeeRouted(poolId, token, toVolatilityPool);
         }
     }
 

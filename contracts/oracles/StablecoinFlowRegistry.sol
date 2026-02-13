@@ -294,7 +294,13 @@ contract StablecoinFlowRegistry is
 
     // ============ Internal Functions ============
 
+    error RatioOutOfBounds();
+
     function _updateFlowRatio(uint256 newRatio) internal {
+        // Sanity bounds: ratio must be between 0.01 and 100.0 (1e16 to 1e20)
+        // Prevents zero-division and overflow in downstream calculations
+        if (newRatio < PRECISION / 100 || newRatio > PRECISION * 100) revert RatioOutOfBounds();
+
         // Store previous state for regime change detection
         bool wasUsdtDominant = currentFlowRatio > MANIPULATION_THRESHOLD;
         bool wasUsdcDominant = currentFlowRatio < TREND_THRESHOLD;

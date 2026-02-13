@@ -394,13 +394,10 @@ contract StablecoinFlowRegistryTest is Test {
 
     // ============ Edge Cases ============
 
-    function test_zeroRatio() public {
+    function test_zeroRatio_reverts() public {
         vm.prank(updater);
+        vm.expectRevert(StablecoinFlowRegistry.RatioOutOfBounds.selector);
         registry.updateFlowRatio(0);
-
-        assertEq(registry.currentFlowRatio(), 0);
-        assertTrue(registry.isUSDCDominant()); // 0 < 0.5
-        assertFalse(registry.isUSDTDominant());
     }
 
     function test_veryHighRatio() public {
@@ -416,6 +413,7 @@ contract StablecoinFlowRegistryTest is Test {
     // ============ Fuzz Tests ============
 
     function testFuzz_updateFlowRatio(uint256 ratio) public {
+        ratio = bound(ratio, PRECISION / 100, PRECISION * 100); // 0.01 to 100.0
         vm.prank(updater);
         registry.updateFlowRatio(ratio);
 
@@ -423,6 +421,7 @@ contract StablecoinFlowRegistryTest is Test {
     }
 
     function testFuzz_volatilityMultiplierBounds(uint256 ratio) public {
+        ratio = bound(ratio, PRECISION / 100, PRECISION * 100);
         vm.prank(updater);
         registry.updateFlowRatio(ratio);
 
@@ -432,6 +431,7 @@ contract StablecoinFlowRegistryTest is Test {
     }
 
     function testFuzz_manipulationProbabilityBounds(uint256 ratio) public {
+        ratio = bound(ratio, PRECISION / 100, PRECISION * 100);
         vm.prank(updater);
         registry.updateFlowRatio(ratio);
 
@@ -440,10 +440,23 @@ contract StablecoinFlowRegistryTest is Test {
     }
 
     function testFuzz_trustReductionBounds(uint256 ratio) public {
+        ratio = bound(ratio, PRECISION / 100, PRECISION * 100);
         vm.prank(updater);
         registry.updateFlowRatio(ratio);
 
         uint256 reduction = registry.getTrustReduction();
         assertLe(reduction, PRECISION / 2); // <= 50%
+    }
+
+    function test_ratioOutOfBounds_tooLow() public {
+        vm.prank(updater);
+        vm.expectRevert(StablecoinFlowRegistry.RatioOutOfBounds.selector);
+        registry.updateFlowRatio(PRECISION / 100 - 1);
+    }
+
+    function test_ratioOutOfBounds_tooHigh() public {
+        vm.prank(updater);
+        vm.expectRevert(StablecoinFlowRegistry.RatioOutOfBounds.selector);
+        registry.updateFlowRatio(PRECISION * 100 + 1);
     }
 }

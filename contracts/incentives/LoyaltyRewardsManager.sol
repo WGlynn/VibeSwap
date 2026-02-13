@@ -287,12 +287,14 @@ contract LoyaltyRewardsManager is
     ) external override {
         if (amount == 0) revert InvalidAmount();
 
+        uint256 balanceBefore = IERC20(rewardToken).balanceOf(address(this));
         IERC20(rewardToken).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 actualReceived = IERC20(rewardToken).balanceOf(address(this)) - balanceBefore;
 
         PoolRewardState storage poolState = poolStates[poolId];
 
         if (poolState.totalStaked > 0) {
-            poolState.rewardPerShareAccumulated += (amount * PRECISION) / poolState.totalStaked;
+            poolState.rewardPerShareAccumulated += (actualReceived * PRECISION) / poolState.totalStaked;
         }
 
         poolState.lastRewardTimestamp = uint64(block.timestamp);

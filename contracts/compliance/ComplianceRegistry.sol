@@ -318,6 +318,10 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
         UserProfile storage profile = userProfiles[user];
         if (profile.status != AccountStatus.ACTIVE) return false;
         if (profile.tier == UserTier.BLOCKED) return false;
+        // Check KYC expiry (skip for EXEMPT tier)
+        if (profile.tier != UserTier.EXEMPT && profile.kycExpiry > 0 && block.timestamp > profile.kycExpiry) {
+            return false;
+        }
         return tierLimits[profile.tier].canProvideLiquidity;
     }
 
@@ -330,6 +334,10 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
         UserProfile storage profile = userProfiles[user];
         if (profile.status != AccountStatus.ACTIVE) return false;
         if (profile.tier == UserTier.BLOCKED) return false;
+        // Check KYC expiry (skip for EXEMPT tier)
+        if (profile.tier != UserTier.EXEMPT && profile.kycExpiry > 0 && block.timestamp > profile.kycExpiry) {
+            return false;
+        }
         return tierLimits[profile.tier].canUsePriority;
     }
 

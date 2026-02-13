@@ -186,13 +186,16 @@ contract DAOTreasury is
         IERC20(pool.token0).safeIncreaseAllowance(vibeAMM, token0Amount);
         IERC20(pool.token1).safeIncreaseAllowance(vibeAMM, token1Amount);
 
-        // Add liquidity
+        // Add liquidity with 95% slippage protection against sandwich attacks
+        uint256 minToken0 = (token0Amount * 95) / 100;
+        uint256 minToken1 = (token1Amount * 95) / 100;
+
         (,, uint256 liquidity) = amm.addLiquidity(
             poolId,
             token0Amount,
             token1Amount,
-            0, // Accept any amount
-            0
+            minToken0,
+            minToken1
         );
 
         lpPositions[poolId] += liquidity;
@@ -209,14 +212,16 @@ contract DAOTreasury is
      */
     function removeBackstopLiquidity(
         bytes32 poolId,
-        uint256 lpAmount
+        uint256 lpAmount,
+        uint256 minAmount0,
+        uint256 minAmount1
     ) external onlyOwner nonReentrant returns (uint256 received) {
         IVibeAMM amm = IVibeAMM(vibeAMM);
         (uint256 amount0, uint256 amount1) = amm.removeLiquidity(
             poolId,
             lpAmount,
-            0, // min amount0
-            0  // min amount1
+            minAmount0,
+            minAmount1
         );
         lpPositions[poolId] -= lpAmount;
         received = amount0 + amount1;

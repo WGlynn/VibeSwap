@@ -130,7 +130,9 @@ interface IDAOTreasury {
      */
     function removeBackstopLiquidity(
         bytes32 poolId,
-        uint256 lpAmount
+        uint256 lpAmount,
+        uint256 minAmount0,
+        uint256 minAmount1
     ) external returns (uint256 received);
 
     /**

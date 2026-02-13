@@ -164,16 +164,18 @@ contract VolatilityInsurancePool is
         uint256 liquidity
     ) external onlyController {
         LPCoverage storage coverage = lpCoverage[poolId][lp];
+        uint256 oldLiquidity = coverage.liquidityAtRisk;
 
-        // Update totals
-        if (coverage.liquidityAtRisk > 0) {
-            totalCoveredLiquidity[poolId] -= coverage.liquidityAtRisk;
+        // Atomic update: only modify totalCoveredLiquidity if value changed
+        if (oldLiquidity != liquidity) {
+            if (oldLiquidity > 0) {
+                totalCoveredLiquidity[poolId] -= oldLiquidity;
+            }
+            totalCoveredLiquidity[poolId] += liquidity;
+            coverage.liquidityAtRisk = liquidity;
         }
 
-        coverage.liquidityAtRisk = liquidity;
         coverage.lastUpdateTimestamp = block.timestamp;
-        totalCoveredLiquidity[poolId] += liquidity;
-
         emit CoverageUpdated(poolId, lp, liquidity);
     }
 

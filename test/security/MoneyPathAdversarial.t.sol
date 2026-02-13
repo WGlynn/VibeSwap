@@ -882,7 +882,206 @@ contract MoneyPathAdversarial is Test {
         vm.stopPrank();
     }
 
+    // ============ Section 6: Cross-Chain Security Bypass Tests ============
+
+    /**
+     * @notice Blacklisted address cannot bypass via cross-chain commit
+     */
+    function test_adversarial_crossChainBlacklistBypass() public {
+        // Blacklist the attacker
+        core.setBlacklist(attacker, true);
+
+        // Fund attacker
+        weth.mint(attacker, 10 ether);
+        vm.deal(attacker, 1 ether);
+
+        vm.startPrank(attacker);
+        weth.approve(address(core), type(uint256).max);
+
+        // Attempt cross-chain commit — should revert with Blacklisted
+        vm.expectRevert(VibeSwapCore.Blacklisted.selector);
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2, // dstChainId
+            address(weth),
+            address(usdc),
+            1 ether,
+            0,
+            keccak256("secret"),
+            ""
+        );
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Contract caller cannot bypass EOA requirement via cross-chain commit
+     */
+    function test_adversarial_crossChainFlashLoanBypass() public {
+        // Enable EOA requirement
+        core.setRequireEOA(true);
+
+        // Deploy attacker contract
+        CrossChainAttackerContract attackerContract = new CrossChainAttackerContract(core, weth);
+
+        // Fund attacker contract
+        weth.mint(address(attackerContract), 10 ether);
+        vm.deal(address(attackerContract), 1 ether);
+
+        // Attempt cross-chain commit from contract — should revert with NotEOA
+        vm.expectRevert(VibeSwapCore.NotEOA.selector);
+        attackerContract.attemptCrossChainCommit(address(usdc));
+
+        // Re-disable for other tests
+        core.setRequireEOA(false);
+    }
+
+    /**
+     * @notice Unsupported output token rejected on cross-chain path
+     */
+    function test_adversarial_crossChainUnsupportedToken() public {
+        address fakeToken = makeAddr("fakeToken");
+
+        weth.mint(attacker, 10 ether);
+        vm.deal(attacker, 1 ether);
+
+        vm.startPrank(attacker);
+        weth.approve(address(core), type(uint256).max);
+
+        // Attempt cross-chain commit with unsupported output token
+        vm.expectRevert(VibeSwapCore.UnsupportedToken.selector);
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2,
+            address(weth),
+            fakeToken, // Not a supported token
+            1 ether,
+            0,
+            keccak256("secret"),
+            ""
+        );
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Rate limit enforced on cross-chain path
+     */
+    function test_adversarial_crossChainRateLimitBypass() public {
+        // Set very low rate limit and disable cooldown (we're testing rate limits, not cooldown)
+        core.setMaxSwapPerHour(1 ether);
+        core.setCommitCooldown(0);
+
+        // Set up peer so router.sendCommit doesn't revert with InvalidPeer
+        router.setPeer(2, bytes32(uint256(uint160(address(0xBBBB)))));
+
+        weth.mint(attacker, 10 ether);
+        vm.deal(attacker, 2 ether);
+
+        vm.startPrank(attacker);
+        weth.approve(address(core), type(uint256).max);
+
+        // First commit should succeed (uses 1 ether of 1 ether limit)
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2,
+            address(weth),
+            address(usdc),
+            1 ether,
+            0,
+            keccak256("secret1"),
+            ""
+        );
+
+        // Second commit should fail — rate limit exceeded (no cooldown to trip first)
+        vm.expectRevert(VibeSwapCore.RateLimitExceededError.selector);
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2,
+            address(weth),
+            address(usdc),
+            1 ether,
+            0,
+            keccak256("secret2"),
+            ""
+        );
+        vm.stopPrank();
+
+        // Restore
+        core.setMaxSwapPerHour(100_000 * 1e18);
+        core.setCommitCooldown(1);
+    }
+
+    /**
+     * @notice Commit cooldown enforced on cross-chain path
+     */
+    function test_adversarial_crossChainCooldownBypass() public {
+        // Set 10-second cooldown
+        core.setCommitCooldown(10);
+
+        // Set up peer so router doesn't revert
+        router.setPeer(2, bytes32(uint256(uint160(address(0xBBBB)))));
+
+        weth.mint(attacker, 10 ether);
+        vm.deal(attacker, 2 ether);
+
+        // Warp to fresh timestamp (past any setUp cooldowns)
+        vm.warp(block.timestamp + 11);
+
+        vm.startPrank(attacker);
+        weth.approve(address(core), type(uint256).max);
+
+        // First commit succeeds
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2,
+            address(weth),
+            address(usdc),
+            1 ether,
+            0,
+            keccak256("secret1"),
+            ""
+        );
+
+        // Immediate second commit — should fail with cooldown
+        vm.expectRevert(VibeSwapCore.CommitCooldownActive.selector);
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2,
+            address(weth),
+            address(usdc),
+            1 ether,
+            0,
+            keccak256("secret2"),
+            ""
+        );
+        vm.stopPrank();
+
+        // Restore
+        core.setCommitCooldown(1);
+    }
+
     // ============ Receive ETH ============
+
+    receive() external payable {}
+}
+
+/**
+ * @notice Helper contract for flash loan bypass test
+ */
+contract CrossChainAttackerContract {
+    VibeSwapCore public core;
+    IERC20 public token;
+
+    constructor(VibeSwapCore _core, IERC20 _token) {
+        core = _core;
+        token = _token;
+        token.approve(address(_core), type(uint256).max);
+    }
+
+    function attemptCrossChainCommit(address tokenOut) external {
+        core.commitCrossChainSwap{value: 0.1 ether}(
+            2,
+            address(token),
+            tokenOut,
+            1 ether,
+            0,
+            keccak256("secret"),
+            ""
+        );
+    }
 
     receive() external payable {}
 }

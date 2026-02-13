@@ -9,7 +9,7 @@ This file maintains continuity between Claude Code sessions across devices.
 
 ## Current Focus
 - Protocol security hardening in progress
-- **543 tests passing, 0 failures, 0 skipped** (full suite green)
+- **548 tests passing, 0 failures, 0 skipped** (full suite green)
 - All previously-skipped test files now activated and passing
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
@@ -19,6 +19,12 @@ This file maintains continuity between Claude Code sessions across devices.
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 12, 2026)
+26. **Cross-Chain Security Parity + Rate Limit Bug (3 fixes, 5 new tests)**
+    - **HIGH**: `commitCrossChainSwap` missing 5 security modifiers (notBlacklisted, notTainted, onlyEOAOrWhitelisted, onlySupported(tokenOut)) + rate limit + cooldown checks — all security controls bypassable via cross-chain path. Fixed.
+    - **HIGH**: Rate limit `_checkAndUpdateRateLimit` was non-functional — first-time initialization wrote to memory copy but only persisted usedAmount, leaving windowDuration=0 in storage so it re-initialized every call. Fixed by writing full struct to storage on init.
+    - 5 new adversarial tests: blacklist bypass, flash loan bypass, unsupported token, rate limit, cooldown
+    - Full modifier consistency audit across all contracts completed
+    - Total suite: 548 tests, 0 failures
 25. **Contract Security Hardening (4 fixes, 6 new tests)**
     - DAOTreasury: Added `nonReentrant` to `receiveProtocolFees` (external token call reentrancy protection)
     - CrossChainRouter: Added bridged deposit expiration system (24h default, `recoverExpiredDeposit()`, `setBridgedDepositExpiry()`)

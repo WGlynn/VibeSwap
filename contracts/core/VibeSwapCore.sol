@@ -425,7 +425,22 @@ contract VibeSwapCore is
         uint256 minAmountOut,
         bytes32 secret,
         bytes calldata options
-    ) external payable whenNotPaused nonReentrant onlySupported(tokenIn) {
+    ) external payable whenNotPaused nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
+      onlySupported(tokenIn) onlySupported(tokenOut) {
+        require(amountIn > 0, "Zero amount");
+        require(tokenIn != tokenOut, "Same token");
+
+        // Commit cooldown check (anti-spam) — must match commitSwap
+        if (commitCooldown > 0) {
+            if (block.timestamp < lastCommitTime[msg.sender] + commitCooldown) {
+                revert CommitCooldownActive();
+            }
+            lastCommitTime[msg.sender] = block.timestamp;
+        }
+
+        // Rate limit check — must match commitSwap
+        _checkAndUpdateRateLimit(msg.sender, amountIn);
+
         // Deposit tokens
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         deposits[msg.sender][tokenIn] += amountIn;
@@ -674,12 +689,17 @@ contract VibeSwapCore is
     function _checkAndUpdateRateLimit(address user, uint256 amount) internal {
         SecurityLib.RateLimit memory limit = userRateLimits[user];
 
-        // Initialize if first interaction
+        // Initialize if first interaction — write FULL struct to storage
         if (limit.windowDuration == 0) {
             limit.windowStart = block.timestamp;
             limit.windowDuration = 1 hours;
             limit.maxAmount = maxSwapPerHour;
             limit.usedAmount = 0;
+
+            // FIX: Persist the full struct on first interaction
+            // Previously only usedAmount was written, leaving windowDuration=0 in storage
+            // causing re-initialization on every call (rate limit was non-functional)
+            userRateLimits[user] = limit;
         }
 
         (bool allowed, uint256 newUsedAmount) = SecurityLib.checkRateLimit(limit, amount);

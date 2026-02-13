@@ -8,17 +8,31 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- Protocol security hardening in progress
-- **548 tests passing, 0 failures, 0 skipped** (full suite green)
+- Protocol security hardening in progress — comprehensive audit complete
+- **550 tests passing, 0 failures, 0 skipped** (full suite green)
 - All previously-skipped test files now activated and passing
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Continue protocol security hardening (contract-level fixes, formal verification)
+- Continue protocol security hardening (remaining medium-severity items)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 12, 2026)
+28. **Comprehensive Audit Fixes: 4 contracts hardened (4 fixes, 2 new tests)**
+    - **CRITICAL**: IncentiveController volatility pool deposit now reverts on failure (tokens were getting stuck in controller on silent fail)
+    - **HIGH**: VolatilityInsurancePool per-event claim tracking (was using shared claimedAmount across events — LPs shortchanged)
+    - **HIGH**: StablecoinFlowRegistry ratio bounds [0.01, 100.0] (prevented zero-division/overflow in downstream calcs)
+    - **HIGH**: FederatedConsensus vote expiry check moved before state changes (revert was undoing EXPIRED status)
+    - Updated fuzz tests with bounded inputs + 2 new bounds-checking tests
+    - False positives confirmed: TruePriceOracle sig validation (SecurityLib handles v/s), ComplianceRegistry daily reset (integer division is deterministic), TreasuryStabilizer (already checks balance)
+    - Total suite: 550 tests, 0 failures
+27. **Deploy Script Fixes (3 bugs, verification gaps)**
+    - **MEDIUM**: CommitRevealAuction.initialize needs 3 params but both Deploy.s.sol and DeployProduction.s.sol only passed 2 — deployment would REVERT. Fixed.
+    - **MEDIUM**: setGuardian called on VibeAMM (no such function) — moved to VibeSwapCore
+    - **MEDIUM**: EmergencyPause called setGlobalPause on VibeAMM (doesn't exist) — fixed to use Core.pause()
+    - Added security verification to _verifyDeployment: EOA, rate limit, guardian, flash loan, TWAP, router auth
+    - Total suite: 548 tests, 0 failures
 26. **Cross-Chain Security Parity + Rate Limit Bug (3 fixes, 5 new tests)**
     - **HIGH**: `commitCrossChainSwap` missing 5 security modifiers (notBlacklisted, notTainted, onlyEOAOrWhitelisted, onlySupported(tokenOut)) + rate limit + cooldown checks — all security controls bypassable via cross-chain path. Fixed.
     - **HIGH**: Rate limit `_checkAndUpdateRateLimit` was non-functional — first-time initialization wrote to memory copy but only persisted usedAmount, leaving windowDuration=0 in storage so it re-initialized every call. Fixed by writing full struct to storage on init.

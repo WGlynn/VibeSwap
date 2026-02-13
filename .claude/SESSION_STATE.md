@@ -8,17 +8,30 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- **Protocol security hardening COMPLETE** — 7 full audit passes (including cross-contract), 35+ findings fixed across 14 commits
-- **550 tests passing, 0 failures, 0 skipped** (full suite green)
-- All contracts audited: core, AMM, governance, incentives, messaging, libraries, identity, compliance, quantum, oracles
-- Cross-contract interaction audit complete — verified EVM atomicity protects most interaction patterns
+- **Phase 2: Financial Primitives** — building out DeFi primitive contracts
+- **550+ tests passing, 0 failures, 0 skipped** (full suite green)
+- Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
+- Phase 2 Financial Primitives (next: streaming payments, options, yield stables, bonds, etc.)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
-## Recently Completed (Feb 12, 2026)
+## Recently Completed (Feb 13, 2026)
+36. **VibeLPNFT — LP Position NFTs** (`49ffd73`)
+    - ERC-721 position manager wrapping VibeAMM (purely additive, no AMM changes)
+    - Holds VibeLP ERC-20 tokens in custody, issues NFTs as transferable position receipts
+    - Full lifecycle: mint → increaseLiquidity → decreaseLiquidity → collect → burn
+    - Two-step withdrawal (decrease stores tokens owed, collect sends them)
+    - Lightweight enumeration via _ownedTokens with O(1) swap-and-pop removal
+    - Entry price from TWAP (fallback spot), weight-averaged on increase
+    - 3 new files: `contracts/amm/interfaces/IVibeLPNFT.sol`, `contracts/amm/VibeLPNFT.sol`, `test/VibeLPNFT.t.sol`
+    - 28 tests (25 unit + 3 integration), all passing. 0 regressions on existing 27 integration tests.
+35. **wBAR — Wrapped Batch Auction Receipts** (`4c4bae0`)
+    - First Phase 2 financial primitive
+
+## Previously Completed (Feb 12, 2026)
 34. **Cross-contract interaction audit + DAOTreasury slippage protection**
     - Audited all cross-contract call chains (Core→AMM, IncentiveController→sub-contracts, Auction→Core settlement, Treasury→AMM, CrossChainRouter→Core)
     - Confirmed most findings were false positives (EVM atomicity, admin-only access)

@@ -67,6 +67,9 @@ contract VolatilityInsurancePool is
     ClaimEvent[] public claimEvents;
     mapping(bytes32 => uint256[]) public poolClaimEvents; // poolId => event indices
 
+    // Per-event claim tracking: user => eventIndex => claimed
+    mapping(address => mapping(uint256 => bool)) public hasClaimedEvent;
+
     // Configuration
     uint256 public claimCooldownPeriod;
     uint256 public maxClaimPercentBps;    // Max % of reserve per claim
@@ -86,6 +89,7 @@ contract VolatilityInsurancePool is
     error InsufficientReserves();
     error ClaimCooldownActive();
     error NoCoverageAvailable();
+    error AlreadyClaimed();
     error InvalidAmount();
     error ZeroAddress();
 
@@ -249,24 +253,20 @@ contract VolatilityInsurancePool is
         uint256 eventIndex,
         address token
     ) external nonReentrant returns (uint256 amount) {
+        // Per-event claim tracking — prevents double-claims AND ensures each event pays independently
+        if (hasClaimedEvent[msg.sender][eventIndex]) revert AlreadyClaimed();
+
         ClaimEvent storage claimEvent = claimEvents[eventIndex];
         bytes32 poolId = claimEvent.poolId;
 
         LPCoverage storage coverage = lpCoverage[poolId][msg.sender];
         if (coverage.liquidityAtRisk == 0) revert NoCoverageAvailable();
 
-        // Calculate pro-rata share
+        // Calculate pro-rata share for THIS event
         uint256 totalCovered = totalCoveredLiquidity[poolId];
         if (totalCovered == 0) revert NoCoverageAvailable();
 
-        uint256 share = (claimEvent.totalPayout * coverage.liquidityAtRisk) / totalCovered;
-
-        // Ensure they haven't claimed this event already
-        // Simple approach: track total claimed vs eligible
-        uint256 alreadyClaimed = coverage.claimedAmount;
-        if (share <= alreadyClaimed) revert NoCoverageAvailable();
-
-        amount = share - alreadyClaimed;
+        amount = (claimEvent.totalPayout * coverage.liquidityAtRisk) / totalCovered;
 
         PoolInsurance storage insurance = poolInsurance[poolId][token];
         if (amount > insurance.reserveBalance) {
@@ -275,7 +275,8 @@ contract VolatilityInsurancePool is
 
         if (amount == 0) revert InsufficientReserves();
 
-        // Update state
+        // Update state — mark event as claimed BEFORE transfer (CEI pattern)
+        hasClaimedEvent[msg.sender][eventIndex] = true;
         coverage.claimedAmount += amount;
         insurance.reserveBalance -= amount;
         insurance.totalClaimsPaid += amount;
@@ -330,20 +331,19 @@ contract VolatilityInsurancePool is
             return 0;
         }
 
-        // Sum up all claim events for this pool
+        // Sum up unclaimed events for this pool
         uint256[] storage eventIndices = poolClaimEvents[poolId];
-        uint256 totalEligible;
+        uint256 totalUnclaimed;
 
         for (uint256 i = 0; i < eventIndices.length; i++) {
-            ClaimEvent storage claimEvent = claimEvents[eventIndices[i]];
-            totalEligible += (claimEvent.totalPayout * coverage.liquidityAtRisk) / totalCovered;
+            uint256 eventIdx = eventIndices[i];
+            if (!hasClaimedEvent[lp][eventIdx]) {
+                ClaimEvent storage claimEvent = claimEvents[eventIdx];
+                totalUnclaimed += (claimEvent.totalPayout * coverage.liquidityAtRisk) / totalCovered;
+            }
         }
 
-        if (totalEligible <= coverage.claimedAmount) {
-            return 0;
-        }
-
-        return totalEligible - coverage.claimedAmount;
+        return totalUnclaimed;
     }
 
     // ============ Admin Functions ============

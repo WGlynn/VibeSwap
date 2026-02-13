@@ -245,14 +245,11 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
     function vote(bytes32 proposalId, bool approve) external onlyActiveAuthority {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.status != ProposalStatus.PENDING) revert ProposalNotPending();
-        if (hasVoted[proposalId][msg.sender]) revert AlreadyVoted();
 
-        // Check expiry
-        if (block.timestamp > proposal.createdAt + proposalExpiry) {
-            proposal.status = ProposalStatus.EXPIRED;
-            emit ProposalExpired(proposalId);
-            revert ProposalExpiredError();
-        }
+        // Check expiry BEFORE any state changes — revert undoes status updates
+        if (block.timestamp > proposal.createdAt + proposalExpiry) revert ProposalExpiredError();
+
+        if (hasVoted[proposalId][msg.sender]) revert AlreadyVoted();
 
         hasVoted[proposalId][msg.sender] = true;
         voteValue[proposalId][msg.sender] = approve;

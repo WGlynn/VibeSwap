@@ -484,7 +484,8 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         uint256 bond = recoveryBonds[requestId];
         if (bond > 0) {
             recoveryBonds[requestId] = 0;
-            payable(request.requester).transfer(bond);
+            (bool sent, ) = payable(request.requester).call{value: bond}("");
+            require(sent, "Bond return failed");
             emit RecoveryBondReturned(requestId, request.requester, bond);
         }
     }
@@ -520,7 +521,8 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         uint256 bond = recoveryBonds[requestId];
         if (bond > 0) {
             recoveryBonds[requestId] = 0;
-            payable(msg.sender).transfer(bond);
+            (bool sent, ) = payable(msg.sender).call{value: bond}("");
+            require(sent, "Bond slash transfer failed");
             emit RecoveryBondSlashed(requestId, request.requester, bond, "Owner cancelled - potential fraud");
         }
 
@@ -549,7 +551,8 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         if (bond > 0) {
             recoveryBonds[requestId] = 0;
             uint256 reporterReward = bond / 2;
-            payable(msg.sender).transfer(reporterReward);
+            (bool sent, ) = payable(msg.sender).call{value: reporterReward}("");
+            require(sent, "Reporter reward failed");
             // Remaining goes to contract (treasury)
             emit RecoveryBondSlashed(requestId, request.requester, bond, "Fraud reported");
         }

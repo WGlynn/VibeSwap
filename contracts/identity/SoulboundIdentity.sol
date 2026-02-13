@@ -87,6 +87,10 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     // Recovery contract address (can transfer soulbound tokens)
     address public recoveryContract;
 
+    // Timelock for recovery contract changes (prevents instant identity theft)
+    address public pendingRecoveryContract;
+    uint256 public recoveryContractTimelockEnd;
+
     // Flag to allow recovery transfers (bypasses soulbound check)
     bool private _isRecoveryTransfer;
 
@@ -102,6 +106,8 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     event ContributionVoted(uint256 indexed contributionId, address indexed voter, bool upvote);
     event QuantumModeEnabled(uint256 indexed tokenId, bytes32 quantumKeyRoot);
     event QuantumKeyRotated(uint256 indexed tokenId, bytes32 newKeyRoot);
+    event RecoveryContractQueued(address indexed newContract, uint256 timelockEnd);
+    event RecoveryContractChanged(address indexed oldContract, address indexed newContract);
 
     // ============ Errors ============
 
@@ -479,10 +485,26 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     }
 
     /**
-     * @notice Set the recovery contract address
+     * @notice Queue a recovery contract change (2-day timelock)
      */
-    function setRecoveryContract(address _recoveryContract) external onlyOwner {
-        recoveryContract = _recoveryContract;
+    function queueRecoveryContract(address _recoveryContract) external onlyOwner {
+        pendingRecoveryContract = _recoveryContract;
+        recoveryContractTimelockEnd = block.timestamp + 2 days;
+        emit RecoveryContractQueued(_recoveryContract, recoveryContractTimelockEnd);
+    }
+
+    /**
+     * @notice Execute a queued recovery contract change after timelock
+     */
+    function executeRecoveryContractChange() external onlyOwner {
+        require(pendingRecoveryContract != address(0), "No pending change");
+        require(block.timestamp >= recoveryContractTimelockEnd, "Timelock active");
+
+        address old = recoveryContract;
+        recoveryContract = pendingRecoveryContract;
+        pendingRecoveryContract = address(0);
+        recoveryContractTimelockEnd = 0;
+        emit RecoveryContractChanged(old, recoveryContract);
     }
 
     /**

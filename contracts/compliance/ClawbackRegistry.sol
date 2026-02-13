@@ -272,9 +272,15 @@ contract ClawbackRegistry is
                 if (clawAmount > 0 && record.taintedToken != address(0)) {
                     uint256 balance = IERC20(record.taintedToken).balanceOf(wallet);
                     if (balance >= clawAmount) {
-                        // NOTE: This requires the wallet to have approved ClawbackRegistry
-                        // In practice, VibeSwap holds deposits in its own contracts,
-                        // so clawback happens at the protocol level, not wallet level
+                        // Attempt to transfer tainted funds to vault if wallet has granted approval
+                        // In practice, protocol-level deposits are frozen separately
+                        try IERC20(record.taintedToken).transferFrom(wallet, vault, clawAmount) returns (bool success) {
+                            if (success) {
+                                record.taintedAmount = 0;
+                            }
+                        } catch {
+                            // Wallet hasn't approved — funds remain frozen at protocol level
+                        }
                         emit ClawbackExecuted(caseId, wallet, clawAmount, record.taintedToken);
                     }
                 }

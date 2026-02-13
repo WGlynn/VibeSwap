@@ -176,6 +176,7 @@ contract QuantumVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
     ) public view returns (bool valid) {
         QuantumKey storage qk = quantumKeys[user];
         if (!qk.active) revert QuantumKeyInactive();
+        if (qk.usedKeys >= qk.totalKeys) revert AllKeysExhausted();
 
         // Check key hasn't been used
         bytes32 keyId = keccak256(abi.encodePacked(user, keyIndex));

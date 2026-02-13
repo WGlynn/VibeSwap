@@ -176,9 +176,12 @@ contract DisputeResolver is
         if (arbitrators[msg.sender].registered) revert AlreadyRegistered();
         if (msg.value < minArbitratorStake) revert InsufficientStake();
 
+        // Only accept exact stake amount — refund excess
+        uint256 excess = msg.value - minArbitratorStake;
+
         arbitrators[msg.sender] = Arbitrator({
             registered: true,
-            stake: msg.value,
+            stake: minArbitratorStake,
             casesHandled: 0,
             correctRulings: 0,
             reputation: 10000, // Start with perfect reputation
@@ -186,7 +189,14 @@ contract DisputeResolver is
         });
 
         activeArbitrators.push(msg.sender);
-        emit ArbitratorRegistered(msg.sender, msg.value);
+
+        // Refund excess ETH
+        if (excess > 0) {
+            (bool sent, ) = msg.sender.call{value: excess}("");
+            require(sent, "Refund failed");
+        }
+
+        emit ArbitratorRegistered(msg.sender, minArbitratorStake);
     }
 
     // ============ Dispute Filing ============
@@ -362,9 +372,17 @@ contract DisputeResolver is
         );
 
         // Escalation fee (2x filing fee)
-        require(msg.value >= filingFee * 2, "Insufficient escalation fee");
+        uint256 escalationFee = filingFee * 2;
+        require(msg.value >= escalationFee, "Insufficient escalation fee");
 
         dispute.phase = DisputePhase.APPEALED;
+
+        // Refund excess ETH
+        uint256 excess = msg.value - escalationFee;
+        if (excess > 0) {
+            (bool sent, ) = msg.sender.call{value: excess}("");
+            require(sent, "Refund failed");
+        }
         dispute.resolution = Resolution.ESCALATED;
 
         // Open trial in DecentralizedTribunal if configured

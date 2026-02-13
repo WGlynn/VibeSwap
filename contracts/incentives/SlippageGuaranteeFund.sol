@@ -112,6 +112,8 @@ contract SlippageGuaranteeFund is
         uint256 expectedOut,
         uint256 actualOut
     ) external override onlyController returns (bytes32 claimId) {
+        require(token != address(0), "Invalid token");
+
         // Only create claim if there's a shortfall
         if (actualOut >= expectedOut) {
             return bytes32(0);

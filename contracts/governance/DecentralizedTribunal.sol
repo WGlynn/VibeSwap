@@ -6,6 +6,33 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../compliance/FederatedConsensus.sol";
 
+/// @notice Minimal interface for SoulboundIdentity juror eligibility checks
+interface ISoulboundIdentityMinimal {
+    struct AvatarTraits {
+        uint8 background;
+        uint8 body;
+        uint8 eyes;
+        uint8 mouth;
+        uint8 accessory;
+        uint8 aura;
+    }
+    struct IdentityInfo {
+        string username;
+        uint256 level;
+        uint256 xp;
+        int256 alignment;
+        uint256 contributions;
+        uint256 reputation;
+        uint256 createdAt;
+        uint256 lastActive;
+        AvatarTraits avatar;
+        bool quantumEnabled;
+        bytes32 quantumKeyRoot;
+    }
+    function hasIdentity(address addr) external view returns (bool);
+    function getIdentity(address addr) external view returns (IdentityInfo memory);
+}
+
 /**
  * @title DecentralizedTribunal
  * @notice On-chain equivalent of courts and juries
@@ -111,6 +138,12 @@ contract DecentralizedTribunal is
     /// @notice Trial counter
     uint256 public trialCount;
 
+    /// @notice SoulboundIdentity contract for juror eligibility
+    address public soulboundIdentity;
+
+    /// @notice Pending stake withdrawals (pull pattern for safe ETH returns)
+    mapping(address => uint256) public pendingStakeWithdrawals;
+
     // ============ Events ============
 
     event TrialOpened(bytes32 indexed trialId, bytes32 indexed caseId, uint256 jurySize);
@@ -121,6 +154,9 @@ contract DecentralizedTribunal is
     event AppealFiled(bytes32 indexed trialId, uint256 appealRound);
     event TrialClosed(bytes32 indexed trialId, Verdict finalVerdict);
     event ConsensusVoteCast(bytes32 indexed trialId, bytes32 indexed proposalId, bool approved);
+    event StakePendingWithdrawal(address indexed juror, uint256 amount);
+    event StakeWithdrawn(address indexed juror, uint256 amount);
+    event SoulboundIdentitySet(address indexed identity);
 
     // ============ Errors ============
 
@@ -133,6 +169,11 @@ contract DecentralizedTribunal is
     error MaxAppealsReached();
     error InsufficientStake();
     error JuryFull();
+    error NoIdentity();
+    error InsufficientLevel();
+    error InsufficientReputation();
+    error AlreadyJuror();
+    error NoPendingStake();
 
     // ============ Initialization ============
 
@@ -206,11 +247,18 @@ contract DecentralizedTribunal is
         if (trial.phase != TrialPhase.JURY_SELECTION) revert WrongPhase();
         if (msg.value < trial.jurorStake) revert InsufficientStake();
         if (trialJurors[trialId].length >= trial.jurySize) revert JuryFull();
+        if (jurors[trialId][msg.sender].summoned) revert AlreadyJuror();
 
-        // NOTE: In production, check SoulboundIdentity for:
-        // - Minimum level (minJurorLevel)
-        // - Minimum reputation (minJurorReputation)
-        // - Not a party to the case
+        // SoulboundIdentity checks for sybil resistance
+        if (soulboundIdentity != address(0)) {
+            bool hasId = ISoulboundIdentityMinimal(soulboundIdentity).hasIdentity(msg.sender);
+            if (!hasId) revert NoIdentity();
+
+            ISoulboundIdentityMinimal.IdentityInfo memory id =
+                ISoulboundIdentityMinimal(soulboundIdentity).getIdentity(msg.sender);
+            if (id.level < minJurorLevel) revert InsufficientLevel();
+            if (id.reputation < minJurorReputation) revert InsufficientReputation();
+        }
 
         jurors[trialId][msg.sender] = Juror({
             summoned: true,
@@ -369,12 +417,26 @@ contract DecentralizedTribunal is
             // Jurors who voted with majority get stake back + bonus from minority
             bool votedWithMajority = juror.votedGuilty == majorityGuilty;
             if (votedWithMajority) {
-                // Return full stake (bonus distribution is handled separately)
-                (bool sent, ) = jurorList[i].call{value: juror.stakeAmount}("");
-                require(sent, "Stake return failed");
+                // Pull pattern: credit pending withdrawal instead of pushing ETH
+                // This prevents a single reverting recipient from blocking all settlements
+                pendingStakeWithdrawals[jurorList[i]] += juror.stakeAmount;
+                emit StakePendingWithdrawal(jurorList[i], juror.stakeAmount);
             }
             // Minority stake stays in contract as penalty
         }
+    }
+
+    /// @notice Withdraw pending stake (pull pattern)
+    function withdrawStake() external nonReentrant {
+        uint256 amount = pendingStakeWithdrawals[msg.sender];
+        if (amount == 0) revert NoPendingStake();
+
+        pendingStakeWithdrawals[msg.sender] = 0;
+
+        (bool sent, ) = msg.sender.call{value: amount}("");
+        require(sent, "Stake withdrawal failed");
+
+        emit StakeWithdrawn(msg.sender, amount);
     }
 
     // ============ View Functions ============
@@ -418,6 +480,11 @@ contract DecentralizedTribunal is
     function setEligibility(uint256 _minReputation, uint256 _minLevel) external onlyOwner {
         minJurorReputation = _minReputation;
         minJurorLevel = _minLevel;
+    }
+
+    function setSoulboundIdentity(address _soulboundIdentity) external onlyOwner {
+        soulboundIdentity = _soulboundIdentity;
+        emit SoulboundIdentitySet(_soulboundIdentity);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}

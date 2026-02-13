@@ -63,6 +63,7 @@ contract ClawbackVault is
     error EscrowNotFound();
     error AlreadyReleased();
     error InsufficientBalance();
+    error InvalidRecipient();
 
     // ============ Modifiers ============
 
@@ -132,6 +133,7 @@ contract ClawbackVault is
         bytes32 escrowId,
         address recipient
     ) external onlyRegistry nonReentrant {
+        if (recipient == address(0)) revert InvalidRecipient();
         EscrowRecord storage record = escrows[escrowId];
         if (record.depositedAt == 0) revert EscrowNotFound();
         if (record.released) revert AlreadyReleased();

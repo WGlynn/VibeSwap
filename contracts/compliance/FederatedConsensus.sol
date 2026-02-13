@@ -327,6 +327,8 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
      */
     function setThreshold(uint256 newThreshold) external onlyOwner {
         if (newThreshold == 0 || newThreshold > authorityCount) revert InvalidThreshold();
+        // Require at least 2 authorities for meaningful consensus
+        if (authorityCount < 2) revert InvalidThreshold();
         uint256 oldThreshold = approvalThreshold;
         approvalThreshold = newThreshold;
         emit ThresholdUpdated(oldThreshold, newThreshold);

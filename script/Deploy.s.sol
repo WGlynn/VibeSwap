@@ -75,7 +75,8 @@ contract DeployVibeSwap is Script {
         bytes memory auctionInit = abi.encodeWithSelector(
             CommitRevealAuction.initialize.selector,
             owner,
-            treasury
+            treasury,
+            address(0) // complianceRegistry - set later if needed
         );
         ERC1967Proxy auctionProxy = new ERC1967Proxy(address(auctionImpl), auctionInit);
         auction = address(auctionProxy);
@@ -138,8 +139,8 @@ contract DeployVibeSwap is Script {
         VibeSwapCore(payable(core)).setMaxSwapPerHour(1_000_000 * 1e18); // 1M token limit per hour
         VibeSwapCore(payable(core)).setCommitCooldown(1); // 1 second between commits
 
-        // Configure AMM security (guardian can pause)
-        VibeAMM(amm).setGuardian(owner, true);
+        // Configure Core security (guardian can pause)
+        VibeSwapCore(payable(core)).setGuardian(owner);
 
         // Enable TWAP validation and flash loan protection on AMM
         VibeAMM(amm).setFlashLoanProtection(true);

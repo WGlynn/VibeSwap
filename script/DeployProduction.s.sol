@@ -203,7 +203,8 @@ contract DeployProduction is Script {
         bytes memory auctionInit = abi.encodeWithSelector(
             CommitRevealAuction.initialize.selector,
             owner,
-            treasury
+            treasury,
+            address(0) // complianceRegistry - can be set post-deploy
         );
         auction = address(new ERC1967Proxy(auctionImpl, auctionInit));
         console.log("  CommitRevealAuction proxy:", auction);
@@ -289,10 +290,13 @@ contract DeployProduction is Script {
 
     function _configureSecurity() internal {
         // AMM security
-        VibeAMM(amm).setGuardian(guardian, true);
         VibeAMM(amm).setFlashLoanProtection(true);
         VibeAMM(amm).setTWAPValidation(true);
-        console.log("  AMM: Guardian set, flash loan protection enabled, TWAP validation enabled");
+        console.log("  AMM: Flash loan protection enabled, TWAP validation enabled");
+
+        // Core security - guardian
+        VibeSwapCore(payable(core)).setGuardian(guardian);
+        console.log("  Core: Guardian set:", guardian);
 
         // Core security
         VibeSwapCore(payable(core)).setRequireEOA(true);
@@ -346,6 +350,16 @@ contract DeployProduction is Script {
 
         // Verify liquidity protection
         require(VibeAMM(amm).liquidityProtectionEnabled(), "Liquidity protection not enabled");
+
+        // Verify security settings from _configureSecurity()
+        require(VibeSwapCore(payable(core)).requireEOA(), "Core: EOA requirement not enabled");
+        require(VibeSwapCore(payable(core)).maxSwapPerHour() > 0, "Core: Rate limit not configured");
+        require(VibeSwapCore(payable(core)).guardian() == guardian, "Core: Guardian not set");
+        require(VibeAMM(amm).flashLoanProtectionEnabled(), "AMM: Flash loan protection not enabled");
+        require(VibeAMM(amm).twapValidationEnabled(), "AMM: TWAP validation not enabled");
+
+        // Verify router authorization
+        require(CrossChainRouter(payable(router)).authorized(core), "Router: Core not authorized");
 
         console.log("  All verifications passed");
     }
@@ -486,18 +500,18 @@ contract EmergencyPause is Script {
     function run() external {
         uint256 guardianKey = vm.envUint("GUARDIAN_KEY");
 
-        address amm = vm.envAddress("VIBESWAP_AMM");
+        address core = vm.envAddress("VIBESWAP_CORE");
 
         console.log("Initiating emergency pause...");
 
         vm.startBroadcast(guardianKey);
 
-        // Pause AMM globally (this prevents all swaps and liquidity operations)
-        VibeAMM(amm).setGlobalPause(true);
+        // Pause VibeSwapCore (guardian or owner can call this)
+        VibeSwapCore(payable(core)).pause();
 
         vm.stopBroadcast();
 
-        console.log("AMM globally paused - all operations are disabled");
-        console.log("Guardian must call setGlobalPause(false) to resume operations");
+        console.log("VibeSwapCore paused - all swap operations are disabled");
+        console.log("Owner must call unpause() to resume operations");
     }
 }

@@ -8,18 +8,30 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- Protocol security hardening in progress — comprehensive audit complete
+- **Protocol security hardening COMPLETE** — 6 full audit passes, 30+ findings fixed across 11 commits
 - **550 tests passing, 0 failures, 0 skipped** (full suite green)
-- Comprehensive audit of ALL contracts complete — 23+ findings fixed across 8 commits
-- All previously-skipped test files now activated and passing
+- All contracts audited: core, AMM, governance, incentives, messaging, libraries, identity, compliance, quantum, oracles
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Continue protocol security hardening (remaining medium-severity items)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
+- Consider additional adversarial tests for edge cases
 
 ## Recently Completed (Feb 12, 2026)
+33. **SlippageGuaranteeFund daily limit fix**
+    - **MEDIUM**: Daily claim limit was hardcoded to 1e18, ignoring config.userDailyLimitBps
+    - Now uses configurable BPS percentage of fund reserves per user per day
+    - Total suite: 550 tests, 0 failures
+32. **ComplianceRegistry KYC expiry + LoyaltyRewardsManager fee-on-transfer**
+    - **HIGH**: canProvideLiquidity and canUsePriorityAuction missing KYC expiry checks
+    - **MEDIUM**: depositRewards now uses balance-before/after pattern for fee-on-transfer tokens
+    - Total suite: 550 tests, 0 failures
+31. **Medium-severity fixes (bounded loops, array limits, threshold validation)**
+    - **MEDIUM**: DisputeResolver bounded arbitrator assignment loop (gas DoS prevention)
+    - **MEDIUM**: ClawbackRegistry MAX_CASE_WALLETS=1000 (unbounded array growth prevention)
+    - **MEDIUM**: WalletRecovery guardianThreshold validated against active guardian count
+    - Total suite: 550 tests, 0 failures
 30. **Peripheral Contract Audit Fixes (7 fixes across 6 contracts)**
     - **CRITICAL**: DisputeResolver excess ETH refund in escalateToTribunal + registerArbitrator
     - **CRITICAL**: WalletRecovery replaced unsafe .transfer() with .call{value:}() (3 bond paths)

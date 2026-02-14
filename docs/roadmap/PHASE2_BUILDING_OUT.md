@@ -16,7 +16,7 @@
 | 3 | **Hook System (Uniswap V4 style)** | Pre/post swap hooks on pools — third parties attach logic (fees, rewards, compliance) without modifying core | |
 | 4 | **Keeper Network / Relayer Layer** | Decentralized keeper network — JUL staking, task registry, batch execution, reputation-gated min stake, slashing, performance tracking. Removes single-operator dependency | **Complete** |
 | 5 | **Gasless Meta-Transactions (EIP-2771)** | VibeForwarder extends OZ ERC2771Forwarder — relayer registry, JUL tips, per-user hourly rate limiting, reputation-gated access, target whitelisting. Users sign, relayers pay gas | **Complete** |
-| 6 | **Account Abstraction (ERC-4337)** | Smart contract wallets with session keys, batched txns, social recovery — pairs with WebAuthn device wallet | |
+| 6 | **Account Abstraction (ERC-4337)** | VibeSmartWallet + VibeWalletFactory — session keys (time-limited, function-scoped, spending-capped), batched txns, social recovery, ERC-4337 validateUserOp, CREATE2 deterministic deployment | **Complete** |
 | 7 | **Plugin Registry** | On-chain registry of approved protocol extensions (curves, oracles, compliance, hooks, keepers). Governance-gated lifecycle (PROPOSED→APPROVED→ACTIVE→DEPRECATED/DEACTIVATED), reputation-gated grace periods, JUL author tips, category indexing, audit scores | **Complete** |
 | 8 | **Timelocked Governance Execution** | Role-based timelock (proposer/executor/canceller/guardian), reputation-gated delay reduction, emergency fast-track, operation chaining, JUL keeper tips | **Complete** |
 | 9 | **Protocol-Owned Liquidity (POL)** | Treasury deploys its own LP positions, earning fees perpetually instead of renting liquidity via emissions | |
@@ -122,4 +122,5 @@ Financial:  WrappedBAR (wBAR), VibeLPNFT, VibeStream, VibeOptions, VibeYieldStab
             VibeBonds, VibeCredit, VibeSynth, VibeInsurance, VibeRevShare
 Governance: VibeTimelock, VibeKeeperNetwork, VibePluginRegistry
 MetaTx:     VibeForwarder
+Account:    VibeSmartWallet, VibeWalletFactory
 ```

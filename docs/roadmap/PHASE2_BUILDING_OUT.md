@@ -20,7 +20,7 @@
 | 7 | **Plugin Registry** | On-chain registry of approved protocol extensions (curves, oracles, compliance, hooks, keepers). Governance-gated lifecycle (PROPOSED→APPROVED→ACTIVE→DEPRECATED/DEACTIVATED), reputation-gated grace periods, JUL author tips, category indexing, audit scores | **Complete** |
 | 8 | **Timelocked Governance Execution** | Role-based timelock (proposer/executor/canceller/guardian), reputation-gated delay reduction, emergency fast-track, operation chaining, JUL keeper tips | **Complete** |
 | 9 | **Protocol-Owned Liquidity (POL)** | Treasury deploys its own LP positions, earning fees perpetually instead of renting liquidity via emissions | |
-| 10 | **Versioned Proxy Architecture** | Multiple implementation versions live simultaneously — users opt-in to upgrades rather than forced migration | |
+| 10 | **Versioned Proxy Architecture** | VibeVersionRouter — multiple implementations coexist, users opt-in to upgrades. Lifecycle: BETA→STABLE→DEPRECATED→SUNSET. Auto-migration on sunset, deterministic defaults, no forced upgrades | **Complete** |
 
 ---
 
@@ -123,4 +123,5 @@ Financial:  WrappedBAR (wBAR), VibeLPNFT, VibeStream, VibeOptions, VibeYieldStab
 Governance: VibeTimelock, VibeKeeperNetwork, VibePluginRegistry
 MetaTx:     VibeForwarder
 Account:    VibeSmartWallet, VibeWalletFactory
+Proxy:      VibeVersionRouter
 ```

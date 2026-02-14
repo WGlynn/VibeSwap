@@ -14,11 +14,22 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Phase 2 Financial Primitives (next: options, yield stables, bonds, credit delegation, synthetics, insurance, revenue share)
+- Phase 2 Financial Primitives (next: yield stables, bonds, credit delegation, synthetics, insurance, revenue share)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 13, 2026)
+38. **VibeOptions — On-Chain European-Style Options** (`72f6cc0`)
+    - Financial Primitive #4: calls/puts as ERC-721 NFTs, fully collateralised by writer
+    - European-style, cash-settled from collateral using TWAP pricing (anti-MEV)
+    - CALL collateral = token0 (underlying), PUT collateral = amount × strike / 1e18 of token1 (quote)
+    - Payoff: CALL = amount × (settlement - strike) / settlement, PUT = amount × (strike - settlement) / 1e18
+    - Writer sets premium; suggestPremium() view provides reference via VolatilityOracle (simplified Black-Scholes approximation)
+    - Lifecycle: write → purchase → exercise (after expiry, within 24h window) → reclaim remainder (after window)
+    - Cancel path: writer cancels unpurchased option, gets collateral back, NFT burned
+    - 3 new files: `contracts/financial/interfaces/IVibeOptions.sol`, `contracts/financial/VibeOptions.sol`, `test/VibeOptions.t.sol`
+    - 31 tests (write 6, purchase 3, exercise 8, reclaim 5, cancel 3, premium 3, integration 3), all passing
+    - 106 regression tests all passing (VibeLPNFT 28, VibeStream 51, AuctionAMM 10, VibeSwap 13, MoneyFlow 4)
 37. **VibeStream FundingPool — Conviction-Weighted Distribution** (`c3b1e87`)
     - Extended VibeStream.sol and IVibeStream.sol in-place with FundingPool mode
     - Conviction voting: voters stake tokens to signal for recipients, conviction = stake × time (O(1) from aggregates)

@@ -80,9 +80,9 @@
 | # | Primitive | What It Enables | Status |
 |---|----------|----------------|--------|
 | 1 | **Wrapped Batch Auction Receipts (wBAR)** | ERC-20 tokens representing pending auction positions — tradeable before settlement, creates a pre-market | **Complete** |
-| 2 | **LP Position NFTs (ERC-721)** | Each LP position is a unique NFT with metadata (range, fees earned, age) — composable, tradeable, collateral-eligible | Planned |
-| 3 | **Streaming Payments (ERC-7575)** | Continuous token flows — salary payments, subscription fees, vesting, all in real-time | Planned |
-| 4 | **Options Primitives** | On-chain calls/puts priced by volatility oracle — built on top of AMM liquidity | Planned |
+| 2 | **LP Position NFTs (ERC-721)** | Each LP position is a unique NFT with metadata (range, fees earned, age) — composable, tradeable, collateral-eligible | **Complete** |
+| 3 | **Streaming Payments + FundingPools** | Continuous token flows (salary, vesting) + conviction-weighted multi-recipient distribution with Shapley fairness | **Complete** |
+| 4 | **Options Primitives** | On-chain calls/puts priced by volatility oracle — built on top of AMM liquidity | **Complete** |
 | 5 | **Yield-Bearing Stablecoins** | Deposit USDC → get vsUSDC that auto-earns from protocol fees — composable yield layer | Planned |
 | 6 | **Bond Market** | Fixed-term, fixed-rate deposits — treasury issues bonds to smooth liquidity, users get predictable yield | Planned |
 | 7 | **Credit Delegation** | Depositors delegate borrowing power to trusted addresses — undercollateralized lending with reputation oracle | Planned |

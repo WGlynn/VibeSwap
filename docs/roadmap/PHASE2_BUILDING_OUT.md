@@ -84,9 +84,9 @@
 | 3 | **Streaming Payments + FundingPools** | Continuous token flows (salary, vesting) + conviction-weighted multi-recipient distribution with Shapley fairness | **Complete** |
 | 4 | **Options Primitives** | On-chain calls/puts priced by volatility oracle — built on top of AMM liquidity | **Complete** |
 | 5 | **Joule (JUL) — Trinomial Stability Token** | Single ERC-20 with 3 mechanisms: RPow mining (electricity anchor), PI controller (oscillation dampening), elastic rebase (demand shock absorption) — replaces volatile collateral with electricity-backed stable money | **Complete** |
-| 6 | **Bond Market** | Fixed-term, fixed-rate deposits — treasury issues bonds to smooth liquidity, users get predictable yield | Planned |
-| 7 | **Credit Delegation** | Depositors delegate borrowing power to trusted addresses — undercollateralized lending with reputation oracle | Planned |
-| 8 | **Synthetic Assets** | Mint synthetic exposure to any asset using oracle infrastructure — trade TSLA, gold, BTC on any chain | Planned |
+| 6 | **Bond Market** | Fixed-term, fixed-rate deposits — treasury issues bonds to smooth liquidity, users get predictable yield | **Complete** |
+| 7 | **Credit Delegation** | Depositors delegate borrowing power to trusted addresses — undercollateralized lending with reputation oracle | **Complete** |
+| 8 | **Synthetic Assets** | Mint synthetic exposure to any asset using oracle infrastructure — trade TSLA, gold, BTC on any chain | **Complete** |
 | 9 | **Insurance Derivatives** | Tokenized coverage against IL, smart contract exploits, depeg events — extends VolatilityInsurancePool | Planned |
 | 10 | **Revenue Share Tokens** | ERC-20 tokens that auto-receive % of protocol revenue — stakeable, tradeable, collateral-eligible | Planned |
 

@@ -14,11 +14,23 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Phase 2 Financial Primitives (next: yield stables, bonds, credit delegation, synthetics, insurance, revenue share)
+- Phase 2 Financial Primitives (next: bonds, credit delegation, synthetics, insurance, revenue share)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 13, 2026)
+39. **Joule (JUL) — Trinomial Stability Token** (`5f86ecb`)
+    - Financial Primitive #5: Replaces "Yield-Bearing Stablecoins (vsUSDC)" — single token with 3 stability mechanisms
+    - **RPow Mining**: SHA-256 proportional PoW anchoring value to electricity cost (Bitcoin ASIC compatible)
+    - **PI Controller**: Kp=7.5e-8, Ki=2.4e-14, 120-day leaky integrator adjusts floating rebase target
+    - **Elastic Rebase**: supplyDelta = totalSupply × (price - target) / target / lag=10, ±5% equilibrium band
+    - Custom ERC-20 with O(1) rebase via global scalar (externalBalance = internalBalance × scalar / 1e18)
+    - Moore's Law decay (~25%/yr), difficulty adjustment every 144 blocks, dual oracle (market + electricity + CPI)
+    - Anti-merge-mining: challenge includes address(this)
+    - Found & worked around SHA256Verifier assembly bug (always returns 0) — uses built-in sha256() instead
+    - Trinomial Stability Theorem docs updated to v2.0: one-token architecture, RPow terminology, optimal yield section (Friedman Rule)
+    - 3 new files: `contracts/monetary/interfaces/IJoule.sol`, `contracts/monetary/Joule.sol`, `test/Joule.t.sol`
+    - 40 tests, all passing
 38. **VibeOptions — On-Chain European-Style Options** (`72f6cc0`)
     - Financial Primitive #4: calls/puts as ERC-721 NFTs, fully collateralised by writer
     - European-style, cash-settled from collateral using TWAP pricing (anti-MEV)

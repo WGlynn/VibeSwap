@@ -148,6 +148,73 @@ const questions = [
       { text: 'stay flexible and adapt as you go', value: 'P' },
     ],
   },
+  // ============================================
+  // RSP COGNITIVE PROFILE DIMENSIONS
+  // Rosetta Stone Protocol — cognitive fingerprint
+  // ============================================
+  // Technical depth tolerance (general, not crypto-specific)
+  {
+    id: 'rsp1',
+    type: 'rsp',
+    dimension: 'technicalDepth',
+    text: 'when you hit a concept you don\'t know:',
+    options: [
+      { text: 'just tell me what it does, skip the details', value: 1 },
+      { text: 'give me enough to get the gist', value: 2 },
+      { text: 'I want to understand the mechanism', value: 4 },
+      { text: 'show me the math, code, or proof', value: 5 },
+    ],
+  },
+  // Preferred analogy domain
+  {
+    id: 'rsp2',
+    type: 'rsp',
+    dimension: 'analogyDomain',
+    text: 'which comparison clicks fastest for you?',
+    options: [
+      { text: '"it\'s like a machine with parts"', value: 'mechanical' },
+      { text: '"it\'s like a team working together"', value: 'social' },
+      { text: '"it\'s like a market or economy"', value: 'financial' },
+      { text: '"it\'s like a living organism"', value: 'biological' },
+    ],
+  },
+  // Humor modality
+  {
+    id: 'rsp3',
+    type: 'rsp',
+    dimension: 'humorMode',
+    text: 'what actually makes you laugh?',
+    options: [
+      { text: 'deadpan, understated delivery', value: 'dry' },
+      { text: 'the weirder the better', value: 'absurdist' },
+      { text: 'sharp references and callbacks', value: 'referential' },
+      { text: 'honestly, just give me the info straight', value: 'none' },
+    ],
+  },
+  // Attention architecture
+  {
+    id: 'rsp4',
+    type: 'rsp',
+    dimension: 'attentionStyle',
+    text: 'when you open a long document:',
+    options: [
+      { text: 'I read front to back, give me the full picture', value: 'deep-dive' },
+      { text: 'I skip to the summary, then decide if I need more', value: 'executive' },
+    ],
+  },
+  // Trust signals
+  {
+    id: 'rsp5',
+    type: 'rsp',
+    dimension: 'trustSignal',
+    text: 'what convinces you something is legit?',
+    options: [
+      { text: 'show me the numbers and data', value: 'data' },
+      { text: 'who built it and what\'s their track record?', value: 'credentials' },
+      { text: 'tell me the story — why it exists', value: 'narrative' },
+      { text: 'show me who else is using it', value: 'social-proof' },
+    ],
+  },
 ]
 
 // ============================================
@@ -581,6 +648,8 @@ function PersonalityExplainer({ onComplete }) {
   const [answers, setAnswers] = useState({})
   const [selectedProfile, setSelectedProfile] = useState(null)
   const [dimensionStrengths, setDimensionStrengths] = useState({})
+  // RSP Cognitive Profile state
+  const [cognitiveProfile, setCognitiveProfile] = useState({})
 
   // Calculate crypto comprehension score (0-6)
   const cryptoScore = useMemo(() => {
@@ -642,6 +711,20 @@ function PersonalityExplainer({ onComplete }) {
     const nextLevel = getNextLevel(xpData.totalXP)
     const xpProgress = getXPProgress(xpData.totalXP)
 
+    // Build RSP Cognitive Profile vector
+    const cp = {
+      technicalDepth: cognitiveProfile.technicalDepth || (cryptoLevel <= 2 ? 1 : cryptoLevel <= 4 ? 3 : 5),
+      analogyDomain: cognitiveProfile.analogyDomain || 'financial',
+      humorMode: cognitiveProfile.humorMode || 'none',
+      abstractionComfort: personalityCode[1] === 'N' ? 'principles-first' : 'concrete-first',
+      attentionStyle: cognitiveProfile.attentionStyle || 'executive',
+      trustSignal: cognitiveProfile.trustSignal || 'data',
+      domainFamiliarity: {
+        crypto: cryptoLevel,
+        finance: cryptoLevel >= 3 ? 'familiar' : 'basic',
+      },
+    }
+
     return {
       profile: selectedProfile,
       cryptoLevel,
@@ -658,16 +741,18 @@ function PersonalityExplainer({ onComplete }) {
       level,
       nextLevel,
       xpProgress,
+      cognitiveProfile: cp,
       ...adaptiveContent,
       tips: adaptiveTips,
     }
-  }, [stage, selectedProfile, cryptoLevel, personalityCode, archetype, dimensionStrengths])
+  }, [stage, selectedProfile, cryptoLevel, personalityCode, archetype, dimensionStrengths, cognitiveProfile])
 
   const handleAnswer = (value, optionIndex) => {
     const question = questions[currentQuestion]
 
     // For crypto questions, value is the score number
     // For personality questions, value is the letter (E, I, S, N, etc.)
+    // For RSP questions, value is the dimension value
     const newAnswers = { ...answers, [question.id]: value }
     setAnswers(newAnswers)
 
@@ -678,6 +763,14 @@ function PersonalityExplainer({ onComplete }) {
       setDimensionStrengths(prev => ({
         ...prev,
         [question.dimension]: baseStrength,
+      }))
+    }
+
+    // For RSP cognitive dimension questions, store in cognitive profile
+    if (question.type === 'rsp' && question.dimension) {
+      setCognitiveProfile(prev => ({
+        ...prev,
+        [question.dimension]: value,
       }))
     }
 
@@ -698,6 +791,7 @@ function PersonalityExplainer({ onComplete }) {
     setCurrentQuestion(0)
     setAnswers({})
     setSelectedProfile(null)
+    setCognitiveProfile({})
   }
 
   const cryptoQuestions = questions.filter(q => q.type === 'crypto')
@@ -800,7 +894,7 @@ function PersonalityExplainer({ onComplete }) {
               step 2 of 2
             </p>
             <p className="text-[10px] text-black-600 mb-4">
-              {isCryptoQuestion ? 'understanding your experience' : 'understanding your style'}
+              {isCryptoQuestion ? 'understanding your experience' : currentQ?.type === 'rsp' ? 'building your cognitive profile' : 'understanding your style'}
             </p>
 
             {/* Progress */}
@@ -1043,6 +1137,43 @@ function PersonalityExplainer({ onComplete }) {
               </div>
             </motion.div>
 
+            {/* RSP Cognitive Profile */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="mb-6 p-4 rounded-lg bg-black-800 border border-cyan-500/30"
+            >
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
+                </div>
+                <span className="text-xs font-bold text-cyan-400">cognitive profile</span>
+                <span className="text-[9px] text-black-600 ml-auto">RSP v0.1 — stored locally only</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'depth', value: result.cognitiveProfile.technicalDepth + '/5' },
+                  { label: 'analogy', value: result.cognitiveProfile.analogyDomain },
+                  { label: 'humor', value: result.cognitiveProfile.humorMode },
+                  { label: 'abstraction', value: result.cognitiveProfile.abstractionComfort === 'principles-first' ? 'principles' : 'concrete' },
+                  { label: 'attention', value: result.cognitiveProfile.attentionStyle === 'deep-dive' ? 'deep dive' : 'executive' },
+                  { label: 'trust', value: result.cognitiveProfile.trustSignal === 'social-proof' ? 'social proof' : result.cognitiveProfile.trustSignal },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between px-2 py-1.5 rounded bg-black-900/50">
+                    <span className="text-[10px] text-black-500">{item.label}</span>
+                    <span className="text-[10px] font-mono text-cyan-400">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-black-600 mt-2 text-center">
+                this profile never leaves your device — your cognitive fingerprint belongs to you
+              </p>
+            </motion.div>
+
             {/* Main Content */}
             <div className="mb-8">
               <div className="flex items-center space-x-2 mb-4">
@@ -1130,6 +1261,7 @@ function PersonalityExplainer({ onComplete }) {
                   baseXP: result.baseXP,
                   xp: result.xp,
                   level: result.level,
+                  cognitiveProfile: result.cognitiveProfile,
                 })}
                 className="px-6 py-3 rounded-lg font-semibold bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 transition-colors"
               >

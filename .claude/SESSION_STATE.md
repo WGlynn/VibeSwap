@@ -14,11 +14,21 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Phase 2 Financial Primitives (next: streaming payments, options, yield stables, bonds, etc.)
+- Phase 2 Financial Primitives (next: options, yield stables, bonds, credit delegation, synthetics, insurance, revenue share)
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
 ## Recently Completed (Feb 13, 2026)
+37. **VibeStream FundingPool — Conviction-Weighted Distribution** (`c3b1e87`)
+    - Extended VibeStream.sol and IVibeStream.sol in-place with FundingPool mode
+    - Conviction voting: voters stake tokens to signal for recipients, conviction = stake × time (O(1) from aggregates)
+    - Lazy evaluation: allocation computed on-demand at withdrawal, not per-block
+    - Pairwise fairness verified on-chain via PairwiseFairness library at withdrawal
+    - Pool IDs count DOWN from type(uint256).max to avoid collision with stream NFT IDs
+    - 5 core functions: createFundingPool, signalConviction, removeSignal, withdrawFromPool, cancelPool
+    - 8 view functions + 3 internals, 4 new structs, 5 events, 10 errors
+    - 17 new tests (51 total VibeStream), 55 regression tests all passing
+    - Files modified: `contracts/financial/VibeStream.sol`, `contracts/financial/interfaces/IVibeStream.sol`, `test/VibeStream.t.sol`
 36. **VibeLPNFT — LP Position NFTs** (`49ffd73`)
     - ERC-721 position manager wrapping VibeAMM (purely additive, no AMM changes)
     - Holds VibeLP ERC-20 tokens in custody, issues NFTs as transferable position receipts

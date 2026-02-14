@@ -87,7 +87,7 @@
 | 6 | **Bond Market** | Fixed-term, fixed-rate deposits — treasury issues bonds to smooth liquidity, users get predictable yield | **Complete** |
 | 7 | **Credit Delegation** | Depositors delegate borrowing power to trusted addresses — undercollateralized lending with reputation oracle | **Complete** |
 | 8 | **Synthetic Assets** | Mint synthetic exposure to any asset using oracle infrastructure — trade TSLA, gold, BTC on any chain | **Complete** |
-| 9 | **Insurance Derivatives** | Tokenized coverage against IL, smart contract exploits, depeg events — extends VolatilityInsurancePool | Planned |
+| 9 | **Insurance Derivatives** | Parametric insurance + prediction market primitive — ERC-721 policies as Arrow-Debreu securities, mutualized risk pools, reputation-gated premium discounts | **Complete** |
 | 10 | **Revenue Share Tokens** | ERC-20 tokens that auto-receive % of protocol revenue — stakeable, tradeable, collateral-eligible | Planned |
 
 ---

@@ -6,7 +6,7 @@
 
 **Date**: February 2026
 
-**Version**: 1.1
+**Version**: 2.0
 
 ---
 
@@ -96,7 +96,7 @@ Traditional finance mitigates these failures through credit scoring (reduces adv
 
 Bitcoin's money supply follows a predetermined schedule: a fixed block reward halving every four years, independent of demand. This means the relative price is driven purely by exchange — supply does not react to changes in the environment. If adoption doesn't meet the schedule's assumptions, the entire prediction is ruined.
 
-The proportional reward system, formalized by Trzeszczkowski (2021), makes a simple modification: **block reward is a function of the current block mining difficulty**. This single change creates a feedback loop that regulates supply and stabilizes price around a physical equilibrium.
+The proportional reward system — originally formalized by Trzeszczkowski (2021) in the **Ergon** whitepaper (a proof-of-work cryptocurrency implementing this mechanism, named after the Greek word for "work") — makes a simple modification: **block reward is a function of the current block mining difficulty**. This single change creates a feedback loop that regulates supply and stabilizes price around a physical equilibrium. We refer to this class of mechanism as **RPow** (Reusable Proof-of-Work), following Hal Finney's 2004 concept of work-backed digital tokens, with the Ergon implementation serving as the mathematical foundation.
 
 ### 3.2 Mathematical Model
 
@@ -265,15 +265,15 @@ The system responds countercyclically through incentive adjustment. When market 
 
 Critically, this system has no external peg. It does not target $1, or any fiat value, or any external asset. It finds its own equilibrium and dampens deviations from it.
 
-### 4.4 The Innovation: RAI on Ergon, Not ETH
+### 4.4 The Innovation: RAI on RPow, Not ETH
 
 RAI deployed on Ethereum uses ETH as collateral. This means it inherits ETH's volatility — dampened by the PI controller, but still present. When ETH drops 50%, RAI positions face liquidation risk despite the controller's efforts.
 
-We propose deploying the RAI mechanism on top of the proportional PoW money (Section 3) instead. The implications are profound.
+We propose deploying the RAI mechanism on top of the RPow proportional proof-of-work money (the Ergon model from Section 3) instead. The implications are profound.
 
 With single dampening (RAI on ETH), the controller reduces ETH volatility, but the input signal (ETH price) can swing wildly. The output volatility is a function of the input volatility and the controller gains: `Volatility_RAI = f(Volatility_ETH, Kp, Ki)`.
 
-With double dampening (RAI on Ergon), the Ergon mechanism already bounds price to oscillations around ε₀ (electricity cost). The PI controller then dampens these bounded oscillations further. The input signal is already near-stable: `Volatility_RAI = f(Volatility_Ergon, Kp, Ki)`.
+With double dampening (RAI on RPow), the proportional PoW mechanism already bounds price to oscillations around ε₀ (electricity cost). The PI controller then dampens these bounded oscillations further. The input signal is already near-stable: `Volatility_RAI = f(Volatility_RPow, Kp, Ki)`.
 
 The result is ultra-stable: the PI controller operates on a signal that is already mean-reverting, producing a compound dampening effect. Oscillation amplitude decreases exponentially at the rate determined by both the Ergon market damping (γ) and the RAI controller gains (Kp, Ki).
 
@@ -592,63 +592,153 @@ This is the complete realization of Intrinsically Incentivized Altruism (IIA): w
 
 ---
 
-## 10. Implementation Roadmap
+## 10. Unified Token Architecture: Joule (JUL)
 
-### Phase 1: Proportional PoW Money (Ergon Model)
+### 10.1 One Token, Three Mechanisms
 
-Deploy a SHA-256 proof-of-work token with proportional block reward:
-- Block reward = f(difficulty) = linear function of current difficulty
-- Moore's Law adjustment via estimated efficiency curve ε(t) = ε₀ × e^{-a_estim × t}
-- No merge mining (dedicated hash power only)
-- Configurable proportionality constant calibrated to initial target price
+A critical architectural decision: the trinomial system is implemented as **one token, not three**. The three stability mechanisms are not three separate assets requiring users to manage a portfolio — they are three internal layers of a single ERC-20 token called **Joule (JUL)**, named after the SI unit of energy.
 
-### Phase 2: PI-Controller Dampened Stable (RAI Model)
+This is not merely a UX convenience. It is a design requirement. Three separate tokens would create:
+- **Friction**: Users must understand which token to hold and when to convert between them
+- **Arbitrage surfaces**: Price divergences between the three tokens create extractable value, violating the IIA principle
+- **Composition complexity**: Every financial primitive would need to decide which of three "stable" tokens to denominate in
+- **Fragmented liquidity**: Three separate tokens split liquidity three ways
 
-Deploy a PI-controlled redemption pricing contract using the Ergon token as collateral:
-- Kp and Ki parameters calibrated via simulation before mainnet
-- TWAP oracle (anti-manipulation) feeding market price
-- Leaky integrator with configurable half-life (120 days reference)
-- Liquidation mechanism for undercollateralized positions
+A single token eliminates all of these. Every user, every contract, every financial primitive interacts with one asset: JUL.
 
-### Phase 3: Elastic Supply Rebasing (AMPL Model)
+### 10.2 Internal Mechanism Composition
 
-Deploy an elastic supply token targeting the RAI redemption price:
-- Rebase lag = 10 (reference, configurable via governance)
-- ±5% equilibrium band
-- O(1) rebase via global scalar
-- 24-hour rebase cycle with TWAP oracle input
+Inside the Joule token, the three mechanisms compose as follows:
 
-### Phase 4: Integration
+**Layer 1 — Mining (RPow/Ergon)**: New JUL supply enters circulation through SHA-256 proof-of-work mining with proportional block reward. This is the only way new tokens are created. The reward scales with difficulty and decays with Moore's Law, anchoring long-term value to electricity cost.
 
-Deploy the trinomial system as VibeSwap's base collateral layer:
-- Bridge stable tokens to all supported chains via CrossChainRouter (LayerZero V2)
-- Integrate with existing financial primitives (wBAR, VibeLPNFT, VibeOptions, VibeStream)
+**Layer 2 — PI Controller (RAI)**: A Proportional-Integral controller continuously adjusts a floating **rebase target**. Unlike standalone RAI (which is a CDP system with separate collateral), the PI controller here modifies the target price that the rebase mechanism aims for. This makes the target float to find natural equilibrium rather than being hardcoded.
+
+**Layer 3 — Rebase (AMPL)**: The O(1) global rebase scalar adjusts all balances proportionally. But instead of targeting a fixed $1.009, it targets the **PI controller's floating redemption price**, which itself is informed by the dual oracle system (CPI + electricity cost).
+
+The rebase formula becomes:
+
+```
+target(t) = PI_controller(market_price, electricity_oracle, CPI_oracle)
+supplyDelta = totalSupply × (oraclePrice - target(t)) / target(t) / rebaseLag
+```
+
+This composition means:
+- Mining provides the base supply and electricity anchor (long-term)
+- The PI controller adjusts what "equilibrium" means (medium-term)
+- The rebase pushes toward that floating equilibrium (short-term)
+
+All three operate on the same token simultaneously, without user intervention.
+
+### 10.3 Implementation Roadmap
+
+The contract is implemented in a single deployment:
+- **SHA-256 PoW mining** with proportional reward, Moore's Law decay, difficulty adjustment per epoch
+- **PI controller** with configurable Kp, Ki, leaky integrator (120-day half-life)
+- **Elastic rebase** with O(1) global scalar, ±5% equilibrium band, lag = 10
+- **Dual oracle** integration (Chainlink CPI + electricity price feed)
+- **Anti-merge-mining** via contract-address-bound challenge generation
+- **ERC-20 compatible** — standard transfer/approve/transferFrom with rebase-aware internal accounting
+
+Integration with VibeSwap:
+- Bridge JUL to all supported chains via CrossChainRouter (LayerZero V2)
+- Use as base collateral for all financial primitives (wBAR, VibeLPNFT, VibeOptions, VibeStream)
 - Enable lending with reduced overcollateralization (100-110%)
-- Update ShapleyDistributor to denominate distributions in stable units
-
-Each phase is independently useful. The Ergon token alone provides a more stable base than ETH or BTC. Adding RAI reduces volatility further. Adding AMPL handles edge cases. Full integration realizes the complete theorem.
+- Denominate ShapleyDistributor distributions in JUL
 
 ---
 
-## 11. Conclusion
+## 11. The Optimal Yield Problem
+
+### 11.1 The Paradox of Stable Money Yield
+
+A natural question arises: what should the yield on Joule be? This question conceals a deeper paradox that strikes at the heart of monetary design.
+
+High yield signals strength and demand — a currency that people want to hold. But high yield means high borrowing costs — a currency that is expensive to use. These two properties are in direct tension. A world reserve currency that yields 15% annually is simultaneously "strong" (high demand to hold) and "unusable" (prohibitive to borrow against). A currency with 0% yield is "weak" (no incentive to hold beyond transactional need) but "efficient" (zero cost of capital for productive use).
+
+This is not merely a parameter optimization. It is a fundamental design choice about what kind of money Joule aspires to be.
+
+### 11.2 The Case for Zero
+
+Milton Friedman's "Optimum Quantity of Money" (1969) argued that the optimal monetary policy sets the nominal interest rate to zero — the "Friedman Rule." The reasoning is elegant: holding money has an opportunity cost equal to the interest rate. Any positive rate means people economize on money holdings, which creates friction. At zero rates, money is a free good to hold, and the economy achieves the "satiation" level of real balances.
+
+For a world reserve currency — one that aims to be the base layer for all financial activity — zero yield has several advantages:
+
+**Capital allocation efficiency**: If the risk-free rate is zero, all returns in the economy reflect genuine productive value, not monetary premium. A business that earns 5% is genuinely productive. Under a 5% risk-free rate, that same business is break-even — it creates no value above what money itself provides for doing nothing.
+
+**Borrowing accessibility**: Zero cost of capital means anyone can borrow to fund productive activity without a hurdle rate. This is the most inclusive possible monetary regime — the bar for "worth doing" is any positive return at all.
+
+**Neutrality**: Zero yield makes money a neutral medium — it neither rewards hoarding nor penalizes holding. It is purely a coordination tool, which is arguably money's highest purpose.
+
+### 11.3 The Case Against Zero
+
+Zero yield creates its own problems:
+
+**No holding incentive**: If money yields nothing, rational actors hold only the minimum needed for transactions and invest the rest. This reduces monetary demand and, in a PoW system, reduces hash rate and security. Joule needs people to hold it to maintain the electricity equilibrium.
+
+**Velocity instability**: Money that yields nothing moves faster (hot potato effect). High velocity means each unit of money must "do more work," which amplifies demand shocks and makes the rebase mechanism work harder.
+
+**Savings destruction**: In a zero-yield regime, saving is always inferior to investing. This penalizes risk-averse actors and creates a world where everyone must be an investor — a socially costly outcome.
+
+### 11.4 The Theoretical Optimum
+
+The optimal yield for a trinomial stability currency is **not zero, but asymptotically approaching zero from above** — specifically, it should equal the long-run variance of the system's stability floor:
+
+```
+optimal_yield ≈ σ²_elec ≈ 2-5% annually
+```
+
+The reasoning:
+
+**Yield as volatility compensation**: The remaining irreducible volatility of the system (electricity cost variance, ~2-5% annually) represents a real risk to holders. Fair compensation for bearing this risk is a yield equal to the variance itself. This satisfies the Shapley efficiency axiom: holders are compensated exactly for the cost they bear by participating in the monetary system.
+
+**Natural emergence**: In the trinomial system, this yield emerges naturally without being set by policy. Miners earn block rewards proportional to difficulty (which tracks demand). As the system matures, the equilibrium mining reward (denominated in purchasing power) converges to the electricity cost variance — miners earn just enough to cover their costs plus the risk premium of electricity cost fluctuation.
+
+**Self-regulating**: If yield rises above the optimum (due to high demand), more miners enter, increasing supply, reducing yield back toward equilibrium. If yield falls below the optimum, miners exit, reducing supply, increasing yield. The proportional reward mechanism IS the yield-setting mechanism, and it converges to the physical cost of maintaining the system.
+
+### 11.5 Why Not Higher
+
+Yield significantly above the electricity variance optimum would indicate:
+
+- **Artificial scarcity**: Supply is not responding to demand (Bitcoin's disease — fixed supply creates speculative premium)
+- **Rent extraction**: Some mechanism is capturing value beyond the cost of security provision
+- **Adverse selection re-emergence**: High yield attracts speculative capital that destabilizes the system it seeks returns from
+
+Each of these violates Shapley fairness and reintroduces the market failures the trinomial system is designed to eliminate.
+
+### 11.6 The Reserve Currency Implication
+
+A world reserve currency should be boring. Its yield should be just enough to compensate for the irreducible cost of maintaining the system (electricity for PoW security) and nothing more. This is the monetary equivalent of a utility — you don't want your electricity grid to be "exciting" or "high-yielding." You want it to work, reliably, at the lowest possible cost.
+
+Joule's optimal yield profile is therefore: **converging to ~2-5% annually (matching electricity cost variance), set by market forces (not governance), emerging naturally from the proportional reward mechanism, and declining over time as the system matures and volatility decreases.**
+
+This is the answer to the yield paradox: the optimal rate is not a policy choice but a physical constant — the cost of turning electricity into trust.
+
+---
+
+## 12. Conclusion
 
 Decentralized finance's foundational defect is not in its lending protocols, its execution mechanisms, or its governance structures. It is in the collateral itself. When the base layer is volatile, information asymmetry, moral hazard, and adverse selection are mathematical inevitabilities — no amount of overcollateralization, liquidation efficiency, or governance optimization can solve problems that are structural to the collateral.
 
 The Trinomial Stability System transforms this unsolvable problem into a solved one:
 
-1. **Ergon** grounds monetary value in electricity — the most globally distributed, constantly priced, and physically real commodity available as a proof-of-work anchor.
+1. **RPow Mining** (Ergon model) grounds monetary value in electricity — the most globally distributed, constantly priced, and physically real commodity available as a proof-of-work anchor.
 
-2. **RAI** applies control theory to dampen the bounded oscillations around the electricity equilibrium, producing compound stability through mathematical feedback. It corrects sustained drift through accumulated corrective pressure — the integral term remembers what AMPL cannot.
+2. **PI Controller** (RAI model) applies control theory to dampen the bounded oscillations around the electricity equilibrium, producing compound stability through mathematical feedback. It corrects sustained drift through accumulated corrective pressure — the integral term remembers what the rebase cannot.
 
-3. **AMPL** absorbs demand shocks through elastic supply, operating at the fastest timescale to smooth transients that escape the slower mechanisms. It clips acute spikes that RAI is too conservative to catch.
+3. **Elastic Rebase** (AMPL model) absorbs demand shocks through elastic supply, operating at the fastest timescale to smooth transients that escape the slower mechanisms. It clips acute spikes that the PI controller is too conservative to catch.
 
-Both RAI and AMPL are countercyclical, but they are not redundant. RAI is the demand-side memory that corrects trends. AMPL is the supply-side reflex that absorbs shocks. One without the other leaves a gap — either in speed (without AMPL) or in persistence (without RAI). Together, they cover the full spectrum of instability that the Ergon equilibrium alone does not instantly resolve.
+All three mechanisms live inside a single token — **Joule (JUL)** — the SI unit of energy and the name of VibeSwap's trinomial stability currency. One token, one UX, three stability layers. Users interact with JUL as they would any ERC-20 token; the trinomial machinery operates transparently underneath.
 
-Together, they converge to a volatility floor bounded by the variance of global electricity costs — the lowest achievable bound for proof-of-work money. At this floor, the three classical market failures vanish: information asymmetry dissolves (collateral quality is observable and bounded), adverse selection neutralizes (the borrower's put option becomes worthless), and moral hazard evaporates (hidden leverage produces no return on stable collateral).
+Both the PI controller and elastic rebase are countercyclical, but they are not redundant. The PI controller is the demand-side memory that corrects trends. The rebase is the supply-side reflex that absorbs shocks. One without the other leaves a gap — either in speed (without rebase) or in persistence (without PI). Together, they cover the full spectrum of instability that the RPow equilibrium alone does not instantly resolve.
+
+Together, they converge to a volatility floor bounded by the variance of global electricity costs — the lowest achievable bound for proof-of-work money. The natural yield of the system converges to this same variance (~2-5% annually) — just enough to compensate holders for the irreducible cost of electricity-backed security, and no more.
+
+At this floor, the three classical market failures vanish: information asymmetry dissolves (collateral quality is observable and bounded), adverse selection neutralizes (the borrower's put option becomes worthless), and moral hazard evaporates (hidden leverage produces no return on stable collateral).
 
 Within VibeSwap's architecture — where execution fairness is guaranteed by commit-reveal auctions and distributional fairness is guaranteed by Shapley allocation — the trinomial system provides the final piece: **monetary fairness**. Not just fair execution and fair distribution, but fair money itself.
 
-The vision of Cooperative Capitalism is complete. From the electricity that powers the miners, to the stable money they produce, to the fair auctions that exchange it, to the proportional rewards that distribute its surplus — every layer is positive-sum, every participant is treated fairly, and defection is not merely costly but impossible.
+The vision of Cooperative Capitalism is complete. From the electricity that powers the miners, to the stable Joule they produce, to the fair auctions that exchange it, to the proportional rewards that distribute its surplus — every layer is positive-sum, every participant is treated fairly, and defection is not merely costly but impossible.
 
 ---
 
@@ -679,3 +769,5 @@ The vision of Cooperative Capitalism is complete. From the electricity that powe
 [12] Holmstrom, B. (1979). "Moral Hazard and Observability." *Bell Journal of Economics*, 10(1), 74-91.
 
 [13] Trobevsek, J., Smith, C. & De Gonzalez-Soler, F. (2018). "DoI-SMS: A Diffusion of Innovations based Subsidy Minting Schedule for Proof-of-Work Cryptocurrencies."
+
+[14] Friedman, M. (1969). "The Optimum Quantity of Money." In *The Optimum Quantity of Money and Other Essays*. Aldine Publishing Company.

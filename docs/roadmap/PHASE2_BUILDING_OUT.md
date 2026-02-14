@@ -17,7 +17,7 @@
 | 4 | **Keeper Network / Relayer Layer** | Decentralized keeper network — JUL staking, task registry, batch execution, reputation-gated min stake, slashing, performance tracking. Removes single-operator dependency | **Complete** |
 | 5 | **Gasless Meta-Transactions (EIP-2771)** | Users sign, relayers pay gas — critical for the "abstract crypto away" UX goal | |
 | 6 | **Account Abstraction (ERC-4337)** | Smart contract wallets with session keys, batched txns, social recovery — pairs with WebAuthn device wallet | |
-| 7 | **Plugin Registry** | On-chain registry of approved extensions (new curve types, oracle adapters, compliance modules) — governed by DAO | |
+| 7 | **Plugin Registry** | On-chain registry of approved protocol extensions (curves, oracles, compliance, hooks, keepers). Governance-gated lifecycle (PROPOSED→APPROVED→ACTIVE→DEPRECATED/DEACTIVATED), reputation-gated grace periods, JUL author tips, category indexing, audit scores | **Complete** |
 | 8 | **Timelocked Governance Execution** | Role-based timelock (proposer/executor/canceller/guardian), reputation-gated delay reduction, emergency fast-track, operation chaining, JUL keeper tips | **Complete** |
 | 9 | **Protocol-Owned Liquidity (POL)** | Treasury deploys its own LP positions, earning fees perpetually instead of renting liquidity via emissions | |
 | 10 | **Versioned Proxy Architecture** | Multiple implementation versions live simultaneously — users opt-in to upgrades rather than forced migration | |
@@ -120,5 +120,5 @@ Other:      CreatorTipJar
 ```
 Financial:  WrappedBAR (wBAR), VibeLPNFT, VibeStream, VibeOptions, VibeYieldStable,
             VibeBonds, VibeCredit, VibeSynth, VibeInsurance, VibeRevShare
-Governance: VibeTimelock, VibeKeeperNetwork
+Governance: VibeTimelock, VibeKeeperNetwork, VibePluginRegistry
 ```

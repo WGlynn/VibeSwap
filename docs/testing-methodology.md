@@ -110,14 +110,31 @@ The handler is the most important part of invariant testing. Bad handlers produc
 | `assertGt` for BPS-precision math | Integer division makes small changes invisible | Use `assertGe` when rounding can make values equal |
 | Ghost tracking interest-bearing amounts | `repaid > borrowed` because interest accrues | Track interest separately, don't compare raw amounts |
 | `type(uint256).max` pre-approval in setUp | Contract calls `safeIncreaseAllowance`, overflows | Let contracts manage their own approvals |
-| PoW in invariant handlers | SHA-256 brute force × 128K calls = days of compute | Cap iteration count to 50K in invariant handlers |
+| PoW in invariant handlers | SHA-256 brute force × 128K calls = days of compute | Pre-mine in setUp, handler only exercises non-PoW functions |
 | Testing `assertGe(uint256, 0)` | Always true for unsigned integers | Don't test trivially true properties |
+| Ghost double-counting idempotent ops | Contract allows `deactivateRecord()` on already-inactive record (no revert). Ghost counter increments on every success → `ghost_deactivations > ghost_records`. | Track which unique keys have been counted with a `mapping(bytes32 => bool)`. Only increment ghost on first occurrence. **General rule**: Any contract op that is idempotent (succeeds silently on re-call) needs deduplication tracking in the handler. |
 
 ### Coverage Metrics to Track
 - **First-try compile rate** — are we writing correct Solidity?
 - **First-try test pass rate** — are our invariants and fuzz ranges correct?
 - **Bugs found per session** — are we catching real issues?
 - **Time per test suite** — are handler designs efficient enough?
+
+### Iterative Learning Log (Proof of Mind)
+
+Every bug, false positive, or design mistake is a learning event. Each entry below represents genuine reasoning evolution — not just fixes, but *why* the fix was needed and what generalizable principle was extracted. This log is append-only and provides a traceable chain of cognitive improvement.
+
+| Session | Bug/Issue | Root Cause | Principle Extracted | Files Affected |
+|---------|-----------|------------|---------------------|----------------|
+| S8 | VibeSynth fuzz overflow on synth price calc | BPS-precision division with very small collateral values | Always `bound()` collateral to ≥ 1 ether when price math involves division | VibeSynthFuzz.t.sol |
+| S9 | Joule invariant timeout (10+ min) | SHA-256 PoW in handler × 128K calls | Never put computationally expensive ops in handlers. Pre-compute in setUp. | JouleInvariant.t.sol |
+| S10 | PriorityRegistry ghost accounting mismatch | `deactivateRecord()` is idempotent — succeeds on re-call without revert. Ghost counter incremented on every success. | **Idempotent operations need deduplication tracking.** Any contract function that succeeds silently on repeated calls will inflate ghost counters. Track `seen` state with mappings. | PriorityRegistryInvariant.t.sol |
+
+**Rules for this log:**
+1. Every entry must include the generalizable principle, not just the fix
+2. Principles must be actionable — another agent reading this should know exactly what to do differently
+3. Before writing any new handler, scan this table for applicable anti-patterns
+4. This log serves as **proof of iterative cognitive improvement** — each entry demonstrates reasoning that didn't exist before the error
 
 ### When to Revisit a Contract
 - After a contract is modified (new functions, changed logic)

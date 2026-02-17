@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
 import "../../contracts/identity/ContributionYieldTokenizer.sol";
-import "../../contracts/identity/ContributionDAG.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // ============ Mocks ============
@@ -18,7 +17,6 @@ contract MockCYTIToken is ERC20 {
 
 contract CYTHandler is Test {
     ContributionYieldTokenizer public tokenizer;
-    ContributionDAG public dag;
     MockCYTIToken public rewardToken;
 
     address public alice;
@@ -29,10 +27,9 @@ contract CYTHandler is Test {
     uint256 public ghost_ideasCreated;
     uint256 public ghost_totalFunded;
     uint256 public ghost_streamsCreated;
-    uint256 public ghost_votesAdded;
-    uint256 public ghost_votesWithdrawn;
     uint256 public ghost_milestones;
     uint256 public ghost_staleChecks;
+    uint256 public ghost_claims;
 
     // Track ideas and streams
     uint256[] public ideaIds;
@@ -40,14 +37,12 @@ contract CYTHandler is Test {
 
     constructor(
         ContributionYieldTokenizer _tokenizer,
-        ContributionDAG _dag,
         MockCYTIToken _rewardToken,
         address _alice,
         address _bob,
         address _carol
     ) {
         tokenizer = _tokenizer;
-        dag = _dag;
         rewardToken = _rewardToken;
         alice = _alice;
         bob = _bob;
@@ -87,41 +82,6 @@ contract CYTHandler is Test {
         } catch {}
     }
 
-    function voteConviction(uint256 streamSeed, uint256 amountSeed) public {
-        if (streamIds.length == 0) return;
-        uint256 index = streamSeed % streamIds.length;
-        uint256 streamId = streamIds[index];
-
-        // Get idea token for this stream
-        IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
-        if (stream.lastUpdate == 0) return;
-
-        IContributionYieldTokenizer.Idea memory idea = tokenizer.getIdea(stream.ideaId);
-        IdeaToken it = IdeaToken(idea.ideaToken);
-
-        uint256 carolBalance = it.balanceOf(carol);
-        if (carolBalance == 0) return;
-
-        uint256 amount = bound(amountSeed, 1, carolBalance);
-        if (amount < 101e18) return; // below conviction threshold is useless
-
-        vm.prank(carol);
-        try tokenizer.voteConviction(streamId, amount) {
-            ghost_votesAdded++;
-        } catch {}
-    }
-
-    function withdrawConviction(uint256 streamSeed) public {
-        if (streamIds.length == 0) return;
-        uint256 index = streamSeed % streamIds.length;
-        uint256 streamId = streamIds[index];
-
-        vm.prank(carol);
-        try tokenizer.withdrawConviction(streamId) {
-            ghost_votesWithdrawn++;
-        } catch {}
-    }
-
     function reportMilestone(uint256 streamSeed) public {
         if (streamIds.length == 0) return;
         uint256 index = streamSeed % streamIds.length;
@@ -130,6 +90,17 @@ contract CYTHandler is Test {
         vm.prank(bob);
         try tokenizer.reportMilestone(streamId, bytes32("milestone")) {
             ghost_milestones++;
+        } catch {}
+    }
+
+    function claimStream(uint256 streamSeed) public {
+        if (streamIds.length == 0) return;
+        uint256 index = streamSeed % streamIds.length;
+        uint256 streamId = streamIds[index];
+
+        vm.prank(bob);
+        try tokenizer.claimStream(streamId) {
+            ghost_claims++;
         } catch {}
     }
 
@@ -169,7 +140,6 @@ contract CYTHandler is Test {
 
 contract ContributionYieldTokenizerInvariantTest is StdInvariant, Test {
     ContributionYieldTokenizer public tokenizer;
-    ContributionDAG public dag;
     MockCYTIToken public rewardToken;
     CYTHandler public handler;
 
@@ -183,18 +153,9 @@ contract ContributionYieldTokenizerInvariantTest is StdInvariant, Test {
         carol = makeAddr("carol");
 
         rewardToken = new MockCYTIToken();
-        dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
-
-        vm.prank(alice);
-        dag.addVouch(bob, bytes32(0));
-        vm.prank(bob);
-        dag.addVouch(alice, bytes32(0));
-        dag.recalculateTrustScores();
 
         tokenizer = new ContributionYieldTokenizer(
             address(rewardToken),
-            address(dag),
             address(0)
         );
 
@@ -206,7 +167,7 @@ contract ContributionYieldTokenizerInvariantTest is StdInvariant, Test {
         vm.prank(carol);
         rewardToken.approve(address(tokenizer), type(uint256).max);
 
-        handler = new CYTHandler(tokenizer, dag, rewardToken, alice, bob, carol);
+        handler = new CYTHandler(tokenizer, rewardToken, alice, bob, carol);
         targetContract(address(handler));
     }
 
@@ -290,9 +251,6 @@ contract ContributionYieldTokenizerInvariantTest is StdInvariant, Test {
     // ============ Invariant: reward token conservation ============
 
     function invariant_rewardTokenConservation() public view {
-        // Total reward tokens in system must be conserved
-        // tokenizer balance + alice balance + carol balance + bob balance = initial mint
-        // This is approximately true (some tokens flow through streams)
         uint256 total = rewardToken.balanceOf(address(tokenizer)) +
             rewardToken.balanceOf(alice) +
             rewardToken.balanceOf(bob) +
@@ -300,15 +258,5 @@ contract ContributionYieldTokenizerInvariantTest is StdInvariant, Test {
 
         // Total should not exceed initial mint (200M)
         assertLe(total, 200_000_000e18, "INVARIANT: tokens must not be created from thin air");
-    }
-
-    // ============ Invariant: votes withdrawn <= votes added ============
-
-    function invariant_votesAccountable() public view {
-        assertLe(
-            handler.ghost_votesWithdrawn(),
-            handler.ghost_votesAdded(),
-            "INVARIANT: votes withdrawn must be <= votes added"
-        );
     }
 }

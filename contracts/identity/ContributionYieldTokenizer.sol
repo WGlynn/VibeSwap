@@ -8,13 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interfaces/IContributionYieldTokenizer.sol";
-import "./interfaces/IContributionDAG.sol";
 import "./interfaces/IRewardLedger.sol";
 
 // ============ Idea Token ============
 // ERC20 representing ownership of an idea's intrinsic value.
 // Minted 1:1 with funding deposited. Fully liquid, never expires.
-// Holding IT = governance over execution streams for that idea.
+// IT eternalizes the value of an idea — separate from its execution.
 
 contract IdeaToken is ERC20 {
     address public immutable tokenizer;
@@ -53,24 +52,22 @@ contract IdeaToken is ERC20 {
  *    - Minted 1:1 with funding deposited (1 IT = 1 reward token of funding)
  *    - Fully liquid from day zero — trade on any DEX
  *    - Ideas are eternal — IT never expires or decays
- *    - Holding IT gives governance over execution streams
+ *    - IT eternalizes the idea's value, independent of who executes it
  *
  * 2. EXECUTION STREAM (ES) — Continuous funding for whoever executes.
- *    - IT holders vote with conviction: commit IT toward a stream
- *    - Stream rate = proportional to accumulated conviction (grows over time)
- *    - Conviction is trust-weighted via ContributionDAG
+ *    - Anyone can propose to execute — free market, no gatekeeping
+ *    - Streams auto-flow: equal share of remaining funding / 30 days
+ *    - Multiple executors compete — funding split equally among active streams
  *    - Decays on stale execution (no milestones reported)
- *    - Stalled streams can be redirected to a new executor
- *    - Multiple executors can compete for the same idea
+ *    - Stalled streams can be redirected by any IT holder
  *
- * Proactive funding flow:
+ * Flow:
  *   Idea created → IT minted → IT traded (instant liquidity) →
- *   Executor proposes → IT holders vote conviction →
- *   Stream flows reward tokens → Executor claims →
- *   Milestones reported → Conviction grows → Stream rate increases →
+ *   Executor proposes → Stream auto-flows →
+ *   Milestones reported → Stream stays alive →
  *   If stalled → decay → redirect to new executor
  *
- * @dev Non-upgradeable. Integrates ContributionDAG for trust-weighted voting.
+ * @dev Non-upgradeable.
  */
 contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -80,17 +77,11 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BPS = 10000;
 
-    /// @notice Conviction half-life: conviction doubles every 3 days of continuous support
-    uint256 public constant CONVICTION_GROWTH_PERIOD = 3 days;
-
     /// @notice Default stale duration before decay kicks in (14 days without milestone)
     uint256 public constant DEFAULT_STALE_DURATION = 14 days;
 
     /// @notice Decay rate when stale: stream loses 10% of rate per day of staleness
     uint256 public constant STALE_DECAY_RATE_BPS = 1000; // 10% per day
-
-    /// @notice Minimum conviction threshold before a stream starts flowing
-    uint256 public constant MIN_CONVICTION_THRESHOLD = 100e18;
 
     /// @notice Maximum streams per idea (prevents spam)
     uint256 public constant MAX_STREAMS_PER_IDEA = 10;
@@ -98,7 +89,6 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
     // ============ State ============
 
     IERC20 public rewardToken;
-    IContributionDAG public contributionDAG;
     IRewardLedger public rewardLedger;
 
     /// @notice Ideas by ID (starts at 1)
@@ -109,11 +99,11 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
     mapping(uint256 => ExecutionStream) private _streams;
     uint256 public nextStreamId;
 
-    /// @notice Conviction votes: streamId => voter => ConvictionVote
-    mapping(uint256 => mapping(address => ConvictionVote)) private _convictionVotes;
-
     /// @notice Streams per idea: ideaId => streamId[]
     mapping(uint256 => uint256[]) private _ideaStreams;
+
+    /// @notice Unclaimed rewards per stream (accrued but not yet transferred)
+    mapping(uint256 => uint256) private _unclaimedRewards;
 
     /// @notice Authorized callers (can create ideas on behalf, record milestones)
     mapping(address => bool) public authorizedCallers;
@@ -122,12 +112,10 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
 
     constructor(
         address _rewardToken,
-        address _contributionDAG,
         address _rewardLedger
     ) Ownable(msg.sender) {
         if (_rewardToken == address(0)) revert ZeroAddress();
         rewardToken = IERC20(_rewardToken);
-        contributionDAG = IContributionDAG(_contributionDAG);
         rewardLedger = IRewardLedger(_rewardLedger);
         nextIdeaId = 1;
         nextStreamId = 1;
@@ -171,6 +159,9 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         if (_ideas[ideaId].createdAt == 0) revert IdeaNotFound();
         if (amount == 0) revert ZeroAmount();
         _fundIdea(ideaId, msg.sender, amount);
+
+        // Recalculate stream rates for this idea (more funding = higher rates)
+        _updateAllStreamRates(ideaId);
     }
 
     function _fundIdea(uint256 ideaId, address funder, uint256 amount) internal {
@@ -194,6 +185,9 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         if (_ideas[ideaId].createdAt == 0) revert IdeaNotFound();
         if (_ideaStreams[ideaId].length >= MAX_STREAMS_PER_IDEA) revert Unauthorized();
 
+        // Settle all existing streams before adding a new one (changes their shares)
+        _settleAllStreams(ideaId);
+
         streamId = nextStreamId++;
 
         _streams[streamId] = ExecutionStream({
@@ -201,7 +195,6 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
             ideaId: ideaId,
             executor: msg.sender,
             streamRate: 0,
-            totalConviction: 0,
             totalStreamed: 0,
             lastUpdate: block.timestamp,
             lastMilestone: block.timestamp,
@@ -210,6 +203,9 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         });
 
         _ideaStreams[ideaId].push(streamId);
+
+        // Recalculate all stream rates (new stream changes the split)
+        _updateAllStreamRates(ideaId);
 
         emit StreamCreated(streamId, ideaId, msg.sender);
     }
@@ -226,7 +222,7 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
 
         stream.lastMilestone = block.timestamp;
 
-        // If stream was decayed due to staleness, restore it
+        // Restore rate if it was decayed due to staleness
         _updateStreamRate(streamId);
 
         emit MilestoneReported(streamId, evidenceHash, block.timestamp);
@@ -238,9 +234,13 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         if (stream.lastUpdate == 0) revert StreamNotFound();
         if (stream.executor != msg.sender) revert NotExecutor();
 
-        uint256 claimable = _settleStream(streamId);
+        // Settle any new accrual first
+        _settleStream(streamId);
+
+        uint256 claimable = _unclaimedRewards[streamId];
         if (claimable == 0) revert NothingToClaim();
 
+        _unclaimedRewards[streamId] = 0;
         rewardToken.safeTransfer(msg.sender, claimable);
 
         emit StreamClaimed(streamId, msg.sender, claimable);
@@ -257,84 +257,10 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         stream.status = StreamStatus.COMPLETED;
         stream.streamRate = 0;
 
+        // Recalculate remaining streams (they get bigger shares)
+        _updateAllStreamRates(stream.ideaId);
+
         emit StreamCompleted(streamId);
-    }
-
-    // ============ Conviction Voting (Liquid Democracy) ============
-
-    /// @inheritdoc IContributionYieldTokenizer
-    function voteConviction(uint256 streamId, uint256 amount) external {
-        ExecutionStream storage stream = _streams[streamId];
-        if (stream.lastUpdate == 0) revert StreamNotFound();
-        if (stream.status != StreamStatus.ACTIVE) revert StreamNotActive();
-        if (amount == 0) revert ZeroAmount();
-
-        Idea storage idea = _ideas[stream.ideaId];
-        IdeaToken it = IdeaToken(idea.ideaToken);
-
-        // Voter must hold sufficient IT
-        if (it.balanceOf(msg.sender) < amount) revert InsufficientBalance();
-
-        // Check not already voting on this stream
-        ConvictionVote storage existing = _convictionVotes[streamId][msg.sender];
-        if (existing.amount > 0) revert AlreadyVoting();
-
-        // Lock IT tokens (transfer to this contract)
-        it.burn(msg.sender, amount);
-
-        // Get trust-weighted conviction
-        uint256 trustMultiplier = _getTrustMultiplier(msg.sender);
-
-        // Initial conviction = amount * trustMultiplier / BPS
-        uint256 initialConviction = (amount * trustMultiplier) / BPS;
-
-        _convictionVotes[streamId][msg.sender] = ConvictionVote({
-            amount: amount,
-            timestamp: block.timestamp,
-            conviction: initialConviction
-        });
-
-        // Settle stream before updating conviction
-        _settleStream(streamId);
-
-        stream.totalConviction += initialConviction;
-        _updateStreamRate(streamId);
-
-        emit ConvictionVoteCast(streamId, msg.sender, amount);
-    }
-
-    /// @inheritdoc IContributionYieldTokenizer
-    function withdrawConviction(uint256 streamId) external {
-        ExecutionStream storage stream = _streams[streamId];
-        if (stream.lastUpdate == 0) revert StreamNotFound();
-
-        ConvictionVote storage vote = _convictionVotes[streamId][msg.sender];
-        if (vote.amount == 0) revert NotVoting();
-
-        // Settle stream before removing conviction
-        _settleStream(streamId);
-
-        // Calculate current conviction (may have grown over time)
-        uint256 currentConviction = _calculateCurrentConviction(vote);
-
-        // Remove conviction from stream
-        if (stream.totalConviction > currentConviction) {
-            stream.totalConviction -= currentConviction;
-        } else {
-            stream.totalConviction = 0;
-        }
-
-        // Return IT tokens (mint back to voter)
-        Idea storage idea = _ideas[stream.ideaId];
-        IdeaToken(idea.ideaToken).mint(msg.sender, vote.amount);
-
-        // Clear vote
-        delete _convictionVotes[streamId][msg.sender];
-
-        // Update stream rate with new conviction
-        _updateStreamRate(streamId);
-
-        emit ConvictionVoteWithdrawn(streamId, msg.sender, vote.amount);
     }
 
     /// @inheritdoc IContributionYieldTokenizer
@@ -351,6 +277,9 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
 
         stream.status = StreamStatus.STALLED;
         stream.streamRate = 0;
+
+        // Recalculate remaining streams (they get bigger shares)
+        _updateAllStreamRates(stream.ideaId);
 
         emit StreamStalled(streamId);
     }
@@ -373,8 +302,8 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         stream.lastMilestone = block.timestamp;
         stream.lastUpdate = block.timestamp;
 
-        // Recalculate stream rate
-        _updateStreamRate(streamId);
+        // Recalculate all stream rates
+        _updateAllStreamRates(stream.ideaId);
 
         emit StreamRedirected(streamId, oldExecutor, newExecutor);
     }
@@ -399,26 +328,22 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
     /// @inheritdoc IContributionYieldTokenizer
     function pendingStreamAmount(uint256 streamId) external view returns (uint256) {
         ExecutionStream storage stream = _streams[streamId];
-        if (stream.status != StreamStatus.ACTIVE || stream.streamRate == 0) return 0;
+        uint256 unclaimed = _unclaimedRewards[streamId];
+
+        if (stream.status != StreamStatus.ACTIVE || stream.streamRate == 0) return unclaimed;
 
         uint256 elapsed = block.timestamp - stream.lastUpdate;
-        uint256 pending = stream.streamRate * elapsed;
+        uint256 newAccrual = stream.streamRate * elapsed;
 
-        // Cap at remaining funding
+        // Cap new accrual at remaining funding
         Idea storage idea = _ideas[stream.ideaId];
         uint256 remaining = idea.totalFunding > stream.totalStreamed
             ? idea.totalFunding - stream.totalStreamed
             : 0;
 
-        return pending > remaining ? remaining : pending;
-    }
+        if (newAccrual > remaining) newAccrual = remaining;
 
-    /// @inheritdoc IContributionYieldTokenizer
-    function getConvictionVote(
-        uint256 streamId,
-        address voter
-    ) external view returns (ConvictionVote memory) {
-        return _convictionVotes[streamId][voter];
+        return unclaimed + newAccrual;
     }
 
     /// @inheritdoc IContributionYieldTokenizer
@@ -437,10 +362,6 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         authorizedCallers[caller] = authorized;
     }
 
-    function setContributionDAG(address _dag) external onlyOwner {
-        contributionDAG = IContributionDAG(_dag);
-    }
-
     function setRewardLedger(address _ledger) external onlyOwner {
         rewardLedger = IRewardLedger(_ledger);
     }
@@ -449,9 +370,9 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
 
     /**
      * @notice Settle pending stream earnings and update lastUpdate
-     * @return claimable Amount of reward tokens earned since last update
+     * @return accrued Amount of reward tokens earned since last update
      */
-    function _settleStream(uint256 streamId) internal returns (uint256 claimable) {
+    function _settleStream(uint256 streamId) internal returns (uint256 accrued) {
         ExecutionStream storage stream = _streams[streamId];
         if (stream.status != StreamStatus.ACTIVE || stream.streamRate == 0) {
             stream.lastUpdate = block.timestamp;
@@ -461,7 +382,7 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         uint256 elapsed = block.timestamp - stream.lastUpdate;
         if (elapsed == 0) return 0;
 
-        claimable = stream.streamRate * elapsed;
+        accrued = stream.streamRate * elapsed;
 
         // Cap at remaining funding for this idea (across ALL streams)
         Idea storage idea = _ideas[stream.ideaId];
@@ -470,34 +391,33 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
             ? idea.totalFunding - ideaTotalStreamed
             : 0;
 
-        if (claimable > remaining) {
-            claimable = remaining;
+        if (accrued > remaining) {
+            accrued = remaining;
         }
 
-        stream.totalStreamed += claimable;
+        stream.totalStreamed += accrued;
+        _unclaimedRewards[streamId] += accrued;
         stream.lastUpdate = block.timestamp;
     }
 
-    // ============ Internal: Conviction & Stream Rate ============
-
     /**
-     * @notice Calculate current conviction for a vote (grows over time)
-     * @dev Conviction doubles every CONVICTION_GROWTH_PERIOD.
-     *      conviction(t) = initialConviction * 2^(elapsed / growthPeriod)
-     *      Approximated with linear growth for gas efficiency:
-     *      conviction(t) = initial * (1 + elapsed / growthPeriod)
+     * @notice Settle all active streams for an idea
      */
-    function _calculateCurrentConviction(ConvictionVote storage vote) internal view returns (uint256) {
-        uint256 elapsed = block.timestamp - vote.timestamp;
-        // Linear approximation: conviction grows by initial amount per growth period
-        uint256 growth = (vote.conviction * elapsed) / CONVICTION_GROWTH_PERIOD;
-        return vote.conviction + growth;
+    function _settleAllStreams(uint256 ideaId) internal {
+        uint256[] storage streamIds = _ideaStreams[ideaId];
+        for (uint256 i = 0; i < streamIds.length; i++) {
+            if (_streams[streamIds[i]].status == StreamStatus.ACTIVE) {
+                _settleStream(streamIds[i]);
+            }
+        }
     }
 
+    // ============ Internal: Stream Rate Calculation ============
+
     /**
-     * @notice Update stream rate based on total conviction and stale status
-     * @dev Rate = totalConviction * fundingPool / (totalConvictionAcrossAllStreams * scaleFactor)
-     *      Simplified: rate proportional to conviction, capped by funding pool
+     * @notice Update stream rate for a single stream
+     * @dev Rate = equal share of remaining funding / 30 days
+     *      With stale decay applied if past milestone deadline
      */
     function _updateStreamRate(uint256 streamId) internal {
         ExecutionStream storage stream = _streams[streamId];
@@ -506,34 +426,18 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
             return;
         }
 
-        // Below threshold: no funding flows
-        if (stream.totalConviction < MIN_CONVICTION_THRESHOLD) {
-            stream.streamRate = 0;
-            emit StreamRateUpdated(streamId, 0, stream.totalConviction);
-            return;
-        }
-
-        // Calculate available funding pool for this idea
         Idea storage idea = _ideas[stream.ideaId];
 
-        // Sum total conviction across ALL streams for this idea
-        uint256 totalIdeaConviction = 0;
-        uint256[] storage streamIds = _ideaStreams[idea.ideaId];
-        for (uint256 i = 0; i < streamIds.length; i++) {
-            ExecutionStream storage s = _streams[streamIds[i]];
-            if (s.status == StreamStatus.ACTIVE) {
-                totalIdeaConviction += s.totalConviction;
-            }
-        }
-
-        if (totalIdeaConviction == 0) {
+        // Count active streams for this idea
+        uint256 activeStreamCount = _countActiveStreams(stream.ideaId);
+        if (activeStreamCount == 0) {
             stream.streamRate = 0;
             return;
         }
 
         // Remaining funding
-        uint256 remainingFunding = idea.totalFunding > _totalStreamedForIdea(idea.ideaId)
-            ? idea.totalFunding - _totalStreamedForIdea(idea.ideaId)
+        uint256 remainingFunding = idea.totalFunding > _totalStreamedForIdea(stream.ideaId)
+            ? idea.totalFunding - _totalStreamedForIdea(stream.ideaId)
             : 0;
 
         if (remainingFunding == 0) {
@@ -541,13 +445,9 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
             return;
         }
 
-        // This stream's share of conviction
-        uint256 convictionShare = (stream.totalConviction * PRECISION) / totalIdeaConviction;
-
-        // Rate = this stream's share of remaining funding, distributed over 30 days
-        // This means at current conviction, the stream would drain its share in ~30 days
-        uint256 streamFundingShare = (remainingFunding * convictionShare) / PRECISION;
-        uint256 newRate = streamFundingShare / 30 days;
+        // Equal share among active streams, distributed over 30 days
+        uint256 streamShare = remainingFunding / activeStreamCount;
+        uint256 newRate = streamShare / 30 days;
 
         // Apply stale decay if past milestone deadline
         uint256 timeSinceMilestone = block.timestamp - stream.lastMilestone;
@@ -561,7 +461,31 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         }
 
         stream.streamRate = newRate;
-        emit StreamRateUpdated(streamId, newRate, stream.totalConviction);
+        emit StreamRateUpdated(streamId, newRate);
+    }
+
+    /**
+     * @notice Update rates for all active streams of an idea
+     */
+    function _updateAllStreamRates(uint256 ideaId) internal {
+        uint256[] storage streamIds = _ideaStreams[ideaId];
+        for (uint256 i = 0; i < streamIds.length; i++) {
+            if (_streams[streamIds[i]].status == StreamStatus.ACTIVE) {
+                _updateStreamRate(streamIds[i]);
+            }
+        }
+    }
+
+    /**
+     * @notice Count active streams for an idea
+     */
+    function _countActiveStreams(uint256 ideaId) internal view returns (uint256 count) {
+        uint256[] storage streamIds = _ideaStreams[ideaId];
+        for (uint256 i = 0; i < streamIds.length; i++) {
+            if (_streams[streamIds[i]].status == StreamStatus.ACTIVE) {
+                count++;
+            }
+        }
     }
 
     /**
@@ -571,20 +495,6 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         uint256[] storage streamIds = _ideaStreams[ideaId];
         for (uint256 i = 0; i < streamIds.length; i++) {
             total += _streams[streamIds[i]].totalStreamed;
-        }
-    }
-
-    /**
-     * @notice Get trust-weighted multiplier for a voter from ContributionDAG
-     * @dev Maps voting power to conviction multiplier. Founders 3x, trusted 2x, etc.
-     */
-    function _getTrustMultiplier(address user) internal view returns (uint256) {
-        if (address(contributionDAG) == address(0)) return BPS; // 1.0x default
-
-        try contributionDAG.getVotingPowerMultiplier(user) returns (uint256 multiplier) {
-            return multiplier;
-        } catch {
-            return BPS; // 1.0x on failure
         }
     }
 }

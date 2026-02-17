@@ -15,11 +15,10 @@ pragma solidity ^0.8.20;
  *    - Ideas are eternal — IT never expires or decays
  *
  * 2. EXECUTION STREAM (ES) — Continuous funding for whoever executes the idea.
- *    - Liquid democracy: IT holders vote continuously on execution progress
- *    - Funding flows proportionally to demonstrated value (conviction voting)
+ *    - Auto-flows to active executors proportional to their share
  *    - Decays on stall/staleness — unused streams redirect automatically
- *    - Executor can change: if original stalls, anyone can propose to take over
- *    - Stream rate = f(conviction, trust_score, execution_progress)
+ *    - Executor can change: if original stalls, any IT holder can redirect
+ *    - Stream rate = equal share of remaining funding / 30 days
  *
  * The separation:
  * - Ideas have permanent, intrinsic value (never goes stale)
@@ -28,7 +27,6 @@ pragma solidity ^0.8.20;
  * - Multiple executors can compete for the same idea's execution stream
  *
  * Integration:
- * - ContributionDAG: trust scores weight conviction votes
  * - RewardLedger: execution milestones recorded as value events
  * - ShapleyDistributor: rewards flow through trust chains
  */
@@ -58,19 +56,11 @@ interface IContributionYieldTokenizer {
         uint256 ideaId;            // Which idea this executes
         address executor;          // Current executor
         uint256 streamRate;        // Tokens per second flowing to executor
-        uint256 totalConviction;   // Weighted conviction from IT holders
         uint256 totalStreamed;     // Cumulative tokens streamed
         uint256 lastUpdate;        // Last stream rate update
         uint256 lastMilestone;     // Timestamp of last progress report
         uint256 staleDuration;     // Seconds since last milestone before decay kicks in
         StreamStatus status;
-    }
-
-    /// @notice A conviction vote from an IT holder toward an execution stream
-    struct ConvictionVote {
-        uint256 amount;            // IT tokens committed to this vote
-        uint256 timestamp;         // When the vote was cast
-        uint256 conviction;        // Accumulated conviction (grows over time)
     }
 
     // ============ Events ============
@@ -80,15 +70,12 @@ interface IContributionYieldTokenizer {
     event IdeaTokensMinted(uint256 indexed ideaId, address indexed to, uint256 amount);
 
     event StreamCreated(uint256 indexed streamId, uint256 indexed ideaId, address indexed executor);
-    event StreamRateUpdated(uint256 indexed streamId, uint256 newRate, uint256 totalConviction);
+    event StreamRateUpdated(uint256 indexed streamId, uint256 newRate);
     event StreamClaimed(uint256 indexed streamId, address indexed executor, uint256 amount);
     event StreamStalled(uint256 indexed streamId);
     event StreamRedirected(uint256 indexed streamId, address indexed oldExecutor, address indexed newExecutor);
     event StreamCompleted(uint256 indexed streamId);
     event MilestoneReported(uint256 indexed streamId, bytes32 evidenceHash, uint256 timestamp);
-
-    event ConvictionVoteCast(uint256 indexed streamId, address indexed voter, uint256 amount);
-    event ConvictionVoteWithdrawn(uint256 indexed streamId, address indexed voter, uint256 amount);
 
     // ============ Errors ============
 
@@ -100,10 +87,6 @@ interface IContributionYieldTokenizer {
     error NotIdeaTokenHolder();
     error ZeroAmount();
     error ZeroAddress();
-    error InsufficientBalance();
-    error InsufficientConviction();
-    error AlreadyVoting();
-    error NotVoting();
     error NothingToClaim();
     error StalePeriodNotReached();
     error Unauthorized();
@@ -123,7 +106,7 @@ interface IContributionYieldTokenizer {
 
     // ============ Execution Stream Functions ============
 
-    /// @notice Propose to execute an idea (creates a stream, starts at 0 rate)
+    /// @notice Propose to execute an idea (creates a stream, auto-starts flowing)
     /// @param ideaId The idea to execute
     /// @return streamId The new stream's ID
     function proposeExecution(uint256 ideaId) external returns (uint256 streamId);
@@ -141,18 +124,7 @@ interface IContributionYieldTokenizer {
     /// @param streamId The execution stream
     function completeStream(uint256 streamId) external;
 
-    // ============ Conviction Voting (Liquid Democracy) ============
-
-    /// @notice Cast conviction vote: commit IT tokens toward an execution stream
-    /// @param streamId The execution stream to support
-    /// @param amount IT tokens to commit
-    function voteConviction(uint256 streamId, uint256 amount) external;
-
-    /// @notice Withdraw conviction vote
-    /// @param streamId The execution stream
-    function withdrawConviction(uint256 streamId) external;
-
-    /// @notice Trigger stale check — if executor hasn't reported milestones, decay the stream
+    /// @notice Trigger stale check — if executor hasn't reported milestones, stall the stream
     /// @param streamId The execution stream to check
     function checkStale(uint256 streamId) external;
 
@@ -167,7 +139,6 @@ interface IContributionYieldTokenizer {
     function getStream(uint256 streamId) external view returns (ExecutionStream memory);
     function getStreamRate(uint256 streamId) external view returns (uint256);
     function pendingStreamAmount(uint256 streamId) external view returns (uint256);
-    function getConvictionVote(uint256 streamId, address voter) external view returns (ConvictionVote memory);
     function getIdeaStreamCount(uint256 ideaId) external view returns (uint256);
     function getIdeaStreams(uint256 ideaId) external view returns (uint256[] memory streamIds);
 }

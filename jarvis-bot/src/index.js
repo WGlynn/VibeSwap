@@ -2,6 +2,7 @@ import { Telegraf } from 'telegraf';
 import { config } from './config.js';
 import { initClaude, chat, reloadSystemPrompt, clearHistory } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog } from './git.js';
+import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
 
 if (!config.telegram.token) {
   console.error('TELEGRAM_BOT_TOKEN is required. Copy .env.example to .env and fill it in.');
@@ -12,7 +13,9 @@ if (!config.anthropic.apiKey) {
   process.exit(1);
 }
 
-const bot = new Telegraf(config.telegram.token);
+const bot = new Telegraf(config.telegram.token, {
+  telegram: { allowedUpdates: ['message', 'callback_query'] },
+});
 
 // Auth middleware
 function isAuthorized(ctx) {
@@ -28,19 +31,7 @@ function unauthorized(ctx) {
 
 bot.command('start', (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
-  ctx.reply(
-    'JARVIS online.\n\n' +
-    'Commands:\n' +
-    '/status — git status\n' +
-    '/pull — git pull\n' +
-    '/log — recent commits\n' +
-    '/commit <message> — commit and push to both remotes\n' +
-    '/refresh — reload memory files\n' +
-    '/clear — clear conversation history\n' +
-    '/model <opus|sonnet> — switch model\n' +
-    '/whoami — show your Telegram user ID\n\n' +
-    'Or just talk to me.'
-  );
+  ctx.reply('JARVIS online. Just talk to me.');
 });
 
 bot.command('whoami', (ctx) => {
@@ -101,13 +92,78 @@ bot.command('model', (ctx) => {
   }
 });
 
+// ============ Contribution Tracking Commands ============
+
+bot.command('mystats', (ctx) => {
+  const stats = getUserStats(ctx.from.id);
+  if (!stats) {
+    return ctx.reply('No contributions tracked yet. Just keep talking.');
+  }
+  const lines = [
+    `${stats.username} — since ${stats.firstSeen}`,
+    `Messages: ${stats.messageCount}`,
+    `Tracked contributions: ${stats.contributions}`,
+    `Avg quality: ${stats.avgQuality}/5`,
+    `Replies given: ${stats.repliesGiven} | received: ${stats.repliesReceived}`,
+    `Days active: ${stats.daysSinceFirst}`,
+    `Wallet linked: ${stats.walletLinked ? 'yes' : 'no'}`,
+    '',
+    'Categories:',
+    ...Object.entries(stats.categoryCounts).map(([k, v]) => `  ${k}: ${v}`),
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('groupstats', (ctx) => {
+  const stats = getGroupStats(ctx.chat.id);
+  const lines = [
+    `Group contributions: ${stats.totalContributions}`,
+    `Active users: ${stats.totalUsers}`,
+    `Interactions: ${stats.totalInteractions}`,
+    '',
+    'Categories:',
+    ...Object.entries(stats.categoryCounts).map(([k, v]) => `  ${k}: ${v}`),
+    '',
+    'Top contributors:',
+    ...stats.topContributors,
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('linkwallet', async (ctx) => {
+  const address = ctx.message.text.replace('/linkwallet', '').trim();
+  if (!address || !address.startsWith('0x') || address.length !== 42) {
+    return ctx.reply('Usage: /linkwallet 0xYourAddress');
+  }
+  const success = await linkWallet(ctx.from.id, address);
+  if (success) {
+    ctx.reply(`Wallet linked: ${address.slice(0, 6)}...${address.slice(-4)}`);
+  } else {
+    ctx.reply('Send a message first so I can track you, then link your wallet.');
+  }
+});
+
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  // Track ALL messages silently (before auth check for chat responses)
+  await trackMessage(ctx);
 
   // Skip commands (already handled above)
   if (ctx.message.text.startsWith('/')) return;
+
+  // In group chats, only respond if mentioned or replied to
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  const botUsername = ctx.botInfo?.username?.toLowerCase();
+  const isMentioned = botUsername && ctx.message.text.toLowerCase().includes(`@${botUsername}`);
+  const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
+
+  if (isGroup && !isMentioned && !isReplyToBot) {
+    // In groups: track silently, only respond when addressed
+    return;
+  }
+
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
 
   const chatId = ctx.chat.id;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -115,7 +171,6 @@ bot.on('text', async (ctx) => {
   // Show typing indicator
   await ctx.sendChatAction('typing');
 
-  // Keep typing indicator alive for long responses
   const typingInterval = setInterval(() => {
     ctx.sendChatAction('typing').catch(() => {});
   }, 4000);
@@ -125,12 +180,10 @@ bot.on('text', async (ctx) => {
 
     clearInterval(typingInterval);
 
-    // Telegram has a 4096 char limit per message
     const text = response.text;
     if (text.length <= 4096) {
       await ctx.reply(text, { parse_mode: undefined });
     } else {
-      // Split into chunks
       const chunks = [];
       for (let i = 0; i < text.length; i += 4096) {
         chunks.push(text.slice(i, i + 4096));
@@ -151,16 +204,26 @@ bot.on('text', async (ctx) => {
 async function main() {
   console.log('[jarvis] Loading memory...');
   await initClaude();
+  await initTracker();
 
   console.log(`[jarvis] Model: ${config.anthropic.model}`);
   console.log('[jarvis] Starting Telegram bot...');
 
   bot.launch();
-  console.log('[jarvis] JARVIS is online.');
+  console.log('[jarvis] JARVIS is online. Contribution tracking active.');
+
+  // Flush tracker data every 5 minutes
+  setInterval(() => flushTracker(), 5 * 60 * 1000);
 
   // Graceful shutdown
-  process.once('SIGINT', () => bot.stop('SIGINT'));
-  process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  process.once('SIGINT', async () => {
+    await flushTracker();
+    bot.stop('SIGINT');
+  });
+  process.once('SIGTERM', async () => {
+    await flushTracker();
+    bot.stop('SIGTERM');
+  });
 }
 
 main().catch(console.error);

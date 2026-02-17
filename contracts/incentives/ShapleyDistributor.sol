@@ -71,6 +71,13 @@ contract ShapleyDistributor is
     // Applied as multiplier: 1.0x (non-pioneer) to 1.5x (max pioneer)
     uint256 public constant PIONEER_BONUS_MAX_BPS = 5000;
 
+    /// @notice The Lawson Fairness Floor — minimum reward share (1%) for any
+    ///         participant who contributed to a cooperative game, ensuring nobody
+    ///         who showed up and acted honestly walks away with zero.
+    ///         Named after Jayme Lawson, whose embodiment of cooperative fairness
+    ///         and community-first ethos inspired VibeSwap's design philosophy.
+    uint256 public constant LAWSON_FAIRNESS_FLOOR = 100; // 1% in BPS
+
     // ============ Bitcoin Halving Schedule Constants ============
 
     /// @notice Number of games per halving era (like Bitcoin's 210,000 blocks)

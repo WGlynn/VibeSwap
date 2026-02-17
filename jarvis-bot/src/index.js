@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, reloadSystemPrompt, clearHistory } from './claude.js';
+import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
 
@@ -159,7 +159,9 @@ bot.on('text', async (ctx) => {
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
 
   if (isGroup && !isMentioned && !isReplyToBot) {
-    // In groups: track silently, only respond when addressed
+    // In groups: buffer into conversation history for situational awareness, but don't call Claude
+    const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+    bufferMessage(ctx.chat.id, userName, ctx.message.text);
     return;
   }
 

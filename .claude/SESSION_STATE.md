@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-16 (Desktop - Claude Code Opus 4.6)
+**Last Updated**: 2026-02-17 (Desktop - Claude Code Opus 4.6)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -10,20 +10,40 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **1700+ tests passing, 0 failures, 0 skipped** (full suite green)
-- Financial Primitives: 10/10 COMPLETE (wBAR, LPNFT, Stream, Options, Joule, Bonds, Credit, Synth, Insurance, RevShare)
-- Protocol/Framework: 10/10 COMPLETE (HookRegistry, PluginRegistry, KeeperNetwork, Forwarder, SmartWallet, WalletFactory, VersionRouter, PoolFactory, IntentRouter, POL)
-- Identity Layer: ContributionDAG + RewardLedger + ContributionYieldTokenizer + GitHubContributionTracker — ALL COMPLETE
+- **1700+ tests passing, 0 failures, 0 skipped** (full suite green, 21 backend tests)
+- Financial Primitives: 10/10 COMPLETE
+- Protocol/Framework: 10/10 COMPLETE
+- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker)
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
-- **Zero-test contract coverage: COMPLETE** — ALL contracts now have unit+fuzz+invariant tests
-- Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
+- **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
+- **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
+- **GitHub webhook relayer: COMPLETE** — off-chain service with EIP-712 signing + batch submission
 
-## Active Tasks
-- Zero-test contract coverage: **COMPLETE** — all contracts tested
-- Frontend: "Sign In" button change + abstraction redesign, make launchable
-- Testnet deployment preparation
-- Off-chain services: GitHub webhook relayer
+## Active Tasks — GO-LIVE BLOCKERS (need Will)
+- **Contract deployment** to testnet (Sepolia) then mainnet — needs private key + ETH for gas
+- **Frontend .env** with real WalletConnect project ID, RPC URLs, contract addresses
+- **GitHub App/Webhook** setup on VibeSwap repos — needs admin access
+- **Relayer wallet** funding — needs ETH for gas
+- **IPFS pinning** service for contribution evidence hashes
+
+## Recently Completed (Feb 17, 2026 — Session 16)
+52. **Frontend Go-Live Hardening**
+    - Extracted 8 ABIs from forge output: CommitRevealAuction, DAOTreasury, CrossChainRouter, SoulboundIdentity, WalletRecovery, ShapleyDistributor, ILProtectionVault, SlippageGuaranteeFund
+    - Refactored useContracts.jsx to dynamic ABI_REGISTRY pattern (all 10 contract types auto-created)
+    - Installed terser for production minification
+    - Verified frontend build passes with all validations
+    - Provider wiring confirmed correct (Messaging + Contributions in App.jsx)
+    - Commit: `12f3cba`
+53. **GitHub Webhook Relayer Service**
+    - New service: `backend/src/services/githubRelayer.js` — receives GitHub webhooks, signs EIP-712 typed data, submits to GitHubContributionTracker contract
+    - Batch processing with configurable size/interval, auto-flush on shutdown
+    - HMAC-SHA256 webhook signature verification (timing-safe)
+    - Event parsing: push (commits), PR merge, review, issue close
+    - Contributor resolution: env-based static mapping + runtime registration cache
+    - New route: `backend/src/routes/github.js` — POST /webhook, GET /status, POST /register, POST /flush
+    - 14 new backend unit tests (21 total backend tests, all passing)
+    - Commit: `851b1b7`
 
 ## Recently Completed (Feb 16, 2026 — Session 15)
 51. **Zero-Test Contract Mega-Blitz — 15 contracts, 651 tests (4 batches + VibeSwapCore)**
@@ -331,8 +351,11 @@ This file maintains continuity between Claude Code sessions across devices.
 11. Built Paper Backup feature (offline generation axiom)
 
 ## Known Issues / TODO
-- Large bundle size warning (2.8MB chunk) - consider code splitting
+- Large bundle size warning (2MB vendor-wallet chunk) — WalletConnect+Web3Modal circular deps require combined chunk
 - Need to test balance updates after real blockchain transactions
+- Mock prices in SwapCore.jsx (hardcoded ETH $2847) — correct for demo mode, real mode uses on-chain data
+- Frontend missing real price oracle integration (TruePriceOracle or Chainlink)
+- Transaction history not persisted to localStorage (lost on refresh)
 
 ## Session Handoff Notes
 When starting a new session, tell Claude:

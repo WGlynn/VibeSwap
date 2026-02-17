@@ -4,6 +4,8 @@ import { useWallet } from '../hooks/useWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import { useDeviceWallet, isPlatformAuthenticatorAvailable } from '../hooks/useDeviceWallet'
 import RecoverySetup from './RecoverySetup'
+import GlassCard from './ui/GlassCard'
+import InteractiveButton from './ui/InteractiveButton'
 import toast from 'react-hot-toast'
 
 /**
@@ -1119,13 +1121,17 @@ function SwapCore() {
 
   return (
     <div className="h-full flex items-center justify-center px-4 overflow-hidden">
-      <div className="w-full max-w-[420px]">
-        {/* Main swap card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-black-800 rounded-2xl border border-black-600 overflow-hidden"
-        >
+      {/* Faint radial spotlight behind the swap card */}
+      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+        <div className="w-[500px] h-[500px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(0,255,65,0.02) 0%, transparent 70%)' }} />
+      </div>
+      <div className="w-full max-w-[420px] relative">
+        {/* Main swap card — glass morphism */}
+        <GlassCard variant="primary" glowColor="matrix" spotlight hover={false}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
           {/* From */}
           <div className="p-4">
             <div className="text-sm text-black-400 mb-2">You pay</div>
@@ -1139,7 +1145,7 @@ function SwapCore() {
                   if (v.split('.').length <= 2) setFromAmount(v)
                 }}
                 placeholder="0"
-                className="flex-1 bg-transparent text-4xl font-light outline-none placeholder-black-600 min-w-0"
+                className="flex-1 bg-transparent text-4xl font-light outline-none placeholder-black-600 min-w-0 focus:text-matrix-400 transition-colors"
               />
               <button
                 onClick={() => setShowFromTokens(true)}
@@ -1167,17 +1173,20 @@ function SwapCore() {
             )}
           </div>
 
-          {/* Switch button */}
+          {/* Switch button — rotation on hover */}
           <div className="relative h-0">
             <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-              <button
+              <motion.button
                 onClick={switchTokens}
-                className="w-10 h-10 rounded-full bg-black-700 border-4 border-black-800 flex items-center justify-center hover:bg-black-600 transition-colors"
+                className="w-10 h-10 rounded-full bg-black-700 border-4 border-black-800 flex items-center justify-center hover:bg-black-600 transition-colors hover:shadow-glow-green-md"
+                whileHover={{ rotate: 180, scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 15 }}
               >
                 <svg className="w-4 h-4 text-black-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                 </svg>
-              </button>
+              </motion.button>
             </div>
           </div>
 
@@ -1210,14 +1219,14 @@ function SwapCore() {
             )}
           </div>
 
-          {/* Savings banner - THE key differentiator */}
+          {/* Savings banner — shimmer sweep effect */}
           <AnimatePresence>
             {savings && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="px-4 py-3 bg-matrix-500/10 border-t border-matrix-500/20"
+                className="px-4 py-3 bg-matrix-500/10 border-t border-matrix-500/20 shimmer-sweep"
               >
                 <div className="flex items-center justify-center space-x-2">
                   <svg className="w-4 h-4 text-matrix-500" fill="currentColor" viewBox="0 0 20 20">
@@ -1231,21 +1240,22 @@ function SwapCore() {
             )}
           </AnimatePresence>
 
-          {/* Swap button */}
+          {/* Swap button — InteractiveButton */}
           <div className="p-4">
-            <button
+            <InteractiveButton
+              variant="primary"
               onClick={handleSwap}
-              disabled={isSwapping || (isAnyWalletConnected && (!fromAmount || parseFloat(fromAmount) <= 0))}
-              className="w-full py-4 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 text-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isAnyWalletConnected && (!fromAmount || parseFloat(fromAmount) <= 0)}
+              loading={isSwapping}
+              className="w-full py-4 text-lg"
             >
               {!isAnyWalletConnected ? 'Get Started' :
-               isSwapping ? 'Exchanging...' :
                !fromAmount ? 'Enter amount' :
                'Exchange Now'}
-            </button>
-
-                      </div>
+            </InteractiveButton>
+          </div>
         </motion.div>
+        </GlassCard>
 
         {/* Subtle info - no clutter */}
         <div className="mt-4 text-center text-sm text-black-500">
@@ -1334,12 +1344,16 @@ function TokenSelector({ isOpen, onClose, tokens, selected, onSelect }) {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.03), rgba(0,0,0,0.6))' }}
+          onClick={onClose}
+        />
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          className="relative w-full max-w-sm bg-black-800 rounded-2xl border border-black-600 overflow-hidden"
+          initial={{ scale: 0.95, opacity: 0, filter: 'blur(4px)' }}
+          animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
+          exit={{ scale: 0.95, opacity: 0, filter: 'blur(4px)' }}
+          className="relative w-full max-w-sm glass-card rounded-2xl overflow-hidden"
         >
           <div className="p-4 border-b border-black-700">
             <div className="flex items-center justify-between">

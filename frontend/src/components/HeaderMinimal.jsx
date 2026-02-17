@@ -6,6 +6,8 @@ import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import SoulboundAvatar from './SoulboundAvatar'
 import RecoverySetup from './RecoverySetup'
+import PulseIndicator from './ui/PulseIndicator'
+import InteractiveButton from './ui/InteractiveButton'
 
 /**
  * Minimal header - Logo, wallet, and hidden drawer for power users
@@ -32,12 +34,19 @@ function HeaderMinimal() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-black-900/80 backdrop-blur-md border-b border-black-700/50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header
+        className="sticky top-0 z-40 backdrop-blur-xl border-b border-black-700/50"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          background: 'rgba(0,0,0,0.6)',
+          boxShadow: '0 1px 0 0 rgba(0,255,65,0.08), 0 4px 20px rgba(0,0,0,0.3)',
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-14">
-            {/* Logo - simple */}
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-lg bg-matrix-600 flex items-center justify-center">
+            {/* Logo — subtle constant glow */}
+            <Link to="/" className="flex items-center space-x-2 group">
+              <div className="w-8 h-8 rounded-lg bg-matrix-600 flex items-center justify-center animate-glow-breathe">
                 <svg className="w-4 h-4 text-black-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -51,7 +60,7 @@ function HeaderMinimal() {
               {isConnected ? (
                 <button
                   onClick={() => setShowDrawer(true)}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-full bg-black-800 border border-black-600 hover:border-black-500 transition-colors"
+                  className="flex items-center space-x-2 px-3 py-2 rounded-full bg-black-800/60 border border-black-600 hover:border-black-500 transition-colors backdrop-blur-sm"
                 >
                   {hasIdentity && identity ? (
                     <SoulboundAvatar identity={identity} size={24} showLevel={false} />
@@ -59,21 +68,23 @@ function HeaderMinimal() {
                     <div className="w-6 h-6 rounded-full bg-matrix-600" />
                   )}
                   <span className="text-sm font-mono text-black-300">{shortAddress}</span>
+                  <PulseIndicator color="matrix" size="sm" />
                 </button>
               ) : (
-                <button
+                <InteractiveButton
+                  variant="primary"
                   onClick={connect}
                   disabled={isConnecting}
-                  className="px-4 py-2 rounded-full bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-sm transition-colors"
+                  className="px-4 py-2 rounded-full text-sm"
                 >
                   {isConnecting ? 'Setting up...' : 'Get Started'}
-                </button>
+                </InteractiveButton>
               )}
 
-              {/* Menu button - for power users */}
+              {/* Menu button */}
               <button
                 onClick={() => setShowDrawer(true)}
-                className="p-2 rounded-lg hover:bg-black-800 transition-colors"
+                className="p-2 rounded-lg hover:bg-black-800/60 transition-colors"
               >
                 <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -148,13 +159,14 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         onClick={onClose}
       />
 
-      {/* Drawer */}
+      {/* Drawer — glass morphism */}
       <motion.div
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xs bg-black-800 border-l border-black-600 overflow-y-auto allow-scroll"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xs border-l border-black-600 overflow-y-auto allow-scroll backdrop-blur-xl"
+        style={{ background: 'rgba(0,0,0,0.9)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-black-700">
@@ -199,8 +211,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
               onClick={onClose}
               className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                 location.pathname === item.path
-                  ? 'bg-matrix-500/10 text-matrix-500'
-                  : 'hover:bg-black-700 text-black-200'
+                  ? 'bg-matrix-500/10 text-matrix-500 border-l-2 border-matrix-500'
+                  : 'hover:bg-black-700/50 text-black-200 border-l-2 border-transparent'
               }`}
             >
               <span className="text-xl">{item.icon}</span>

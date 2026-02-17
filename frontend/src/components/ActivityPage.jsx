@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
+import GlassCard from './ui/GlassCard'
+import PulseIndicator from './ui/PulseIndicator'
 
 /**
  * Activity/Transaction History Page
@@ -139,14 +142,16 @@ function ActivityPage() {
     switch (status) {
       case 'confirmed':
         return (
-          <span className="px-2 py-0.5 text-xs rounded-full bg-matrix-500/20 text-matrix-400">
-            Confirmed
+          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 text-xs rounded-full bg-matrix-500/20 text-matrix-400">
+            <PulseIndicator color="matrix" size="sm" active={false} />
+            <span>Confirmed</span>
           </span>
         )
       case 'pending':
         return (
-          <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400 animate-pulse">
-            Pending
+          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
+            <PulseIndicator color="warning" size="sm" />
+            <span>Pending</span>
           </span>
         )
       case 'failed':
@@ -260,69 +265,68 @@ function ActivityPage() {
       </div>
 
       {/* Transaction List */}
-      <div className="space-y-3">
+      <StaggerContainer className="space-y-3">
         {filteredTransactions.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-black-400">No transactions found</p>
           </div>
         ) : (
           filteredTransactions.map(tx => (
-            <div
-              key={tx.id}
-              className="bg-black-800 border border-black-700 rounded-xl p-4 hover:border-black-600 transition-colors"
-            >
-              <div className="flex items-center space-x-4">
-                {getTypeIcon(tx.type)}
+            <StaggerItem key={tx.id}>
+              <GlassCard className="p-4">
+                <div className="flex items-center space-x-4">
+                  {getTypeIcon(tx.type)}
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-white capitalize">{tx.type}</span>
-                      {getStatusBadge(tx.status)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-white capitalize">{tx.type}</span>
+                        {getStatusBadge(tx.status)}
+                      </div>
+                      <span className="text-sm text-black-400">{formatTime(tx.timestamp)}</span>
                     </div>
-                    <span className="text-sm text-black-400">{formatTime(tx.timestamp)}</span>
+
+                    <div className="text-sm">
+                      {tx.type === 'swap' ? (
+                        <span className="text-black-300">
+                          {tx.fromAmount} {tx.from} → {tx.toAmount} {tx.to}
+                        </span>
+                      ) : tx.type === 'send' ? (
+                        <span className="text-black-300">
+                          -{tx.fromAmount} {tx.from} to {tx.to}
+                        </span>
+                      ) : (
+                        <span className="text-black-300">
+                          +{tx.toAmount} {tx.to}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-3 mt-2 text-xs text-black-500">
+                      <span>{tx.chain}</span>
+                      {tx.gasUsed && <span>Gas: {tx.gasUsed}</span>}
+                      {tx.blockNumber && <span>Block: {tx.blockNumber.toLocaleString()}</span>}
+                    </div>
                   </div>
 
-                  <div className="text-sm">
-                    {tx.type === 'swap' ? (
-                      <span className="text-black-300">
-                        {tx.fromAmount} {tx.from} → {tx.toAmount} {tx.to}
-                      </span>
-                    ) : tx.type === 'send' ? (
-                      <span className="text-black-300">
-                        -{tx.fromAmount} {tx.from} to {tx.to}
-                      </span>
-                    ) : (
-                      <span className="text-black-300">
-                        +{tx.toAmount} {tx.to}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-3 mt-2 text-xs text-black-500">
-                    <span>{tx.chain}</span>
-                    {tx.gasUsed && <span>Gas: {tx.gasUsed}</span>}
-                    {tx.blockNumber && <span>Block: {tx.blockNumber.toLocaleString()}</span>}
-                  </div>
+                  {/* Explorer Link */}
+                  <a
+                    href={tx.explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg hover:bg-black-700 transition-colors"
+                    title="View on Explorer"
+                  >
+                    <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
                 </div>
-
-                {/* Explorer Link */}
-                <a
-                  href={tx.explorerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 rounded-lg hover:bg-black-700 transition-colors"
-                  title="View on Explorer"
-                >
-                  <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              </div>
-            </div>
+              </GlassCard>
+            </StaggerItem>
           ))
         )}
-      </div>
+      </StaggerContainer>
 
       {/* Load More (disabled for demo) */}
       {filteredTransactions.length > 0 && (

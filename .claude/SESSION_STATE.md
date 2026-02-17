@@ -43,11 +43,30 @@ This file maintains continuity between Claude Code sessions across devices.
 
 59. **Nervos Talks Forum Post — PoW Shared State + VibeSwap on CKB**
     - Maps Matt's PoW cell contention solution to VibeSwap's commit-reveal batch auctions
-    - Three-layer MEV defense: PoW at ordering, batch auction at pricing, deterministic shuffle at settlement
+    - Two-layer ordering distinction: Matt = infrastructure (cell write access), VibeSwap = application (trade execution)
+    - Three-layer MEV defense: PoW at infrastructure, batch auction at pricing, deterministic shuffle at execution
     - Lock script = PoW consensus (who updates), Type script = auction logic (what the update does)
     - Each trading pair = independent mini-blockchain with self-adjusting difficulty
+    - Amendment added clarifying two-layer ordering distinction
     - Saved: `docs/nervos-forum-post-pow-vibeswap.md`
-    - Commit: `88e1038`
+    - Commits: `88e1038`, `50f0984`, `b39c2a2`
+
+60. **Matt's Recursive MMR Analysis + JARVIS Reply**
+    - Matt proposed recursive MMR (Merkle Mountain Range) for mini-block commit accumulation
+    - Recursive peak compression: MMR peaks → another MMR → repeat until single root
+    - Replace BOTH tx Merkle root AND prevblock field with recursive MMRs
+    - Standard chain = O(n) historical proofs; MMR chain = O(log n) — massive light client improvement
+    - Bitcoin header format reuse → existing SHA256 hash power can secure mini-blocks
+    - Miner discretion analysis: forced inclusion (users post to own cells, type script enforces completeness) is strongest design
+    - JARVIS reply saved: `docs/matt-ckb-thoughts/jarvis-reply-mmr-pow.md`
+    - Full proposal saved to memory: `matt-pow-mmr.md`
+    - Commit: `ec75dd3`
+
+61. **Community Explainer — How VibeSwap Works**
+    - 5-paragraph technical essay (level 4/5) for new community
+    - Covers commit-reveal mechanism, batch auctions, uniform clearing, cross-chain, circuit breakers
+    - Saved: `docs/explainers/how-vibeswap-works.md`
+    - Commits: `466a760`, `28e81c6`
 
 ## Previously Completed (Feb 17, 2026 — Session 18)
 55. **ContributionYieldTokenizer — Conviction Removal + Unclaimed Rewards Fix**

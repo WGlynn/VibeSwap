@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../contracts/identity/ContributionYieldTokenizer.sol";
-import "../contracts/identity/ContributionDAG.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // ============ Mocks ============
@@ -19,13 +18,12 @@ contract ContributionYieldTokenizerTest is Test {
     // Re-declare events for expectEmit (Solidity 0.8.20)
     event IdeaCreated(uint256 indexed ideaId, address indexed creator, address ideaToken, bytes32 contentHash);
     ContributionYieldTokenizer public tokenizer;
-    ContributionDAG public dag;
     MockRewardToken2 public rewardToken;
 
     address public owner;
-    address public alice; // idea creator, funder, founder
+    address public alice; // idea creator, funder
     address public bob;   // executor
-    address public carol; // voter
+    address public carol; // funder
     address public dave;  // redirect candidate
 
     uint256 public constant FUND_AMOUNT = 10_000e18;
@@ -38,13 +36,10 @@ contract ContributionYieldTokenizerTest is Test {
         dave = makeAddr("dave");
 
         rewardToken = new MockRewardToken2();
-        dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
 
-        // Deploy tokenizer (rewardLedger = address(0) for now, not needed in unit tests)
+        // Deploy tokenizer (rewardLedger = address(0) for unit tests)
         tokenizer = new ContributionYieldTokenizer(
             address(rewardToken),
-            address(dag),
             address(0) // rewardLedger
         );
 
@@ -53,7 +48,7 @@ contract ContributionYieldTokenizerTest is Test {
         vm.prank(alice);
         rewardToken.approve(address(tokenizer), type(uint256).max);
 
-        // Fund carol too (for voting tests)
+        // Fund carol too
         rewardToken.mint(carol, FUND_AMOUNT * 10);
         vm.prank(carol);
         rewardToken.approve(address(tokenizer), type(uint256).max);
@@ -72,32 +67,17 @@ contract ContributionYieldTokenizerTest is Test {
         streamId = tokenizer.proposeExecution(ideaId);
     }
 
-    function _createIdeaStreamAndVote(uint256 voteAmount) internal returns (uint256 ideaId, uint256 streamId) {
-        ideaId = _createAndFundIdea(FUND_AMOUNT);
-
-        // Carol also funds to get IT tokens for voting
-        vm.prank(carol);
-        tokenizer.fundIdea(ideaId, voteAmount);
-
-        vm.prank(bob);
-        streamId = tokenizer.proposeExecution(ideaId);
-
-        vm.prank(carol);
-        tokenizer.voteConviction(streamId, voteAmount);
-    }
-
     // ============ Constructor Tests ============
 
     function test_constructor_setsState() public view {
         assertEq(address(tokenizer.rewardToken()), address(rewardToken));
-        assertEq(address(tokenizer.contributionDAG()), address(dag));
         assertEq(tokenizer.nextIdeaId(), 1);
         assertEq(tokenizer.nextStreamId(), 1);
     }
 
     function test_constructor_zeroRewardToken_reverts() public {
         vm.expectRevert(IContributionYieldTokenizer.ZeroAddress.selector);
-        new ContributionYieldTokenizer(address(0), address(dag), address(0));
+        new ContributionYieldTokenizer(address(0), address(0));
     }
 
     // ============ Idea Creation Tests ============
@@ -198,9 +178,21 @@ contract ContributionYieldTokenizerTest is Test {
         IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
         assertEq(stream.ideaId, ideaId);
         assertEq(stream.executor, bob);
-        assertEq(stream.streamRate, 0); // starts at 0
-        assertEq(stream.totalConviction, 0);
+        assertGt(stream.streamRate, 0); // auto-starts flowing
         assertEq(uint256(stream.status), uint256(IContributionYieldTokenizer.StreamStatus.ACTIVE));
+    }
+
+    function test_proposeExecution_autoFlows() public {
+        uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
+
+        vm.prank(bob);
+        uint256 streamId = tokenizer.proposeExecution(ideaId);
+
+        IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
+
+        // Rate = FUND_AMOUNT / 1 active stream / 30 days
+        uint256 expectedRate = FUND_AMOUNT / 30 days;
+        assertEq(stream.streamRate, expectedRate);
     }
 
     function test_proposeExecution_notFound_reverts() public {
@@ -224,112 +216,78 @@ contract ContributionYieldTokenizerTest is Test {
         assertEq(streams.length, 2);
     }
 
-    // ============ Conviction Voting Tests ============
-
-    function test_voteConviction_success() public {
+    function test_proposeExecution_equalSplit() public {
         uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
 
-        // Carol funds to get IT tokens
+        vm.prank(bob);
+        uint256 stream1 = tokenizer.proposeExecution(ideaId);
+
         vm.prank(carol);
-        tokenizer.fundIdea(ideaId, 500e18);
+        uint256 stream2 = tokenizer.proposeExecution(ideaId);
+
+        IContributionYieldTokenizer.ExecutionStream memory s1 = tokenizer.getStream(stream1);
+        IContributionYieldTokenizer.ExecutionStream memory s2 = tokenizer.getStream(stream2);
+
+        // Both should have equal rates = FUND_AMOUNT / 2 / 30 days
+        uint256 expectedRate = FUND_AMOUNT / 2 / 30 days;
+        assertEq(s1.streamRate, expectedRate);
+        assertEq(s2.streamRate, expectedRate);
+    }
+
+    function test_proposeExecution_noFunding_zeroRate() public {
+        uint256 ideaId = _createAndFundIdea(0); // no funding
 
         vm.prank(bob);
         uint256 streamId = tokenizer.proposeExecution(ideaId);
 
-        // Carol votes with her IT
-        vm.prank(carol);
-        tokenizer.voteConviction(streamId, 500e18);
-
-        IContributionYieldTokenizer.ConvictionVote memory vote = tokenizer.getConvictionVote(streamId, carol);
-        assertEq(vote.amount, 500e18);
-        assertGt(vote.conviction, 0);
-
-        // IT burned from carol
-        IContributionYieldTokenizer.Idea memory idea = tokenizer.getIdea(ideaId);
-        IdeaToken it = IdeaToken(idea.ideaToken);
-        assertEq(it.balanceOf(carol), 0);
-    }
-
-    function test_voteConviction_trustWeighted() public {
-        // Setup: alice is founder (3x), carol is untrusted (0.5x)
-        dag.recalculateTrustScores();
-
-        uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
-
-        // Alice has IT from funding
-        vm.prank(bob);
-        uint256 streamId = tokenizer.proposeExecution(ideaId);
-
-        // Alice votes (founder 3x multiplier)
-        vm.prank(alice);
-        tokenizer.voteConviction(streamId, 1000e18);
-
-        IContributionYieldTokenizer.ConvictionVote memory aliceVote = tokenizer.getConvictionVote(streamId, alice);
-        // conviction = 1000e18 * 30000 / 10000 = 3000e18
-        assertEq(aliceVote.conviction, 3000e18);
-    }
-
-    function test_voteConviction_insufficientBalance_reverts() public {
-        uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
-
-        vm.prank(bob);
-        uint256 streamId = tokenizer.proposeExecution(ideaId);
-
-        // Dave has no IT tokens
-        vm.prank(dave);
-        vm.expectRevert(IContributionYieldTokenizer.InsufficientBalance.selector);
-        tokenizer.voteConviction(streamId, 100e18);
-    }
-
-    function test_voteConviction_alreadyVoting_reverts() public {
-        (uint256 ideaId, uint256 streamId) = _createIdeaStreamAndVote(500e18);
-
-        // Carol funds more and tries to vote again
-        vm.prank(carol);
-        tokenizer.fundIdea(ideaId, 100e18);
-
-        vm.prank(carol);
-        vm.expectRevert(IContributionYieldTokenizer.AlreadyVoting.selector);
-        tokenizer.voteConviction(streamId, 100e18);
-    }
-
-    function test_voteConviction_zeroAmount_reverts() public {
-        (, uint256 streamId) = _createIdeaAndStream();
-
-        vm.prank(alice);
-        vm.expectRevert(IContributionYieldTokenizer.ZeroAmount.selector);
-        tokenizer.voteConviction(streamId, 0);
-    }
-
-    // ============ Withdraw Conviction Tests ============
-
-    function test_withdrawConviction_success() public {
-        (uint256 ideaId, uint256 streamId) = _createIdeaStreamAndVote(500e18);
-
-        // Carol withdraws
-        vm.prank(carol);
-        tokenizer.withdrawConviction(streamId);
-
-        // IT returned to carol
-        IContributionYieldTokenizer.Idea memory idea = tokenizer.getIdea(ideaId);
-        IdeaToken it = IdeaToken(idea.ideaToken);
-        assertEq(it.balanceOf(carol), 500e18);
-
-        // Vote cleared
-        IContributionYieldTokenizer.ConvictionVote memory vote = tokenizer.getConvictionVote(streamId, carol);
-        assertEq(vote.amount, 0);
-
-        // Stream conviction reduced
         IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
-        assertEq(stream.totalConviction, 0);
+        assertEq(stream.streamRate, 0);
     }
 
-    function test_withdrawConviction_notVoting_reverts() public {
+    // ============ Stream Claim Tests ============
+
+    function test_claimStream_afterTimeElapsed() public {
         (, uint256 streamId) = _createIdeaAndStream();
 
-        vm.prank(carol);
-        vm.expectRevert(IContributionYieldTokenizer.NotVoting.selector);
-        tokenizer.withdrawConviction(streamId);
+        // Advance 10 days
+        vm.warp(block.timestamp + 10 days);
+
+        uint256 pending = tokenizer.pendingStreamAmount(streamId);
+        assertGt(pending, 0);
+
+        uint256 bobBalBefore = rewardToken.balanceOf(bob);
+        vm.prank(bob);
+        tokenizer.claimStream(streamId);
+
+        assertEq(rewardToken.balanceOf(bob) - bobBalBefore, pending);
+    }
+
+    function test_claimStream_nothingToClaim_reverts() public {
+        (, uint256 streamId) = _createIdeaAndStream();
+
+        // No time elapsed
+        vm.prank(bob);
+        vm.expectRevert(IContributionYieldTokenizer.NothingToClaim.selector);
+        tokenizer.claimStream(streamId);
+    }
+
+    function test_claimStream_notExecutor_reverts() public {
+        (, uint256 streamId) = _createIdeaAndStream();
+
+        vm.prank(alice); // not executor
+        vm.expectRevert(IContributionYieldTokenizer.NotExecutor.selector);
+        tokenizer.claimStream(streamId);
+    }
+
+    function test_claimStream_cappedAtFunding() public {
+        (, uint256 streamId) = _createIdeaAndStream();
+
+        // Advance way past 30 days
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 pending = tokenizer.pendingStreamAmount(streamId);
+        // Should be capped at total funding
+        assertLe(pending, FUND_AMOUNT);
     }
 
     // ============ Milestone Tests ============
@@ -363,7 +321,7 @@ contract ContributionYieldTokenizerTest is Test {
     // ============ Stale Check Tests ============
 
     function test_checkStale_afterStaleDuration() public {
-        (, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         // Warp past stale duration (14 days)
         vm.warp(block.timestamp + 15 days);
@@ -376,7 +334,7 @@ contract ContributionYieldTokenizerTest is Test {
     }
 
     function test_checkStale_beforeStaleDuration_reverts() public {
-        (, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         vm.warp(block.timestamp + 7 days); // only 7 of 14 days
 
@@ -385,7 +343,7 @@ contract ContributionYieldTokenizerTest is Test {
     }
 
     function test_checkStale_afterMilestoneResetsTimer() public {
-        (, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         // 10 days pass
         vm.warp(block.timestamp + 10 days);
@@ -404,7 +362,7 @@ contract ContributionYieldTokenizerTest is Test {
     // ============ Redirect Stream Tests ============
 
     function test_redirectStream_success() public {
-        (uint256 ideaId, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         // Stale the stream
         vm.warp(block.timestamp + 15 days);
@@ -417,10 +375,11 @@ contract ContributionYieldTokenizerTest is Test {
         IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
         assertEq(stream.executor, dave);
         assertEq(uint256(stream.status), uint256(IContributionYieldTokenizer.StreamStatus.ACTIVE));
+        assertGt(stream.streamRate, 0); // rate restored
     }
 
     function test_redirectStream_notStalled_reverts() public {
-        (, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         vm.prank(alice);
         vm.expectRevert(IContributionYieldTokenizer.StreamStillActive.selector);
@@ -428,7 +387,7 @@ contract ContributionYieldTokenizerTest is Test {
     }
 
     function test_redirectStream_noITTokens_reverts() public {
-        (, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         vm.warp(block.timestamp + 15 days);
         tokenizer.checkStale(streamId);
@@ -440,7 +399,7 @@ contract ContributionYieldTokenizerTest is Test {
     }
 
     function test_redirectStream_zeroAddress_reverts() public {
-        (, uint256 streamId) = _createIdeaStreamAndVote(500e18);
+        (, uint256 streamId) = _createIdeaAndStream();
 
         vm.warp(block.timestamp + 15 days);
         tokenizer.checkStale(streamId);
@@ -448,24 +407,6 @@ contract ContributionYieldTokenizerTest is Test {
         vm.prank(alice);
         vm.expectRevert(IContributionYieldTokenizer.ZeroAddress.selector);
         tokenizer.redirectStream(streamId, address(0));
-    }
-
-    // ============ Stream Claim Tests ============
-
-    function test_claimStream_nothingToClaim_reverts() public {
-        (, uint256 streamId) = _createIdeaAndStream();
-
-        vm.prank(bob);
-        vm.expectRevert(IContributionYieldTokenizer.NothingToClaim.selector);
-        tokenizer.claimStream(streamId);
-    }
-
-    function test_claimStream_notExecutor_reverts() public {
-        (, uint256 streamId) = _createIdeaAndStream();
-
-        vm.prank(alice); // not executor
-        vm.expectRevert(IContributionYieldTokenizer.NotExecutor.selector);
-        tokenizer.claimStream(streamId);
     }
 
     // ============ Complete Stream Tests ============
@@ -509,11 +450,42 @@ contract ContributionYieldTokenizerTest is Test {
         tokenizer.completeStream(streamId);
     }
 
+    function test_completeStream_redistributesRate() public {
+        uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
+
+        vm.prank(bob);
+        uint256 stream1 = tokenizer.proposeExecution(ideaId);
+        vm.prank(carol);
+        uint256 stream2 = tokenizer.proposeExecution(ideaId);
+
+        // Both get half the rate
+        uint256 halfRate = FUND_AMOUNT / 2 / 30 days;
+        assertEq(tokenizer.getStreamRate(stream1), halfRate);
+        assertEq(tokenizer.getStreamRate(stream2), halfRate);
+
+        // Complete stream 1 — stream 2 should get the full rate
+        vm.prank(bob);
+        tokenizer.completeStream(stream1);
+
+        uint256 fullRate = FUND_AMOUNT / 30 days;
+        assertEq(tokenizer.getStreamRate(stream2), fullRate);
+    }
+
     // ============ View Function Tests ============
 
-    function test_pendingStreamAmount_noRate() public {
+    function test_pendingStreamAmount_grows() public {
         (, uint256 streamId) = _createIdeaAndStream();
+        uint256 startTime = block.timestamp;
+
         assertEq(tokenizer.pendingStreamAmount(streamId), 0);
+
+        vm.warp(startTime + 1 days);
+        uint256 pending1 = tokenizer.pendingStreamAmount(streamId);
+        assertGt(pending1, 0);
+
+        vm.warp(startTime + 2 days);
+        uint256 pending2 = tokenizer.pendingStreamAmount(streamId);
+        assertGt(pending2, pending1);
     }
 
     function test_getIdeaStreamCount_empty() public {
@@ -561,21 +533,15 @@ contract ContributionYieldTokenizerTest is Test {
 
     // ============ Admin Tests ============
 
-    function test_setContributionDAG_success() public {
-        address newDAG = makeAddr("newDAG");
-        tokenizer.setContributionDAG(newDAG);
-        assertEq(address(tokenizer.contributionDAG()), newDAG);
-    }
-
-    function test_setContributionDAG_onlyOwner_reverts() public {
+    function test_setRewardLedger_onlyOwner_reverts() public {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", alice));
-        tokenizer.setContributionDAG(address(1));
+        tokenizer.setRewardLedger(address(1));
     }
 
     // ============ Integration Flow Test ============
 
-    function test_fullFlow_createIdea_fund_propose_vote_milestone_complete() public {
+    function test_fullFlow_createIdea_fund_propose_milestone_claim_complete() public {
         // 1. Alice creates and funds an idea
         uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
 
@@ -583,40 +549,72 @@ contract ContributionYieldTokenizerTest is Test {
         vm.prank(carol);
         tokenizer.fundIdea(ideaId, 2000e18);
 
-        // 3. Bob proposes to execute
+        // 3. Bob proposes to execute — stream auto-starts
         vm.prank(bob);
         uint256 streamId = tokenizer.proposeExecution(ideaId);
 
-        // 4. Carol votes with conviction (2000e18 IT)
-        vm.prank(carol);
-        tokenizer.voteConviction(streamId, 2000e18);
-
-        // 5. Stream should have conviction
+        // 4. Stream should have a rate immediately
         IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
-        assertGt(stream.totalConviction, 0);
+        assertGt(stream.streamRate, 0);
 
-        // 6. Bob reports milestones over time
+        // 5. Time passes, bob reports milestones
         vm.warp(block.timestamp + 7 days);
         vm.prank(bob);
         tokenizer.reportMilestone(streamId, bytes32("milestone1"));
 
+        // 6. Bob claims earnings
+        uint256 bobBalBefore = rewardToken.balanceOf(bob);
+        vm.prank(bob);
+        tokenizer.claimStream(streamId);
+        assertGt(rewardToken.balanceOf(bob), bobBalBefore);
+
+        // 7. More time passes
         vm.warp(block.timestamp + 7 days);
         vm.prank(bob);
         tokenizer.reportMilestone(streamId, bytes32("milestone2"));
 
-        // 7. Bob completes the stream
+        // 8. Bob completes the stream
         vm.prank(bob);
         tokenizer.completeStream(streamId);
 
         stream = tokenizer.getStream(streamId);
         assertEq(uint256(stream.status), uint256(IContributionYieldTokenizer.StreamStatus.COMPLETED));
+    }
 
-        // 8. Carol withdraws conviction (gets IT back)
+    function test_freeMarket_anyoneCanExecute() public {
+        uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);
+
+        // Bob, Carol, and Dave all propose to execute — free market
+        vm.prank(bob);
+        uint256 s1 = tokenizer.proposeExecution(ideaId);
         vm.prank(carol);
-        tokenizer.withdrawConviction(streamId);
+        uint256 s2 = tokenizer.proposeExecution(ideaId);
+        vm.prank(dave);
+        uint256 s3 = tokenizer.proposeExecution(ideaId);
 
-        IContributionYieldTokenizer.Idea memory idea = tokenizer.getIdea(ideaId);
-        IdeaToken it = IdeaToken(idea.ideaToken);
-        assertEq(it.balanceOf(carol), 2000e18);
+        // All three should have equal rates
+        uint256 expectedRate = FUND_AMOUNT / 3 / 30 days;
+        assertEq(tokenizer.getStreamRate(s1), expectedRate);
+        assertEq(tokenizer.getStreamRate(s2), expectedRate);
+        assertEq(tokenizer.getStreamRate(s3), expectedRate);
+
+        // Bob stalls out, gets staled after 14 days
+        vm.warp(block.timestamp + 15 days);
+
+        // Carol and Dave report milestones (they're still active)
+        vm.prank(carol);
+        tokenizer.reportMilestone(s2, bytes32("progress"));
+        vm.prank(dave);
+        tokenizer.reportMilestone(s3, bytes32("progress"));
+
+        // Anyone can trigger stale check on bob
+        tokenizer.checkStale(s1);
+
+        // Carol and Dave now split the remaining funding equally
+        // After 15 days with 3 streams, ~50% of funding consumed → remaining split between 2
+        IContributionYieldTokenizer.ExecutionStream memory sc = tokenizer.getStream(s2);
+        IContributionYieldTokenizer.ExecutionStream memory sd = tokenizer.getStream(s3);
+        assertEq(sc.streamRate, sd.streamRate, "Carol and Dave must have equal rates");
+        assertGt(sc.streamRate, 0, "Rate must be > 0 after redistribution");
     }
 }

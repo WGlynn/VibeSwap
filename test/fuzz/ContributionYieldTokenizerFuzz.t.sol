@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/identity/ContributionYieldTokenizer.sol";
-import "../../contracts/identity/ContributionDAG.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // ============ Mocks ============
@@ -17,10 +16,8 @@ contract MockCYTToken is ERC20 {
 
 contract ContributionYieldTokenizerFuzzTest is Test {
     ContributionYieldTokenizer public tokenizer;
-    ContributionDAG public dag;
     MockCYTToken public rewardToken;
 
-    address public owner;
     address public alice;
     address public bob;
     address public carol;
@@ -28,25 +25,14 @@ contract ContributionYieldTokenizerFuzzTest is Test {
     uint256 public constant MAX_FUND = 10_000_000e18;
 
     function setUp() public {
-        owner = address(this);
         alice = makeAddr("alice");
         bob = makeAddr("bob");
         carol = makeAddr("carol");
 
         rewardToken = new MockCYTToken();
-        dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
-
-        // Setup trust: alice <-> bob
-        vm.prank(alice);
-        dag.addVouch(bob, bytes32(0));
-        vm.prank(bob);
-        dag.addVouch(alice, bytes32(0));
-        dag.recalculateTrustScores();
 
         tokenizer = new ContributionYieldTokenizer(
             address(rewardToken),
-            address(dag),
             address(0)
         );
 
@@ -155,53 +141,41 @@ contract ContributionYieldTokenizerFuzzTest is Test {
         assertLe(tokenizer.getIdeaStreamCount(ideaId), 10, "Stream count must not exceed MAX_STREAMS_PER_IDEA");
     }
 
-    // ============ Fuzz: conviction vote locks IT tokens ============
+    // ============ Fuzz: stream auto-flows with funding ============
 
-    function testFuzz_convictionVoteLocksTokens(uint256 voteAmount) public {
-        voteAmount = bound(voteAmount, 101e18, MAX_FUND);
+    function testFuzz_streamAutoFlows(uint256 funding) public {
+        funding = bound(funding, 1e18, MAX_FUND);
 
-        uint256 ideaId = _createAndFundIdea(MAX_FUND);
-
-        // Carol funds to get IT
-        vm.prank(carol);
-        tokenizer.fundIdea(ideaId, voteAmount);
-
-        IContributionYieldTokenizer.Idea memory idea = tokenizer.getIdea(ideaId);
-        IdeaToken it = IdeaToken(idea.ideaToken);
-        uint256 itBefore = it.balanceOf(carol);
+        uint256 ideaId = _createAndFundIdea(funding);
 
         vm.prank(bob);
         uint256 streamId = tokenizer.proposeExecution(ideaId);
 
-        vm.prank(carol);
-        tokenizer.voteConviction(streamId, voteAmount);
-
-        assertEq(it.balanceOf(carol), itBefore - voteAmount, "IT must be burned (locked) on vote");
+        IContributionYieldTokenizer.ExecutionStream memory stream = tokenizer.getStream(streamId);
+        uint256 expectedRate = funding / 30 days;
+        assertEq(stream.streamRate, expectedRate, "Stream rate must be funding / 30 days");
     }
 
-    // ============ Fuzz: withdraw conviction returns IT ============
+    // ============ Fuzz: equal split among multiple streams ============
 
-    function testFuzz_withdrawConvictionReturnsIT(uint256 voteAmount) public {
-        voteAmount = bound(voteAmount, 101e18, MAX_FUND);
+    function testFuzz_equalSplitAmongStreams(uint256 funding, uint256 numStreams) public {
+        funding = bound(funding, 1e18, MAX_FUND);
+        numStreams = bound(numStreams, 1, 10);
 
-        uint256 ideaId = _createAndFundIdea(MAX_FUND);
+        uint256 ideaId = _createAndFundIdea(funding);
 
-        vm.prank(carol);
-        tokenizer.fundIdea(ideaId, voteAmount);
+        uint256[] memory sIds = new uint256[](numStreams);
+        for (uint256 i = 0; i < numStreams; i++) {
+            address executor = address(uint160(9000 + i));
+            vm.prank(executor);
+            sIds[i] = tokenizer.proposeExecution(ideaId);
+        }
 
-        IContributionYieldTokenizer.Idea memory idea = tokenizer.getIdea(ideaId);
-        IdeaToken it = IdeaToken(idea.ideaToken);
-
-        vm.prank(bob);
-        uint256 streamId = tokenizer.proposeExecution(ideaId);
-
-        vm.prank(carol);
-        tokenizer.voteConviction(streamId, voteAmount);
-
-        vm.prank(carol);
-        tokenizer.withdrawConviction(streamId);
-
-        assertEq(it.balanceOf(carol), voteAmount, "IT must be returned after withdrawal");
+        // All streams should have equal rates
+        uint256 expectedRate = funding / numStreams / 30 days;
+        for (uint256 i = 0; i < numStreams; i++) {
+            assertEq(tokenizer.getStreamRate(sIds[i]), expectedRate, "All streams must have equal rate");
+        }
     }
 
     // ============ Fuzz: stale check enforces deadline ============
@@ -290,32 +264,19 @@ contract ContributionYieldTokenizerFuzzTest is Test {
         tokenizer.checkStale(streamId);
     }
 
-    // ============ Fuzz: conviction grows over time ============
+    // ============ Fuzz: claim capped at total funding ============
 
-    function testFuzz_convictionGrowsOverTime(uint256 voteAmount, uint256 timeElapsed) public {
-        voteAmount = bound(voteAmount, 101e18, 1_000_000e18);
-        timeElapsed = bound(timeElapsed, 1 hours, 30 days);
+    function testFuzz_claimCappedAtFunding(uint256 funding, uint256 timeElapsed) public {
+        funding = bound(funding, 1e18, MAX_FUND);
+        timeElapsed = bound(timeElapsed, 1 days, 365 days);
 
-        uint256 ideaId = _createAndFundIdea(MAX_FUND);
-
-        vm.prank(carol);
-        tokenizer.fundIdea(ideaId, voteAmount);
-
+        uint256 ideaId = _createAndFundIdea(funding);
         vm.prank(bob);
         uint256 streamId = tokenizer.proposeExecution(ideaId);
 
-        vm.prank(carol);
-        tokenizer.voteConviction(streamId, voteAmount);
+        vm.warp(block.timestamp + timeElapsed);
 
-        IContributionYieldTokenizer.ConvictionVote memory voteT0 = tokenizer.getConvictionVote(streamId, carol);
-        uint256 convictionT0 = voteT0.conviction;
-        assertGt(convictionT0, 0, "Initial conviction must be > 0");
-
-        // The stored conviction doesn't change on-chain without interaction,
-        // but the stream rate accounts for time-growth internally.
-        // Verify the initial conviction was computed with trust multiplier.
-        uint256 trustMultiplier = dag.getVotingPowerMultiplier(carol);
-        uint256 expectedConviction = (voteAmount * trustMultiplier) / 10000;
-        assertEq(convictionT0, expectedConviction, "Conviction must be trust-weighted");
+        uint256 pending = tokenizer.pendingStreamAmount(streamId);
+        assertLe(pending, funding, "Pending must never exceed total funding");
     }
 }

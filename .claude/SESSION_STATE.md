@@ -10,15 +10,16 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **1700+ tests passing, 0 failures, 0 skipped** (full suite green, 21 backend tests)
+- **1770+ tests passing, 0 failures, 0 skipped** (full suite green, 21 backend tests)
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
-- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker)
+- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + **ContributionAttestor**)
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
 - **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
 - **GitHub webhook relayer: COMPLETE** — off-chain service with EIP-712 signing + batch submission
+- **Contribution attestation governance: COMPLETE** — 3-branch separation of powers (Executive/Judicial/Legislative)
 
 ## Active Tasks — GO-LIVE BLOCKERS (need Will)
 - **Contract deployment** to testnet (Sepolia) then mainnet — needs private key + ETH for gas
@@ -27,7 +28,21 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Relayer wallet** funding — needs ETH for gas
 - **IPFS pinning** service for contribution evidence hashes
 
-## Recently Completed (Feb 17, 2026 — Session 16)
+## Recently Completed (Feb 17, 2026 — Session 17)
+54. **ContributionAttestor — 3-Branch Separation of Powers**
+    - Rewrote ContributionAttestor from attestation-only to full 3-branch constitutional governance
+    - **Executive (Handshake Protocol)**: Peer attestations weighted by ContributionDAG trust scores, auto-accept at threshold
+    - **Judicial (DecentralizedTribunal)**: Escalate contested claims to jury trial, verdict is binding (NOT_GUILTY/GUILTY/MISTRIAL)
+    - **Legislative (QuadraticVoting)**: Supreme authority — governance proposals can override any prior decision
+    - Claim lifecycle: Pending → Accepted/Contested/Rejected/Expired/Escalated/GovernanceReview
+    - ResolutionSource tracking: which branch resolved each claim (Executive/Judicial/Legislative)
+    - ITribunal minimal interface defined inline (DecentralizedTribunal has no extracted interface)
+    - Mock contracts: MockTribunal + MockGovernance for deterministic testing
+    - **96 tests**: 76 unit + 12 fuzz (256 runs) + 8 invariant (128K calls) — ALL PASSING
+    - Frontend trustChain.js updated with escalateToTribunal, resolveByTribunal, escalateToGovernance, resolveByGovernance, getClaimEscalationHistory
+    - Files: IContributionAttestor.sol, ContributionAttestor.sol, ContributionAttestor.t.sol, ContributionAttestorFuzz.t.sol, ContributionAttestorInvariant.t.sol, trustChain.js
+
+## Previously Completed (Feb 17, 2026 — Session 16)
 52. **Frontend Go-Live Hardening**
     - Extracted 8 ABIs from forge output: CommitRevealAuction, DAOTreasury, CrossChainRouter, SoulboundIdentity, WalletRecovery, ShapleyDistributor, ILProtectionVault, SlippageGuaranteeFund
     - Refactored useContracts.jsx to dynamic ABI_REGISTRY pattern (all 10 contract types auto-created)

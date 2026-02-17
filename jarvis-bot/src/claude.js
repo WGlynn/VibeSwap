@@ -23,6 +23,31 @@ export function clearHistory(chatId) {
   conversations.delete(chatId);
 }
 
+// Buffer a message into conversation history WITHOUT calling Claude.
+// Used for group chat messages so JARVIS has situational awareness.
+export function bufferMessage(chatId, userName, message) {
+  if (!conversations.has(chatId)) {
+    conversations.set(chatId, []);
+  }
+
+  const history = conversations.get(chatId);
+  const taggedMessage = userName ? `[${userName}]: ${message}` : message;
+
+  // Claude API requires alternating user/assistant messages.
+  // Buffer consecutive user messages by appending to the last user message.
+  const last = history[history.length - 1];
+  if (last && last.role === 'user') {
+    last.content += '\n' + taggedMessage;
+  } else {
+    history.push({ role: 'user', content: taggedMessage });
+  }
+
+  // Trim if too long
+  while (history.length > config.maxConversationHistory) {
+    history.shift();
+  }
+}
+
 export async function chat(chatId, userName, message) {
   if (!conversations.has(chatId)) {
     conversations.set(chatId, []);
@@ -32,7 +57,14 @@ export async function chat(chatId, userName, message) {
 
   // Add user message with name tag
   const taggedMessage = userName ? `[${userName}]: ${message}` : message;
-  history.push({ role: 'user', content: taggedMessage });
+
+  // Append to existing user block or create new one
+  const last = history[history.length - 1];
+  if (last && last.role === 'user') {
+    last.content += '\n' + taggedMessage;
+  } else {
+    history.push({ role: 'user', content: taggedMessage });
+  }
 
   // Trim history if too long
   while (history.length > config.maxConversationHistory) {

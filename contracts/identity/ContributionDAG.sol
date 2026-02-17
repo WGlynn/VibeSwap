@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "../libraries/IncrementalMerkleTree.sol";
 import "./interfaces/IContributionDAG.sol";
 
 /**
@@ -19,6 +21,7 @@ import "./interfaces/IContributionDAG.sol";
  * @dev Non-upgradeable. Gas-bounded BFS: MAX_TRUST_HOPS = 6.
  */
 contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
+    using IncrementalMerkleTree for IncrementalMerkleTree.Tree;
 
     // ============ Constants (from TRUST_CONFIG) ============
 
@@ -69,10 +72,16 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     // Track all scored users for recalculation
     address[] private _scoredUsers;
 
+    // Merkle-compressed vouch audit trail
+    IncrementalMerkleTree.Tree private _vouchTree;
+    bool private _vouchTreeInitialized;
+
     // ============ Constructor ============
 
     constructor(address _soulbound) Ownable(msg.sender) {
         soulboundIdentity = _soulbound;
+        _vouchTree.init(20);
+        _vouchTreeInitialized = true;
     }
 
     // ============ Modifiers ============
@@ -130,6 +139,14 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         });
         _vouchesFrom[msg.sender].push(to);
         _vouchedBy[to].push(msg.sender);
+
+        // Insert vouch into Merkle audit trail
+        if (_vouchTreeInitialized) {
+            bytes32 vouchLeaf = keccak256(abi.encodePacked(
+                msg.sender, to, block.timestamp, messageHash
+            ));
+            _vouchTree.insert(vouchLeaf);
+        }
 
         emit VouchAdded(msg.sender, to, messageHash);
 
@@ -423,6 +440,36 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         return _handshakes.length;
     }
 
+    // ============ Merkle Vouch Audit Trail ============
+
+    /// @notice Get the Merkle root of all vouches (compressed audit trail)
+    function getVouchTreeRoot() external view returns (bytes32) {
+        return _vouchTree.getRoot();
+    }
+
+    /// @notice Verify a vouch exists in the Merkle tree
+    function verifyVouch(
+        bytes32[] calldata proof,
+        address from,
+        address to,
+        uint256 timestamp,
+        bytes32 messageHash
+    ) external view returns (bool) {
+        bytes32 leaf = keccak256(abi.encodePacked(from, to, timestamp, messageHash));
+        return _vouchTree.verify(proof, leaf)
+            || _vouchTree.isKnownRoot(_recomputeRoot(proof, leaf));
+    }
+
+    /// @notice Check if a root is in the vouch tree's recent history
+    function isKnownVouchRoot(bytes32 root) external view returns (bool) {
+        return _vouchTree.isKnownRoot(root);
+    }
+
+    /// @notice Get the number of vouches recorded in the Merkle tree
+    function getVouchTreeCount() external view returns (uint256) {
+        return _vouchTree.getNextIndex();
+    }
+
     // ============ Admin Functions ============
 
     /// @notice Add a founder (root of trust DAG)
@@ -484,5 +531,17 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
                 return;
             }
         }
+    }
+
+    /// @dev Recompute Merkle root from proof + leaf (for historical root verification)
+    function _recomputeRoot(
+        bytes32[] calldata proof,
+        bytes32 leaf
+    ) internal pure returns (bytes32) {
+        bytes32 computedHash = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            computedHash = IncrementalMerkleTree._hashPair(computedHash, proof[i]);
+        }
+        return computedHash;
     }
 }

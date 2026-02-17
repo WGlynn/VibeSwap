@@ -28,7 +28,11 @@ interface IRewardLedger {
         CODE,
         TRADE,
         REFERRAL,
-        GOVERNANCE
+        GOVERNANCE,
+        GITHUB_COMMIT,
+        GITHUB_PR,
+        GITHUB_REVIEW,
+        GITHUB_ISSUE
     }
 
     // ============ Structs ============

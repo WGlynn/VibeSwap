@@ -4,6 +4,30 @@ import { useWallet } from './useWallet'
 import { CONTRACTS, TOKENS, areContractsDeployed } from '../utils/constants'
 import VibeSwapCoreABI from '../abis/VibeSwapCore.json'
 import VibeAMMABI from '../abis/VibeAMM.json'
+import CommitRevealAuctionABI from '../abis/CommitRevealAuction.json'
+import DAOTreasuryABI from '../abis/DAOTreasury.json'
+import CrossChainRouterABI from '../abis/CrossChainRouter.json'
+import SoulboundIdentityABI from '../abis/SoulboundIdentity.json'
+import WalletRecoveryABI from '../abis/WalletRecovery.json'
+import ShapleyDistributorABI from '../abis/ShapleyDistributor.json'
+import ILProtectionVaultABI from '../abis/ILProtectionVault.json'
+import SlippageGuaranteeFundABI from '../abis/SlippageGuaranteeFund.json'
+
+// ABI registry — maps address key in CONTRACTS to its ABI
+const ABI_REGISTRY = {
+  vibeSwapCore: VibeSwapCoreABI,
+  auction: CommitRevealAuctionABI,
+  amm: VibeAMMABI,
+  treasury: DAOTreasuryABI,
+  router: CrossChainRouterABI,
+  identity: SoulboundIdentityABI,
+  recovery: WalletRecoveryABI,
+  shapleyDistributor: ShapleyDistributorABI,
+  ilProtectionVault: ILProtectionVaultABI,
+  slippageGuaranteeFund: SlippageGuaranteeFundABI,
+}
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 // ERC20 ABI (minimal)
 const ERC20_ABI = [
@@ -26,7 +50,7 @@ export function useContracts() {
     return CONTRACTS[chainId] || null
   }, [chainId])
 
-  // Create contract instances
+  // Create contract instances for all available contracts on this chain
   const contracts = useMemo(() => {
     if (!provider || !addresses) return null
 
@@ -34,19 +58,23 @@ export function useContracts() {
     if (!areContractsDeployed(chainId)) return null
 
     const signerOrProvider = signer || provider
+    const result = {}
 
-    return {
-      vibeSwapCore: new ethers.Contract(
-        addresses.vibeSwapCore,
-        VibeSwapCoreABI,
-        signerOrProvider
-      ),
-      vibeAMM: new ethers.Contract(
-        addresses.amm,
-        VibeAMMABI,
-        signerOrProvider
-      ),
+    for (const [key, abi] of Object.entries(ABI_REGISTRY)) {
+      const addr = addresses[key]
+      if (addr && addr !== ZERO_ADDRESS) {
+        try {
+          result[key] = new ethers.Contract(addr, abi, signerOrProvider)
+        } catch (e) {
+          console.warn(`Failed to create ${key} contract:`, e.message)
+        }
+      }
     }
+
+    // Aliases for backward compat
+    if (result.amm) result.vibeAMM = result.amm
+
+    return Object.keys(result).length > 0 ? result : null
   }, [provider, signer, addresses, chainId])
 
   // Check if contracts are deployed

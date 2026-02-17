@@ -159,6 +159,7 @@ const team = [
   { name: "Faraday1", role: "Founder", contribution: "Protocol design & smart contracts" },
   { name: "Matt", role: "Early Contributor", contribution: "UX simplification for newcomers" },
   { name: "Bill", role: "Advisor", contribution: "Recovery system inspiration" },
+  { name: "Jayme Lawson", role: "Cultural Inspiration", contribution: "Embodiment of cooperative fairness — the Lawson Fairness Floor is named in her honor" },
 ]
 
 function AboutPage() {

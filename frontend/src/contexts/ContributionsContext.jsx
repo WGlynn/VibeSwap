@@ -68,6 +68,12 @@ const RESERVED_USERNAMES = {
     reason: 'Father of Faraday1 - Inspired the Wallet Recovery System so nobody ever loses their crypto again',
     relationship: 'father',
   },
+  'Jayme Lawson': {
+    reservedBy: 'Faraday1',
+    signature: 'contrib-lawson-001',
+    reason: 'Cultural inspiration — embodies cooperative fairness, community-first ethos, and doing the right thing by design',
+    badge: 'lawson-award',
+  },
 }
 
 // Initial seed contributions
@@ -432,6 +438,20 @@ export const CONTRIBUTION_TYPES = {
   bug: { label: 'Bug Report', color: 'red', icon: '🐛', points: 40 },
   docs: { label: 'Documentation', color: 'blue', icon: '📚', points: 25 },
   feedback: { label: 'Feedback', color: 'purple', icon: '💬', points: 20 },
+  inspiration: { label: 'Inspiration', color: 'amber', icon: '🌟', points: 100 },
+}
+
+// ============================================================
+// FORUM BADGES — Special recognition beyond contribution types
+// ============================================================
+export const FORUM_BADGES = {
+  'lawson-award': {
+    label: 'Lawson Award',
+    icon: '🏆',
+    color: 'amber',
+    description: 'Awarded to those who embody cooperative fairness — named after Jayme Lawson',
+    rarity: 'legendary',
+  },
 }
 
 // ============================================================

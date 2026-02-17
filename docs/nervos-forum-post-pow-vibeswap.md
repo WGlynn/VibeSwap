@@ -1,6 +1,6 @@
 PoW Shared State + Commit-Reveal Batch Auctions: Eliminating MEV at Every Layer on CKB
 
-This post builds on Matt's PoW shared state proposal and explains how it fits naturally into VibeSwap's architecture as we explore a CKB integration. The short version: Matt solved the ordering problem, we solved the pricing problem, and together they eliminate MEV at every layer of the stack.
+This post builds on Matt's PoW shared state proposal and explains how it fits naturally into VibeSwap's architecture as we explore a CKB integration. The short version: both projects solve ordering problems, but at different layers of the stack, and together they eliminate MEV at every layer.
 
 
 The Problem VibeSwap Solves
@@ -32,19 +32,28 @@ The type script handles what the update does. This is where VibeSwap's auction l
 Authorization and validation are cleanly separated. The PoW gate controls access. The auction logic controls correctness. Neither needs to know about the other.
 
 
+Two Ordering Problems, Two Layers
+
+It is worth being precise here because both VibeSwap and Matt's proposal solve ordering problems, but at different layers of the stack.
+
+Matt's PoW solves infrastructure-layer ordering. On CKB's cell model, multiple transactions competing to update the same cell is a contention problem. Who gets write access next? On Ethereum this problem does not exist because the EVM handles shared state natively and anyone can call a contract. On CKB it is a fundamental blocker. Matt's PoW decentralizes write access the same way Nakamoto consensus decentralizes block production. This is not about trade ordering. It is about access to the cell itself.
+
+VibeSwap solves application-layer ordering. Within a batch of collected orders, what sequence do they execute in? On Ethereum the ordering problem is mempool transaction ordering, which is where MEV lives. Validators and searchers reorder transactions for profit. VibeSwap neutralizes this by making ordering irrelevant. Orders are hidden during commit, batched together, then shuffled deterministically using XORed user secrets before settlement at a uniform clearing price. No one can predict or manipulate which trade executes first within the batch.
+
+On Ethereum, VibeSwap's application-layer solution is sufficient because infrastructure-layer ordering is handled by the EVM. On CKB, you need both layers. Matt's PoW handles who gets to write to the auction cell. VibeSwap's auction logic handles fairness inside the auction once writes are collected. Neither replaces the other.
+
+
 Why This Combination Is Uniquely Powerful
 
-Most DEX designs address MEV at one layer. VibeSwap's batch auction eliminates MEV at the pricing layer by hiding orders and settling at uniform prices. Matt's PoW shared state eliminates MEV at the ordering layer by replacing speed-of-access races with cost-of-work equilibrium.
+Together these two layers close the entire MEV surface on CKB.
 
-Together they close the entire MEV surface.
-
-At the ordering layer, you cannot win write access by being faster or by bribing a sequencer. You win by doing work. The cost of that work self-adjusts through difficulty targeting. Griefing is self-punishing because you burn real hash power for no economic gain.
+At the infrastructure layer, you cannot win write access by being faster or by bribing a sequencer. You win by doing work. The cost of that work self-adjusts through difficulty targeting. Griefing is self-punishing because you burn real hash power for no economic gain.
 
 At the pricing layer, even if you win write access, you cannot extract value from other users because all orders in the batch settle at the same uniform clearing price. There is no informational advantage to being first because orders are committed as hashes.
 
-At the settlement layer, the deterministic shuffle (seeded by XORed user secrets) ensures that execution order within a batch is unpredictable and unmanipulable. No one can position their trade advantageously within the batch.
+At the execution layer, the deterministic shuffle (seeded by XORed user secrets) ensures that execution order within a batch is unpredictable and unmanipulable. No one can position their trade advantageously within the batch.
 
-This is defense in depth against MEV. Not one mechanism hoping to cover everything, but three independent layers each closing a different attack vector.
+This is defense in depth against MEV. Not one mechanism hoping to cover everything, but three independent layers each closing a different attack vector. Matt's PoW handles the layer that is unique to CKB. VibeSwap's batch auction handles the layers that exist on every chain. The combination is stronger than either alone.
 
 
 Implementation Sketch

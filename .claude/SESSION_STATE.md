@@ -28,7 +28,28 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Relayer wallet** funding — needs ETH for gas
 - **IPFS pinning** service for contribution evidence hashes
 
-## Recently Completed (Feb 17, 2026 — Session 18)
+## Recently Completed (Feb 17, 2026 — Session 18, continued)
+57. **Proof of Mind Article — Three-Piece Synthesis**
+    - Full article: GenTu (substrate) + IT (native object) + POM (consensus)
+    - Saved as markdown + PDF: `docs/proof-of-mind-article.md`, `docs/proof-of-mind-article.pdf`
+    - Commit: `7fc4914`
+
+58. **Partner Knowledge Base — Three-Partner Vision Saved to Memory**
+    - `it-token-vision.md` — Freedomwarrior13's IT design (5 components, conviction execution, native chain)
+    - `gentu-substrate.md` — tbhxnest's GenTu (persistent execution substrate, PHI-addressing, mesh)
+    - `freedom-micro-interfaces.md` — Freedom's code cell vision (self-differentiating proto-AI, biological metaphor)
+    - Key convergence: Freedom (biology-up) and tbhxnest (math-down) arrived at same architecture independently
+    - Three partners, three layers: GenTu (WHERE) + IT (WHAT) + POM (HOW)
+
+59. **Nervos Talks Forum Post — PoW Shared State + VibeSwap on CKB**
+    - Maps Matt's PoW cell contention solution to VibeSwap's commit-reveal batch auctions
+    - Three-layer MEV defense: PoW at ordering, batch auction at pricing, deterministic shuffle at settlement
+    - Lock script = PoW consensus (who updates), Type script = auction logic (what the update does)
+    - Each trading pair = independent mini-blockchain with self-adjusting difficulty
+    - Saved: `docs/nervos-forum-post-pow-vibeswap.md`
+    - Commit: `88e1038`
+
+## Previously Completed (Feb 17, 2026 — Session 18)
 55. **ContributionYieldTokenizer — Conviction Removal + Unclaimed Rewards Fix**
     - Stripped ALL conviction voting from CYT (Will: "get rid of the voting power that is stupid")
     - Free market execution: anyone can propose to execute, streams auto-flow

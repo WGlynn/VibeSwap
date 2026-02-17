@@ -616,11 +616,608 @@ export function checkSybilRisk(graph, username, allContributions) {
 }
 
 // ============================================================
+// CONTRIBUTION ATTESTATION (3-Branch Governance)
+// ============================================================
+//
+// Separation of powers — mirrors constitutional governance:
+//
+// ┌─────────────────────────────────────────────────────────┐
+// │  EXECUTIVE (Handshake Protocol)                         │
+// │  Peer attestations weighted by trust score × multiplier │
+// │  Action: attest() / contest()                           │
+// │  Auto-accepts when cumulative weight ≥ threshold        │
+// ├─────────────────────────────────────────────────────────┤
+// │  JUDICIAL (Tribunal)                                    │
+// │  Jury-based dispute resolution for contested claims     │
+// │  Action: escalateToTribunal() → resolveByTribunal()     │
+// │  Verdict is BINDING — overrides executive branch        │
+// ├─────────────────────────────────────────────────────────┤
+// │  LEGISLATIVE (Governance)                               │
+// │  Quadratic voting proposals can override any decision   │
+// │  Action: escalateToGovernance() → resolveByGovernance() │
+// │  Supreme authority — can override both exec and judicial │
+// └─────────────────────────────────────────────────────────┘
+//
+// Key property: attestation weight = trust_score × trust_multiplier
+// Three founders (3 × 3.0) = 9.0 weight >> one untrusted user (0.05)
+// Attestations are CUMULATIVE — more credible attesters = stronger signal
+
+export const ATTESTATION_CONFIG = {
+  // Acceptance threshold: cumulative weight needed (PRECISION scale in contract = 2.0)
+  ACCEPTANCE_THRESHOLD: 2.0,
+
+  // Contestation rejection threshold: negative weight to reject
+  CONTESTATION_THRESHOLD: -1.0,
+
+  // Default TTL for claims (7 days in ms)
+  CLAIM_TTL_MS: 7 * 24 * 60 * 60 * 1000,
+
+  // Contribution types (mirrors Solidity enum)
+  CONTRIBUTION_TYPES: {
+    CODE: 0,
+    DESIGN: 1,
+    RESEARCH: 2,
+    COMMUNITY: 3,
+    MARKETING: 4,
+    SECURITY: 5,
+    GOVERNANCE: 6,
+    INSPIRATION: 7,
+    OTHER: 8,
+  },
+
+  CONTRIBUTION_TYPE_LABELS: {
+    0: 'Code',
+    1: 'Design',
+    2: 'Research',
+    3: 'Community',
+    4: 'Marketing',
+    5: 'Security',
+    6: 'Governance',
+    7: 'Inspiration',
+    8: 'Other',
+  },
+
+  // Claim statuses (mirrors Solidity ClaimStatus enum)
+  STATUS: {
+    PENDING: 'Pending',
+    ACCEPTED: 'Accepted',
+    CONTESTED: 'Contested',
+    REJECTED: 'Rejected',
+    EXPIRED: 'Expired',
+    ESCALATED: 'Escalated',             // Under judicial review (Tribunal)
+    GOVERNANCE_REVIEW: 'GovernanceReview', // Under legislative review (QuadraticVoting)
+  },
+
+  // Resolution sources (which branch resolved the claim)
+  RESOLUTION_SOURCE: {
+    NONE: 'None',
+    EXECUTIVE: 'Executive',    // Handshake protocol (attestation weight)
+    JUDICIAL: 'Judicial',      // Tribunal verdict
+    LEGISLATIVE: 'Legislative', // Governance vote
+  },
+}
+
+/**
+ * Create an empty attestation registry
+ */
+export function createAttestationRegistry() {
+  return {
+    claims: {},         // { claimId: ContributionClaim }
+    attestations: {},   // { claimId: [Attestation] }
+    contributorClaims: {}, // { contributor: [claimId] }
+    claimNonce: 0,
+  }
+}
+
+/**
+ * Submit a contribution claim for attestation
+ * @param {Object} registry - Attestation registry
+ * @param {Object} graph - Trust graph (for trust score lookups)
+ * @param {string} claimant - Who is submitting the claim
+ * @param {string} contributor - Who made the contribution
+ * @param {number} contribType - ContributionType enum value
+ * @param {string} evidenceHash - IPFS/Arweave hash of evidence
+ * @param {string} description - Human-readable description
+ * @param {number} value - Proposed reward value (0 for attestation-only)
+ * @returns {Object} - { success, registry, claimId }
+ */
+export function submitContributionClaim(registry, graph, claimant, contributor, contribType, evidenceHash, description, value = 0) {
+  if (!contributor) return { success: false, error: 'Contributor required' }
+  if (!description) return { success: false, error: 'Description required' }
+
+  const claimId = `claim_${contributor}_${registry.claimNonce}_${Date.now()}`
+  const newRegistry = { ...registry }
+
+  const claim = {
+    claimId,
+    contributor,
+    claimant,
+    contribType,
+    evidenceHash: evidenceHash || '',
+    description,
+    value,
+    timestamp: Date.now(),
+    expiresAt: Date.now() + ATTESTATION_CONFIG.CLAIM_TTL_MS,
+    status: ATTESTATION_CONFIG.STATUS.PENDING,
+    resolvedBy: ATTESTATION_CONFIG.RESOLUTION_SOURCE.NONE,
+    netWeight: 0,
+    attestationCount: 0,
+    contestationCount: 0,
+    trialId: null,       // Set when escalated to Tribunal
+    proposalId: null,    // Set when escalated to Governance
+  }
+
+  newRegistry.claims = { ...newRegistry.claims, [claimId]: claim }
+  newRegistry.attestations = { ...newRegistry.attestations, [claimId]: [] }
+  newRegistry.claimNonce = registry.claimNonce + 1
+
+  if (!newRegistry.contributorClaims[contributor]) {
+    newRegistry.contributorClaims = { ...newRegistry.contributorClaims, [contributor]: [] }
+  }
+  newRegistry.contributorClaims[contributor] = [...(newRegistry.contributorClaims[contributor] || []), claimId]
+
+  return { success: true, registry: newRegistry, claimId }
+}
+
+/**
+ * Compute attestation weight for a user based on their trust score
+ * @param {Object} graph - Trust graph
+ * @param {string} username - Attester's username
+ * @returns {number} - Attestation weight (score × multiplier)
+ */
+export function computeAttestationWeight(graph, username) {
+  const trust = getTrustScore(graph, username)
+  // Weight = score × multiplier
+  // Founder: 1.0 × 3.0 = 3.0
+  // Trusted: 0.85 × 2.0 = 1.7
+  // Partial: 0.5 × 1.5 = 0.75
+  // Untrusted: 0 × 0.5 = 0
+  return trust.score * trust.multiplier
+}
+
+/**
+ * Attest to a contribution claim (positive endorsement)
+ * @param {Object} registry - Attestation registry
+ * @param {Object} graph - Trust graph
+ * @param {string} claimId - Claim to attest to
+ * @param {string} attester - User attesting
+ * @returns {Object} - { success, registry, weight, newNetWeight }
+ */
+export function attestContribution(registry, graph, claimId, attester) {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+  if (claim.status !== ATTESTATION_CONFIG.STATUS.PENDING) return { success: false, error: 'Claim is not pending' }
+  if (Date.now() >= claim.expiresAt) return { success: false, error: 'Claim has expired' }
+
+  // Check if already attested
+  const existing = (registry.attestations[claimId] || []).find(a => a.attester === attester)
+  if (existing) return { success: false, error: 'Already attested to this claim' }
+
+  // Cannot attest own claim
+  if (attester === claim.claimant || attester === claim.contributor) {
+    return { success: false, error: 'Cannot attest your own claim' }
+  }
+
+  // Compute weight
+  const weight = computeAttestationWeight(graph, attester)
+  if (weight === 0) return { success: false, error: 'Zero trust score — cannot attest' }
+
+  const newRegistry = { ...registry }
+  const attestation = {
+    attester,
+    weight,
+    timestamp: Date.now(),
+    isContestation: false,
+    reasonHash: null,
+  }
+
+  newRegistry.attestations = {
+    ...newRegistry.attestations,
+    [claimId]: [...(newRegistry.attestations[claimId] || []), attestation],
+  }
+
+  const newNetWeight = claim.netWeight + weight
+  const newClaim = {
+    ...claim,
+    netWeight: newNetWeight,
+    attestationCount: claim.attestationCount + 1,
+  }
+
+  // Auto-accept if threshold met (Executive branch resolution)
+  if (newNetWeight >= ATTESTATION_CONFIG.ACCEPTANCE_THRESHOLD) {
+    newClaim.status = ATTESTATION_CONFIG.STATUS.ACCEPTED
+    newClaim.resolvedBy = ATTESTATION_CONFIG.RESOLUTION_SOURCE.EXECUTIVE
+  }
+
+  newRegistry.claims = { ...newRegistry.claims, [claimId]: newClaim }
+
+  return {
+    success: true,
+    registry: newRegistry,
+    weight,
+    newNetWeight,
+    isAccepted: newClaim.status === ATTESTATION_CONFIG.STATUS.ACCEPTED,
+    message: newClaim.status === ATTESTATION_CONFIG.STATUS.ACCEPTED
+      ? `Claim accepted by Executive branch! Cumulative weight: ${newNetWeight.toFixed(2)}`
+      : `Attestation recorded (weight: ${weight.toFixed(2)}). Cumulative: ${newNetWeight.toFixed(2)} / ${ATTESTATION_CONFIG.ACCEPTANCE_THRESHOLD}`,
+  }
+}
+
+/**
+ * Contest a contribution claim (negative attestation)
+ * @param {Object} registry - Attestation registry
+ * @param {Object} graph - Trust graph
+ * @param {string} claimId - Claim to contest
+ * @param {string} contester - User contesting
+ * @param {string} reasonHash - IPFS hash of contestation reasoning
+ * @returns {Object} - { success, registry, weight, newNetWeight }
+ */
+export function contestContribution(registry, graph, claimId, contester, reasonHash = '') {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+  if (claim.status !== ATTESTATION_CONFIG.STATUS.PENDING) return { success: false, error: 'Claim is not pending' }
+  if (Date.now() >= claim.expiresAt) return { success: false, error: 'Claim has expired' }
+
+  const existing = (registry.attestations[claimId] || []).find(a => a.attester === contester)
+  if (existing) return { success: false, error: 'Already attested to this claim' }
+
+  const weight = computeAttestationWeight(graph, contester)
+  if (weight === 0) return { success: false, error: 'Zero trust score — cannot contest' }
+
+  const newRegistry = { ...registry }
+  const contestation = {
+    attester: contester,
+    weight,
+    timestamp: Date.now(),
+    isContestation: true,
+    reasonHash,
+  }
+
+  newRegistry.attestations = {
+    ...newRegistry.attestations,
+    [claimId]: [...(newRegistry.attestations[claimId] || []), contestation],
+  }
+
+  const newNetWeight = claim.netWeight - weight
+  const newClaim = {
+    ...claim,
+    netWeight: newNetWeight,
+    contestationCount: claim.contestationCount + 1,
+  }
+
+  // Auto-reject if contestation threshold met
+  if (newNetWeight <= ATTESTATION_CONFIG.CONTESTATION_THRESHOLD) {
+    newClaim.status = ATTESTATION_CONFIG.STATUS.CONTESTED
+  }
+
+  newRegistry.claims = { ...newRegistry.claims, [claimId]: newClaim }
+
+  return {
+    success: true,
+    registry: newRegistry,
+    weight,
+    newNetWeight,
+    isContested: newClaim.status === ATTESTATION_CONFIG.STATUS.CONTESTED,
+  }
+}
+
+/**
+ * Get cumulative weight breakdown for a claim
+ * @param {Object} registry - Attestation registry
+ * @param {string} claimId - Claim to check
+ * @returns {Object} - { netWeight, totalPositive, totalNegative, isAccepted, attesters }
+ */
+export function getCumulativeWeight(registry, claimId) {
+  const attestations = registry.attestations[claimId] || []
+
+  let totalPositive = 0
+  let totalNegative = 0
+  const attesters = []
+
+  attestations.forEach(a => {
+    if (a.isContestation) {
+      totalNegative += a.weight
+    } else {
+      totalPositive += a.weight
+    }
+    attesters.push({
+      attester: a.attester,
+      weight: a.weight,
+      type: a.isContestation ? 'contest' : 'attest',
+    })
+  })
+
+  const netWeight = totalPositive - totalNegative
+
+  return {
+    netWeight,
+    totalPositive,
+    totalNegative,
+    isAccepted: netWeight >= ATTESTATION_CONFIG.ACCEPTANCE_THRESHOLD,
+    threshold: ATTESTATION_CONFIG.ACCEPTANCE_THRESHOLD,
+    progress: Math.min(100, (netWeight / ATTESTATION_CONFIG.ACCEPTANCE_THRESHOLD) * 100),
+    attesters,
+  }
+}
+
+/**
+ * Preview what weight a user's attestation would carry
+ * @param {Object} graph - Trust graph
+ * @param {string} username - Potential attester
+ * @returns {Object} - { weight, trustLevel, equivalentTo }
+ */
+export function previewAttestationWeight(graph, username) {
+  const trust = getTrustScore(graph, username)
+  const weight = trust.score * trust.multiplier
+
+  // Context: how many of this user's attestations equal one founder?
+  const founderWeight = 1.0 * TRUST_CONFIG.FOUNDER_MULTIPLIER
+  const equivalentFounders = weight / founderWeight
+
+  return {
+    weight,
+    trustLevel: trust.level,
+    trustScore: trust.score,
+    multiplier: trust.multiplier,
+    equivalentFounders: Math.round(equivalentFounders * 100) / 100,
+    message: `Your attestation carries ${weight.toFixed(2)} weight (${(equivalentFounders * 100).toFixed(0)}% of a founder attestation)`,
+  }
+}
+
+/**
+ * Get all claims with their status and progress
+ */
+export function getClaimsSummary(registry) {
+  return Object.values(registry.claims).map(claim => ({
+    claimId: claim.claimId,
+    contributor: claim.contributor,
+    type: ATTESTATION_CONFIG.CONTRIBUTION_TYPE_LABELS[claim.contribType] || 'Other',
+    description: claim.description,
+    status: claim.status,
+    resolvedBy: claim.resolvedBy,
+    netWeight: claim.netWeight,
+    progress: Math.min(100, Math.max(0, (claim.netWeight / ATTESTATION_CONFIG.ACCEPTANCE_THRESHOLD) * 100)),
+    attestationCount: claim.attestationCount,
+    contestationCount: claim.contestationCount,
+    isExpired: Date.now() >= claim.expiresAt,
+    trialId: claim.trialId,
+    proposalId: claim.proposalId,
+  }))
+}
+
+// ============================================================
+// JUDICIAL BRANCH (Tribunal Escalation)
+// ============================================================
+
+/**
+ * Escalate a contested claim to the Tribunal (judicial branch)
+ * @param {Object} registry - Attestation registry
+ * @param {string} claimId - Claim to escalate
+ * @param {string} trialId - Tribunal trial ID linked to this claim
+ * @returns {Object} - { success, registry }
+ */
+export function escalateToTribunal(registry, claimId, trialId) {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+
+  // Must be Contested or Pending to escalate to Tribunal
+  if (claim.status !== ATTESTATION_CONFIG.STATUS.CONTESTED &&
+      claim.status !== ATTESTATION_CONFIG.STATUS.PENDING) {
+    return { success: false, error: 'Claim must be Contested or Pending to escalate to Tribunal' }
+  }
+
+  if (claim.status === ATTESTATION_CONFIG.STATUS.ESCALATED) {
+    return { success: false, error: 'Claim is already escalated' }
+  }
+
+  if (!trialId) return { success: false, error: 'Trial ID required' }
+
+  const newRegistry = { ...registry }
+  newRegistry.claims = {
+    ...newRegistry.claims,
+    [claimId]: {
+      ...claim,
+      status: ATTESTATION_CONFIG.STATUS.ESCALATED,
+      trialId,
+    },
+  }
+
+  return {
+    success: true,
+    registry: newRegistry,
+    message: `Claim escalated to Tribunal (trial: ${trialId})`,
+  }
+}
+
+/**
+ * Apply a Tribunal verdict to a claim (judicial branch resolution)
+ * @param {Object} registry - Attestation registry
+ * @param {string} claimId - Claim to resolve
+ * @param {string} verdict - 'NOT_GUILTY' | 'GUILTY' | 'MISTRIAL'
+ * @returns {Object} - { success, registry, finalStatus }
+ */
+export function resolveByTribunal(registry, claimId, verdict) {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+  if (claim.status !== ATTESTATION_CONFIG.STATUS.ESCALATED) {
+    return { success: false, error: 'Claim is not under Tribunal review' }
+  }
+
+  const newRegistry = { ...registry }
+  let finalStatus
+
+  switch (verdict) {
+    case 'NOT_GUILTY':
+      finalStatus = ATTESTATION_CONFIG.STATUS.ACCEPTED
+      break
+    case 'GUILTY':
+      finalStatus = ATTESTATION_CONFIG.STATUS.REJECTED
+      break
+    case 'MISTRIAL':
+      // Returns to Contested — can be re-escalated to Governance
+      finalStatus = ATTESTATION_CONFIG.STATUS.CONTESTED
+      break
+    default:
+      return { success: false, error: `Invalid verdict: ${verdict}` }
+  }
+
+  const resolvedBy = verdict === 'MISTRIAL'
+    ? ATTESTATION_CONFIG.RESOLUTION_SOURCE.NONE
+    : ATTESTATION_CONFIG.RESOLUTION_SOURCE.JUDICIAL
+
+  newRegistry.claims = {
+    ...newRegistry.claims,
+    [claimId]: {
+      ...claim,
+      status: finalStatus,
+      resolvedBy,
+    },
+  }
+
+  return {
+    success: true,
+    registry: newRegistry,
+    finalStatus,
+    resolvedBy,
+    message: verdict === 'MISTRIAL'
+      ? 'Tribunal declared mistrial — claim returned to Contested. Can escalate to Governance.'
+      : `Tribunal verdict: ${verdict} — claim ${finalStatus} (Judicial branch)`,
+  }
+}
+
+// ============================================================
+// LEGISLATIVE BRANCH (Governance Override)
+// ============================================================
+
+/**
+ * Escalate a claim to Governance (legislative branch — supreme authority)
+ * Can override ANY prior decision (executive or judicial)
+ * @param {Object} registry - Attestation registry
+ * @param {string} claimId - Claim to escalate
+ * @param {string} proposalId - Governance proposal ID linked to this claim
+ * @returns {Object} - { success, registry }
+ */
+export function escalateToGovernance(registry, claimId, proposalId) {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+
+  // Governance is supreme — can override any status except already-in-governance and expired
+  if (claim.status === ATTESTATION_CONFIG.STATUS.GOVERNANCE_REVIEW) {
+    return { success: false, error: 'Claim is already under governance review' }
+  }
+  if (claim.status === ATTESTATION_CONFIG.STATUS.EXPIRED) {
+    return { success: false, error: 'Cannot escalate an expired claim' }
+  }
+
+  if (!proposalId) return { success: false, error: 'Proposal ID required' }
+
+  const newRegistry = { ...registry }
+  newRegistry.claims = {
+    ...newRegistry.claims,
+    [claimId]: {
+      ...claim,
+      status: ATTESTATION_CONFIG.STATUS.GOVERNANCE_REVIEW,
+      proposalId,
+    },
+  }
+
+  return {
+    success: true,
+    registry: newRegistry,
+    message: `Claim escalated to Governance (proposal: ${proposalId}) — supreme authority override`,
+  }
+}
+
+/**
+ * Apply a Governance vote result to a claim (legislative branch resolution)
+ * @param {Object} registry - Attestation registry
+ * @param {string} claimId - Claim to resolve
+ * @param {boolean} accepted - Whether governance approved the claim
+ * @returns {Object} - { success, registry, finalStatus }
+ */
+export function resolveByGovernance(registry, claimId, accepted) {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+  if (claim.status !== ATTESTATION_CONFIG.STATUS.GOVERNANCE_REVIEW) {
+    return { success: false, error: 'Claim is not under governance review' }
+  }
+
+  const finalStatus = accepted
+    ? ATTESTATION_CONFIG.STATUS.ACCEPTED
+    : ATTESTATION_CONFIG.STATUS.REJECTED
+
+  const newRegistry = { ...registry }
+  newRegistry.claims = {
+    ...newRegistry.claims,
+    [claimId]: {
+      ...claim,
+      status: finalStatus,
+      resolvedBy: ATTESTATION_CONFIG.RESOLUTION_SOURCE.LEGISLATIVE,
+    },
+  }
+
+  return {
+    success: true,
+    registry: newRegistry,
+    finalStatus,
+    resolvedBy: ATTESTATION_CONFIG.RESOLUTION_SOURCE.LEGISLATIVE,
+    message: `Governance resolved claim: ${finalStatus} (Legislative branch — supreme authority)`,
+  }
+}
+
+/**
+ * Get full escalation history for a claim
+ * Shows which branches have been involved in the decision
+ */
+export function getClaimEscalationHistory(registry, claimId) {
+  const claim = registry.claims[claimId]
+  if (!claim) return { success: false, error: 'Claim not found' }
+
+  const history = []
+
+  // Executive branch always participates (attestations)
+  if (claim.attestationCount > 0 || claim.contestationCount > 0) {
+    history.push({
+      branch: 'Executive',
+      action: `${claim.attestationCount} attestation(s), ${claim.contestationCount} contestation(s)`,
+      netWeight: claim.netWeight,
+    })
+  }
+
+  // Judicial branch
+  if (claim.trialId) {
+    history.push({
+      branch: 'Judicial',
+      action: `Tribunal trial: ${claim.trialId}`,
+      resolved: claim.resolvedBy === ATTESTATION_CONFIG.RESOLUTION_SOURCE.JUDICIAL,
+    })
+  }
+
+  // Legislative branch
+  if (claim.proposalId) {
+    history.push({
+      branch: 'Legislative',
+      action: `Governance proposal: ${claim.proposalId}`,
+      resolved: claim.resolvedBy === ATTESTATION_CONFIG.RESOLUTION_SOURCE.LEGISLATIVE,
+    })
+  }
+
+  return {
+    claimId,
+    currentStatus: claim.status,
+    resolvedBy: claim.resolvedBy,
+    branchesInvolved: history.length,
+    history,
+  }
+}
+
+// ============================================================
 // EXPORT
 // ============================================================
 
 export default {
   TRUST_CONFIG,
+  ATTESTATION_CONFIG,
   createTrustGraph,
   addVouch,
   revokeVouch,
@@ -637,4 +1234,21 @@ export default {
   calculateVouchCounterfactual,
   calculateDiversityScore,
   getAdjustedTrustScore,
+  // Contribution attestation (3-branch governance)
+  createAttestationRegistry,
+  submitContributionClaim,
+  computeAttestationWeight,
+  attestContribution,
+  contestContribution,
+  getCumulativeWeight,
+  previewAttestationWeight,
+  getClaimsSummary,
+  // Judicial branch (Tribunal)
+  escalateToTribunal,
+  resolveByTribunal,
+  // Legislative branch (Governance)
+  escalateToGovernance,
+  resolveByGovernance,
+  // Escalation analytics
+  getClaimEscalationHistory,
 }

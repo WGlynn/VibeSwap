@@ -10,20 +10,40 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **759+ tests passing, 0 failures, 0 skipped** (full suite green)
+- **859+ tests passing, 0 failures, 0 skipped** (full suite green)
 - Financial Primitives: 10/10 COMPLETE (wBAR, LPNFT, Stream, Options, Joule, Bonds, Credit, Synth, Insurance, RevShare)
 - Protocol/Framework: 10/10 COMPLETE (HookRegistry, PluginRegistry, KeeperNetwork, Forwarder, SmartWallet, WalletFactory, VersionRouter, PoolFactory, IntentRouter, POL)
-- Identity Layer: ContributionDAG + RewardLedger + ContributionYieldTokenizer — ALL COMPLETE
+- Identity Layer: ContributionDAG + RewardLedger + ContributionYieldTokenizer + GitHubContributionTracker — ALL COMPLETE
+- Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - Frontend redesign: "Sign In" button (not "Connect Wallet"), game-like abstraction TBD
 
 ## Active Tasks
-- Identity layer: COMPLETE (ContributionDAG, RewardLedger, ContributionYieldTokenizer)
-- Next: Fuzz+invariant tests for identity contracts, DeFi/DeFAI extensions, Aesthetic/UX
+- Identity layer: COMPLETE (ContributionDAG, RewardLedger, ContributionYieldTokenizer, GitHubContributionTracker)
+- Merkle compression: COMPLETE (IncrementalMerkleTree library, vouch tree audit trail)
+- Next: Off-chain relayer service, IPFS integration, testnet deployment
 - Frontend: "Sign In" button change + abstraction redesign
 - Testnet deployment preparation
 
-## Recently Completed (Feb 16, 2026)
+## Recently Completed (Feb 16, 2026 — Session 13)
+46. **IncrementalMerkleTree — Hybrid Merkle Tree Library**
+    - Combines 3 proven patterns: Eth2 insert (gas-efficient), Tornado Cash root history (async proofs), OZ commutative hashing (MerkleProof.verify compat)
+    - O(depth) storage, ~40-55k gas per insert, 30-root ring buffer for historical verification
+    - 1 file: `contracts/libraries/IncrementalMerkleTree.sol`
+    - 19 unit tests — ALL PASSING
+47. **GitHubContributionTracker — Webhook-Driven GitHub Ingestion**
+    - EIP-712 signed contributions from authorized relayers, Merkle-compressed, RewardLedger integrated
+    - Replay protection, GitHub account binding, configurable reward values, batch recording
+    - 4 new event types: GITHUB_COMMIT, GITHUB_PR, GITHUB_REVIEW, GITHUB_ISSUE
+    - 4 files: IGitHubContributionTracker.sol, GitHubContributionTracker.sol, GitHubContributionTracker.t.sol, GitHubContributionTrackerFuzz.t.sol
+    - 26 unit tests + 7 fuzz tests (256 runs each) — ALL PASSING
+48. **ContributionDAG + RewardLedger Modifications**
+    - ContributionDAG: Merkle vouch audit trail (insert on every new vouch), getVouchTreeRoot, verifyVouch, isKnownVouchRoot views
+    - RewardLedger: Extended EventType enum with GITHUB_COMMIT, GITHUB_PR, GITHUB_REVIEW, GITHUB_ISSUE
+    - All existing tests pass (41 DAG unit, 9 DAG fuzz, 36 ledger unit, 8 ledger fuzz, 5 ledger invariant)
+    - Session total: **6 new files, ~900 lines, 52 new tests (all first-try pass)**
+
+## Previously Completed (Feb 16, 2026 — Sessions 11-12)
 43. **ContributionDAG — On-Chain Trust DAG (Web of Trust)**
     - Port of `trustChain.js` to Solidity. BFS trust scores from founders with 15% decay/hop (max 6 hops)
     - Vouches, handshakes, referral quality, diversity scores, Sybil resistance via SoulboundIdentity

@@ -241,16 +241,6 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         uint256 claimable = _settleStream(streamId);
         if (claimable == 0) revert NothingToClaim();
 
-        // Check contract has sufficient balance
-        Idea storage idea = _ideas[stream.ideaId];
-        if (claimable > idea.totalFunding - stream.totalStreamed + claimable) {
-            // Can't stream more than total funding
-            claimable = idea.totalFunding > stream.totalStreamed
-                ? idea.totalFunding - stream.totalStreamed
-                : 0;
-            if (claimable == 0) revert NothingToClaim();
-        }
-
         rewardToken.safeTransfer(msg.sender, claimable);
 
         emit StreamClaimed(streamId, msg.sender, claimable);
@@ -473,10 +463,11 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
 
         claimable = stream.streamRate * elapsed;
 
-        // Cap at remaining funding for this idea
+        // Cap at remaining funding for this idea (across ALL streams)
         Idea storage idea = _ideas[stream.ideaId];
-        uint256 remaining = idea.totalFunding > stream.totalStreamed
-            ? idea.totalFunding - stream.totalStreamed
+        uint256 ideaTotalStreamed = _totalStreamedForIdea(stream.ideaId);
+        uint256 remaining = idea.totalFunding > ideaTotalStreamed
+            ? idea.totalFunding - ideaTotalStreamed
             : 0;
 
         if (claimable > remaining) {

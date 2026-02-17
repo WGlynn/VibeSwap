@@ -15,6 +15,8 @@ import { createHealthRoutes } from './routes/health.js';
 import priceRoutes from './routes/prices.js';
 import tokenRoutes from './routes/tokens.js';
 import chainRoutes from './routes/chains.js';
+import { createGitHubRoutes } from './routes/github.js';
+import { GitHubRelayerService } from './services/githubRelayer.js';
 
 const app = express();
 const server = createServer(app);
@@ -23,6 +25,8 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // ============ Shared Services ============
 const priceFeed = new PriceFeedService();
+const githubRelayer = new GitHubRelayerService();
+githubRelayer.initialize(); // Non-blocking — logs warning if not configured
 
 // ============ Security Middleware ============
 app.use(helmet({
@@ -75,6 +79,7 @@ app.use('/api/health', createHealthRoutes(priceFeed));
 app.use('/api/prices', priceRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/chains', chainRoutes);
+app.use('/api/github', createGitHubRoutes(githubRelayer));
 
 // ============ Root ============
 app.get('/', (_req, res) => {
@@ -108,6 +113,9 @@ server.listen(PORT, () => {
 // ============ Graceful Shutdown ============
 const shutdown = (signal) => {
   logger.info({ signal }, 'Shutdown signal received');
+
+  // Flush pending GitHub contributions
+  githubRelayer.shutdown();
 
   // Close WebSocket server first
   if (wss) {

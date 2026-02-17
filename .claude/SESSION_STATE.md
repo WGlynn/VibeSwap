@@ -10,10 +10,10 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **1770+ tests passing, 0 failures, 0 skipped** (full suite green, 21 backend tests)
+- **1840+ tests passing, 0 failures, 0 skipped** (full suite green, 21 backend tests)
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
-- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + **ContributionAttestor**)
+- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode**)
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
@@ -28,7 +28,36 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Relayer wallet** funding — needs ETH for gas
 - **IPFS pinning** service for contribution evidence hashes
 
-## Recently Completed (Feb 17, 2026 — Session 17)
+## Recently Completed (Feb 17, 2026 — Session 18)
+55. **ContributionYieldTokenizer — Conviction Removal + Unclaimed Rewards Fix**
+    - Stripped ALL conviction voting from CYT (Will: "get rid of the voting power that is stupid")
+    - Free market execution: anyone can propose to execute, streams auto-flow
+    - Fixed settlement-without-transfer bug: added `_unclaimedRewards` mapping
+    - `reportMilestone`, `completeStream`, `checkStale` no longer lose accrued earnings
+    - `pendingStreamAmount` now returns unclaimed + new accrual
+    - Constructor simplified: 2 params (removed ContributionDAG dependency)
+    - Fixed Forge `block.timestamp` caching bug (use stored start time, not repeated `block.timestamp + X`)
+    - 61 tests passing: 43 unit + 12 fuzz + 6 invariant (128K calls each)
+    - Files: IContributionYieldTokenizer.sol, ContributionYieldTokenizer.sol, ContributionYieldTokenizer.t.sol, ContributionYieldTokenizerFuzz.t.sol, ContributionYieldTokenizerInvariant.t.sol
+
+56. **VibeCode — Deterministic Identity Fingerprint (NEW CONTRACT)**
+    - Your account IS your vibe code: bytes32 hash derived from on-chain contribution data
+    - 5-dimension reputation score (max 10000 BPS):
+      - Builder (30%): CODE + EXECUTION + REVIEW → log2 scaling
+      - Funder (20%): IDEA funding → log2 scaling
+      - Ideator (15%): DESIGN (idea creation) → linear, 150pts/idea
+      - Community (20%): ATTESTATION + GOVERNANCE + COMMUNITY → log2 scaling
+      - Longevity (15%): days since first activity → 4pts/day
+    - Log2 scaling prevents whale dominance (breadth > depth)
+    - Visual seed for deterministic avatar generation (hue/pattern/border/glow/shape/background)
+    - Display code: first 4 bytes of vibe code hash → human-readable hex identity
+    - Authorized source model: ContributionAttestor/CYT/DAG record contributions
+    - Permissionless refresh: anyone can recompute any user's vibe code
+    - 67 tests passing: 49 unit + 11 fuzz + 7 invariant (128K calls each)
+    - Files: IVibeCode.sol, VibeCode.sol, VibeCode.t.sol, VibeCodeFuzz.t.sol, VibeCodeInvariant.t.sol
+    - Commit: `b8c7ad2`
+
+## Previously Completed (Feb 17, 2026 — Session 17)
 54. **ContributionAttestor — 3-Branch Separation of Powers**
     - Rewrote ContributionAttestor from attestation-only to full 3-branch constitutional governance
     - **Executive (Handshake Protocol)**: Peer attestations weighted by ContributionDAG trust scores, auto-accept at threshold

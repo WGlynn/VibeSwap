@@ -1,0 +1,60 @@
+import simpleGit from 'simple-git';
+import { homedir } from 'os';
+import { join } from 'path';
+import { config } from './config.js';
+
+const REPO_PATH = process.env.VIBESWAP_REPO || join(homedir(), 'vibeswap');
+const git = simpleGit(REPO_PATH);
+
+export async function gitStatus() {
+  const status = await git.status();
+  const lines = [];
+
+  if (status.not_added.length) lines.push(`Untracked: ${status.not_added.join(', ')}`);
+  if (status.modified.length) lines.push(`Modified: ${status.modified.join(', ')}`);
+  if (status.staged.length) lines.push(`Staged: ${status.staged.join(', ')}`);
+  if (!lines.length) lines.push('Working tree clean.');
+
+  return lines.join('\n');
+}
+
+export async function gitPull() {
+  try {
+    const result = await git.pull(config.repo.remoteOrigin, 'master');
+    return `Pulled from ${config.repo.remoteOrigin}: ${result.summary.changes} changes, ${result.summary.insertions} insertions, ${result.summary.deletions} deletions`;
+  } catch (error) {
+    return `Pull failed: ${error.message}`;
+  }
+}
+
+export async function gitCommitAndPush(message) {
+  try {
+    const status = await git.status();
+    if (!status.modified.length && !status.not_added.length && !status.staged.length) {
+      return 'Nothing to commit.';
+    }
+
+    // Stage all changes
+    await git.add('-A');
+
+    // Commit
+    const fullMessage = `${message}\n\nCo-Authored-By: JARVIS <noreply@anthropic.com>`;
+    await git.commit(fullMessage);
+
+    // Push to both remotes
+    await git.push(config.repo.remoteOrigin, 'master');
+    await git.push(config.repo.remoteStealth, 'master');
+
+    const log = await git.log({ maxCount: 1 });
+    return `Committed and pushed to both remotes: ${log.latest.hash.slice(0, 7)} — ${log.latest.message.split('\n')[0]}`;
+  } catch (error) {
+    return `Git operation failed: ${error.message}`;
+  }
+}
+
+export async function gitLog(count = 5) {
+  const log = await git.log({ maxCount: count });
+  return log.all
+    .map(c => `${c.hash.slice(0, 7)} ${c.message.split('\n')[0]}`)
+    .join('\n');
+}

@@ -1,0 +1,17 @@
+{
+  "name": "jarvis-bot",
+  "version": "1.0.0",
+  "description": "JARVIS Telegram bot — Claude-powered assistant for VibeSwap",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "telegraf": "^4.16.3",
+    "simple-git": "^3.27.0",
+    "dotenv": "^16.4.7"
+  }
+}

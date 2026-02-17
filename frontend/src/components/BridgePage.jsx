@@ -4,6 +4,8 @@ import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBalances } from '../hooks/useBalances'
 import toast from 'react-hot-toast'
+import GlassCard from './ui/GlassCard'
+import InteractiveButton from './ui/InteractiveButton'
 
 const CHAINS = [
   { id: 1, name: 'Ethereum', logo: '🔷', color: 'from-blue-500 to-blue-600', lzGas: '0.0012' },
@@ -120,7 +122,7 @@ function BridgePage() {
       </div>
 
       {/* Bridge Card */}
-      <div className="bg-black-800 border border-black-700 rounded-2xl p-4">
+      <GlassCard className="p-4">
         {/* From Chain */}
         <div className="mb-2">
           <div className="text-sm text-black-400 mb-2">From</div>
@@ -186,14 +188,17 @@ function BridgePage() {
 
         {/* Swap Direction Button */}
         <div className="flex justify-center -my-1 relative z-10">
-          <button
+          <motion.button
             onClick={handleSwapChains}
-            className="p-2.5 rounded-xl bg-black-900 border-4 border-black-800 hover:bg-black-700 transition-colors group"
+            whileHover={{ rotate: 180 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="p-2.5 rounded-xl bg-black-900 border-4 border-black-800 hover:bg-black-700 hover:shadow-glow-cyan-md transition-colors group"
           >
             <svg className="w-5 h-5 text-black-300 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
             </svg>
-          </button>
+          </motion.button>
         </div>
 
         {/* To Chain */}
@@ -276,21 +281,22 @@ function BridgePage() {
         </div>
 
         {/* Send Button - always says "Send", connects wallet if needed when clicked */}
-        <button
+        <InteractiveButton
+          variant="primary"
           onClick={handleSendClick}
-          disabled={isLoading}
-          className={`w-full mt-4 py-4 rounded-xl text-lg font-semibold transition-colors ${
+          loading={isLoading}
+          className={`w-full mt-4 py-4 text-lg ${
             isConnected && amount && parseFloat(amount) > 0
-              ? 'bg-matrix-600 hover:bg-matrix-500 text-black-900'
-              : 'bg-black-700 text-black-400 hover:bg-black-600'
+              ? ''
+              : '!bg-black-700 !text-black-400 !border-black-700'
           }`}
         >
-          {isLoading ? 'Sending...' : 'Send'}
-        </button>
-      </div>
+          Send
+        </InteractiveButton>
+      </GlassCard>
 
       {/* Route Info */}
-      <div className="mt-4 p-4 rounded-2xl bg-black-800/30 border border-black-700">
+      <GlassCard className="mt-4 p-4">
         <div className="flex items-center space-x-2 mb-3">
           <svg className="w-5 h-5 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -321,7 +327,7 @@ function BridgePage() {
         <p className="text-xs text-black-500 mt-3 text-center">
           One-way burn-and-mint ensures no double spends are possible
         </p>
-      </div>
+      </GlassCard>
 
       {/* Confirmation Modal */}
       <AnimatePresence>
@@ -369,10 +375,10 @@ function ConfirmationModal({ fromChain, toChain, token, amount, receiveAmount, l
     >
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden"
+        initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+        animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
+        exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
+        className="relative w-full max-w-md glass-card rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-black-700">
@@ -461,12 +467,13 @@ function ConfirmationModal({ fromChain, toChain, token, amount, receiveAmount, l
 
         {/* Actions */}
         <div className="p-4 border-t border-black-700 space-y-3">
-          <button
+          <InteractiveButton
+            variant="primary"
             onClick={onConfirm}
-            className="w-full py-4 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold text-lg transition-colors"
+            className="w-full py-4 text-lg"
           >
             Confirm Send
-          </button>
+          </InteractiveButton>
           <button
             onClick={onClose}
             className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 text-black-300 font-medium transition-colors"

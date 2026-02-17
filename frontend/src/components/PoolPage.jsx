@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import toast from 'react-hot-toast'
+import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
+import GlassCard from './ui/GlassCard'
+import AnimatedNumber from './ui/AnimatedNumber'
+import InteractiveButton from './ui/InteractiveButton'
 
 // Mock pool data
 const POOLS = [
@@ -71,15 +75,12 @@ function PoolPage() {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => setShowAddLiquidity(true)}
-          className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold border border-matrix-500 transition-colors"
-        >
+        <InteractiveButton variant="primary" onClick={() => setShowAddLiquidity(true)} className="flex items-center space-x-2 px-5 py-2.5">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
           <span>Start Earning</span>
-        </button>
+        </InteractiveButton>
       </div>
 
       {/* Tabs */}
@@ -107,26 +108,32 @@ function PoolPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="p-4 rounded-2xl bg-dark-800/50 border border-dark-700">
-          <p className="text-sm text-dark-400">Community Savings</p>
-          <p className="text-2xl font-bold mt-1">$24.8M</p>
-          <p className="text-sm text-green-500 mt-1">+5.2% (24h)</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-dark-800/50 border border-dark-700">
-          <p className="text-sm text-dark-400">Exchanged Today</p>
-          <p className="text-2xl font-bold mt-1">$4.29M</p>
-          <p className="text-sm text-green-500 mt-1">+12.8% (24h)</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-dark-800/50 border border-dark-700">
-          <p className="text-sm text-dark-400">Earnings Paid Out</p>
-          <p className="text-2xl font-bold mt-1">$12,870</p>
-          <p className="text-sm text-green-500 mt-1">+8.3% (24h)</p>
-        </div>
-      </div>
+      <StaggerContainer className="grid grid-cols-3 gap-4 mb-6">
+        <StaggerItem>
+          <GlassCard className="p-4">
+            <p className="text-sm text-dark-400">Community Savings</p>
+            <p className="text-2xl font-bold mt-1">$24.8M</p>
+            <p className="text-sm text-green-500 mt-1">+5.2% (24h)</p>
+          </GlassCard>
+        </StaggerItem>
+        <StaggerItem>
+          <GlassCard className="p-4">
+            <p className="text-sm text-dark-400">Exchanged Today</p>
+            <p className="text-2xl font-bold mt-1">$4.29M</p>
+            <p className="text-sm text-green-500 mt-1">+12.8% (24h)</p>
+          </GlassCard>
+        </StaggerItem>
+        <StaggerItem>
+          <GlassCard className="p-4">
+            <p className="text-sm text-dark-400">Earnings Paid Out</p>
+            <p className="text-2xl font-bold mt-1">$12,870</p>
+            <p className="text-sm text-green-500 mt-1">+8.3% (24h)</p>
+          </GlassCard>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Pool List */}
-      <div className="swap-card rounded-2xl overflow-hidden">
+      <GlassCard className="rounded-2xl overflow-hidden">
         {/* Table Header */}
         <div className="grid grid-cols-6 gap-4 px-4 py-3 text-sm text-dark-400 border-b border-dark-700">
           <div className="col-span-2">Currency Pair</div>
@@ -138,38 +145,39 @@ function PoolPage() {
 
         {/* Pool Rows */}
         {POOLS.filter(pool => activeTab === 'pools' || parseFloat(pool.myLiquidity.replace(/[$,]/g, '')) > 0).map((pool) => (
-          <div
-            key={pool.id}
-            className="grid grid-cols-6 gap-4 px-4 py-4 hover:bg-dark-700/30 transition-colors cursor-pointer border-b border-dark-700/50 last:border-0"
-            onClick={() => {
-              setSelectedPool(pool)
-              setShowAddLiquidity(true)
-            }}
-          >
-            <div className="col-span-2 flex items-center space-x-3">
-              <div className="flex -space-x-2">
-                <span className="text-2xl">{pool.token0.logo}</span>
-                <span className="text-2xl">{pool.token1.logo}</span>
-              </div>
-              <div>
-                <span className="font-medium">{pool.token0.symbol}/{pool.token1.symbol}</span>
-                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-vibe-500/20 text-vibe-400">0.05%</span>
-              </div>
-            </div>
-            <div className="text-right font-medium">{pool.tvl}</div>
-            <div className="text-right">{pool.volume24h}</div>
-            <div className="text-right text-green-500 font-medium">{pool.apr}</div>
-            <div className="text-right">
-              {pool.myLiquidity !== '$0' ? (
-                <div>
-                  <div className="font-medium">{pool.myLiquidity}</div>
-                  <div className="text-xs text-dark-400">{pool.myShare}</div>
+          <StaggerItem key={pool.id}>
+            <div
+              className="grid grid-cols-6 gap-4 px-4 py-4 hover:bg-dark-700/30 transition-colors cursor-pointer border-b border-dark-700/50 last:border-0"
+              onClick={() => {
+                setSelectedPool(pool)
+                setShowAddLiquidity(true)
+              }}
+            >
+              <div className="col-span-2 flex items-center space-x-3">
+                <div className="flex -space-x-2">
+                  <span className="text-2xl">{pool.token0.logo}</span>
+                  <span className="text-2xl">{pool.token1.logo}</span>
                 </div>
-              ) : (
-                <span className="text-dark-500">-</span>
-              )}
+                <div>
+                  <span className="font-medium">{pool.token0.symbol}/{pool.token1.symbol}</span>
+                  <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-vibe-500/20 text-vibe-400">0.05%</span>
+                </div>
+              </div>
+              <div className="text-right font-medium">{pool.tvl}</div>
+              <div className="text-right">{pool.volume24h}</div>
+              <div className="text-right text-green-500 font-medium">{pool.apr}</div>
+              <div className="text-right">
+                {pool.myLiquidity !== '$0' ? (
+                  <div>
+                    <div className="font-medium">{pool.myLiquidity}</div>
+                    <div className="text-xs text-dark-400">{pool.myShare}</div>
+                  </div>
+                ) : (
+                  <span className="text-dark-500">-</span>
+                )}
+              </div>
             </div>
-          </div>
+          </StaggerItem>
         ))}
 
         {activeTab === 'my' && POOLS.filter(pool => parseFloat(pool.myLiquidity.replace(/[$,]/g, '')) > 0).length === 0 && (
@@ -179,15 +187,16 @@ function PoolPage() {
             </svg>
             <h3 className="text-lg font-medium mb-2">No earnings yet</h3>
             <p className="text-dark-400 mb-4">Deposit to start earning passive income</p>
-            <button
+            <InteractiveButton
+              variant="primary"
               onClick={() => setShowAddLiquidity(true)}
-              className="px-5 py-2.5 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold border border-matrix-500 transition-colors"
+              className="px-5 py-2.5"
             >
               Start Earning
-            </button>
+            </InteractiveButton>
           </div>
         )}
-      </div>
+      </GlassCard>
 
       {/* Add Liquidity Modal */}
       {showAddLiquidity && (
@@ -234,7 +243,7 @@ function AddLiquidityModal({ pool, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-dark-800 rounded-3xl border border-dark-600 shadow-2xl">
+      <div className="relative w-full max-w-md glass-card rounded-3xl shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-dark-700">
           <h3 className="text-lg font-semibold">Deposit & Earn</h3>
@@ -324,13 +333,15 @@ function AddLiquidityModal({ pool, onClose }) {
           </div>
 
           {/* Button */}
-          <button
+          <InteractiveButton
+            variant="primary"
             onClick={handleAddLiquidity}
             disabled={!amount0 || !amount1 || isLoading}
-            className="w-full py-4 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold border border-matrix-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            loading={isLoading}
+            className="w-full py-4"
           >
-            {!isConnected ? 'Get Started' : isLoading ? 'Depositing...' : 'Deposit & Start Earning'}
-          </button>
+            {!isConnected ? 'Get Started' : 'Deposit & Start Earning'}
+          </InteractiveButton>
         </div>
       </div>
     </div>

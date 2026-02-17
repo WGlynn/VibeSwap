@@ -156,6 +156,11 @@ export default {
         'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite',
         'blink': 'blink 1s step-end infinite',
         'heartbeat': 'heartbeat 1s ease-in-out infinite',
+        'pulse-ring': 'pulse-ring 1.5s ease-out infinite',
+        'glow-breathe': 'glow-breathe 3s ease-in-out infinite',
+        'shimmer': 'shimmer 3s ease-in-out infinite',
+        'float': 'float 6s ease-in-out infinite',
+        'border-flow': 'border-flow 3s linear infinite',
       },
       keyframes: {
         'fade-in': {
@@ -190,6 +195,26 @@ export default {
           '70%': { opacity: '0.3', transform: 'scale(1)' },
           '100%': { opacity: '0.3', transform: 'scale(1)' },
         },
+        'pulse-ring': {
+          '0%': { transform: 'scale(1)', opacity: '0.8' },
+          '100%': { transform: 'scale(2.5)', opacity: '0' },
+        },
+        'glow-breathe': {
+          '0%, 100%': { boxShadow: '0 0 8px rgba(0,255,65,0.05)' },
+          '50%': { boxShadow: '0 0 20px rgba(0,255,65,0.12)' },
+        },
+        'shimmer': {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        'float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+        'border-flow': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '100%': { backgroundPosition: '200% 50%' },
+        },
       },
       boxShadow: {
         'subtle': '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -197,6 +222,12 @@ export default {
         'strong': '0 8px 24px rgba(0, 0, 0, 0.6)',
         'glow-green': '0 0 20px rgba(0, 255, 65, 0.15)',
         'glow-cyan': '0 0 20px rgba(0, 212, 255, 0.15)',
+        'glow-green-md': '0 0 30px -5px rgba(0, 255, 65, 0.08)',
+        'glow-green-lg': '0 0 40px -5px rgba(0, 255, 65, 0.12)',
+        'glow-cyan-md': '0 0 30px -5px rgba(0, 212, 255, 0.08)',
+        'glow-cyan-lg': '0 0 40px -5px rgba(0, 212, 255, 0.12)',
+        'inner-glow-green': 'inset 0 0 20px rgba(0, 255, 65, 0.06)',
+        'inner-glow-cyan': 'inset 0 0 20px rgba(0, 212, 255, 0.06)',
       },
       borderColor: {
         DEFAULT: '#252525',

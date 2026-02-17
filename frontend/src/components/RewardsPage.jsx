@@ -4,6 +4,9 @@ import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIncentives } from '../hooks/useIncentives'
 import toast from 'react-hot-toast'
+import GlassCard from './ui/GlassCard'
+import AnimatedNumber from './ui/AnimatedNumber'
+import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
 
 function RewardsPage() {
   const { isConnected: isExternalConnected, connect } = useWallet()
@@ -79,36 +82,44 @@ function RewardsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <SummaryCard
-          label="Your Balance"
-          value={`$${totalValue.toLocaleString()}`}
-          icon="◇"
-          color="text-white"
-        />
-        <SummaryCard
-          label="Ready to Claim"
-          value={`$${totalPendingRewards.toFixed(2)}`}
-          icon="+"
-          color="text-glow-500"
-          action={totalPendingRewards > 0 ? () => handleClaim('shapley') : null}
-          actionLabel="Claim"
-          isLoading={isClaiming}
-        />
-        <SummaryCard
-          label="Total Earned"
-          value={`$${totalEarnedAllTime.toFixed(2)}`}
-          icon="↗"
-          color="text-cyber-400"
-        />
-        <SummaryCard
-          label="Bonus Multiplier"
-          value={`${loyalty.currentMultiplier.toFixed(2)}x`}
-          icon="×"
-          color="text-yellow-400"
-          sublabel={loyalty.tier}
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <StaggerItem>
+          <SummaryCard
+            label="Your Balance"
+            value={`$${totalValue.toLocaleString()}`}
+            icon="◇"
+            color="text-white"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <SummaryCard
+            label="Ready to Claim"
+            value={`$${totalPendingRewards.toFixed(2)}`}
+            icon="+"
+            color="text-glow-500"
+            action={totalPendingRewards > 0 ? () => handleClaim('shapley') : null}
+            actionLabel="Claim"
+            isLoading={isClaiming}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <SummaryCard
+            label="Total Earned"
+            value={`$${totalEarnedAllTime.toFixed(2)}`}
+            icon="↗"
+            color="text-cyber-400"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <SummaryCard
+            label="Bonus Multiplier"
+            value={`${loyalty.currentMultiplier.toFixed(2)}x`}
+            icon="×"
+            color="text-yellow-400"
+            sublabel={loyalty.tier}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Tabs */}
       <div className="flex space-x-1 mb-6 p-1 bg-void-800/50 rounded-xl w-fit">
@@ -116,7 +127,7 @@ function RewardsPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+            className={`relative px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
               activeTab === tab
                 ? 'bg-void-700 text-white'
                 : 'text-void-400 hover:text-white'
@@ -126,6 +137,7 @@ function RewardsPage() {
             {tab === 'shapley' && 'Fair Share'}
             {tab === 'il-protection' && 'Protection'}
             {tab === 'loyalty' && 'Bonuses'}
+            {activeTab === tab && <motion.div layoutId="rewards-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-matrix-500" />}
           </button>
         ))}
       </div>
@@ -174,10 +186,7 @@ function RewardsPage() {
 
 function SummaryCard({ label, value, icon, color, sublabel, action, actionLabel, isLoading }) {
   return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      className="p-4 rounded-2xl bg-void-800/50 border border-void-700/50"
-    >
+    <GlassCard className="p-4" hover>
       <div className="flex items-center justify-between mb-2">
         <span className="text-2xl">{icon}</span>
         {action && (
@@ -193,7 +202,7 @@ function SummaryCard({ label, value, icon, color, sublabel, action, actionLabel,
       <div className={`text-2xl font-bold font-mono ${color}`}>{value}</div>
       <div className="text-sm text-void-400 mt-1">{label}</div>
       {sublabel && <div className="text-xs text-void-500 mt-0.5">{sublabel}</div>}
-    </motion.div>
+    </GlassCard>
   )
 }
 
@@ -201,7 +210,7 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Your Deposits */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
           <span className="text-matrix-500">≡</span>
           <span>Your Deposits</span>
@@ -245,10 +254,10 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
             ))}
           </div>
         )}
-      </div>
+      </GlassCard>
 
       {/* Recent Earnings */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
           <span className="text-matrix-500">≡</span>
           <span>Recent Earnings</span>
@@ -275,10 +284,10 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
             </div>
           ))}
         </div>
-      </div>
+      </GlassCard>
 
       {/* Price Protection */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
           <span className="text-matrix-500">◇</span>
           <span>Price Protection</span>
@@ -302,10 +311,10 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
         <div className="text-xs text-void-400">
           Up to 2% of your exchange value is protected if prices move unexpectedly.
         </div>
-      </div>
+      </GlassCard>
 
       {/* Rewards History */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
           <span>📜</span>
           <span>Recent Activity</span>
@@ -346,7 +355,7 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
             </div>
           ))}
         </div>
-      </div>
+      </GlassCard>
     </div>
   )
 }
@@ -365,7 +374,7 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Explanation */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4">Fair Share Earnings</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
@@ -387,10 +396,10 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
             <span className="text-glow-500">Fair share: they split the benefit equally</span>
           </div>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Your Breakdown */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-bold text-lg">Your Pending Rewards</h3>
           <button
@@ -439,7 +448,7 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
             <span className="font-mono">${shapleyRewards.totalEarned.toFixed(2)}</span>
           </div>
         </div>
-      </div>
+      </GlassCard>
     </div>
   )
 }
@@ -448,7 +457,7 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* How Protection Works */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4">How Protection Works</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
@@ -478,10 +487,10 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
         <p className="text-xs text-void-500 mt-4">
           Coverage funded by fees. Claims paid when you withdraw.
         </p>
-      </div>
+      </GlassCard>
 
       {/* Your Coverage */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-bold text-lg">Your Coverage</h3>
           {ilProtection.claimableAmount > 0 && (
@@ -538,7 +547,7 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
             </div>
           ))}
         </div>
-      </div>
+      </GlassCard>
     </div>
   )
 }
@@ -558,7 +567,7 @@ function LoyaltyTab({ loyalty }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* How Bonuses Work */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4">Bonus Rewards Program</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
@@ -607,10 +616,10 @@ function LoyaltyTab({ loyalty }) {
             )
           })}
         </div>
-      </div>
+      </GlassCard>
 
       {/* Your Status */}
-      <div className="swap-card rounded-2xl p-5">
+      <GlassCard className="p-5">
         <h3 className="font-display font-bold text-lg mb-4">Your Bonus Status</h3>
 
         {/* Current tier display */}
@@ -664,7 +673,7 @@ function LoyaltyTab({ loyalty }) {
             <span className="text-glow-500 font-medium">You've reached the maximum tier!</span>
           </div>
         )}
-      </div>
+      </GlassCard>
     </div>
   )
 }

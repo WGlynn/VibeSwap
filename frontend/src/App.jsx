@@ -2,6 +2,7 @@ import { lazy, Suspense, Component } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
+import AmbientBackground from './components/ui/AmbientBackground'
 import { ContributionsProvider } from './contexts/ContributionsContext'
 import { MessagingProvider } from './contexts/MessagingContext'
 
@@ -57,15 +58,16 @@ const PersonalityPage = lazy(() => import('./components/PersonalityPage'))
 const MessageBoard = lazy(() => import('./components/MessageBoard'))
 const PromptsPage = lazy(() => import('./components/PromptsPage'))
 
-// Minimal page transitions - subtle, fast
+// Rocketship page transitions — blur + slide + opacity
 const pageVariants = {
-  initial: { opacity: 0 },
-  in: { opacity: 1 },
-  out: { opacity: 0 },
+  initial: { opacity: 0, y: 8, filter: 'blur(4px)' },
+  in: { opacity: 1, y: 0, filter: 'blur(0px)' },
+  out: { opacity: 0, y: -4, filter: 'blur(2px)' },
 }
 
 const pageTransition = {
-  duration: 0.15,
+  duration: 0.25,
+  ease: [0.25, 0.1, 0.25, 1],
 }
 
 function AnimatedRoutes() {
@@ -117,9 +119,10 @@ function App() {
   return (
     <MessagingProvider>
     <ContributionsProvider>
+      <AmbientBackground />
       {isHomePage ? (
         // Home page: completely fixed layout, no scroll possible
-        <div className="fixed inset-0 bg-black-900 flex flex-col">
+        <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>
           <HeaderMinimal />
           <main className="flex-1 overflow-hidden">
             <AnimatedRoutes />
@@ -127,7 +130,7 @@ function App() {
         </div>
       ) : (
         // Other pages: allow scrolling with .allow-scroll class
-        <div className="fixed inset-0 bg-black-900 flex flex-col allow-scroll">
+        <div className="fixed inset-0 flex flex-col allow-scroll" style={{ zIndex: 1 }}>
           <HeaderMinimal />
           <main className="flex-1 overflow-y-auto allow-scroll">
             <AnimatedRoutes />

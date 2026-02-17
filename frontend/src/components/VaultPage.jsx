@@ -5,6 +5,9 @@ import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBalances } from '../hooks/useBalances'
 import { useVault } from '../hooks/useVault'
 import toast from 'react-hot-toast'
+import GlassCard from './ui/GlassCard'
+import InteractiveButton from './ui/InteractiveButton'
+import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
 
 /**
  * Savings Vault Page
@@ -233,37 +236,43 @@ function VaultPage() {
       )}
 
       {/* Balance overview */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="p-4 rounded-xl bg-black-800 border border-black-700">
-          <div className="text-sm text-black-400 mb-1">Spending Balance</div>
-          <div className="text-2xl font-bold">${totalSpendingValue.toLocaleString()}</div>
-          <div className="text-xs text-black-500 mt-1">Instant access</div>
-        </div>
-        <div className="p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/30">
-          <div className="text-sm text-terminal-400 mb-1">Vault Balance</div>
-          <div className="text-2xl font-bold text-terminal-400">${totalVaultValue.toLocaleString()}</div>
-          <div className="text-xs text-black-400 mt-1">{VAULT_CONFIG.timelockDays}-day timelock</div>
-        </div>
-      </div>
+      <StaggerContainer className="grid grid-cols-2 gap-4 mb-6">
+        <StaggerItem>
+          <GlassCard className="p-4">
+            <div className="text-sm text-black-400 mb-1">Spending Balance</div>
+            <div className="text-2xl font-bold">${totalSpendingValue.toLocaleString()}</div>
+            <div className="text-xs text-black-500 mt-1">Instant access</div>
+          </GlassCard>
+        </StaggerItem>
+        <StaggerItem>
+          <GlassCard glowColor="terminal" className="p-4">
+            <div className="text-sm text-terminal-400 mb-1">Vault Balance</div>
+            <div className="text-2xl font-bold text-terminal-400">${totalVaultValue.toLocaleString()}</div>
+            <div className="text-xs text-black-400 mt-1">{VAULT_CONFIG.timelockDays}-day timelock</div>
+          </GlassCard>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Actions */}
       <div className="flex gap-3 mb-6">
-        <button
+        <InteractiveButton
+          variant="primary"
           onClick={() => setShowDepositModal(true)}
-          className="flex-1 py-3 rounded-xl bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
+          className="flex-1 py-3"
         >
           Deposit to Vault
-        </button>
-        <button
+        </InteractiveButton>
+        <InteractiveButton
+          variant="secondary"
           onClick={() => setShowWithdrawModal(true)}
-          className="flex-1 py-3 rounded-xl bg-black-700 hover:bg-black-600 text-white font-semibold transition-colors border border-black-600"
+          className="flex-1 py-3"
         >
           Withdraw
-        </button>
+        </InteractiveButton>
       </div>
 
       {/* Vault assets */}
-      <div className="bg-black-800 border border-black-700 rounded-2xl overflow-hidden mb-6">
+      <GlassCard className="overflow-hidden mb-6">
         <div className="p-4 border-b border-black-700">
           <h2 className="font-semibold">Vault Assets</h2>
         </div>
@@ -303,11 +312,11 @@ function VaultPage() {
             )
           })}
         </div>
-      </div>
+      </GlassCard>
 
       {/* Pending withdrawals */}
       {pendingWithdrawals.length > 0 && (
-        <div className="bg-black-800 border border-black-700 rounded-2xl overflow-hidden mb-6">
+        <GlassCard className="overflow-hidden mb-6">
           <div className="p-4 border-b border-black-700">
             <h2 className="font-semibold">Pending Withdrawals</h2>
           </div>
@@ -357,7 +366,7 @@ function VaultPage() {
               )
             })}
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {/* Security info */}
@@ -543,10 +552,10 @@ function Modal({ title, children, onClose }) {
     >
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden"
+        initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+        animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
+        exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+        className="relative w-full max-w-md glass-card rounded-2xl shadow-2xl overflow-hidden"
       >
         <div className="flex items-center justify-between p-4 border-b border-black-700">
           <h3 className="font-semibold">{title}</h3>

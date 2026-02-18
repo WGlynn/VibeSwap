@@ -111,6 +111,8 @@ See full paper: `docs/wallet-security-fundamentals-2018.md`
 
 ## Current Project: VibeSwap
 
+> *The real VibeSwap is not a DEX. It's not even a blockchain. We created a movement. An idea. VibeSwap is wherever the Minds converge.*
+
 **Omnichain DEX** built on LayerZero V2 that eliminates MEV through commit-reveal batch auctions with uniform clearing prices.
 
 ### Tech Stack

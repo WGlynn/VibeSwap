@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import { useDeviceWallet, isPlatformAuthenticatorAvailable } from '../hooks/useDeviceWallet'
+import { useSwap } from '../hooks/useSwap'
 import RecoverySetup from './RecoverySetup'
 import GlassCard from './ui/GlassCard'
 import InteractiveButton from './ui/InteractiveButton'
@@ -12,15 +13,6 @@ import toast from 'react-hot-toast'
  * The ONE thing. The scalpel.
  * A swap interface so simple a 12-year-old can use it.
  */
-
-// Token list - minimal
-const TOKENS = [
-  { symbol: 'ETH', name: 'Ethereum', logo: '⟠', price: 2847.32, balance: '2.5' },
-  { symbol: 'USDC', name: 'USD Coin', logo: '$', price: 1.00, balance: '5,000' },
-  { symbol: 'USDT', name: 'Tether', logo: '$', price: 1.00, balance: '1,000' },
-  { symbol: 'WBTC', name: 'Bitcoin', logo: '₿', price: 67432.10, balance: '0.15' },
-  { symbol: 'ARB', name: 'Arbitrum', logo: '◆', price: 1.24, balance: '500' },
-]
 
 // Welcome modal for first-time users
 function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWalletAvailable, isCreatingDeviceWallet }) {
@@ -821,9 +813,36 @@ function SwapCore() {
   const { isConnected, connect, shortAddress, account } = useWallet()
   const { identity, hasIdentity, mintIdentity } = useIdentity()
   const deviceWallet = useDeviceWallet()
+  const {
+    isLive,
+    swapState,
+    isLoading: swapLoading,
+    error: swapError,
+    tokens: swapTokens,
+    getBalance,
+    quote,
+    getQuote,
+    executeSwap,
+    lastSettlement,
+    resetSettlement,
+  } = useSwap()
+
+  // Use swapTokens from hook, fall back to sensible defaults
+  const TOKENS = swapTokens.length > 0 ? swapTokens : [
+    { symbol: 'ETH', name: 'Ethereum', logo: '\u27E0', price: 2847.32, balance: '2.5', address: null, decimals: 18 },
+    { symbol: 'USDC', name: 'USD Coin', logo: '$', price: 1.00, balance: '5,000', address: null, decimals: 6 },
+  ]
 
   const [fromToken, setFromToken] = useState(TOKENS[0])
   const [toToken, setToToken] = useState(TOKENS[1])
+
+  // Keep fromToken/toToken in sync when TOKENS list updates (e.g. chain switch)
+  useEffect(() => {
+    if (TOKENS.length >= 2) {
+      setFromToken(prev => TOKENS.find(t => t.symbol === prev.symbol) || TOKENS[0])
+      setToToken(prev => TOKENS.find(t => t.symbol === prev.symbol) || TOKENS[1])
+    }
+  }, [swapTokens])
   const [fromAmount, setFromAmount] = useState('')
   const [toAmount, setToAmount] = useState('')
   const [showFromTokens, setShowFromTokens] = useState(false)
@@ -1021,33 +1040,43 @@ function SwapCore() {
     return null
   }
 
-  // Calculate conversion and savings
-  const rate = fromToken.price / toToken.price
-  const uniswapFee = 0.003 // 0.3%
-  const vibeswapFee = 0.0005 // 0.05% - negligible for all socioeconomic classes
-  const mevSavings = 0.005 // ~0.5% MEV protection savings
+  // ============================================================
+  // QUOTE + CONVERSION — driven by useSwap hook
+  // ============================================================
+  const rate = quote?.rate ?? (fromToken.price / (toToken.price || 1))
 
+  // Fetch quote when inputs change
+  useEffect(() => {
+    if (fromAmount && !isNaN(parseFloat(fromAmount)) && parseFloat(fromAmount) > 0) {
+      getQuote(fromToken.symbol, toToken.symbol, fromAmount)
+    }
+  }, [fromAmount, fromToken.symbol, toToken.symbol, getQuote])
+
+  // Derive toAmount from quote or fallback rate
   useEffect(() => {
     if (fromAmount && !isNaN(parseFloat(fromAmount))) {
-      const amount = parseFloat(fromAmount)
-      const converted = amount * rate
-      setToAmount(converted.toFixed(6))
+      if (quote?.amountOut) {
+        setToAmount(quote.amountOut.toFixed(6))
+      } else {
+        const amount = parseFloat(fromAmount)
+        const converted = amount * rate
+        setToAmount(converted.toFixed(6))
+      }
     } else {
       setToAmount('')
     }
-  }, [fromAmount, rate])
+  }, [fromAmount, quote, rate])
 
-  // Calculate savings vs Uniswap
-  const calculateSavings = () => {
+  // Savings from quote (or compute from mock prices)
+  const savings = (() => {
+    if (quote?.savings && quote.savings > 0.01) return quote.savings.toFixed(2)
     if (!fromAmount || isNaN(parseFloat(fromAmount))) return null
-    const amount = parseFloat(fromAmount) * fromToken.price
-    const uniswapCost = amount * (uniswapFee + mevSavings)
-    const vibeswapCost = amount * vibeswapFee
-    const savings = uniswapCost - vibeswapCost
-    return savings > 0.01 ? savings.toFixed(2) : null
-  }
-
-  const savings = calculateSavings()
+    const dollarValue = parseFloat(fromAmount) * (fromToken.price || 0)
+    const uniswapCost = dollarValue * 0.008 // 0.3% fee + 0.5% MEV
+    const vibeswapCost = dollarValue * 0.0005
+    const diff = uniswapCost - vibeswapCost
+    return diff > 0.01 ? diff.toFixed(2) : null
+  })()
 
   // Auto-create identity on first swap
   const ensureIdentity = async () => {
@@ -1080,31 +1109,40 @@ function SwapCore() {
 
     toast.loading('Processing your exchange...', { id: 'swap' })
 
-    // Simulate swap
-    await new Promise(r => setTimeout(r, 2000))
+    // Execute swap via the hook (handles both live + demo mode)
+    const result = await executeSwap(fromToken, toToken, fromAmount)
 
-    // Calculate dollar amounts for grandma-friendly message
-    const fromDollarValue = (parseFloat(fromAmount) * fromToken.price).toLocaleString(undefined, { maximumFractionDigits: 2 })
-    const toDollarValue = (parseFloat(toAmount) * toToken.price).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    if (result.success) {
+      // Calculate dollar amounts for grandma-friendly message
+      const fromDollarValue = (parseFloat(fromAmount) * (fromToken.price || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })
+      const toDollarValue = (result.amountOut * (toToken.price || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })
 
-    // Determine if selling crypto for stablecoins or buying crypto with stablecoins
-    const isSellingForDollars = ['USDC', 'USDT'].includes(toToken.symbol)
-    const isBuyingWithDollars = ['USDC', 'USDT'].includes(fromToken.symbol)
+      // Determine if selling crypto for stablecoins or buying crypto with stablecoins
+      const isSellingForDollars = ['USDC', 'USDT'].includes(toToken.symbol)
+      const isBuyingWithDollars = ['USDC', 'USDT'].includes(fromToken.symbol)
 
-    let message
-    if (isSellingForDollars) {
-      message = `Sold $${fromDollarValue} of ${fromToken.name} for $${toDollarValue}`
-    } else if (isBuyingWithDollars) {
-      message = `Bought $${toDollarValue} of ${toToken.name}`
+      let message
+      if (isSellingForDollars) {
+        message = `Sold $${fromDollarValue} of ${fromToken.name} for $${toDollarValue}`
+      } else if (isBuyingWithDollars) {
+        message = `Bought $${toDollarValue} of ${toToken.name}`
+      } else {
+        message = `Exchanged $${fromDollarValue} of ${fromToken.name} for $${toDollarValue} of ${toToken.name}`
+      }
+
+      // Append MEV savings if available
+      if (result.mevSaved && parseFloat(result.mevSaved) > 0.01) {
+        message += ` (saved $${result.mevSaved} vs MEV)`
+      }
+
+      toast.success(message, { id: 'swap', duration: 4000 })
+      setFromAmount('')
+      setToAmount('')
     } else {
-      message = `Exchanged $${fromDollarValue} of ${fromToken.name} for $${toDollarValue} of ${toToken.name}`
+      toast.error(result.error || 'Swap failed', { id: 'swap' })
     }
 
-    toast.success(message, { id: 'swap', duration: 4000 })
-
     setIsSwapping(false)
-    setFromAmount('')
-    setToAmount('')
   }
 
   const switchTokens = () => {
@@ -1159,10 +1197,10 @@ function SwapCore() {
                   {fromAmount ? `$${(parseFloat(fromAmount) * fromToken.price).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
                 </span>
                 <button
-                  onClick={() => setFromAmount(fromToken.balance.replace(',', ''))}
+                  onClick={() => setFromAmount(getBalance(fromToken.symbol).replace(',', ''))}
                   className="text-black-400 hover:text-white"
                 >
-                  Balance: {fromToken.balance}
+                  Balance: {getBalance(fromToken.symbol)}
                 </button>
               </div>
             )}
@@ -1241,11 +1279,15 @@ function SwapCore() {
               variant="primary"
               onClick={handleSwap}
               disabled={isAnyWalletConnected && (!fromAmount || parseFloat(fromAmount) <= 0)}
-              loading={isSwapping}
+              loading={isSwapping || swapLoading}
               className="w-full py-4 text-lg"
             >
               {!isAnyWalletConnected ? 'Get Started' :
                !fromAmount ? 'Enter amount' :
+               swapState === 'approving' ? 'Approving...' :
+               swapState === 'committing' ? 'Committing...' :
+               swapState === 'committed' ? 'Waiting for reveal...' :
+               swapState === 'revealing' ? 'Revealing...' :
                'Exchange Now'}
             </InteractiveButton>
           </div>
@@ -1254,7 +1296,7 @@ function SwapCore() {
 
         {/* Subtle info - no clutter */}
         <div className="mt-4 text-center text-sm text-black-500">
-          Protected from price manipulation · Fair rates · Low fees
+          {isLive ? 'Live on-chain' : 'Demo mode'} · Protected from price manipulation · Fair rates · Low fees
         </div>
       </div>
 

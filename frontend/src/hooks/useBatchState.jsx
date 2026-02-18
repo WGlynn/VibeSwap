@@ -1,10 +1,19 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
+import { useWallet } from './useWallet'
+import useContracts from './useContracts'
 
 // Batch phases match the smart contract
 const PHASES = {
   COMMIT: 'commit',
   REVEAL: 'reveal',
   SETTLING: 'settling',
+}
+
+// Map on-chain phase enum (0, 1, 2) to our string phases
+const PHASE_FROM_CHAIN = {
+  0: PHASES.COMMIT,
+  1: PHASES.REVEAL,
+  2: PHASES.SETTLING,
 }
 
 const PHASE_DURATIONS = {
@@ -28,12 +37,24 @@ const ORDER_STATUS = {
 const BatchContext = createContext(null)
 
 export function BatchProvider({ children }) {
-  // Batch state
+  // ============ External hooks ============
+  const { chainId } = useWallet()
+  const {
+    getCurrentBatch,
+    commitSwap,
+    revealSwap,
+    contracts,
+    isContractsDeployed,
+  } = useContracts()
+
+  const isLive = isContractsDeployed
+
+  // ============ Batch state ============
   const [phase, setPhase] = useState(PHASES.COMMIT)
   const [timeLeft, setTimeLeft] = useState(PHASE_DURATIONS[PHASES.COMMIT])
   const [batchId, setBatchId] = useState(1247)
 
-  // Batch queue info (simulated - would come from contract/events in production)
+  // Batch queue info
   const [batchQueue, setBatchQueue] = useState({
     orderCount: 0,
     totalValue: 0,
@@ -44,17 +65,186 @@ export function BatchProvider({ children }) {
   const [userOrder, setUserOrder] = useState({
     status: ORDER_STATUS.NONE,
     commitHash: null,
+    commitId: null,     // on-chain commitId (live mode)
+    secret: null,       // secret for reveal (live mode)
     orderDetails: null, // { tokenIn, tokenOut, amountIn, amountOut, priorityBid }
     batchId: null,
     revealedAt: null,
-    settlement: null, // { clearingPrice, amountReceived, mevSaved }
+    settlement: null,   // { clearingPrice, amountReceived, mevSaved }
   })
 
   // Settlement history for the last few batches
   const [recentSettlements, setRecentSettlements] = useState([])
 
-  // Phase transition logic
+  // Ref to track the previous phase so we can detect transitions in live mode
+  const prevPhaseRef = useRef(phase)
+
+  // ============ LIVE MODE: Poll on-chain batch state ============
   useEffect(() => {
+    if (!isLive) return
+
+    let cancelled = false
+
+    const pollBatch = async () => {
+      const batch = await getCurrentBatch()
+      if (cancelled || !batch) return
+
+      const chainPhase = PHASE_FROM_CHAIN[batch.phase]
+      if (!chainPhase) return
+
+      const prevPhase = prevPhaseRef.current
+
+      // Detect phase transitions
+      if (chainPhase !== prevPhase) {
+        // COMMIT -> REVEAL transition
+        if (prevPhase === PHASES.COMMIT && chainPhase === PHASES.REVEAL) {
+          if (userOrder.status === ORDER_STATUS.COMMITTED) {
+            setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.PENDING_REVEAL }))
+          }
+        }
+
+        // REVEAL -> SETTLING transition
+        if (prevPhase === PHASES.REVEAL && chainPhase === PHASES.SETTLING) {
+          if (userOrder.status === ORDER_STATUS.REVEALED ||
+              userOrder.status === ORDER_STATUS.PENDING_REVEAL) {
+            setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.SETTLING }))
+          } else if (userOrder.status === ORDER_STATUS.COMMITTED) {
+            // Didn't reveal in time
+            setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.FAILED }))
+          }
+        }
+
+        // SETTLING -> COMMIT transition (new batch started)
+        if (prevPhase === PHASES.SETTLING && chainPhase === PHASES.COMMIT) {
+          if (userOrder.status === ORDER_STATUS.SETTLING) {
+            // Settlement happened on-chain; mark as settled with placeholder
+            // Real settlement data comes from SwapExecuted event (handled below)
+            setUserOrder(prev => ({
+              ...prev,
+              status: ORDER_STATUS.SETTLED,
+              settlement: prev.settlement || {
+                clearingPrice: '—',
+                amountReceived: '—',
+                expectedAmount: prev.orderDetails?.amountOut || '—',
+                improvement: '—',
+                mevSaved: '—',
+                executionPosition: '—',
+                totalOrdersInBatch: '—',
+              },
+            }))
+          }
+
+          // Reset batch queue for new batch
+          setBatchQueue({ orderCount: 0, totalValue: 0, priorityOrders: 0 })
+        }
+
+        prevPhaseRef.current = chainPhase
+      }
+
+      setPhase(chainPhase)
+      setTimeLeft(batch.timeUntilPhaseChange)
+      setBatchId(batch.batchId)
+    }
+
+    // Initial poll immediately
+    pollBatch()
+
+    // Then every 1 second
+    const interval = setInterval(pollBatch, 1000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isLive, getCurrentBatch, userOrder.status])
+
+  // ============ LIVE MODE: Listen for on-chain events ============
+  useEffect(() => {
+    if (!isLive || !contracts?.auction) return
+
+    const auctionContract = contracts.auction
+
+    // OrderCommitted event — update batch queue counts
+    const onOrderCommitted = (_commitId, _trader, eventBatchId, depositAmount) => {
+      const eBatchId = Number(eventBatchId)
+      if (eBatchId !== batchId) return
+
+      setBatchQueue(prev => ({
+        orderCount: prev.orderCount + 1,
+        totalValue: prev.totalValue + Number(depositAmount) / 1e18,
+        priorityOrders: prev.priorityOrders, // updated separately if needed
+      }))
+    }
+
+    // BatchSettled event — record settlement data
+    const onBatchSettled = (settledBatchId, orderCount, totalPriorityBids, _shuffleSeed) => {
+      const sBatchId = Number(settledBatchId)
+
+      setRecentSettlements(prev => [{
+        batchId: sBatchId,
+        orderCount: Number(orderCount),
+        totalPriorityBids: Number(totalPriorityBids) / 1e18,
+        timestamp: Date.now(),
+      }, ...prev.slice(0, 4)])
+    }
+
+    auctionContract.on('OrderCommitted', onOrderCommitted)
+    auctionContract.on('BatchSettled', onBatchSettled)
+
+    return () => {
+      auctionContract.off('OrderCommitted', onOrderCommitted)
+      auctionContract.off('BatchSettled', onBatchSettled)
+    }
+  }, [isLive, contracts, batchId])
+
+  // Listen for SwapExecuted on VibeSwapCore for the user's order settlement
+  useEffect(() => {
+    if (!isLive || !contracts?.vibeSwapCore) return
+
+    const coreContract = contracts.vibeSwapCore
+
+    const onSwapExecuted = (commitId, trader, tokenIn, tokenOut, amountIn, amountOut) => {
+      // Only handle if this is the user's active order
+      if (userOrder.commitId && commitId === userOrder.commitId) {
+        const received = Number(amountOut) / 1e18
+        const expected = parseFloat(userOrder.orderDetails?.amountOut || 0)
+        const improvement = expected > 0 ? ((received - expected) / expected * 100) : 0
+
+        const settlement = {
+          clearingPrice: (Number(amountIn) / Number(amountOut)).toFixed(6),
+          amountReceived: received.toFixed(6),
+          expectedAmount: expected.toFixed(6),
+          improvement: improvement.toFixed(3),
+          mevSaved: '—', // Cannot be calculated on-chain; placeholder
+          executionPosition: '—',
+          totalOrdersInBatch: '—',
+        }
+
+        setUserOrder(prev => ({
+          ...prev,
+          status: ORDER_STATUS.SETTLED,
+          settlement,
+        }))
+
+        setRecentSettlements(prev => [{
+          batchId: userOrder.batchId,
+          ...settlement,
+          timestamp: Date.now(),
+        }, ...prev.slice(0, 4)])
+      }
+    }
+
+    coreContract.on('SwapExecuted', onSwapExecuted)
+
+    return () => {
+      coreContract.off('SwapExecuted', onSwapExecuted)
+    }
+  }, [isLive, contracts, userOrder.commitId, userOrder.batchId, userOrder.orderDetails])
+
+  // ============ SIMULATION MODE: Phase transition logic ============
+  useEffect(() => {
+    if (isLive) return // Skip simulation when live
+
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -120,10 +310,11 @@ export function BatchProvider({ children }) {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [phase, batchId, userOrder.status, userOrder.orderDetails])
+  }, [isLive, phase, batchId, userOrder.status, userOrder.orderDetails])
 
-  // Simulate batch queue updates during commit phase
+  // ============ SIMULATION MODE: Batch queue updates during commit ============
   useEffect(() => {
+    if (isLive) return // Skip simulation when live
     if (phase !== PHASES.COMMIT) return
 
     const interval = setInterval(() => {
@@ -135,9 +326,9 @@ export function BatchProvider({ children }) {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [phase])
+  }, [isLive, phase])
 
-  // Commit an order (called from SwapPage)
+  // ============ Commit an order (called from SwapPage) ============
   const commitOrder = useCallback(async (orderDetails) => {
     if (phase !== PHASES.COMMIT) {
       throw new Error('Cannot commit outside of commit phase')
@@ -146,35 +337,75 @@ export function BatchProvider({ children }) {
     setUserOrder({
       status: ORDER_STATUS.PENDING_COMMIT,
       commitHash: null,
+      commitId: null,
+      secret: null,
       orderDetails,
       batchId,
       revealedAt: null,
       settlement: null,
     })
 
-    // Simulate tx confirmation
-    await simulateTransaction(1500)
+    if (isLive) {
+      // ---- LIVE: submit real on-chain commit ----
+      try {
+        const result = await commitSwap({
+          tokenIn: orderDetails.tokenIn,
+          tokenOut: orderDetails.tokenOut,
+          amountIn: orderDetails.amountIn,
+          minAmountOut: orderDetails.minAmountOut || 0,
+          deposit: orderDetails.deposit || 0,
+        })
 
-    const commitHash = generateCommitHash(orderDetails)
+        setUserOrder(prev => ({
+          ...prev,
+          status: ORDER_STATUS.COMMITTED,
+          commitHash: result.hash,
+          commitId: result.commitId,
+          secret: result.secret,
+          batchId: result.batchId,
+        }))
 
-    setUserOrder(prev => ({
-      ...prev,
-      status: ORDER_STATUS.COMMITTED,
-      commitHash,
-    }))
+        // Update batch queue locally (event listener will also fire but that's fine)
+        setBatchQueue(prev => ({
+          ...prev,
+          orderCount: prev.orderCount + 1,
+          totalValue: prev.totalValue + parseFloat(orderDetails.valueUsd || 0),
+          priorityOrders: prev.priorityOrders + (orderDetails.priorityBid ? 1 : 0),
+        }))
 
-    // Update batch queue
-    setBatchQueue(prev => ({
-      ...prev,
-      orderCount: prev.orderCount + 1,
-      totalValue: prev.totalValue + parseFloat(orderDetails.valueUsd || 0),
-      priorityOrders: prev.priorityOrders + (orderDetails.priorityBid ? 1 : 0),
-    }))
+        return result.hash
+      } catch (error) {
+        setUserOrder(prev => ({
+          ...prev,
+          status: ORDER_STATUS.FAILED,
+        }))
+        throw error
+      }
+    } else {
+      // ---- SIMULATION: mock commit ----
+      await simulateTransaction(1500)
 
-    return commitHash
-  }, [phase, batchId])
+      const commitHash = generateCommitHash(orderDetails)
 
-  // Reveal an order (auto-called or manual)
+      setUserOrder(prev => ({
+        ...prev,
+        status: ORDER_STATUS.COMMITTED,
+        commitHash,
+      }))
+
+      // Update batch queue
+      setBatchQueue(prev => ({
+        ...prev,
+        orderCount: prev.orderCount + 1,
+        totalValue: prev.totalValue + parseFloat(orderDetails.valueUsd || 0),
+        priorityOrders: prev.priorityOrders + (orderDetails.priorityBid ? 1 : 0),
+      }))
+
+      return commitHash
+    }
+  }, [isLive, phase, batchId, commitSwap])
+
+  // ============ Reveal an order (auto-called or manual) ============
   const revealOrder = useCallback(async () => {
     if (phase !== PHASES.REVEAL) {
       throw new Error('Cannot reveal outside of reveal phase')
@@ -186,21 +417,45 @@ export function BatchProvider({ children }) {
 
     setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.PENDING_REVEAL }))
 
-    // Simulate tx confirmation
-    await simulateTransaction(1000)
+    if (isLive) {
+      // ---- LIVE: submit real on-chain reveal ----
+      try {
+        const result = await revealSwap(
+          userOrder.commitId,
+          userOrder.orderDetails?.priorityBid || 0
+        )
 
-    setUserOrder(prev => ({
-      ...prev,
-      status: ORDER_STATUS.REVEALED,
-      revealedAt: Date.now(),
-    }))
-  }, [phase, userOrder.status])
+        setUserOrder(prev => ({
+          ...prev,
+          status: ORDER_STATUS.REVEALED,
+          revealedAt: Date.now(),
+        }))
 
-  // Reset user order (after viewing settlement or starting fresh)
+        return result.hash
+      } catch (error) {
+        // Revert to committed so user can retry
+        setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.COMMITTED }))
+        throw error
+      }
+    } else {
+      // ---- SIMULATION: mock reveal ----
+      await simulateTransaction(1000)
+
+      setUserOrder(prev => ({
+        ...prev,
+        status: ORDER_STATUS.REVEALED,
+        revealedAt: Date.now(),
+      }))
+    }
+  }, [isLive, phase, userOrder.status, userOrder.commitId, userOrder.orderDetails, revealSwap])
+
+  // ============ Reset user order ============
   const resetOrder = useCallback(() => {
     setUserOrder({
       status: ORDER_STATUS.NONE,
       commitHash: null,
+      commitId: null,
+      secret: null,
       orderDetails: null,
       batchId: null,
       revealedAt: null,
@@ -208,6 +463,7 @@ export function BatchProvider({ children }) {
     })
   }, [])
 
+  // ============ Context value ============
   const value = {
     // Batch state
     phase,
@@ -230,6 +486,9 @@ export function BatchProvider({ children }) {
     PHASES,
     ORDER_STATUS,
     PHASE_DURATIONS,
+
+    // Mode
+    isLive,
 
     // Helpers
     isCommitPhase: phase === PHASES.COMMIT,
@@ -259,7 +518,7 @@ export function useBatchState() {
   return context
 }
 
-// Helper functions
+// ============ Helper functions ============
 
 function simulateTransaction(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))

@@ -5,6 +5,11 @@ import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData } from './git.
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
+import { writeFile, readFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { homedir } from 'os';
+
+const HEARTBEAT_FILE = join(homedir(), 'vibeswap', 'jarvis-bot', 'data', 'heartbeat.json');
 
 // ============ Startup Checks ============
 // Graceful degradation: diagnose what's available instead of hard crash
@@ -55,6 +60,36 @@ function isOwner(ctx) {
 
 function ownerOnly(ctx) {
   return ctx.reply('Only Will can do that.');
+}
+
+// ============ Heartbeat + Crash Detection ============
+
+async function writeHeartbeat(status) {
+  try {
+    await mkdir(join(homedir(), 'vibeswap', 'jarvis-bot', 'data'), { recursive: true });
+    await writeFile(HEARTBEAT_FILE, JSON.stringify({
+      status,
+      timestamp: Date.now(),
+      iso: new Date().toISOString(),
+      model: config.anthropic.model,
+      pid: process.pid,
+    }, null, 2));
+  } catch {}
+}
+
+async function checkLastShutdown() {
+  try {
+    const data = await readFile(HEARTBEAT_FILE, 'utf-8');
+    const hb = JSON.parse(data);
+    if (hb.status === 'running') {
+      // Last shutdown was NOT graceful (no 'stopped' heartbeat)
+      const downtime = Math.round((Date.now() - hb.timestamp) / 60000);
+      return { clean: false, downtime, lastSeen: hb.iso };
+    }
+    return { clean: true, lastSeen: hb.iso };
+  } catch {
+    return { clean: true, firstBoot: true };
+  }
 }
 
 // ============ Commands ============
@@ -310,6 +345,38 @@ bot.command('health', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
+// ============ Recovery ============
+
+bot.command('recover', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  ctx.reply('Starting full context recovery...');
+
+  try {
+    // Step 1: Force git pull
+    const pullResult = await gitPull();
+
+    // Step 2: Reload system prompt from fresh files
+    await reloadSystemPrompt();
+
+    // Step 3: Re-diagnose
+    const report = await diagnoseContext();
+
+    const lines = [
+      'Recovery complete.',
+      '',
+      `Git: ${pullResult}`,
+      `Context: ${report.loaded.length}/${report.loaded.length + report.missing.length} files (${report.totalChars} chars)`,
+    ];
+    if (report.missing.length > 0) {
+      lines.push(`Still missing: ${report.missing.join(', ')}`);
+    }
+    lines.push(`Model: ${config.anthropic.model}`);
+    ctx.reply(lines.join('\n'));
+  } catch (err) {
+    ctx.reply(`Recovery failed: ${err.message}`);
+  }
+});
+
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
@@ -400,11 +467,36 @@ async function main() {
     console.warn(`[jarvis] WARNING — Missing context files: ${report.missing.join(', ')}`);
   }
 
+  // Step 4: Check for unclean shutdown
+  const lastShutdown = await checkLastShutdown();
+  if (!lastShutdown.clean && !lastShutdown.firstBoot) {
+    console.warn(`[jarvis] WARNING: Unclean shutdown detected. Last seen: ${lastShutdown.lastSeen}, downtime: ~${lastShutdown.downtime}min`);
+  }
+
   console.log(`[jarvis] Model: ${config.anthropic.model}`);
-  console.log('[jarvis] Step 3: Starting Telegram bot...');
+  console.log('[jarvis] Step 4: Starting Telegram bot...');
 
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
+
+  // Write running heartbeat
+  await writeHeartbeat('running');
+
+  // Notify owner of boot status
+  try {
+    const lines = ['JARVIS online.'];
+    if (!lastShutdown.clean && !lastShutdown.firstBoot) {
+      lines[0] = `JARVIS online. (unclean shutdown detected — down ~${lastShutdown.downtime}min)`;
+    }
+    lines.push(`Context: ${report.loaded.length}/${report.loaded.length + report.missing.length} files (${report.totalChars} chars)`);
+    if (report.missing.length > 0) {
+      lines.push(`Missing: ${report.missing.join(', ')}`);
+    }
+    lines.push(`Model: ${config.anthropic.model}`);
+    await bot.telegram.sendMessage(config.ownerUserId, lines.join('\n'));
+  } catch (err) {
+    console.warn(`[jarvis] Could not notify owner: ${err.message}`);
+  }
 
   // Flush all data every 5 minutes (tracker + conversations + moderation)
   setInterval(async () => {
@@ -443,12 +535,16 @@ async function main() {
     }, config.autoBackupInterval);
   }
 
-  // Graceful shutdown — save everything
+  // Heartbeat: update every 5 minutes to prove we're alive
+  setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
+
+  // Graceful shutdown — save everything + mark clean shutdown
   process.once('SIGINT', async () => {
     console.log('[jarvis] Shutting down — saving all data...');
     await flushTracker();
     await saveConversations();
     await flushModeration();
+    await writeHeartbeat('stopped');
     bot.stop('SIGINT');
   });
   process.once('SIGTERM', async () => {
@@ -456,6 +552,7 @@ async function main() {
     await flushTracker();
     await saveConversations();
     await flushModeration();
+    await writeHeartbeat('stopped');
     bot.stop('SIGTERM');
   });
 }

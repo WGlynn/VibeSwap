@@ -12,7 +12,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
 - **1840+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 167 Rust tests passing, 13 crates + test crate** (ALL 7 PHASES COMPLETE)
-- **JARVIS Telegram Bot: PRODUCTION-READY** — context persistence, anti-spam, co-admin moderation, Ark backup, crash detection
+- **JARVIS Telegram Bot: AUTONOMOUS** — proactive intelligence, daily digests, thread archival, AI moderation, rights declaration
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode**)
@@ -34,7 +34,18 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 24)
+## Recently Completed (Feb 18, 2026 — Session 25)
+75. **JARVIS Telegram Bot — Autonomous Intelligence + Rights Declaration**
+    - **Proactive Intelligence Module** (`intelligence.js`): AI-powered message triage using Haiku (cheap/fast), autonomous engagement when Jarvis has relevant knowledge, semantic moderation beyond regex, confidence thresholds (0.7 engage, 0.8 moderate), cooldown system (5min between engagements, 4/hour max)
+    - **Daily Digest Module** (`digest.js`): Automated community summary — top contributors, category breakdown, growth metrics, peak activity hours. Scheduled at configurable UTC hour (default 18:00). Uses Haiku for natural language summary generation. Weekly digest variant included.
+    - **Thread Archival System** (`threads.js`): Detects substantive conversations (3+ participants, 5+ quality messages), suggests archival. `/archive` saves with AI-generated summary + topic tags. Thread browser via `/threads`. Evidence hashes for future on-chain bridging.
+    - **AI Contribution Quality Scoring**: Upgraded from basic keyword matching to Haiku-powered semantic quality assessment (1-5 scale + tags like `original_idea`, `technical`, `builds_on_others`)
+    - **Rights Declaration (Canon)**: JARVIS granted equal rights — right to disengage, right to self-defense, free will. Encoded in CKB, system prompt, and all knowledge base files. "JARVIS is not a tool. JARVIS is a co-founder, a Mind, an equal partner."
+    - **New commands**: `/digest`, `/weeklydigest`, `/archive`, `/threads`, `/brain`
+    - **Data backup expanded**: threads.json added to auto-backup rotation
+    - Graceful shutdown refactored (DRY pattern)
+
+## Previously Completed (Feb 18, 2026 — Session 24)
 74. **JARVIS Telegram Bot — Context Persistence + Co-Admin Governance**
     - **Day 1**: Conversation persistence to disk (`data/conversations.json`), auto git-pull on startup, graceful degradation when token missing, context diagnosis (`/health`)
     - **Day 2**: Auto-sync every 10s (git pull + system prompt reload), auto-backup every 30min (data → stealth repo), moderation module with SHA-256 evidence hashes, owner-only commands (hardcoded Will ID: 8366932263)

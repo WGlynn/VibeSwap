@@ -27,6 +27,6 @@ export const config = {
   maxTokens: 1024,
   // Auto-sync: pull from git + reload context (ms, default 10s)
   autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '10000'),
-  // Auto-backup: commit data/ to git (ms, default 6 hours)
-  autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '21600000'),
+  // Auto-backup: commit data/ to git (ms, default 30 min)
+  autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '1800000'),
 };

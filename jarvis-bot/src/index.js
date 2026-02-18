@@ -126,6 +126,7 @@ bot.on('new_chat_members', async (ctx) => {
     await ctx.reply(
       `Welcome ${name}. This is the VibeSwap community — cooperative capitalism, zero MEV, fair markets.\n\n` +
       `Say hi, ask questions, share ideas. Your contributions are tracked and count toward governance weight.\n\n` +
+      `DM me directly — if this chat ever goes down, I'll send you an invite link to the backup channel (the Ark).\n\n` +
       `Type /mystats anytime to see your contribution profile.`
     );
   }

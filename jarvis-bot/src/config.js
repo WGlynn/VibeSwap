@@ -23,8 +23,12 @@ export const config = {
   // Co-admin: Will (human) + Jarvis (AI) — 50/50 governance
   ownerUserId: 8366932263,
   botUsername: 'JarvisMind1828383bot',
+  // Community group chat ID — set after adding bot to group, use /whoami in group to get it
+  communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID) : null,
   maxConversationHistory: 50,
-  maxTokens: 1024,
+  maxTokens: 2048,
+  // Rate limit: max Claude API calls per user per minute
+  rateLimitPerMinute: parseInt(process.env.RATE_LIMIT_PER_MINUTE || '5'),
   // Auto-sync: pull from git + reload context (ms, default 10s)
   autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '10000'),
   // Auto-backup: commit data/ to git (ms, default 30 min)

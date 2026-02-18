@@ -25,6 +25,8 @@ export const config = {
   botUsername: 'JarvisMind1828383bot',
   // Community group chat ID — set after adding bot to group, use /whoami in group to get it
   communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID) : null,
+  // The Ark — backup group. If main group dies, Jarvis DMs everyone an invite link here.
+  arkGroupId: process.env.ARK_GROUP_ID ? parseInt(process.env.ARK_GROUP_ID) : null,
   maxConversationHistory: 50,
   maxTokens: 2048,
   // Rate limit: max Claude API calls per user per minute

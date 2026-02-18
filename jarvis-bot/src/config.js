@@ -21,5 +21,5 @@ export const config = {
     ? process.env.AUTHORIZED_USERS.split(',').map(id => parseInt(id.trim()))
     : [],
   maxConversationHistory: 50,
-  maxTokens: 4096,
+  maxTokens: 1024,
 };

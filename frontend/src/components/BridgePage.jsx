@@ -490,7 +490,7 @@ function ChainDropdown({ chains, onSelect, onClose }) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute top-full left-0 mt-2 w-48 rounded-xl bg-black-800 border border-black-600 shadow-xl py-2 z-50">
+      <div className="absolute top-full left-0 mt-2 w-48 rounded-xl glass-card shadow-xl py-2 z-50">
         {chains.map((chain) => (
           <button
             key={chain.id}
@@ -519,7 +519,7 @@ function TokenSelectModal({ tokens, selected, onSelect, onClose, getBalance }) {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="relative w-full max-w-sm bg-black-800 rounded-2xl border border-black-600 shadow-xl"
+        className="relative w-full max-w-sm glass-card rounded-2xl shadow-xl"
       >
         <div className="flex items-center justify-between p-4 border-b border-black-700">
           <h3 className="font-semibold">Select Token</h3>

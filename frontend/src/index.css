@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -34,9 +35,10 @@ html {
 body {
   background: var(--black-900);
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
 /* Mobile home page - no scroll (Safari iOS fix) */
@@ -571,4 +573,102 @@ input[type="number"] {
 
 .progress-glow::after {
   display: none;
+}
+
+/* ============================================
+   PREMIUM POLISH
+   ============================================ */
+
+/* Smooth all transitions globally */
+*, *::before, *::after {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Better focus ring for accessibility + style */
+*:focus-visible {
+  outline: 1px solid rgba(0, 255, 65, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Subtle noise texture overlay for depth */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.015;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Glass card enhanced hover — more dramatic lift */
+.glass-card:hover {
+  border-color: rgba(66, 66, 66, 0.8);
+}
+
+/* Gradient border on focused inputs */
+input:focus {
+  border-color: rgba(0, 255, 65, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(0, 255, 65, 0.1), 0 0 20px -5px rgba(0, 255, 65, 0.1);
+}
+
+/* Better select/dropdown styling */
+select {
+  background-color: var(--black-700);
+  border: 1px solid var(--black-500);
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+/* Subtle text glow on matrix-colored elements */
+.text-glow {
+  text-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+}
+
+/* Animated underline for tabs */
+.tab-underline {
+  position: relative;
+}
+
+.tab-underline::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--matrix);
+  transform: scaleX(0);
+  transition: transform 0.25s ease;
+}
+
+.tab-underline.active::after {
+  transform: scaleX(1);
+}
+
+/* Gradient separator line */
+.gradient-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.15), transparent);
+}
+
+/* Better scrollbar for inner scroll areas */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(66, 66, 66, 0.5);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.5);
 }

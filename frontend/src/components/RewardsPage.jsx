@@ -5,6 +5,7 @@ import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIncentives } from '../hooks/useIncentives'
 import toast from 'react-hot-toast'
 import GlassCard from './ui/GlassCard'
+import InteractiveButton from './ui/InteractiveButton'
 import AnimatedNumber from './ui/AnimatedNumber'
 import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
 
@@ -51,8 +52,8 @@ function RewardsPage() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="text-center py-20">
+      <div className="max-w-4xl mx-auto px-4 py-20">
+        <GlassCard className="max-w-md mx-auto p-8 text-center">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-vibe-500/20 flex items-center justify-center">
             <svg className="w-10 h-10 text-vibe-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -62,13 +63,10 @@ function RewardsPage() {
           <p className="text-void-400 mb-6 max-w-md mx-auto">
             Connect to see how much you've earned, your savings, and bonus rewards.
           </p>
-          <button
-            onClick={connect}
-            className="px-6 py-3 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-semibold transition-all"
-          >
+          <InteractiveButton variant="primary" onClick={connect} className="px-6 py-3">
             Get Started
-          </button>
-        </div>
+          </InteractiveButton>
+        </GlassCard>
       </div>
     )
   }

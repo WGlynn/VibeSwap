@@ -127,7 +127,7 @@ function VaultPage() {
   if (!isConnected) {
     return (
       <div className="max-w-lg mx-auto px-4 py-12">
-        <div className="text-center">
+        <GlassCard className="p-8 text-center">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
             <span className="text-4xl">🏦</span>
           </div>
@@ -135,13 +135,14 @@ function VaultPage() {
           <p className="text-black-400 mb-6">
             Separate your savings from spending money for better security.
           </p>
-          <button
+          <InteractiveButton
+            variant="primary"
             onClick={connect}
-            className="px-6 py-3 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold transition-colors"
+            className="px-6 py-3"
           >
             Connect Wallet
-          </button>
-        </div>
+          </InteractiveButton>
+        </GlassCard>
       </div>
     )
   }
@@ -149,7 +150,7 @@ function VaultPage() {
   if (!isVaultSetup) {
     return (
       <div className="max-w-lg mx-auto px-4 py-8">
-        <div className="bg-black-800 border border-black-700 rounded-2xl p-6">
+        <GlassCard className="p-6">
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
               <span className="text-3xl">🏦</span>
@@ -195,13 +196,14 @@ function VaultPage() {
             </div>
           </div>
 
-          <button
+          <InteractiveButton
+            variant="primary"
             onClick={handleSetupVault}
-            className="w-full py-4 rounded-xl bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold text-lg transition-colors"
+            className="w-full py-4 text-lg"
           >
             Create Savings Vault
-          </button>
-        </div>
+          </InteractiveButton>
+        </GlassCard>
       </div>
     )
   }
@@ -370,7 +372,7 @@ function VaultPage() {
       )}
 
       {/* Security info */}
-      <div className="p-4 rounded-xl bg-black-800/50 border border-black-700">
+      <GlassCard className="p-4">
         <div className="flex items-center space-x-2 mb-3">
           <svg className="w-5 h-5 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -391,7 +393,7 @@ function VaultPage() {
             <span>Cancel any withdrawal during timelock period</span>
           </li>
         </ul>
-      </div>
+      </GlassCard>
 
       {/* Deposit Modal */}
       <AnimatePresence>

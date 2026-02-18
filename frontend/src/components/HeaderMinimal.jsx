@@ -51,7 +51,7 @@ function HeaderMinimal() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <span className="font-bold text-lg hidden sm:block">VIBESWAP</span>
+              <span className="font-bold text-lg hidden sm:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-matrix-300 to-white">VIBESWAP</span>
             </Link>
 
             {/* Right side */}
@@ -165,8 +165,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xs border-l border-black-600 overflow-y-auto allow-scroll backdrop-blur-xl"
-        style={{ background: 'rgba(0,0,0,0.9)' }}
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xs border-l border-black-600/50 overflow-y-auto allow-scroll backdrop-blur-2xl"
+        style={{ background: 'rgba(4,4,4,0.92)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-black-700">

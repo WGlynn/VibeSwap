@@ -108,7 +108,7 @@ function PoolPage() {
       </div>
 
       {/* Stats Cards */}
-      <StaggerContainer className="grid grid-cols-3 gap-4 mb-6">
+      <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Community Savings</p>
@@ -134,39 +134,40 @@ function PoolPage() {
 
       {/* Pool List */}
       <GlassCard className="rounded-2xl overflow-hidden">
-        {/* Table Header */}
-        <div className="grid grid-cols-6 gap-4 px-4 py-3 text-sm text-black-400 border-b border-black-700">
-          <div className="col-span-2">Currency Pair</div>
-          <div className="text-right">Pool Size</div>
-          <div className="text-right">Daily Activity</div>
-          <div className="text-right">Annual Return</div>
-          <div className="text-right">My Balance</div>
+        {/* Table Header — desktop only */}
+        <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-3 text-sm text-black-400 border-b border-black-700">
+          <div className="col-span-4">Currency Pair</div>
+          <div className="col-span-2 text-right">Pool Size</div>
+          <div className="col-span-2 text-right">Daily Activity</div>
+          <div className="col-span-2 text-right">Annual Return</div>
+          <div className="col-span-2 text-right">My Balance</div>
         </div>
 
         {/* Pool Rows */}
         {POOLS.filter(pool => activeTab === 'pools' || parseFloat(pool.myLiquidity.replace(/[$,]/g, '')) > 0).map((pool) => (
           <StaggerItem key={pool.id}>
+            {/* Desktop row */}
             <div
-              className="grid grid-cols-6 gap-4 px-4 py-4 hover:bg-black-700/30 transition-colors cursor-pointer border-b border-black-700/50 last:border-0"
+              className="hidden md:grid grid-cols-12 gap-2 items-center px-4 py-4 hover:bg-black-700/30 transition-colors cursor-pointer border-b border-black-700/50 last:border-0"
               onClick={() => {
                 setSelectedPool(pool)
                 setShowAddLiquidity(true)
               }}
             >
-              <div className="col-span-2 flex items-center space-x-3">
+              <div className="col-span-4 flex items-center space-x-3">
                 <div className="flex -space-x-2">
                   <span className="text-2xl">{pool.token0.logo}</span>
                   <span className="text-2xl">{pool.token1.logo}</span>
                 </div>
                 <div>
                   <span className="font-medium">{pool.token0.symbol}/{pool.token1.symbol}</span>
-                  <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-vibe-500/20 text-vibe-400">0.05%</span>
+                  <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-matrix-500/20 text-matrix-400">0.05%</span>
                 </div>
               </div>
-              <div className="text-right font-medium">{pool.tvl}</div>
-              <div className="text-right">{pool.volume24h}</div>
-              <div className="text-right text-green-500 font-medium">{pool.apr}</div>
-              <div className="text-right">
+              <div className="col-span-2 text-right font-medium">{pool.tvl}</div>
+              <div className="col-span-2 text-right">{pool.volume24h}</div>
+              <div className="col-span-2 text-right text-green-500 font-medium">{pool.apr}</div>
+              <div className="col-span-2 text-right">
                 {pool.myLiquidity !== '$0' ? (
                   <div>
                     <div className="font-medium">{pool.myLiquidity}</div>
@@ -175,6 +176,46 @@ function PoolPage() {
                 ) : (
                   <span className="text-black-500">-</span>
                 )}
+              </div>
+            </div>
+
+            {/* Mobile card */}
+            <div
+              className="md:hidden px-4 py-4 hover:bg-black-700/30 transition-colors cursor-pointer border-b border-black-700/50 last:border-0"
+              onClick={() => {
+                setSelectedPool(pool)
+                setShowAddLiquidity(true)
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="flex -space-x-2">
+                    <span className="text-2xl">{pool.token0.logo}</span>
+                    <span className="text-2xl">{pool.token1.logo}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium">{pool.token0.symbol}/{pool.token1.symbol}</span>
+                    <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-matrix-500/20 text-matrix-400">0.05%</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-green-500 font-semibold">{pool.apr}</div>
+                  <div className="text-xs text-black-400">APR</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <div className="text-black-400 text-xs">Pool Size</div>
+                  <div className="font-medium">{pool.tvl}</div>
+                </div>
+                <div>
+                  <div className="text-black-400 text-xs">24h Volume</div>
+                  <div>{pool.volume24h}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-black-400 text-xs">My Balance</div>
+                  <div className="font-medium">{pool.myLiquidity !== '$0' ? pool.myLiquidity : '-'}</div>
+                </div>
               </div>
             </div>
           </StaggerItem>

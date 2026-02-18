@@ -1,0 +1,8 @@
+[package]
+name = "compliance-type"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vibeswap-types = { path = "../../lib/types" }
+sha2 = "0.10"

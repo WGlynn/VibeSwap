@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-17 (Desktop - Claude Code Opus 4.6)
+**Last Updated**: 2026-02-18 (Desktop - Claude Code Opus 4.6)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -18,6 +18,8 @@ This file maintains continuity between Claude Code sessions across devices.
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
 - **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
+- **Frontend contract integration: COMPLETE** — useSwap, usePool, useBridge hooks + useBatchState live mode
+- **Frontend mobile responsiveness: COMPLETE** — all 10 pages responsive, AnimatedNumber/ProgressRing wired
 - **GitHub webhook relayer: COMPLETE** — off-chain service with EIP-712 signing + batch submission
 - **Contribution attestation governance: COMPLETE** — 3-branch separation of powers (Executive/Judicial/Legislative)
 
@@ -27,8 +29,32 @@ This file maintains continuity between Claude Code sessions across devices.
 - **GitHub App/Webhook** setup on VibeSwap repos — needs admin access
 - **Relayer wallet** funding — needs ETH for gas
 - **IPFS pinning** service for contribution evidence hashes
+- **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 17, 2026 — Session 19)
+## Recently Completed (Feb 18, 2026 — Session 20)
+68. **Contract Integration Hooks — Full Frontend→Contract Bridge**
+    - **useSwap.jsx** (NEW): Full commit→reveal→settle flow, secret management (localStorage), real price quotes, ERC20 approval, settlement tracking. Wired into SwapCore.jsx.
+    - **usePool.jsx** (NEW): Reads on-chain pool reserves, computes TVL/APR/volume, tracks user LP positions. addLiquidity/removeLiquidity. Wired into PoolPage.jsx.
+    - **useBridge.jsx** (NEW): CrossChainRouter burn-mint bridge, real LZ gas estimation, state machine. Wired into BridgePage.jsx.
+    - **useBatchState.jsx** (UPGRADED): Polls getCurrentBatch() for real phase/time, listens for OrderCommitted/BatchSettled/SwapExecuted events. Exposes isLive flag.
+    - All hooks fall back to demo mode when contracts not deployed (areContractsDeployed check)
+    - Commit: `baa9eed`
+
+69. **On-Chain Transaction History Stubs**
+    - Event ABIs for CommitRevealAuction, VibeAMM, CrossChainRouter
+    - fetchChainTransactions + subscribeToEvents + mergeTransactions (localStorage + chain dedup)
+    - Incremental sync via last-synced-block tracking
+    - Commit: `50085d4`
+
+70. **Full Mobile Responsiveness + UI Polish**
+    - All 10 pages: PoolPage, RewardsPage, VaultPage, BridgePage, ActivityPage, ForumPage, DocsPage, AboutPage, BuySellPage + SwapCore
+    - AnimatedNumber wired for all numeric displays, ProgressRing for timelocks, animated tab underlines
+    - useTransactions localStorage persistence (max 100 entries, cross-tab sync)
+    - CSS isolation primitive: scoped global selectors to #root, fixed Web3Modal pollution
+    - Device wallet always visible (graceful error when WebAuthn unavailable)
+    - Commit: `9fdd589`
+
+## Previously Completed (Feb 17, 2026 — Session 19)
 67. **Frontend UI Overhaul — Premium Rocketship Redesign**
     - FONT SYSTEM: Replaced monospace body font (JetBrains Mono everywhere) with Inter sans-serif
     - Keep JetBrains Mono only for `font-mono` (data, numbers, addresses, code)
@@ -490,9 +516,10 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Known Issues / TODO
 - Large bundle size warning (2MB vendor-wallet chunk) — WalletConnect+Web3Modal circular deps require combined chunk
 - Need to test balance updates after real blockchain transactions
-- Mock prices in SwapCore.jsx (hardcoded ETH $2847) — correct for demo mode, real mode uses on-chain data
-- Frontend missing real price oracle integration (TruePriceOracle or Chainlink)
-- Transaction history not persisted to localStorage (lost on refresh)
+- Mock prices used in demo mode (ETH $2847) — live mode queries contracts for real quotes
+- Frontend price oracle: live mode uses contract getQuote(), could add TruePriceOracle/Chainlink for spot display
+- 2 TODOs in TreasuryStabilizer, 1 in AdaptiveBatchTiming — review before mainnet
+- Oracle service needs production packaging (Dockerfile/systemd)
 
 ## Session Handoff Notes
 When starting a new session, tell Claude:

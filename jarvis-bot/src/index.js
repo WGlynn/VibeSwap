@@ -507,34 +507,19 @@ async function main() {
 
   // Auto-sync: pull from git + reload context periodically
   if (config.autoSyncInterval > 0) {
-    const syncMins = Math.round(config.autoSyncInterval / 60000);
-    console.log(`[jarvis] Auto-sync enabled: every ${syncMins} minutes`);
     setInterval(async () => {
       try {
         const pullResult = await gitPull();
-        // Only log + reload when something actually changed
         if (!pullResult.includes('0 changes, 0 insertions, 0 deletions')) {
-          console.log(`[jarvis] Auto-sync: ${pullResult}`);
           await reloadSystemPrompt();
-          console.log('[jarvis] Auto-sync: context reloaded');
         }
-      } catch (err) {
-        console.warn(`[jarvis] Auto-sync failed: ${err.message}`);
-      }
+      } catch {}
     }, config.autoSyncInterval);
   }
 
-  // Auto-backup: commit data files to git periodically
   if (config.autoBackupInterval > 0) {
-    const backupHrs = Math.round(config.autoBackupInterval / 3600000);
-    console.log(`[jarvis] Auto-backup enabled: every ${backupHrs} hours`);
     setInterval(async () => {
-      try {
-        const result = await backupData();
-        console.log(`[jarvis] Auto-backup: ${result}`);
-      } catch (err) {
-        console.warn(`[jarvis] Auto-backup failed: ${err.message}`);
-      }
+      try { await backupData(); } catch {}
     }, config.autoBackupInterval);
   }
 

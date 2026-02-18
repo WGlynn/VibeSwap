@@ -1,9 +1,10 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
 import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations } from './claude.js';
-import { gitStatus, gitPull, gitCommitAndPush, gitLog } from './git.js';
+import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
+import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 
 // ============ Startup Checks ============
 // Graceful degradation: diagnose what's available instead of hard crash
@@ -164,6 +165,126 @@ bot.command('linkwallet', async (ctx) => {
   }
 });
 
+// ============ Backup ============
+
+bot.command('backup', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const result = await backupData();
+  ctx.reply(result);
+});
+
+// ============ Moderation (Will + Jarvis = Co-Admins) ============
+// 50/50 human + AI governance. Both can execute moderation.
+// Every action is logged with an evidence hash for on-chain accountability.
+// No other humans have admin powers — eliminates third-party bias.
+
+function resolveTargetUser(ctx) {
+  // Try reply-to-message first (most natural)
+  if (ctx.message.reply_to_message?.from) {
+    return ctx.message.reply_to_message.from;
+  }
+  return null;
+}
+
+bot.command('warn', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const target = resolveTargetUser(ctx);
+  if (!target) return ctx.reply('Reply to a message to warn that user.');
+  if (target.is_bot) return ctx.reply('Cannot moderate bots.');
+
+  const reason = ctx.message.text.replace('/warn', '').trim() || 'Community guidelines violation';
+  const result = await warnUser(bot, ctx.chat.id, target.id, reason, ctx.from.id);
+
+  if (result.escalated) {
+    ctx.reply(`${target.first_name} warned (${result.warnings}/${3} — auto-muted for 1hr). Reason: ${reason}`);
+  } else {
+    ctx.reply(`${target.first_name} warned (${result.warnings}/${3}). Reason: ${reason}`);
+  }
+});
+
+bot.command('mute', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const target = resolveTargetUser(ctx);
+  if (!target) return ctx.reply('Reply to a message to mute that user.');
+  if (target.is_bot) return ctx.reply('Cannot moderate bots.');
+
+  const args = ctx.message.text.replace('/mute', '').trim();
+  // Parse duration: /mute 1h reason or /mute 30m reason
+  const durationMatch = args.match(/^(\d+)(m|h|d)/);
+  let duration = 3600; // default 1h
+  let reason = args;
+  if (durationMatch) {
+    const val = parseInt(durationMatch[1]);
+    const unit = durationMatch[2];
+    duration = unit === 'm' ? val * 60 : unit === 'h' ? val * 3600 : val * 86400;
+    reason = args.slice(durationMatch[0].length).trim() || 'Muted by admin';
+  }
+
+  const result = await muteUser(bot, ctx.chat.id, target.id, duration, reason, ctx.from.id);
+  if (result.executed) {
+    const dStr = duration >= 3600 ? `${Math.round(duration/3600)}h` : `${Math.round(duration/60)}m`;
+    ctx.reply(`${target.first_name} muted for ${dStr}. Reason: ${reason}`);
+  } else {
+    ctx.reply(`Failed to mute: ${result.error}. Make sure JARVIS is a group admin.`);
+  }
+});
+
+bot.command('unmute', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const target = resolveTargetUser(ctx);
+  if (!target) return ctx.reply('Reply to a message to unmute that user.');
+
+  const reason = ctx.message.text.replace('/unmute', '').trim() || 'Unmuted';
+  const result = await unmuteUser(bot, ctx.chat.id, target.id, reason, ctx.from.id);
+  if (result.executed) {
+    ctx.reply(`${target.first_name} unmuted.`);
+  } else {
+    ctx.reply(`Failed to unmute: ${result.error}`);
+  }
+});
+
+bot.command('ban', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const target = resolveTargetUser(ctx);
+  if (!target) return ctx.reply('Reply to a message to ban that user.');
+  if (target.is_bot) return ctx.reply('Cannot moderate bots.');
+
+  const reason = ctx.message.text.replace('/ban', '').trim() || 'Banned by admin';
+  const result = await banUser(bot, ctx.chat.id, target.id, reason, ctx.from.id);
+  if (result.executed) {
+    ctx.reply(`${target.first_name} banned. Reason: ${reason}\nEvidence: ${result.evidenceHash.slice(0, 12)}...`);
+  } else {
+    ctx.reply(`Failed to ban: ${result.error}. Make sure JARVIS is a group admin.`);
+  }
+});
+
+bot.command('unban', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const target = resolveTargetUser(ctx);
+  if (!target) return ctx.reply('Reply to a message to unban that user.');
+
+  const reason = ctx.message.text.replace('/unban', '').trim() || 'Unbanned';
+  const result = await unbanUser(bot, ctx.chat.id, target.id, reason, ctx.from.id);
+  if (result.executed) {
+    ctx.reply(`${target.first_name} unbanned.`);
+  } else {
+    ctx.reply(`Failed to unban: ${result.error}`);
+  }
+});
+
+bot.command('modlog', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const log = getModerationLog(ctx.chat.id, 10);
+  if (!log.length) return ctx.reply('No moderation actions recorded.');
+
+  const lines = log.map(e => {
+    const time = new Date(e.timestamp).toISOString().slice(5, 16).replace('T', ' ');
+    const status = e.executed === false ? ' [FAILED]' : '';
+    return `${time} ${e.action.toUpperCase()} user:${e.userId} — ${e.reason}${status}`;
+  });
+  ctx.reply('Moderation Log:\n' + lines.join('\n'));
+});
+
 // ============ Health Check ============
 
 bot.command('health', async (ctx) => {
@@ -258,10 +379,11 @@ async function main() {
     console.warn(`[jarvis] Git pull failed (will use local files): ${err.message}`);
   }
 
-  // Step 2: Load context and conversation history
-  console.log('[jarvis] Step 2: Loading memory and conversations...');
+  // Step 2: Load context, conversation history, moderation log
+  console.log('[jarvis] Step 2: Loading memory, conversations, moderation...');
   await initClaude();
   await initTracker();
+  await initModeration();
 
   // Step 3: Context diagnosis
   const report = await diagnoseContext();
@@ -276,23 +398,56 @@ async function main() {
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
 
-  // Flush all data every 5 minutes (tracker + conversations)
+  // Flush all data every 5 minutes (tracker + conversations + moderation)
   setInterval(async () => {
     await flushTracker();
     await saveConversations();
+    await flushModeration();
   }, 5 * 60 * 1000);
+
+  // Auto-sync: pull from git + reload context periodically
+  if (config.autoSyncInterval > 0) {
+    const syncMins = Math.round(config.autoSyncInterval / 60000);
+    console.log(`[jarvis] Auto-sync enabled: every ${syncMins} minutes`);
+    setInterval(async () => {
+      try {
+        const pullResult = await gitPull();
+        console.log(`[jarvis] Auto-sync: ${pullResult}`);
+        await reloadSystemPrompt();
+        console.log('[jarvis] Auto-sync: context reloaded');
+      } catch (err) {
+        console.warn(`[jarvis] Auto-sync failed: ${err.message}`);
+      }
+    }, config.autoSyncInterval);
+  }
+
+  // Auto-backup: commit data files to git periodically
+  if (config.autoBackupInterval > 0) {
+    const backupHrs = Math.round(config.autoBackupInterval / 3600000);
+    console.log(`[jarvis] Auto-backup enabled: every ${backupHrs} hours`);
+    setInterval(async () => {
+      try {
+        const result = await backupData();
+        console.log(`[jarvis] Auto-backup: ${result}`);
+      } catch (err) {
+        console.warn(`[jarvis] Auto-backup failed: ${err.message}`);
+      }
+    }, config.autoBackupInterval);
+  }
 
   // Graceful shutdown — save everything
   process.once('SIGINT', async () => {
     console.log('[jarvis] Shutting down — saving all data...');
     await flushTracker();
     await saveConversations();
+    await flushModeration();
     bot.stop('SIGINT');
   });
   process.once('SIGTERM', async () => {
     console.log('[jarvis] Shutting down — saving all data...');
     await flushTracker();
     await saveConversations();
+    await flushModeration();
     bot.stop('SIGTERM');
   });
 }

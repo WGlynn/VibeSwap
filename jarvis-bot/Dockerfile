@@ -27,9 +27,9 @@ RUN mkdir -p /app/data
 # Create directories for context files that get cloned at startup
 RUN mkdir -p /repo /memory
 
-# Copy the entrypoint script
+# Copy the entrypoint script (strip Windows CRLF line endings)
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Health check — verify the process is alive
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 \

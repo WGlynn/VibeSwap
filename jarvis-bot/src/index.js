@@ -2,7 +2,7 @@ import { Telegraf } from 'telegraf';
 import { config } from './config.js';
 import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData } from './git.js';
-import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
+import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
@@ -378,6 +378,58 @@ bot.command('spamlog', async (ctx) => {
     return `${time} ${e.action.toUpperCase()} user:${e.userId} — ${e.reason}${del}`;
   });
   ctx.reply('Spam Log:\n' + lines.join('\n'));
+});
+
+// ============ The Ark — Emergency Recovery ============
+// If the main group is ever deleted, Jarvis DMs every active user an invite link to the Ark.
+
+bot.command('ark', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  if (!config.arkGroupId) {
+    return ctx.reply('Ark group not configured. Set ARK_GROUP_ID in .env.');
+  }
+
+  ctx.reply('Launching the Ark. Creating invite link and notifying all active users...');
+
+  try {
+    // Create a permanent invite link for the Ark
+    const invite = await bot.telegram.createChatInviteLink(config.arkGroupId, {
+      name: 'VibeSwap Ark — Emergency Recovery',
+      creates_join_request: false,
+    });
+
+    const inviteLink = invite.invite_link;
+
+    // Get all tracked users from tracker
+    const allUsers = getAllUsers();
+    const userIds = Object.keys(allUsers).map(Number);
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const userId of userIds) {
+      // Skip bots and the owner (owner already knows)
+      if (userId === config.ownerUserId) continue;
+
+      try {
+        await bot.telegram.sendMessage(userId,
+          `The VibeSwap community chat was disrupted. We've activated the Ark — the backup channel.\n\n` +
+          `Join here: ${inviteLink}\n\n` +
+          `Your contributions and history are safe. See you inside.`
+        );
+        sent++;
+        // Rate limit: Telegram allows ~30 msgs/sec to different users
+        await new Promise(r => setTimeout(r, 50));
+      } catch {
+        failed++;
+      }
+    }
+
+    ctx.reply(`Ark deployed. Invite sent to ${sent} users (${failed} unreachable — they haven't DMed Jarvis before).`);
+  } catch (err) {
+    ctx.reply(`Ark failed: ${err.message}. Make sure Jarvis is admin of the Ark group.`);
+  }
 });
 
 // ============ Health Check ============

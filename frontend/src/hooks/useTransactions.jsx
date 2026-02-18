@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
+import { Contract } from 'ethers'
 import { useWallet } from './useWallet'
+import { CONTRACTS, areContractsDeployed } from '../utils/constants'
 
 const TransactionsContext = createContext(null)
 
@@ -24,6 +26,27 @@ const TX_STATUS = {
 
 const STORAGE_KEY = 'vibeswap_transactions'
 const MAX_TRANSACTIONS = 100
+const SYNC_BLOCK_KEY = 'vibeswap_last_sync_block'
+
+// ============ On-Chain Event ABIs (stubs) ============
+// These match the Solidity event signatures in our contracts.
+// Wire up when contracts are deployed and CONTRACTS addresses are set.
+
+const AUCTION_EVENTS = [
+  'event OrderCommitted(address indexed user, bytes32 commitHash, uint256 indexed batchId, uint256 deposit)',
+  'event OrderRevealed(address indexed user, uint256 indexed batchId, address tokenIn, address tokenOut, uint256 amountIn)',
+  'event BatchSettled(uint256 indexed batchId, uint256 clearingPrice, uint256 totalVolume, uint256 orderCount)',
+]
+
+const AMM_EVENTS = [
+  'event LiquidityAdded(address indexed provider, address indexed pool, uint256 amount0, uint256 amount1, uint256 liquidity)',
+  'event LiquidityRemoved(address indexed provider, address indexed pool, uint256 amount0, uint256 amount1, uint256 liquidity)',
+]
+
+const ROUTER_EVENTS = [
+  'event BridgeInitiated(address indexed sender, uint32 indexed dstChainId, address token, uint256 amount, bytes32 messageId)',
+  'event BridgeCompleted(bytes32 indexed messageId, address indexed recipient, address token, uint256 amount)',
+]
 
 // ============ localStorage Helpers ============
 
@@ -72,14 +95,310 @@ function saveTransactions(account, transactions) {
   }
 }
 
+// ============ On-Chain Event → Transaction Mappers ============
+
+function mapAuctionCommit(event) {
+  return {
+    id: `chain-${event.transactionHash}-${event.logIndex}`,
+    type: TX_TYPE.SWAP_COMMIT,
+    status: TX_STATUS.CONFIRMING,
+    hash: event.transactionHash,
+    blockNumber: event.blockNumber,
+    timestamp: null, // filled by block timestamp lookup
+    commitHash: event.args.commitHash,
+    batchId: Number(event.args.batchId),
+    deposit: event.args.deposit?.toString(),
+    source: 'chain',
+  }
+}
+
+function mapAuctionReveal(event) {
+  return {
+    id: `chain-${event.transactionHash}-${event.logIndex}`,
+    type: TX_TYPE.SWAP_REVEAL,
+    status: TX_STATUS.CONFIRMING,
+    hash: event.transactionHash,
+    blockNumber: event.blockNumber,
+    timestamp: null,
+    batchId: Number(event.args.batchId),
+    tokenIn: event.args.tokenIn,
+    tokenOut: event.args.tokenOut,
+    amountIn: event.args.amountIn?.toString(),
+    source: 'chain',
+  }
+}
+
+function mapBatchSettled(event) {
+  return {
+    id: `chain-${event.transactionHash}-${event.logIndex}`,
+    type: TX_TYPE.SWAP_SETTLED,
+    status: TX_STATUS.COMPLETED,
+    hash: event.transactionHash,
+    blockNumber: event.blockNumber,
+    timestamp: null,
+    batchId: Number(event.args.batchId),
+    clearingPrice: event.args.clearingPrice?.toString(),
+    totalVolume: event.args.totalVolume?.toString(),
+    orderCount: Number(event.args.orderCount),
+    source: 'chain',
+  }
+}
+
+function mapLiquidityAdded(event) {
+  return {
+    id: `chain-${event.transactionHash}-${event.logIndex}`,
+    type: TX_TYPE.ADD_LIQUIDITY,
+    status: TX_STATUS.COMPLETED,
+    hash: event.transactionHash,
+    blockNumber: event.blockNumber,
+    timestamp: null,
+    pool: event.args.pool,
+    amount0: event.args.amount0?.toString(),
+    amount1: event.args.amount1?.toString(),
+    liquidity: event.args.liquidity?.toString(),
+    source: 'chain',
+  }
+}
+
+function mapLiquidityRemoved(event) {
+  return {
+    id: `chain-${event.transactionHash}-${event.logIndex}`,
+    type: TX_TYPE.REMOVE_LIQUIDITY,
+    status: TX_STATUS.COMPLETED,
+    hash: event.transactionHash,
+    blockNumber: event.blockNumber,
+    timestamp: null,
+    pool: event.args.pool,
+    amount0: event.args.amount0?.toString(),
+    amount1: event.args.amount1?.toString(),
+    liquidity: event.args.liquidity?.toString(),
+    source: 'chain',
+  }
+}
+
+function mapBridgeInitiated(event) {
+  return {
+    id: `chain-${event.transactionHash}-${event.logIndex}`,
+    type: TX_TYPE.BRIDGE,
+    status: TX_STATUS.CONFIRMING,
+    hash: event.transactionHash,
+    blockNumber: event.blockNumber,
+    timestamp: null,
+    token: event.args.token,
+    amount: event.args.amount?.toString(),
+    toChain: Number(event.args.dstChainId),
+    messageId: event.args.messageId,
+    source: 'chain',
+  }
+}
+
+// ============ Merge: localStorage + on-chain ============
+
+function mergeTransactions(localTxs, chainTxs) {
+  // On-chain is source of truth. Deduplicate by tx hash.
+  // If a localStorage tx has the same hash as a chain tx, the chain version wins.
+  const chainHashes = new Set(chainTxs.map(tx => tx.hash).filter(Boolean))
+
+  const dedupedLocal = localTxs.filter(tx => {
+    // Keep local txs that have no hash (pending, not yet submitted)
+    if (!tx.hash) return true
+    // Keep local txs whose hash isn't in the chain set
+    return !chainHashes.has(tx.hash)
+  })
+
+  // Merge: chain txs first (newest), then remaining local txs
+  const merged = [...chainTxs, ...dedupedLocal]
+
+  // Sort by timestamp descending (newest first), nulls at top (pending)
+  merged.sort((a, b) => {
+    if (!a.timestamp && !b.timestamp) return 0
+    if (!a.timestamp) return -1
+    if (!b.timestamp) return 1
+    return b.timestamp - a.timestamp
+  })
+
+  return merged.slice(0, MAX_TRANSACTIONS)
+}
+
+// ============ Fetch Events from Chain ============
+
+async function fetchChainTransactions(provider, chainId, account) {
+  if (!provider || !chainId || !account) return []
+  if (!areContractsDeployed(chainId)) return []
+
+  const contracts = CONTRACTS[chainId]
+  const chainTxs = []
+
+  // Determine block range: last synced block → latest
+  const lastSyncKey = `${SYNC_BLOCK_KEY}_${chainId}_${account.toLowerCase()}`
+  let fromBlock
+  try {
+    const stored = localStorage.getItem(lastSyncKey)
+    fromBlock = stored ? Number(stored) + 1 : 'earliest'
+  } catch {
+    fromBlock = 'earliest'
+  }
+
+  try {
+    // --- Auction events (CommitRevealAuction) ---
+    if (contracts.auction) {
+      const auction = new Contract(contracts.auction, AUCTION_EVENTS, provider)
+
+      const [commits, reveals] = await Promise.all([
+        auction.queryFilter(auction.filters.OrderCommitted(account), fromBlock),
+        auction.queryFilter(auction.filters.OrderRevealed(account), fromBlock),
+      ])
+
+      commits.forEach(e => chainTxs.push(mapAuctionCommit(e)))
+      reveals.forEach(e => chainTxs.push(mapAuctionReveal(e)))
+
+      // BatchSettled is not indexed by user — fetch all and cross-reference
+      // TODO: Once subgraph is live, query per-user settlements instead
+    }
+
+    // --- AMM events (VibeAMM) ---
+    if (contracts.amm) {
+      const amm = new Contract(contracts.amm, AMM_EVENTS, provider)
+
+      const [adds, removes] = await Promise.all([
+        amm.queryFilter(amm.filters.LiquidityAdded(account), fromBlock),
+        amm.queryFilter(amm.filters.LiquidityRemoved(account), fromBlock),
+      ])
+
+      adds.forEach(e => chainTxs.push(mapLiquidityAdded(e)))
+      removes.forEach(e => chainTxs.push(mapLiquidityRemoved(e)))
+    }
+
+    // --- Bridge events (CrossChainRouter) ---
+    if (contracts.router) {
+      const router = new Contract(contracts.router, ROUTER_EVENTS, provider)
+
+      const bridges = await router.queryFilter(
+        router.filters.BridgeInitiated(account),
+        fromBlock
+      )
+
+      bridges.forEach(e => chainTxs.push(mapBridgeInitiated(e)))
+    }
+
+    // Backfill block timestamps for all fetched events
+    if (chainTxs.length > 0) {
+      const uniqueBlocks = [...new Set(chainTxs.map(tx => tx.blockNumber))]
+      const blockTimestamps = {}
+
+      // Batch block lookups (cap at 20 to avoid RPC rate limits)
+      const blocksToFetch = uniqueBlocks.slice(0, 20)
+      const blockResults = await Promise.all(
+        blocksToFetch.map(bn => provider.getBlock(bn).catch(() => null))
+      )
+      blocksToFetch.forEach((bn, i) => {
+        if (blockResults[i]) blockTimestamps[bn] = blockResults[i].timestamp * 1000
+      })
+
+      chainTxs.forEach(tx => {
+        tx.timestamp = blockTimestamps[tx.blockNumber] || Date.now()
+      })
+
+      // Update last synced block
+      const maxBlock = Math.max(...chainTxs.map(tx => tx.blockNumber))
+      try {
+        localStorage.setItem(lastSyncKey, String(maxBlock))
+      } catch {
+        // localStorage unavailable
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch on-chain transactions:', error)
+  }
+
+  return chainTxs
+}
+
+// ============ Subscribe to Live Events ============
+
+function subscribeToEvents(provider, chainId, account, onNewTx) {
+  if (!provider || !chainId || !account) return () => {}
+  if (!areContractsDeployed(chainId)) return () => {}
+
+  const contracts = CONTRACTS[chainId]
+  const cleanups = []
+
+  try {
+    if (contracts.auction) {
+      const auction = new Contract(contracts.auction, AUCTION_EVENTS, provider)
+
+      const onCommit = (...args) => {
+        const event = args[args.length - 1]
+        onNewTx(mapAuctionCommit(event))
+      }
+      const onReveal = (...args) => {
+        const event = args[args.length - 1]
+        onNewTx(mapAuctionReveal(event))
+      }
+
+      auction.on(auction.filters.OrderCommitted(account), onCommit)
+      auction.on(auction.filters.OrderRevealed(account), onReveal)
+
+      cleanups.push(() => {
+        auction.off(auction.filters.OrderCommitted(account), onCommit)
+        auction.off(auction.filters.OrderRevealed(account), onReveal)
+      })
+    }
+
+    if (contracts.amm) {
+      const amm = new Contract(contracts.amm, AMM_EVENTS, provider)
+
+      const onAdd = (...args) => {
+        const event = args[args.length - 1]
+        onNewTx(mapLiquidityAdded(event))
+      }
+      const onRemove = (...args) => {
+        const event = args[args.length - 1]
+        onNewTx(mapLiquidityRemoved(event))
+      }
+
+      amm.on(amm.filters.LiquidityAdded(account), onAdd)
+      amm.on(amm.filters.LiquidityRemoved(account), onRemove)
+
+      cleanups.push(() => {
+        amm.off(amm.filters.LiquidityAdded(account), onAdd)
+        amm.off(amm.filters.LiquidityRemoved(account), onRemove)
+      })
+    }
+
+    if (contracts.router) {
+      const router = new Contract(contracts.router, ROUTER_EVENTS, provider)
+
+      const onBridge = (...args) => {
+        const event = args[args.length - 1]
+        onNewTx(mapBridgeInitiated(event))
+      }
+
+      router.on(router.filters.BridgeInitiated(account), onBridge)
+
+      cleanups.push(() => {
+        router.off(router.filters.BridgeInitiated(account), onBridge)
+      })
+    }
+  } catch (error) {
+    console.error('Failed to subscribe to contract events:', error)
+  }
+
+  // Return cleanup function that unsubscribes all listeners
+  return () => cleanups.forEach(fn => fn())
+}
+
 export function TransactionsProvider({ children }) {
-  const { account, chainId } = useWallet()
+  const { account, chainId, provider } = useWallet()
   const [transactions, setTransactions] = useState([])
   const [pendingCount, setPendingCount] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const hasSyncedRef = useRef(false)
 
   // Load transactions from localStorage on mount/account change
   useEffect(() => {
     setTransactions(loadTransactions(account))
+    hasSyncedRef.current = false // reset sync flag on account change
   }, [account])
 
   // Save transactions to localStorage when they change
@@ -87,6 +406,54 @@ export function TransactionsProvider({ children }) {
     if (!account) return
     saveTransactions(account, transactions)
   }, [transactions, account])
+
+  // ============ On-Chain Sync (runs once per account+chain) ============
+  useEffect(() => {
+    if (!provider || !chainId || !account) return
+    if (!areContractsDeployed(chainId)) return
+    if (hasSyncedRef.current) return
+
+    hasSyncedRef.current = true
+    setIsSyncing(true)
+
+    fetchChainTransactions(provider, chainId, account)
+      .then(chainTxs => {
+        if (chainTxs.length > 0) {
+          setTransactions(prev => mergeTransactions(prev, chainTxs))
+        }
+      })
+      .finally(() => setIsSyncing(false))
+  }, [provider, chainId, account])
+
+  // ============ Live Event Subscription ============
+  useEffect(() => {
+    if (!provider || !chainId || !account) return () => {}
+    if (!areContractsDeployed(chainId)) return () => {}
+
+    const unsubscribe = subscribeToEvents(provider, chainId, account, (newTx) => {
+      // Backfill timestamp for live events
+      newTx.timestamp = newTx.timestamp || Date.now()
+      setTransactions(prev => mergeTransactions(prev, [newTx]))
+    })
+
+    return unsubscribe
+  }, [provider, chainId, account])
+
+  // Manual sync trigger (exposed to consumers)
+  const syncFromChain = useCallback(async () => {
+    if (!provider || !chainId || !account) return
+    if (!areContractsDeployed(chainId)) return
+
+    setIsSyncing(true)
+    try {
+      const chainTxs = await fetchChainTransactions(provider, chainId, account)
+      if (chainTxs.length > 0) {
+        setTransactions(prev => mergeTransactions(prev, chainTxs))
+      }
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [provider, chainId, account])
 
   // Update pending count
   useEffect(() => {
@@ -272,6 +639,10 @@ export function TransactionsProvider({ children }) {
     getLiquidityTransactions,
     getBridgeTransactions,
     getPendingTransactions,
+
+    // On-chain sync
+    syncFromChain,
+    isSyncing,
 
     // Constants
     TX_TYPE,

@@ -20,8 +20,9 @@ export const config = {
   authorizedUsers: process.env.AUTHORIZED_USERS
     ? process.env.AUTHORIZED_USERS.split(',').map(id => parseInt(id.trim()))
     : [],
-  // Jarvis is the sole admin — Will's Telegram user ID
-  ownerUserId: process.env.OWNER_USER_ID ? parseInt(process.env.OWNER_USER_ID) : null,
+  // Co-admin: Will (human) + Jarvis (AI) — 50/50 governance
+  ownerUserId: 8366932263,
+  botUsername: 'JarvisMind1828383bot',
   maxConversationHistory: 50,
   maxTokens: 1024,
   // Auto-sync: pull from git + reload context (ms, default 1 hour)

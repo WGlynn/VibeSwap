@@ -579,26 +579,23 @@ input[type="number"] {
    PREMIUM POLISH
    ============================================ */
 
-/* Smooth all transitions globally */
-*, *::before, *::after {
+/* Smooth transitions for VibeSwap elements only (scoped — never pollute third-party components) */
+#root *, #root *::before, #root *::after {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Better focus ring for accessibility + style */
-*:focus-visible {
-  outline: 1px solid rgba(0, 255, 65, 0.5);
-  outline-offset: 2px;
-  border-radius: 4px;
+/* Subtle noise texture overlay for depth — z-index BELOW modals to avoid blocking third-party overlays */
+.noise-overlay {
+  pointer-events: none;
 }
 
-/* Subtle noise texture overlay for depth */
 .noise-overlay::before {
   content: '';
   position: fixed;
   inset: 0;
   opacity: 0.015;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 1;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
@@ -609,9 +606,9 @@ input[type="number"] {
   border-color: rgba(66, 66, 66, 0.8);
 }
 
-/* Gradient border on focused inputs */
-input:focus {
-  border-color: rgba(0, 255, 65, 0.3) !important;
+/* Gradient border on focused inputs — scoped to #root to avoid breaking Web3Modal/third-party inputs */
+#root input:focus {
+  border-color: rgba(0, 255, 65, 0.3);
   box-shadow: 0 0 0 1px rgba(0, 255, 65, 0.1), 0 0 20px -5px rgba(0, 255, 65, 0.1);
 }
 

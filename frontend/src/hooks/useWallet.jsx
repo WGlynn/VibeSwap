@@ -112,8 +112,14 @@ const modal = createWeb3Modal({
     '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust
     'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa', // Coinbase
   ],
-  // Only show wallet options, no email/social for now
-  // Email login requires WalletConnect Cloud project configuration
+  // Disable social/email login — requires WalletConnect Cloud configuration we haven't done yet
+  // When ready: set email: true, socials: ['google', 'apple', 'discord'] and configure in Cloud dashboard
+  features: {
+    email: false,
+    socials: false,
+    emailShowWallets: true,
+    swaps: false,
+  },
   allWallets: 'SHOW',
 })
 

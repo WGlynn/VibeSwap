@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { config } from './config.js';
 import { loadSystemPrompt } from './memory.js';
 
@@ -10,7 +9,7 @@ const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 // Per-chat conversation history — persisted to disk
 const conversations = new Map();
 
-const DATA_DIR = join(homedir(), 'vibeswap', 'jarvis-bot', 'data');
+const DATA_DIR = config.dataDir;
 const CONVERSATIONS_FILE = join(DATA_DIR, 'conversations.json');
 
 let systemPrompt = '';

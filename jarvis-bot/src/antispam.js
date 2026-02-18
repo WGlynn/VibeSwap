@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
+import { config } from './config.js';
 
-const DATA_DIR = join(homedir(), 'vibeswap', 'jarvis-bot', 'data');
+const DATA_DIR = config.dataDir;
 const SPAM_LOG_FILE = join(DATA_DIR, 'spam-log.json');
 
 // ============ State ============

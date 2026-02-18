@@ -1,6 +1,5 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { config } from './config.js';
 
 const MEMORY_FILES = [
@@ -11,10 +10,9 @@ const MEMORY_FILES = [
   'matt-pow-mmr.md',
 ];
 
-// Use OS-native home directory for reliable path resolution
-const HOME = homedir();
-const REPO_PATH = process.env.VIBESWAP_REPO || join(HOME, 'vibeswap');
-const MEMORY_DIR = process.env.MEMORY_DIR || join(HOME, '.claude', 'projects', 'C--Users-Will', 'memory');
+// Path resolution uses config (supports both local and Docker/cloud)
+const REPO_PATH = config.repo.path;
+const MEMORY_DIR = config.memory.dir;
 
 const SESSION_STATE_PATH = join(REPO_PATH, '.claude', 'SESSION_STATE.md');
 const CLAUDE_MD_PATH = join(REPO_PATH, 'CLAUDE.md');

@@ -1,9 +1,9 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { createHash } from 'crypto';
+import { config } from './config.js';
 
-const DATA_DIR = join(homedir(), 'vibeswap', 'jarvis-bot', 'data');
+const DATA_DIR = config.dataDir;
 const CONTRIBUTIONS_FILE = join(DATA_DIR, 'contributions.json');
 const USERS_FILE = join(DATA_DIR, 'users.json');
 const INTERACTIONS_FILE = join(DATA_DIR, 'interactions.json');

@@ -1,9 +1,7 @@
 import simpleGit from 'simple-git';
-import { homedir } from 'os';
-import { join } from 'path';
 import { config } from './config.js';
 
-const REPO_PATH = process.env.VIBESWAP_REPO || join(homedir(), 'vibeswap');
+const REPO_PATH = config.repo.path;
 const git = simpleGit(REPO_PATH);
 
 export async function gitStatus() {

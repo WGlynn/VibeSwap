@@ -1,0 +1,33 @@
+# JARVIS — Fly.io Deployment
+# Deploy: fly launch --copy-config --no-deploy && fly deploy
+# Secrets: fly secrets set TELEGRAM_BOT_TOKEN=... ANTHROPIC_API_KEY=... GITHUB_TOKEN=...
+
+app = "jarvis-vibeswap"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DOCKER = "1"
+  NODE_ENV = "production"
+  VIBESWAP_REPO = "/repo"
+  MEMORY_DIR = "/repo/.claude/projects/C--Users-Will/memory"
+  DATA_DIR = "/app/data"
+  GITHUB_REPO_URL = "https://github.com/WGlynn/vibeswap-private.git"
+
+[mounts]
+  source = "jarvis_data"
+  destination = "/app/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8080
+    path = "/health"
+    interval = "60s"
+    timeout = "10s"

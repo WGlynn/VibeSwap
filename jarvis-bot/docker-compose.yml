@@ -1,0 +1,41 @@
+# JARVIS — Docker Compose
+# Usage:
+#   docker compose up -d          # Start Jarvis (detached)
+#   docker compose logs -f        # Watch logs
+#   docker compose down            # Stop Jarvis
+#   docker compose up -d --build   # Rebuild and restart
+
+services:
+  jarvis:
+    build: .
+    container_name: jarvis-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DOCKER=1
+      - NODE_ENV=production
+      - VIBESWAP_REPO=/repo
+      - MEMORY_DIR=/repo/.claude/projects/C--Users-Will/memory
+      - DATA_DIR=/app/data
+      # Set these in .env:
+      # TELEGRAM_BOT_TOKEN
+      # ANTHROPIC_API_KEY
+      # GITHUB_TOKEN (for private repo access)
+      # GITHUB_REPO_URL (defaults to vibeswap-private)
+      # GITHUB_STEALTH_URL (stealth remote)
+    volumes:
+      # Persistent data — survives container rebuilds
+      - jarvis-data:/app/data
+      # Persistent repo clone — avoids re-clone on restart
+      - jarvis-repo:/repo
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  jarvis-data:
+    name: jarvis-data
+  jarvis-repo:
+    name: jarvis-repo

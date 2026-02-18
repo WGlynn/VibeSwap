@@ -225,7 +225,7 @@ function AboutPage() {
         <div className="max-w-4xl mx-auto px-4">
           {/* Rotating Headline */}
           <div
-            className="h-[120px] md:h-[140px] flex items-center justify-center mb-4 cursor-default"
+            className="h-[100px] sm:h-[120px] md:h-[140px] flex items-center justify-center mb-4 cursor-default"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
@@ -236,7 +236,7 @@ function AboutPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
-                className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-center"
+                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-center"
               >
                 {current.headline.map((line, i) => (
                   <span key={i} className="block">
@@ -251,7 +251,7 @@ function AboutPage() {
 
           {/* Rotating Blurb */}
           <div
-            className="relative h-[80px] md:h-[60px] mb-6"
+            className="relative h-[90px] sm:h-[80px] md:h-[60px] mb-6"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
@@ -363,7 +363,7 @@ function AboutPage() {
           <h2 className="text-2xl font-bold mb-6 text-center">
             Built by <span className="text-matrix-500">Real People</span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {team.map((member, i) => (
               <motion.div
                 key={member.name}
@@ -406,15 +406,15 @@ function AboutPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.7 + i * 0.1 }}
-                className="p-6 rounded-lg bg-black-800 border border-black-600"
+                className="p-4 sm:p-6 rounded-lg bg-black-800 border border-black-600"
               >
-                <h3 className="text-lg font-bold mb-4 text-matrix-500">
+                <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 text-matrix-500">
                   {i + 1}. {section.title}
                 </h3>
 
                 {section.quote && (
-                  <div className="mb-4 pl-4 border-l-2 border-matrix-500/30">
-                    <p className="text-black-300 italic">{section.quote}</p>
+                  <div className="mb-3 sm:mb-4 pl-3 sm:pl-4 border-l-2 border-matrix-500/30">
+                    <p className="text-black-300 italic text-sm sm:text-base">{section.quote}</p>
                     <p className="text-xs text-black-500 mt-1">{section.quoteAuthor}</p>
                   </div>
                 )}

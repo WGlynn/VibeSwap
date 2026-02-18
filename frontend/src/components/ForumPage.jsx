@@ -116,23 +116,24 @@ function ForumPage() {
       </motion.div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-center space-x-2 mb-8">
+      <div className="flex items-center justify-center space-x-1 sm:space-x-2 mb-8 overflow-x-auto">
         {[
           { id: 'feed', label: 'Feed', icon: '📝' },
-          { id: 'graph', label: 'Knowledge Graph', icon: '🔗' },
-          { id: 'leaderboard', label: 'Leaderboard', icon: '🏆' },
+          { id: 'graph', label: 'Knowledge Graph', mobileLabel: 'Graph', icon: '🔗' },
+          { id: 'leaderboard', label: 'Leaderboard', mobileLabel: 'Leaders', icon: '🏆' },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
               activeTab === tab.id
                 ? 'bg-matrix-500/20 text-matrix-400 border border-matrix-500/30'
                 : 'text-black-400 hover:text-white hover:bg-black-800'
             }`}
           >
-            <span className="mr-2">{tab.icon}</span>
-            {tab.label}
+            <span className="mr-1 sm:mr-2">{tab.icon}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.mobileLabel || tab.label}</span>
           </button>
         ))}
       </div>
@@ -394,24 +395,24 @@ function ContributionCard({ contribution, onUpvote, isThreaded = false, isLastIn
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`p-5 rounded-lg bg-black-800 border ${
+      className={`p-3 sm:p-5 rounded-lg bg-black-800 border ${
         isKeyInsight ? 'border-yellow-500/50 bg-yellow-500/5' :
         isSignature ? 'border-purple-500/50 bg-purple-500/5' :
         contribution.implemented ? 'border-matrix-500/50' : 'border-black-600'
-      } hover:border-black-500 transition-colors ${isThreaded ? 'ml-6 border-l-2 border-l-black-600' : ''}`}
+      } hover:border-black-500 transition-colors ${isThreaded ? 'ml-3 sm:ml-6 border-l-2 border-l-black-600' : ''}`}
     >
-      <div className="flex items-start space-x-4">
+      <div className="flex items-start space-x-2 sm:space-x-4">
         {/* Upvote */}
-        <div className="flex flex-col items-center space-y-1">
+        <div className="flex flex-col items-center space-y-1 flex-shrink-0">
           <button
             onClick={onUpvote}
-            className="p-2 rounded hover:bg-black-700 transition-colors text-black-400 hover:text-matrix-500"
+            className="p-1.5 sm:p-2 rounded hover:bg-black-700 transition-colors text-black-400 hover:text-matrix-500"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
           </button>
-          <span className="text-sm font-bold text-matrix-500">{contribution.upvotes}</span>
+          <span className="text-xs sm:text-sm font-bold text-matrix-500">{contribution.upvotes}</span>
         </div>
 
         {/* Content */}
@@ -472,8 +473,8 @@ function ContributionCard({ contribution, onUpvote, isThreaded = false, isLastIn
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between text-xs text-black-500">
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center justify-between text-xs text-black-500 flex-wrap gap-1">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-wrap">
               <span className="font-medium text-black-300 flex items-center space-x-1">
                 <span>@{contribution.author}</span>
                 {isReservedUser && (
@@ -569,9 +570,9 @@ function KnowledgeGraphView({ graph, contributions }) {
         </div>
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 flex flex-wrap gap-3">
+        <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 flex flex-wrap gap-2 sm:gap-3 max-w-[60%]">
           {Object.entries(CONTRIBUTION_TYPES).map(([key, type]) => (
-            <div key={key} className="flex items-center space-x-1 text-xs text-black-400">
+            <div key={key} className="flex items-center space-x-1 text-[10px] sm:text-xs text-black-400">
               <span>{type.icon}</span>
               <span>{type.label}</span>
             </div>
@@ -579,7 +580,7 @@ function KnowledgeGraphView({ graph, contributions }) {
         </div>
 
         {/* Connection count */}
-        <div className="absolute bottom-4 right-4 text-xs text-black-500">
+        <div className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 text-[10px] sm:text-xs text-black-500">
           {graph.edges.length} connections
         </div>
       </div>
@@ -593,12 +594,12 @@ function KnowledgeGraphView({ graph, contributions }) {
               const source = contributions.find(c => c.id === edge.source)
               const target = contributions.find(c => c.id === edge.target)
               return (
-                <div key={i} className="flex items-center text-xs text-black-400">
-                  <span className="text-white">{source?.title?.slice(0, 30)}</span>
-                  <span className="mx-2">—</span>
+                <div key={i} className="flex flex-wrap items-center text-xs text-black-400 gap-1">
+                  <span className="text-white truncate max-w-[120px] sm:max-w-none">{source?.title?.slice(0, 30)}</span>
+                  <span>—</span>
                   <span className="text-matrix-500">#{edge.tags.join(', #')}</span>
-                  <span className="mx-2">—</span>
-                  <span className="text-white">{target?.title?.slice(0, 30)}</span>
+                  <span>—</span>
+                  <span className="text-white truncate max-w-[120px] sm:max-w-none">{target?.title?.slice(0, 30)}</span>
                 </div>
               )
             })}
@@ -821,7 +822,7 @@ function NewContributionModal({ onClose, onSubmit, identity, hasIdentity }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80"
       onClick={onClose}
     >
       <motion.div
@@ -829,7 +830,7 @@ function NewContributionModal({ onClose, onSubmit, identity, hasIdentity }) {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg p-6 rounded-lg bg-black-800 border border-black-600"
+        className="w-full max-w-lg p-4 sm:p-6 rounded-lg bg-black-800 border border-black-600 max-h-[90vh] overflow-y-auto"
       >
         <h2 className="text-xl font-bold text-white mb-4">New Contribution</h2>
 

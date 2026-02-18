@@ -7,39 +7,51 @@ import GlassCard from './ui/GlassCard'
 import AnimatedNumber from './ui/AnimatedNumber'
 import InteractiveButton from './ui/InteractiveButton'
 
+// Format large numbers into abbreviated form for AnimatedNumber
+// Returns { value, suffix, decimals } so AnimatedNumber shows e.g. "$12.5M"
+function formatLargeNumber(num) {
+  if (num >= 1_000_000) {
+    return { value: num / 1_000_000, suffix: 'M', decimals: 1 }
+  }
+  if (num >= 1_000) {
+    return { value: num / 1_000, suffix: 'K', decimals: num >= 10_000 ? 0 : 1 }
+  }
+  return { value: num, suffix: '', decimals: 0 }
+}
+
 // Mock pool data
 const POOLS = [
   {
     id: '1',
     token0: { symbol: 'ETH', logo: '⟠' },
     token1: { symbol: 'USDC', logo: '💵' },
-    tvl: '$12.5M',
-    volume24h: '$2.3M',
-    fees24h: '$6,900',
-    apr: '18.2%',
-    myLiquidity: '$5,230',
+    tvl: 12500000,
+    volume24h: 2300000,
+    fees24h: 6900,
+    apr: 18.2,
+    myLiquidity: 5230,
     myShare: '0.042%',
   },
   {
     id: '2',
     token0: { symbol: 'ETH', logo: '⟠' },
     token1: { symbol: 'WBTC', logo: '₿' },
-    tvl: '$8.2M',
-    volume24h: '$1.1M',
-    fees24h: '$3,300',
-    apr: '14.7%',
-    myLiquidity: '$0',
+    tvl: 8200000,
+    volume24h: 1100000,
+    fees24h: 3300,
+    apr: 14.7,
+    myLiquidity: 0,
     myShare: '0%',
   },
   {
     id: '3',
     token0: { symbol: 'USDC', logo: '💵' },
     token1: { symbol: 'ARB', logo: '🔵' },
-    tvl: '$4.1M',
-    volume24h: '$890K',
-    fees24h: '$2,670',
-    apr: '23.8%',
-    myLiquidity: '$1,500',
+    tvl: 4100000,
+    volume24h: 890000,
+    fees24h: 2670,
+    apr: 23.8,
+    myLiquidity: 1500,
     myShare: '0.037%',
   },
 ]
@@ -87,9 +99,9 @@ function PoolPage() {
       <div className="flex space-x-1 mb-6 p-1 bg-black-800/50 rounded-xl w-fit">
         <button
           onClick={() => setActiveTab('pools')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`tab-underline px-4 py-2 rounded-lg font-medium transition-colors ${
             activeTab === 'pools'
-              ? 'bg-black-700 text-white'
+              ? 'active bg-black-700 text-white'
               : 'text-black-400 hover:text-white'
           }`}
         >
@@ -97,9 +109,9 @@ function PoolPage() {
         </button>
         <button
           onClick={() => setActiveTab('my')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`tab-underline px-4 py-2 rounded-lg font-medium transition-colors ${
             activeTab === 'my'
-              ? 'bg-black-700 text-white'
+              ? 'active bg-black-700 text-white'
               : 'text-black-400 hover:text-white'
           }`}
         >
@@ -112,21 +124,21 @@ function PoolPage() {
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Community Savings</p>
-            <p className="text-2xl font-bold mt-1">$24.8M</p>
+            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={24.8} prefix="$" suffix="M" decimals={1} /></p>
             <p className="text-sm text-green-500 mt-1">+5.2% (24h)</p>
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Exchanged Today</p>
-            <p className="text-2xl font-bold mt-1">$4.29M</p>
+            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={4.29} prefix="$" suffix="M" decimals={2} /></p>
             <p className="text-sm text-green-500 mt-1">+12.8% (24h)</p>
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Earnings Paid Out</p>
-            <p className="text-2xl font-bold mt-1">$12,870</p>
+            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={12870} prefix="$" decimals={0} /></p>
             <p className="text-sm text-green-500 mt-1">+8.3% (24h)</p>
           </GlassCard>
         </StaggerItem>
@@ -144,7 +156,7 @@ function PoolPage() {
         </div>
 
         {/* Pool Rows */}
-        {POOLS.filter(pool => activeTab === 'pools' || parseFloat(pool.myLiquidity.replace(/[$,]/g, '')) > 0).map((pool) => (
+        {POOLS.filter(pool => activeTab === 'pools' || pool.myLiquidity > 0).map((pool) => (
           <StaggerItem key={pool.id}>
             {/* Desktop row */}
             <div
@@ -164,13 +176,21 @@ function PoolPage() {
                   <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-matrix-500/20 text-matrix-400">0.05%</span>
                 </div>
               </div>
-              <div className="col-span-2 text-right font-medium">{pool.tvl}</div>
-              <div className="col-span-2 text-right">{pool.volume24h}</div>
-              <div className="col-span-2 text-right text-green-500 font-medium">{pool.apr}</div>
+              <div className="col-span-2 text-right font-medium">
+                <AnimatedNumber value={formatLargeNumber(pool.tvl).value} prefix="$" suffix={formatLargeNumber(pool.tvl).suffix} decimals={formatLargeNumber(pool.tvl).decimals} />
+              </div>
               <div className="col-span-2 text-right">
-                {pool.myLiquidity !== '$0' ? (
+                <AnimatedNumber value={formatLargeNumber(pool.volume24h).value} prefix="$" suffix={formatLargeNumber(pool.volume24h).suffix} decimals={formatLargeNumber(pool.volume24h).decimals} />
+              </div>
+              <div className="col-span-2 text-right text-green-500 font-medium">
+                <AnimatedNumber value={pool.apr} suffix="%" decimals={1} />
+              </div>
+              <div className="col-span-2 text-right">
+                {pool.myLiquidity > 0 ? (
                   <div>
-                    <div className="font-medium">{pool.myLiquidity}</div>
+                    <div className="font-medium">
+                      <AnimatedNumber value={formatLargeNumber(pool.myLiquidity).value} prefix="$" suffix={formatLargeNumber(pool.myLiquidity).suffix} decimals={formatLargeNumber(pool.myLiquidity).decimals} />
+                    </div>
                     <div className="text-xs text-black-400">{pool.myShare}</div>
                   </div>
                 ) : (
@@ -199,29 +219,37 @@ function PoolPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-green-500 font-semibold">{pool.apr}</div>
+                  <div className="text-green-500 font-semibold"><AnimatedNumber value={pool.apr} suffix="%" decimals={1} /></div>
                   <div className="text-xs text-black-400">APR</div>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
                   <div className="text-black-400 text-xs">Pool Size</div>
-                  <div className="font-medium">{pool.tvl}</div>
+                  <div className="font-medium">
+                    <AnimatedNumber value={formatLargeNumber(pool.tvl).value} prefix="$" suffix={formatLargeNumber(pool.tvl).suffix} decimals={formatLargeNumber(pool.tvl).decimals} />
+                  </div>
                 </div>
                 <div>
                   <div className="text-black-400 text-xs">24h Volume</div>
-                  <div>{pool.volume24h}</div>
+                  <div>
+                    <AnimatedNumber value={formatLargeNumber(pool.volume24h).value} prefix="$" suffix={formatLargeNumber(pool.volume24h).suffix} decimals={formatLargeNumber(pool.volume24h).decimals} />
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-black-400 text-xs">My Balance</div>
-                  <div className="font-medium">{pool.myLiquidity !== '$0' ? pool.myLiquidity : '-'}</div>
+                  <div className="font-medium">
+                    {pool.myLiquidity > 0 ? (
+                      <AnimatedNumber value={formatLargeNumber(pool.myLiquidity).value} prefix="$" suffix={formatLargeNumber(pool.myLiquidity).suffix} decimals={formatLargeNumber(pool.myLiquidity).decimals} />
+                    ) : '-'}
+                  </div>
                 </div>
               </div>
             </div>
           </StaggerItem>
         ))}
 
-        {activeTab === 'my' && POOLS.filter(pool => parseFloat(pool.myLiquidity.replace(/[$,]/g, '')) > 0).length === 0 && (
+        {activeTab === 'my' && POOLS.filter(pool => pool.myLiquidity > 0).length === 0 && (
           <div className="p-12 text-center">
             <svg className="w-16 h-16 mx-auto text-black-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />

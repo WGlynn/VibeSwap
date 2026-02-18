@@ -368,12 +368,12 @@ function BuySellPage() {
 
               {/* Quick Amounts */}
               {mode === 'buy' && (
-                <div className="flex space-x-2">
+                <div className="grid grid-cols-4 gap-2">
                   {['50', '100', '250', '500'].map((preset) => (
                     <button
                       key={preset}
                       onClick={() => setAmount(preset)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
                         amount === preset
                           ? 'bg-matrix-500/20 text-matrix-400 border border-matrix-500/30'
                           : 'bg-black-700 text-black-300 hover:bg-black-600'
@@ -468,20 +468,20 @@ function BuySellPage() {
                     <button
                       key={method.id}
                       onClick={() => setSelectedPayment(method)}
-                      className={`w-full p-4 rounded-xl border transition-all text-left flex items-center justify-between ${
+                      className={`w-full p-3 sm:p-4 rounded-xl border transition-all text-left flex items-center justify-between gap-2 ${
                         selectedPayment?.id === method.id
                           ? 'border-matrix-500 bg-matrix-500/10'
                           : 'border-black-600 bg-black-700/50 hover:border-black-500'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{method.icon}</span>
-                        <div>
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <span className="text-2xl flex-shrink-0">{method.icon}</span>
+                        <div className="min-w-0">
                           <div className="font-medium">{method.name}</div>
                           <div className="text-xs text-black-500">{method.speed} · {method.fee} fee</div>
                         </div>
                       </div>
-                      <span className="text-xs text-black-500">{method.limit}</span>
+                      <span className="text-xs text-black-500 flex-shrink-0 hidden sm:block">{method.limit}</span>
                     </button>
                   ))}
                 </div>
@@ -728,9 +728,9 @@ function BuySellPage() {
       </div>
 
       {/* Trust Badges */}
-      <div className="mt-6 flex items-center justify-center space-x-4">
+      <div className="mt-6 flex items-center justify-center flex-wrap gap-2 sm:gap-4">
         <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black-800 border border-black-700">
-          <svg className="w-4 h-4 text-matrix-500" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-4 h-4 text-matrix-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
           <span className="text-xs text-black-300">Bank-level encryption</span>
@@ -739,7 +739,7 @@ function BuySellPage() {
           onClick={() => setShowSupport(true)}
           className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black-800 border border-black-700 hover:border-terminal-500/50 transition-colors"
         >
-          <svg className="w-4 h-4 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-terminal-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
           <span className="text-xs text-black-300">Need help?</span>
@@ -851,9 +851,9 @@ function BuySellPage() {
                           </svg>
                         </a>
                       )}
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm">
-                        <span className="text-black-300">Phone</span>
-                        <span className="text-black-200 font-mono text-xs">{method.support.phone}</span>
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm gap-2">
+                        <span className="text-black-300 flex-shrink-0">Phone</span>
+                        <span className="text-black-200 font-mono text-xs text-right truncate">{method.support.phone}</span>
                       </div>
                       <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm">
                         <span className="text-black-300">Hours</span>

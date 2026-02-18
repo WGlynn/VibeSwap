@@ -8,6 +8,8 @@ import toast from 'react-hot-toast'
 import GlassCard from './ui/GlassCard'
 import InteractiveButton from './ui/InteractiveButton'
 import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
+import ProgressRing from './ui/ProgressRing'
+import AnimatedNumber from './ui/AnimatedNumber'
 
 /**
  * Savings Vault Page
@@ -162,7 +164,7 @@ function VaultPage() {
           </div>
 
           {/* Security comparison */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div className="p-4 rounded-xl bg-black-700/50 border border-black-600">
               <div className="text-sm font-medium mb-2">Spending Wallet</div>
               <ul className="text-xs text-black-400 space-y-1">
@@ -238,18 +240,22 @@ function VaultPage() {
       )}
 
       {/* Balance overview */}
-      <StaggerContainer className="grid grid-cols-2 gap-4 mb-6">
+      <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <StaggerItem>
           <GlassCard className="p-4">
             <div className="text-sm text-black-400 mb-1">Spending Balance</div>
-            <div className="text-2xl font-bold">${totalSpendingValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              <AnimatedNumber value={totalSpendingValue} prefix="$" decimals={0} />
+            </div>
             <div className="text-xs text-black-500 mt-1">Instant access</div>
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard glowColor="terminal" className="p-4">
             <div className="text-sm text-terminal-400 mb-1">Vault Balance</div>
-            <div className="text-2xl font-bold text-terminal-400">${totalVaultValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-terminal-400">
+              <AnimatedNumber value={totalVaultValue} prefix="$" decimals={0} className="text-terminal-400" />
+            </div>
             <div className="text-xs text-black-400 mt-1">{VAULT_CONFIG.timelockDays}-day timelock</div>
           </GlassCard>
         </StaggerItem>
@@ -285,7 +291,7 @@ function VaultPage() {
             const vaultValue = vaultBal * token.price
 
             return (
-              <div key={token.symbol} className="p-4 flex items-center justify-between">
+              <div key={token.symbol} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center space-x-3">
                   <span className="text-2xl">{token.logo}</span>
                   <div>
@@ -293,20 +299,20 @@ function VaultPage() {
                     <div className="text-xs text-black-500">{token.name}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center space-x-4">
+                <div className="text-right sm:text-right">
+                  <div className="flex items-center justify-end space-x-4">
                     <div className="text-right">
                       <div className="text-xs text-black-500">Spending</div>
-                      <div className="text-sm text-black-300">{spendingBal.toFixed(4)}</div>
+                      <AnimatedNumber value={spendingBal} decimals={4} className="text-sm text-black-300" />
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-terminal-500">Vault</div>
-                      <div className="font-medium text-terminal-400">{vaultBal.toFixed(4)}</div>
+                      <AnimatedNumber value={vaultBal} decimals={4} className="font-medium text-terminal-400" />
                     </div>
                   </div>
                   {vaultValue > 0 && (
                     <div className="text-xs text-black-500 mt-1">
-                      ${vaultValue.toLocaleString()}
+                      <AnimatedNumber value={vaultValue} prefix="$" decimals={0} />
                     </div>
                   )}
                 </div>
@@ -326,16 +332,40 @@ function VaultPage() {
             {pendingWithdrawals.map((w) => {
               const time = getWithdrawalTimeRemaining(w.id)
               const isReady = time?.ready
+              const totalDuration = w.availableAt - w.initiatedAt
+              const elapsed = Date.now() - w.initiatedAt
+              const timelockProgress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
 
               return (
-                <div key={w.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{w.amount} {w.symbol}</div>
-                    <div className="text-xs text-black-500">
-                      Initiated {new Date(w.initiatedAt).toLocaleDateString()}
+                <div key={w.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center space-x-3">
+                    <ProgressRing
+                      progress={timelockProgress}
+                      size={48}
+                      strokeWidth={3}
+                      color={isReady ? '#00ff41' : '#f59e0b'}
+                    >
+                      {isReady ? (
+                        <svg className="w-5 h-5 text-matrix-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <span className="text-[10px] font-bold text-amber-400">
+                          {time?.days > 0 ? `${time.days}d` : `${time?.hours || 0}h`}
+                        </span>
+                      )}
+                    </ProgressRing>
+                    <div>
+                      <div className="font-medium">
+                        <AnimatedNumber value={w.amount} decimals={4} className="font-medium" />{' '}
+                        {w.symbol}
+                      </div>
+                      <div className="text-xs text-black-500">
+                        Initiated {new Date(w.initiatedAt).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 self-end sm:self-auto">
                     {isReady ? (
                       <button
                         onClick={() => {
@@ -405,7 +435,7 @@ function VaultPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-black-400 mb-2">Token</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {TOKENS.map((token) => (
                     <button
                       key={token.symbol}
@@ -436,11 +466,11 @@ function VaultPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="flex-1 bg-black-700 border border-black-600 rounded-lg px-4 py-3 text-lg font-medium outline-none focus:border-terminal-500"
+                    className="w-full min-w-0 flex-1 bg-black-700 border border-black-600 rounded-lg px-4 py-3 text-lg font-medium outline-none focus:border-terminal-500"
                   />
                   <button
                     onClick={() => setAmount(getBalance(selectedToken.symbol).toString())}
-                    className="px-3 py-3 rounded-lg bg-black-600 hover:bg-black-500 text-sm font-medium transition-colors"
+                    className="px-3 py-3 rounded-lg bg-black-600 hover:bg-black-500 text-sm font-medium transition-colors shrink-0"
                   >
                     MAX
                   </button>
@@ -487,7 +517,7 @@ function VaultPage() {
 
               <div>
                 <label className="block text-sm text-black-400 mb-2">Token</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {TOKENS.map((token) => (
                     <button
                       key={token.symbol}
@@ -518,11 +548,11 @@ function VaultPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="flex-1 bg-black-700 border border-black-600 rounded-lg px-4 py-3 text-lg font-medium outline-none focus:border-terminal-500"
+                    className="w-full min-w-0 flex-1 bg-black-700 border border-black-600 rounded-lg px-4 py-3 text-lg font-medium outline-none focus:border-terminal-500"
                   />
                   <button
                     onClick={() => setAmount((vaultBalances[selectedToken.symbol] || 0).toString())}
-                    className="px-3 py-3 rounded-lg bg-black-600 hover:bg-black-500 text-sm font-medium transition-colors"
+                    className="px-3 py-3 rounded-lg bg-black-600 hover:bg-black-500 text-sm font-medium transition-colors shrink-0"
                   >
                     MAX
                   </button>

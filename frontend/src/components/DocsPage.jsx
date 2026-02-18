@@ -38,6 +38,7 @@ function getSections(cryptoLevel) {
 function DocsPage() {
   const [activeSection, setActiveSection] = useState('getting-started')
   const [personalityData, setPersonalityData] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Load personality data from localStorage
   useEffect(() => {
@@ -123,11 +124,65 @@ function DocsPage() {
       </motion.div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Navigation */}
+        {/* Mobile Sidebar Toggle */}
+        <div className="lg:hidden">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl glass-strong text-sm font-medium text-void-300"
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">{sections.find(s => s.id === activeSection)?.icon}</span>
+              <span>{sections.find(s => s.id === activeSection)?.label}</span>
+            </div>
+            <motion.svg
+              animate={{ rotate: sidebarOpen ? 180 : 0 }}
+              className="w-5 h-5 text-void-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </motion.svg>
+          </button>
+
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="glass-strong rounded-2xl p-3 mt-2 space-y-1">
+                  {sections.map((section) => (
+                    <button
+                      key={section.id}
+                      onClick={() => {
+                        setActiveSection(section.id)
+                        setSidebarOpen(false)
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        activeSection === section.id
+                          ? 'bg-vibe-500/20 text-vibe-400 border border-vibe-500/30'
+                          : 'text-void-300 hover:text-white hover:bg-void-700/50'
+                      }`}
+                    >
+                      <span className="text-lg">{section.icon}</span>
+                      <span>{section.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Desktop Sidebar Navigation */}
         <motion.nav
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="lg:w-64 flex-shrink-0"
+          className="hidden lg:block lg:w-64 flex-shrink-0"
         >
           <div className="glass-strong rounded-2xl p-4 sticky top-24">
             <h3 className="text-sm font-semibold text-void-400 uppercase tracking-wider mb-4 px-3">
@@ -261,9 +316,9 @@ function GettingStarted({ cryptoLevel }) {
   ]
 
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Getting Started</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Getting Started</h2>
         <p className="text-void-300 text-lg">
           {getWelcomeText()}
         </p>
@@ -331,9 +386,9 @@ function HowItWorks({ cryptoLevel }) {
   const isAdvanced = cryptoLevel >= 5
 
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">How VibeSwap Works</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">How VibeSwap Works</h2>
         <p className="text-void-300 text-lg">
           {isBeginner
             ? "We protect you by keeping your trade secret until everyone trades at once."
@@ -440,21 +495,23 @@ function HowItWorks({ cryptoLevel }) {
 
       {/* Visual Diagram - hide technical details for beginners */}
       {!isBeginner && (
-        <div className="bg-void-800/50 rounded-xl p-6 font-mono text-sm">
+        <div className="bg-void-800/50 rounded-xl p-4 sm:p-6 font-mono text-sm">
           <div className="text-void-400 mb-4">Batch Lifecycle (10 seconds)</div>
-          <div className="flex items-center space-x-2 text-void-300">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 text-void-300">
             <div className="flex-1 bg-vibe-500/20 rounded p-3 text-center border border-vibe-500/30">
               <div className="text-vibe-400 font-bold">COMMIT</div>
               <div className="text-xs text-void-400">0-8s</div>
               <div className="text-xs mt-1">{isAdvanced ? "Hash submissions" : "Orders hidden"}</div>
             </div>
-            <span className="text-void-500">→</span>
+            <span className="text-void-500 text-center hidden sm:block">→</span>
+            <span className="text-void-500 text-center sm:hidden">↓</span>
             <div className="flex-1 bg-cyber-500/20 rounded p-3 text-center border border-cyber-500/30">
               <div className="text-cyber-400 font-bold">REVEAL</div>
               <div className="text-xs text-void-400">8-10s</div>
               <div className="text-xs mt-1">{isAdvanced ? "Verify & seal" : "Batch sealed"}</div>
             </div>
-            <span className="text-void-500">→</span>
+            <span className="text-void-500 text-center hidden sm:block">→</span>
+            <span className="text-void-500 text-center sm:hidden">↓</span>
             <div className="flex-1 bg-glow-500/20 rounded p-3 text-center border border-glow-500/30">
               <div className="text-glow-400 font-bold">SETTLE</div>
               <div className="text-xs text-void-400">Instant</div>
@@ -466,19 +523,21 @@ function HowItWorks({ cryptoLevel }) {
 
       {/* Simple visual for beginners */}
       {isBeginner && (
-        <div className="bg-void-800/50 rounded-xl p-6">
+        <div className="bg-void-800/50 rounded-xl p-4 sm:p-6">
           <div className="text-void-400 mb-4 text-center">How your trade stays protected</div>
-          <div className="flex items-center justify-center space-x-4 text-center">
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4 text-center">
             <div className="flex-1 max-w-32">
               <div className="text-3xl mb-2">🔒</div>
               <div className="text-sm text-void-300">Your trade is locked</div>
             </div>
-            <span className="text-void-500 text-xl">→</span>
+            <span className="text-void-500 text-xl hidden sm:block">→</span>
+            <span className="text-void-500 text-xl sm:hidden">↓</span>
             <div className="flex-1 max-w-32">
               <div className="text-3xl mb-2">⏱️</div>
               <div className="text-sm text-void-300">Wait 10 seconds</div>
             </div>
-            <span className="text-void-500 text-xl">→</span>
+            <span className="text-void-500 text-xl hidden sm:block">→</span>
+            <span className="text-void-500 text-xl sm:hidden">↓</span>
             <div className="flex-1 max-w-32">
               <div className="text-3xl mb-2">✅</div>
               <div className="text-sm text-void-300">Everyone trades fairly</div>
@@ -566,9 +625,9 @@ function KeyConcepts({ cryptoLevel }) {
   ]
 
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Key Concepts</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Key Concepts</h2>
         <p className="text-void-300 text-lg">
           {isAdvanced
             ? "Core protocol mechanics and design principles."
@@ -591,9 +650,9 @@ function KeyConcepts({ cryptoLevel }) {
 
 function FibonacciSection() {
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Fibonacci Scaling</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Fibonacci Scaling</h2>
         <p className="text-void-300 text-lg">
           VibeSwap uses the Fibonacci sequence and golden ratio for natural, harmonic market design.
         </p>
@@ -661,9 +720,9 @@ function FibonacciSection() {
 
 function ShapleySection() {
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Shapley Value Distribution</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Shapley Value Distribution</h2>
         <p className="text-void-300 text-lg">
           Fair rewards based on marginal contribution, not just capital size.
         </p>
@@ -783,9 +842,9 @@ function ShapleySection() {
 
 function MechanismInsulationSection() {
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Mechanism Insulation</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Mechanism Insulation</h2>
         <p className="text-void-300 text-lg">
           Why exchange fees and governance rewards must remain separate to prevent game-breaking exploits.
         </p>
@@ -859,7 +918,7 @@ function MechanismInsulationSection() {
 
           <div className="bg-void-800/50 rounded-xl p-5 border border-void-600/30">
             <h4 className="font-semibold text-red-400 mb-2">3. Liquidity Death Spiral</h4>
-            <div className="flex items-center space-x-2 text-sm text-void-300 flex-wrap">
+            <div className="flex items-center text-sm text-void-300 flex-wrap gap-1.5">
               <span className="bg-void-700 px-2 py-1 rounded">Legal costs spike</span>
               <span className="text-void-500">→</span>
               <span className="bg-void-700 px-2 py-1 rounded">Fees diverted to lawyers</span>
@@ -896,7 +955,7 @@ function MechanismInsulationSection() {
       {/* The Insulation Principle */}
       <div className="bg-gradient-to-r from-vibe-500/10 to-terminal-500/10 rounded-xl p-6 border border-vibe-500/20">
         <h3 className="text-lg font-semibold text-white mb-4">The Insulation Principle</h3>
-        <div className="bg-void-900/50 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+        <div className="bg-void-900/50 rounded-lg p-4 font-mono text-xs sm:text-sm overflow-x-auto">
           <pre className="text-void-300">{`┌─────────────────┐     ┌─────────────────┐
 │   TRADING FEES  │     │  TOKEN REWARDS  │
 │                 │     │                 │
@@ -934,9 +993,9 @@ function MechanismInsulationSection() {
 
 function HalvingSection() {
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Bitcoin Halving Schedule</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Bitcoin Halving Schedule</h2>
         <p className="text-void-300 text-lg">
           Shapley rewards follow Bitcoin's deflationary emission model.
         </p>
@@ -945,14 +1004,14 @@ function HalvingSection() {
       {/* Halving Table */}
       <div>
         <h3 className="text-xl font-semibold text-white mb-4">Emission Schedule</h3>
-        <div className="bg-void-800/50 rounded-xl overflow-hidden">
-          <table className="w-full">
+        <div className="bg-void-800/50 rounded-xl overflow-x-auto">
+          <table className="w-full min-w-[360px]">
             <thead>
               <tr className="bg-void-700/50 text-void-400 text-sm">
-                <th className="text-left py-3 px-4">Era</th>
-                <th className="text-left py-3 px-4">Games</th>
-                <th className="text-left py-3 px-4">Emission</th>
-                <th className="text-left py-3 px-4">Multiplier</th>
+                <th className="text-left py-3 px-3 sm:px-4">Era</th>
+                <th className="text-left py-3 px-3 sm:px-4">Games</th>
+                <th className="text-left py-3 px-3 sm:px-4">Emission</th>
+                <th className="text-left py-3 px-3 sm:px-4">Multiplier</th>
               </tr>
             </thead>
             <tbody className="text-void-300">
@@ -1003,9 +1062,9 @@ function HalvingSection() {
 
 function BuildFrontendSection() {
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Build Your Own Frontend</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Build Your Own Frontend</h2>
         <p className="text-void-300 text-lg">
           VibeSwap is a <span className="text-vibe-400 font-semibold">decentralized protocol</span>, not a company.
           Anyone can build their own frontend to interact with the smart contracts.
@@ -1206,8 +1265,8 @@ vibeSwap.on('BatchSettled', (batchId, clearingPrice, volume) => {
 function ContractRow({ network, contract, address }) {
   const isComingSoon = address === 'Coming Soon'
   return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-void-400 w-24">{network}</span>
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm gap-1 sm:gap-0">
+      <span className="text-void-400 sm:w-24">{network}</span>
       <span className="text-void-200">{contract}</span>
       <span className={`${isComingSoon ? 'text-void-500 italic' : 'text-vibe-400'}`}>
         {isComingSoon ? address : `${address.slice(0, 6)}...${address.slice(-4)}`}
@@ -1232,9 +1291,9 @@ function CodeBlock({ title, language, code }) {
 
 function PapersSection() {
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-8">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">Research Papers</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">Research Papers</h2>
         <p className="text-void-300 text-lg">
           The theoretical foundations behind VibeSwap's mechanism design.
         </p>
@@ -1379,9 +1438,9 @@ function FAQSection({ cryptoLevel }) {
   const faqs = isBeginner ? beginnerFaqs : standardFaqs
 
   return (
-    <div className="glass-strong rounded-2xl p-8 space-y-6">
+    <div className="glass-strong rounded-2xl p-4 sm:p-8 space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-display font-bold text-white mb-4">
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-4">
           {isBeginner ? "Common Questions" : "Frequently Asked Questions"}
         </h2>
         {isBeginner && (

@@ -23,6 +23,54 @@ const TX_STATUS = {
 }
 
 const STORAGE_KEY = 'vibeswap_transactions'
+const MAX_TRANSACTIONS = 100
+
+// ============ localStorage Helpers ============
+
+function loadTransactions(account) {
+  if (!account) return []
+
+  try {
+    const stored = localStorage.getItem(`${STORAGE_KEY}_${account.toLowerCase()}`)
+    if (!stored) return []
+
+    const parsed = JSON.parse(stored)
+
+    // Guard against corrupted data — must be an array
+    if (!Array.isArray(parsed)) {
+      console.warn('Corrupted transaction data in localStorage, starting fresh')
+      localStorage.removeItem(`${STORAGE_KEY}_${account.toLowerCase()}`)
+      return []
+    }
+
+    // Trim to max limit (oldest get dropped)
+    return parsed.slice(0, MAX_TRANSACTIONS)
+  } catch (error) {
+    // JSON parse failure or any other error — start fresh
+    console.error('Failed to load transactions from localStorage:', error)
+    try {
+      localStorage.removeItem(`${STORAGE_KEY}_${account.toLowerCase()}`)
+    } catch (_) {
+      // localStorage itself may be unavailable — nothing we can do
+    }
+    return []
+  }
+}
+
+function saveTransactions(account, transactions) {
+  if (!account) return
+
+  try {
+    const trimmed = transactions.slice(0, MAX_TRANSACTIONS)
+    localStorage.setItem(
+      `${STORAGE_KEY}_${account.toLowerCase()}`,
+      JSON.stringify(trimmed)
+    )
+  } catch (error) {
+    // localStorage may be full or unavailable — log but don't crash
+    console.error('Failed to save transactions to localStorage:', error)
+  }
+}
 
 export function TransactionsProvider({ children }) {
   const { account, chainId } = useWallet()
@@ -31,35 +79,13 @@ export function TransactionsProvider({ children }) {
 
   // Load transactions from localStorage on mount/account change
   useEffect(() => {
-    if (!account) {
-      setTransactions([])
-      return
-    }
-
-    try {
-      const stored = localStorage.getItem(`${STORAGE_KEY}_${account.toLowerCase()}`)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        // Filter to only show last 100 transactions
-        setTransactions(parsed.slice(0, 100))
-      }
-    } catch (error) {
-      console.error('Failed to load transactions:', error)
-    }
+    setTransactions(loadTransactions(account))
   }, [account])
 
   // Save transactions to localStorage when they change
   useEffect(() => {
-    if (!account || transactions.length === 0) return
-
-    try {
-      localStorage.setItem(
-        `${STORAGE_KEY}_${account.toLowerCase()}`,
-        JSON.stringify(transactions.slice(0, 100))
-      )
-    } catch (error) {
-      console.error('Failed to save transactions:', error)
-    }
+    if (!account) return
+    saveTransactions(account, transactions)
   }, [transactions, account])
 
   // Update pending count
@@ -80,7 +106,7 @@ export function TransactionsProvider({ children }) {
       ...tx,
     }
 
-    setTransactions(prev => [newTx, ...prev])
+    setTransactions(prev => [newTx, ...prev].slice(0, MAX_TRANSACTIONS))
     return newTx.id
   }, [chainId])
 

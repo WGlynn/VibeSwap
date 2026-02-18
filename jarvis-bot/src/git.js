@@ -58,3 +58,43 @@ export async function gitLog(count = 5) {
     .map(c => `${c.hash.slice(0, 7)} ${c.message.split('\n')[0]}`)
     .join('\n');
 }
+
+// ============ Data Backup ============
+// Commits contribution/user/interaction data to git for off-machine recovery
+
+export async function backupData() {
+  try {
+    const dataFiles = [
+      'jarvis-bot/data/contributions.json',
+      'jarvis-bot/data/users.json',
+      'jarvis-bot/data/interactions.json',
+    ];
+
+    // Check if any data files have changes
+    const status = await git.status();
+    const dataChanged = dataFiles.some(f =>
+      status.modified.includes(f) || status.not_added.includes(f)
+    );
+
+    if (!dataChanged) {
+      return 'Data files unchanged — no backup needed.';
+    }
+
+    // Stage only data files
+    for (const f of dataFiles) {
+      try { await git.add(f); } catch {}
+    }
+
+    const now = new Date().toISOString().split('T')[0];
+    const msg = `backup: JARVIS data snapshot ${now}\n\nCo-Authored-By: JARVIS <noreply@anthropic.com>`;
+    await git.commit(msg);
+
+    // Push to stealth (private) only — data stays off public repo
+    await git.push(config.repo.remoteStealth, 'master');
+
+    const log = await git.log({ maxCount: 1 });
+    return `Backed up to stealth: ${log.latest.hash.slice(0, 7)} — ${dataFiles.length} data files`;
+  } catch (error) {
+    return `Backup failed: ${error.message}`;
+  }
+}

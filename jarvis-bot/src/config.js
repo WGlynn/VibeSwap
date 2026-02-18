@@ -20,6 +20,12 @@ export const config = {
   authorizedUsers: process.env.AUTHORIZED_USERS
     ? process.env.AUTHORIZED_USERS.split(',').map(id => parseInt(id.trim()))
     : [],
+  // Jarvis is the sole admin — Will's Telegram user ID
+  ownerUserId: process.env.OWNER_USER_ID ? parseInt(process.env.OWNER_USER_ID) : null,
   maxConversationHistory: 50,
   maxTokens: 1024,
+  // Auto-sync: pull from git + reload context (ms, default 1 hour)
+  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '3600000'),
+  // Auto-backup: commit data/ to git (ms, default 6 hours)
+  autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '21600000'),
 };

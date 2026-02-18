@@ -303,7 +303,8 @@ function BridgePage() {
           </svg>
           <span className="font-medium">How It Works</span>
         </div>
-        <div className="flex items-center justify-between text-sm">
+        {/* Desktop route */}
+        <div className="hidden sm:flex items-center justify-between text-sm">
           <div className="flex items-center space-x-2">
             <span className="text-xl">{fromChain.logo}</span>
             <div className="text-left">
@@ -322,6 +323,28 @@ function BridgePage() {
               <div className="text-xs text-black-500">Mint tokens</div>
             </div>
             <span className="text-xl">{toChain.logo}</span>
+          </div>
+        </div>
+        {/* Mobile route - stacked vertically */}
+        <div className="flex sm:hidden flex-col items-center space-y-2 text-sm">
+          <div className="flex items-center space-x-2">
+            <span className="text-xl">{fromChain.logo}</span>
+            <div>
+              <div className="font-medium">{fromChain.name}</div>
+              <div className="text-xs text-black-500">Burn tokens</div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 border-t border-dashed border-black-600" />
+            <div className="px-2 py-1 rounded-full bg-black-700 text-xs">LayerZero</div>
+            <div className="w-8 border-t border-dashed border-black-600" />
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-xl">{toChain.logo}</span>
+            <div>
+              <div className="font-medium">{toChain.name}</div>
+              <div className="text-xs text-black-500">Mint tokens</div>
+            </div>
           </div>
         </div>
         <p className="text-xs text-black-500 mt-3 text-center">
@@ -393,18 +416,18 @@ function ConfirmationModal({ fromChain, toChain, token, amount, receiveAmount, l
         {/* Content */}
         <div className="p-4 space-y-4">
           {/* Transfer Visual */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-black-900">
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl bg-black-900 gap-3 sm:gap-0">
             <div className="text-center">
               <span className="text-3xl">{fromChain.logo}</span>
               <div className="text-sm font-medium mt-1">{fromChain.name}</div>
             </div>
-            <div className="flex-1 flex flex-col items-center px-4">
+            <div className="flex-1 flex flex-col items-center px-0 sm:px-4">
               <div className="text-2xl font-bold text-white">{amount}</div>
               <div className="flex items-center space-x-1 text-black-400">
                 <span>{token.logo}</span>
                 <span>{token.symbol}</span>
               </div>
-              <svg className="w-6 h-6 text-matrix-500 mt-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-6 h-6 text-matrix-500 mt-2 rotate-90 sm:rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
             </div>

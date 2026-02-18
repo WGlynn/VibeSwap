@@ -80,11 +80,13 @@ function RewardsPage() {
       </div>
 
       {/* Summary Cards */}
-      <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <StaggerContainer className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StaggerItem>
           <SummaryCard
             label="Your Balance"
-            value={`$${totalValue.toLocaleString()}`}
+            value={totalValue}
+            prefix="$"
+            decimals={0}
             icon="◇"
             color="text-white"
           />
@@ -92,7 +94,9 @@ function RewardsPage() {
         <StaggerItem>
           <SummaryCard
             label="Ready to Claim"
-            value={`$${totalPendingRewards.toFixed(2)}`}
+            value={totalPendingRewards}
+            prefix="$"
+            decimals={2}
             icon="+"
             color="text-glow-500"
             action={totalPendingRewards > 0 ? () => handleClaim('shapley') : null}
@@ -103,7 +107,9 @@ function RewardsPage() {
         <StaggerItem>
           <SummaryCard
             label="Total Earned"
-            value={`$${totalEarnedAllTime.toFixed(2)}`}
+            value={totalEarnedAllTime}
+            prefix="$"
+            decimals={2}
             icon="↗"
             color="text-cyber-400"
           />
@@ -111,7 +117,9 @@ function RewardsPage() {
         <StaggerItem>
           <SummaryCard
             label="Bonus Multiplier"
-            value={`${loyalty.currentMultiplier.toFixed(2)}x`}
+            value={loyalty.currentMultiplier}
+            suffix="x"
+            decimals={2}
             icon="×"
             color="text-yellow-400"
             sublabel={loyalty.tier}
@@ -120,14 +128,14 @@ function RewardsPage() {
       </StaggerContainer>
 
       {/* Tabs */}
-      <div className="flex space-x-1 mb-6 p-1 bg-void-800/50 rounded-xl w-fit">
+      <div className="flex overflow-x-auto scrollbar-hide space-x-1 mb-6 border-b border-void-700/50 -mx-4 px-4 sm:mx-0 sm:px-0">
         {['overview', 'shapley', 'il-protection', 'loyalty'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`relative px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+            className={`tab-underline whitespace-nowrap px-4 py-2.5 font-medium transition-colors text-sm ${
               activeTab === tab
-                ? 'bg-void-700 text-white'
+                ? 'active text-white'
                 : 'text-void-400 hover:text-white'
             }`}
           >
@@ -135,7 +143,6 @@ function RewardsPage() {
             {tab === 'shapley' && 'Fair Share'}
             {tab === 'il-protection' && 'Protection'}
             {tab === 'loyalty' && 'Bonuses'}
-            {activeTab === tab && <motion.div layoutId="rewards-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-matrix-500" />}
           </button>
         ))}
       </div>
@@ -182,23 +189,25 @@ function RewardsPage() {
   )
 }
 
-function SummaryCard({ label, value, icon, color, sublabel, action, actionLabel, isLoading }) {
+function SummaryCard({ label, value, prefix = '', suffix = '', decimals = 2, icon, color, sublabel, action, actionLabel, isLoading }) {
   return (
-    <GlassCard className="p-4" hover>
+    <GlassCard className="p-3 sm:p-4" hover>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-2xl">{icon}</span>
+        <span className="text-xl sm:text-2xl">{icon}</span>
         {action && (
           <button
             onClick={action}
             disabled={isLoading}
-            className="px-3 py-1 text-xs font-medium rounded-lg bg-vibe-500/20 text-vibe-400 hover:bg-vibe-500/30 transition-colors disabled:opacity-50"
+            className="px-2 sm:px-3 py-1 text-xs font-medium rounded-lg bg-vibe-500/20 text-vibe-400 hover:bg-vibe-500/30 transition-colors disabled:opacity-50"
           >
             {isLoading ? '...' : actionLabel}
           </button>
         )}
       </div>
-      <div className={`text-2xl font-bold font-mono ${color}`}>{value}</div>
-      <div className="text-sm text-void-400 mt-1">{label}</div>
+      <div className={`text-lg sm:text-2xl font-bold font-mono ${color}`}>
+        <AnimatedNumber value={value} prefix={prefix} suffix={suffix} decimals={decimals} />
+      </div>
+      <div className="text-xs sm:text-sm text-void-400 mt-1">{label}</div>
       {sublabel && <div className="text-xs text-void-500 mt-0.5">{sublabel}</div>}
     </GlassCard>
   )
@@ -206,10 +215,10 @@ function SummaryCard({ label, value, icon, color, sublabel, action, actionLabel,
 
 function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuarantee, rewardsHistory }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       {/* Your Deposits */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4 flex items-center space-x-2">
           <span className="text-matrix-500">≡</span>
           <span>Your Deposits</span>
         </h3>
@@ -230,22 +239,30 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
                   <div className="flex items-center space-x-2">
                     <span className="text-lg">{position.token0.logo}</span>
                     <span className="text-lg -ml-1">{position.token1.logo}</span>
-                    <span className="font-medium">{position.pool}</span>
+                    <span className="font-medium text-sm sm:text-base">{position.pool}</span>
                   </div>
-                  <span className="font-mono font-medium">${position.value.toLocaleString()}</span>
+                  <span className="font-mono font-medium text-sm sm:text-base">
+                    <AnimatedNumber value={position.value} prefix="$" decimals={0} />
+                  </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <span className="text-void-400">Earned</span>
-                    <div className="font-mono text-glow-500">${position.earnedFees.toFixed(2)}</div>
+                    <div className="font-mono text-glow-500">
+                      <AnimatedNumber value={position.earnedFees} prefix="$" decimals={2} />
+                    </div>
                   </div>
                   <div>
                     <span className="text-void-400">Market Change</span>
-                    <div className="font-mono text-red-400">${Math.abs(position.ilLoss).toFixed(2)}</div>
+                    <div className="font-mono text-red-400">
+                      <AnimatedNumber value={Math.abs(position.ilLoss)} prefix="$" decimals={2} />
+                    </div>
                   </div>
                   <div>
                     <span className="text-void-400">Protected</span>
-                    <div className="font-mono text-glow-500">${position.ilCovered.toFixed(2)}</div>
+                    <div className="font-mono text-glow-500">
+                      <AnimatedNumber value={position.ilCovered} prefix="$" decimals={2} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -255,8 +272,8 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
       </GlassCard>
 
       {/* Recent Earnings */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4 flex items-center space-x-2">
           <span className="text-matrix-500">≡</span>
           <span>Recent Earnings</span>
         </h3>
@@ -267,14 +284,16 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
               key={batch.batchId}
               className="flex items-center justify-between p-3 rounded-xl bg-void-800/30 border border-void-700/30"
             >
-              <div>
+              <div className="min-w-0 mr-3">
                 <div className="text-sm font-medium">Batch #{batch.batchId}</div>
-                <div className="text-xs text-void-400">
+                <div className="text-xs text-void-400 truncate">
                   {batch.yourShare.toFixed(1)}% share of ${batch.totalFees.toFixed(0)} fees
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-mono text-glow-500">+${batch.earned.toFixed(2)}</div>
+              <div className="text-right shrink-0">
+                <div className="font-mono text-glow-500 text-sm">
+                  +<AnimatedNumber value={batch.earned} prefix="$" decimals={2} />
+                </div>
                 <div className="text-xs text-void-500">
                   {Math.floor((Date.now() - batch.timestamp) / 1000)}s ago
                 </div>
@@ -285,8 +304,8 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
       </GlassCard>
 
       {/* Price Protection */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4 flex items-center space-x-2">
           <span className="text-matrix-500">◇</span>
           <span>Price Protection</span>
         </h3>
@@ -294,8 +313,10 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-void-400">Monthly Protection</span>
-            <span className="font-mono">
-              ${slippageGuarantee.availableProtection.toFixed(0)} / ${slippageGuarantee.maxMonthly.toFixed(0)}
+            <span className="font-mono text-xs sm:text-sm">
+              <AnimatedNumber value={slippageGuarantee.availableProtection} prefix="$" decimals={0} />
+              {' / '}
+              <AnimatedNumber value={slippageGuarantee.maxMonthly} prefix="$" decimals={0} />
             </span>
           </div>
           <div className="h-2 bg-void-700 rounded-full overflow-hidden">
@@ -312,8 +333,8 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
       </GlassCard>
 
       {/* Rewards History */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4 flex items-center space-x-2">
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4 flex items-center space-x-2">
           <span>📜</span>
           <span>Recent Activity</span>
         </h3>
@@ -324,8 +345,8 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
               key={i}
               className="flex items-center justify-between py-2 border-b border-void-700/30 last:border-0"
             >
-              <div className="flex items-center space-x-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm shrink-0 ${
                   reward.type === 'fee' ? 'bg-glow-500/20 text-glow-500' :
                   reward.type === 'shapley' ? 'bg-cyber-500/20 text-cyber-400' :
                   reward.type === 'il_claim' ? 'bg-vibe-500/20 text-vibe-400' :
@@ -335,20 +356,22 @@ function OverviewTab({ lpPositions, shapleyRewards, ilProtection, slippageGuaran
                    reward.type === 'shapley' ? '≡' :
                    reward.type === 'il_claim' ? '◈' : '×'}
                 </div>
-                <div>
-                  <div className="text-sm font-medium">
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-medium truncate">
                     {reward.type === 'fee' && 'Exchange Fee'}
                     {reward.type === 'shapley' && 'Fair Share Reward'}
                     {reward.type === 'il_claim' && 'Protection Payout'}
                     {reward.type === 'loyalty' && 'Bonus Reward'}
                   </div>
-                  <div className="text-xs text-void-400">
+                  <div className="text-xs text-void-400 truncate">
                     {reward.pool || 'Protocol-wide'}
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-mono text-glow-500">+{reward.amount.toFixed(2)} {reward.token}</div>
+              <div className="text-right shrink-0 ml-2">
+                <div className="font-mono text-glow-500 text-xs sm:text-sm">
+                  +<AnimatedNumber value={reward.amount} decimals={2} /> {reward.token}
+                </div>
               </div>
             </div>
           ))}
@@ -370,10 +393,10 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
   ]
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       {/* Explanation */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4">Fair Share Earnings</h3>
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4">Fair Share Earnings</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
           Most platforms just pay based on how much money you put in. We pay based on <span className="text-white">when</span> you contributed,
@@ -397,15 +420,15 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
       </GlassCard>
 
       {/* Your Breakdown */}
-      <GlassCard className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-lg">Your Pending Rewards</h3>
+      <GlassCard className="p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+          <h3 className="font-display font-bold text-base sm:text-lg">Your Pending Rewards</h3>
           <button
             onClick={onClaim}
             disabled={isClaiming || shapleyRewards.pendingClaim === 0}
-            className="px-4 py-2 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-medium text-sm transition-all disabled:opacity-50"
+            className="px-4 py-2 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-medium text-sm transition-all disabled:opacity-50 w-full sm:w-auto"
           >
-            {isClaiming ? 'Claiming...' : `Claim $${shapleyRewards.pendingClaim.toFixed(2)}`}
+            {isClaiming ? 'Claiming...' : <>Claim <AnimatedNumber value={shapleyRewards.pendingClaim} prefix="$" decimals={2} /></>}
           </button>
         </div>
 
@@ -421,7 +444,9 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
                     <span className="text-sm font-medium">{comp.label}</span>
                     <span className="text-xs text-void-500 ml-2">({comp.weight})</span>
                   </div>
-                  <span className="font-mono text-sm">${value.toFixed(2)}</span>
+                  <span className="font-mono text-sm">
+                    <AnimatedNumber value={value} prefix="$" decimals={2} />
+                  </span>
                 </div>
                 <div className="h-2 bg-void-700 rounded-full overflow-hidden mb-1">
                   <motion.div
@@ -439,11 +464,15 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
         <div className="mt-4 pt-4 border-t border-void-700">
           <div className="flex items-center justify-between">
             <span className="font-medium">Total Pending</span>
-            <span className="font-mono text-xl text-glow-500">${shapleyRewards.pendingClaim.toFixed(2)}</span>
+            <span className="font-mono text-lg sm:text-xl text-glow-500">
+              <AnimatedNumber value={shapleyRewards.pendingClaim} prefix="$" decimals={2} />
+            </span>
           </div>
           <div className="flex items-center justify-between text-sm text-void-400 mt-1">
             <span>All-time earned</span>
-            <span className="font-mono">${shapleyRewards.totalEarned.toFixed(2)}</span>
+            <span className="font-mono">
+              <AnimatedNumber value={shapleyRewards.totalEarned} prefix="$" decimals={2} />
+            </span>
           </div>
         </div>
       </GlassCard>
@@ -453,10 +482,10 @@ function ShapleyTab({ shapleyRewards, onClaim, isClaiming }) {
 
 function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       {/* How Protection Works */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4">How Protection Works</h3>
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4">How Protection Works</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
           When market prices change, your deposit value can shift. We protect you from
@@ -488,27 +517,29 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
       </GlassCard>
 
       {/* Your Coverage */}
-      <GlassCard className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-lg">Your Coverage</h3>
+      <GlassCard className="p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+          <h3 className="font-display font-bold text-base sm:text-lg">Your Coverage</h3>
           {ilProtection.claimableAmount > 0 && (
             <button
               onClick={onClaim}
               disabled={isClaiming}
-              className="px-4 py-2 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-medium text-sm transition-all disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 font-medium text-sm transition-all disabled:opacity-50 w-full sm:w-auto"
             >
-              {isClaiming ? 'Claiming...' : `Claim $${ilProtection.claimableAmount.toFixed(2)}`}
+              {isClaiming ? 'Claiming...' : <>Claim <AnimatedNumber value={ilProtection.claimableAmount} prefix="$" decimals={2} /></>}
             </button>
           )}
         </div>
 
         <div className="p-4 rounded-xl bg-glow-500/10 border border-glow-500/30 mb-4">
           <div className="flex items-center justify-between">
-            <span className="text-void-300">Total Claimable</span>
-            <span className="font-mono text-2xl text-glow-500">${ilProtection.totalCoverage.toFixed(2)}</span>
+            <span className="text-void-300 text-sm">Total Claimable</span>
+            <span className="font-mono text-xl sm:text-2xl text-glow-500">
+              <AnimatedNumber value={ilProtection.totalCoverage} prefix="$" decimals={2} />
+            </span>
           </div>
           <div className="text-xs text-void-400 mt-1">
-            Average coverage: {ilProtection.coveragePercent}%
+            Average coverage: <AnimatedNumber value={ilProtection.coveragePercent} suffix="%" decimals={0} />
           </div>
         </div>
 
@@ -516,19 +547,23 @@ function ILProtectionTab({ ilProtection, lpPositions, onClaim, isClaiming }) {
           {ilProtection.positions.map((pos, i) => (
             <div key={i} className="p-3 rounded-xl bg-void-800/50 border border-void-700/50">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">{pos.pool}</span>
+                <span className="font-medium text-sm sm:text-base">{pos.pool}</span>
                 <span className={`text-sm font-mono ${pos.coverage >= 60 ? 'text-glow-500' : 'text-yellow-400'}`}>
-                  {pos.coverage}% coverage
+                  <AnimatedNumber value={pos.coverage} suffix="%" decimals={0} /> coverage
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div>
                   <span className="text-void-400">Market Loss</span>
-                  <div className="font-mono text-red-400">-${pos.ilLoss.toFixed(2)}</div>
+                  <div className="font-mono text-red-400">
+                    -<AnimatedNumber value={pos.ilLoss} prefix="$" decimals={2} />
+                  </div>
                 </div>
                 <div>
                   <span className="text-void-400">We Cover</span>
-                  <div className="font-mono text-glow-500">${pos.covered.toFixed(2)}</div>
+                  <div className="font-mono text-glow-500">
+                    <AnimatedNumber value={pos.covered} prefix="$" decimals={2} />
+                  </div>
                 </div>
                 <div>
                   <span className="text-void-400">Days to Max</span>
@@ -563,10 +598,10 @@ function LoyaltyTab({ loyalty }) {
   const nextTier = tiers[currentTierIndex + 1]
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       {/* How Bonuses Work */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4">Bonus Rewards Program</h3>
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4">Bonus Rewards Program</h3>
 
         <p className="text-void-300 text-sm mb-4 leading-relaxed">
           The longer you stay with us, the more you earn. This rewards
@@ -590,8 +625,8 @@ function LoyaltyTab({ loyalty }) {
                     : 'bg-void-800/50 border-void-700/50'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <span className={`text-lg ${tier.color}`}>
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <span className={`text-base sm:text-lg ${tier.color}`}>
                     {tier.name === 'Bronze' && '🥉'}
                     {tier.name === 'Silver' && '🥈'}
                     {tier.name === 'Gold' && '🥇'}
@@ -599,15 +634,15 @@ function LoyaltyTab({ loyalty }) {
                     {tier.name === 'Diamond' && '👑'}
                   </span>
                   <div>
-                    <span className={`font-medium ${isActive ? 'text-white' : 'text-void-300'}`}>
+                    <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-void-300'}`}>
                       {tier.name}
                     </span>
-                    <span className="text-xs text-void-500 ml-2">
+                    <span className="text-xs text-void-500 ml-1 sm:ml-2">
                       {tier.minDays === 0 ? 'Start' : `${tier.minDays}+ days`}
                     </span>
                   </div>
                 </div>
-                <span className={`font-mono ${isActive ? 'text-vibe-400' : 'text-void-400'}`}>
+                <span className={`font-mono text-sm ${isActive ? 'text-vibe-400' : 'text-void-400'}`}>
                   {tier.multiplier.toFixed(2)}x
                 </span>
               </div>
@@ -617,38 +652,44 @@ function LoyaltyTab({ loyalty }) {
       </GlassCard>
 
       {/* Your Status */}
-      <GlassCard className="p-5">
-        <h3 className="font-display font-bold text-lg mb-4">Your Bonus Status</h3>
+      <GlassCard className="p-4 sm:p-5">
+        <h3 className="font-display font-bold text-base sm:text-lg mb-4">Your Bonus Status</h3>
 
         {/* Current tier display */}
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-vibe-500/20 to-purple-600/20 border border-vibe-500/30 text-center mb-6">
-          <div className="text-4xl mb-2">
+        <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-vibe-500/20 to-purple-600/20 border border-vibe-500/30 text-center mb-6">
+          <div className="text-3xl sm:text-4xl mb-2">
             {loyalty.tier === 'Bronze' && '🥉'}
             {loyalty.tier === 'Silver' && '🥈'}
             {loyalty.tier === 'Gold' && '🥇'}
             {loyalty.tier === 'Platinum' && '💎'}
             {loyalty.tier === 'Diamond' && '👑'}
           </div>
-          <div className="text-2xl font-display font-bold text-white mb-1">{loyalty.tier}</div>
-          <div className="text-3xl font-mono text-vibe-400">{loyalty.currentMultiplier.toFixed(2)}x</div>
+          <div className="text-xl sm:text-2xl font-display font-bold text-white mb-1">{loyalty.tier}</div>
+          <div className="text-2xl sm:text-3xl font-mono text-vibe-400">
+            <AnimatedNumber value={loyalty.currentMultiplier} suffix="x" decimals={2} />
+          </div>
           <div className="text-sm text-void-400 mt-1">reward multiplier</div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4">
           <div className="p-3 rounded-xl bg-void-800/50 text-center">
-            <div className="text-2xl font-mono font-bold text-white">{loyalty.daysActive}</div>
+            <div className="text-xl sm:text-2xl font-mono font-bold text-white">
+              <AnimatedNumber value={loyalty.daysActive} decimals={0} />
+            </div>
             <div className="text-xs text-void-400">Days Active</div>
           </div>
           <div className="p-3 rounded-xl bg-void-800/50 text-center">
-            <div className="text-2xl font-mono font-bold text-glow-500">{loyalty.maxMultiplier.toFixed(1)}x</div>
+            <div className="text-xl sm:text-2xl font-mono font-bold text-glow-500">
+              <AnimatedNumber value={loyalty.maxMultiplier} suffix="x" decimals={1} />
+            </div>
             <div className="text-xs text-void-400">Max Multiplier</div>
           </div>
         </div>
 
         {/* Progress to next tier */}
         {nextTier && (
-          <div className="p-4 rounded-xl bg-void-800/30 border border-void-700/50">
+          <div className="p-3 sm:p-4 rounded-xl bg-void-800/30 border border-void-700/50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-void-300">Progress to {nextTier.name}</span>
               <span className="text-sm font-mono text-void-400">{loyalty.daysToNextTier} days left</span>
@@ -667,7 +708,7 @@ function LoyaltyTab({ loyalty }) {
         )}
 
         {!nextTier && (
-          <div className="p-4 rounded-xl bg-glow-500/10 border border-glow-500/30 text-center">
+          <div className="p-3 sm:p-4 rounded-xl bg-glow-500/10 border border-glow-500/30 text-center">
             <span className="text-glow-500 font-medium">You've reached the maximum tier!</span>
           </div>
         )}

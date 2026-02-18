@@ -79,38 +79,32 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
 
           {/* Connection Options */}
           <div className="space-y-3">
-            {/* Device Wallet - Primary option if available */}
-            {deviceWalletAvailable && (
-              <button
-                onClick={onUseDevice}
-                disabled={isCreatingDeviceWallet}
-                className="w-full py-3.5 rounded-xl bg-matrix-600 hover:bg-matrix-500 disabled:opacity-70 text-black-900 font-semibold transition-colors"
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <span>📱</span>
-                  <span>{isCreatingDeviceWallet ? 'Setting up...' : 'Use This Device'}</span>
-                </div>
-                <div className="text-sm font-normal mt-0.5 opacity-80">
-                  Secured by Face ID / Touch ID / fingerprint
-                </div>
-              </button>
-            )}
+            {/* Device Wallet - Always show, handle unavailability in click handler */}
+            <button
+              onClick={onUseDevice}
+              disabled={isCreatingDeviceWallet}
+              className="w-full py-3.5 rounded-xl bg-matrix-600 hover:bg-matrix-500 disabled:opacity-70 text-black-900 font-semibold transition-colors"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <span>📱</span>
+                <span>{isCreatingDeviceWallet ? 'Setting up...' : 'Use This Device'}</span>
+              </div>
+              <div className="text-sm font-normal mt-0.5 opacity-80">
+                Secured by Face ID / Touch ID / fingerprint
+              </div>
+            </button>
 
             {/* WalletConnect / Other options */}
             <button
               onClick={onGetStarted}
-              className={`w-full py-3.5 rounded-xl font-semibold transition-colors ${
-                deviceWalletAvailable
-                  ? 'bg-black-700 hover:bg-black-600 text-white border border-black-600'
-                  : 'bg-matrix-600 hover:bg-matrix-500 text-black-900'
-              }`}
+              className="w-full py-3.5 rounded-xl font-semibold transition-colors bg-black-700 hover:bg-black-600 text-white border border-black-600"
             >
               <div className="flex items-center justify-center space-x-2">
                 <span>🔗</span>
-                <span>{deviceWalletAvailable ? 'Other Options' : 'Get Started'}</span>
+                <span>Other Options</span>
               </div>
               <div className="text-sm font-normal mt-0.5 opacity-70">
-                Email, Google, Apple, or existing wallet
+                MetaMask, Coinbase, or other wallet
               </div>
             </button>
           </div>
@@ -118,15 +112,7 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
           {/* Explanation */}
           <div className="mt-4 p-3 rounded-lg bg-terminal-500/10 border border-terminal-500/20">
             <p className="text-sm text-black-200 text-center">
-              {deviceWalletAvailable ? (
-                <>
-                  <strong className="text-terminal-400">"Use This Device"</strong> creates a wallet secured by your phone's or computer's security chip. Your biometrics (face/fingerprint) protect your money.
-                </>
-              ) : (
-                <>
-                  Sign in with your email, Google, Apple, or connect an existing wallet. We'll create a secure account for you.
-                </>
-              )}
+              <strong className="text-terminal-400">"Use This Device"</strong> creates a wallet secured by your phone's or computer's security chip. Your biometrics (face/fingerprint) protect your money.
             </p>
           </div>
 
@@ -960,7 +946,16 @@ function SwapCore() {
 
   // Handle device wallet creation (from welcome modal)
   const handleUseDevice = async () => {
-    console.log('[handleUseDevice] CALLED')
+    console.log('[handleUseDevice] CALLED, deviceWalletAvailable:', deviceWalletAvailable)
+
+    // Check if device supports biometric wallet
+    if (!deviceWalletAvailable) {
+      toast.error(
+        'This device doesn\'t support biometric wallets. Enable Windows Hello, Face ID, or Touch ID in your device settings, then try again.',
+        { duration: 6000 }
+      )
+      return
+    }
 
     // Clear any stale acknowledged flag
     localStorage.removeItem('vibeswap_wallet_acknowledged')

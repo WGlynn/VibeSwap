@@ -9,11 +9,11 @@ import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispa
 import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
+import { createServer } from 'http';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 
-const HEARTBEAT_FILE = join(homedir(), 'vibeswap', 'jarvis-bot', 'data', 'heartbeat.json');
+const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
 
 // ============ Startup Checks ============
 // Graceful degradation: diagnose what's available instead of hard crash
@@ -94,7 +94,7 @@ function isRateLimited(userId) {
 
 async function writeHeartbeat(status) {
   try {
-    await mkdir(join(homedir(), 'vibeswap', 'jarvis-bot', 'data'), { recursive: true });
+    await mkdir(config.dataDir, { recursive: true });
     await writeFile(HEARTBEAT_FILE, JSON.stringify({
       status,
       timestamp: Date.now(),
@@ -709,6 +709,33 @@ async function main() {
 
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
+
+  // HTTP health endpoint for cloud platforms (Fly.io, Railway, etc.)
+  if (config.isDocker || process.env.HEALTH_PORT) {
+    const healthPort = parseInt(process.env.HEALTH_PORT || '8080');
+    createServer(async (req, res) => {
+      if (req.url === '/health') {
+        try {
+          const report = await diagnoseContext();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            status: 'ok',
+            uptime: process.uptime(),
+            model: config.anthropic.model,
+            context: { loaded: report.loaded.length, total: report.loaded.length + report.missing.length, chars: report.totalChars },
+          }));
+        } catch {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+        }
+      } else {
+        res.writeHead(404);
+        res.end('Not found');
+      }
+    }).listen(healthPort, () => {
+      console.log(`[jarvis] Health endpoint: http://0.0.0.0:${healthPort}/health`);
+    });
+  }
 
   // Register commands with Telegram (shows in command menu)
   try {

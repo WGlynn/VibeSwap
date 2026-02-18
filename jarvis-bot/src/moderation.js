@@ -1,9 +1,9 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { createHash } from 'crypto';
+import { config } from './config.js';
 
-const DATA_DIR = join(homedir(), 'vibeswap', 'jarvis-bot', 'data');
+const DATA_DIR = config.dataDir;
 const MOD_LOG_FILE = join(DATA_DIR, 'moderation.json');
 const MOD_POLICY_FILE = join(DATA_DIR, 'moderation-policy.json');
 

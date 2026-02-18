@@ -25,8 +25,8 @@ export const config = {
   botUsername: 'JarvisMind1828383bot',
   maxConversationHistory: 50,
   maxTokens: 1024,
-  // Auto-sync: pull from git + reload context (ms, default 1 hour)
-  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '3600000'),
+  // Auto-sync: pull from git + reload context (ms, default 5 min)
+  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '300000'),
   // Auto-backup: commit data/ to git (ms, default 6 hours)
   autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '21600000'),
 };

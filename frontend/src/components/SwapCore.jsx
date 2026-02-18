@@ -34,12 +34,12 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
+          initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+          animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
+          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
         >
           {/* Content */}
           <div className="text-center mb-6">
@@ -169,12 +169,12 @@ function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isS
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 p-6 shadow-2xl"
+          initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+          animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
+          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl"
         >
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
@@ -279,12 +279,12 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
+          initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+          animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
+          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
         >
           {/* Content */}
           <div className="text-center mb-6">
@@ -597,12 +597,12 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
+          initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
+          animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
+          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
         >
           {/* Intro Step */}
           {step === 'intro' && (

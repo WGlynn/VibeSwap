@@ -120,6 +120,7 @@ function App() {
     <MessagingProvider>
     <ContributionsProvider>
       <AmbientBackground />
+      <div className="noise-overlay" />
       {isHomePage ? (
         // Home page: completely fixed layout, no scroll possible
         <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>

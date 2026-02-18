@@ -12,6 +12,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
 - **1840+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 167 Rust tests passing, 13 crates + test crate** (ALL 7 PHASES COMPLETE)
+- **JARVIS Telegram Bot: PRODUCTION-READY** — context persistence, anti-spam, co-admin moderation, Ark backup, crash detection
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode**)
@@ -33,7 +34,23 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 23)
+## Recently Completed (Feb 18, 2026 — Session 24)
+74. **JARVIS Telegram Bot — Context Persistence + Co-Admin Governance**
+    - **Day 1**: Conversation persistence to disk (`data/conversations.json`), auto git-pull on startup, graceful degradation when token missing, context diagnosis (`/health`)
+    - **Day 2**: Auto-sync every 10s (git pull + system prompt reload), auto-backup every 30min (data → stealth repo), moderation module with SHA-256 evidence hashes, owner-only commands (hardcoded Will ID: 8366932263)
+    - **Day 3**: Crash detection via heartbeat file (5min heartbeat, detects unclean shutdowns), startup DM to owner with context status + crash warnings, `/recover` command (force git pull + full reload), complete backup coverage (moderation + conversations + spam-log)
+    - **Anti-spam**: Scam pattern detection (airdrop/phishing/impersonation/pump) → auto-ban, flood detection (5+ msgs/10s) → auto-mute, duplicate spam (3x same msg/60s) → auto-mute, new account link spam → auto-mute, all with evidence hashes
+    - **New member welcome**: Greets by name, explains VibeSwap, points to /mystats and DM for Ark coverage
+    - **Rate limiting**: 5 Claude API calls/min per user (owner exempt)
+    - **Command menu**: 10 commands auto-registered with BotFather on startup
+    - **maxTokens**: 1024 → 2048
+    - **DM vs group behavior**: Open about internals in DMs, silent in groups
+    - **Circular logic protocol**: 1=accident, 2=ignorance, 3=call-out, 3x3=spam
+    - **The Ark**: Emergency backup Telegram group — `/ark` DMs all tracked users an invite link if main chat dies
+    - **VSP-00000000000000000000001**: Co-admin governance proposal (temporary framework, decentralize once governance matures)
+    - Commits: `9011e80` → `462eda3` → `a3203fa` → `73c47ba` → `53df7f0` → `80d87bc` → `b82de55` → `e78708c` → `449d7fb` → `92a0f25` → `899c04d` → `0987d70` → `16c94d8` → `bd315fb` → `de83a74` → `1b191a9` → `d797fc5` → `15f5836`
+
+## Previously Completed (Feb 18, 2026 — Session 23)
 73. **CKB Phase 7 — Comprehensive Integration + Adversarial + Fuzz + Parity Tests**
     - **59 new tests** in vibeswap-tests crate (4 modules), **167 total CKB Rust tests** all passing
     - **integration.rs** (10 tests): Full lifecycle (commit→reveal→settle→new batch), pool creation+swap, commit create/consume, SDK→type script interop, MMR accumulation across batches, PoW-gated transitions, LP add/remove roundtrip, 6-order batch settlement, partial reveal slashing, compliance filtering

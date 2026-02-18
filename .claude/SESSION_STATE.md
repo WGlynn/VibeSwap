@@ -41,7 +41,8 @@ This file maintains continuity between Claude Code sessions across devices.
     - **math_parity.rs** (20 tests): AMM get_amount_out/in parity, LP initial+subsequent, optimal ratio, clearing price balanced/buy/sell pressure/single order, shuffle deterministic+permutation+seed generation, TWAP accumulation+single obs, wide_mul+mul_div+mul_cmp+sqrt_product overflow-safe, edge cases (zero input, large reserves)
     - **fuzz.rs** (16 tests): 1000-iteration constant product invariant, clearing price bounded, shuffle permutation+uniform distribution, sqrt_product no-panic, mul_div identity, wide_mul commutativity+correctness, mul_cmp transitivity, sqrt exact, MMR append-only, TWAP monotonic, PoW difficulty target, cell data roundtrip (all types), get_amount_in/out inverse, oracle/pow roundtrip
     - **Bug fix**: sqrt() overflow for u128::MAX — changed `(x+1)/2` to `x/2+1`
-    - Commit: pending
+    - KB updated: contracts-catalogue.md (full CKB Rust crate API section), build-recommendations.md (Session 23 entry), MEMORY.md stats
+    - Commit: `3887d6b`
 
 ## Previously Completed (Feb 18, 2026 — Session 22)
 72. **CKB Frontend Integration — Phase 6 Complete**

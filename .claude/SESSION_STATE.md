@@ -28,7 +28,45 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Relayer wallet** funding — needs ETH for gas
 - **IPFS pinning** service for contribution evidence hashes
 
-## Recently Completed (Feb 17, 2026 — Session 18, continued)
+## Recently Completed (Feb 17, 2026 — Session 18, continued pt2)
+62. **JARVIS Telegram Bot — Built + Deployed**
+    - Telegraf + Anthropic SDK + simple-git
+    - Loads full memory context (CLAUDE.md, SESSION_STATE, 5 memory files = 18K chars)
+    - Commands: /status, /pull, /log, /commit, /refresh, /clear, /model, /mystats, /groupstats, /linkwallet
+    - Per-chat conversation history with user tagging
+    - Model switching: Sonnet (fast) / Opus (deep analysis)
+    - Bot: @JarvisMind1828383bot
+    - Commits: `68117f2` → `ae45213`
+
+63. **Contribution Tracking Module**
+    - Silent message tracking in all group chats
+    - Categorizes messages: IDEA, CODE, GOVERNANCE, COMMUNITY, DESIGN, REVIEW
+    - Quality scoring (0-5): length, questions, links, code blocks
+    - SHA256 evidence hashes per message (ContributionDAG-compatible)
+    - Interaction graph: reply chains (who replied to whom)
+    - User registry with wallet linking (/linkwallet 0x...)
+    - Data persists to jarvis-bot/data/ (JSON, auto-flush every 5min)
+
+64. **Group Chat Situational Awareness**
+    - All group messages buffered into Claude conversation history (no API call)
+    - When @mentioned or name-called, JARVIS has full context of ongoing conversation
+    - Responds to "jarvis" anywhere in message (case insensitive), not just @tag
+    - Personality tuned: short replies (1024 max tokens), humor matching, no filler, no context dumping
+
+65. **PoW Auction Design Deep Dive with Matt**
+    - Miner visibility: miners only see hashes, can't front-run
+    - Reveal window + 50% slash for non-reveals
+    - Forced inclusion is NON-NEGOTIABLE: without it miners can grief by dropping commits
+    - FOCIL parallel: legal concerns about forced inclusion of sanctioned addresses
+    - Solution: ComplianceRegistry as cell_dep — protocol-enforced filtering, zero miner discretion
+    - CKB UTXO compliance via cell_dep pattern (type script reads compliance cell as read-only dependency)
+    - Full conversation saved: `docs/matt-ckb-thoughts/pow-auction-design-conversation.md`
+
+66. **Community Explainers**
+    - `docs/explainers/how-vibeswap-works.md` — 5-paragraph technical essay (level 4/5)
+    - `docs/explainers/vibeswap-whitepaper-simple.md` + PDF — non-technical whitepaper (level 1/5, bar analogies)
+
+## Previously Completed (Feb 17, 2026 — Session 18)
 57. **Proof of Mind Article — Three-Piece Synthesis**
     - Full article: GenTu (substrate) + IT (native object) + POM (consensus)
     - Saved as markdown + PDF: `docs/proof-of-mind-article.md`, `docs/proof-of-mind-article.pdf`

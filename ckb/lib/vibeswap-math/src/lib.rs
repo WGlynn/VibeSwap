@@ -625,7 +625,8 @@ pub fn sqrt(x: u128) -> u128 {
     if x == 0 {
         return 0;
     }
-    let mut z = (x + 1) / 2;
+    // Use x/2 + 1 instead of (x+1)/2 to avoid overflow when x = u128::MAX
+    let mut z = x / 2 + 1;
     let mut y = x;
     while z < y {
         y = z;

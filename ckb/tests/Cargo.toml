@@ -1,0 +1,17 @@
+[package]
+name = "vibeswap-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vibeswap-math = { path = "../lib/vibeswap-math" }
+vibeswap-mmr = { path = "../lib/mmr" }
+vibeswap-pow = { path = "../lib/pow" }
+vibeswap-types = { path = "../lib/types" }
+vibeswap-sdk = { path = "../sdk" }
+sha2 = "0.10"
+
+# Scripts (for their validation functions)
+commit-type = { path = "../scripts/commit-type" }
+amm-pool-type = { path = "../scripts/amm-pool-type" }
+batch-auction-type = { path = "../scripts/batch-auction-type" }

@@ -475,7 +475,7 @@ bot.on('text', async (ctx) => {
   }, 4000);
 
   try {
-    const response = await chat(chatId, userName, ctx.message.text);
+    const response = await chat(chatId, userName, ctx.message.text, ctx.chat.type);
 
     clearInterval(typingInterval);
 

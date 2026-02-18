@@ -94,15 +94,17 @@ export function bufferMessage(chatId, userName, message) {
   conversationsDirty = true;
 }
 
-export async function chat(chatId, userName, message) {
+export async function chat(chatId, userName, message, chatType = 'private') {
   if (!conversations.has(chatId)) {
     conversations.set(chatId, []);
   }
 
   const history = conversations.get(chatId);
 
-  // Add user message with name tag
-  const taggedMessage = userName ? `[${userName}]: ${message}` : message;
+  // Add user message with name tag and chat context
+  const isDM = chatType === 'private';
+  const contextPrefix = isDM ? '[DM] ' : '[GROUP] ';
+  const taggedMessage = contextPrefix + (userName ? `[${userName}]: ${message}` : message);
 
   // Append to existing user block or create new one
   const last = history[history.length - 1];

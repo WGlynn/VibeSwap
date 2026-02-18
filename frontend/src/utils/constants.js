@@ -459,6 +459,29 @@ export const SUPPORTED_CHAINS = [
     isTestnet: true,
     lzEndpointId: 40231,
   },
+  // ============================================
+  // NERVOS CKB (UTXO Cell Model)
+  // ============================================
+  {
+    id: 'ckb-mainnet',
+    name: 'Nervos CKB',
+    network: 'ckb',
+    currency: 'CKB',
+    rpcUrl: import.meta.env.VITE_CKB_RPC_URL || 'https://mainnet.ckbapp.dev/rpc',
+    explorer: 'https://explorer.nervos.org',
+    isTestnet: false,
+    isCKB: true,
+  },
+  {
+    id: 'ckb-testnet',
+    name: 'CKB Testnet',
+    network: 'ckb-testnet',
+    currency: 'CKB',
+    rpcUrl: import.meta.env.VITE_CKB_TESTNET_RPC_URL || 'https://testnet.ckbapp.dev/rpc',
+    explorer: 'https://pudge.explorer.nervos.org',
+    isTestnet: true,
+    isCKB: true,
+  },
 ]
 
 // ============================================
@@ -505,4 +528,19 @@ export const getTestnetChains = () => {
 // Check if in production mode
 export const isProductionMode = () => {
   return import.meta.env.VITE_PRODUCTION_MODE === 'true'
+}
+
+// Check if a chain ID is a CKB chain
+export const isCKBChain = (chainId) => {
+  return typeof chainId === 'string' && chainId.startsWith('ckb-')
+}
+
+// Get EVM-only chains
+export const getEVMChains = () => {
+  return SUPPORTED_CHAINS.filter(c => !c.isCKB)
+}
+
+// Get CKB chains
+export const getCKBChains = () => {
+  return SUPPORTED_CHAINS.filter(c => c.isCKB)
 }

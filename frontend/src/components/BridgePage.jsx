@@ -14,6 +14,7 @@ const CHAINS = [
   { id: 10, name: 'Optimism', logo: '🔴', color: 'from-red-500 to-red-600', lzGas: '0.0004' },
   { id: 8453, name: 'Base', logo: '🔵', color: 'from-blue-600 to-blue-700', lzGas: '0.0003' },
   { id: 137, name: 'Polygon', logo: '🟣', color: 'from-purple-500 to-purple-600', lzGas: '0.0002' },
+  { id: 'ckb-mainnet', name: 'Nervos CKB', logo: '🟢', color: 'from-green-500 to-emerald-600', lzGas: '0', isCKB: true },
 ]
 
 const BRIDGE_TOKENS = [

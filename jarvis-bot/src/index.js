@@ -63,6 +63,30 @@ function ownerOnly(ctx) {
   return ctx.reply('Only Will can do that.');
 }
 
+// ============ Rate Limiting ============
+
+const rateLimitMap = new Map(); // userId -> [timestamps]
+
+function isRateLimited(userId) {
+  const now = Date.now();
+  if (!rateLimitMap.has(userId)) {
+    rateLimitMap.set(userId, []);
+  }
+  const timestamps = rateLimitMap.get(userId);
+
+  // Clean entries older than 60s
+  while (timestamps.length > 0 && now - timestamps[0] > 60000) {
+    timestamps.shift();
+  }
+
+  if (timestamps.length >= config.rateLimitPerMinute) {
+    return true;
+  }
+
+  timestamps.push(now);
+  return false;
+}
+
 // ============ Heartbeat + Crash Detection ============
 
 async function writeHeartbeat(status) {
@@ -435,6 +459,11 @@ bot.on('text', async (ctx) => {
 
   if (!isAuthorized(ctx)) return unauthorized(ctx);
 
+  // Rate limit Claude API calls (owner exempt)
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) {
+    return ctx.reply('Slow down — too many requests. Try again in a minute.');
+  }
+
   const chatId = ctx.chat.id;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
 
@@ -511,6 +540,22 @@ async function main() {
 
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
+
+  // Register commands with Telegram (shows in command menu)
+  try {
+    await bot.telegram.setMyCommands([
+      { command: 'start', description: 'Start JARVIS' },
+      { command: 'whoami', description: 'Show your Telegram user info' },
+      { command: 'mystats', description: 'Your contribution profile' },
+      { command: 'groupstats', description: 'Group contribution stats' },
+      { command: 'linkwallet', description: 'Link your wallet address' },
+      { command: 'modlog', description: 'View moderation log' },
+      { command: 'spamlog', description: 'View anti-spam log' },
+      { command: 'health', description: 'JARVIS health check' },
+      { command: 'model', description: 'Switch AI model (opus/sonnet)' },
+      { command: 'clear', description: 'Clear conversation history' },
+    ]);
+  } catch {}
 
   // Write running heartbeat
   await writeHeartbeat('running');

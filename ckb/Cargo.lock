@@ -598,6 +598,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "vibeswap-tests"
+version = "0.1.0"
+dependencies = [
+ "amm-pool-type",
+ "batch-auction-type",
+ "commit-type",
+ "sha2",
+ "vibeswap-math",
+ "vibeswap-mmr",
+ "vibeswap-pow",
+ "vibeswap-sdk",
+ "vibeswap-types",
+]
+
+[[package]]
 name = "vibeswap-types"
 version = "0.1.0"
 dependencies = [

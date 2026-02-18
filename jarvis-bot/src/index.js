@@ -512,9 +512,12 @@ async function main() {
     setInterval(async () => {
       try {
         const pullResult = await gitPull();
-        console.log(`[jarvis] Auto-sync: ${pullResult}`);
-        await reloadSystemPrompt();
-        console.log('[jarvis] Auto-sync: context reloaded');
+        // Only log + reload when something actually changed
+        if (!pullResult.includes('0 changes, 0 insertions, 0 deletions')) {
+          console.log(`[jarvis] Auto-sync: ${pullResult}`);
+          await reloadSystemPrompt();
+          console.log('[jarvis] Auto-sync: context reloaded');
+        }
       } catch (err) {
         console.warn(`[jarvis] Auto-sync failed: ${err.message}`);
       }

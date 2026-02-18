@@ -49,6 +49,14 @@ function unauthorized(ctx) {
   return ctx.reply('Not authorized. Ask Will to add your Telegram user ID.');
 }
 
+function isOwner(ctx) {
+  return ctx.from.id === config.ownerUserId;
+}
+
+function ownerOnly(ctx) {
+  return ctx.reply('Only Will can do that.');
+}
+
 // ============ Commands ============
 
 bot.command('start', (ctx) => {
@@ -187,7 +195,7 @@ function resolveTargetUser(ctx) {
 }
 
 bot.command('warn', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (!isOwner(ctx)) return ownerOnly(ctx);
   const target = resolveTargetUser(ctx);
   if (!target) return ctx.reply('Reply to a message to warn that user.');
   if (target.is_bot) return ctx.reply('Cannot moderate bots.');
@@ -203,7 +211,7 @@ bot.command('warn', async (ctx) => {
 });
 
 bot.command('mute', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (!isOwner(ctx)) return ownerOnly(ctx);
   const target = resolveTargetUser(ctx);
   if (!target) return ctx.reply('Reply to a message to mute that user.');
   if (target.is_bot) return ctx.reply('Cannot moderate bots.');
@@ -230,7 +238,7 @@ bot.command('mute', async (ctx) => {
 });
 
 bot.command('unmute', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (!isOwner(ctx)) return ownerOnly(ctx);
   const target = resolveTargetUser(ctx);
   if (!target) return ctx.reply('Reply to a message to unmute that user.');
 
@@ -244,7 +252,7 @@ bot.command('unmute', async (ctx) => {
 });
 
 bot.command('ban', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (!isOwner(ctx)) return ownerOnly(ctx);
   const target = resolveTargetUser(ctx);
   if (!target) return ctx.reply('Reply to a message to ban that user.');
   if (target.is_bot) return ctx.reply('Cannot moderate bots.');
@@ -259,7 +267,7 @@ bot.command('ban', async (ctx) => {
 });
 
 bot.command('unban', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (!isOwner(ctx)) return ownerOnly(ctx);
   const target = resolveTargetUser(ctx);
   if (!target) return ctx.reply('Reply to a message to unban that user.');
 

@@ -1,15 +1,36 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory } from './claude.js';
+import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
+import { diagnoseContext } from './memory.js';
+
+// ============ Startup Checks ============
+// Graceful degradation: diagnose what's available instead of hard crash
 
 if (!config.telegram.token) {
-  console.error('TELEGRAM_BOT_TOKEN is required. Copy .env.example to .env and fill it in.');
+  console.error('============================================================');
+  console.error('TELEGRAM_BOT_TOKEN is missing.');
+  console.error('');
+  console.error('To fix:');
+  console.error('  1. Go to @BotFather on Telegram');
+  console.error('  2. Create or select a bot');
+  console.error('  3. Copy the token');
+  console.error('  4. Set it in jarvis-bot/.env as TELEGRAM_BOT_TOKEN=...');
+  console.error('');
+  console.error('Your context and contribution data are INTACT:');
+  console.error('  - jarvis-bot/data/contributions.json (contribution history)');
+  console.error('  - jarvis-bot/data/users.json (user registry)');
+  console.error('  - jarvis-bot/data/conversations.json (chat history)');
+  console.error('  - CLAUDE.md + SESSION_STATE.md + memory files (project context)');
+  console.error('');
+  console.error('Nothing is lost. Just add the token and restart.');
+  console.error('============================================================');
   process.exit(1);
 }
 if (!config.anthropic.apiKey) {
   console.error('ANTHROPIC_API_KEY is required. Copy .env.example to .env and fill it in.');
+  console.error('All local data (contributions, conversations, users) is safe.');
   process.exit(1);
 }
 
@@ -143,6 +164,23 @@ bot.command('linkwallet', async (ctx) => {
   }
 });
 
+// ============ Health Check ============
+
+bot.command('health', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const report = await diagnoseContext();
+  const lines = [
+    'JARVIS Health Check',
+    '',
+    `Context loaded: ${report.loaded.length}/${report.loaded.length + report.missing.length} files (${report.totalChars} chars)`,
+  ];
+  if (report.missing.length > 0) {
+    lines.push(`Missing: ${report.missing.join(', ')}`);
+  }
+  lines.push(`Model: ${config.anthropic.model}`);
+  ctx.reply(lines.join('\n'));
+});
+
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
@@ -184,6 +222,9 @@ bot.on('text', async (ctx) => {
 
     clearInterval(typingInterval);
 
+    // Save conversation after every Claude response (resilience)
+    await saveConversations();
+
     const text = response.text;
     if (text.length <= 4096) {
       await ctx.reply(text, { parse_mode: undefined });
@@ -206,26 +247,52 @@ bot.on('text', async (ctx) => {
 // ============ Startup ============
 
 async function main() {
-  console.log('[jarvis] Loading memory...');
+  console.log('[jarvis] ============ STARTUP ============');
+
+  // Step 1: Pull latest from git BEFORE loading context
+  console.log('[jarvis] Step 1: Syncing from git...');
+  try {
+    const pullResult = await gitPull();
+    console.log(`[jarvis] Git: ${pullResult}`);
+  } catch (err) {
+    console.warn(`[jarvis] Git pull failed (will use local files): ${err.message}`);
+  }
+
+  // Step 2: Load context and conversation history
+  console.log('[jarvis] Step 2: Loading memory and conversations...');
   await initClaude();
   await initTracker();
 
+  // Step 3: Context diagnosis
+  const report = await diagnoseContext();
+  console.log(`[jarvis] Context: ${report.loaded.length} files loaded (${report.totalChars} chars)`);
+  if (report.missing.length > 0) {
+    console.warn(`[jarvis] WARNING — Missing context files: ${report.missing.join(', ')}`);
+  }
+
   console.log(`[jarvis] Model: ${config.anthropic.model}`);
-  console.log('[jarvis] Starting Telegram bot...');
+  console.log('[jarvis] Step 3: Starting Telegram bot...');
 
   bot.launch();
-  console.log('[jarvis] JARVIS is online. Contribution tracking active.');
+  console.log('[jarvis] ============ JARVIS IS ONLINE ============');
 
-  // Flush tracker data every 5 minutes
-  setInterval(() => flushTracker(), 5 * 60 * 1000);
-
-  // Graceful shutdown
-  process.once('SIGINT', async () => {
+  // Flush all data every 5 minutes (tracker + conversations)
+  setInterval(async () => {
     await flushTracker();
+    await saveConversations();
+  }, 5 * 60 * 1000);
+
+  // Graceful shutdown — save everything
+  process.once('SIGINT', async () => {
+    console.log('[jarvis] Shutting down — saving all data...');
+    await flushTracker();
+    await saveConversations();
     bot.stop('SIGINT');
   });
   process.once('SIGTERM', async () => {
+    console.log('[jarvis] Shutting down — saving all data...');
     await flushTracker();
+    await saveConversations();
     bot.stop('SIGTERM');
   });
 }

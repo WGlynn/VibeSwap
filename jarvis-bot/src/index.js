@@ -152,13 +152,15 @@ bot.on('text', async (ctx) => {
   // Skip commands (already handled above)
   if (ctx.message.text.startsWith('/')) return;
 
-  // In group chats, only respond if mentioned or replied to
+  // In group chats, respond if mentioned, replied to, or called by name
   const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
   const botUsername = ctx.botInfo?.username?.toLowerCase();
-  const isMentioned = botUsername && ctx.message.text.toLowerCase().includes(`@${botUsername}`);
+  const textLower = ctx.message.text.toLowerCase();
+  const isMentioned = botUsername && textLower.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
+  const isCalledByName = textLower.includes('jarvis');
 
-  if (isGroup && !isMentioned && !isReplyToBot) {
+  if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
     // In groups: buffer into conversation history for situational awareness, but don't call Claude
     const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
     bufferMessage(ctx.chat.id, userName, ctx.message.text);

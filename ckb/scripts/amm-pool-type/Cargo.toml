@@ -1,0 +1,8 @@
+[package]
+name = "amm-pool-type"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vibeswap-math = { path = "../../lib/vibeswap-math" }
+vibeswap-types = { path = "../../lib/types" }

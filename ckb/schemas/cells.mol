@@ -1,0 +1,131 @@
+// ============ VibeSwap CKB Cell Schemas (Molecule Format) ============
+// Binary serialization schemas for all cell data structures
+// Molecule = CKB's zero-copy deserialization format
+
+// ============ Primitive Types ============
+array Byte32 [byte; 32];
+array Byte20 [byte; 20];
+array Uint8 [byte; 1];
+array Uint16 [byte; 2];
+array Uint32 [byte; 4];
+array Uint64 [byte; 8];
+array Uint128 [byte; 16];
+array Uint256 [byte; 32];
+
+// ============ Auction Cell Data ============
+// Shared state cell per trading pair, PoW-gated
+table AuctionCellData {
+    phase:              Uint8,      // 0=COMMIT, 1=REVEAL, 2=SETTLING, 3=SETTLED
+    batch_id:           Uint64,
+    commit_mmr_root:    Byte32,     // MMR root of all commits in this batch
+    commit_count:       Uint32,
+    reveal_count:       Uint32,
+    xor_seed:           Byte32,     // XOR of all revealed secrets
+    clearing_price:     Uint128,    // Uniform clearing price (18 decimals)
+    fillable_volume:    Uint128,
+    difficulty_target:  Byte32,     // Current PoW difficulty
+    prev_state_hash:    Byte32,     // Hash chain of prior transitions
+    phase_start_block:  Uint64,     // Block number when phase started
+    pair_id:            Byte32,     // Trading pair identifier
+}
+
+// ============ Commit Cell Data ============
+// Per-user commit cell, no contention
+table CommitCellData {
+    order_hash:         Byte32,     // hash(order || secret)
+    batch_id:           Uint64,
+    deposit_ckb:        Uint64,     // CKB deposit (for slashing)
+    token_type_hash:    Byte32,     // Which xUDT token deposited
+    token_amount:       Uint128,    // Amount of token deposited
+    block_number:       Uint64,     // When commit was created
+    sender_lock_hash:   Byte32,     // Hash of sender's lock script
+}
+
+// ============ Reveal Data (in witness) ============
+// Submitted as witness during reveal phase
+table RevealWitness {
+    order_type:         Uint8,      // 0=BUY, 1=SELL
+    amount_in:          Uint128,
+    limit_price:        Uint128,    // min price for buy, max price for sell
+    secret:             Byte32,     // The secret from commit
+    priority_bid:       Uint64,     // Optional priority bid in CKB
+    commit_index:       Uint32,     // Index of the commit being revealed
+}
+
+// ============ Pool Cell Data ============
+// Shared state cell per trading pair AMM, PoW-gated
+table PoolCellData {
+    reserve0:           Uint128,
+    reserve1:           Uint128,
+    total_lp_supply:    Uint128,
+    fee_rate_bps:       Uint16,     // Basis points (default 5)
+    twap_price_cum:     Uint128,    // Cumulative price for TWAP
+    twap_last_block:    Uint64,
+    k_last:             Uint256,    // Last invariant for fee accounting
+    minimum_liquidity:  Uint128,    // Locked forever (anti first-depositor)
+    pair_id:            Byte32,     // Trading pair identifier
+    token0_type_hash:   Byte32,     // Type script hash of token 0
+    token1_type_hash:   Byte32,     // Type script hash of token 1
+}
+
+// ============ LP Position Cell Data ============
+// Per-user LP position, no contention
+table LPPositionCellData {
+    lp_amount:          Uint128,
+    entry_price:        Uint128,    // TWAP at deposit for IL tracking
+    pool_id:            Byte32,     // Pool cell type args hash
+    deposit_block:      Uint64,     // When LP was deposited
+}
+
+// ============ Compliance Cell Data ============
+// Singleton, read-only dependency (cell_dep)
+table ComplianceCellData {
+    blocked_merkle_root:    Byte32,     // Merkle root of blocked addresses
+    tier_merkle_root:       Byte32,     // Merkle root of user tier data
+    jurisdiction_root:      Byte32,     // Merkle root of jurisdiction configs
+    last_updated:           Uint64,
+    version:                Uint32,
+}
+
+// ============ Config Cell Data ============
+// Singleton, read-only dependency (cell_dep)
+table ConfigCellData {
+    commit_window_blocks:   Uint64,     // How many blocks for commit phase
+    reveal_window_blocks:   Uint64,
+    slash_rate_bps:         Uint16,     // 5000 = 50%
+    max_price_deviation:    Uint16,     // 500 = 5%
+    max_trade_size_bps:     Uint16,     // 1000 = 10% of reserves
+    rate_limit_amount:      Uint128,
+    rate_limit_window:      Uint64,
+    volume_breaker_limit:   Uint128,
+    price_breaker_bps:      Uint16,
+    withdrawal_breaker_bps: Uint16,
+    min_pow_difficulty:      Uint8,
+}
+
+// ============ Oracle Cell Data ============
+// Updated by authorized relayers
+table OracleCellData {
+    price:              Uint128,    // 18 decimal price
+    block_number:       Uint64,
+    confidence:         Uint8,      // 0-100
+    source_hash:        Byte32,     // Hash of off-chain data sources
+    pair_id:            Byte32,     // Which trading pair
+}
+
+// ============ PoW Lock Args ============
+// Arguments for the PoW lock script
+table PoWLockArgs {
+    pair_id:            Byte32,     // Which cell this PoW protects
+    min_difficulty:     Uint8,      // Minimum required difficulty
+}
+
+// ============ Merkle Proof ============
+// For compliance verification
+vector Byte32Vec <Byte32>;
+
+table MerkleProof {
+    leaf:               Byte32,
+    path:               Byte32Vec,
+    indices:            Uint32,     // Bit-packed left/right indicators
+}

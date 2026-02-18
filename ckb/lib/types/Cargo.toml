@@ -1,0 +1,12 @@
+[package]
+name = "vibeswap-types"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = ["sha2"]
+no_std = []
+
+[dependencies]
+sha2 = { version = "0.10", default-features = false, optional = true }

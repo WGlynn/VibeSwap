@@ -1,0 +1,11 @@
+[package]
+name = "batch-auction-type"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vibeswap-math = { path = "../../lib/vibeswap-math" }
+vibeswap-mmr = { path = "../../lib/mmr" }
+vibeswap-pow = { path = "../../lib/pow" }
+vibeswap-types = { path = "../../lib/types" }
+sha2 = "0.10"

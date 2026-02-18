@@ -1,0 +1,15 @@
+[package]
+name = "vibeswap-pow"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+no_std = []
+
+[dependencies]
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+proptest = "1.4"

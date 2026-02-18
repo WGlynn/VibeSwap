@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "lib/vibeswap-math",
+    "lib/mmr",
+    "lib/pow",
+    "lib/types",
+    "scripts/pow-lock",
+    "scripts/batch-auction-type",
+    "scripts/commit-type",
+    "scripts/amm-pool-type",
+    "scripts/lp-position-type",
+    "scripts/compliance-type",
+    "scripts/config-type",
+    "scripts/oracle-type",
+    "sdk",
+]
+
+[workspace.dependencies]
+blake2b-rs = "0.2"
+sha2 = { version = "0.10", default-features = false }
+molecule = { version = "0.7", default-features = false }
+
+[profile.release]
+overflow-checks = true
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -7,6 +7,7 @@ import { WalletProvider } from './hooks/useWallet'
 import { DeviceWalletProvider } from './hooks/useDeviceWallet'
 import { BalanceProvider } from './hooks/useBalances'
 import { VaultProvider } from './hooks/useVault'
+import { CKBWalletProvider } from './hooks/useCKBWallet'
 import { BatchProvider } from './hooks/useBatchState'
 import { IncentivesProvider } from './hooks/useIncentives'
 import { TransactionsProvider } from './hooks/useTransactions'
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <WalletProvider>
         <DeviceWalletProvider>
+          <CKBWalletProvider>
           <BalanceProvider>
             <VaultProvider>
               <BatchProvider>
@@ -57,6 +59,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               </BatchProvider>
             </VaultProvider>
           </BalanceProvider>
+          </CKBWalletProvider>
         </DeviceWalletProvider>
       </WalletProvider>
     </BrowserRouter>

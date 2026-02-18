@@ -10,7 +10,8 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **1840+ tests passing, 0 failures, 0 skipped** (full suite green, 21 backend tests)
+- **1840+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **CKB Integration: 108 Rust tests passing, 13 crates, 7,265 lines** (Phases 1-5 of 7 COMPLETE)
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode**)
@@ -22,6 +23,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Frontend mobile responsiveness: COMPLETE** — all 10 pages responsive, AnimatedNumber/ProgressRing wired
 - **GitHub webhook relayer: COMPLETE** — off-chain service with EIP-712 signing + batch submission
 - **Contribution attestation governance: COMPLETE** — 3-branch separation of powers (Executive/Judicial/Legislative)
+- **CKB cell model port: Phases 1-6 COMPLETE** — toolchain, math, scripts, SDK, mining client, frontend hooks
 
 ## Active Tasks — GO-LIVE BLOCKERS (need Will)
 - **Contract deployment** to testnet (Sepolia) then mainnet — needs private key + ETH for gas
@@ -31,7 +33,31 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 20)
+## Recently Completed (Feb 18, 2026 — Session 22)
+72. **CKB Frontend Integration — Phase 6 Complete**
+    - **useCKBWallet.jsx** (NEW): CKB wallet hook with Omnilock (MetaMask→CKB) + JoyID (WebAuthn passkey) providers
+    - **useCKBContracts.jsx** (NEW): CKB cell operations — auction state polling, pool queries, commit/reveal lifecycle, secret management (localStorage)
+    - **ckb-constants.js** (NEW): Complete CKB configuration — chain IDs, script code hashes, cell data parsers/builders (matches Rust types), SHA-256 order hash computation, xUDT token list
+    - **BridgePage.jsx**: Added Nervos CKB to chain selector dropdown
+    - **main.jsx**: Added CKBWalletProvider to provider tree
+    - **constants.js**: Added CKB mainnet + testnet to SUPPORTED_CHAINS, isCKBChain/getEVMChains/getCKBChains utilities
+    - Frontend build passes clean, 108 CKB Rust tests still passing
+    - Remaining: Phase 7 (OffCKB devnet integration tests)
+
+## Previously Completed (Feb 18, 2026 — Session 21)
+71. **Nervos CKB Integration — Full Cell Model Port (Phases 1-5)**
+    - **13 Rust crates**, 7,265 lines, **108 tests all passing**
+    - Five-layer MEV defense: PoW-gated state + MMR + forced inclusion + shuffle + uniform clearing
+    - **Libraries**: vibeswap-math (BatchMath/Shuffle/TWAP + 256-bit wide_mul/mul_div/mul_cmp), vibeswap-mmr (Merkle Mountain Range), vibeswap-pow (SHA-256 PoW + difficulty), vibeswap-types (cell data serialize/deserialize)
+    - **Scripts**: pow-lock, batch-auction-type (commit-reveal state machine + forced inclusion), commit-type, amm-pool-type (constant product AMM + TWAP + circuit breakers), lp-position-type, compliance-type, config-type, oracle-type
+    - **SDK**: Transaction builder (create_commit, create_reveal, add/remove_liquidity) + PoW mining client
+    - **Key fixes**: u128 overflow in AMM math — added wide_mul (256-bit), mul_div (safe a*b/c), mul_cmp (256-bit comparison), sqrt_product (overflow-safe sqrt(a*b))
+    - Fixed TWAP oracle binary search bug (incorrect observation lookup in ring buffer)
+    - Toolchain: Installed Rust + MinGW-w64 from scratch on Windows/MINGW
+    - Remaining: Phase 6 (frontend CKB hooks) + Phase 7 (OffCKB devnet integration tests)
+    - Commit: `5f88fe4`
+
+## Previously Completed (Feb 18, 2026 — Session 20)
 68. **Contract Integration Hooks — Full Frontend→Contract Bridge**
     - **useSwap.jsx** (NEW): Full commit→reveal→settle flow, secret management (localStorage), real price quotes, ERC20 approval, settlement tracking. Wired into SwapCore.jsx.
     - **usePool.jsx** (NEW): Reads on-chain pool reserves, computes TVL/APR/volume, tracks user LP positions. addLiquidity/removeLiquidity. Wired into PoolPage.jsx.

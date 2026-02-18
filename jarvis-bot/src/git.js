@@ -71,6 +71,7 @@ export async function backupData() {
       'jarvis-bot/data/moderation.json',
       'jarvis-bot/data/conversations.json',
       'jarvis-bot/data/spam-log.json',
+      'jarvis-bot/data/threads.json',
     ];
 
     // Check if any data files have changes

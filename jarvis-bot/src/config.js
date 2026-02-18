@@ -35,4 +35,6 @@ export const config = {
   autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '10000'),
   // Auto-backup: commit data/ to git (ms, default 30 min)
   autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '1800000'),
+  // Daily digest: UTC hour to send (default 18 = 6pm UTC)
+  digestHour: parseInt(process.env.DIGEST_HOUR || '18'),
 };

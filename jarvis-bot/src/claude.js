@@ -62,6 +62,10 @@ export async function reloadSystemPrompt() {
   console.log(`[claude] System prompt reloaded (${systemPrompt.length} chars)`);
 }
 
+export function getSystemPrompt() {
+  return systemPrompt;
+}
+
 export function clearHistory(chatId) {
   conversations.delete(chatId);
   conversationsDirty = true;

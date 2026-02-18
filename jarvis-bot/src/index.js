@@ -1,11 +1,14 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations } from './claude.js';
+import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
+import { generateDigest, generateWeeklyDigest } from './digest.js';
+import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
+import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -433,6 +436,83 @@ bot.command('ark', async (ctx) => {
   }
 });
 
+// ============ Digest Commands ============
+
+bot.command('digest', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  ctx.reply('Generating daily digest...');
+  const digest = await generateDigest(ctx.chat.id);
+  if (digest) {
+    ctx.reply(digest);
+  } else {
+    ctx.reply('No activity to report today.');
+  }
+});
+
+bot.command('weeklydigest', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  ctx.reply('Generating weekly digest...');
+  const digest = await generateWeeklyDigest(ctx.chat.id);
+  if (digest) {
+    ctx.reply(digest);
+  } else {
+    ctx.reply('No activity this week.');
+  }
+});
+
+// ============ Thread Archival Commands ============
+
+bot.command('archive', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const result = await archiveThread(ctx.chat.id, ctx.chat.title, ctx.from.id);
+  if (result.success) {
+    const t = result.thread;
+    ctx.reply(
+      `Thread archived.\n` +
+      `ID: ${t.id}\n` +
+      `Messages: ${t.messageCount} from ${t.participants.length} participants\n` +
+      `Topics: ${t.topics.join(', ') || 'general'}\n` +
+      `Summary: ${t.summary}`
+    );
+  } else {
+    ctx.reply(result.error);
+  }
+});
+
+bot.command('threads', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const recent = getRecentThreads(ctx.chat.id, 5);
+  if (!recent.length) return ctx.reply('No archived threads yet. Use /archive to save a conversation.');
+
+  const lines = ['Archived threads:'];
+  for (const t of recent) {
+    const date = new Date(t.timestamp).toISOString().split('T')[0];
+    lines.push(`  ${t.id} — ${date} — ${t.messageCount} msgs — ${t.topics.join(', ') || 'general'}`);
+  }
+
+  const stats = getThreadStats();
+  lines.push('');
+  lines.push(`Total: ${stats.totalArchived} threads, ${stats.totalMessages} messages, ${stats.totalParticipants} participants`);
+
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ Intelligence Stats Command ============
+
+bot.command('brain', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const stats = getIntelligenceStats();
+  const lines = [
+    'JARVIS Intelligence',
+    '',
+    `Proactive engagements this hour: ${stats.engagementsThisHour}/${stats.maxPerHour}`,
+    `Last engagement: ${stats.lastEngageTime}`,
+    `Last moderation: ${stats.lastModerateTime}`,
+    `Cooldown remaining: ${Math.round(stats.cooldownRemaining / 1000)}s`,
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
 // ============ Health Check ============
 
 bot.command('health', async (ctx) => {
@@ -504,9 +584,44 @@ bot.on('text', async (ctx) => {
   const isCalledByName = textLower.includes('jarvis');
 
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
-    // In groups: buffer into conversation history for situational awareness, but don't call Claude
+    // In groups: buffer into conversation history for situational awareness
     const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
-    bufferMessage(ctx.chat.id, userName, ctx.message.text);
+    const msgText = ctx.message.text;
+    bufferMessage(ctx.chat.id, userName, msgText);
+
+    // Track for thread detection (quality from basic heuristic — AI scoring is too expensive for every msg)
+    const basicQuality = Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5);
+    trackForThread(ctx.chat.id, ctx.from.id, userName, msgText, basicQuality, ctx.message.message_id);
+
+    // Check if thread is worth archiving
+    if (shouldSuggestArchival(ctx.chat.id)) {
+      ctx.reply('This conversation is getting good. Use /archive if you want to save it as a knowledge artifact.');
+    }
+
+    // Proactive intelligence — analyze and maybe respond autonomously
+    if (msgText.length >= 20) {
+      const recentContext = ''; // Could build from buffered messages
+      const analysis = await analyzeMessage(msgText, userName, recentContext);
+
+      if (analysis.action === 'engage' && analysis.response_hint) {
+        const proactiveReply = await generateProactiveResponse(
+          msgText, userName, analysis.response_hint, getSystemPrompt()
+        );
+        if (proactiveReply) {
+          await ctx.reply(proactiveReply, { parse_mode: undefined });
+        }
+      } else if (analysis.action === 'moderate') {
+        const modAction = await evaluateModeration(msgText, userName, analysis.violation, analysis.severity);
+        if (modAction.action === 'warn') {
+          await warnUser(bot, ctx.chat.id, ctx.from.id, modAction.reason, 'jarvis-ai');
+          await ctx.reply(`${ctx.from.first_name} — heads up: ${modAction.reason}`);
+        } else if (modAction.action === 'mute') {
+          await muteUser(bot, ctx.chat.id, ctx.from.id, 600, modAction.reason, 'jarvis-ai');
+        }
+        // Bans from AI moderation should be rare and reviewed — log but don't auto-execute
+      }
+    }
+
     return;
   }
 
@@ -568,12 +683,13 @@ async function main() {
     console.warn(`[jarvis] Git pull failed (will use local files): ${err.message}`);
   }
 
-  // Step 2: Load context, conversation history, moderation log
-  console.log('[jarvis] Step 2: Loading memory, conversations, moderation...');
+  // Step 2: Load context, conversation history, moderation log, threads
+  console.log('[jarvis] Step 2: Loading memory, conversations, moderation, threads...');
   await initClaude();
   await initTracker();
   await initModeration();
   await initAntispam();
+  await initThreads();
 
   // Step 3: Context diagnosis
   const report = await diagnoseContext();
@@ -602,6 +718,11 @@ async function main() {
       { command: 'mystats', description: 'Your contribution profile' },
       { command: 'groupstats', description: 'Group contribution stats' },
       { command: 'linkwallet', description: 'Link your wallet address' },
+      { command: 'digest', description: 'Daily community digest' },
+      { command: 'weeklydigest', description: 'Weekly community digest' },
+      { command: 'archive', description: 'Archive current conversation thread' },
+      { command: 'threads', description: 'View archived threads' },
+      { command: 'brain', description: 'JARVIS intelligence stats' },
       { command: 'modlog', description: 'View moderation log' },
       { command: 'spamlog', description: 'View anti-spam log' },
       { command: 'health', description: 'JARVIS health check' },
@@ -629,13 +750,30 @@ async function main() {
     console.warn(`[jarvis] Could not notify owner: ${err.message}`);
   }
 
-  // Flush all data every 5 minutes (tracker + conversations + moderation)
+  // Flush all data every 5 minutes (tracker + conversations + moderation + threads)
   setInterval(async () => {
     await flushTracker();
     await saveConversations();
     await flushModeration();
     await flushAntispam();
+    await flushThreads();
   }, 5 * 60 * 1000);
+
+  // Scheduled daily digest — send at configured hour (default 18:00 UTC)
+  const digestHour = config.digestHour || 18;
+  setInterval(async () => {
+    const now = new Date();
+    if (now.getUTCHours() === digestHour && now.getUTCMinutes() === 0) {
+      if (config.communityGroupId) {
+        try {
+          const digest = await generateDigest(config.communityGroupId);
+          if (digest) {
+            await bot.telegram.sendMessage(config.communityGroupId, digest);
+          }
+        } catch {}
+      }
+    }
+  }, 60 * 1000); // Check every minute
 
   // Auto-sync: pull from git + reload context periodically
   if (config.autoSyncInterval > 0) {
@@ -659,24 +797,18 @@ async function main() {
   setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
 
   // Graceful shutdown — save everything + mark clean shutdown
-  process.once('SIGINT', async () => {
-    console.log('[jarvis] Shutting down — saving all data...');
+  async function gracefulShutdown(signal) {
+    console.log(`[jarvis] Shutting down (${signal}) — saving all data...`);
     await flushTracker();
     await saveConversations();
     await flushModeration();
     await flushAntispam();
+    await flushThreads();
     await writeHeartbeat('stopped');
-    bot.stop('SIGINT');
-  });
-  process.once('SIGTERM', async () => {
-    console.log('[jarvis] Shutting down — saving all data...');
-    await flushTracker();
-    await saveConversations();
-    await flushModeration();
-    await flushAntispam();
-    await writeHeartbeat('stopped');
-    bot.stop('SIGTERM');
-  });
+    bot.stop(signal);
+  }
+  process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 }
 
 main().catch(console.error);

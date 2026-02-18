@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBalances } from '../hooks/useBalances'
+import { useBridge } from '../hooks/useBridge'
 import toast from 'react-hot-toast'
 import GlassCard from './ui/GlassCard'
 import InteractiveButton from './ui/InteractiveButton'
@@ -25,7 +26,17 @@ const BRIDGE_TOKENS = [
 function BridgePage() {
   const { isConnected: isExternalConnected, connect, chainId } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
-  const { getFormattedBalance, simulateSend, refresh } = useBalances()
+  const { getFormattedBalance } = useBalances()
+  const {
+    isLive,
+    bridgeState,
+    isLoading: isBridgeLoading,
+    error: bridgeError,
+    estimateGas,
+    executeBridge,
+    lastBridge,
+    resetBridge,
+  } = useBridge()
 
   // Combined wallet state - connected if EITHER wallet type is connected
   const isConnected = isExternalConnected || isDeviceConnected
@@ -38,7 +49,9 @@ function BridgePage() {
   const [showToChainSelect, setShowToChainSelect] = useState(false)
   const [showTokenSelect, setShowTokenSelect] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+
+  // Gas estimation state
+  const [gasEstimate, setGasEstimate] = useState(null)
 
   // Get current balance for selected token
   const currentBalance = getFormattedBalance(selectedToken.symbol)
@@ -48,13 +61,72 @@ function BridgePage() {
     setToChain(fromChain)
   }
 
-  // LayerZero gas estimate (burn on source + mint on destination)
-  const lzGasFee = parseFloat(fromChain.lzGas) + parseFloat(toChain.lzGas)
-  const lzGasFeeFormatted = lzGasFee.toFixed(4)
+  // Fetch gas estimate when inputs change
+  useEffect(() => {
+    let cancelled = false
 
-  // Estimate bridge time - 0% protocol fee, only LayerZero gas
-  const estimatedTime = '~2-5 min'
+    const fetchGas = async () => {
+      if (!amount || parseFloat(amount) <= 0) {
+        setGasEstimate(null)
+        return
+      }
+
+      try {
+        const estimate = await estimateGas(fromChain.id, toChain.id, selectedToken, amount)
+        if (!cancelled) {
+          setGasEstimate(estimate)
+        }
+      } catch (err) {
+        console.warn('Gas estimation failed:', err)
+        if (!cancelled) {
+          setGasEstimate(null)
+        }
+      }
+    }
+
+    fetchGas()
+    return () => { cancelled = true }
+  }, [fromChain.id, toChain.id, selectedToken, amount, estimateGas])
+
+  // LayerZero gas fee from estimate or fallback
+  const lzGasFeeFormatted = gasEstimate?.fee || (parseFloat(fromChain.lzGas) + parseFloat(toChain.lzGas)).toFixed(4)
+
+  // Estimate bridge time from gas estimate or fallback
+  const estimatedTimeSeconds = gasEstimate?.time || 180
+  const estimatedTime = estimatedTimeSeconds >= 60
+    ? `~${Math.round(estimatedTimeSeconds / 60)} min`
+    : `~${estimatedTimeSeconds}s`
+
   const receiveAmount = amount ? parseFloat(amount).toFixed(4) : '0'
+
+  // Show toasts based on bridge state changes
+  useEffect(() => {
+    const TOAST_ID = 'bridge'
+
+    switch (bridgeState) {
+      case 'approving':
+        toast.loading('Approving token transfer...', { id: TOAST_ID })
+        break
+      case 'burning':
+        toast.loading('Burning tokens on source chain...', { id: TOAST_ID })
+        break
+      case 'in_transit':
+        toast.loading('LayerZero message in transit...', { id: TOAST_ID })
+        break
+      case 'completed':
+        toast.success(
+          `Sent ${lastBridge?.amount || amount} ${lastBridge?.token || selectedToken.symbol} to ${lastBridge?.toChain || toChain.name}!`,
+          { id: TOAST_ID, duration: 5000 }
+        )
+        setAmount('')
+        break
+      case 'failed':
+        toast.error(bridgeError || 'Bridge transfer failed', { id: TOAST_ID, duration: 5000 })
+        break
+      default:
+        break
+    }
+  }, [bridgeState, lastBridge, bridgeError, amount, selectedToken.symbol, toChain.name])
 
   const handleSendClick = () => {
     if (!isConnected) {
@@ -67,38 +139,27 @@ function BridgePage() {
       return
     }
 
+    // Reset any previous bridge state before showing confirmation
+    resetBridge()
+
     // Show confirmation modal
     setShowConfirmation(true)
   }
 
   const handleConfirmSend = async () => {
-    setIsLoading(true)
     setShowConfirmation(false)
-    toast.loading('Burning tokens on source chain...', { id: 'bridge' })
 
-    // Simulate burn on source chain
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    toast.loading('LayerZero message in transit...', { id: 'bridge' })
-
-    // Simulate cross-chain message
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    toast.loading('Minting tokens on destination...', { id: 'bridge' })
-
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    // Update balance (simulate the send - balance decreases on source chain)
-    simulateSend(selectedToken.symbol, amount)
-
-    // Refresh real balances if connected to real network
-    refresh()
-
-    toast.success(
-      `Sent ${amount} ${selectedToken.symbol} to ${toChain.name}!`,
-      { id: 'bridge', duration: 5000 }
-    )
-
-    setIsLoading(false)
-    setAmount('')
+    try {
+      await executeBridge({
+        fromChain,
+        toChain,
+        token: selectedToken,
+        amount,
+      })
+    } catch (err) {
+      // Error is already handled by useBridge (sets bridgeState to 'failed')
+      console.error('Bridge failed:', err)
+    }
   }
 
   return (
@@ -284,7 +345,7 @@ function BridgePage() {
         <InteractiveButton
           variant="primary"
           onClick={handleSendClick}
-          loading={isLoading}
+          loading={isBridgeLoading}
           className={`w-full mt-4 py-4 text-lg ${
             isConnected && amount && parseFloat(amount) > 0
               ? ''

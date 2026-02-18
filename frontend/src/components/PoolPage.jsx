@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
-import toast from 'react-hot-toast'
+import { usePool } from '../hooks/usePool'
 import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
 import GlassCard from './ui/GlassCard'
 import AnimatedNumber from './ui/AnimatedNumber'
@@ -19,43 +19,6 @@ function formatLargeNumber(num) {
   return { value: num, suffix: '', decimals: 0 }
 }
 
-// Mock pool data
-const POOLS = [
-  {
-    id: '1',
-    token0: { symbol: 'ETH', logo: '⟠' },
-    token1: { symbol: 'USDC', logo: '💵' },
-    tvl: 12500000,
-    volume24h: 2300000,
-    fees24h: 6900,
-    apr: 18.2,
-    myLiquidity: 5230,
-    myShare: '0.042%',
-  },
-  {
-    id: '2',
-    token0: { symbol: 'ETH', logo: '⟠' },
-    token1: { symbol: 'WBTC', logo: '₿' },
-    tvl: 8200000,
-    volume24h: 1100000,
-    fees24h: 3300,
-    apr: 14.7,
-    myLiquidity: 0,
-    myShare: '0%',
-  },
-  {
-    id: '3',
-    token0: { symbol: 'USDC', logo: '💵' },
-    token1: { symbol: 'ARB', logo: '🔵' },
-    tvl: 4100000,
-    volume24h: 890000,
-    fees24h: 2670,
-    apr: 23.8,
-    myLiquidity: 1500,
-    myShare: '0.037%',
-  },
-]
-
 function PoolPage() {
   const { isConnected: isExternalConnected, connect } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
@@ -63,9 +26,27 @@ function PoolPage() {
   // Combined wallet state - connected if EITHER wallet type is connected
   const isConnected = isExternalConnected || isDeviceConnected
 
+  // Pool data from hook (live or mock depending on contract deployment)
+  const {
+    pools,
+    isLoading: poolsLoading,
+    error: poolsError,
+    totalTVL,
+    totalVolume24h,
+    totalEarnings,
+    addLiquidity,
+    removeLiquidity,
+    refreshPools,
+  } = usePool()
+
   const [activeTab, setActiveTab] = useState('pools')
   const [showAddLiquidity, setShowAddLiquidity] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
+
+  // Format aggregate stats for the stat cards
+  const tvlFormatted = formatLargeNumber(totalTVL)
+  const volumeFormatted = formatLargeNumber(totalVolume24h)
+  const earningsFormatted = formatLargeNumber(totalEarnings)
 
   return (
     <div className="max-w-4xl mx-auto px-4">
@@ -124,21 +105,21 @@ function PoolPage() {
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Community Savings</p>
-            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={24.8} prefix="$" suffix="M" decimals={1} /></p>
+            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={tvlFormatted.value} prefix="$" suffix={tvlFormatted.suffix} decimals={tvlFormatted.decimals} /></p>
             <p className="text-sm text-green-500 mt-1">+5.2% (24h)</p>
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Exchanged Today</p>
-            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={4.29} prefix="$" suffix="M" decimals={2} /></p>
+            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={volumeFormatted.value} prefix="$" suffix={volumeFormatted.suffix} decimals={volumeFormatted.decimals} /></p>
             <p className="text-sm text-green-500 mt-1">+12.8% (24h)</p>
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Earnings Paid Out</p>
-            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={12870} prefix="$" decimals={0} /></p>
+            <p className="text-2xl font-bold mt-1"><AnimatedNumber value={earningsFormatted.value} prefix="$" suffix={earningsFormatted.suffix} decimals={earningsFormatted.decimals} /></p>
             <p className="text-sm text-green-500 mt-1">+8.3% (24h)</p>
           </GlassCard>
         </StaggerItem>
@@ -146,7 +127,7 @@ function PoolPage() {
 
       {/* Pool List */}
       <GlassCard className="rounded-2xl overflow-hidden">
-        {/* Table Header — desktop only */}
+        {/* Table Header -- desktop only */}
         <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-3 text-sm text-black-400 border-b border-black-700">
           <div className="col-span-4">Currency Pair</div>
           <div className="col-span-2 text-right">Pool Size</div>
@@ -155,8 +136,23 @@ function PoolPage() {
           <div className="col-span-2 text-right">My Balance</div>
         </div>
 
+        {/* Loading state */}
+        {poolsLoading && (
+          <div className="p-8 text-center text-black-400">Loading pools...</div>
+        )}
+
+        {/* Error state */}
+        {poolsError && !poolsLoading && (
+          <div className="p-8 text-center">
+            <p className="text-red-400 mb-2">{poolsError}</p>
+            <InteractiveButton variant="secondary" onClick={refreshPools} className="px-4 py-2 text-sm">
+              Retry
+            </InteractiveButton>
+          </div>
+        )}
+
         {/* Pool Rows */}
-        {POOLS.filter(pool => activeTab === 'pools' || pool.myLiquidity > 0).map((pool) => (
+        {!poolsLoading && pools.filter(pool => activeTab === 'pools' || pool.myLiquidity > 0).map((pool) => (
           <StaggerItem key={pool.id}>
             {/* Desktop row */}
             <div
@@ -249,7 +245,7 @@ function PoolPage() {
           </StaggerItem>
         ))}
 
-        {activeTab === 'my' && POOLS.filter(pool => pool.myLiquidity > 0).length === 0 && (
+        {!poolsLoading && activeTab === 'my' && pools.filter(pool => pool.myLiquidity > 0).length === 0 && (
           <div className="p-12 text-center">
             <svg className="w-16 h-16 mx-auto text-black-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -271,6 +267,7 @@ function PoolPage() {
       {showAddLiquidity && (
         <AddLiquidityModal
           pool={selectedPool}
+          addLiquidity={addLiquidity}
           onClose={() => {
             setShowAddLiquidity(false)
             setSelectedPool(null)
@@ -281,7 +278,7 @@ function PoolPage() {
   )
 }
 
-function AddLiquidityModal({ pool, onClose }) {
+function AddLiquidityModal({ pool, addLiquidity, onClose }) {
   const { isConnected: isExternalConnected, connect } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
 
@@ -292,6 +289,12 @@ function AddLiquidityModal({ pool, onClose }) {
   const [amount1, setAmount1] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
+  // Determine token labels from the selected pool (fallback to ETH/USDC)
+  const token0Symbol = pool?.token0?.symbol || 'ETH'
+  const token1Symbol = pool?.token1?.symbol || 'USDC'
+  const token0Logo = pool?.token0?.logo || '\u27E0'
+  const token1Logo = pool?.token1?.logo || '\uD83D\uDCB5'
+
   const handleAddLiquidity = async () => {
     if (!isConnected) {
       connect()
@@ -299,13 +302,19 @@ function AddLiquidityModal({ pool, onClose }) {
     }
 
     setIsLoading(true)
-    toast.loading('Adding liquidity...', { id: 'liquidity' })
-
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    toast.success('Liquidity added successfully!', { id: 'liquidity' })
-    setIsLoading(false)
-    onClose()
+    try {
+      await addLiquidity({
+        poolId: pool?.id || '1',
+        amount0: amount0,
+        amount1: amount1,
+      })
+      onClose()
+    } catch (err) {
+      // Error toast is handled inside the hook
+      console.error('Add liquidity failed:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -346,8 +355,8 @@ function AddLiquidityModal({ pool, onClose }) {
                 className="flex-1 bg-transparent text-2xl font-medium outline-none placeholder-black-500"
               />
               <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-black-700">
-                <span className="text-xl">⟠</span>
-                <span className="font-medium">ETH</span>
+                <span className="text-xl">{token0Logo}</span>
+                <span className="font-medium">{token0Symbol}</span>
               </div>
             </div>
           </div>
@@ -379,8 +388,8 @@ function AddLiquidityModal({ pool, onClose }) {
                 className="flex-1 bg-transparent text-2xl font-medium outline-none placeholder-black-500"
               />
               <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-black-700">
-                <span className="text-xl">💵</span>
-                <span className="font-medium">USDC</span>
+                <span className="text-xl">{token1Logo}</span>
+                <span className="font-medium">{token1Symbol}</span>
               </div>
             </div>
           </div>
@@ -389,11 +398,11 @@ function AddLiquidityModal({ pool, onClose }) {
           <div className="p-4 rounded-2xl bg-black-700/50 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-black-400">Exchange Rate</span>
-              <span>1 ETH = 2,000 USDC</span>
+              <span>1 {token0Symbol} = 2,000 {token1Symbol}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black-400">Your Share</span>
-              <span>0.05%</span>
+              <span>{pool?.myShare || '0.05%'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black-400">Earnings Rate</span>

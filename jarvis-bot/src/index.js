@@ -5,6 +5,7 @@ import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData } from './git.
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
+import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -91,6 +92,20 @@ async function checkLastShutdown() {
     return { clean: true, firstBoot: true };
   }
 }
+
+// ============ New Member Welcome ============
+
+bot.on('new_chat_members', async (ctx) => {
+  for (const member of ctx.message.new_chat_members) {
+    if (member.is_bot) continue;
+    const name = member.first_name || member.username || 'newcomer';
+    await ctx.reply(
+      `Welcome ${name}. This is the VibeSwap community — cooperative capitalism, zero MEV, fair markets.\n\n` +
+      `Say hi, ask questions, share ideas. Your contributions are tracked and count toward governance weight.\n\n` +
+      `Type /mystats anytime to see your contribution profile.`
+    );
+  }
+});
 
 // ============ Commands ============
 
@@ -328,6 +343,19 @@ bot.command('modlog', async (ctx) => {
   ctx.reply('Moderation Log:\n' + lines.join('\n'));
 });
 
+bot.command('spamlog', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const log = getSpamLog(ctx.chat.id, 10);
+  if (!log.length) return ctx.reply('No spam actions recorded.');
+
+  const lines = log.map(e => {
+    const time = new Date(e.timestamp).toISOString().slice(5, 16).replace('T', ' ');
+    const del = e.messageDeleted ? ' [deleted]' : '';
+    return `${time} ${e.action.toUpperCase()} user:${e.userId} — ${e.reason}${del}`;
+  });
+  ctx.reply('Spam Log:\n' + lines.join('\n'));
+});
+
 // ============ Health Check ============
 
 bot.command('health', async (ctx) => {
@@ -380,6 +408,10 @@ bot.command('recover', async (ctx) => {
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
+  // Anti-spam check FIRST — before anything else
+  const spamResult = await checkMessage(bot, ctx);
+  if (spamResult.action !== 'allow') return; // Message handled by antispam
+
   // Track ALL messages silently (before auth check for chat responses)
   await trackMessage(ctx);
 
@@ -459,6 +491,7 @@ async function main() {
   await initClaude();
   await initTracker();
   await initModeration();
+  await initAntispam();
 
   // Step 3: Context diagnosis
   const report = await diagnoseContext();
@@ -503,6 +536,7 @@ async function main() {
     await flushTracker();
     await saveConversations();
     await flushModeration();
+    await flushAntispam();
   }, 5 * 60 * 1000);
 
   // Auto-sync: pull from git + reload context periodically
@@ -532,6 +566,7 @@ async function main() {
     await flushTracker();
     await saveConversations();
     await flushModeration();
+    await flushAntispam();
     await writeHeartbeat('stopped');
     bot.stop('SIGINT');
   });
@@ -540,6 +575,7 @@ async function main() {
     await flushTracker();
     await saveConversations();
     await flushModeration();
+    await flushAntispam();
     await writeHeartbeat('stopped');
     bot.stop('SIGTERM');
   });

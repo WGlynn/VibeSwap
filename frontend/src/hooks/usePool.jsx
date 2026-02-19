@@ -3,7 +3,10 @@ import { ethers } from 'ethers'
 import { useWallet } from './useWallet'
 import { useDeviceWallet } from './useDeviceWallet'
 import { useContracts } from './useContracts'
+import { useCKBWallet } from './useCKBWallet'
+import { useCKBContracts } from './useCKBContracts'
 import { TOKENS, areContractsDeployed } from '../utils/constants'
+import { isCKBChain, CKB_PRECISION } from '../utils/ckb-constants'
 import toast from 'react-hot-toast'
 
 // ============ Token Logo Map ============
@@ -118,17 +121,45 @@ const ERC20_BALANCE_ABI = [
   'function decimals() view returns (uint8)',
 ]
 
+// ============ CKB Mock Pools ============
+const CKB_MOCK_POOLS = [
+  {
+    id: 'ckb-pool-1',
+    token0: { symbol: 'CKB', logo: '◎' },
+    token1: { symbol: 'dCKB', logo: '◎' },
+    tvl: 250000,
+    volume24h: 45000,
+    fees24h: 22.5,
+    apr: 3.3,
+    myLiquidity: 0,
+    myShare: '0%',
+  },
+]
+
 // ============ Hook: usePool ============
 export function usePool() {
-  const { chainId, provider, account: externalAccount } = useWallet()
+  const { chainId: evmChainId, provider, account: externalAccount } = useWallet()
   const { address: deviceAddress } = useDeviceWallet()
   const {
     contracts,
-    isContractsDeployed: isLive,
+    isContractsDeployed: evmLive,
     addLiquidity: contractAddLiquidity,
     removeLiquidity: contractRemoveLiquidity,
   } = useContracts()
 
+  // CKB hooks
+  const { chainId: ckbChainId, isConnected: isCKBConnected } = useCKBWallet()
+  const {
+    poolStates: ckbPoolStates,
+    fetchPoolState: ckbFetchPool,
+    userLPPositions: ckbLPPositions,
+    isLive: isCKBLive,
+    isDemoMode: isCKBDemo,
+  } = useCKBContracts()
+
+  const isCKB = isCKBConnected && isCKBChain(ckbChainId)
+  const chainId = isCKB ? ckbChainId : evmChainId
+  const isLive = isCKB ? (isCKBLive || isCKBDemo) : evmLive
   const account = externalAccount || deviceAddress
 
   const [pools, setPools] = useState(MOCK_POOLS)
@@ -137,13 +168,14 @@ export function usePool() {
 
   // ---- Resolve token address from symbol on current chain ----
   const tokensBySymbol = useMemo(() => {
-    const tokens = TOKENS[chainId] || []
+    if (isCKB) return {} // CKB tokens use type script hashes, not addresses
+    const tokens = TOKENS[evmChainId] || []
     const map = {}
     for (const t of tokens) {
       map[t.symbol] = t
     }
     return map
-  }, [chainId])
+  }, [isCKB, evmChainId])
 
   // ---- Fetch live pool data from contracts ----
   const fetchLivePools = useCallback(async () => {
@@ -239,6 +271,29 @@ export function usePool() {
     let cancelled = false
 
     const load = async () => {
+      // CKB chain — use CKB pool data or CKB mock pools
+      if (isCKB) {
+        const ckbPools = Object.entries(ckbPoolStates).map(([pairId, pool]) => {
+          const r0 = Number(pool.reserve0) / 1e18
+          const r1 = Number(pool.reserve1) / 1e18
+          const tvl = r0 * 0.012 + r1 * 0.012 // CKB price ~$0.012
+          return {
+            id: pairId,
+            token0: { symbol: 'CKB', logo: '◎' },
+            token1: { symbol: 'dCKB', logo: '◎' },
+            tvl,
+            volume24h: tvl * 0.18,
+            fees24h: tvl * 0.18 * 0.0005,
+            apr: tvl > 0 ? ((tvl * 0.18 * 0.0005 * 365) / tvl * 100) : 0,
+            myLiquidity: 0,
+            myShare: '0%',
+          }
+        })
+        setPools(ckbPools.length > 0 ? ckbPools : CKB_MOCK_POOLS)
+        setError(null)
+        return
+      }
+
       if (!isLive) {
         setPools(MOCK_POOLS)
         setError(null)
@@ -251,7 +306,6 @@ export function usePool() {
       try {
         const livePools = await fetchLivePools()
         if (!cancelled) {
-          // Fall back to mock if no pools found on-chain
           setPools(livePools || MOCK_POOLS)
         }
       } catch (err) {
@@ -267,7 +321,7 @@ export function usePool() {
 
     load()
     return () => { cancelled = true }
-  }, [isLive, fetchLivePools])
+  }, [isLive, isCKB, fetchLivePools, ckbPoolStates])
 
   // ---- Refresh ----
   const refreshPools = useCallback(() => {
@@ -381,6 +435,7 @@ export function usePool() {
   return {
     // State
     isLive,
+    isCKB,
     pools,
     isLoading,
     error,

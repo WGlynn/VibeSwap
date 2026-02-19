@@ -1,21 +1,27 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useCKBWallet } from '../hooks/useCKBWallet'
 import { useGameMode } from '../contexts/GameModeContext'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TransactionHistory from './TransactionHistory'
+import { isCKBChain, CKB_CHAIN_ID, CKB_TESTNET_CHAIN_ID } from '../utils/ckb-constants'
 
 function Header() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isConnected: isExternalConnected, shortAddress: externalShortAddress, chainName, connect, disconnect, isConnecting, switchChain } = useWallet()
+  const { isConnected: isExternalConnected, shortAddress: externalShortAddress, chainName: evmChainName, connect, disconnect, isConnecting, switchChain } = useWallet()
   const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
+  const { isConnected: isCKBConnected, chainName: ckbChainName, shortAddress: ckbShortAddress, disconnect: ckbDisconnect } = useCKBWallet()
   const { isGamerMode, toggleMode } = useGameMode()
 
-  // Combined wallet state - connected if EITHER wallet type is connected
-  const isConnected = isExternalConnected || isDeviceConnected
-  const shortAddress = externalShortAddress || (deviceAddress ? `${deviceAddress.slice(0, 6)}...${deviceAddress.slice(-4)}` : '')
+  // Combined wallet state - connected if ANY wallet type is connected
+  const isConnected = isExternalConnected || isDeviceConnected || isCKBConnected
+  const chainName = isCKBConnected ? ckbChainName : evmChainName
+  const shortAddress = isCKBConnected
+    ? ckbShortAddress
+    : externalShortAddress || (deviceAddress ? `${deviceAddress.slice(0, 6)}...${deviceAddress.slice(-4)}` : '')
   const [showChainMenu, setShowChainMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
@@ -181,6 +187,12 @@ function Header() {
                             Testnets
                           </div>
                           <ChainOption name="Sepolia" chainId={11155111} icon="§" isTestnet onSelect={() => setShowChainMenu(false)} />
+                          <div className="border-t border-black-600 my-1" />
+                          <div className="px-3 py-1 text-xs text-black-500 uppercase tracking-wider">
+                            Cell Model
+                          </div>
+                          <CKBChainOption name="Nervos CKB" ckbChainId={CKB_CHAIN_ID} icon="◎" onSelect={() => setShowChainMenu(false)} />
+                          <CKBChainOption name="CKB Testnet" ckbChainId={CKB_TESTNET_CHAIN_ID} icon="◎" isTestnet onSelect={() => setShowChainMenu(false)} />
                         </motion.div>
                       </>
                     )}
@@ -191,7 +203,7 @@ function Header() {
               {/* Wallet button */}
               {isConnected ? (
                 <button
-                  onClick={disconnect}
+                  onClick={isCKBConnected ? ckbDisconnect : disconnect}
                   className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-black-800 border border-black-500 hover:border-matrix-500/50 transition-colors"
                 >
                   {/* Avatar */}
@@ -259,6 +271,48 @@ function ChainOption({ name, chainId, icon, isTestnet, onSelect }) {
             test
           </span>
         )}
+        {isActive && (
+          <div className="w-1.5 h-1.5 rounded-full bg-matrix-500" />
+        )}
+      </div>
+    </button>
+  )
+}
+
+function CKBChainOption({ name, ckbChainId, icon, isTestnet, onSelect }) {
+  const { connect, switchChain, isConnected, chainId: currentCKBChainId } = useCKBWallet()
+  const isActive = isConnected && currentCKBChainId === ckbChainId
+
+  const handleClick = async () => {
+    if (isConnected) {
+      switchChain(ckbChainId)
+    } else {
+      await connect('omnilock')
+      switchChain(ckbChainId)
+    }
+    onSelect()
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-black-700 ${
+        isActive ? 'text-matrix-500' : 'text-black-200'
+      }`}
+    >
+      <div className="flex items-center space-x-2">
+        <span className="text-base opacity-60">{icon}</span>
+        <span>{name}</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        {isTestnet && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-black-700 text-black-400 uppercase">
+            test
+          </span>
+        )}
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-400 uppercase">
+          cell
+        </span>
         {isActive && (
           <div className="w-1.5 h-1.5 rounded-full bg-matrix-500" />
         )}

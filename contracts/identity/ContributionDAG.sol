@@ -217,8 +217,8 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         // We'll use a separate array approach for gas efficiency
 
         // Build BFS queue starting from founders
-        address[] memory queueUsers = new address[](256); // max BFS nodes
-        uint8[] memory queueHops = new uint8[](256);
+        address[] memory queueUsers = new address[](1024); // max BFS nodes
+        uint8[] memory queueHops = new uint8[](1024);
         uint256 queueTail = 0;
 
         for (uint256 i = 0; i < _founders.length; i++) {
@@ -278,7 +278,7 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
                 _scoredUsers.push(vouchedUser);
 
                 // Add to BFS queue
-                if (queueTail < 256) {
+                if (queueTail < 1024) {
                     queueUsers[queueTail] = vouchedUser;
                     queueHops[queueTail] = newHops;
                     queueTail++;

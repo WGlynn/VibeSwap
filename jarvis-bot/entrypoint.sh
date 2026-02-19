@@ -40,8 +40,14 @@ if [ -n "$GITHUB_STEALTH_URL" ]; then
 fi
 
 # ============ Context Files ============
-# The memory dir in cloud mode lives inside the repo clone
-MEMORY_DIR="${MEMORY_DIR:-/repo/.claude/projects/C--Users-Will/memory}"
+# Memory files are bundled in /app/memory/ at build time.
+# If the repo clone has them (local dev), use those. Otherwise use bundled.
+REPO_MEMORY="/repo/.claude/projects/C--Users-Will/memory"
+if [ -f "$REPO_MEMORY/MEMORY.md" ]; then
+    MEMORY_DIR="${MEMORY_DIR:-$REPO_MEMORY}"
+else
+    MEMORY_DIR="${MEMORY_DIR:-/app/memory}"
+fi
 export MEMORY_DIR
 
 # Ensure VIBESWAP_REPO points to the clone
@@ -54,12 +60,18 @@ mkdir -p /app/data
 
 # If the repo has existing data files, seed them into the data dir (first boot only)
 if [ -d "$REPO_DIR/jarvis-bot/data" ]; then
-    for f in contributions.json users.json interactions.json moderation.json threads.json spam-log.json; do
+    for f in contributions.json users.json interactions.json moderation.json threads.json spam-log.json behavior.json; do
         if [ -f "$REPO_DIR/jarvis-bot/data/$f" ] && [ ! -f "/app/data/$f" ]; then
             echo "Seeding $f from repo..."
             cp "$REPO_DIR/jarvis-bot/data/$f" /app/data/
         fi
     done
+fi
+
+# Sync memory files from repo into bundled memory dir (keeps Jarvis fresh between deploys)
+if [ -d "$REPO_DIR/jarvis-bot/memory" ]; then
+    echo "Syncing memory files from repo..."
+    cp -u "$REPO_DIR/jarvis-bot/memory/"*.md /app/memory/ 2>/dev/null || true
 fi
 
 # Symlink data dir into repo path so git backup sees the live data

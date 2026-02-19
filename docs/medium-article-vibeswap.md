@@ -79,7 +79,7 @@ When total extractable value equals zero — MEV eliminated by commit-reveal, li
 
 > *"Tony Stark was able to build this in a cave! With a box of scraps!"*
 
-VibeSwap is being built by a solo founder with an AI co-developer. 121 Solidity contracts. 51 frontend components. 1,700+ tests. No VC funding. No team of 50 engineers. Just a human and an AI building in a cave with a box of scraps.
+VibeSwap is being built by a solo founder with an AI co-developer. 123 Solidity contracts. 14 Rust crates for Nervos CKB. 51 frontend components. 2,000+ tests across two blockchains. No VC funding. No team of 50 engineers. Just a human and an AI building in a cave with a box of scraps.
 
 The AI loses context. It hallucinates functions that don't exist. It confidently generates code that fails in ways only visible at runtime. The debugging sessions are painful. There are scars in the codebase where we fought and compromised.
 
@@ -111,8 +111,10 @@ Beyond the DEX, VibeSwap is becoming **VSOS — the VibeSwap Operating System**.
 - **Insurance Pools** — Mutualized impermanent loss protection, funded by the protocol
 - **Conviction Governance** — Quadratic voting, commit-reveal governance, federated consensus
 - **Cross-Chain Settlement** — LayerZero V2 for omnichain liquidity
+- **Nervos CKB Cell Model** — PoW-gated shared state that eliminates MEV at the infrastructure layer, impossible on account-based chains
 - **Post-Quantum Security** — Lamport signatures and quantum-resistant recovery for long-term asset safety
 - **Identity Layer** — Soulbound NFTs with contribution-based reputation, not purchased status
+- **AI Agent Registry** — ERC-8004 compatible agent identities with capability delegation and pairwise verification
 
 The design philosophy: take any existing DeFi primitive, find its natural mapping to VibeSwap's mechanism design, discover what new capability the combination unlocks, and build the bridge. This is how VSOS absorbs other DeFi projects — not by competing, but by composing.
 

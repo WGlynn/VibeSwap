@@ -2,30 +2,35 @@
 # Usage:
 #   docker compose up -d          # Start Jarvis (detached)
 #   docker compose logs -f        # Watch logs
-#   docker compose down            # Stop Jarvis
-#   docker compose up -d --build   # Rebuild and restart
+#   docker compose down           # Stop Jarvis
+#   docker compose up -d --build  # Rebuild and restart
 
 services:
-  jarvis:
+  jarvis-bot:
     build: .
     container_name: jarvis-bot
     restart: unless-stopped
-    env_file: .env
     environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TELEGRAM_OWNER_ID=8366932263
       - DOCKER=1
       - NODE_ENV=production
       - VIBESWAP_REPO=/repo
       - MEMORY_DIR=/repo/.claude/projects/C--Users-Will/memory
       - DATA_DIR=/app/data
-      # Set these in .env:
-      # TELEGRAM_BOT_TOKEN
-      # ANTHROPIC_API_KEY
-      # GITHUB_TOKEN (for private repo access)
-      # GITHUB_REPO_URL (defaults to vibeswap-private)
-      # GITHUB_STEALTH_URL (stealth remote)
+      - OWNER_USER_ID=8366932263
+      - GITHUB_REPO_URL=${GITHUB_REPO_URL:-https://github.com/WGlynn/vibeswap-private.git}
+      - GITHUB_STEALTH_URL=${GITHUB_STEALTH_URL:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      - COMMUNITY_GROUP_ID=${COMMUNITY_GROUP_ID:-}
+      - ARK_GROUP_ID=${ARK_GROUP_ID:-}
+      - AUTHORIZED_USERS=${AUTHORIZED_USERS:-}
+      - BOT_USERNAME=${BOT_USERNAME:-JarvisMind1828383bot}
     volumes:
       # Persistent data — survives container rebuilds
-      - jarvis-data:/app/data
+      - ./data:/app/data
       # Persistent repo clone — avoids re-clone on restart
       - jarvis-repo:/repo
     logging:
@@ -35,7 +40,5 @@ services:
         max-file: "3"
 
 volumes:
-  jarvis-data:
-    name: jarvis-data
   jarvis-repo:
     name: jarvis-repo

@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
 import { Contract } from 'ethers'
 import { useWallet } from './useWallet'
+import { useCKBWallet } from './useCKBWallet'
+import { useCKBContracts } from './useCKBContracts'
 import { CONTRACTS, areContractsDeployed } from '../utils/constants'
+import { isCKBChain } from '../utils/ckb-constants'
 
 const TransactionsContext = createContext(null)
 
@@ -390,6 +393,13 @@ function subscribeToEvents(provider, chainId, account, onNewTx) {
 
 export function TransactionsProvider({ children }) {
   const { account, chainId, provider } = useWallet()
+  const { isConnected: isCKBConnected, chainId: ckbChainId, address: ckbAddress } = useCKBWallet()
+  const { auctionState: ckbAuctionState } = useCKBContracts()
+
+  const isCKB = isCKBConnected && isCKBChain(ckbChainId)
+  const activeAccount = isCKB ? ckbAddress : account
+  const activeChainId = isCKB ? ckbChainId : chainId
+
   const [transactions, setTransactions] = useState([])
   const [pendingCount, setPendingCount] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -397,18 +407,19 @@ export function TransactionsProvider({ children }) {
 
   // Load transactions from localStorage on mount/account change
   useEffect(() => {
-    setTransactions(loadTransactions(account))
+    setTransactions(loadTransactions(activeAccount))
     hasSyncedRef.current = false // reset sync flag on account change
-  }, [account])
+  }, [activeAccount])
 
   // Save transactions to localStorage when they change
   useEffect(() => {
-    if (!account) return
-    saveTransactions(account, transactions)
-  }, [transactions, account])
+    if (!activeAccount) return
+    saveTransactions(activeAccount, transactions)
+  }, [transactions, activeAccount])
 
-  // ============ On-Chain Sync (runs once per account+chain) ============
+  // ============ On-Chain Sync (runs once per account+chain — EVM only) ============
   useEffect(() => {
+    if (isCKB) return // CKB txs tracked via localStorage only (no event queries)
     if (!provider || !chainId || !account) return
     if (!areContractsDeployed(chainId)) return
     if (hasSyncedRef.current) return
@@ -423,10 +434,11 @@ export function TransactionsProvider({ children }) {
         }
       })
       .finally(() => setIsSyncing(false))
-  }, [provider, chainId, account])
+  }, [provider, chainId, account, isCKB])
 
-  // ============ Live Event Subscription ============
+  // ============ Live Event Subscription (EVM only) ============
   useEffect(() => {
+    if (isCKB) return () => {} // CKB doesn't use ethers event subscriptions
     if (!provider || !chainId || !account) return () => {}
     if (!areContractsDeployed(chainId)) return () => {}
 
@@ -437,10 +449,36 @@ export function TransactionsProvider({ children }) {
     })
 
     return unsubscribe
-  }, [provider, chainId, account])
+  }, [provider, chainId, account, isCKB])
+
+  // ============ CKB Auction State Tracking ============
+  // Track CKB batch phase transitions as transaction-like entries
+  const prevCKBBatchRef = useRef(null)
+  useEffect(() => {
+    if (!isCKB || !ckbAuctionState) return
+
+    const { batchId, phase } = ckbAuctionState
+    const prevBatch = prevCKBBatchRef.current
+
+    // Detect batch settlement (new batch ID = previous batch settled)
+    if (prevBatch !== null && batchId > prevBatch) {
+      setTransactions(prev => [{
+        id: `ckb-settle-${prevBatch}-${Date.now()}`,
+        type: TX_TYPE.SWAP_SETTLED,
+        status: TX_STATUS.COMPLETED,
+        timestamp: Date.now(),
+        batchId: prevBatch,
+        chainId: ckbChainId,
+        source: 'ckb',
+      }, ...prev].slice(0, MAX_TRANSACTIONS))
+    }
+
+    prevCKBBatchRef.current = batchId
+  }, [isCKB, ckbAuctionState, ckbChainId])
 
   // Manual sync trigger (exposed to consumers)
   const syncFromChain = useCallback(async () => {
+    if (isCKB) return // CKB sync is automatic via auction state polling
     if (!provider || !chainId || !account) return
     if (!areContractsDeployed(chainId)) return
 
@@ -453,7 +491,7 @@ export function TransactionsProvider({ children }) {
     } finally {
       setIsSyncing(false)
     }
-  }, [provider, chainId, account])
+  }, [provider, chainId, account, isCKB])
 
   // Update pending count
   useEffect(() => {
@@ -469,13 +507,14 @@ export function TransactionsProvider({ children }) {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: Date.now(),
       status: TX_STATUS.PENDING,
-      chainId,
+      chainId: activeChainId,
+      source: isCKB ? 'ckb' : 'evm',
       ...tx,
     }
 
     setTransactions(prev => [newTx, ...prev].slice(0, MAX_TRANSACTIONS))
     return newTx.id
-  }, [chainId])
+  }, [activeChainId, isCKB])
 
   // Update transaction status
   const updateTransaction = useCallback((id, updates) => {
@@ -508,10 +547,10 @@ export function TransactionsProvider({ children }) {
   // Clear all transactions
   const clearAllTransactions = useCallback(() => {
     setTransactions([])
-    if (account) {
-      localStorage.removeItem(`${STORAGE_KEY}_${account.toLowerCase()}`)
+    if (activeAccount) {
+      localStorage.removeItem(`${STORAGE_KEY}_${activeAccount.toLowerCase()}`)
     }
-  }, [account])
+  }, [activeAccount])
 
   // Helper: Add swap commit transaction
   const addSwapCommit = useCallback((data) => {
@@ -643,6 +682,9 @@ export function TransactionsProvider({ children }) {
     // On-chain sync
     syncFromChain,
     isSyncing,
+
+    // Chain detection
+    isCKB,
 
     // Constants
     TX_TYPE,

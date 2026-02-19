@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, createContext, useContext } from 'react'
 import { useWallet } from './useWallet'
 import { useDeviceWallet } from './useDeviceWallet'
+import { useCKBWallet } from './useCKBWallet'
 import { ethers } from 'ethers'
+import { isCKBChain, CKB_TOKENS, formatCKB } from '../utils/ckb-constants'
 
 // ============ Initial Mock Balances ============
 const INITIAL_BALANCES = {
@@ -11,6 +13,12 @@ const INITIAL_BALANCES = {
   WBTC: 0.15,
   ARB: 2500,
   OP: 1800,
+}
+
+// CKB mock balances for demo mode
+const CKB_MOCK_BALANCES = {
+  CKB: 50000,
+  dCKB: 10000,
 }
 
 // ERC20 ABI for balance fetching
@@ -39,8 +47,10 @@ const BalanceContext = createContext(null)
 export function BalanceProvider({ children }) {
   const { provider, account: externalAccount, chainId } = useWallet()
   const { address: deviceAddress } = useDeviceWallet()
+  const { isConnected: isCKBConnected, chainId: ckbChainId, address: ckbAddress, balance: ckbBalance } = useCKBWallet()
 
-  const account = externalAccount || deviceAddress
+  const isCKB = isCKBConnected && isCKBChain(ckbChainId)
+  const account = isCKB ? ckbAddress : (externalAccount || deviceAddress)
 
   // Mock balances state (for demo mode)
   const [mockBalances, setMockBalances] = useState(INITIAL_BALANCES)
@@ -104,23 +114,38 @@ export function BalanceProvider({ children }) {
     setIsLoading(false)
   }, [provider, account, fetchRealBalance])
 
-  // Refresh balances when account/provider changes
+  // Sync CKB balances when connected to CKB
   useEffect(() => {
+    if (!isCKB) return
+    if (ckbBalance !== null && ckbBalance !== undefined) {
+      const parsed = typeof ckbBalance === 'string' ? parseFloat(ckbBalance) : ckbBalance
+      setRealBalances(prev => ({ ...prev, CKB: parsed }))
+      setIsRealMode(true)
+    }
+  }, [isCKB, ckbBalance])
+
+  // Refresh balances when account/provider changes (EVM only)
+  useEffect(() => {
+    if (isCKB) return // CKB balances come from useCKBWallet
     if (provider && account) {
       fetchAllBalances()
     } else {
       setIsRealMode(false)
       setRealBalances({})
     }
-  }, [provider, account, fetchAllBalances])
+  }, [provider, account, fetchAllBalances, isCKB])
 
   // Get balance for a symbol
   const getBalance = useCallback((symbol) => {
     if (isRealMode && realBalances[symbol] !== undefined) {
       return realBalances[symbol]
     }
+    // Use CKB mock balances when on CKB in demo mode
+    if (isCKB && CKB_MOCK_BALANCES[symbol] !== undefined) {
+      return CKB_MOCK_BALANCES[symbol]
+    }
     return mockBalances[symbol] || 0
-  }, [isRealMode, realBalances, mockBalances])
+  }, [isRealMode, realBalances, mockBalances, isCKB])
 
   // Get formatted balance string
   const getFormattedBalance = useCallback((symbol) => {
@@ -166,10 +191,11 @@ export function BalanceProvider({ children }) {
 
   // Refresh balances (for real mode)
   const refresh = useCallback(() => {
+    if (isCKB) return // CKB balances auto-refresh via useCKBWallet
     if (provider && account) {
       fetchAllBalances()
     }
-  }, [provider, account, fetchAllBalances])
+  }, [provider, account, fetchAllBalances, isCKB])
 
   const value = {
     getBalance,
@@ -181,6 +207,7 @@ export function BalanceProvider({ children }) {
     refresh,
     isRealMode,
     isLoading,
+    isCKB,
   }
 
   return (

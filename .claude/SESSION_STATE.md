@@ -10,7 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **2186+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **2300+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
 - **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
@@ -37,7 +37,30 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 29)
+## Recently Completed (Feb 19, 2026 — Session 31)
+80. **Freedom's Backlog Implementation — IdeaMarketplace + Referral Exclusion + Soundboard**
+    - **IdeaMarketplace.sol** (814 lines): Full idea submission→scoring→bounty→claim→execute→Shapley reward split pipeline
+      - 5 categories (UX, PROTOCOL, TOOLING, GROWTH, SECURITY) — Phase 1 internal only per Freedom's anti-vampire constraint
+      - Auto-scoring: 3 scorers, feasibility/impact/novelty (0-10 each), avg<15 auto-reject, avg>=24 auto-approve, 15-23 manual review
+      - Builder claims with collateral (10% of bounty), 7-day deadline, slashed on abandon/timeout
+      - Shapley split: default 40% ideator / 60% builder, per-idea override
+      - Dispute path → DecentralizedTribunal integration
+      - Anti-spam: 100 VIBE stake to submit, returned on completion/rejection
+      - Referral exclusion check via ContributionDAG.isReferralExcluded()
+    - **IIdeaMarketplace.sol** interface: 7 enums/structs, 15 events, 14 errors, 10 core functions, 10 view functions
+    - **ContributionDAG.sol** — Referral exclusion (Freedom's backlog-006):
+      - `mapping(address => bool) public referralExcluded` + `setReferralExclusion(address, bool)` admin + 100% penalty in `calculateReferralQuality()`
+    - **useSoundboard.jsx** — Daft Punk "Stronger" interactive soundboard hook (Freedom's backlog-009):
+      - 7 action→audio mappings: swap/pool/connect/contribution/referral/rankUp/bounty
+      - localStorage persistence for mute/volume, browser autoplay policy handling
+    - **soundboard-constants.js** — action→path mapping, labels, defaults
+    - **114 new tests**: 93 unit + 11 fuzz (256 runs) + 10 invariant (128K calls each) — ALL PASSING
+    - **Backlog system**: 10 items from Freedom saved to jarvis-bot/data/backlog.json with Jarvis auto-evaluation
+    - **Transcript pipeline fixed**: Google Apps Script → Vercel proxy → Fly.io (root cause: missing [http_service] in fly.toml + Google DNS can't resolve fly.dev)
+    - **deployment-patterns.md**: 5 codified debugging anti-patterns from transcript pipeline debugging
+    - **contracts-catalogue.md**: Updated with IdeaMarketplace + ContributionDAG referral exclusion
+
+## Previously Completed (Feb 18, 2026 — Session 29)
 79. **Frontend CKB Integration — All Core Hooks Wired**
     - **useBatchState**: CKB auction cell polling, phase mapping (CKB phases → PHASES strings), commit/reveal routing through useCKBContracts
     - **useSwap**: CKB token list (CKB_TOKENS from ckb-constants), AMM quote from pool reserves, commit/reveal via CKB cell creation

@@ -72,6 +72,9 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     // Track all scored users for recalculation
     address[] private _scoredUsers;
 
+    // Referral exclusion list (founders excluded while manual gatekeeping)
+    mapping(address => bool) public referralExcluded;
+
     // Merkle-compressed vouch audit trail
     IncrementalMerkleTree.Tree private _vouchTree;
     bool private _vouchTreeInitialized;
@@ -338,6 +341,11 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         uint256 score,
         uint256 penalty
     ) {
+        // Excluded addresses get 100% penalty (no referral bonuses)
+        if (referralExcluded[user]) {
+            return (0, PRECISION);
+        }
+
         address[] storage outgoing = _vouchesFrom[user];
         if (outgoing.length == 0) {
             return (PRECISION, 0); // No vouches = no penalty
@@ -440,6 +448,11 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         return _handshakes.length;
     }
 
+    /// @inheritdoc IContributionDAG
+    function isReferralExcluded(address account) external view returns (bool) {
+        return referralExcluded[account];
+    }
+
     // ============ Merkle Vouch Audit Trail ============
 
     /// @notice Get the Merkle root of all vouches (compressed audit trail)
@@ -496,6 +509,14 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     /// @notice Set SoulboundIdentity contract (address(0) to disable check)
     function setSoulboundIdentity(address _soulbound) external onlyOwner {
         soulboundIdentity = _soulbound;
+    }
+
+    /// @notice Exclude or re-include an address from referral bonuses
+    /// @dev Used to prevent conflict of interest while founders are manual gatekeepers.
+    ///      Remove exclusion once the auto-review system is live.
+    function setReferralExclusion(address account, bool excluded) external onlyOwner {
+        referralExcluded[account] = excluded;
+        emit ReferralExclusionSet(account, excluded);
     }
 
     // ============ Internal Helpers ============

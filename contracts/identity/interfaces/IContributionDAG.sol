@@ -44,6 +44,7 @@ interface IContributionDAG {
     event TrustScoresRecalculated(uint256 usersScored);
     event FounderAdded(address indexed founder);
     event FounderRemoved(address indexed founder);
+    event ReferralExclusionSet(address indexed account, bool excluded);
 
     // ============ Errors ============
 
@@ -119,4 +120,7 @@ interface IContributionDAG {
 
     /// @notice Get total handshake count
     function getHandshakeCount() external view returns (uint256);
+
+    /// @notice Check if an address is excluded from referral bonuses
+    function isReferralExcluded(address account) external view returns (bool);
 }

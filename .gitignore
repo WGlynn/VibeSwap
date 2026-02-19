@@ -29,3 +29,14 @@ Thumbs.db
 *.swp
 *.swo
 frontend/dist/
+frontend/.vercel/
+
+# Generated document exports (originals stay in docs/*.md)
+docs/pdf/
+
+# Jarvis bot runtime data (seeded from repo, but live data stays on Fly volume)
+jarvis-bot/data/*.json
+!jarvis-bot/data/behavior.json
+
+# Build logs
+*.log

@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => ({
         }
       }
     },
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 2500, // WalletConnect + Web3Modal bundle is ~2MB
   },
   preview: {
     port: 3000,

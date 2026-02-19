@@ -43,6 +43,9 @@ export const config = {
   communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID) : null,
   // The Ark — backup group. If main group dies, Jarvis DMs everyone an invite link here.
   arkGroupId: process.env.ARK_GROUP_ID ? parseInt(process.env.ARK_GROUP_ID) : null,
+  // Meeting transcript webhook — receives live transcripts from Fireflies.ai
+  transcriptWebhookSecret: process.env.TRANSCRIPT_WEBHOOK_SECRET || null,
+  transcriptChatId: process.env.TRANSCRIPT_CHAT_ID ? parseInt(process.env.TRANSCRIPT_CHAT_ID) : null,
   maxConversationHistory: 50,
   maxTokens: 2048,
   // Rate limit: max Claude API calls per user per minute

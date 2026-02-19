@@ -728,12 +728,62 @@ async function main() {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
         }
+      } else if (req.url === '/transcript' && req.method === 'POST') {
+        // ============ Meeting Transcript Webhook ============
+        // Receives live transcript chunks from Fireflies.ai (or any transcription service)
+        // and forwards Jarvis's response to the Telegram group/DM
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body);
+
+            // Verify webhook secret
+            if (config.transcriptWebhookSecret && payload.secret !== config.transcriptWebhookSecret) {
+              res.writeHead(401);
+              res.end('Unauthorized');
+              return;
+            }
+
+            const transcript = payload.transcript || payload.text || payload.data?.transcript || '';
+            const speaker = payload.speaker || payload.data?.speaker || 'Unknown';
+            const meetingTitle = payload.meeting_title || payload.data?.title || 'Meeting';
+
+            if (transcript.length < 10) {
+              res.writeHead(200);
+              res.end('OK — too short, skipped');
+              return;
+            }
+
+            // Send to Claude for analysis
+            const chatId = config.transcriptChatId || config.ownerUserId;
+            const prompt = `[LIVE MEETING: ${meetingTitle}]\n[${speaker}]: ${transcript}\n\nProvide a brief, useful response if this is relevant to VibeSwap, CKB, mechanism design, or anything we're building. If it's just small talk or off-topic, reply with exactly "—" and nothing else.`;
+
+            await bot.telegram.sendChatAction(chatId, 'typing');
+            const response = await chat(chatId, 'meeting-transcript', prompt, 'private');
+
+            // Only forward if Jarvis has something meaningful to say
+            if (response.text && response.text.trim() !== '—' && response.text.trim() !== '-') {
+              await bot.telegram.sendMessage(chatId,
+                `[Meeting: ${meetingTitle}]\n${speaker}: "${transcript.slice(0, 100)}${transcript.length > 100 ? '...' : ''}"\n\nJarvis: ${response.text}`
+              );
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', responded: response.text?.trim() !== '—' }));
+          } catch (err) {
+            console.error('[transcript] Webhook error:', err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
       } else {
         res.writeHead(404);
         res.end('Not found');
       }
     }).listen(healthPort, () => {
       console.log(`[jarvis] Health endpoint: http://0.0.0.0:${healthPort}/health`);
+      console.log(`[jarvis] Transcript webhook: http://0.0.0.0:${healthPort}/transcript`);
     });
   }
 

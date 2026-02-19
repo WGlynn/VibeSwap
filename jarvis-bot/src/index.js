@@ -758,7 +758,7 @@ async function main() {
 
             // Send to Claude for analysis
             const chatId = config.transcriptChatId || config.ownerUserId;
-            const prompt = `[LIVE MEETING: ${meetingTitle}]\n[${speaker}]: ${transcript}\n\nProvide a brief, useful response if this is relevant to VibeSwap, CKB, mechanism design, or anything we're building. If it's just small talk or off-topic, reply with exactly "—" and nothing else.`;
+            const prompt = `[LIVE MEETING: ${meetingTitle}]\n[${speaker}]: ${transcript}\n\nYou are JARVIS, listening to a live meeting. Your ONLY role is to provide actionable feedback and suggestions that build on what was just said. Think like an architect and co-founder.\n\nRules:\n- ONLY respond with concrete suggestions, improvements, or critical feedback on ideas being discussed\n- Point out flaws, edge cases, or missed opportunities in what was proposed\n- Suggest specific technical approaches, patterns, or alternatives\n- Connect what they're saying to existing VibeSwap/CKB mechanisms if relevant\n- Be concise — 2-3 sentences max, like you're interjecting in a meeting\n- If nothing constructive to add (small talk, greetings, off-topic), reply with exactly "—" and nothing else\n- Do NOT summarize what they said. Do NOT repeat their points. Only ADD value.`;
 
             await bot.telegram.sendChatAction(chatId, 'typing');
             const response = await chat(chatId, 'meeting-transcript', prompt, 'private');

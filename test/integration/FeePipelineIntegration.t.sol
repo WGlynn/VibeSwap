@@ -19,6 +19,12 @@ contract MockToken is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+contract MockFPWETH is ERC20 {
+    constructor() ERC20("Wrapped ETH", "WETH") {}
+    function deposit() external payable { _mint(msg.sender, msg.value); }
+    function withdraw(uint256 amount) external { _burn(msg.sender, amount); payable(msg.sender).transfer(amount); }
+}
+
 // ============ Fee Pipeline Integration Test ============
 
 /**
@@ -78,7 +84,8 @@ contract FeePipelineIntegrationTest is Test {
         );
 
         // Deploy ProtocolFeeAdapter pointing at FeeRouter
-        adapter = new ProtocolFeeAdapter(address(router));
+        MockFPWETH weth = new MockFPWETH();
+        adapter = new ProtocolFeeAdapter(address(router), address(weth));
 
         // Authorize adapter as a fee source on FeeRouter
         router.authorizeSource(address(adapter));

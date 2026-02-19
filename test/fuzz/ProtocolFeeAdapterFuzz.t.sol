@@ -13,10 +13,17 @@ contract MockAdapterFuzzToken is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+contract MockFuzzWETH is ERC20 {
+    constructor() ERC20("Wrapped ETH", "WETH") {}
+    function deposit() external payable { _mint(msg.sender, msg.value); }
+    function withdraw(uint256 amount) external { _burn(msg.sender, amount); payable(msg.sender).transfer(amount); }
+}
+
 // ============ Fuzz Tests ============
 
 contract ProtocolFeeAdapterFuzzTest is Test {
     MockAdapterFuzzToken token;
+    MockFuzzWETH weth;
     FeeRouter router;
     ProtocolFeeAdapter adapter;
 
@@ -27,8 +34,9 @@ contract ProtocolFeeAdapterFuzzTest is Test {
 
     function setUp() public {
         token = new MockAdapterFuzzToken();
+        weth = new MockFuzzWETH();
         router = new FeeRouter(treasury, insurance, revShare, buyback);
-        adapter = new ProtocolFeeAdapter(address(router));
+        adapter = new ProtocolFeeAdapter(address(router), address(weth));
         router.authorizeSource(address(adapter));
     }
 
@@ -72,14 +80,11 @@ contract ProtocolFeeAdapterFuzzTest is Test {
         amount = bound(amount, 1, 1000 ether);
 
         vm.deal(address(adapter), amount);
-
-        uint256 ownerBefore = address(this).balance;
         adapter.forwardETH();
-        uint256 ownerAfter = address(this).balance;
 
-        assertEq(ownerAfter - ownerBefore, amount);
+        // ETH wrapped to WETH and forwarded to FeeRouter
+        assertEq(address(adapter).balance, 0);
+        assertEq(router.pendingFees(address(weth)), amount);
         assertEq(adapter.totalETHForwarded(), amount);
     }
-
-    receive() external payable {}
 }

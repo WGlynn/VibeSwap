@@ -282,7 +282,9 @@ contract DeployProduction is Script {
         console.log("  FeeRouter:", feeRouter);
 
         // Deploy ProtocolFeeAdapter (bridges VibeAMM fees to FeeRouter)
-        feeAdapter = address(new ProtocolFeeAdapter(feeRouter));
+        // WETH address is chain-specific (e.g. 0xC02a...6Cc2 on Ethereum mainnet)
+        address weth = vm.envOr("WETH_ADDRESS", address(0x4200000000000000000000000000000000000006));
+        feeAdapter = address(new ProtocolFeeAdapter(feeRouter, weth));
         console.log("  ProtocolFeeAdapter:", feeAdapter);
 
         // Deploy BuybackEngine (swaps + burns via VibeAMM)

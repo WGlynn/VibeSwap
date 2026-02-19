@@ -8,6 +8,13 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IProtocolFeeAdapter.sol";
 import "./interfaces/IFeeRouter.sol";
 
+interface IWETH {
+    function deposit() external payable;
+    function withdraw(uint256) external;
+    function balanceOf(address) external view returns (uint256);
+    function approve(address, uint256) external returns (bool);
+}
+
 /**
  * @title ProtocolFeeAdapter
  * @notice Adapter that bridges fee-generating contracts to the cooperative distribution system.
@@ -37,15 +44,17 @@ contract ProtocolFeeAdapter is IProtocolFeeAdapter, Ownable, ReentrancyGuard {
     // ============ State ============
 
     address private _feeRouter;
+    address private _weth;
 
     mapping(address => uint256) private _totalForwarded;
     uint256 private _totalETHForwarded;
 
     // ============ Constructor ============
 
-    constructor(address feeRouter_) Ownable(msg.sender) {
-        if (feeRouter_ == address(0)) revert ZeroAddress();
+    constructor(address feeRouter_, address weth_) Ownable(msg.sender) {
+        if (feeRouter_ == address(0) || weth_ == address(0)) revert ZeroAddress();
         _feeRouter = feeRouter_;
+        _weth = weth_;
     }
 
     // ============ Receive ETH ============
@@ -73,10 +82,10 @@ contract ProtocolFeeAdapter is IProtocolFeeAdapter, Ownable, ReentrancyGuard {
         uint256 balance = address(this).balance;
         if (balance == 0) revert ZeroAmount();
 
-        // Forward ETH to owner (treasury) since FeeRouter handles ERC20 only
-        // In production, this would wrap to WETH first
-        (bool success,) = owner().call{value: balance}("");
-        if (!success) revert TransferFailed();
+        // Wrap ETH to WETH so it flows through FeeRouter's cooperative distribution
+        IWETH(_weth).deposit{value: balance}();
+        IERC20(_weth).safeIncreaseAllowance(_feeRouter, balance);
+        IFeeRouter(_feeRouter).collectFee(_weth, balance);
 
         _totalETHForwarded += balance;
 
@@ -100,6 +109,7 @@ contract ProtocolFeeAdapter is IProtocolFeeAdapter, Ownable, ReentrancyGuard {
     // ============ Views ============
 
     function feeRouter() external view returns (address) { return _feeRouter; }
+    function weth() external view returns (address) { return _weth; }
     function totalForwarded(address token) external view returns (uint256) { return _totalForwarded[token]; }
     function totalETHForwarded() external view returns (uint256) { return _totalETHForwarded; }
 }

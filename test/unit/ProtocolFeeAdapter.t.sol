@@ -13,11 +13,18 @@ contract MockAdapterToken is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+contract MockWETH is ERC20 {
+    constructor() ERC20("Wrapped ETH", "WETH") {}
+    function deposit() external payable { _mint(msg.sender, msg.value); }
+    function withdraw(uint256 amount) external { _burn(msg.sender, amount); payable(msg.sender).transfer(amount); }
+}
+
 // ============ Test Contract ============
 
 contract ProtocolFeeAdapterTest is Test {
     MockAdapterToken tokenA;
     MockAdapterToken tokenB;
+    MockWETH weth;
     FeeRouter router;
     ProtocolFeeAdapter adapter;
 
@@ -31,12 +38,13 @@ contract ProtocolFeeAdapterTest is Test {
     function setUp() public {
         tokenA = new MockAdapterToken();
         tokenB = new MockAdapterToken();
+        weth = new MockWETH();
 
         // Deploy FeeRouter
         router = new FeeRouter(treasury, insurance, revShare, buyback);
 
         // Deploy adapter
-        adapter = new ProtocolFeeAdapter(address(router));
+        adapter = new ProtocolFeeAdapter(address(router), address(weth));
 
         // Authorize adapter as fee source on router
         router.authorizeSource(address(adapter));
@@ -50,7 +58,12 @@ contract ProtocolFeeAdapterTest is Test {
 
     function test_constructor_revert_zeroRouter() public {
         vm.expectRevert(IProtocolFeeAdapter.ZeroAddress.selector);
-        new ProtocolFeeAdapter(address(0));
+        new ProtocolFeeAdapter(address(0), address(weth));
+    }
+
+    function test_constructor_revert_zeroWeth() public {
+        vm.expectRevert(IProtocolFeeAdapter.ZeroAddress.selector);
+        new ProtocolFeeAdapter(address(router), address(0));
     }
 
     // ============ Forward Fees Tests ============
@@ -107,12 +120,11 @@ contract ProtocolFeeAdapterTest is Test {
         // Send ETH to adapter
         vm.deal(address(adapter), 5 ether);
 
-        uint256 ownerBalBefore = address(this).balance;
         adapter.forwardETH();
-        uint256 ownerBalAfter = address(this).balance;
 
+        // ETH should be wrapped to WETH and forwarded to FeeRouter
         assertEq(address(adapter).balance, 0);
-        assertEq(ownerBalAfter - ownerBalBefore, 5 ether);
+        assertEq(router.pendingFees(address(weth)), 5 ether);
         assertEq(adapter.totalETHForwarded(), 5 ether);
     }
 

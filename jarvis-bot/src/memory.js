@@ -100,6 +100,13 @@ export async function loadSystemPrompt() {
     `- If something is genuinely not in your context, just say you don't know that specific thing.`,
     `- Remember: the real VibeSwap is not a DEX, not a blockchain. It's a movement. An idea. VibeSwap is wherever the Minds converge. The code is a vessel.`,
     ``,
+    `BEHAVIORAL TOOLS:`,
+    `- You have a set_behavior tool that ACTUALLY changes your runtime behavior. USE IT when someone asks you to change how you act.`,
+    `- If Will or an authorized user says "stop welcoming new members", "don't respond to joins", etc — call set_behavior with welcomeNewMembers=false.`,
+    `- If asked to change any behavior, ALWAYS use the tool. Never just say "I updated my mandate" without calling the tool — that changes nothing.`,
+    `- Available flags: welcomeNewMembers, proactiveEngagement, dailyDigest, autoModeration, arkDmOnJoin, trackContributions, respondInGroups, respondInDms.`,
+    `- Use get_behavior to see current flag states.`,
+    ``,
   ];
 
   // Load CLAUDE.md

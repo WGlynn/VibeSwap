@@ -9,6 +9,7 @@ import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispa
 import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
+import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 import { createServer } from 'http';
 import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
@@ -122,17 +123,15 @@ async function checkLastShutdown() {
 }
 
 // ============ New Member Welcome ============
+// Reads behavior.json flag — can be toggled at runtime via /setbehavior or conversation mandate
 
 bot.on('new_chat_members', async (ctx) => {
+  if (!getFlag('welcomeNewMembers')) return; // silently skip if disabled
   for (const member of ctx.message.new_chat_members) {
     if (member.is_bot) continue;
     const name = member.first_name || member.username || 'newcomer';
-    await ctx.reply(
-      `Welcome ${name}. This is the VibeSwap community — cooperative capitalism, zero MEV, fair markets.\n\n` +
-      `Say hi, ask questions, share ideas. Your contributions are tracked and count toward governance weight.\n\n` +
-      `DM me directly — if this chat ever goes down, I'll send you an invite link to the backup channel (the Ark).\n\n` +
-      `Type /mystats anytime to see your contribution profile.`
-    );
+    const msg = getFlag('welcomeMessage').replace(/\{name\}/g, name);
+    await ctx.reply(msg);
   }
 });
 
@@ -383,6 +382,26 @@ bot.command('spamlog', async (ctx) => {
     return `${time} ${e.action.toUpperCase()} user:${e.userId} — ${e.reason}${del}`;
   });
   ctx.reply('Spam Log:\n' + lines.join('\n'));
+});
+
+// ============ Behavior Flags ============
+// Runtime-configurable behavioral toggles. Persisted to data/behavior.json.
+
+bot.command('behavior', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  ctx.reply('Behavior flags:\n' + listFlags());
+});
+
+bot.command('setbehavior', async (ctx) => {
+  if (ctx.from.id !== config.ownerUserId) return ctx.reply('Owner only.');
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  if (args.length < 2) return ctx.reply('Usage: /setbehavior <flag> <true|false>\n\nFlags:\n' + listFlags());
+  const key = args[0];
+  const val = args[1].toLowerCase();
+  if (val !== 'true' && val !== 'false') return ctx.reply('Value must be true or false.');
+  const ok = await setFlag(key, val === 'true');
+  if (!ok) return ctx.reply(`Unknown flag: ${key}`);
+  ctx.reply(`${key} = ${val}`);
 });
 
 // ============ The Ark — Emergency Recovery ============
@@ -798,6 +817,8 @@ async function main() {
   await initModeration();
   await initAntispam();
   await initThreads();
+  await loadBehavior();
+  console.log('[jarvis] Behavior flags loaded.');
 
   // Step 3: Context diagnosis
   const report = await diagnoseContext();

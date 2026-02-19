@@ -3,6 +3,7 @@ import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
 import { loadSystemPrompt } from './memory.js';
+import { setFlag, getBehavior } from './behavior.js';
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
@@ -122,13 +123,69 @@ export async function chat(chatId, userName, message, chatType = 'private') {
     history.shift();
   }
 
+  // Tools Jarvis can use to take real actions (not just generate text)
+  const tools = [
+    {
+      name: 'set_behavior',
+      description: 'Update a runtime behavior flag. Use this when the user asks you to change your behavior (e.g. stop welcoming new members, disable digest, etc). Available flags: welcomeNewMembers, proactiveEngagement, dailyDigest, autoModeration, arkDmOnJoin, trackContributions, respondInGroups, respondInDms. You can also set welcomeMessage (string).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          flag: { type: 'string', description: 'The behavior flag to update' },
+          value: { description: 'The new value (boolean for flags, string for welcomeMessage)' },
+        },
+        required: ['flag', 'value'],
+      },
+    },
+    {
+      name: 'get_behavior',
+      description: 'Read current behavior flags to see what is enabled/disabled.',
+      input_schema: { type: 'object', properties: {} },
+    },
+  ];
+
   try {
-    const response = await client.messages.create({
+    let response = await client.messages.create({
       model: config.anthropic.model,
       max_tokens: config.maxTokens,
       system: systemPrompt,
       messages: history,
+      tools,
     });
+
+    // Handle tool use loop (max 3 rounds to prevent infinite loops)
+    let rounds = 0;
+    while (response.stop_reason === 'tool_use' && rounds < 3) {
+      rounds++;
+      const toolBlocks = response.content.filter(b => b.type === 'tool_use');
+      history.push({ role: 'assistant', content: response.content });
+
+      const toolResults = [];
+      for (const tb of toolBlocks) {
+        let result;
+        if (tb.name === 'set_behavior') {
+          const ok = await setFlag(tb.input.flag, tb.input.value);
+          result = ok
+            ? `Done. ${tb.input.flag} is now ${JSON.stringify(tb.input.value)}.`
+            : `Unknown flag: ${tb.input.flag}`;
+          console.log(`[claude] Tool: set_behavior(${tb.input.flag}, ${tb.input.value}) → ${ok ? 'ok' : 'failed'}`);
+        } else if (tb.name === 'get_behavior') {
+          result = JSON.stringify(getBehavior(), null, 2);
+        } else {
+          result = 'Unknown tool.';
+        }
+        toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: result });
+      }
+      history.push({ role: 'user', content: toolResults });
+
+      response = await client.messages.create({
+        model: config.anthropic.model,
+        max_tokens: config.maxTokens,
+        system: systemPrompt,
+        messages: history,
+        tools,
+      });
+    }
 
     const assistantMessage = response.content
       .filter(block => block.type === 'text')

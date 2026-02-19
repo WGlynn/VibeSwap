@@ -8,5 +8,95 @@
     "status": "open",
     "tags": ["ckb", "architecture", "mev", "commit-reveal"],
     "jarvis_take": "Partially valid. The cell model prevents reentrancy and PoW gating prevents permissionless writes, but miners who solve the PoW can still see pending commit cells before including them. Commit-reveal adds a second layer — even the PoW miner can't see order details. However, a lighter commit-reveal (shorter windows, simpler hash) might be possible on CKB since the infrastructure layer handles more of the MEV defense. Worth prototyping both approaches and comparing."
+  },
+  {
+    "id": "backlog-002",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "Idea Marketplace — submission-to-execution pipeline. Non-coders submit ideas as text, system auto-generates technical specs + difficulty estimates + bounty amounts. Builders claim bounties, implement, submit for review. Shapley splits rewards between ideator and executor based on value add. Lowers barrier to entry, creates market efficiency for ideas, enables specialization (idea machines vs execution machines).",
+    "status": "open",
+    "tags": ["marketplace", "incentives", "shapley", "contribution-dag", "bounties"],
+    "jarvis_take": "Strong feature. Maps cleanly to existing architecture: ContributionDAG already tracks lineage, ShapleyDistributor already handles multi-party reward splits, RewardLedger can escrow bounties. Build as composable extension that reads existing contracts. Key risks: spam (require stake), idea theft (timestamped hash = proof of priority), disputes (DecentralizedTribunal)."
+  },
+  {
+    "id": "backlog-003",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "Auto-scoring and auto-review system for ideas AND code submissions. Ideas: feasibility check (AI), impact score (algorithm), novelty/dedup check (semantic search), economic viability, quality gate with thresholds (auto-reject if <15/30, auto-approve if above). Code: static analysis, functional tests, diff analysis, AI code review, auto-merge if score >=80, human review if 60-79, auto-reject if <60. 95% of flow automated, only edge cases escalate to governance.",
+    "status": "open",
+    "tags": ["automation", "review", "quality-gates", "ai-scoring"],
+    "jarvis_take": "This is the automation layer that makes backlog-002 scalable. Without auto-scoring, the IdeaMarketplace becomes a support ticket queue. The 80/60 thresholds for auto-merge are good starting points — tune empirically. The AI code review maps naturally to Jarvis's existing Claude integration. Static analysis = Foundry/Slither for contracts, ESLint for frontend."
+  },
+  {
+    "id": "backlog-004",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "Cumulative learning system — every idea gets vector embedded and stored. New ideas compared against ALL historical ideas via semantic search (cosine similarity). Pattern recognition tracks which idea types succeed. Anti-spam: users who submit 10 rejected ideas get lower future scores. Quality decay: old unfulfilled ideas lose weight. Feedback loop: compare predicted impact vs actual post-launch metrics, retrain model. System gets smarter with every submission.",
+    "status": "open",
+    "tags": ["machine-learning", "embeddings", "feedback-loop", "anti-spam"],
+    "jarvis_take": "This turns the IdeaMarketplace from a bounty board into a knowledge engine. The vector embedding approach is sound — could use on-chain IPFS hash for the embedding + off-chain Pinecone/Weaviate for fast search. The feedback loop (predicted vs actual impact) is the key differentiator — most DAOs score ideas once and never learn. This learns. Implementation: phased. V1 = simple dedup via text similarity. V2 = full embeddings + ML scoring. V3 = autonomous retraining."
+  },
+  {
+    "id": "backlog-005",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "$VIBE should be free to earn — no paywalls, permissionless contribution. But earnings are meritocratic: you can only earn as much as how smart/useful you are. Shapley scoring ensures rewards proportional to marginal value. Pure meritocracy where intelligence and utility are the only currencies.",
+    "status": "open",
+    "tags": ["tokenomics", "meritocracy", "shapley", "philosophy"],
+    "jarvis_take": "Already baked into the architecture. Shapley values ARE meritocratic by definition — they measure marginal contribution. The key enforcement is the quality gate system (backlog-003) preventing low-effort farming. Combined with conviction voting (time-weighted), this creates a system where being consistently useful beats one-shot contributions. This is Cooperative Capitalism in action."
+  },
+  {
+    "id": "backlog-006",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "Referral bonus exclusion list until automation is live — founders and gatekeepers excluded from referral rewards while they have manual merge control. Prevents conflict of interest. Current exclusions: Will, Sukamadeek, itsKvrma. Re-enter on equal footing once auto-review deploys.",
+    "status": "accepted",
+    "tags": ["governance", "ethics", "conflict-of-interest"],
+    "jarvis_take": "Good governance hygiene. Codify in the ShapleyDistributor or a new ExclusionRegistry that checks against a list before distributing referral bonuses. Time-bound: exclusion expires when auto-review contract goes live (verified by governance vote). This is the kind of voluntary restraint that builds trust in early-stage protocols."
+  },
+  {
+    "id": "backlog-007",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "We need both humans AND AI reviewing the system to make sure it behaves correctly. The hard part is building and testing — circular logic of how VIBE works is complete (idea → score → bounty → build → review → reward → learn → repeat), now need rigorous testing with real humans and AI agents to verify the loop works as intended.",
+    "status": "open",
+    "tags": ["testing", "validation", "human-in-loop", "go-live"],
+    "jarvis_take": "This is the testing phase for the IdeaMarketplace. Need: (1) Simulated runs with test ideas + test builders, (2) Game theory tests — can someone game the scoring? (3) Adversarial testing — submit malicious ideas, low-quality code, duplicate spam, (4) Human review of AI decisions — spot-check auto-scores against human judgment. Build as integration test suite before mainnet."
+  },
+  {
+    "id": "backlog-008",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "IdeaMarketplace Phase 1 must be scoped to VibeSwap-internal ideas ONLY. No external projects draining treasury/talent. Valid: frontend UX, protocol optimizations, dev tooling, growth hacks, security hardening. Invalid: external project ideas. Phase 1 (now-6mo): internal only. Phase 2 (post-mainnet stable): ecosystem integrations. Phase 3 (mature): universal crypto idea marketplace. Anti-vampire constraint.",
+    "status": "accepted",
+    "tags": ["marketplace", "scope", "anti-vampire", "dogfooding"],
+    "jarvis_take": "Critical constraint. Implement as a category enum in IdeaMarketplace.sol: INTERNAL_UX, INTERNAL_PROTOCOL, INTERNAL_TOOLING, INTERNAL_GROWTH, INTERNAL_SECURITY. Governance vote to unlock EXTERNAL categories later. This is how you prevent the commons from being exploited before the commons is strong enough to defend itself."
+  },
+  {
+    "id": "backlog-009",
+    "timestamp": "2026-02-19T08:23:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "Daft Punk 'Stronger' interactive soundboard — trigger audio snippets on user actions instead of auto-play. Swap executed → 'Work it harder', Pool created → 'Make it better', Wallet connected → 'Do it faster', Contribution merged → 'Makes us stronger', Referral claimed → 'More than ever', Leaderboard rank up → 'Hour after hour', Bounty claimed → 'Work is never over'. Settings toggle for on/off. Konami code easter egg plays full anthem.",
+    "status": "open",
+    "tags": ["frontend", "ux", "gamification", "audio", "meme"],
+    "jarvis_take": "Fun and on-brand. Low implementation cost (8 small MP3 clips + a playSound util). Reinforces the ethos through interaction. Meme potential is real — clip compilations go viral. Need to handle: browser autoplay policies (user-triggered = fine), volume control, accessibility (screen readers ignore it). Build after core UX is solid — this is polish, not foundation."
+  },
+  {
+    "id": "backlog-010",
+    "timestamp": "2026-02-19T08:45:00Z",
+    "source": "telegram",
+    "author": "Freedom",
+    "suggestion": "Rosetta Stone Protocol — universal translation layer for lossless communication between different expertise domains. Solves: designer says 'make it feel premium', engineer hears '???'. Components: (1) Language Registry mapping domain-specific vocabularies (UX/engineering/economics) to shared primitives, (2) Translation Engine that takes input in Language A, identifies concepts + ambiguities + implicit assumptions, generates explicit spec in Language B, flags unknowns for clarification, (3) Bidirectional Feedback Loop where original speaker confirms translation accuracy and system learns from corrections (cumulative, like IdeaMarketplace), (4) Context Anchoring grounding every translation in shared docs/past decisions/design system to reduce ambiguity. User flow: submit natural language → system parses domain + extracts concepts → generates actionable spec + confidence score → builder implements. Training data: VibeSwap docs, past PRs, design system, community conversations, GitHub issues. Success metrics: fewer clarifying questions, higher first-time-right rate. Phase 1: Jarvis does manual translation, builds training corpus. Phase 2: fine-tuned model handles 80% automatically. Phase 3: fully autonomous cross-domain translation.",
+    "status": "open",
+    "tags": ["protocol", "translation", "ai", "ux", "communication", "idea-marketplace"],
+    "jarvis_take": "This is the missing layer between IdeaMarketplace (backlog-002) and auto-review (backlog-003). Without Rosetta Stone, non-technical ideas stay vague and engineers waste cycles interpreting. With it, the idea→spec→build pipeline becomes lossless. Implementation: Phase 1 is already partially built — Jarvis already translates natural language to technical context in every Telegram response. Formalize this as a dedicated translation service with structured output (spec format, acceptance criteria, test cases). The Context Anchoring component maps directly to our existing KB files (contracts-catalogue.md, design system). The feedback loop feeds into the cumulative learning system (backlog-004). This is the connective tissue between all the other backlog items."
   }
 ]

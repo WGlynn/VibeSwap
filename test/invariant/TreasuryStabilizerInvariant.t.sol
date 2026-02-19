@@ -132,6 +132,14 @@ contract TreasuryStabilizerInvariantTest is StdInvariant, Test {
         stabilizer = TreasuryStabilizer(address(proxy));
 
         handler = new StabilizerHandler(stabilizer, token, amm, treasury);
+
+        // Configure the main pool so assessments work
+        bytes32 poolId = handler.poolId();
+        stabilizer.setMainPool(address(token), poolId);
+
+        // Transfer ownership to handler so it can call admin functions
+        stabilizer.transferOwnership(address(handler));
+
         targetContract(address(handler));
     }
 

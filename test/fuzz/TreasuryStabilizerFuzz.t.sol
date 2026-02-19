@@ -93,6 +93,7 @@ contract TreasuryStabilizerFuzzTest is Test {
         stabilizer.setConfig(address(token), config);
 
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
         amm.setTWAP(poolId, 1 hours, 700e18);
         amm.setTWAP(poolId, 7 days, 1000e18);
         vm.warp(block.timestamp + 2 hours);
@@ -116,6 +117,7 @@ contract TreasuryStabilizerFuzzTest is Test {
         stabilizer.setConfig(address(token), config);
 
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
         amm.setTWAP(poolId, 1 hours, 700e18);
         amm.setTWAP(poolId, 7 days, 1000e18);
         vm.warp(block.timestamp + 2 hours);
@@ -137,6 +139,7 @@ contract TreasuryStabilizerFuzzTest is Test {
         stabilizer.setConfig(address(token), config);
 
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
         amm.setTWAP(poolId, 1 hours, 700e18);
         amm.setTWAP(poolId, 7 days, 1000e18);
         vm.warp(block.timestamp + 2 hours);
@@ -162,6 +165,7 @@ contract TreasuryStabilizerFuzzTest is Test {
         stabilizer.setConfig(address(token), config);
 
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
         amm.setTWAP(poolId, 1 hours, 700e18);
         amm.setTWAP(poolId, 7 days, 1000e18);
         vm.warp(block.timestamp + 2 hours);

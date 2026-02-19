@@ -1,4 +1,246 @@
 {
+  "vague_teasers": [
+    {
+      "id": "vague-001",
+      "text": "Something is being built.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-002",
+      "text": "What if the market couldn't see your order until it was already settled.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-003",
+      "text": "Two humans and an AI walk into a cave. They don't come out the same.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-004",
+      "text": "The trades you can't see are the trades you can't exploit.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-005",
+      "text": "We wrote 2,000 tests before we wrote a single marketing tweet.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-006",
+      "text": "Every DEX has a frontrunning problem. Most just don't talk about it.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-007",
+      "text": "Building something that treats your trade as private by default.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-008",
+      "text": "What if governance wasn't about how many tokens you bought.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-009",
+      "text": "The AI doesn't just assist. It co-founds.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-010",
+      "text": "123 contracts. No VC. No pre-mine. No insider round.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-011",
+      "text": "Your contribution history is your identity. Everything else is speculation.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-012",
+      "text": "We don't have a marketing team. We have a mechanism.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-013",
+      "text": "Building on two chains. Not because we can. Because each one solves a different problem.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-014",
+      "text": "The sandwich attack doesn't work when the bread can't see the filling.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-015",
+      "text": "Fair markets aren't a feature. They're the architecture.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-016",
+      "text": "Three minds converged on the same design from three different directions. None of them knew each other existed.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-017",
+      "text": "We measured contribution before we measured price.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-018",
+      "text": "The protocol doesn't know who you are. It knows what you built.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-019",
+      "text": "Commit. Reveal. Settle. That's the whole trick.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-020",
+      "text": "Work is the only token that matters.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-021",
+      "text": "Not every cave produces a Mark I. But every Mark I starts in a cave.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-022",
+      "text": "The validators can't see your order. That's the point.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-023",
+      "text": "What happens when you let game theory decide who gets rewarded instead of who gets there first.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-024",
+      "text": "Open source isn't a feature. It's accountability.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-025",
+      "text": "Building the exchange you'd want to trade on if you couldn't see anyone else's orders either.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-026",
+      "text": "We didn't raise money. We raised a test suite.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-027",
+      "text": "Cooperative capitalism sounds like an oxymoron until you see the math.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-028",
+      "text": "The most honest market is the one where nobody has an information advantage.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-029",
+      "text": "An AI with commit history is more accountable than a dev team with a pitch deck.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-030",
+      "text": "Uniform clearing price. Everyone pays the same. No exceptions.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-031",
+      "text": "We built the compliance layer before we built the token.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-032",
+      "text": "Proof of Work proves computation. Proof of Stake proves capital. We're working on what proves a mind.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-033",
+      "text": "171 test files. Not because we're paranoid. Because we ship what we can prove.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-034",
+      "text": "Your keys never leave your device. Your orders never leave the hash. Your contribution never leaves the chain.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-035",
+      "text": "The future of trading isn't faster execution. It's hidden execution.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-036",
+      "text": "Mutualized risk. Free market competition. Same protocol.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-037",
+      "text": "A shuffle seeded by secrets no single party controls.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-038",
+      "text": "We're not building a product. We're building a framework that any project can fork.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-039",
+      "text": "The best security audit is a test suite that thinks like an attacker.",
+      "posted": false,
+      "priority": 0
+    },
+    {
+      "id": "vague-040",
+      "text": "Something is coming. It doesn't need your permission.",
+      "posted": false,
+      "priority": 0
+    }
+  ],
   "scheduled": [
     {
       "id": "launch-001",

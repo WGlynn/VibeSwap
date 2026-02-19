@@ -793,6 +793,8 @@ dependencies = [
  "amm-pool-type",
  "batch-auction-type",
  "commit-type",
+ "config-type",
+ "oracle-type",
  "sha2",
  "vibeswap-math",
  "vibeswap-mmr",

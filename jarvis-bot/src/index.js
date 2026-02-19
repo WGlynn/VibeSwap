@@ -563,6 +563,113 @@ bot.command('recover', async (ctx) => {
   }
 });
 
+// ============ Backlog ============
+
+const BACKLOG_FILE = join(config.dataDir, 'backlog.json');
+
+async function loadBacklog() {
+  try {
+    const data = await readFile(BACKLOG_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+async function saveBacklog(items) {
+  await writeFile(BACKLOG_FILE, JSON.stringify(items, null, 2));
+}
+
+bot.command('backlog', async (ctx) => {
+  const args = ctx.message.text.replace('/backlog', '').trim();
+
+  // /backlog — list all open items
+  if (!args) {
+    const items = await loadBacklog();
+    const open = items.filter(i => i.status === 'open' || i.status === 'accepted');
+    if (open.length === 0) return ctx.reply('Backlog is empty.');
+
+    const lines = open.map(i =>
+      `#${i.id.replace('backlog-', '')} [${i.status}] ${i.author}: ${i.suggestion.slice(0, 80)}${i.suggestion.length > 80 ? '...' : ''}`
+    );
+    return ctx.reply(`Backlog (${open.length} items):\n\n${lines.join('\n')}`);
+  }
+
+  // /backlog 003 — view specific item
+  const idMatch = args.match(/^(\d+)$/);
+  if (idMatch) {
+    const items = await loadBacklog();
+    const id = `backlog-${idMatch[1].padStart(3, '0')}`;
+    const item = items.find(i => i.id === id);
+    if (!item) return ctx.reply(`Item ${id} not found.`);
+
+    return ctx.reply(
+      `#${item.id} [${item.status}]\n` +
+      `Author: ${item.author}\n` +
+      `Tags: ${item.tags.join(', ')}\n\n` +
+      `${item.suggestion}\n\n` +
+      `Jarvis: ${item.jarvis_take}`
+    );
+  }
+
+  // /backlog add <suggestion> — add new item from chat
+  if (args.startsWith('add ')) {
+    const suggestion = args.slice(4).trim();
+    if (suggestion.length < 10) return ctx.reply('Too short. Give me a real suggestion.');
+
+    const items = await loadBacklog();
+    const nextNum = items.length + 1;
+    const id = `backlog-${String(nextNum).padStart(3, '0')}`;
+    const author = ctx.from.username || ctx.from.first_name || 'Unknown';
+
+    // Get Jarvis's take via Claude
+    await ctx.sendChatAction('typing');
+    let jarvisTake = '';
+    try {
+      const prompt = `Evaluate this suggestion for VibeSwap in 2-3 sentences. Be direct — is it strong, weak, or redundant? How does it map to existing architecture?\n\nSuggestion: "${suggestion}"`;
+      const response = await chat(ctx.chat.id, 'backlog-eval', prompt, 'private');
+      jarvisTake = response.text || 'No assessment available.';
+    } catch {
+      jarvisTake = 'Assessment failed — will review later.';
+    }
+
+    const newItem = {
+      id,
+      timestamp: new Date().toISOString(),
+      source: 'telegram',
+      author,
+      suggestion,
+      status: 'open',
+      tags: [],
+      jarvis_take: jarvisTake,
+    };
+
+    items.push(newItem);
+    await saveBacklog(items);
+
+    return ctx.reply(
+      `Added #${id}\n\n` +
+      `${suggestion.slice(0, 120)}${suggestion.length > 120 ? '...' : ''}\n\n` +
+      `Jarvis: ${jarvisTake}`
+    );
+  }
+
+  // /backlog close 003 — close an item
+  if (args.startsWith('close ')) {
+    if (!isOwner(ctx)) return ownerOnly(ctx);
+    const num = args.replace('close ', '').trim();
+    const id = `backlog-${num.padStart(3, '0')}`;
+    const items = await loadBacklog();
+    const item = items.find(i => i.id === id);
+    if (!item) return ctx.reply(`Item ${id} not found.`);
+    item.status = 'closed';
+    await saveBacklog(items);
+    return ctx.reply(`Closed #${id}: ${item.suggestion.slice(0, 60)}...`);
+  }
+
+  ctx.reply('Usage:\n/backlog — list open items\n/backlog 003 — view item\n/backlog add <suggestion> — add new\n/backlog close 003 — close item');
+});
+
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
@@ -847,6 +954,7 @@ async function main() {
       { command: 'health', description: 'JARVIS health check' },
       { command: 'model', description: 'Switch AI model (opus/sonnet)' },
       { command: 'clear', description: 'Clear conversation history' },
+      { command: 'backlog', description: 'View/add suggestion backlog' },
     ]);
   } catch {}
 

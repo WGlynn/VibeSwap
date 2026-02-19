@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "ckb", no_std)]
+
 // ============ Commit Type Script ============
 // CKB type script for commit cell validation
 //

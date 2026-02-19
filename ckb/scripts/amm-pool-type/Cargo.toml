@@ -3,6 +3,12 @@ name = "amm-pool-type"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["std"]
+std = ["vibeswap-math/std", "vibeswap-types/std"]
+ckb = ["dep:ckb-std", "vibeswap-math/no_std", "vibeswap-types/no_std"]
+
 [dependencies]
-vibeswap-math = { path = "../../lib/vibeswap-math" }
-vibeswap-types = { path = "../../lib/types" }
+vibeswap-math = { path = "../../lib/vibeswap-math", default-features = false }
+vibeswap-types = { path = "../../lib/types", default-features = false }
+ckb-std = { workspace = true, optional = true }

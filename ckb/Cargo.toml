@@ -14,6 +14,7 @@ members = [
     "scripts/config-type",
     "scripts/oracle-type",
     "sdk",
+    "deploy",
     "tests",
 ]
 
@@ -21,11 +22,29 @@ members = [
 blake2b-rs = "0.2"
 sha2 = { version = "0.10", default-features = false }
 molecule = { version = "0.7", default-features = false }
+ckb-std = { version = "1.0", default-features = false, features = ["allocator", "calc-hash", "ckb-types", "dummy-atomic"] }
 
 [profile.release]
 overflow-checks = true
 opt-level = "s"
-lto = true
-codegen-units = 1
+lto = false
+codegen-units = 16
 panic = "abort"
-strip = true
+strip = false
+
+[profile.release.package.pow-lock]
+opt-level = "s"
+[profile.release.package.batch-auction-type]
+opt-level = "s"
+[profile.release.package.commit-type]
+opt-level = "s"
+[profile.release.package.amm-pool-type]
+opt-level = "s"
+[profile.release.package.lp-position-type]
+opt-level = "s"
+[profile.release.package.compliance-type]
+opt-level = "s"
+[profile.release.package.config-type]
+opt-level = "s"
+[profile.release.package.oracle-type]
+opt-level = "s"

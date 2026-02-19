@@ -1,108 +1,70 @@
-// ============ Compliance Type Script ============
-// CKB type script for the compliance registry singleton cell
-// Used as cell_dep by auction type script for address filtering
-//
-// The compliance cell stores Merkle roots for:
-// - Blocked addresses (sanctioned)
-// - User tiers (RETAIL, ACCREDITED, INSTITUTIONAL)
-// - Jurisdiction configs
-//
-// Only governance multisig can update this cell
+// ============ Compliance Type Script — CKB-VM Entry Point ============
+// Type script for the compliance registry singleton cell.
+// Used as cell_dep by auction type script for address filtering.
 
-use vibeswap_types::*;
+#![cfg_attr(feature = "ckb", no_std)]
+#![cfg_attr(feature = "ckb", no_main)]
 
-// ============ Script Entry Point ============
+#[cfg(feature = "ckb")]
+ckb_std::default_alloc!();
 
-pub fn verify_compliance_type(
-    is_creation: bool,
-    old_data: Option<&[u8]>,
-    new_data: &[u8],
-    is_governance_authorized: bool,
-) -> Result<(), ComplianceTypeError> {
-    let new_compliance = ComplianceCellData::deserialize(new_data)
-        .ok_or(ComplianceTypeError::InvalidCellData)?;
+#[cfg(feature = "ckb")]
+ckb_std::entry!(program);
 
-    if is_creation {
-        // Only governance can create
-        if !is_governance_authorized {
-            return Err(ComplianceTypeError::Unauthorized);
-        }
-        return Ok(());
-    }
+// ============ CKB-VM Entry Point ============
 
-    // Updates require governance authorization
-    if !is_governance_authorized {
-        return Err(ComplianceTypeError::Unauthorized);
-    }
+#[cfg(feature = "ckb")]
+fn program() -> i8 {
+    use ckb_std::ckb_constants::Source;
+    use ckb_std::high_level::load_cell_data;
+    use compliance_type::verify_compliance_type;
 
-    if let Some(old) = old_data {
-        let old_compliance = ComplianceCellData::deserialize(old)
-            .ok_or(ComplianceTypeError::InvalidCellData)?;
+    // Determine creation vs update
+    let old_data = load_cell_data(0, Source::GroupInput).ok();
+    let is_creation = old_data.is_none();
 
-        // Version must increment
-        if new_compliance.version <= old_compliance.version {
-            return Err(ComplianceTypeError::VersionNotIncremented);
-        }
-
-        // Last updated must be more recent
-        if new_compliance.last_updated <= old_compliance.last_updated {
-            return Err(ComplianceTypeError::StaleUpdate);
-        }
-    }
-
-    Ok(())
-}
-
-/// Verify a Merkle proof that an address is blocked
-pub fn verify_blocked_address(
-    compliance: &ComplianceCellData,
-    lock_hash: &[u8; 32],
-    proof_path: &[[u8; 32]],
-    proof_indices: u32,
-) -> bool {
-    use sha2::{Digest, Sha256};
-
-    let leaf = {
-        let mut hasher = Sha256::new();
-        hasher.update(lock_hash);
-        let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result);
-        hash
+    // Load new cell data
+    let new_data = match load_cell_data(0, Source::GroupOutput) {
+        Ok(d) => d,
+        Err(_) => return -2,
     };
 
-    let mut current = leaf;
-    for (i, sibling) in proof_path.iter().enumerate() {
-        let mut hasher = Sha256::new();
-        if (proof_indices >> i) & 1 == 0 {
-            hasher.update(current);
-            hasher.update(sibling);
-        } else {
-            hasher.update(sibling);
-            hasher.update(current);
-        }
-        let result = hasher.finalize();
-        current.copy_from_slice(&result);
+    // Governance authorization: check if a governance signature is present
+    // In CKB, this would be verified via a separate governance lock script
+    // on the input cell. If the input cell is consumed, its lock script passed.
+    let is_governance_authorized = !is_creation; // Input lock passed = authorized
+    // For creation, check if any input has governance lock (simplified)
+    let is_authorized = if is_creation {
+        // In production: verify governance multisig via cell_dep or input lock
+        true // Simplified — actual auth via lock script
+    } else {
+        is_governance_authorized
+    };
+
+    match verify_compliance_type(
+        is_creation,
+        old_data.as_deref(),
+        &new_data,
+        is_authorized,
+    ) {
+        Ok(()) => 0,
+        Err(_) => -10,
     }
-
-    current == compliance.blocked_merkle_root
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ComplianceTypeError {
-    InvalidCellData,
-    Unauthorized,
-    VersionNotIncremented,
-    StaleUpdate,
-}
+// ============ Native Entry Point ============
 
+#[cfg(not(feature = "ckb"))]
 fn main() {
-    println!("Compliance Type Script — compile with RISC-V target for CKB-VM");
+    println!("Compliance Type Script — compile with --features ckb for CKB-VM");
 }
+
+// ============ Tests ============
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use compliance_type::*;
+    use vibeswap_types::*;
 
     #[test]
     fn test_creation_authorized() {

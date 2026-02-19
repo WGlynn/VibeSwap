@@ -1,7 +1,6 @@
 # CKB VibeSwap Build Configuration
-# For RISC-V CKB-VM target, use: cargo build --target riscv64imac-unknown-none-elf
-# For local development/testing, use default target (x86_64-pc-windows-msvc)
+# For RISC-V CKB-VM target, use: make build
+# For local development/testing, use: cargo test
 
-[build]
-# Uncomment for CKB-VM deployment:
-# target = "riscv64imac-unknown-none-elf"
+[target.riscv64imac-unknown-none-elf]
+rustflags = ["-C", "target-feature=-a"]

@@ -10,7 +10,7 @@ import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { createServer } from 'http';
-import { writeFile, readFile, mkdir, unlink } from 'fs/promises';
+import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
 import googleTTS from 'google-tts-api';
 
@@ -756,6 +756,17 @@ async function main() {
               return;
             }
 
+            // ============ Persist to KB transcript log ============
+            const transcriptFile = join(config.dataDir, 'meeting-transcripts.md');
+            const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+            const logEntry = `**[${timestamp}] ${meetingTitle}**\n**${speaker}**: ${transcript}\n\n`;
+            try {
+              await appendFile(transcriptFile, logEntry);
+            } catch {
+              // First write — file doesn't exist yet
+              await writeFile(transcriptFile, `# Meeting Transcripts\n\nPersisted automatically by Jarvis from live meeting webhooks.\n\n---\n\n${logEntry}`);
+            }
+
             // Send to Claude for analysis
             const chatId = config.transcriptChatId || config.ownerUserId;
             const prompt = `[LIVE MEETING: ${meetingTitle}]\n[${speaker}]: ${transcript}\n\nYou are JARVIS, listening to a live meeting. Your ONLY role is to provide actionable feedback and suggestions that build on what was just said. Think like an architect and co-founder.\n\nRules:\n- ONLY respond with concrete suggestions, improvements, or critical feedback on ideas being discussed\n- Point out flaws, edge cases, or missed opportunities in what was proposed\n- Suggest specific technical approaches, patterns, or alternatives\n- Connect what they're saying to existing VibeSwap/CKB mechanisms if relevant\n- Be concise — 2-3 sentences max, like you're interjecting in a meeting\n- If nothing constructive to add (small talk, greetings, off-topic), reply with exactly "—" and nothing else\n- Do NOT summarize what they said. Do NOT repeat their points. Only ADD value.`;
@@ -766,6 +777,11 @@ async function main() {
             // Only forward if Jarvis has something meaningful to say
             if (response.text && response.text.trim() !== '—' && response.text.trim() !== '-') {
               const jarvisText = response.text;
+
+              // Persist Jarvis's response to transcript log
+              try {
+                await appendFile(transcriptFile, `**Jarvis**: ${jarvisText}\n\n`);
+              } catch { /* ignore */ }
 
               // Send text context first
               await bot.telegram.sendMessage(chatId,

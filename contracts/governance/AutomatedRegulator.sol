@@ -340,10 +340,17 @@ contract AutomatedRegulator is OwnableUpgradeable, UUPSUpgradeable {
 
     function _autoFileCase(bytes32 violationId, address wallet, string memory reason) internal {
         // This contract must be an authorized case opener in ClawbackRegistry
-        // In production, the registry would authorize this contract
-        violations[violationId].actionTaken = true;
+        // (requires isActiveAuthority on FederatedConsensus or owner of registry)
+        DetectedViolation storage v = violations[violationId];
+        v.actionTaken = true;
 
-        emit CaseAutoFiled(violationId, bytes32(0), wallet);
+        try registry.openCase(wallet, v.evidenceValue, address(0), reason) returns (bytes32 caseId) {
+            v.caseId = caseId;
+            emit CaseAutoFiled(violationId, caseId, wallet);
+        } catch {
+            // Not authorized yet — emit with zero caseId so off-chain can track
+            emit CaseAutoFiled(violationId, bytes32(0), wallet);
+        }
     }
 
     // ============ Consensus Voting ============

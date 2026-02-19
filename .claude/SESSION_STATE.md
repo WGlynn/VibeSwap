@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6, Session 35)
+**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6, Session 36)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -10,7 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **2960+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **3000+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
 - **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
@@ -37,7 +37,23 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 19, 2026 — Session 35)
+## Recently Completed (Feb 19, 2026 — Session 36)
+86. **Cross-Module Integration Test Expansion — 3 New E2E Test Suites (42 tests)**
+    - **CompliancePipeline.t.sol** (9 tests): ClawbackRegistry + FederatedConsensus + ClawbackVault E2E
+      - Full case→vote→clawback pipeline, cascading taint multi-hop, dismiss clears taint, insufficient votes, grace period gating, taint chain tracking, case wallets, manual propagation, unauthorized access
+    - **GovernanceIdentityPipeline.t.sol** (11 tests): SoulboundIdentity + ReputationOracle + ConvictionGovernance + RetroactiveFunding E2E
+      - Full conviction pipeline (propose→signal→pass→execute), full retroactive funding round, quadratic matching (distributed > concentrated), ReputationOracle comparison flow (commit→reveal→settle→trust score update), identity/tier gating, conviction decay on signal removal, proposal expiry, full reputation→governance lifecycle
+    - **IncentiveDistributionPipeline.t.sol** (12 tests): IncentiveController hub + ILProtectionVault + LoyaltyRewardsManager + VolatilityInsurancePool + SlippageGuaranteeFund + ShapleyDistributor E2E
+      - LP registration propagation, volatility fee routing (AMM→Controller→VolPool), multi-LP lifecycle, auction proceeds distribution, Shapley game creation via controller, execution recording, fee routing via balances, authorization checks (3 separate), pool config customization, full lifecycle
+    - **Key insights**:
+      - ReputationOracle has payable fallback → need `payable()` cast
+      - ShapleyDistributor claim via IncentiveController doesn't work (msg.sender = controller, not LP) → claim directly from Shapley
+      - FederatedConsensus.addAuthority takes 3 args: (address, AuthorityRole, string jurisdiction)
+      - ClawbackCase struct has 11 fields, not 10 — proposalId at position 10
+    - **80 integration tests passing across 8 suites, 0 regressions**
+    - Commits: `2b8b73a`, `2f7ad91`, `ec797f4` — pushed to both remotes
+
+## Previously Completed (Feb 19, 2026 — Session 35)
 85. **Fee Pipeline Go-Live + Comprehensive Fuzz/Invariant Test Expansion**
     - **protocolFeeShare configurable**: Changed VibeAMM constant (0) to mutable with `setProtocolFeeShare()` (max 2500 BPS)
     - **FeePipelineIntegration.t.sol** (11 tests): End-to-end VibeAMM→ProtocolFeeAdapter→FeeRouter→[Treasury/Insurance/RevShare/BuybackEngine]

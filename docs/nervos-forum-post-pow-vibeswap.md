@@ -1,7 +1,6 @@
 PoW Shared State + Commit-Reveal Batch Auctions: Eliminating MEV at Every Layer on CKB
 
-This post builds on Matt's PoW shared state proposal and explains how it fits naturally into VibeSwap's architecture as we explore a CKB integration. The short version: both projects solve ordering problems, but at different layers of the stack, and together they eliminate MEV at every layer.
-
+This post builds on Matt's PoW shared state proposal and explains how it fits naturally into VibeSwap's architecture as we explore a CKB integration. The short version: Matt solved the ordering problem, we solved the pricing problem, and together they eliminate MEV at every layer of the stack.
 
 The Problem VibeSwap Solves
 
@@ -11,7 +10,6 @@ The mechanism works in three phases. During the commit phase, users submit a has
 
 This works well on account-based chains like Ethereum where shared state is native. But bringing it to CKB presents an obvious challenge.
 
-
 The CKB Challenge
 
 VibeSwap's auction contract needs shared state by definition. Multiple users need to submit commits to the same auction cell during the commit phase. Multiple users need to reveal against that same cell during the reveal phase. Settlement reads the full set of orders from that cell and writes the results back.
@@ -19,7 +17,6 @@ VibeSwap's auction contract needs shared state by definition. Multiple users nee
 On an account-based chain this is trivial. On CKB's cell model, this is exactly the contention problem Matt described. If twenty users try to commit to the same auction cell in the same block, nineteen of them fail. The auction becomes unusable.
 
 You could put an operator in front of it to sequence the commits, but then you have reintroduced a centralized party who can see orders before they are committed, which defeats the entire purpose of a commit-reveal scheme. The operator becomes the MEV extractor.
-
 
 How Matt's PoW Shared State Fits
 
@@ -31,30 +28,19 @@ The type script handles what the update does. This is where VibeSwap's auction l
 
 Authorization and validation are cleanly separated. The PoW gate controls access. The auction logic controls correctness. Neither needs to know about the other.
 
-
-Two Ordering Problems, Two Layers
-
-It is worth being precise here because both VibeSwap and Matt's proposal solve ordering problems, but at different layers of the stack.
-
-Matt's PoW solves infrastructure-layer ordering. On CKB's cell model, multiple transactions competing to update the same cell is a contention problem. Who gets write access next? On Ethereum this problem does not exist because the EVM handles shared state natively and anyone can call a contract. On CKB it is a fundamental blocker. Matt's PoW decentralizes write access the same way Nakamoto consensus decentralizes block production. This is not about trade ordering. It is about access to the cell itself.
-
-VibeSwap solves application-layer ordering. Within a batch of collected orders, what sequence do they execute in? On Ethereum the ordering problem is mempool transaction ordering, which is where MEV lives. Validators and searchers reorder transactions for profit. VibeSwap neutralizes this by making ordering irrelevant. Orders are hidden during commit, batched together, then shuffled deterministically using XORed user secrets before settlement at a uniform clearing price. No one can predict or manipulate which trade executes first within the batch.
-
-On Ethereum, VibeSwap's application-layer solution is sufficient because infrastructure-layer ordering is handled by the EVM. On CKB, you need both layers. Matt's PoW handles who gets to write to the auction cell. VibeSwap's auction logic handles fairness inside the auction once writes are collected. Neither replaces the other.
-
-
 Why This Combination Is Uniquely Powerful
 
-Together these two layers close the entire MEV surface on CKB.
+Most DEX designs address MEV at one layer. VibeSwap's batch auction eliminates MEV at the pricing layer by hiding orders and settling at uniform prices. Matt's PoW shared state eliminates MEV at the ordering layer by replacing speed-of-access races with cost-of-work equilibrium.
 
-At the infrastructure layer, you cannot win write access by being faster or by bribing a sequencer. You win by doing work. The cost of that work self-adjusts through difficulty targeting. Griefing is self-punishing because you burn real hash power for no economic gain.
+Together they close the entire MEV surface.
+
+At the ordering layer, you cannot win write access by being faster or by bribing a sequencer. You win by doing work. The cost of that work self-adjusts through difficulty targeting. Griefing is self-punishing because you burn real hash power for no economic gain.
 
 At the pricing layer, even if you win write access, you cannot extract value from other users because all orders in the batch settle at the same uniform clearing price. There is no informational advantage to being first because orders are committed as hashes.
 
-At the execution layer, the deterministic shuffle (seeded by XORed user secrets) ensures that execution order within a batch is unpredictable and unmanipulable. No one can position their trade advantageously within the batch.
+At the settlement layer, the deterministic shuffle (seeded by XORed user secrets) ensures that execution order within a batch is unpredictable and unmanipulable. No one can position their trade advantageously within the batch.
 
-This is defense in depth against MEV. Not one mechanism hoping to cover everything, but three independent layers each closing a different attack vector. Matt's PoW handles the layer that is unique to CKB. VibeSwap's batch auction handles the layers that exist on every chain. The combination is stronger than either alone.
-
+This is defense in depth against MEV. Not one mechanism hoping to cover everything, but three independent layers each closing a different attack vector.
 
 Implementation Sketch
 
@@ -66,7 +52,6 @@ The Bitcoin header format reuse that Matt proposed is elegant here because it me
 
 Multiple auction cells can run concurrently for different trading pairs. Each is an independent PoW chain settled on CKB L1. They appear chaotic from the outside but each is internally ordered and independently verifiable.
 
-
 Difficulty and Timing Considerations
 
 VibeSwap's batches run on fixed time windows. On Ethereum we use roughly 10 second batches with 8 seconds for commits and 2 seconds for reveals. On CKB with PoW-gated shared state, the timing dynamics change.
@@ -74,7 +59,6 @@ VibeSwap's batches run on fixed time windows. On Ethereum we use roughly 10 seco
 The difficulty target on each auction cell needs to be tuned so that state transitions happen frequently enough to include all user commits within the commit window but not so frequently that the PoW cost becomes negligible and stops serving as a contention resolution mechanism. This is an area where the economic equilibrium Matt mentioned becomes important. The market will find the balance between PoW cost and trading value, and difficulty adjustment keeps it calibrated.
 
 For high-volume trading pairs, difficulty will naturally be higher because more miners compete for the more valuable write access. For low-volume pairs, difficulty stays low and updates are cheap. The system self-scales.
-
 
 What This Means for CKB DeFi
 
@@ -85,4 +69,3 @@ VibeSwap on CKB would not just be a port of an Ethereum DEX. It would be a funda
 We think this is a compelling direction and would be interested in collaborating with the CKB community on a proof of concept. The auction logic is already built and battle-tested. The PoW shared state primitive is the missing piece that makes it viable on CKB.
 
 
-Edit: I want to clarify something about how these two solutions relate. Both VibeSwap and Matt's proposal solve ordering problems, but at different layers. Matt's PoW solves infrastructure-layer ordering, which is unique to CKB's cell model. When multiple transactions compete to update the same cell, who gets write access? That problem does not exist on account-based chains like Ethereum where shared state is native. VibeSwap solves application-layer ordering. Within a batch of collected trades, what sequence do they execute in? We handle this with hidden commits, deterministic shuffling, and uniform clearing prices so that ordering becomes irrelevant. On Ethereum, our application-layer solution alone is sufficient. On CKB, you need both layers. Matt handles access to the cell. We handle fairness inside the auction. Neither replaces the other, and the combination is stronger than either alone.

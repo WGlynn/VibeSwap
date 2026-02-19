@@ -14,8 +14,6 @@
 #[cfg(feature = "no_std")]
 extern crate alloc;
 #[cfg(feature = "no_std")]
-use alloc::vec;
-#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
 use sha2::{Digest, Sha256};

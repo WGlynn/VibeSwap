@@ -4,64 +4,64 @@
   "scripts": {
     "amm-pool-type": {
       "description": "Type script: constant product AMM pool validation",
-      "code_hash": "0x2e33f46464886d9620583eae969031501dbb583e6da197ebc1c250394c81b704",
-      "binary_size": 138800,
+      "code_hash": "0xf2be4a5ff22d28577e37cbaf41faadd555f51e42dde95e5f1cd7d6f9754ef5fc",
+      "binary_size": 138776,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "batch-auction-type": {
       "description": "Type script: commit-reveal batch auction state machine",
-      "code_hash": "0x92139d22b7ea03a46f07413f6466c985fa398f666c2612401979f86f919a0e87",
-      "binary_size": 188216,
+      "code_hash": "0x868523a9b8f2b6ed23bfacb1f750c0a5d0ee140921e44d0dd00c998c2dcf6658",
+      "binary_size": 188192,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "commit-type": {
       "description": "Type script: commit cell format validation",
-      "code_hash": "0x505189193b5d88f89aae7c5ba6ec83b8dc0e77f8ba922eb74765abd7e84c1f2c",
-      "binary_size": 172648,
+      "code_hash": "0x1a4fb5427b2665766a2ee7b4937841d8710c4d6eaecb5351e1cb8f3293755299",
+      "binary_size": 172616,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "compliance-type": {
       "description": "Type script: compliance registry management",
-      "code_hash": "0x43871924eab691183cea5366d81da0fdd8052a96e7af6116483276241d625df6",
-      "binary_size": 120440,
+      "code_hash": "0xc3158fa9382196e45412bb066b64a310b98bd5a2cb7c16eb7f9a935d85264d7b",
+      "binary_size": 120408,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "config-type": {
       "description": "Type script: protocol configuration singleton",
-      "code_hash": "0xc32c48baa768e00151d02347a7475ff859d5fdb4a11dd6f42554e46e3ceae0eb",
-      "binary_size": 120408,
+      "code_hash": "0x1dde8321abea728d45d35618f69e6e2eb27719f74b79d242ebbc5257b275d15c",
+      "binary_size": 120384,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "lp-position-type": {
       "description": "Type script: LP position cell tracking",
-      "code_hash": "0xdb9e7f73257392d4eb260afad60c91fef49516f09d99ab0876b48af2d5160cd0",
-      "binary_size": 128832,
+      "code_hash": "0x56aea70f2b6ab67bdea29743287867a0122959d7938889be409c00d8289d1df6",
+      "binary_size": 128800,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "oracle-type": {
       "description": "Type script: oracle price feed validation",
-      "code_hash": "0x07590167cf89333c52faaaac87e6faf1f34a54de3425079bafba62167b291622",
-      "binary_size": 121408,
+      "code_hash": "0xf832992a0c83f5fb6d9c0b2deac5716018b2bbf415ffc800ba90c0b121482f57",
+      "binary_size": 121376,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null
     },
     "pow-lock": {
       "description": "Lock script: PoW-gated shared cell access",
-      "code_hash": "0xf236cd81ff115cce2954dbb81d5293429e33dd051dfafd76515e72824095d100",
-      "binary_size": 192032,
+      "code_hash": "0x4c9dd614a52f144c360c568739ae56c0d9941e0c5b398b17e199774d663a04da",
+      "binary_size": 192000,
       "hash_type": "data1",
       "cell_tx_hash": null,
       "cell_index": null

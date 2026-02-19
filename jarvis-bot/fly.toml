@@ -1,33 +1,34 @@
-# JARVIS — Fly.io Deployment
-# Deploy: fly launch --copy-config --no-deploy && fly deploy
-# Secrets: fly secrets set TELEGRAM_BOT_TOKEN=... ANTHROPIC_API_KEY=... GITHUB_TOKEN=...
+# fly.toml app configuration file generated for jarvis-vibeswap on 2026-02-18T17:46:29-06:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "jarvis-vibeswap"
-primary_region = "iad"
+app = 'jarvis-vibeswap'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  DOCKER = "1"
-  NODE_ENV = "production"
-  VIBESWAP_REPO = "/repo"
-  MEMORY_DIR = "/repo/.claude/projects/C--Users-Will/memory"
-  DATA_DIR = "/app/data"
-  GITHUB_REPO_URL = "https://github.com/WGlynn/vibeswap-private.git"
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  GITHUB_REPO_URL = 'https://github.com/WGlynn/vibeswap-private.git'
+  MEMORY_DIR = '/repo/.claude/projects/C--Users-Will/memory'
+  NODE_ENV = 'production'
+  VIBESWAP_REPO = '/repo'
 
-[mounts]
-  source = "jarvis_data"
-  destination = "/app/data"
-
-[[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+[[mounts]]
+  source = 'jarvis_data'
+  destination = '/app/data'
 
 [checks]
   [checks.health]
-    type = "http"
     port = 8080
-    path = "/health"
-    interval = "60s"
-    timeout = "10s"
+    type = 'http'
+    interval = '1m0s'
+    timeout = '10s'
+    path = '/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

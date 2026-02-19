@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-18 (Desktop - Claude Code Opus 4.6)
+**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -14,7 +14,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
 - **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
-- **JARVIS Telegram Bot: AUTONOMOUS** — proactive intelligence, daily digests, thread archival, AI moderation, rights declaration
+- **JARVIS Telegram Bot: AUTONOMOUS + FULL CONTEXT** — 8/8 memory files loaded (124K chars), behavior flags system, Claude tool use for runtime config
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**)
@@ -37,7 +37,24 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 19, 2026 — Session 31)
+## Recently Completed (Feb 19, 2026 — Session 32)
+81. **IdeaMarketplace Cross-Contract Integration + Jarvis Fix + Go-Live Housekeeping**
+    - **IdeaMarketplace cross-contract wiring**: PredictionMarket (outcome markets), ReputationOracle (accuracy tracking), ContextAnchor (Rosetta Stone spec anchoring)
+    - New functions: `createIdeaMarket()`, `reportOutcome()`, `anchorIdeaSpec()`, `getSubmitterAccuracy()`, `getIdeaMarketPrice()`
+    - 16 new cross-contract unit tests (108 total IdeaMarketplace tests)
+    - **Jarvis behavior flags system**: Root cause diagnosis — welcome handler was hardcoded, mandate updates were text-only hallucinations
+      - New `behavior.js` module: 9 runtime-configurable flags persisted to `data/behavior.json`
+      - Claude API tool use: `set_behavior` + `get_behavior` tools so Jarvis can actually modify behavior in conversation
+      - `welcomeNewMembers: false` — immediate fix for join spam
+      - `/behavior` and `/setbehavior` commands for manual control
+    - **Jarvis memory files bundled**: All 14 KB files copied to `jarvis-bot/memory/`, Dockerfile COPY, fly.toml MEMORY_DIR fixed → 8/8 files, 124K chars
+    - **CKB community report**: `docs/ckb-integration-report.md` + PDF/DOCX/HTML/TXT/RTF exports in `docs/pdf/`
+    - **Go-live housekeeping**: .gitignore cleanup, Vite chunk warning suppressed, forge lint warnings suppressed
+    - **Claude Code permissions**: `allowedTools: ['*']` — full autonomy, zero permission prompts
+    - **Document export primitive**: Codified in MEMORY.md — pandoc for DOCX/HTML/TXT/RTF, md-to-pdf for PDF, skip tool discovery
+    - Commits: `435eee0`, `62666a4`, `5736be2`, `5b04bf9`, `829ecf2`
+
+## Previously Completed (Feb 19, 2026 — Session 31)
 80. **Freedom's Backlog Implementation — IdeaMarketplace + Referral Exclusion + Soundboard**
     - **IdeaMarketplace.sol** (814 lines): Full idea submission→scoring→bounty→claim→execute→Shapley reward split pipeline
       - 5 categories (UX, PROTOCOL, TOOLING, GROWTH, SECURITY) — Phase 1 internal only per Freedom's anti-vampire constraint

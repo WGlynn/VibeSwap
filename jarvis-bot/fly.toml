@@ -13,7 +13,7 @@ primary_region = 'iad'
   DATA_DIR = '/app/data'
   DOCKER = '1'
   GITHUB_REPO_URL = 'https://github.com/WGlynn/vibeswap-private.git'
-  MEMORY_DIR = '/repo/.claude/projects/C--Users-Will/memory'
+  MEMORY_DIR = '/app/memory'
   NODE_ENV = 'production'
   VIBESWAP_REPO = '/repo'
 

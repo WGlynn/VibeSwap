@@ -9,7 +9,7 @@
 // 5. Done — it checks for new transcript content every 60 seconds
 
 // ============ CONFIG ============
-const JARVIS_WEBHOOK_URL = 'https://jarvis-vibeswap.fly.dev/transcript';
+const JARVIS_WEBHOOK_URL = 'https://frontend-jade-five-87.vercel.app/api/transcript';
 const WEBHOOK_SECRET = 'vibeswap-transcript-2026';
 const CHECK_INTERVAL_MINUTES = 1;
 const TRANSCRIPT_FOLDER_NAME = 'Meet Recordings';

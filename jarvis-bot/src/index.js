@@ -794,7 +794,7 @@ async function main() {
                 const audioBuffers = [];
                 for (const chunk of chunks) {
                   if (chunk.length === 0) continue;
-                  const base64 = await getAudioBase64(chunk, { lang: 'en', slow: false });
+                  const base64 = await getAudioBase64(chunk, { lang: 'en-GB', slow: false });
                   audioBuffers.push(Buffer.from(base64, 'base64'));
                 }
                 const fullAudio = Buffer.concat(audioBuffers);

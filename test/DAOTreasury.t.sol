@@ -361,20 +361,89 @@ contract DAOTreasuryTest is Test {
         assertFalse(config.isActive);
     }
 
-    function test_emergencyWithdraw() public {
+    // ============ Emergency Withdrawal (Governed) Tests ============
+
+    function test_queueEmergencyWithdraw() public {
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+        (address token, address recip, uint256 amount, uint256 executeAfter, bool executed, bool cancelled, bool guardianApproved) = treasury.emergencyRequests(emergencyId);
+        assertEq(token, address(tokenA));
+        assertEq(recip, recipient);
+        assertEq(amount, 50 ether);
+        assertEq(executeAfter, block.timestamp + 6 hours);
+        assertFalse(executed);
+        assertFalse(cancelled);
+        assertTrue(guardianApproved); // no guardian set, auto-approved
+    }
+
+    function test_executeEmergencyWithdraw_token() public {
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+        vm.warp(block.timestamp + 6 hours + 1);
+
         uint256 balanceBefore = tokenA.balanceOf(recipient);
-
-        treasury.emergencyWithdraw(address(tokenA), recipient, 50 ether);
-
+        treasury.executeEmergencyWithdraw(emergencyId);
         assertEq(tokenA.balanceOf(recipient), balanceBefore + 50 ether);
     }
 
-    function test_emergencyWithdraw_eth() public {
+    function test_executeEmergencyWithdraw_eth() public {
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(0), recipient, 5 ether);
+        vm.warp(block.timestamp + 6 hours + 1);
+
         uint256 balanceBefore = recipient.balance;
-
-        treasury.emergencyWithdraw(address(0), recipient, 5 ether);
-
+        treasury.executeEmergencyWithdraw(emergencyId);
         assertEq(recipient.balance, balanceBefore + 5 ether);
+    }
+
+    function test_executeEmergencyWithdraw_tooEarly() public {
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+        vm.expectRevert("Emergency timelock active");
+        treasury.executeEmergencyWithdraw(emergencyId);
+    }
+
+    function test_cancelEmergencyWithdraw() public {
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+        treasury.cancelEmergencyWithdraw(emergencyId);
+
+        vm.warp(block.timestamp + 6 hours + 1);
+        vm.expectRevert("Cancelled");
+        treasury.executeEmergencyWithdraw(emergencyId);
+    }
+
+    function test_emergencyGuardian_required() public {
+        address guardian = makeAddr("guardian");
+        treasury.setEmergencyGuardian(guardian);
+
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+        vm.warp(block.timestamp + 6 hours + 1);
+
+        // Fails without guardian approval
+        vm.expectRevert("Guardian approval required");
+        treasury.executeEmergencyWithdraw(emergencyId);
+
+        // Guardian approves
+        vm.prank(guardian);
+        treasury.approveEmergencyWithdraw(emergencyId);
+
+        // Now succeeds
+        uint256 balanceBefore = tokenA.balanceOf(recipient);
+        treasury.executeEmergencyWithdraw(emergencyId);
+        assertEq(tokenA.balanceOf(recipient), balanceBefore + 50 ether);
+    }
+
+    function test_emergencyGuardian_onlyGuardian() public {
+        address guardian = makeAddr("guardian");
+        treasury.setEmergencyGuardian(guardian);
+
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+
+        vm.prank(makeAddr("rando"));
+        vm.expectRevert("Not emergency guardian");
+        treasury.approveEmergencyWithdraw(emergencyId);
+    }
+
+    function test_setEmergencyGuardian() public {
+        address guardian = makeAddr("guardian");
+        treasury.setEmergencyGuardian(guardian);
+        assertEq(treasury.emergencyGuardian(), guardian);
     }
 
     // ============ Backstop Operator Tests ============

@@ -69,6 +69,25 @@ contract DAOTreasury is
     /// @notice Authorized backstop operators (e.g. TreasuryStabilizer)
     mapping(address => bool) public backstopOperators;
 
+    /// @notice Emergency timelock (shorter than normal, but still prevents instant drain)
+    uint256 public constant EMERGENCY_TIMELOCK = 6 hours;
+
+    /// @notice Emergency guardian (optional co-signer for emergency withdrawals)
+    address public emergencyGuardian;
+
+    /// @notice Pending emergency withdrawal requests
+    struct EmergencyRequest {
+        address token;
+        address recipient;
+        uint256 amount;
+        uint256 executeAfter;
+        bool executed;
+        bool cancelled;
+        bool guardianApproved;
+    }
+    mapping(uint256 => EmergencyRequest) public emergencyRequests;
+    uint256 public nextEmergencyId;
+
     // ============ Modifiers ============
 
     modifier onlyAuthorizedFeeSender() {
@@ -454,21 +473,97 @@ contract DAOTreasury is
         backstopConfigs[token].isActive = false;
     }
 
+    // ============ Emergency Withdrawal (Governed) ============
+
+    event EmergencyWithdrawalQueued(uint256 indexed emergencyId, address token, address recipient, uint256 amount, uint256 executeAfter);
+    event EmergencyWithdrawalExecuted(uint256 indexed emergencyId, address token, address recipient, uint256 amount);
+    event EmergencyWithdrawalCancelled(uint256 indexed emergencyId);
+    event EmergencyGuardianApproved(uint256 indexed emergencyId);
+    event EmergencyGuardianSet(address indexed guardian);
+
     /**
-     * @notice Emergency withdraw (bypasses timelock, only for emergencies)
-     * @dev Should be behind additional governance controls in production
+     * @notice Queue an emergency withdrawal (6-hour timelock)
+     * @dev Shorter than normal timelock but still provides governance window
      */
-    function emergencyWithdraw(
+    function queueEmergencyWithdraw(
         address token,
         address recipient,
         uint256 amount
-    ) external onlyOwner nonReentrant {
-        if (token == address(0)) {
-            (bool success, ) = recipient.call{value: amount}("");
+    ) external onlyOwner returns (uint256 emergencyId) {
+        require(recipient != address(0), "Invalid recipient");
+        require(amount > 0, "Zero amount");
+
+        emergencyId = nextEmergencyId++;
+        uint256 executeAfter = block.timestamp + EMERGENCY_TIMELOCK;
+
+        emergencyRequests[emergencyId] = EmergencyRequest({
+            token: token,
+            recipient: recipient,
+            amount: amount,
+            executeAfter: executeAfter,
+            executed: false,
+            cancelled: false,
+            guardianApproved: emergencyGuardian == address(0) // auto-approved if no guardian set
+        });
+
+        emit EmergencyWithdrawalQueued(emergencyId, token, recipient, amount, executeAfter);
+    }
+
+    /**
+     * @notice Emergency guardian approves a pending emergency withdrawal
+     */
+    function approveEmergencyWithdraw(uint256 emergencyId) external {
+        require(msg.sender == emergencyGuardian, "Not emergency guardian");
+
+        EmergencyRequest storage req = emergencyRequests[emergencyId];
+        require(!req.executed && !req.cancelled, "Request closed");
+
+        req.guardianApproved = true;
+        emit EmergencyGuardianApproved(emergencyId);
+    }
+
+    /**
+     * @notice Execute emergency withdrawal after timelock + guardian approval
+     */
+    function executeEmergencyWithdraw(uint256 emergencyId) external onlyOwner nonReentrant {
+        EmergencyRequest storage req = emergencyRequests[emergencyId];
+        require(!req.executed, "Already executed");
+        require(!req.cancelled, "Cancelled");
+        require(block.timestamp >= req.executeAfter, "Emergency timelock active");
+        require(req.guardianApproved, "Guardian approval required");
+        require(req.amount > 0, "Invalid request");
+
+        req.executed = true;
+
+        if (req.token == address(0)) {
+            (bool success, ) = req.recipient.call{value: req.amount}("");
             require(success, "ETH transfer failed");
         } else {
-            IERC20(token).safeTransfer(recipient, amount);
+            IERC20(req.token).safeTransfer(req.recipient, req.amount);
         }
+
+        emit EmergencyWithdrawalExecuted(emergencyId, req.token, req.recipient, req.amount);
+    }
+
+    /**
+     * @notice Cancel a pending emergency withdrawal
+     */
+    function cancelEmergencyWithdraw(uint256 emergencyId) external onlyOwner {
+        EmergencyRequest storage req = emergencyRequests[emergencyId];
+        require(!req.executed, "Already executed");
+        require(!req.cancelled, "Already cancelled");
+
+        req.cancelled = true;
+        emit EmergencyWithdrawalCancelled(emergencyId);
+    }
+
+    /**
+     * @notice Set emergency guardian (optional co-signer for emergency withdrawals)
+     * @param guardian Address of guardian (address(0) to disable)
+     */
+    function setEmergencyGuardian(address guardian) external onlyOwner {
+        emergencyGuardian = guardian;
+        emit EmergencyGuardianSet(guardian);
     }
 
     // ============ Receive ============

@@ -147,20 +147,29 @@ contract DAOTreasuryFuzzTest is Test {
         treasury.executeWithdrawal(requestId);
     }
 
-    // ============ Fuzz: emergency withdraw bypasses timelock ============
+    // ============ Fuzz: emergency withdraw uses 6-hour timelock ============
 
-    function testFuzz_emergencyBypassesTimelock(uint256 amount) public {
+    function testFuzz_emergencyWithdrawGoverned(uint256 amount) public {
         amount = bound(amount, 1, 10_000_000 ether);
 
         token.mint(address(treasury), amount);
 
+        uint256 emergencyId = treasury.queueEmergencyWithdraw(address(token), recipient, amount);
+
+        // Cannot execute before emergency timelock
+        vm.expectRevert("Emergency timelock active");
+        treasury.executeEmergencyWithdraw(emergencyId);
+
+        // Warp past 6-hour emergency timelock
+        vm.warp(block.timestamp + 6 hours + 1);
+
         uint256 balBefore = token.balanceOf(recipient);
-        treasury.emergencyWithdraw(address(token), recipient, amount);
+        treasury.executeEmergencyWithdraw(emergencyId);
 
         assertEq(
             token.balanceOf(recipient),
             balBefore + amount,
-            "Emergency withdraw should transfer immediately"
+            "Emergency withdraw should transfer after timelock"
         );
     }
 

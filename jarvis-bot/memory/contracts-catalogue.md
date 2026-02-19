@@ -1029,6 +1029,14 @@ import "../monetary/interfaces/IJoule.sol";
 - **Key Functions**: `beforeSwap(bytes32, bytes)`, `afterSwap(bytes32, bytes)`, `setParameters(...)`, `setWindowDuration(uint256)`, `calculateFeeForVolume(uint256)`
 - **Fee Logic**: fee = baseFee below threshold, fee = baseFee + surge increase above threshold, capped at maxFee
 
+### SingleStaking (`contracts/incentives/SingleStaking.sol`)
+- **Type**: Incentive primitive | **Inherits**: ISingleStaking, Ownable, ReentrancyGuard
+- **Purpose**: Synthetix-style single-sided staking — stake any ERC-20, earn reward tokens proportional to share × time
+- **Key Functions**: `stake(uint256)`, `withdraw(uint256)`, `claimReward()`, `exit()`, `notifyRewardAmount(uint256, uint256)`
+- **Views**: `stakingToken()`, `rewardToken()`, `totalStaked()`, `stakeOf(address)`, `earned(address)`, `rewardRate()`, `rewardPerTokenStored()`, `lastUpdateTime()`, `periodFinish()`, `rewardDuration()`
+- **Reward Math**: `rewardPerToken` accumulator for O(1) distribution. Owner calls `notifyRewardAmount(amount, duration)` to start/extend reward period
+- **Solvency**: Checks reward rate doesn't exceed balance/duration; supports same-token staking+rewards
+
 ---
 
 ## Stats
@@ -1037,5 +1045,5 @@ import "../monetary/interfaces/IJoule.sol";
 - **~76 implementation contracts**
 - **~49 interfaces**
 - **~11 libraries**
-- Core: 8 | AMM: 6 (+ 2 curves) | Financial: 9 | Governance: 8 | Incentives: 9 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
+- Core: 8 | AMM: 6 (+ 2 curves) | Financial: 9 | Governance: 8 | Incentives: 10 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
 - **14 Rust crates** (CKB): 4 libraries + 8 scripts + 1 SDK + 1 test crate | **190 Rust tests**

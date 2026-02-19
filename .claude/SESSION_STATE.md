@@ -10,7 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **2627+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **2682+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
 - **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
@@ -62,6 +62,15 @@ This file maintains continuity between Claude Code sessions across devices.
       - Tracks volume per pool per window, fee = base + surge when above threshold
       - Implements BEFORE_SWAP (return fee recommendation) + AFTER_SWAP (record volume)
     - **56 additional tests**: 35 unit (20+15) + 11 fuzz (5+6) + 7 invariant (4+3) — ALL PASSING
+    - **SingleStaking.sol** (~200 lines): Synthetix-style single-sided staking rewards
+      - Stake any ERC-20, earn reward tokens proportional to share × time
+      - `rewardPerToken` accumulator for O(1) reward distribution
+      - notifyRewardAmount starts/extends reward period with solvency check
+      - Same-token staking supported (subtracts staked from balance for solvency)
+      - exit() combines withdraw + claim in single tx
+    - **55 SingleStaking tests**: 39 unit + 8 fuzz + 6 invariant — ALL PASSING
+      - Invariant: totalStaked matches sum of balances, ghost accounting, earned never exceeds reward balance
+      - Bug found: Solidity optimizer inlines `block.timestamp` instead of caching local variable — use hardcoded timestamps
 
 ## Previously Completed (Feb 19, 2026 — Session 33)
 82. **DeFi/DeFAI Layer — 4 New Primitives + Cross-Contract Wiring**

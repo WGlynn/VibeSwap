@@ -3,6 +3,12 @@ name = "compliance-type"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["std"]
+std = ["vibeswap-types/std"]
+ckb = ["dep:ckb-std", "vibeswap-types/no_std"]
+
 [dependencies]
-vibeswap-types = { path = "../../lib/types" }
-sha2 = "0.10"
+vibeswap-types = { path = "../../lib/types", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+ckb-std = { workspace = true, optional = true }

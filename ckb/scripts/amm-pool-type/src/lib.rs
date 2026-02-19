@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "ckb", no_std)]
+
 // ============ AMM Pool Type Script ============
 // CKB type script for constant product AMM pool validation
 //

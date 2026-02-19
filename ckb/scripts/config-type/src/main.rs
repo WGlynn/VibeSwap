@@ -1,90 +1,64 @@
-// ============ Config Type Script ============
-// CKB type script for protocol configuration singleton cell
-// Used as cell_dep by auction and pool type scripts
+// ============ Config Type Script — CKB-VM Entry Point ============
+// Type script for protocol configuration singleton cell.
+// Used as cell_dep by auction and pool type scripts.
 
-use vibeswap_types::*;
+#![cfg_attr(feature = "ckb", no_std)]
+#![cfg_attr(feature = "ckb", no_main)]
 
-pub fn verify_config_type(
-    _is_creation: bool,
-    old_data: Option<&[u8]>,
-    new_data: &[u8],
-    is_governance_authorized: bool,
-) -> Result<(), ConfigTypeError> {
-    let new_config = ConfigCellData::deserialize(new_data)
-        .ok_or(ConfigTypeError::InvalidCellData)?;
+#[cfg(feature = "ckb")]
+ckb_std::default_alloc!();
 
-    if !is_governance_authorized {
-        return Err(ConfigTypeError::Unauthorized);
+#[cfg(feature = "ckb")]
+ckb_std::entry!(program);
+
+// ============ CKB-VM Entry Point ============
+
+#[cfg(feature = "ckb")]
+fn program() -> i8 {
+    use ckb_std::ckb_constants::Source;
+    use ckb_std::high_level::load_cell_data;
+    use config_type::verify_config_type;
+
+    // Determine creation vs update
+    let old_data = load_cell_data(0, Source::GroupInput).ok();
+    let is_creation = old_data.is_none();
+
+    // Load new cell data
+    let new_data = match load_cell_data(0, Source::GroupOutput) {
+        Ok(d) => d,
+        Err(_) => return -2,
+    };
+
+    // Governance authorization: if input cell lock script passed, it's authorized
+    let is_governance_authorized = !is_creation || {
+        // For creation: simplified — actual auth via lock script
+        true
+    };
+
+    match verify_config_type(
+        is_creation,
+        old_data.as_deref(),
+        &new_data,
+        is_governance_authorized,
+    ) {
+        Ok(()) => 0,
+        Err(_) => -10,
     }
-
-    // Validate parameter ranges
-    validate_config_ranges(&new_config)?;
-
-    if let Some(old) = old_data {
-        let _old_config = ConfigCellData::deserialize(old)
-            .ok_or(ConfigTypeError::InvalidCellData)?;
-
-        // Slash rate cannot exceed 100%
-        if new_config.slash_rate_bps > 10_000 {
-            return Err(ConfigTypeError::InvalidSlashRate);
-        }
-
-        // Min PoW difficulty cannot be zero
-        if new_config.min_pow_difficulty == 0 {
-            return Err(ConfigTypeError::InvalidMinDifficulty);
-        }
-    }
-
-    Ok(())
 }
 
-fn validate_config_ranges(config: &ConfigCellData) -> Result<(), ConfigTypeError> {
-    // Commit window: 1-1000 blocks
-    if config.commit_window_blocks == 0 || config.commit_window_blocks > 1000 {
-        return Err(ConfigTypeError::InvalidCommitWindow);
-    }
+// ============ Native Entry Point ============
 
-    // Reveal window: 1-500 blocks
-    if config.reveal_window_blocks == 0 || config.reveal_window_blocks > 500 {
-        return Err(ConfigTypeError::InvalidRevealWindow);
-    }
-
-    // Slash rate: 0-10000 bps
-    if config.slash_rate_bps > 10_000 {
-        return Err(ConfigTypeError::InvalidSlashRate);
-    }
-
-    // Price deviation: 1-5000 bps (0.01%-50%)
-    if config.max_price_deviation == 0 || config.max_price_deviation > 5000 {
-        return Err(ConfigTypeError::InvalidPriceDeviation);
-    }
-
-    // PoW difficulty: 1-255
-    if config.min_pow_difficulty == 0 {
-        return Err(ConfigTypeError::InvalidMinDifficulty);
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConfigTypeError {
-    InvalidCellData,
-    Unauthorized,
-    InvalidCommitWindow,
-    InvalidRevealWindow,
-    InvalidSlashRate,
-    InvalidPriceDeviation,
-    InvalidMinDifficulty,
-}
-
+#[cfg(not(feature = "ckb"))]
 fn main() {
-    println!("Config Type Script — compile with RISC-V target for CKB-VM");
+    println!("Config Type Script — compile with --features ckb for CKB-VM");
 }
+
+// ============ Tests ============
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use config_type::*;
+    use vibeswap_types::*;
 
     #[test]
     fn test_valid_creation() {

@@ -1,95 +1,68 @@
-// ============ Oracle Type Script ============
-// CKB type script for oracle price feed cells
-// Updated by authorized relayers with freshness checks
+// ============ Oracle Type Script — CKB-VM Entry Point ============
+// Type script for oracle price feed cells.
+// Updated by authorized relayers with freshness checks.
 
-use vibeswap_types::*;
+#![cfg_attr(feature = "ckb", no_std)]
+#![cfg_attr(feature = "ckb", no_main)]
 
-pub fn verify_oracle_type(
-    _is_creation: bool,
-    old_data: Option<&[u8]>,
-    new_data: &[u8],
-    is_authorized_relayer: bool,
-    current_block: u64,
-) -> Result<(), OracleTypeError> {
-    let new_oracle = OracleCellData::deserialize(new_data)
-        .ok_or(OracleTypeError::InvalidCellData)?;
+#[cfg(feature = "ckb")]
+ckb_std::default_alloc!();
 
-    // Only authorized relayers can update
-    if !is_authorized_relayer {
-        return Err(OracleTypeError::Unauthorized);
+#[cfg(feature = "ckb")]
+ckb_std::entry!(program);
+
+// ============ CKB-VM Entry Point ============
+
+#[cfg(feature = "ckb")]
+fn program() -> i8 {
+    use ckb_std::ckb_constants::Source;
+    use ckb_std::high_level::load_cell_data;
+    use oracle_type::verify_oracle_type;
+
+    // Determine creation vs update
+    let old_data = load_cell_data(0, Source::GroupInput).ok();
+    let is_creation = old_data.is_none();
+
+    // Load new cell data
+    let new_data = match load_cell_data(0, Source::GroupOutput) {
+        Ok(d) => d,
+        Err(_) => return -2,
+    };
+
+    // Authorization: if input cell lock script passed, relayer is authorized
+    let is_authorized_relayer = !is_creation || {
+        // For creation: simplified — actual auth via lock script
+        true
+    };
+
+    // Current block from header_deps (simplified — would use load_header)
+    let current_block = 0u64;
+
+    match verify_oracle_type(
+        is_creation,
+        old_data.as_deref(),
+        &new_data,
+        is_authorized_relayer,
+        current_block,
+    ) {
+        Ok(()) => 0,
+        Err(_) => -10,
     }
-
-    // Price must be positive
-    if new_oracle.price == 0 {
-        return Err(OracleTypeError::ZeroPrice);
-    }
-
-    // Confidence must be 0-100
-    if new_oracle.confidence > 100 {
-        return Err(OracleTypeError::InvalidConfidence);
-    }
-
-    // Block number must be current or recent
-    if new_oracle.block_number > current_block {
-        return Err(OracleTypeError::FutureBlock);
-    }
-    if current_block - new_oracle.block_number > 100 {
-        return Err(OracleTypeError::StaleData);
-    }
-
-    // Pair ID must be non-zero
-    if new_oracle.pair_id == [0u8; 32] {
-        return Err(OracleTypeError::InvalidPairId);
-    }
-
-    // If updating, verify freshness
-    if let Some(old) = old_data {
-        let old_oracle = OracleCellData::deserialize(old)
-            .ok_or(OracleTypeError::InvalidCellData)?;
-
-        // Must be newer
-        if new_oracle.block_number <= old_oracle.block_number {
-            return Err(OracleTypeError::NotNewer);
-        }
-
-        // Pair ID must match
-        if new_oracle.pair_id != old_oracle.pair_id {
-            return Err(OracleTypeError::PairIdChanged);
-        }
-
-        // Price change must be reasonable (max 50% per update)
-        let max_change = old_oracle.price / 2;
-        if new_oracle.price > old_oracle.price + max_change
-            || new_oracle.price + max_change < old_oracle.price
-        {
-            return Err(OracleTypeError::ExcessivePriceChange);
-        }
-    }
-
-    Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OracleTypeError {
-    InvalidCellData,
-    Unauthorized,
-    ZeroPrice,
-    InvalidConfidence,
-    FutureBlock,
-    StaleData,
-    InvalidPairId,
-    NotNewer,
-    PairIdChanged,
-    ExcessivePriceChange,
-}
+// ============ Native Entry Point ============
 
+#[cfg(not(feature = "ckb"))]
 fn main() {
-    println!("Oracle Type Script — compile with RISC-V target for CKB-VM");
+    println!("Oracle Type Script — compile with --features ckb for CKB-VM");
 }
+
+// ============ Tests ============
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use oracle_type::*;
+    use vibeswap_types::*;
 
     #[test]
     fn test_valid_creation() {

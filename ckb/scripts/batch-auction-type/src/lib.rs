@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "ckb", no_std)]
+
 // ============ Batch Auction Type Script ============
 // The CORE CKB type script for VibeSwap's commit-reveal batch auction
 //

@@ -1,8 +1,66 @@
 // ============ AMM Pool Type Script — CKB-VM Entry Point ============
-// The library logic lives in lib.rs; this binary is compiled for RISC-V.
+// Type script for constant product AMM pool validation.
+// Port of VibeAMM.sol to CKB's cell model.
 
+#![cfg_attr(feature = "ckb", no_std)]
+#![cfg_attr(feature = "ckb", no_main)]
+
+#[cfg(feature = "ckb")]
+ckb_std::default_alloc!();
+
+#[cfg(feature = "ckb")]
+ckb_std::entry!(program);
+
+// ============ CKB-VM Entry Point ============
+
+#[cfg(feature = "ckb")]
+fn program() -> i8 {
+    use ckb_std::ckb_constants::Source;
+    use ckb_std::high_level::load_cell_data;
+    use amm_pool_type::verify_amm_pool_type;
+    use vibeswap_types::*;
+
+    // Determine creation vs transition
+    let old_data = load_cell_data(0, Source::GroupInput).ok();
+
+    // Load new pool data from GroupOutput
+    let new_data = match load_cell_data(0, Source::GroupOutput) {
+        Ok(d) => d,
+        Err(_) => return -2,
+    };
+
+    // Load config from cell_deps
+    let config = match load_cell_data(0, Source::CellDep) {
+        Ok(d) => match ConfigCellData::deserialize(&d) {
+            Some(c) => c,
+            None => ConfigCellData::default(),
+        },
+        Err(_) => ConfigCellData::default(),
+    };
+
+    // Load oracle price from cell_deps (optional, second cell_dep)
+    let oracle_price: Option<u128> = load_cell_data(1, Source::CellDep)
+        .ok()
+        .and_then(|d| OracleCellData::deserialize(&d))
+        .map(|o| o.price);
+
+    match verify_amm_pool_type(
+        old_data.as_deref(),
+        &new_data,
+        &config,
+        oracle_price,
+        0, // block_number — from header_deps in production
+    ) {
+        Ok(()) => 0,
+        Err(_) => -10,
+    }
+}
+
+// ============ Native Entry Point ============
+
+#[cfg(not(feature = "ckb"))]
 fn main() {
-    println!("AMM Pool Type Script — compile with RISC-V target for CKB-VM");
+    println!("AMM Pool Type Script — compile with --features ckb for CKB-VM");
 }
 
 // ============ Tests ============

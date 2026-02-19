@@ -1,84 +1,71 @@
-// ============ LP Position Type Script ============
-// CKB type script for tracking per-user LP positions
-// No contention — each user has their own LP position cells
+// ============ LP Position Type Script — CKB-VM Entry Point ============
+// Type script for tracking per-user LP positions.
+// No contention — each user has their own LP position cells.
 
-use vibeswap_types::*;
+#![cfg_attr(feature = "ckb", no_std)]
+#![cfg_attr(feature = "ckb", no_main)]
 
-// ============ Script Entry Point ============
+#[cfg(feature = "ckb")]
+ckb_std::default_alloc!();
 
-pub fn verify_lp_position_type(
-    is_creation: bool,
-    cell_data: &[u8],
-    pool_data: Option<&PoolCellData>,
-) -> Result<(), LPPositionError> {
-    let position = LPPositionCellData::deserialize(cell_data)
-        .ok_or(LPPositionError::InvalidCellData)?;
+#[cfg(feature = "ckb")]
+ckb_std::entry!(program);
 
-    if is_creation {
-        validate_creation(&position, pool_data)
-    } else {
-        validate_consumption(&position)
-    }
-}
+// ============ CKB-VM Entry Point ============
 
-fn validate_creation(
-    position: &LPPositionCellData,
-    pool_data: Option<&PoolCellData>,
-) -> Result<(), LPPositionError> {
-    // LP amount must be positive
-    if position.lp_amount == 0 {
-        return Err(LPPositionError::ZeroLPAmount);
-    }
+#[cfg(feature = "ckb")]
+fn program() -> i8 {
+    use ckb_std::ckb_constants::Source;
+    use ckb_std::high_level::load_cell_data;
+    use lp_position_type::verify_lp_position_type;
+    use vibeswap_types::PoolCellData;
 
-    // Pool ID must be non-zero
-    if position.pool_id == [0u8; 32] {
-        return Err(LPPositionError::InvalidPoolId);
-    }
+    // Determine creation vs consumption
+    let has_group_input = load_cell_data(0, Source::GroupInput).is_ok();
+    let has_group_output = load_cell_data(0, Source::GroupOutput).is_ok();
+    let is_creation = !has_group_input && has_group_output;
 
-    // If pool data is available, verify entry price matches current TWAP
-    if let Some(pool) = pool_data {
-        let current_price = pool.reserve1
-            .checked_mul(PRECISION)
-            .ok_or(LPPositionError::Overflow)?
-            / pool.reserve0;
-
-        // Entry price should be within 1% of current price
-        let deviation = if position.entry_price > current_price {
-            (position.entry_price - current_price) * 10_000 / current_price
-        } else {
-            (current_price - position.entry_price) * 10_000 / current_price
-        };
-
-        if deviation > 100 {
-            return Err(LPPositionError::EntryPriceDeviation);
+    // Load the LP position cell data
+    let cell_data = if is_creation {
+        match load_cell_data(0, Source::GroupOutput) {
+            Ok(d) => d,
+            Err(_) => return -2,
         }
+    } else {
+        match load_cell_data(0, Source::GroupInput) {
+            Ok(d) => d,
+            Err(_) => return -2,
+        }
+    };
+
+    // Try to load pool data from cell_deps for price verification
+    let pool_data: Option<PoolCellData> = load_cell_data(0, Source::CellDep)
+        .ok()
+        .and_then(|d| PoolCellData::deserialize(&d));
+
+    match verify_lp_position_type(
+        is_creation,
+        &cell_data,
+        pool_data.as_ref(),
+    ) {
+        Ok(()) => 0,
+        Err(_) => -10,
     }
-
-    Ok(())
 }
 
-fn validate_consumption(_position: &LPPositionCellData) -> Result<(), LPPositionError> {
-    // LP cells can be consumed (burned) when removing liquidity
-    // The pool type script validates that the correct amount is returned
-    Ok(())
-}
+// ============ Native Entry Point ============
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LPPositionError {
-    InvalidCellData,
-    ZeroLPAmount,
-    InvalidPoolId,
-    Overflow,
-    EntryPriceDeviation,
-}
-
+#[cfg(not(feature = "ckb"))]
 fn main() {
-    println!("LP Position Type Script — compile with RISC-V target for CKB-VM");
+    println!("LP Position Type Script — compile with --features ckb for CKB-VM");
 }
+
+// ============ Tests ============
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use lp_position_type::*;
+    use vibeswap_types::*;
 
     #[test]
     fn test_valid_creation() {

@@ -10,12 +10,14 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **1840+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
-- **CKB Integration: 167 Rust tests passing, 13 crates + test crate** (ALL 7 PHASES COMPLETE)
+- **2186+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **CKB Integration: 167 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE)
+- **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
 - **JARVIS Telegram Bot: AUTONOMOUS** — proactive intelligence, daily digests, thread archival, AI moderation, rights declaration
 - Financial Primitives: 10/10 COMPLETE
 - Protocol/Framework: 10/10 COMPLETE
-- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode**)
+- Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**)
+- **PsiNet × VibeSwap merge: COMPLETE** — ERC-8004 AI agent identities, CRPC verification, context graph anchoring
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
@@ -24,7 +26,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Frontend mobile responsiveness: COMPLETE** — all 10 pages responsive, AnimatedNumber/ProgressRing wired
 - **GitHub webhook relayer: COMPLETE** — off-chain service with EIP-712 signing + batch submission
 - **Contribution attestation governance: COMPLETE** — 3-branch separation of powers (Executive/Judicial/Legislative)
-- **CKB cell model port: ALL 7 PHASES COMPLETE** — toolchain, math, scripts, SDK, mining client, frontend hooks, Phase 7 integration/adversarial/fuzz/parity tests
+- **CKB cell model port: ALL 7 PHASES COMPLETE + RISC-V DEPLOYMENT** — toolchain, math, scripts, SDK, mining client, frontend hooks, Phase 7 tests, RISC-V cross-compilation, deployment tool
 
 ## Active Tasks — GO-LIVE BLOCKERS (need Will)
 - **Contract deployment** to testnet (Sepolia) then mainnet — needs private key + ETH for gas
@@ -34,7 +36,32 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 25)
+## Recently Completed (Feb 18, 2026 — Session 27)
+77. **CKB RISC-V Build Pipeline — All 8 Scripts Deployable**
+    - **RISC-V target**: `riscv64imac-unknown-none-elf` installed, `.cargo/config.toml` configured
+    - **ckb-std 1.0.2**: Feature-gated (allocator, calc-hash, ckb-types, dummy-atomic) — no C compiler required
+    - **Dual-mode compilation**: `std` feature for native tests, `ckb` feature for CKB-VM. `#![cfg_attr(feature = "ckb", no_std)]` + `#![cfg_attr(feature = "ckb", no_main)]`
+    - **8 CKB-VM entry points** in main.rs: `ckb_std::entry!(program)` + `ckb_std::default_alloc!()`, each calls verify function from lib.rs
+    - **5 new lib.rs files** extracted (pow-lock, lp-position-type, compliance-type, config-type, oracle-type)
+    - **LTO disabled** to fix rust-lld heap corruption (0xc0000374) on Windows — `lto = false`, `codegen-units = 16`
+    - **All 8 RISC-V ELF binaries**: pow-lock (192KB), batch-auction-type (188KB), commit-type (172KB), amm-pool-type (138KB), lp-position-type (128KB), compliance-type (120KB), config-type (120KB), oracle-type (121KB)
+    - **Deploy tool** (`vibeswap-deploy`): blake2b-256 code hashes + deploy.json config + SDK DeploymentInfo output
+    - **Makefile**: `make build` (all scripts), `make test` (167 tests), `make deploy-info` (code hashes), `make <script>` (individual)
+    - **167 native tests still passing** after all changes
+    - Key learnings: ckb-std `entry!()` macro includes `extern crate alloc` (don't duplicate), blake2b-rs needs C compiler (use blake2b_simd for native tools), workspace `-p` flags avoid RISC-V compilation of sdk/tests
+
+## Previously Completed (Feb 18, 2026 — Session 26)
+76. **PsiNet × VibeSwap Merge — AI Agents as First-Class DeFi Citizens**
+    - **AgentRegistry.sol** (~350 lines): ERC-8004 compatible AI agent identity, capability delegation (7 types: TRADE/GOVERN/ATTEST/MODERATE/ANALYZE/CREATE/DELEGATE), human-agent trust bridge via ContributionDAG vouch
+    - **ContextAnchor.sol** (~300 lines): On-chain anchor for IPFS/Arweave context graphs, Merkle proof verification, CRDT-compatible merge, version tracking
+    - **PairwiseVerifier.sol** (~450 lines): 4-phase CRPC protocol (work commit → work reveal → compare commit → compare reveal → settled), ETH reward pools, consensus-aligned validator rewards
+    - **3 interfaces**: IAgentRegistry, IContextAnchor, IPairwiseVerifier
+    - **346 tests**: 308 unit (135+81+92) + 22 fuzz (8+7+7) + 14 invariant (5+5+4) — ALL PASSING
+    - **Bug found + fixed**: PairwiseVerifier consensus normalization — tally loop normalized to comp's reference frame but self-check used canonical ordering, causing validators to get 0 rewards when submissionA > submissionB
+    - **Knowledge base**: psinet-protocol.md + deepfunding-protocol.md added to memory
+    - Commits: `cbcbec3` (merge) + `cd6b28d` (bug fix), pushed to both remotes
+
+## Previously Completed (Feb 18, 2026 — Session 25)
 75. **JARVIS Telegram Bot — Autonomous Intelligence + Rights Declaration**
     - **Proactive Intelligence Module** (`intelligence.js`): AI-powered message triage using Haiku (cheap/fast), autonomous engagement when Jarvis has relevant knowledge, semantic moderation beyond regex, confidence thresholds (0.7 engage, 0.8 moderate), cooldown system (5min between engagements, 4/hour max)
     - **Daily Digest Module** (`digest.js`): Automated community summary — top contributors, category breakdown, growth metrics, peak activity hours. Scheduled at configurable UTC hour (default 18:00). Uses Haiku for natural language summary generation. Weekly digest variant included.

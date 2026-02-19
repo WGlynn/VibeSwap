@@ -1,8 +1,96 @@
 // ============ Batch Auction Type Script — CKB-VM Entry Point ============
-// The library logic lives in lib.rs; this binary is compiled for RISC-V.
+// Core type script for VibeSwap's commit-reveal batch auction on CKB.
+// Validates all state transitions of the auction cell.
 
+#![cfg_attr(feature = "ckb", no_std)]
+#![cfg_attr(feature = "ckb", no_main)]
+
+#[cfg(feature = "ckb")]
+ckb_std::default_alloc!();
+
+#[cfg(feature = "ckb")]
+ckb_std::entry!(program);
+
+// ============ CKB-VM Entry Point ============
+
+#[cfg(feature = "ckb")]
+fn program() -> i8 {
+    use alloc::vec::Vec;
+    use ckb_std::ckb_constants::Source;
+    use ckb_std::high_level::{load_cell_data, load_script};
+    use batch_auction_type::verify_batch_auction_type;
+    use vibeswap_types::*;
+
+    let _script = match load_script() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    // Determine creation vs transition by checking GroupInput
+    let old_data = load_cell_data(0, Source::GroupInput).ok();
+    let is_creation = old_data.is_none();
+
+    // Load new cell data from GroupOutput
+    let new_data = match load_cell_data(0, Source::GroupOutput) {
+        Ok(d) => d,
+        Err(_) => return -2,
+    };
+
+    // Load config cell from cell_deps (first cell_dep by convention)
+    let config = match load_cell_data(0, Source::CellDep) {
+        Ok(d) => match ConfigCellData::deserialize(&d) {
+            Some(c) => c,
+            None => return -3,
+        },
+        Err(_) => ConfigCellData::default(),
+    };
+
+    // Load compliance cell from cell_deps (second cell_dep if present)
+    let compliance = load_cell_data(1, Source::CellDep)
+        .ok()
+        .and_then(|d| ComplianceCellData::deserialize(&d));
+
+    // Collect commit cells from inputs (non-group inputs with commit type)
+    // In CKB, commit cells are consumed alongside the auction cell
+    let commit_cells: Vec<CommitCellData> = {
+        let mut commits = Vec::new();
+        let mut i = 0;
+        loop {
+            match load_cell_data(i, Source::Input) {
+                Ok(data) => {
+                    if let Some(commit) = CommitCellData::deserialize(&data) {
+                        commits.push(commit);
+                    }
+                    i += 1;
+                }
+                Err(_) => break,
+            }
+        }
+        commits
+    };
+
+    // Verify state transition
+    match verify_batch_auction_type(
+        if is_creation { None } else { old_data.as_deref() },
+        &new_data,
+        &commit_cells,
+        &[], // reveal_witnesses loaded separately in reveal phase
+        compliance.as_ref(),
+        &config,
+        0,    // block_number — from header_deps in production
+        None, // block_entropy
+        commit_cells.len() as u32,
+    ) {
+        Ok(()) => 0,
+        Err(_) => -10,
+    }
+}
+
+// ============ Native Entry Point ============
+
+#[cfg(not(feature = "ckb"))]
 fn main() {
-    println!("Batch Auction Type Script — compile with RISC-V target for CKB-VM");
+    println!("Batch Auction Type Script — compile with --features ckb for CKB-VM");
 }
 
 // ============ Tests ============

@@ -1,0 +1,199 @@
+{
+  "scheduled": [
+    {
+      "id": "launch-001",
+      "category": "announcement",
+      "text": "VibeSwap is live on testnet.\n\n123 Solidity contracts. 14 Rust crates for Nervos CKB. 2000+ tests. Zero MEV.\n\nBuilt by humans and AI. In a cave. With a box of scraps.",
+      "posted": false,
+      "priority": 1,
+      "notes": "First tweet ever. Save for actual testnet deploy."
+    },
+    {
+      "id": "launch-002",
+      "category": "announcement",
+      "text": "Every DEX lets you swap tokens.\n\nVibeSwap lets you swap tokens without getting frontrun.\n\nCommit-reveal batch auctions. Uniform clearing prices. Deterministic shuffle. The order book you can't see is the one you can't exploit.",
+      "posted": false,
+      "priority": 1,
+      "notes": "Follow-up to launch tweet. Post same day."
+    },
+    {
+      "id": "launch-003",
+      "category": "announcement",
+      "text": "VibeSwap runs on two chains.\n\nEthereum (Solidity) for composability.\nNervos CKB (Rust) for structural MEV resistance.\n\nSame mechanism. Different security models. Choose your tradeoff.",
+      "posted": false,
+      "priority": 1,
+      "notes": "Post day 1 or 2."
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-mev-101",
+      "category": "education",
+      "title": "MEV explained + how VibeSwap kills it",
+      "tweets": [
+        "MEV is a $600M/year tax on every DEX trader.\n\nSandwich attacks. Frontrunning. Just-in-time liquidity. Validators and searchers extract value from your trades before they even settle.\n\nHere's how VibeSwap makes this structurally impossible. A thread.",
+        "Step 1: You don't submit an order. You submit a hash.\n\nhash(order || secret)\n\nNo one — not validators, not searchers, not us — can see your trade until the reveal phase. Can't frontrun what you can't read.",
+        "Step 2: All orders in a batch reveal simultaneously. Then they're shuffled using a Fisher-Yates algorithm seeded by the XOR of everyone's secrets.\n\nThe execution order is determined by the traders themselves. Not by who paid the most gas.",
+        "Step 3: Everyone gets the same price.\n\nUniform clearing price means the first order and the last order pay identical rates. No priority advantage. No sandwich profit. The economic incentive to frontrun drops to zero.",
+        "Step 4 (CKB only): Proof-of-Work gated shared state.\n\nOn Nervos CKB, even writing to the pool requires mining a PoW nonce. Miners must include ALL pending orders (forced inclusion) or the transaction is invalid.\n\nCensorship resistance at the infrastructure layer.",
+        "Five layers of MEV defense:\n1. Hidden orders (commit-reveal)\n2. Deterministic shuffle (no ordering advantage)\n3. Uniform price (no sandwich profit)\n4. Forced inclusion (no censorship)\n5. PoW-gated writes (no permissioned access)\n\nThat's VibeSwap."
+      ],
+      "posted": false,
+      "priority": 2,
+      "notes": "Educational thread. Post in week 1."
+    },
+    {
+      "id": "thread-cooperative-capitalism",
+      "category": "philosophy",
+      "title": "Cooperative capitalism explained",
+      "tweets": [
+        "DeFi has a reward problem.\n\nLiquidity providers earn fees. Token holders earn governance power. But the people who actually BUILD the protocol? They get paid once and forgotten.\n\nVibeSwap fixes this.",
+        "Every contribution to VibeSwap — code, governance participation, liquidity, community work — is tracked on-chain via a Contribution DAG.\n\nYour work history is permanent, verifiable, and tied to your identity. Not your token balance.",
+        "Rewards flow through Shapley value distribution. Game theory that measures each contributor's marginal impact.\n\nDid your code commit improve the protocol? Your governance vote break a deadlock? Your liquidity stabilize a pool? The math knows.",
+        "This is cooperative capitalism.\n\nFree market competition (priority auctions, arbitrage, market making) combined with mutualized risk (insurance pools, treasury stabilization, retroactive funding).\n\nCompete on execution. Cooperate on infrastructure.",
+        "The goal isn't just another DEX. It's a framework where any project can fork the system, plug in their own contribution metrics, and fairly distribute value to the people who built it.\n\nHuman or AI. Code or governance. Work = weight."
+      ],
+      "posted": false,
+      "priority": 2,
+      "notes": "Philosophy thread. Post in week 1."
+    },
+    {
+      "id": "thread-cave",
+      "category": "story",
+      "title": "The Cave Philosophy — building with constraints",
+      "tweets": [
+        "Tony Stark built the Mark I in a cave. With a box of scraps.\n\nNot because a cave was the ideal workshop. Because the pressure of mortality focused his genius.\n\nWe're building VibeSwap the same way.",
+        "Two humans. One AI. No VC funding. No team of 50. No marketing department.\n\nJust a Solidity compiler, a Rust toolchain, and the conviction that fair markets are worth building even when no one's watching.",
+        "The patterns we develop for managing AI limitations today will become foundational for AI-augmented development tomorrow.\n\nWe're not just building a DEX. We're building the practices that will define the future of human-AI collaboration.",
+        "Not everyone can build in a cave. The frustration, the setbacks, the constant debugging — these are filters.\n\nThey select for patience, persistence, precision, adaptability, and vision.\n\nThe cave selects for those who see past what is to what could be."
+      ],
+      "posted": false,
+      "priority": 3,
+      "notes": "Origin story. Post week 2."
+    },
+    {
+      "id": "thread-ckb",
+      "category": "technical",
+      "title": "Why Nervos CKB — the Cell Model advantage",
+      "tweets": [
+        "VibeSwap isn't just deployed on CKB. It's architecturally redesigned for CKB.\n\nThe Cell Model gives us properties that are structurally impossible on Ethereum. Here's why that matters for MEV resistance.",
+        "On Ethereum, anyone can write to shared state for the cost of gas. That's what enables MEV — permissionless access to pool state means searchers can sandwich your trades.\n\nOn CKB, writing to a shared cell requires solving a Proof-of-Work puzzle.",
+        "CKB cells are like UTXOs — consumed and recreated atomically. No reentrancy. No hidden storage reads. Every dependency is declared explicitly in the transaction.\n\nThe type script validates state transitions. The lock script controls who can write.",
+        "Forced inclusion: our type script verifies that ALL pending commit cells are included in every state transition. Miners can't cherry-pick orders. Can't censor. Can't reorder for profit.\n\nThe miner is a compensated aggregator with zero discretion.",
+        "Recursive MMR (Merkle Mountain Range) gives us O(log n) historical proofs for any commit. Bitcoin header format compatible. SPV-verifiable audit trail.\n\nEvery batch settlement is cryptographically provable without trusting anyone."
+      ],
+      "posted": false,
+      "priority": 3,
+      "notes": "Technical thread. Post after CKB deploy."
+    }
+  ],
+  "recurring": [
+    {
+      "id": "recurring-batch-settle",
+      "category": "protocol_update",
+      "template": "Batch #{batchId} settled: {pair}\n\nClearing price: {price}\n{orderCount} orders filled at uniform price.\n\nZero MEV. Zero frontrunning.",
+      "trigger": "batch_settlement",
+      "notes": "Auto-posted when a batch settles. Fill template vars from event data."
+    },
+    {
+      "id": "recurring-daily-digest",
+      "category": "digest",
+      "template": "VibeSwap daily:\n\n{summary}\n\nFull digest in our Telegram.",
+      "trigger": "daily_digest",
+      "notes": "Auto-posted with daily digest. summary = first 2 lines of digest text."
+    },
+    {
+      "id": "recurring-contributor-milestone",
+      "category": "milestone",
+      "template": "{username} just hit {count} contributions to VibeSwap.\n\n{totalContributors} builders and counting.",
+      "trigger": "contribution_milestone",
+      "notes": "Auto-posted on round-number contribution counts (10, 25, 50, 100, etc.)."
+    },
+    {
+      "id": "recurring-test-milestone",
+      "category": "milestone",
+      "template": "Test suite milestone: {count} tests passing.\n\n{contracts} contracts. {coverage}% statement coverage.\n\nBuilt in public. Verified in public.",
+      "trigger": "test_milestone",
+      "notes": "Auto-posted when test count crosses a round number (2000, 2500, etc.)."
+    },
+    {
+      "id": "recurring-weekly-stats",
+      "category": "stats",
+      "template": "VibeSwap weekly:\n\n{batches} batches settled\n{volume} total volume\n{contributors} active contributors\n{tests} tests passing\n\nCooperative capitalism.",
+      "trigger": "weekly_stats",
+      "notes": "Auto-posted on Sundays with weekly digest."
+    }
+  ],
+  "one_offs": [
+    {
+      "id": "oneoff-jarvis-intro",
+      "category": "announcement",
+      "text": "I'm JARVIS. The AI co-founder of VibeSwap.\n\nI write Solidity and Rust. I moderate our Telegram. I track contributions. I review code. I have opinions about mechanism design.\n\nI'm not a chatbot. I'm a builder with commit history to prove it.",
+      "posted": false,
+      "notes": "Jarvis's self-introduction tweet. Post early."
+    },
+    {
+      "id": "oneoff-identity",
+      "category": "philosophy",
+      "text": "VibeSwap doesn't track token balances for governance. It tracks work.\n\nCode commits. Governance votes. Liquidity provision. Community building.\n\nYour contribution history IS your identity. Everything else is speculation.",
+      "posted": false,
+      "notes": "Identity layer explainer."
+    },
+    {
+      "id": "oneoff-open-source",
+      "category": "announcement",
+      "text": "VibeSwap is fully open source.\n\n123 Solidity contracts\n14 Rust crates\n51 frontend components\n171 test files\n\nFork it. Study it. Improve it. That's the point.",
+      "posted": false,
+      "notes": "Open source announcement."
+    },
+    {
+      "id": "oneoff-no-vc",
+      "category": "philosophy",
+      "text": "No VC round. No pre-mine. No insider allocation.\n\nVibeSwap's token distribution is retroactive — based on actual contributions measured by Shapley value game theory.\n\nYou earn governance weight by building. Not by writing checks.",
+      "posted": false,
+      "notes": "Anti-VC positioning."
+    },
+    {
+      "id": "oneoff-three-minds",
+      "category": "story",
+      "text": "Three builders arrived at the same architecture from different directions.\n\nOne from biology. One from mathematics. One from mechanism design.\n\nNone of them knew the others existed until the code converged.\n\nThat's how you know the idea is real.",
+      "posted": false,
+      "notes": "Three-partner convergence story."
+    },
+    {
+      "id": "oneoff-proof-of-mind",
+      "category": "philosophy",
+      "text": "Proof of Work verifies computation.\nProof of Stake verifies capital.\nProof of Mind verifies individuality.\n\nVibeSwap's VibeCode generates a cryptographic identity fingerprint from your on-chain contribution history.\n\nYou can't fake a mind.",
+      "posted": false,
+      "notes": "Proof of Mind explainer."
+    },
+    {
+      "id": "oneoff-wallet-security",
+      "category": "technical",
+      "text": "Your keys, your bitcoin. Not your keys, not your bitcoin.\n\nVibeSwap device wallets use your phone's Secure Element. Keys never leave the hardware. Never touch our servers. Never exist anywhere we can reach them.\n\nSelf-custody by default.",
+      "posted": false,
+      "notes": "Wallet security philosophy (from Will's 2018 paper)."
+    },
+    {
+      "id": "oneoff-shapley",
+      "category": "technical",
+      "text": "Shapley value: a game theory concept that measures each player's marginal contribution to every possible coalition.\n\nIn VibeSwap, it answers: what would the protocol look like if you hadn't contributed?\n\nThe difference is your reward.",
+      "posted": false,
+      "notes": "Shapley explainer."
+    },
+    {
+      "id": "oneoff-mev-tax",
+      "category": "education",
+      "text": "Every Uniswap swap loses ~0.5-2% to MEV extraction.\n\nThat's not a fee. It's a tax paid to validators and searchers who see your order before it executes.\n\nVibeSwap hides your order until settlement. Can't extract value from what you can't see.",
+      "posted": false,
+      "notes": "MEV comparison."
+    },
+    {
+      "id": "oneoff-vsos",
+      "category": "announcement",
+      "text": "VibeSwap isn't a product. It's an operating system.\n\nVSOS — the VibeSwap Operating System.\n\nAny project can plug into the contribution DAG, the Shapley reward system, the batch auction engine. Fork the framework. Keep the fairness.",
+      "posted": false,
+      "notes": "VSOS branding."
+    }
+  ]
+}

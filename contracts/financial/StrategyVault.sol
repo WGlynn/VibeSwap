@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IStrategyVault.sol";
+import "../core/interfaces/IFeeRouter.sol";
 
 /**
  * @title StrategyVault
@@ -53,6 +54,7 @@ contract StrategyVault is ERC4626, Ownable, ReentrancyGuard, IStrategyVault {
     uint256 private _lastHarvestTime;
     bool private _emergencyShutdown;
     uint256 private _strategyTimelock;
+    address private _feeRouter; // optional: route fees through FeeRouter for cooperative distribution
 
     // ============ Constructor ============
 
@@ -196,9 +198,14 @@ contract StrategyVault is ERC4626, Ownable, ReentrancyGuard, IStrategyVault {
             totalFee = received; // fees can't exceed profit
         }
 
-        // Transfer fees to recipient
+        // Transfer fees: through FeeRouter (cooperative) or directly to recipient
         if (totalFee > 0) {
-            IERC20(asset()).safeTransfer(_feeRecipient, totalFee);
+            if (_feeRouter != address(0)) {
+                IERC20(asset()).safeIncreaseAllowance(_feeRouter, totalFee);
+                IFeeRouter(_feeRouter).collectFee(asset(), totalFee);
+            } else {
+                IERC20(asset()).safeTransfer(_feeRecipient, totalFee);
+            }
         }
 
         _lastHarvestTime = block.timestamp;
@@ -248,6 +255,11 @@ contract StrategyVault is ERC4626, Ownable, ReentrancyGuard, IStrategyVault {
         _strategyTimelock = timelock;
     }
 
+    function setFeeRouter(address router) external onlyOwner {
+        _feeRouter = router;
+        emit FeeRouterUpdated(router);
+    }
+
     // ============ Views ============
 
     function strategy() external view returns (address) { return _strategy; }
@@ -260,6 +272,7 @@ contract StrategyVault is ERC4626, Ownable, ReentrancyGuard, IStrategyVault {
     function lastHarvestTime() external view returns (uint256) { return _lastHarvestTime; }
     function emergencyShutdownActive() external view returns (bool) { return _emergencyShutdown; }
     function strategyTimelock() external view returns (uint256) { return _strategyTimelock; }
+    function feeRouter() external view returns (address) { return _feeRouter; }
 
     // ============ Internal ============
 

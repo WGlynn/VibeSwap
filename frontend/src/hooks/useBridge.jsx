@@ -2,8 +2,10 @@ import { useState, useCallback, useRef } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from './useWallet'
 import { useDeviceWallet } from './useDeviceWallet'
+import { useCKBWallet } from './useCKBWallet'
 import { useBalances } from './useBalances'
 import { CONTRACTS, LZ_ENDPOINTS, SUPPORTED_CHAINS, areContractsDeployed } from '../utils/constants'
+import { isCKBChain } from '../utils/ckb-constants'
 import CrossChainRouterABI from '../abis/CrossChainRouter.json'
 
 // ============ Bridge State Machine ============
@@ -38,7 +40,11 @@ const DEFAULT_LZ_OPTIONS = ethers.AbiCoder.defaultAbiCoder().encode(
 export function useBridge() {
   const { provider, signer, chainId, account } = useWallet()
   const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
+  const { isConnected: isCKBConnected, chainId: ckbChainId, address: ckbAddress } = useCKBWallet()
   const { simulateSend, refresh } = useBalances()
+
+  // ============ CKB Detection ============
+  const isCKB = isCKBConnected && isCKBChain(ckbChainId)
 
   // ============ State ============
   const [bridgeState, setBridgeState] = useState('idle')
@@ -46,12 +52,13 @@ export function useBridge() {
   const [lastBridge, setLastBridge] = useState(null)
   const timeoutRefs = useRef([])
 
-  // Determine live vs demo
-  const isLive = areContractsDeployed(chainId)
+  // Determine live vs demo (CKB bridge not yet available)
+  const isLive = isCKB ? false : areContractsDeployed(chainId)
   const isLoading = ['approving', 'burning', 'in_transit'].includes(bridgeState)
+  const isCKBBridgeUnavailable = isCKB // CKB↔EVM bridge coming in future release
 
   // Active wallet address
-  const activeAccount = account || deviceAddress
+  const activeAccount = isCKB ? ckbAddress : (account || deviceAddress)
 
   // ============ Helpers ============
 
@@ -335,6 +342,8 @@ export function useBridge() {
     bridgeState,
     isLoading,
     error,
+    isCKB,
+    isCKBBridgeUnavailable,
 
     // Gas estimation
     estimateGas,

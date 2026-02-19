@@ -30,7 +30,7 @@ opt-level = "s"
 lto = false
 codegen-units = 16
 panic = "abort"
-strip = false
+strip = "symbols"
 
 [profile.release.package.pow-lock]
 opt-level = "s"

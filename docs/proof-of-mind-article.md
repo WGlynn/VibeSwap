@@ -4,7 +4,7 @@
 
 ---
 
-## The Problem Nobody Talks About
+##  The Problem Nobody Talks About
 
 Every blockchain project builds on the same assumption: consensus requires either energy (Proof of Work) or capital (Proof of Stake). You either burn electricity to prove you did something, or you lock money to prove you have something at risk.
 
@@ -29,6 +29,7 @@ What follows isn't a theoretical exercise. Three independent builders — workin
 The key insight: a 21×13 grid addressed by mathematical constants (Fibonacci sequence, golden ratio) creates a space where data finds its own position based on its mathematical properties. No admin decides where to store things. No server must stay running. Identity, addressing, storage, and computation are different views of the same structure.
 
 This substrate has five properties that matter:
+
 - **Persistent** — execution doesn't stop when a machine stops
 - **Machine-independent** — bound to cryptographic identity, not hardware
 - **Unified** — one structure for everything
@@ -77,11 +78,11 @@ Each piece alone solves a real problem. Together, they create something none cou
 
 The composition:
 
-| Layer | Role | Builder |
-|-------|------|---------|
-| GenTu | WHERE ideas live | Persistent execution substrate with mathematical addressing |
-| IT | WHAT lives there | Protocol-native ideas with treasury, execution, memory |
-| POM | HOW they agree | Consensus from sustained contribution, not energy or capital |
+| Layer | Role             | Builder                                                      |
+| ----- | ---------------- | ------------------------------------------------------------ |
+| GenTu | WHERE ideas live | Persistent execution substrate with mathematical addressing  |
+| IT    | WHAT lives there | Protocol-native ideas with treasury, execution, memory       |
+| POM   | HOW they agree   | Consensus from sustained contribution, not energy or capital |
 
 ITs are drones in the GenTu substrate — universal work units with treasury, conviction, and memory. They find their position by content hash (GenTu's PHI-derived addressing). Conviction grows in substrate time, not machine time (GenTu's persistent execution). More contributors strengthen the network (GenTu's additive mesh).
 
@@ -128,3 +129,5 @@ We're not constrained by existing concepts. We have the freedom to manifest some
 *Three builders. Three layers. One new paradigm.*
 
 *If you want to follow the build: the code is open, the mechanism design is public, and the conversation is ongoing.*
+
+

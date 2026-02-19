@@ -72,21 +72,21 @@ export const CONTRACTS = {
   // SEPOLIA TESTNET (Chain ID: 11155111)
   // ============================================
   11155111: {
-    vibeSwapCore: '0x0000000000000000000000000000000000000000',
-    auction: '0x0000000000000000000000000000000000000000',
-    amm: '0x0000000000000000000000000000000000000000',
-    treasury: '0x0000000000000000000000000000000000000000',
-    router: '0x0000000000000000000000000000000000000000',
+    vibeSwapCore: getEnvAddress('VITE_SEPOLIA_VIBESWAP_CORE'),
+    auction: getEnvAddress('VITE_SEPOLIA_AUCTION'),
+    amm: getEnvAddress('VITE_SEPOLIA_VIBE_AMM'),
+    treasury: getEnvAddress('VITE_SEPOLIA_TREASURY'),
+    router: getEnvAddress('VITE_SEPOLIA_ROUTER'),
   },
   // ============================================
   // ARBITRUM SEPOLIA (Chain ID: 421614)
   // ============================================
   421614: {
-    vibeSwapCore: '0x0000000000000000000000000000000000000000',
-    auction: '0x0000000000000000000000000000000000000000',
-    amm: '0x0000000000000000000000000000000000000000',
-    treasury: '0x0000000000000000000000000000000000000000',
-    router: '0x0000000000000000000000000000000000000000',
+    vibeSwapCore: getEnvAddress('VITE_ARB_SEPOLIA_VIBESWAP_CORE'),
+    auction: getEnvAddress('VITE_ARB_SEPOLIA_AUCTION'),
+    amm: getEnvAddress('VITE_ARB_SEPOLIA_VIBE_AMM'),
+    treasury: getEnvAddress('VITE_ARB_SEPOLIA_TREASURY'),
+    router: getEnvAddress('VITE_ARB_SEPOLIA_ROUTER'),
   },
   // ============================================
   // LOCAL DEVELOPMENT (Chain ID: 31337)
@@ -444,7 +444,7 @@ export const SUPPORTED_CHAINS = [
     name: 'Sepolia',
     network: 'sepolia',
     currency: 'ETH',
-    rpcUrl: 'https://rpc.sepolia.org',
+    rpcUrl: import.meta.env.VITE_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
     explorer: 'https://sepolia.etherscan.io',
     isTestnet: true,
     lzEndpointId: 40161,
@@ -454,7 +454,7 @@ export const SUPPORTED_CHAINS = [
     name: 'Arbitrum Sepolia',
     network: 'arbitrum-sepolia',
     currency: 'ETH',
-    rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+    rpcUrl: import.meta.env.VITE_ARB_SEPOLIA_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc',
     explorer: 'https://sepolia.arbiscan.io',
     isTestnet: true,
     lzEndpointId: 40231,

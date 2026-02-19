@@ -10,8 +10,9 @@ import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { createServer } from 'http';
-import { writeFile, readFile, mkdir } from 'fs/promises';
+import { writeFile, readFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
+import { getAudioBase64 } from 'google-tts-api';
 
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
 
@@ -764,9 +765,49 @@ async function main() {
 
             // Only forward if Jarvis has something meaningful to say
             if (response.text && response.text.trim() !== '—' && response.text.trim() !== '-') {
+              const jarvisText = response.text;
+
+              // Send text context first
               await bot.telegram.sendMessage(chatId,
-                `[Meeting: ${meetingTitle}]\n${speaker}: "${transcript.slice(0, 100)}${transcript.length > 100 ? '...' : ''}"\n\nJarvis: ${response.text}`
+                `[Meeting: ${meetingTitle}]\n${speaker}: "${transcript.slice(0, 100)}${transcript.length > 100 ? '...' : ''}"`
               );
+
+              // Generate TTS voice message — Jarvis speaks
+              try {
+                // google-tts-api has a 200 char limit per call, so chunk long responses
+                const chunks = [];
+                let remaining = jarvisText;
+                while (remaining.length > 0) {
+                  // Split at sentence boundaries within 200 chars
+                  let end = Math.min(remaining.length, 190);
+                  if (end < remaining.length) {
+                    const lastPeriod = remaining.lastIndexOf('.', end);
+                    const lastQuestion = remaining.lastIndexOf('?', end);
+                    const lastBreak = Math.max(lastPeriod, lastQuestion);
+                    if (lastBreak > 50) end = lastBreak + 1;
+                  }
+                  chunks.push(remaining.slice(0, end).trim());
+                  remaining = remaining.slice(end).trim();
+                }
+
+                // Concatenate audio chunks into one buffer
+                const audioBuffers = [];
+                for (const chunk of chunks) {
+                  if (chunk.length === 0) continue;
+                  const base64 = await getAudioBase64(chunk, { lang: 'en', slow: false });
+                  audioBuffers.push(Buffer.from(base64, 'base64'));
+                }
+                const fullAudio = Buffer.concat(audioBuffers);
+
+                // Save temp file and send as voice
+                const tmpFile = join(config.dataDir, `tts_${Date.now()}.mp3`);
+                await writeFile(tmpFile, fullAudio);
+                await bot.telegram.sendVoice(chatId, { source: tmpFile }, { caption: 'Jarvis' });
+                await unlink(tmpFile).catch(() => {});
+              } catch (ttsErr) {
+                console.warn('[tts] Voice generation failed, sending text only:', ttsErr.message);
+                await bot.telegram.sendMessage(chatId, `Jarvis: ${jarvisText}`);
+              }
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' });

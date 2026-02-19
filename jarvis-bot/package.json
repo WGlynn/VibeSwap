@@ -10,8 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "telegraf": "^4.16.3",
+    "dotenv": "^16.4.7",
+    "google-tts-api": "^2.0.2",
     "simple-git": "^3.27.0",
-    "dotenv": "^16.4.7"
+    "telegraf": "^4.16.3"
   }
 }

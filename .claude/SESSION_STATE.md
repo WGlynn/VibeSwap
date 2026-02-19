@@ -10,7 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **2430+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **2571+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
 - **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
@@ -37,21 +37,44 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 19, 2026 — Session 33)
-82. **DeFi/DeFAI Layer — 3 New Primitives (StrategyVault, LiquidityGauge, FeeRouter)**
-    - **StrategyVault.sol** (~275 lines): ERC-4626 automated yield vault with pluggable IStrategy interface
+## Recently Completed (Feb 19, 2026 — Session 34)
+83. **Go-Live Revenue & Distribution Primitives — 3 New Contracts**
+    - **BuybackEngine.sol** (~230 lines): Automated buyback-and-burn for protocol token value accrual
+      - FeeRouter sends 10% to BuybackEngine → swaps via VibeAMM → burns protocol token
+      - Keeper-friendly (anyone can trigger), cooldown protection, slippage tolerance
+      - Direct burn path for protocol token (no swap needed)
+      - Bug fixed: first-ever buyback blocked by cooldown check (defaulted to 0 + cooldown > timestamp)
+    - **MerkleAirdrop.sol** (~160 lines): Gas-efficient token distribution via Merkle proofs
+      - Multiple distribution rounds, permissionless claiming on behalf of recipients
+      - Deadline enforcement, unclaimed reclaim after expiry, deactivation
+    - **VestingSchedule.sol** (~190 lines): Token vesting with cliff + linear unlock
+      - Multiple schedules per beneficiary, revocable by owner
+      - Cliff period blocks all vesting, linear unlock after cliff
+      - Revocation returns unvested tokens to owner, beneficiary keeps vested portion
+    - **6 interfaces**: IBuybackEngine, IMerkleAirdrop, IVestingSchedule
+    - **116 new tests**: 81 unit (28+24+29) + 22 fuzz (8+6+8) + 13 invariant (4+4+5) — ALL PASSING
+    - Zero reverts in 1.5M+ invariant handler calls
+
+## Previously Completed (Feb 19, 2026 — Session 33)
+82. **DeFi/DeFAI Layer — 4 New Primitives + Cross-Contract Wiring**
+    - **StrategyVault.sol** (~280 lines): ERC-4626 automated yield vault with pluggable IStrategy interface
       - Deposit cap, emergency shutdown, strategy migration with timelock, performance+management fees
       - `_deployToStrategy()` auto-deploys idle assets, harvest pulls profit back
+      - **FeeRouter integration**: Optional `setFeeRouter()` routes harvest fees through cooperative distribution
     - **LiquidityGauge.sol** (~300 lines): Curve-style vote-directed LP incentives
       - Synthetix `rewardPerToken` accumulator, epoch-based emission schedules
       - Governance-controlled gauge weights, multi-gauge support, gauge killing
     - **FeeRouter.sol** (~228 lines): Central protocol fee collector and distributor
       - Default 40/20/30/10 split (treasury/insurance/revshare/buyback)
       - Multi-token support, authorized sources, emergency recovery
-    - **6 interfaces**: IStrategy, IStrategyVault, ILiquidityGauge, IFeeRouter
-    - **133 new tests**: 96 unit (35+31+30) + 25 fuzz (8+9+8) + 12 invariant (4+5+3/5+5+5) — ALL PASSING
+    - **ProtocolFeeAdapter.sol** (~100 lines): Bridge between fee-generating contracts and FeeRouter
+      - Set as VibeAMM's treasury address → fees forward through FeeRouter for cooperative distribution
+      - ETH forwarding for priority bids, emergency recovery
+    - **8 interfaces**: IStrategy, IStrategyVault, ILiquidityGauge, IFeeRouter, IProtocolFeeAdapter
+    - **155 new tests**: 112 unit (38+31+30+16) + 28 fuzz (7+9+8+3) + 15 invariant (4+5+3+3) — ALL PASSING
     - **Bug found + fixed**: Solidity optimizer re-reads `block.timestamp` opcode instead of using cached local variable after `vm.warp`. Fix: use absolute numeric timestamps in all Foundry tests that call `vm.warp` multiple times.
     - **Mock strategy pattern**: Vault does `safeTransfer` to strategy then calls `deposit()` as notification — mock's deposit() must be a no-op (not transferFrom)
+    - Commits: `829ac82`, `3858846`
 
 ## Previously Completed (Feb 19, 2026 — Session 32)
 81. **IdeaMarketplace Cross-Contract Integration + Jarvis Fix + Go-Live Housekeeping**

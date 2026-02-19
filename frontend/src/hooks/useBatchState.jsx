@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
 import { useWallet } from './useWallet'
 import useContracts from './useContracts'
+import { useCKBWallet } from './useCKBWallet'
+import { useCKBContracts } from './useCKBContracts'
+import { isCKBChain, CKB_PHASES, CKB_BATCH_TIMING } from '../utils/ckb-constants'
 
 // Batch phases match the smart contract
 const PHASES = {
@@ -14,6 +17,14 @@ const PHASE_FROM_CHAIN = {
   0: PHASES.COMMIT,
   1: PHASES.REVEAL,
   2: PHASES.SETTLING,
+}
+
+// Map CKB phase numbers to our string phases
+const CKB_PHASE_MAP = {
+  [CKB_PHASES.COMMIT]: PHASES.COMMIT,
+  [CKB_PHASES.REVEAL]: PHASES.REVEAL,
+  [CKB_PHASES.SETTLING]: PHASES.SETTLING,
+  [CKB_PHASES.SETTLED]: PHASES.SETTLING, // SETTLED maps to settling (new batch starts)
 }
 
 const PHASE_DURATIONS = {
@@ -38,7 +49,7 @@ const BatchContext = createContext(null)
 
 export function BatchProvider({ children }) {
   // ============ External hooks ============
-  const { chainId } = useWallet()
+  const { chainId: evmChainId } = useWallet()
   const {
     getCurrentBatch,
     commitSwap,
@@ -47,7 +58,23 @@ export function BatchProvider({ children }) {
     isContractsDeployed,
   } = useContracts()
 
-  const isLive = isContractsDeployed
+  // CKB hooks — always called (React rules), conditionally used
+  const { chainId: ckbChainId, isConnected: isCKBConnected } = useCKBWallet()
+  const {
+    auctionState: ckbAuctionState,
+    commitOrder: ckbCommitOrder,
+    revealOrder: ckbRevealOrder,
+    fetchAuctionState: ckbFetchAuction,
+    startPolling: ckbStartPolling,
+    stopPolling: ckbStopPolling,
+    phaseTimeRemaining: ckbTimeRemaining,
+    isLive: isCKBLive,
+    isDemoMode: isCKBDemo,
+  } = useCKBContracts()
+
+  // Determine which chain is active
+  const isCKB = isCKBConnected && isCKBChain(ckbChainId)
+  const isLive = isCKB ? (isCKBLive || isCKBDemo) : isContractsDeployed
 
   // ============ Batch state ============
   const [phase, setPhase] = useState(PHASES.COMMIT)
@@ -79,9 +106,79 @@ export function BatchProvider({ children }) {
   // Ref to track the previous phase so we can detect transitions in live mode
   const prevPhaseRef = useRef(phase)
 
-  // ============ LIVE MODE: Poll on-chain batch state ============
+  // ============ CKB MODE: Sync auction cell state ============
   useEffect(() => {
-    if (!isLive) return
+    if (!isCKB) return
+
+    // Start CKB polling (polls auction cell via indexer)
+    ckbStartPolling(null, 2000)
+    return () => ckbStopPolling()
+  }, [isCKB, ckbStartPolling, ckbStopPolling])
+
+  // Sync CKB auction state into batch state
+  useEffect(() => {
+    if (!isCKB || !ckbAuctionState) return
+
+    const ckbPhase = CKB_PHASE_MAP[ckbAuctionState.phase]
+    if (!ckbPhase) return
+
+    const prevPhase = prevPhaseRef.current
+
+    // Detect phase transitions (same logic as EVM)
+    if (ckbPhase !== prevPhase) {
+      if (prevPhase === PHASES.COMMIT && ckbPhase === PHASES.REVEAL) {
+        if (userOrder.status === ORDER_STATUS.COMMITTED) {
+          setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.PENDING_REVEAL }))
+        }
+      }
+
+      if (prevPhase === PHASES.REVEAL && ckbPhase === PHASES.SETTLING) {
+        if (userOrder.status === ORDER_STATUS.REVEALED ||
+            userOrder.status === ORDER_STATUS.PENDING_REVEAL) {
+          setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.SETTLING }))
+        } else if (userOrder.status === ORDER_STATUS.COMMITTED) {
+          setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.FAILED }))
+        }
+      }
+
+      if (prevPhase === PHASES.SETTLING && ckbPhase === PHASES.COMMIT) {
+        if (userOrder.status === ORDER_STATUS.SETTLING) {
+          setUserOrder(prev => ({
+            ...prev,
+            status: ORDER_STATUS.SETTLED,
+            settlement: prev.settlement || {
+              clearingPrice: '—',
+              amountReceived: '—',
+              expectedAmount: prev.orderDetails?.amountOut || '—',
+              improvement: '—',
+              mevSaved: '—',
+              executionPosition: '—',
+              totalOrdersInBatch: '—',
+            },
+          }))
+        }
+        setBatchQueue({ orderCount: 0, totalValue: 0, priorityOrders: 0 })
+      }
+
+      prevPhaseRef.current = ckbPhase
+    }
+
+    setPhase(ckbPhase)
+    setBatchId(Number(ckbAuctionState.batchId))
+    setBatchQueue(prev => ({
+      ...prev,
+      orderCount: ckbAuctionState.commitCount || 0,
+    }))
+
+    // Estimate time left from CKB block-based timing
+    if (ckbTimeRemaining != null) {
+      setTimeLeft(Math.max(0, Math.round(ckbTimeRemaining)))
+    }
+  }, [isCKB, ckbAuctionState, ckbTimeRemaining, userOrder.status])
+
+  // ============ EVM LIVE MODE: Poll on-chain batch state ============
+  useEffect(() => {
+    if (!isLive || isCKB) return // Skip if CKB chain (handled above)
 
     let cancelled = false
 
@@ -156,11 +253,11 @@ export function BatchProvider({ children }) {
       cancelled = true
       clearInterval(interval)
     }
-  }, [isLive, getCurrentBatch, userOrder.status])
+  }, [isLive, isCKB, getCurrentBatch, userOrder.status])
 
-  // ============ LIVE MODE: Listen for on-chain events ============
+  // ============ EVM LIVE MODE: Listen for on-chain events ============
   useEffect(() => {
-    if (!isLive || !contracts?.auction) return
+    if (!isLive || isCKB || !contracts?.auction) return
 
     const auctionContract = contracts.auction
 
@@ -195,11 +292,11 @@ export function BatchProvider({ children }) {
       auctionContract.off('OrderCommitted', onOrderCommitted)
       auctionContract.off('BatchSettled', onBatchSettled)
     }
-  }, [isLive, contracts, batchId])
+  }, [isLive, isCKB, contracts, batchId])
 
   // Listen for SwapExecuted on VibeSwapCore for the user's order settlement
   useEffect(() => {
-    if (!isLive || !contracts?.vibeSwapCore) return
+    if (!isLive || isCKB || !contracts?.vibeSwapCore) return
 
     const coreContract = contracts.vibeSwapCore
 
@@ -241,9 +338,9 @@ export function BatchProvider({ children }) {
     }
   }, [isLive, contracts, userOrder.commitId, userOrder.batchId, userOrder.orderDetails])
 
-  // ============ SIMULATION MODE: Phase transition logic ============
+  // ============ SIMULATION MODE: Phase transition logic (EVM demo only) ============
   useEffect(() => {
-    if (isLive) return // Skip simulation when live
+    if (isLive || isCKB) return // Skip simulation when live or CKB (CKB has its own demo)
 
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -310,11 +407,11 @@ export function BatchProvider({ children }) {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isLive, phase, batchId, userOrder.status, userOrder.orderDetails])
+  }, [isLive, isCKB, phase, batchId, userOrder.status, userOrder.orderDetails])
 
-  // ============ SIMULATION MODE: Batch queue updates during commit ============
+  // ============ SIMULATION MODE: Batch queue updates during commit (EVM demo only) ============
   useEffect(() => {
-    if (isLive) return // Skip simulation when live
+    if (isLive || isCKB) return // Skip simulation when live or CKB
     if (phase !== PHASES.COMMIT) return
 
     const interval = setInterval(() => {
@@ -326,7 +423,7 @@ export function BatchProvider({ children }) {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [isLive, phase])
+  }, [isLive, isCKB, phase])
 
   // ============ Commit an order (called from SwapPage) ============
   const commitOrder = useCallback(async (orderDetails) => {
@@ -345,8 +442,39 @@ export function BatchProvider({ children }) {
       settlement: null,
     })
 
-    if (isLive) {
-      // ---- LIVE: submit real on-chain commit ----
+    if (isCKB) {
+      // ---- CKB: submit commit via CKB cell creation ----
+      try {
+        const result = await ckbCommitOrder({
+          pairId: orderDetails.pairId || null,
+          orderType: orderDetails.orderType || 0,
+          amountIn: BigInt(Math.floor(parseFloat(orderDetails.amountIn || 0) * 1e18)),
+          limitPrice: BigInt(Math.floor(parseFloat(orderDetails.limitPrice || 0) * 1e18)),
+          priorityBid: orderDetails.priorityBid || 0,
+        })
+
+        setUserOrder(prev => ({
+          ...prev,
+          status: ORDER_STATUS.COMMITTED,
+          commitHash: result.orderHash,
+          secret: result.secret,
+          batchId: Number(result.batchId),
+        }))
+
+        setBatchQueue(prev => ({
+          ...prev,
+          orderCount: prev.orderCount + 1,
+          totalValue: prev.totalValue + parseFloat(orderDetails.valueUsd || 0),
+          priorityOrders: prev.priorityOrders + (orderDetails.priorityBid ? 1 : 0),
+        }))
+
+        return result.orderHash
+      } catch (error) {
+        setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.FAILED }))
+        throw error
+      }
+    } else if (isLive) {
+      // ---- EVM LIVE: submit real on-chain commit ----
       try {
         const result = await commitSwap({
           tokenIn: orderDetails.tokenIn,
@@ -365,7 +493,6 @@ export function BatchProvider({ children }) {
           batchId: result.batchId,
         }))
 
-        // Update batch queue locally (event listener will also fire but that's fine)
         setBatchQueue(prev => ({
           ...prev,
           orderCount: prev.orderCount + 1,
@@ -375,10 +502,7 @@ export function BatchProvider({ children }) {
 
         return result.hash
       } catch (error) {
-        setUserOrder(prev => ({
-          ...prev,
-          status: ORDER_STATUS.FAILED,
-        }))
+        setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.FAILED }))
         throw error
       }
     } else {
@@ -393,7 +517,6 @@ export function BatchProvider({ children }) {
         commitHash,
       }))
 
-      // Update batch queue
       setBatchQueue(prev => ({
         ...prev,
         orderCount: prev.orderCount + 1,
@@ -403,7 +526,7 @@ export function BatchProvider({ children }) {
 
       return commitHash
     }
-  }, [isLive, phase, batchId, commitSwap])
+  }, [isLive, isCKB, phase, batchId, commitSwap, ckbCommitOrder])
 
   // ============ Reveal an order (auto-called or manual) ============
   const revealOrder = useCallback(async () => {
@@ -417,8 +540,30 @@ export function BatchProvider({ children }) {
 
     setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.PENDING_REVEAL }))
 
-    if (isLive) {
-      // ---- LIVE: submit real on-chain reveal ----
+    if (isCKB) {
+      // ---- CKB: submit reveal via CKB witness ----
+      try {
+        const result = await ckbRevealOrder({
+          pairId: userOrder.orderDetails?.pairId || null,
+          orderType: userOrder.orderDetails?.orderType || 0,
+          amountIn: BigInt(Math.floor(parseFloat(userOrder.orderDetails?.amountIn || 0) * 1e18)),
+          limitPrice: BigInt(Math.floor(parseFloat(userOrder.orderDetails?.limitPrice || 0) * 1e18)),
+          priorityBid: userOrder.orderDetails?.priorityBid || 0,
+        })
+
+        setUserOrder(prev => ({
+          ...prev,
+          status: ORDER_STATUS.REVEALED,
+          revealedAt: Date.now(),
+        }))
+
+        return result.txHash || null
+      } catch (error) {
+        setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.COMMITTED }))
+        throw error
+      }
+    } else if (isLive) {
+      // ---- EVM LIVE: submit real on-chain reveal ----
       try {
         const result = await revealSwap(
           userOrder.commitId,
@@ -447,7 +592,7 @@ export function BatchProvider({ children }) {
         revealedAt: Date.now(),
       }))
     }
-  }, [isLive, phase, userOrder.status, userOrder.commitId, userOrder.orderDetails, revealSwap])
+  }, [isLive, isCKB, phase, userOrder.status, userOrder.commitId, userOrder.orderDetails, revealSwap, ckbRevealOrder])
 
   // ============ Reset user order ============
   const resetOrder = useCallback(() => {
@@ -489,6 +634,7 @@ export function BatchProvider({ children }) {
 
     // Mode
     isLive,
+    isCKB,
 
     // Helpers
     isCommitPhase: phase === PHASES.COMMIT,

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "backlog-001",
+    "timestamp": "2026-02-19T08:00:00Z",
+    "source": "meeting-test",
+    "author": "Freedom (simulated)",
+    "suggestion": "Skip the commit-reveal phase on CKB and do direct swaps since the cell model + PoW-gated writes already prevent frontrunning. The commit-reveal may be redundant on CKB if the PoW lock script + forced inclusion already eliminate MEV at the infrastructure layer.",
+    "status": "open",
+    "tags": ["ckb", "architecture", "mev", "commit-reveal"],
+    "jarvis_take": "Partially valid. The cell model prevents reentrancy and PoW gating prevents permissionless writes, but miners who solve the PoW can still see pending commit cells before including them. Commit-reveal adds a second layer — even the PoW miner can't see order details. However, a lighter commit-reveal (shorter windows, simpler hash) might be possible on CKB since the infrastructure layer handles more of the MEV defense. Worth prototyping both approaches and comparing."
+  }
+]

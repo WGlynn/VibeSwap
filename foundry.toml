@@ -19,6 +19,9 @@ sepolia = "${SEPOLIA_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 optimism = "${OPTIMISM_RPC_URL}"
 
+[lint]
+unsafe-typecast = false  # 500+ warnings in test files, all intentional
+
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }

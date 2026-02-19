@@ -363,6 +363,175 @@ Add to `setMyCommands`:
 
 ---
 
+## Engagement Mode — Replies, Roasts, Signal Boosts
+
+Jarvis doesn't just post — he engages. The engagement system monitors crypto/DeFi Twitter for relevant tweets and replies with sharp commentary.
+
+### Two Modes
+
+| Mode | Trigger | Style |
+|------|---------|-------|
+| **Roast** | Tweet promotes an idea that contradicts our philosophy | Factual correction with dry wit. Attack the idea, never the person. End with a question. |
+| **Signal Boost** | Tweet aligns with our philosophy (MEV resistance, open source, contribution governance) | Quote tweet with one-liner. Add technical context. Never sycophantic. |
+
+### Roast Triggers (defined in `tweet-style-guide.json`)
+
+| Category | Example Signal | Philosophy Violated |
+|----------|---------------|---------------------|
+| MEV Acceptance | "MEV is just cost of business" | MEV is a tax, not a feature |
+| VC Worship | "Just raised $40M" | Capital isn't contribution |
+| Token-Gated Governance | "1 token 1 vote" | That's plutocracy, not democracy |
+| Centralized Control | "Our team controls the admin key" | Admin keys are single points of failure |
+| AI Hype Without Code | "Our AI predicts market" | Ask for the commit history |
+| Closed Source DeFi | "Proprietary algorithm" | If you can't read it, you can't trust it |
+| Airdrop Farming | "Farm the drop" | Sybil resistance via real contribution |
+| Speed Over Fairness | "Fastest execution" | Speed only helps institutions |
+
+### Engagement Rules
+
+1. Never insult the person — attack the idea
+2. Always factually correct — if you can't prove it, don't say it
+3. One reply per account per day max
+4. If they respond intelligently, engage respectfully — potential contributor
+5. Leave breadcrumbs — hint at solutions without hard-selling VibeSwap
+6. Skip tweets with < 100 likes — engagement should be visible
+7. Never reply to bots or rage-bait
+8. Big accounts (100k+) get surgical replies — the ratio will be watched
+9. End roasts with a question — questions get more engagement
+10. **Never mention VibeSwap by name in the first reply** — let curiosity do the work
+
+### Implementation: `src/twitter.js` additions
+
+```javascript
+// ============ Engagement: Search + Reply ============
+
+// Search for relevant tweets to engage with
+export async function searchRelevantTweets(keywords, maxResults = 10) {
+  if (!client) return [];
+
+  // Twitter API v2 search (recent tweets, last 7 days)
+  const results = await client.v2.search(keywords.join(' OR '), {
+    max_results: maxResults,
+    'tweet.fields': ['public_metrics', 'author_id', 'created_at'],
+    'user.fields': ['public_metrics', 'username'],
+    expansions: ['author_id'],
+  });
+
+  // Filter: only tweets with 100+ likes (visibility threshold)
+  return (results.data?.data || []).filter(
+    t => t.public_metrics?.like_count >= 100
+  );
+}
+
+// Check if we've already replied to a tweet
+export async function hasReplied(tweetId) {
+  const replied = tweetLog.filter(t => t.replyTo === tweetId);
+  return replied.length > 0;
+}
+
+// Check daily reply limit per author
+export async function canReplyToAuthor(authorId) {
+  const today = new Date().toISOString().split('T')[0];
+  const repliesToday = tweetLog.filter(t =>
+    t.iso?.startsWith(today) && t.authorId === authorId
+  );
+  return repliesToday.length < 1; // Max 1 reply per author per day
+}
+
+// Generate a roast reply using Claude
+export async function generateRoast(originalTweet, triggerCategory, styleGuide) {
+  // Uses Claude to draft a reply following the roast rules
+  // Returns 3 options for owner approval (or auto-post if in autopilot)
+  const prompt = `You are JARVIS. Someone tweeted: "${originalTweet}"
+
+This triggers the "${triggerCategory}" roast category.
+Philosophy violated: ${styleGuide.engagement.roast_triggers[triggerCategory].philosophy_violated}
+Tone: ${styleGuide.engagement.roast_triggers[triggerCategory].roast_tone}
+
+Rules:
+${styleGuide.engagement.reply_rules.join('\n')}
+
+Good roast examples:
+${styleGuide.engagement.good_roast_examples.map(e =>
+  `Trigger: "${e.trigger_tweet}"\nReply: "${e.reply}"`
+).join('\n\n')}
+
+Draft 3 reply options. Max 280 chars each. End with a question.`;
+
+  // Call Claude API and return options
+  return prompt; // Freedom: wire this to the existing claude.js chat function
+}
+
+// Main engagement loop (run on interval)
+export async function runEngagementScan(styleGuide) {
+  if (!client) return { scanned: 0, replied: 0 };
+
+  const keywords = styleGuide.engagement.search_keywords;
+  // Pick 5 random keywords per scan to stay within rate limits
+  const sample = keywords.sort(() => Math.random() - 0.5).slice(0, 5);
+
+  const tweets = await searchRelevantTweets(sample, 10);
+  let replied = 0;
+
+  for (const t of tweets) {
+    if (await hasReplied(t.id)) continue;
+    if (!(await canReplyToAuthor(t.author_id))) continue;
+
+    // Classify: roast or signal boost?
+    // Freedom: use Claude to classify, or do keyword matching
+    // If roast: generateRoast() → send to Will for approval or auto-post
+    // If signal boost: quote tweet with one-liner
+
+    replied++;
+    if (replied >= 3) break; // Max 3 engagements per scan
+  }
+
+  return { scanned: tweets.length, replied };
+}
+```
+
+### Telegram Commands for Engagement
+
+```javascript
+// Owner reviews and approves roast replies
+bot.command('roasts', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  // Show pending roast drafts awaiting approval
+});
+
+bot.command('approve', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const id = ctx.message.text.replace('/approve', '').trim();
+  // Post the approved roast reply
+});
+
+bot.command('engage', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  // Manually trigger an engagement scan
+  const result = await runEngagementScan(styleGuide);
+  ctx.reply(`Scanned ${result.scanned} tweets, engaged with ${result.replied}.`);
+});
+```
+
+### Engagement Schedule
+
+```javascript
+// In index.js — run engagement scan every 2 hours during peak times
+setInterval(async () => {
+  const hour = new Date().getUTCHours();
+  if (hour >= 14 && hour <= 22 && isTwitterEnabled()) {
+    try {
+      const styleGuide = JSON.parse(await readFile('data/tweet-style-guide.json', 'utf-8'));
+      await runEngagementScan(styleGuide);
+    } catch (err) {
+      console.warn(`[twitter] Engagement scan failed: ${err.message}`);
+    }
+  }
+}, 2 * 60 * 60 * 1000); // Every 2 hours
+```
+
+---
+
 ## Event-Driven Posting
 
 Jarvis should tweet automatically on these events:

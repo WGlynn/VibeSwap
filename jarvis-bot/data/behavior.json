@@ -1,0 +1,12 @@
+{
+  "_meta": "Runtime behavioral flags. Jarvis reads these before acting. Editable by owner via /setbehavior or by Jarvis via conversation mandate updates.",
+  "welcomeNewMembers": false,
+  "welcomeMessage": "Welcome {name}. This is the VibeSwap community — cooperative capitalism, zero MEV, fair markets.\n\nSay hi, ask questions, share ideas. Your contributions are tracked and count toward governance weight.\n\nDM me directly — if this chat ever goes down, I'll send you an invite link to the backup channel (the Ark).\n\nType /mystats anytime to see your contribution profile.",
+  "proactiveEngagement": true,
+  "dailyDigest": true,
+  "autoModeration": true,
+  "arkDmOnJoin": true,
+  "trackContributions": true,
+  "respondInGroups": true,
+  "respondInDms": true
+}

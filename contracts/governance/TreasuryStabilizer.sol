@@ -51,6 +51,9 @@ contract TreasuryStabilizer is
     // Emergency mode per token
     mapping(address => bool) public emergencyMode;
 
+    // Token => Main pool ID (for TWAP price queries)
+    mapping(address => bytes32) public tokenMainPool;
+
     // TWAP periods for trend calculation
     uint32 public shortTermPeriod;
     uint32 public longTermPeriod;
@@ -376,9 +379,7 @@ contract TreasuryStabilizer is
      * @return poolId Main pool identifier
      */
     function _getMainPool(address token) internal view returns (bytes32 poolId) {
-        // In production, would have registry of token -> main pool
-        // For now, return a placeholder
-        return keccak256(abi.encodePacked(token, "MAIN"));
+        poolId = tokenMainPool[token];
     }
 
     // ============ Admin Functions ============
@@ -402,6 +403,15 @@ contract TreasuryStabilizer is
         }
 
         emit ConfigUpdated(token, config);
+    }
+
+    /**
+     * @notice Set the main AMM pool for a token (used for TWAP price queries)
+     * @param token Token address
+     * @param poolId VibeAMM pool identifier
+     */
+    function setMainPool(address token, bytes32 poolId) external onlyOwner {
+        tokenMainPool[token] = poolId;
     }
 
     /**

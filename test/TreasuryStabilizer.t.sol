@@ -128,6 +128,7 @@ contract TreasuryStabilizerTest is Test {
         stabilizer.setConfig(address(token), _defaultConfig());
 
         poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
 
         // Set TWAP so short < long (bear market with > 20% decline)
         amm.setTWAP(poolId, 1 hours, 700e18);    // short-term low
@@ -214,6 +215,7 @@ contract TreasuryStabilizerTest is Test {
     function test_assessMarketConditions_bullMarket() public {
         stabilizer.setConfig(address(token), _defaultConfig());
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
 
         // short > long = bull market
         amm.setTWAP(poolId, 1 hours, 1200e18);
@@ -237,6 +239,7 @@ contract TreasuryStabilizerTest is Test {
     function test_assessMarketConditions_tooSoon_reverts() public {
         stabilizer.setConfig(address(token), _defaultConfig());
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
         amm.setTWAP(poolId, 1 hours, 1000e18);
         amm.setTWAP(poolId, 7 days, 1000e18);
 
@@ -273,6 +276,7 @@ contract TreasuryStabilizerTest is Test {
     function test_assessMarketConditions_volatilityFallback() public {
         stabilizer.setConfig(address(token), _defaultConfig());
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
 
         // Don't set TWAP (will fail) — should fall back to volatility oracle
         oracle.setVolatility(poolId, 8000); // High volatility => bear
@@ -373,6 +377,7 @@ contract TreasuryStabilizerTest is Test {
         stabilizer.setConfig(address(token), config);
 
         bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        stabilizer.setMainPool(address(token), poolId);
         amm.setTWAP(poolId, 1 hours, 700e18);
         amm.setTWAP(poolId, 7 days, 1000e18);
         amm.setPool(poolId, 1000 ether, 1000 ether);

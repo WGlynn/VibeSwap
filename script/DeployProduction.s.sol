@@ -9,6 +9,9 @@ import "../contracts/governance/DAOTreasury.sol";
 import "../contracts/messaging/CrossChainRouter.sol";
 import "../contracts/oracles/TruePriceOracle.sol";
 import "../contracts/oracles/StablecoinFlowRegistry.sol";
+import "../contracts/core/ProtocolFeeAdapter.sol";
+import "../contracts/core/FeeRouter.sol";
+import "../contracts/core/BuybackEngine.sol";
 import "../contracts/libraries/LiquidityProtection.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -40,6 +43,11 @@ contract DeployProduction is Script {
     address public treasury;
     address public router;
     address public core;
+
+    // Deployed addresses - Fee Pipeline
+    address public feeAdapter;
+    address public feeRouter;
+    address public buybackEngine;
 
     // Deployed addresses - Oracles
     address public truePriceOracleImpl;
@@ -130,20 +138,24 @@ contract DeployProduction is Script {
         console.log("Step 4: Deploying oracle proxies...");
         _deployOracleProxies();
 
-        // Step 5: Configure authorizations
-        console.log("Step 5: Configuring authorizations...");
+        // Step 5: Deploy fee pipeline
+        console.log("Step 5: Deploying fee pipeline...");
+        _deployFeePipeline();
+
+        // Step 6: Configure authorizations
+        console.log("Step 6: Configuring authorizations...");
         _configureAuthorizations();
 
-        // Step 6: Configure oracles
-        console.log("Step 6: Configuring oracles...");
+        // Step 7: Configure oracles
+        console.log("Step 7: Configuring oracles...");
         _configureOracles();
 
-        // Step 7: Configure security
-        console.log("Step 7: Configuring security...");
+        // Step 8: Configure security
+        console.log("Step 8: Configuring security...");
         _configureSecurity();
 
-        // Step 8: Final verification
-        console.log("Step 8: Running verification...");
+        // Step 9: Final verification
+        console.log("Step 9: Running verification...");
         _verifyDeployment();
 
         vm.stopBroadcast();
@@ -196,7 +208,7 @@ contract DeployProduction is Script {
         treasury = address(new ERC1967Proxy(treasuryImpl, treasuryInit));
         console.log("  DAOTreasury proxy:", treasury);
 
-        // Update AMM treasury
+        // Set AMM treasury to DAOTreasury initially (overridden by fee pipeline in Step 5)
         VibeAMM(amm).setTreasury(treasury);
 
         // Deploy Auction
@@ -252,6 +264,51 @@ contract DeployProduction is Script {
         // Link TruePriceOracle to StablecoinRegistry
         TruePriceOracle(truePriceOracle).setStablecoinRegistry(stablecoinRegistry);
         console.log("  TruePriceOracle linked to StablecoinFlowRegistry");
+    }
+
+    function _deployFeePipeline() internal {
+        // FeeRouter needs 4 destination addresses.
+        // Treasury wallet = DAOTreasury proxy (already deployed).
+        // Insurance + RevShare = owner for now (governance can update).
+        // BuybackEngine address unknown yet — deploy router, then engine, then update.
+
+        // Deploy FeeRouter
+        feeRouter = address(new FeeRouter(
+            treasury,         // 40% to DAOTreasury
+            owner,            // 20% insurance (governance updates to insurance pool later)
+            owner,            // 30% revShare  (governance updates to revshare contract later)
+            address(0xDEAD)   // 10% buyback — placeholder, updated below
+        ));
+        console.log("  FeeRouter:", feeRouter);
+
+        // Deploy ProtocolFeeAdapter (bridges VibeAMM fees to FeeRouter)
+        feeAdapter = address(new ProtocolFeeAdapter(feeRouter));
+        console.log("  ProtocolFeeAdapter:", feeAdapter);
+
+        // Deploy BuybackEngine (swaps + burns via VibeAMM)
+        buybackEngine = address(new BuybackEngine(
+            amm,
+            address(0),     // protocolToken set post-deploy when JUL is deployed
+            500,            // 5% slippage tolerance
+            1 hours         // 1 hour cooldown between buybacks
+        ));
+        console.log("  BuybackEngine:", buybackEngine);
+
+        // Wire up: FeeRouter buyback target -> BuybackEngine
+        FeeRouter(feeRouter).setBuybackTarget(buybackEngine);
+        console.log("  FeeRouter buyback target -> BuybackEngine");
+
+        // Wire up: Authorize ProtocolFeeAdapter as FeeRouter source
+        FeeRouter(feeRouter).authorizeSource(feeAdapter);
+        console.log("  ProtocolFeeAdapter authorized as FeeRouter source");
+
+        // Wire up: VibeAMM treasury -> ProtocolFeeAdapter (fees flow through cooperative pipeline)
+        VibeAMM(amm).setTreasury(feeAdapter);
+        console.log("  VibeAMM treasury -> ProtocolFeeAdapter");
+
+        // Enable protocol fee share (10% of trading fees to protocol)
+        VibeAMM(amm).setProtocolFeeShare(1000);
+        console.log("  VibeAMM protocolFeeShare -> 10% (1000 bps)");
     }
 
     function _configureAuthorizations() internal {
@@ -361,7 +418,16 @@ contract DeployProduction is Script {
         // Verify router authorization
         require(CrossChainRouter(payable(router)).authorized(core), "Router: Core not authorized");
 
-        console.log("  All verifications passed");
+        // Verify fee pipeline
+        require(feeRouter.code.length > 0, "FeeRouter has no code");
+        require(feeAdapter.code.length > 0, "FeeAdapter has no code");
+        require(buybackEngine.code.length > 0, "BuybackEngine has no code");
+        require(VibeAMM(amm).treasury() == feeAdapter, "AMM treasury should be FeeAdapter");
+        require(VibeAMM(amm).protocolFeeShare() == 1000, "AMM protocolFeeShare should be 1000");
+        require(FeeRouter(feeRouter).isAuthorizedSource(feeAdapter), "FeeAdapter not authorized on FeeRouter");
+        require(ProtocolFeeAdapter(payable(feeAdapter)).feeRouter() == feeRouter, "FeeAdapter feeRouter mismatch");
+
+        console.log("  All verifications passed (including fee pipeline)");
     }
 
     function _outputSummary() internal view {
@@ -388,6 +454,11 @@ contract DeployProduction is Script {
         console.log("  TRUE_PRICE_ORACLE=", truePriceOracle);
         console.log("  STABLECOIN_REGISTRY=", stablecoinRegistry);
         console.log("");
+        console.log("Fee Pipeline:");
+        console.log("  FEE_ROUTER=", feeRouter);
+        console.log("  FEE_ADAPTER=", feeAdapter);
+        console.log("  BUYBACK_ENGINE=", buybackEngine);
+        console.log("");
         console.log("Next steps:");
         console.log("1. Verify contracts on block explorer");
         console.log("2. Run VerifyDeployment.s.sol to validate");
@@ -411,6 +482,9 @@ contract DeployProduction is Script {
         console.log(string(abi.encodePacked("VIBESWAP_ROUTER=", vm.toString(router))));
         console.log(string(abi.encodePacked("TRUE_PRICE_ORACLE_ADDRESS=", vm.toString(truePriceOracle))));
         console.log(string(abi.encodePacked("STABLECOIN_REGISTRY_ADDRESS=", vm.toString(stablecoinRegistry))));
+        console.log(string(abi.encodePacked("FEE_ROUTER=", vm.toString(feeRouter))));
+        console.log(string(abi.encodePacked("FEE_ADAPTER=", vm.toString(feeAdapter))));
+        console.log(string(abi.encodePacked("BUYBACK_ENGINE=", vm.toString(buybackEngine))));
     }
 
     function _isMainnet(uint256 chainId) internal pure returns (bool) {
@@ -484,9 +558,17 @@ contract TransferOwnership is Script {
         TruePriceOracle(truePriceOracle).transferOwnership(multisig);
         StablecoinFlowRegistry(stablecoinRegistry).transferOwnership(multisig);
 
+        // Transfer fee pipeline ownership
+        address feeRouterAddr = vm.envAddress("FEE_ROUTER");
+        address feeAdapterAddr = vm.envAddress("FEE_ADAPTER");
+        address buybackAddr = vm.envAddress("BUYBACK_ENGINE");
+        FeeRouter(feeRouterAddr).transferOwnership(multisig);
+        ProtocolFeeAdapter(payable(feeAdapterAddr)).transferOwnership(multisig);
+        BuybackEngine(buybackAddr).transferOwnership(multisig);
+
         vm.stopBroadcast();
 
-        console.log("Ownership transfer initiated for 7 contracts");
+        console.log("Ownership transfer initiated for 10 contracts");
         console.log("Multisig must accept ownership for each contract");
     }
 }

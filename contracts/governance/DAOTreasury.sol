@@ -66,10 +66,18 @@ contract DAOTreasury is
     /// @notice LP positions held by treasury (poolId => amount)
     mapping(bytes32 => uint256) public lpPositions;
 
+    /// @notice Authorized backstop operators (e.g. TreasuryStabilizer)
+    mapping(address => bool) public backstopOperators;
+
     // ============ Modifiers ============
 
     modifier onlyAuthorizedFeeSender() {
         require(authorizedFeeSenders[msg.sender], "Not authorized");
+        _;
+    }
+
+    modifier onlyOwnerOrBackstopOperator() {
+        require(msg.sender == owner() || backstopOperators[msg.sender], "Not authorized");
         _;
     }
 
@@ -176,7 +184,7 @@ contract DAOTreasury is
         bytes32 poolId,
         uint256 token0Amount,
         uint256 token1Amount
-    ) external onlyOwner nonReentrant {
+    ) external onlyOwnerOrBackstopOperator nonReentrant {
         IVibeAMM amm = IVibeAMM(vibeAMM);
         IVibeAMM.Pool memory pool = amm.getPool(poolId);
 
@@ -215,7 +223,7 @@ contract DAOTreasury is
         uint256 lpAmount,
         uint256 minAmount0,
         uint256 minAmount1
-    ) external onlyOwner nonReentrant returns (uint256 received) {
+    ) external onlyOwnerOrBackstopOperator nonReentrant returns (uint256 received) {
         IVibeAMM amm = IVibeAMM(vibeAMM);
         (uint256 amount0, uint256 amount1) = amm.removeLiquidity(
             poolId,
@@ -429,6 +437,14 @@ contract DAOTreasury is
     function setVibeAMM(address _vibeAMM) external onlyOwner {
         require(_vibeAMM != address(0), "Invalid AMM");
         vibeAMM = _vibeAMM;
+    }
+
+    /**
+     * @notice Set authorized backstop operator (e.g. TreasuryStabilizer)
+     */
+    function setBackstopOperator(address operator, bool authorized) external onlyOwner {
+        require(operator != address(0), "Invalid operator");
+        backstopOperators[operator] = authorized;
     }
 
     /**

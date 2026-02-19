@@ -376,4 +376,26 @@ contract DAOTreasuryTest is Test {
 
         assertEq(recipient.balance, balanceBefore + 5 ether);
     }
+
+    // ============ Backstop Operator Tests ============
+
+    function test_setBackstopOperator() public {
+        address operator = makeAddr("stabilizer");
+        treasury.setBackstopOperator(operator, true);
+        assertTrue(treasury.backstopOperators(operator));
+
+        treasury.setBackstopOperator(operator, false);
+        assertFalse(treasury.backstopOperators(operator));
+    }
+
+    function test_setBackstopOperator_onlyOwner() public {
+        vm.prank(makeAddr("rando"));
+        vm.expectRevert();
+        treasury.setBackstopOperator(makeAddr("stabilizer"), true);
+    }
+
+    function test_setBackstopOperator_zeroAddress_reverts() public {
+        vm.expectRevert("Invalid operator");
+        treasury.setBackstopOperator(address(0), true);
+    }
 }

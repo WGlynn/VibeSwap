@@ -1807,18 +1807,10 @@ contract PairwiseVerifierTest is Test {
         verifier.advancePhase(taskId);
         verifier.settle(taskId);
 
-        // Check whether subId1 > subId2 (canonical ordering matters for bug)
-        bool pairFlipped = subId1 > subId2;
-
+        // After fix: consensus is computed in comp's reference frame, so
+        // comp.choice is compared directly — no normalization needed.
+        // Validators should always get reward regardless of submission ordering.
         uint256 v1Reward = verifier.getValidatorReward(taskId, validator1);
-
-        if (pairFlipped) {
-            // When subId1 > subId2: self-normalization flips FIRST->SECOND,
-            // but consensus tally says FIRST. Mismatch => consensusAligned=false => 0 reward
-            assertEq(v1Reward, 0, "Known bug: validator gets 0 when submissionA > submissionB");
-        } else {
-            // When subId1 < subId2: no flip, consensus matches => aligned => reward > 0
-            assertGt(v1Reward, 0, "Validator should get reward when submissionA < submissionB");
-        }
+        assertGt(v1Reward, 0, "Validator should always get reward for consensus-aligned vote");
     }
 }

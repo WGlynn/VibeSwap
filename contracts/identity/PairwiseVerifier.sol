@@ -491,15 +491,10 @@ contract PairwiseVerifier is IPairwiseVerifier, OwnableUpgradeable, ReentrancyGu
                 consensus = CompareChoice.EQUIVALENT;
             }
 
-            // Normalize this comparison's choice for alignment check
-            CompareChoice normalizedSelf = comp.choice;
-            if (comp.submissionA > comp.submissionB && comp.choice != CompareChoice.EQUIVALENT) {
-                normalizedSelf = comp.choice == CompareChoice.FIRST
-                    ? CompareChoice.SECOND
-                    : CompareChoice.FIRST;
-            }
-
-            comp.consensusAligned = (normalizedSelf == consensus);
+            // Consensus was computed in comp's reference frame (tally normalized
+            // other votes to match comp's submissionA/B ordering). So comp.choice
+            // can be compared directly — no further normalization needed.
+            comp.consensusAligned = (comp.choice == consensus);
         }
     }
 

@@ -14,6 +14,12 @@ contract MockAdapterInvToken is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+contract MockInvWETH is ERC20 {
+    constructor() ERC20("Wrapped ETH", "WETH") {}
+    function deposit() external payable { _mint(msg.sender, msg.value); }
+    function withdraw(uint256 amount) external { _burn(msg.sender, amount); payable(msg.sender).transfer(amount); }
+}
+
 // ============ Handler ============
 
 contract AdapterHandler is Test {
@@ -71,8 +77,9 @@ contract ProtocolFeeAdapterInvariantTest is StdInvariant, Test {
 
     function setUp() public {
         token = new MockAdapterInvToken();
+        MockInvWETH weth = new MockInvWETH();
         router = new FeeRouter(treasury, insurance, revShare, buyback);
-        adapter = new ProtocolFeeAdapter(address(router));
+        adapter = new ProtocolFeeAdapter(address(router), address(weth));
         router.authorizeSource(address(adapter));
 
         handler = new AdapterHandler(adapter, router, token);

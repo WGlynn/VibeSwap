@@ -44,6 +44,7 @@ interface IStrategyVault {
     event EmergencyShutdown(bool active);
     event FeesUpdated(uint256 performanceFeeBps, uint256 managementFeeBps);
     event FeeRecipientUpdated(address indexed newRecipient);
+    event FeeRouterUpdated(address indexed newRouter);
 
     // ============ Errors ============
 
@@ -72,6 +73,7 @@ interface IStrategyVault {
     function lastHarvestTime() external view returns (uint256);
     function emergencyShutdownActive() external view returns (bool);
     function strategyTimelock() external view returns (uint256);
+    function feeRouter() external view returns (address);
 
     // ============ Actions ============
 
@@ -82,4 +84,5 @@ interface IStrategyVault {
     function setFees(uint256 performanceBps, uint256 managementBps) external;
     function setFeeRecipient(address recipient) external;
     function setEmergencyShutdown(bool active) external;
+    function setFeeRouter(address router) external;
 }

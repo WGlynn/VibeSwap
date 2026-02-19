@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../../contracts/financial/StrategyVault.sol";
 import "../../contracts/financial/interfaces/IStrategyVault.sol";
+import "../../contracts/core/FeeRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // ============ Mock Contracts ============
@@ -528,5 +529,60 @@ contract StrategyVaultTest is Test {
         vault.redeem(bobShares, bob, bob);
 
         assertGt(token.balanceOf(bob), 99_000 ether);
+    }
+
+    // ============ FeeRouter Integration Tests ============
+
+    function test_setFeeRouter() public {
+        address router = address(0xF001);
+        vault.setFeeRouter(router);
+        assertEq(vault.feeRouter(), router);
+    }
+
+    function test_setFeeRouter_zeroDisables() public {
+        vault.setFeeRouter(address(0xF001));
+        vault.setFeeRouter(address(0));
+        assertEq(vault.feeRouter(), address(0));
+    }
+
+    function test_harvest_routesThroughFeeRouter() public {
+        // Setup FeeRouter
+        address treasury = address(0x1111);
+        address insurance = address(0x2222);
+        address revShareAddr = address(0x3333);
+        address buybackAddr = address(0x4444);
+        FeeRouter router = new FeeRouter(treasury, insurance, revShareAddr, buybackAddr);
+        router.authorizeSource(address(vault));
+
+        // Wire vault to router
+        vault.setFeeRouter(address(router));
+
+        // Setup strategy
+        vault.proposeStrategy(address(strategy));
+        vm.warp(block.timestamp + 2 days + 1);
+        vault.activateStrategy();
+
+        // Alice deposits
+        vm.prank(alice);
+        vault.deposit(5000 ether, alice);
+
+        // Strategy generates profit
+        strategy.setHarvestProfit(500 ether);
+
+        // Harvest (fees should go to router, not feeRecipient)
+        vm.warp(block.timestamp + 7 days);
+        vault.harvest();
+
+        // FeeRouter should have collected fees
+        assertGt(router.totalCollected(address(token)), 0);
+        // Direct feeRecipient should NOT have received tokens
+        assertEq(token.balanceOf(feeRecipient), 0);
+
+        // Distribute and verify
+        router.distribute(address(token));
+        assertGt(token.balanceOf(treasury), 0);
+        assertGt(token.balanceOf(insurance), 0);
+        assertGt(token.balanceOf(revShareAddr), 0);
+        assertGt(token.balanceOf(buybackAddr), 0);
     }
 }

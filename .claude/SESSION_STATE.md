@@ -38,20 +38,23 @@ This file maintains continuity between Claude Code sessions across devices.
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
 ## Recently Completed (Feb 19, 2026 — Session 36)
-86. **Cross-Module Integration Test Expansion — 3 New E2E Test Suites (42 tests)**
+86. **Cross-Module Integration Test Expansion — 4 New E2E Test Suites (56 tests)**
     - **CompliancePipeline.t.sol** (9 tests): ClawbackRegistry + FederatedConsensus + ClawbackVault E2E
       - Full case→vote→clawback pipeline, cascading taint multi-hop, dismiss clears taint, insufficient votes, grace period gating, taint chain tracking, case wallets, manual propagation, unauthorized access
     - **GovernanceIdentityPipeline.t.sol** (11 tests): SoulboundIdentity + ReputationOracle + ConvictionGovernance + RetroactiveFunding E2E
       - Full conviction pipeline (propose→signal→pass→execute), full retroactive funding round, quadratic matching (distributed > concentrated), ReputationOracle comparison flow (commit→reveal→settle→trust score update), identity/tier gating, conviction decay on signal removal, proposal expiry, full reputation→governance lifecycle
     - **IncentiveDistributionPipeline.t.sol** (12 tests): IncentiveController hub + ILProtectionVault + LoyaltyRewardsManager + VolatilityInsurancePool + SlippageGuaranteeFund + ShapleyDistributor E2E
       - LP registration propagation, volatility fee routing (AMM→Controller→VolPool), multi-LP lifecycle, auction proceeds distribution, Shapley game creation via controller, execution recording, fee routing via balances, authorization checks (3 separate), pool config customization, full lifecycle
+    - **PsiNetPipeline.t.sol** (12 tests): AgentRegistry (ERC-8004) + ContextAnchor + PairwiseVerifier (CRPC) E2E
+      - Full agent registration + capabilities, context graph lifecycle + updates, human vouching for AI agents, capability delegation + revocation, full 4-phase CRPC (commit work → reveal → commit comparison → reveal → settle → claim), context graph merge, agent status lifecycle, identity unification (human + AI), Merkle proof verification, interaction recording, operator transfer, access control
     - **Key insights**:
       - ReputationOracle has payable fallback → need `payable()` cast
       - ShapleyDistributor claim via IncentiveController doesn't work (msg.sender = controller, not LP) → claim directly from Shapley
       - FederatedConsensus.addAuthority takes 3 args: (address, AuthorityRole, string jurisdiction)
       - ClawbackCase struct has 11 fields, not 10 — proposalId at position 10
-    - **80 integration tests passing across 8 suites, 0 regressions**
-    - Commits: `2b8b73a`, `2f7ad91`, `ec797f4` — pushed to both remotes
+      - TreasuryStabilizer._getMainPool() is a placeholder — blocks full GovernanceStabilization E2E
+    - **92 integration tests passing across 9 suites, 0 regressions**
+    - Commits: `2b8b73a`, `2f7ad91`, `ec797f4`, `4fdd0e8` — pushed to both remotes
 
 ## Previously Completed (Feb 19, 2026 — Session 35)
 85. **Fee Pipeline Go-Live + Comprehensive Fuzz/Invariant Test Expansion**

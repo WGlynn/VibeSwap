@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6)
+**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6, Session 35)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -37,7 +37,21 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 19, 2026 — Session 34 continued)
+## Recently Completed (Feb 19, 2026 — Session 35)
+85. **Fee Pipeline Go-Live + Comprehensive Fuzz/Invariant Test Expansion**
+    - **protocolFeeShare configurable**: Changed VibeAMM constant (0) to mutable with `setProtocolFeeShare()` (max 2500 BPS)
+    - **FeePipelineIntegration.t.sol** (11 tests): End-to-end VibeAMM→ProtocolFeeAdapter→FeeRouter→[Treasury/Insurance/RevShare/BuybackEngine]
+    - **DeployProduction.s.sol**: Added Step 5 — ProtocolFeeAdapter, FeeRouter, BuybackEngine deployment + full wiring + verification
+    - **6 new library fuzz test suites** (36 tests): TWAPOracle (5), VWAPOracle (4), FibonacciScaling (8), IncrementalMerkleTree (6), ProofOfWorkLib (9), SHA256Verifier (4)
+    - **ClawbackRegistryFuzz.t.sol** (11 tests): Unique IDs, taint propagation/threshold, cascade depth bounds, access control
+    - **ClawbackRegistryInvariant.t.sol** (7 tests): Ghost state consistency, taint level logic, depth bounds, blocked ↔ FLAGGED
+    - **4 library invariant test suites** (15 tests): TWAPOracle (2), IncrementalMerkleTree (3), FibonacciScaling (4), ProofOfWorkLib (6)
+    - **Key debug**: Foundry nightly `vm.warp(block.timestamp + X)` not updating between calls — fix: use absolute timestamps
+    - **Key debug**: TWAPOracle canConsult() `uint32(block.timestamp) - period` underflows when history insufficient
+    - All 69 new tests passing, 0 regressions
+    - Commits: `8d7972f`, `8c97609`, `dd9c200` — pushed to both remotes
+
+## Previously Completed (Feb 19, 2026 — Session 34 continued)
 84. **Complete Library Test Coverage — ALL 12 Libraries Tested**
     - **SecurityLib.t.sol** (57 tests): Flash loan detection, price deviation, balance consistency, slippage, rate limiting, mulDiv 512-bit, divUp/divDown, address validation, BPS, signature recovery w/ malleability check, EIP-712, interaction keys
     - **ProofOfWorkLib.t.sol** (30 tests): Leading zero bit counting, Keccak/SHA256 PoW verification, difficulty-to-value/fee-discount scaling, challenge generation (windowed + non-windowed), proof hash, hash estimation, structure validation

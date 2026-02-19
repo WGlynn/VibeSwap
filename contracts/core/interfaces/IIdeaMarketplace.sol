@@ -219,4 +219,49 @@ interface IIdeaMarketplace {
 
     /// @notice Get the number of scorers for an idea
     function getScorerCount(uint256 ideaId) external view returns (uint256);
+
+    // ============ Cross-Contract Integration ============
+
+    /// @notice Create a prediction market for an idea's success
+    function createIdeaMarket(
+        uint256 ideaId,
+        address collateralToken,
+        uint256 liquidityParam,
+        uint64 lockTime,
+        uint64 resolutionDeadline
+    ) external returns (uint256 marketId);
+
+    /// @notice Report actual impact of a completed idea (feedback loop)
+    function reportOutcome(uint256 ideaId, uint256 actualImpact) external;
+
+    /// @notice Anchor a technical specification to an idea
+    function anchorIdeaSpec(
+        uint256 ideaId,
+        bytes32 merkleRoot,
+        bytes32 contentCID,
+        uint256 nodeCount,
+        uint256 edgeCount
+    ) external returns (bytes32 graphId);
+
+    /// @notice Get submitter's prediction accuracy
+    function getSubmitterAccuracy(address submitter) external view returns (
+        uint256 accuracyBps, uint256 completed, uint256 successes
+    );
+
+    /// @notice Get prediction market price for an idea
+    function getIdeaMarketPrice(uint256 ideaId) external view returns (uint256 yesPrice);
+
+    // ============ Events (Cross-Contract) ============
+
+    event IdeaMarketCreated(uint256 indexed ideaId, uint256 indexed marketId);
+    event IdeaOutcomeReported(uint256 indexed ideaId, uint256 predictedScore, uint256 actualImpact);
+    event IdeaSpecAnchored(uint256 indexed ideaId, bytes32 indexed graphId);
+
+    // ============ Errors (Cross-Contract) ============
+
+    error MarketAlreadyExists();
+    error OutcomeAlreadyReported();
+    error IdeaNotCompleted();
+    error PredictionMarketNotSet();
+    error ContextAnchorNotSet();
 }

@@ -8,6 +8,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../core/interfaces/IIdeaMarketplace.sol";
 import "../identity/interfaces/IContributionDAG.sol";
+import "../mechanism/interfaces/IPredictionMarket.sol";
+import "../oracle/IReputationOracle.sol";
+import "../identity/interfaces/IContextAnchor.sol";
 
 /**
  * @title IdeaMarketplace
@@ -806,6 +809,209 @@ contract IdeaMarketplace is
         for (uint256 i = offset; i < end; i++) {
             result[i - offset] = _ideas[ids[i]];
         }
+    }
+
+    // ============ Cross-Contract Integration (Freedom's Backlog) ============
+    // Storage appended for UUPS upgrade safety — never reorder above slots.
+
+    /// @notice PredictionMarket contract for idea outcome markets (backlog-003)
+    IPredictionMarket public predictionMarket;
+
+    /// @notice ReputationOracle for submitter accuracy tracking (backlog-004)
+    IReputationOracle public reputationOracle;
+
+    /// @notice ContextAnchor for Rosetta Stone spec anchoring (backlog-010)
+    IContextAnchor public contextAnchor;
+
+    /// @notice Idea ID => PredictionMarket market ID (0 = no market)
+    mapping(uint256 => uint256) public ideaMarketId;
+
+    /// @notice Idea ID => actual impact score reported post-completion (0 = unreported)
+    mapping(uint256 => uint256) public ideaActualImpact;
+
+    /// @notice Idea ID => whether outcome has been reported
+    mapping(uint256 => bool) public ideaOutcomeReported;
+
+    /// @notice Idea ID => ContextAnchor graph ID for technical spec
+    mapping(uint256 => bytes32) public ideaSpecGraphId;
+
+    /// @notice Submitter => number of completed ideas (for accuracy tracking)
+    mapping(address => uint256) public submitterCompletedCount;
+
+    /// @notice Submitter => number of high-impact completions (actualImpact >= predicted score)
+    mapping(address => uint256) public submitterSuccessCount;
+
+    // Events and errors for cross-contract integration are inherited from IIdeaMarketplace.
+
+    // ============ Cross-Contract Functions ============
+
+    /**
+     * @notice Create a prediction market for an idea's success outcome
+     * @dev Anyone can create a market for an approved idea. Uses PredictionMarket
+     *      contract to let the community bet on whether the idea will succeed.
+     *      This provides market-based quality scoring (Freedom's backlog-003).
+     * @param ideaId The idea to create a market for
+     * @param collateralToken Token used for market bets
+     * @param liquidityParam Initial liquidity seeded by caller
+     * @param lockTime When betting closes
+     * @param resolutionDeadline When outcome must be resolved
+     */
+    function createIdeaMarket(
+        uint256 ideaId,
+        address collateralToken,
+        uint256 liquidityParam,
+        uint64 lockTime,
+        uint64 resolutionDeadline
+    ) external ideaExists(ideaId) returns (uint256 marketId) {
+        if (address(predictionMarket) == address(0)) revert PredictionMarketNotSet();
+        if (ideaMarketId[ideaId] != 0) revert MarketAlreadyExists();
+
+        Idea storage idea = _ideas[ideaId];
+        // Only create markets for ideas that have been scored
+        if (idea.score == 0) revert InvalidStatus();
+
+        // Question hash encodes the idea ID for traceability
+        bytes32 question = keccak256(abi.encodePacked("IDEA_OUTCOME:", ideaId, idea.title));
+
+        marketId = predictionMarket.createMarket(
+            question,
+            collateralToken,
+            liquidityParam,
+            lockTime,
+            resolutionDeadline
+        );
+
+        ideaMarketId[ideaId] = marketId;
+
+        emit IdeaMarketCreated(ideaId, marketId);
+    }
+
+    /**
+     * @notice Report actual impact of a completed idea (feedback loop)
+     * @dev Only owner/governance can report outcomes. Compares actual impact
+     *      against the idea's predicted score to track submitter accuracy.
+     *      This is the core of Freedom's cumulative learning system (backlog-004):
+     *      predicted vs actual metrics, retrain scoring over time.
+     * @param ideaId The completed idea
+     * @param actualImpact Actual impact score (0-30, same scale as predicted)
+     */
+    function reportOutcome(
+        uint256 ideaId,
+        uint256 actualImpact
+    ) external onlyOwner ideaExists(ideaId) {
+        Idea storage idea = _ideas[ideaId];
+        if (idea.status != IdeaStatus.COMPLETED) revert IdeaNotCompleted();
+        if (ideaOutcomeReported[ideaId]) revert OutcomeAlreadyReported();
+        if (actualImpact > MAX_TOTAL_SCORE) revert InvalidScore();
+
+        ideaActualImpact[ideaId] = actualImpact;
+        ideaOutcomeReported[ideaId] = true;
+
+        // Track submitter accuracy
+        submitterCompletedCount[idea.author]++;
+        if (actualImpact >= idea.score) {
+            submitterSuccessCount[idea.author]++;
+        }
+
+        // Resolve prediction market if one exists
+        if (ideaMarketId[ideaId] != 0 && address(predictionMarket) != address(0)) {
+            IPredictionMarket.MarketOutcome outcome = actualImpact >= AUTO_APPROVE_THRESHOLD
+                ? IPredictionMarket.MarketOutcome.YES
+                : IPredictionMarket.MarketOutcome.NO;
+            try predictionMarket.resolveMarket(ideaMarketId[ideaId], outcome) {} catch {}
+        }
+
+        emit IdeaOutcomeReported(ideaId, idea.score, actualImpact);
+    }
+
+    /**
+     * @notice Anchor a technical specification to an idea via ContextAnchor
+     * @dev Creates a DECISION-type context graph linking the idea's natural
+     *      language description to a structured technical spec. This is the
+     *      on-chain component of Freedom's Rosetta Stone Protocol (backlog-010):
+     *      lossless translation from idea domain to engineering domain.
+     * @param ideaId The idea to anchor a spec for
+     * @param merkleRoot Merkle root of the spec's context nodes
+     * @param contentCID IPFS CID of the full spec document
+     * @param nodeCount Number of nodes in the spec graph
+     * @param edgeCount Number of edges (cross-references)
+     */
+    function anchorIdeaSpec(
+        uint256 ideaId,
+        bytes32 merkleRoot,
+        bytes32 contentCID,
+        uint256 nodeCount,
+        uint256 edgeCount
+    ) external ideaExists(ideaId) returns (bytes32 graphId) {
+        if (address(contextAnchor) == address(0)) revert ContextAnchorNotSet();
+
+        Idea storage idea = _ideas[ideaId];
+        // Only author or builder can anchor specs
+        if (msg.sender != idea.author && msg.sender != idea.builder && msg.sender != owner()) {
+            revert NotAuthor();
+        }
+
+        // GraphType.DECISION = 2 (decision audit trail for specs)
+        graphId = contextAnchor.createGraph(
+            0, // ownerAgentId = 0 (human)
+            IContextAnchor.GraphType.DECISION,
+            IContextAnchor.StorageBackend.IPFS,
+            merkleRoot,
+            contentCID,
+            nodeCount,
+            edgeCount
+        );
+
+        ideaSpecGraphId[ideaId] = graphId;
+
+        emit IdeaSpecAnchored(ideaId, graphId);
+    }
+
+    // ============ Cross-Contract Views ============
+
+    /**
+     * @notice Get submitter's prediction accuracy (success rate in BPS)
+     * @dev Measures how often a submitter's ideas meet or exceed their
+     *      predicted score. Used by the cumulative learning system to
+     *      weight future submissions (backlog-004 feedback loop).
+     * @param submitter The idea submitter address
+     * @return accuracyBps Success rate in basis points (0-10000)
+     * @return completed Total completed ideas
+     * @return successes Ideas that met or exceeded predicted score
+     */
+    function getSubmitterAccuracy(address submitter) external view returns (
+        uint256 accuracyBps,
+        uint256 completed,
+        uint256 successes
+    ) {
+        completed = submitterCompletedCount[submitter];
+        successes = submitterSuccessCount[submitter];
+        accuracyBps = completed > 0 ? (successes * BPS_PRECISION) / completed : 0;
+    }
+
+    /**
+     * @notice Get the prediction market price for an idea (market-based quality signal)
+     * @param ideaId The idea to check
+     * @return yesPrice Price of YES shares (0-1e18, higher = more likely to succeed)
+     */
+    function getIdeaMarketPrice(uint256 ideaId) external view returns (uint256 yesPrice) {
+        uint256 marketId = ideaMarketId[ideaId];
+        if (marketId == 0 || address(predictionMarket) == address(0)) return 0;
+        return predictionMarket.getPrice(marketId, true);
+    }
+
+    // ============ Cross-Contract Admin ============
+
+    function setPredictionMarket(address _predictionMarket) external onlyOwner {
+        predictionMarket = IPredictionMarket(_predictionMarket);
+    }
+
+    function setReputationOracle(address _reputationOracle) external onlyOwner {
+        reputationOracle = IReputationOracle(_reputationOracle);
+    }
+
+    function setContextAnchor(address _contextAnchor) external onlyOwner {
+        contextAnchor = IContextAnchor(_contextAnchor);
     }
 
     // ============ UUPS ============

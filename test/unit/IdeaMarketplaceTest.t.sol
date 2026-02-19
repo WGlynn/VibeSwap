@@ -1278,4 +1278,231 @@ contract IdeaMarketplaceTest is Test {
         vm.expectRevert(IIdeaMarketplace.IdeaNotFound.selector);
         marketplace.getDeadline(0);
     }
+
+    // ============ Cross-Contract Integration Tests ============
+
+    function test_createIdeaMarket_revertsPredictionMarketNotSet() public {
+        uint256 ideaId = _submitAndScoreApprove();
+        vm.expectRevert(IIdeaMarketplace.PredictionMarketNotSet.selector);
+        marketplace.createIdeaMarket(ideaId, address(vibeToken), 1000e18, uint64(block.timestamp + 7 days), uint64(block.timestamp + 9 days));
+    }
+
+    function test_createIdeaMarket_happyPath() public {
+        MockPredictionMarket mockPM = new MockPredictionMarket();
+        marketplace.setPredictionMarket(address(mockPM));
+
+        uint256 ideaId = _submitAndScoreApprove();
+
+        uint256 marketId = marketplace.createIdeaMarket(
+            ideaId, address(vibeToken), 1000e18,
+            uint64(block.timestamp + 7 days), uint64(block.timestamp + 9 days)
+        );
+
+        assertEq(marketplace.ideaMarketId(ideaId), marketId, "Market ID should be stored");
+        assertEq(marketId, 1, "First market should be ID 1");
+    }
+
+    function test_createIdeaMarket_revertsMarketAlreadyExists() public {
+        MockPredictionMarket mockPM = new MockPredictionMarket();
+        marketplace.setPredictionMarket(address(mockPM));
+
+        uint256 ideaId = _submitAndScoreApprove();
+        marketplace.createIdeaMarket(ideaId, address(vibeToken), 1000e18, uint64(block.timestamp + 7 days), uint64(block.timestamp + 9 days));
+
+        vm.expectRevert(IIdeaMarketplace.MarketAlreadyExists.selector);
+        marketplace.createIdeaMarket(ideaId, address(vibeToken), 1000e18, uint64(block.timestamp + 7 days), uint64(block.timestamp + 9 days));
+    }
+
+    function test_reportOutcome_happyPath() public {
+        uint256 ideaId = _submitScoreFundClaimComplete(100e18);
+
+        marketplace.reportOutcome(ideaId, 25);
+
+        assertEq(marketplace.ideaActualImpact(ideaId), 25, "Actual impact should be stored");
+        assertTrue(marketplace.ideaOutcomeReported(ideaId), "Outcome should be reported");
+
+        (uint256 accuracyBps, uint256 completed, uint256 successes) = marketplace.getSubmitterAccuracy(alice);
+        assertEq(completed, 1, "Should have 1 completed");
+        // idea.score was 27 (avg of 27+24+30/3), actual is 25 < 27, so NOT a success
+        assertEq(successes, 0, "25 < 27 predicted, not a success");
+    }
+
+    function test_reportOutcome_success() public {
+        uint256 ideaId = _submitScoreFundClaimComplete(100e18);
+
+        marketplace.reportOutcome(ideaId, 28); // actual >= predicted (27)
+
+        (uint256 accuracyBps, uint256 completed, uint256 successes) = marketplace.getSubmitterAccuracy(alice);
+        assertEq(completed, 1);
+        assertEq(successes, 1, "28 >= 27 predicted, is a success");
+        assertEq(accuracyBps, 10000, "100% accuracy");
+    }
+
+    function test_reportOutcome_revertsNotCompleted() public {
+        uint256 ideaId = _submitAndScoreApprove();
+        vm.expectRevert(IIdeaMarketplace.IdeaNotCompleted.selector);
+        marketplace.reportOutcome(ideaId, 25);
+    }
+
+    function test_reportOutcome_revertsAlreadyReported() public {
+        uint256 ideaId = _submitScoreFundClaimComplete(100e18);
+        marketplace.reportOutcome(ideaId, 25);
+
+        vm.expectRevert(IIdeaMarketplace.OutcomeAlreadyReported.selector);
+        marketplace.reportOutcome(ideaId, 20);
+    }
+
+    function test_reportOutcome_revertsInvalidScore() public {
+        uint256 ideaId = _submitScoreFundClaimComplete(100e18);
+        vm.expectRevert(IIdeaMarketplace.InvalidScore.selector);
+        marketplace.reportOutcome(ideaId, 31); // max is 30
+    }
+
+    function test_reportOutcome_resolvesPredictionMarket() public {
+        MockPredictionMarket mockPM = new MockPredictionMarket();
+        marketplace.setPredictionMarket(address(mockPM));
+
+        uint256 ideaId = _submitAndScoreApprove();
+        marketplace.createIdeaMarket(ideaId, address(vibeToken), 1000e18, uint64(block.timestamp + 7 days), uint64(block.timestamp + 9 days));
+
+        // Complete the idea
+        _fundAndClaimAndComplete(ideaId, 100e18);
+
+        marketplace.reportOutcome(ideaId, 25); // >= 24 threshold → YES
+
+        assertTrue(mockPM.resolved(marketplace.ideaMarketId(ideaId)), "Market should be resolved");
+    }
+
+    function test_anchorIdeaSpec_revertsContextAnchorNotSet() public {
+        uint256 ideaId = _submitAndScoreApprove();
+        vm.prank(alice);
+        vm.expectRevert(IIdeaMarketplace.ContextAnchorNotSet.selector);
+        marketplace.anchorIdeaSpec(ideaId, bytes32(uint256(1)), bytes32(uint256(2)), 10, 5);
+    }
+
+    function test_anchorIdeaSpec_happyPath() public {
+        MockContextAnchor mockCA = new MockContextAnchor();
+        marketplace.setContextAnchor(address(mockCA));
+
+        uint256 ideaId = _submitAndScoreApprove();
+        bytes32 merkleRoot = bytes32(uint256(0xdead));
+        bytes32 contentCID = bytes32(uint256(0xbeef));
+
+        vm.prank(alice); // author can anchor
+        bytes32 graphId = marketplace.anchorIdeaSpec(ideaId, merkleRoot, contentCID, 10, 5);
+
+        assertEq(marketplace.ideaSpecGraphId(ideaId), graphId, "Graph ID should be stored");
+        assertTrue(graphId != bytes32(0), "Graph ID should be non-zero");
+    }
+
+    function test_anchorIdeaSpec_revertsNotAuthor() public {
+        MockContextAnchor mockCA = new MockContextAnchor();
+        marketplace.setContextAnchor(address(mockCA));
+
+        uint256 ideaId = _submitAndScoreApprove();
+
+        address random = makeAddr("random");
+        vm.prank(random);
+        vm.expectRevert(IIdeaMarketplace.NotAuthor.selector);
+        marketplace.anchorIdeaSpec(ideaId, bytes32(uint256(1)), bytes32(uint256(2)), 10, 5);
+    }
+
+    function test_getIdeaMarketPrice_noMarket() public {
+        uint256 ideaId = _submitAndScoreApprove();
+        assertEq(marketplace.getIdeaMarketPrice(ideaId), 0, "No market = 0 price");
+    }
+
+    function test_getIdeaMarketPrice_withMarket() public {
+        MockPredictionMarket mockPM = new MockPredictionMarket();
+        marketplace.setPredictionMarket(address(mockPM));
+
+        uint256 ideaId = _submitAndScoreApprove();
+        marketplace.createIdeaMarket(ideaId, address(vibeToken), 1000e18, uint64(block.timestamp + 7 days), uint64(block.timestamp + 9 days));
+
+        uint256 price = marketplace.getIdeaMarketPrice(ideaId);
+        assertEq(price, 5e17, "Mock returns 50% price");
+    }
+
+    function test_setAdmin_crossContract() public {
+        address pm = makeAddr("pm");
+        address ro = makeAddr("ro");
+        address ca = makeAddr("ca");
+
+        marketplace.setPredictionMarket(pm);
+        marketplace.setReputationOracle(ro);
+        marketplace.setContextAnchor(ca);
+
+        assertEq(address(marketplace.predictionMarket()), pm);
+        assertEq(address(marketplace.reputationOracle()), ro);
+        assertEq(address(marketplace.contextAnchor()), ca);
+    }
+
+    // ============ Cross-Contract Helpers ============
+
+    function _submitAndScoreApprove() internal returns (uint256 ideaId) {
+        vm.prank(alice);
+        ideaId = marketplace.submitIdea("Test Idea", keccak256("desc"), IIdeaMarketplace.IdeaCategory.UX);
+
+        vm.prank(carol);
+        marketplace.scoreIdea(ideaId, 9, 9, 9); // 27
+        vm.prank(dave);
+        marketplace.scoreIdea(ideaId, 8, 8, 8); // 24
+        vm.prank(eve);
+        marketplace.scoreIdea(ideaId, 10, 10, 10); // 30, avg=27
+    }
+
+    function _fundAndClaimAndComplete(uint256 ideaId, uint256 bounty) internal {
+        // Fund
+        address funder = makeAddr("funder2");
+        vibeToken.mint(funder, bounty);
+        vm.prank(funder);
+        vibeToken.approve(address(marketplace), bounty);
+        vm.prank(funder);
+        marketplace.fundBounty(ideaId, bounty);
+
+        // Claim
+        uint256 collateral = (bounty * marketplace.builderCollateralBps()) / marketplace.BPS_PRECISION();
+        vibeToken.mint(bob, collateral);
+        vm.prank(bob);
+        vibeToken.approve(address(marketplace), collateral);
+        vm.prank(bob);
+        marketplace.claimBounty(ideaId);
+
+        // Submit + approve
+        vm.prank(bob);
+        marketplace.submitWork(ideaId, keccak256("proof"));
+        marketplace.approveWork(ideaId);
+    }
+
+    function _submitScoreFundClaimComplete(uint256 bounty) internal returns (uint256 ideaId) {
+        ideaId = _submitAndScoreApprove();
+        _fundAndClaimAndComplete(ideaId, bounty);
+    }
+}
+
+// ============ Mock Cross-Contract Contracts ============
+
+contract MockPredictionMarket {
+    uint256 private _nextId = 1;
+    mapping(uint256 => bool) public resolved;
+
+    function createMarket(bytes32, address, uint256, uint64, uint64) external returns (uint256) {
+        return _nextId++;
+    }
+
+    function resolveMarket(uint256 marketId, uint8) external {
+        resolved[marketId] = true;
+    }
+
+    function getPrice(uint256, bool) external pure returns (uint256) {
+        return 5e17; // 50%
+    }
+}
+
+contract MockContextAnchor {
+    uint256 private _nextId = 1;
+
+    function createGraph(uint256, uint8, uint8, bytes32, bytes32, uint256, uint256) external returns (bytes32) {
+        return bytes32(_nextId++);
+    }
 }

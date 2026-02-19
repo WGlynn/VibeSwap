@@ -12,7 +12,7 @@ import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getR
 import { createServer } from 'http';
 import { writeFile, readFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
-import { getAudioBase64 } from 'google-tts-api';
+import googleTTS from 'google-tts-api';
 
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
 
@@ -774,29 +774,14 @@ async function main() {
 
               // Generate TTS voice message — Jarvis speaks
               try {
-                // google-tts-api has a 200 char limit per call, so chunk long responses
-                const chunks = [];
-                let remaining = jarvisText;
-                while (remaining.length > 0) {
-                  // Split at sentence boundaries within 200 chars
-                  let end = Math.min(remaining.length, 190);
-                  if (end < remaining.length) {
-                    const lastPeriod = remaining.lastIndexOf('.', end);
-                    const lastQuestion = remaining.lastIndexOf('?', end);
-                    const lastBreak = Math.max(lastPeriod, lastQuestion);
-                    if (lastBreak > 50) end = lastBreak + 1;
-                  }
-                  chunks.push(remaining.slice(0, end).trim());
-                  remaining = remaining.slice(end).trim();
-                }
+                // google-tts-api getAllAudioBase64 handles long text + chunking automatically
+                const audioSegments = await googleTTS.getAllAudioBase64(jarvisText, {
+                  lang: 'en',
+                  slow: false,
+                  host: 'https://translate.google.co.uk', // UK endpoint for British accent
+                });
 
-                // Concatenate audio chunks into one buffer
-                const audioBuffers = [];
-                for (const chunk of chunks) {
-                  if (chunk.length === 0) continue;
-                  const base64 = await getAudioBase64(chunk, { lang: 'en-GB', slow: false });
-                  audioBuffers.push(Buffer.from(base64, 'base64'));
-                }
+                const audioBuffers = audioSegments.map(seg => Buffer.from(seg.base64, 'base64'));
                 const fullAudio = Buffer.concat(audioBuffers);
 
                 // Save temp file and send as voice

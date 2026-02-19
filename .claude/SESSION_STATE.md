@@ -10,7 +10,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Current Focus
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
-- **2571+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
+- **2627+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
 - **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
 - **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
@@ -54,6 +54,14 @@ This file maintains continuity between Claude Code sessions across devices.
     - **6 interfaces**: IBuybackEngine, IMerkleAirdrop, IVestingSchedule
     - **116 new tests**: 81 unit (28+24+29) + 22 fuzz (8+6+8) + 13 invariant (4+4+5) — ALL PASSING
     - Zero reverts in 1.5M+ invariant handler calls
+    - **SimpleYieldStrategy.sol** (~140 lines): Reference IStrategy implementation for StrategyVault
+      - Holds assets, owner injects yield, harvest returns profit to vault
+      - First concrete strategy — proves vault architecture works end-to-end
+    - **DynamicFeeHook.sol** (~200 lines): First concrete IVibeHook implementation
+      - Adjusts fees based on trading volume — surge pricing during high volatility
+      - Tracks volume per pool per window, fee = base + surge when above threshold
+      - Implements BEFORE_SWAP (return fee recommendation) + AFTER_SWAP (record volume)
+    - **56 additional tests**: 35 unit (20+15) + 11 fuzz (5+6) + 7 invariant (4+3) — ALL PASSING
 
 ## Previously Completed (Feb 19, 2026 — Session 33)
 82. **DeFi/DeFAI Layer — 4 New Primitives + Cross-Contract Wiring**

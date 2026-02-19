@@ -1013,12 +1013,28 @@ import "../monetary/interfaces/IJoule.sol";
 - **Interface**: IVestingSchedule
 - **Vesting**: startTime → cliff (0% vested) → linear unlock → 100% vested. Revocable schedules return unvested to owner.
 
+## Concrete Implementations (Session 34)
+
+### SimpleYieldStrategy (`contracts/financial/strategies/SimpleYieldStrategy.sol`)
+- **Type**: IStrategy implementation | **Inherits**: IStrategy, Ownable
+- **Purpose**: Reference strategy for StrategyVault — holds assets, owner injects yield, harvest returns profit
+- **Key Functions**: `deposit(uint256)`, `withdraw(uint256)`, `harvest()`, `emergencyWithdraw()`, `injectYield(uint256)`
+- **Views**: `totalAssets()`, `deployed()`, `pendingYield()`, `asset()`, `vault()`
+- **Integration**: Plugs into StrategyVault as first concrete strategy
+
+### DynamicFeeHook (`contracts/hooks/DynamicFeeHook.sol`)
+- **Type**: IVibeHook implementation | **Inherits**: IVibeHook, Ownable
+- **Purpose**: Dynamic fee adjustment based on trading volume (surge pricing)
+- **Hook Points**: BEFORE_SWAP (returns fee recommendation) + AFTER_SWAP (records volume)
+- **Key Functions**: `beforeSwap(bytes32, bytes)`, `afterSwap(bytes32, bytes)`, `setParameters(...)`, `setWindowDuration(uint256)`, `calculateFeeForVolume(uint256)`
+- **Fee Logic**: fee = baseFee below threshold, fee = baseFee + surge increase above threshold, capped at maxFee
+
 ---
 
 ## Stats
 
-- **~128 .sol files** total (contracts + interfaces)
-- **~74 implementation contracts**
+- **~132 .sol files** total (contracts + interfaces)
+- **~76 implementation contracts**
 - **~49 interfaces**
 - **~11 libraries**
 - Core: 8 | AMM: 6 (+ 2 curves) | Financial: 9 | Governance: 8 | Incentives: 9 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2

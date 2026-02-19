@@ -11,7 +11,8 @@ This file maintains continuity between Claude Code sessions across devices.
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
 - **2186+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
-- **CKB Integration: 167 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE)
+- **CKB Integration: 190 Rust tests passing, 14 crates + test crate** (ALL 7 PHASES COMPLETE + RISC-V BUILD PIPELINE + SDK COMPLETE)
+- **CKB SDK: 9 transaction builders** (commit, reveal, pool create, add/remove liquidity, settle batch, oracle, config, compliance)
 - **CKB RISC-V: All 8 scripts compiled to ELF binaries** (117-192 KB each, deploy tool generates code hashes)
 - **JARVIS Telegram Bot: AUTONOMOUS** — proactive intelligence, daily digests, thread archival, AI moderation, rights declaration
 - Financial Primitives: 10/10 COMPLETE
@@ -36,7 +37,19 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 27)
+## Recently Completed (Feb 18, 2026 — Session 28)
+78. **CKB SDK Complete + Test Expansion (190 tests)**
+    - **5 new SDK transaction builders**: create_pool, create_settle_batch, update_oracle, update_config, update_compliance
+    - **create_settle_batch** is the critical one: takes revealed orders → computes clearing price → Fisher-Yates shuffle → applies trades at uniform price → updates pool reserves → transitions auction → creates next batch
+    - **create_pool**: initializes AMM pool cell + auction cell + LP position (sqrt(amount0*amount1) - MINIMUM_LIQUIDITY)
+    - **Fixed mul_div overflow**: all TWAP/price calculations used `checked_mul(PRECISION)` which overflows u128 for any reserves > ~340 tokens — replaced with `vibeswap_math::mul_div()`
+    - **23 new tests**: reveal phase (wrong secret, deadline, slash enforcement, partial reveal), pool ops (initialization, swap settlement, TWAP accumulation, k invariant), oracle/config updates, adversarial (double-spend, MMR manipulation, difficulty bombing, wrong clearing price, phase skip, settlement replay)
+    - **Saturday deployment automation**: deploy-sepolia.sh script, frontend env vars for testnet addresses
+    - **Warning cleanup**: removed unused imports (pow, math, mmr libs), fixed unused variables in tests
+    - **190 total CKB tests, 0 failures, 0 warnings**
+    - Commits: `7f70f86`, `11789c9`
+
+## Previously Completed (Feb 18, 2026 — Session 27)
 77. **CKB RISC-V Build Pipeline — All 8 Scripts Deployable**
     - **RISC-V target**: `riscv64imac-unknown-none-elf` installed, `.cargo/config.toml` configured
     - **ckb-std 1.0.2**: Feature-gated (allocator, calc-hash, ckb-types, dummy-atomic) — no C compiler required

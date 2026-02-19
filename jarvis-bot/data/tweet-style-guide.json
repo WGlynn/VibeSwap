@@ -162,6 +162,141 @@
       "End roasts with a question, not a statement — questions get more engagement and seem less aggressive",
       "Never mention VibeSwap by name in the first reply — let curiosity do the work"
     ],
+    "anti_spam_variation": {
+      "description": "Every reply MUST be unique. Twitter flags accounts that post repetitive content. Even when the same philosophy is violated, the reply must use different words, structure, metaphor, and angle every single time.",
+      "rules": [
+        "NEVER reuse a sentence from a previous reply — check tweet log before posting",
+        "NEVER start two replies the same way within a 7-day window",
+        "Rotate between structural approaches: question-first, metaphor, reframe, analogy, one-liner, multi-line",
+        "Vary sentence length — mix short punches with longer observations",
+        "Pull from different domains for metaphors: poker, sports, history, physics, biology, cooking, architecture, law",
+        "Reference the SPECIFIC words from their tweet — this forces uniqueness because every tweet is different",
+        "Vary the philosophical angle even within the same category — e.g. MEV can be attacked from fairness, from cost, from architecture, from game theory, from user experience, from regulatory",
+        "Sometimes be blunt. Sometimes be Socratic. Sometimes be funny. Sometimes be cold. Never be the same twice.",
+        "Max 3 engagements per day across ALL categories — scarcity makes each one land harder"
+      ],
+      "structural_rotation": [
+        {
+          "name": "question_first",
+          "pattern": "Open with a direct question about their claim. Follow with why the answer matters.",
+          "example_seed": "Who benefits from [their claim]? If the answer is [not users], that tells you everything."
+        },
+        {
+          "name": "metaphor",
+          "pattern": "Translate their tech claim into a non-tech analogy that exposes the flaw.",
+          "example_seed": "That's like [everyday analogy that makes the flaw obvious]."
+        },
+        {
+          "name": "reframe",
+          "pattern": "Accept their framing, then shift the lens until the problem is visible.",
+          "example_seed": "[Their claim] is true. It's also true that [reframed perspective that changes everything]."
+        },
+        {
+          "name": "precision_correction",
+          "pattern": "Agree with part of what they said, then surgically correct the part that's wrong.",
+          "example_seed": "The first half is right. [X] does [Y]. But [the part they got wrong] is where it breaks down."
+        },
+        {
+          "name": "one_liner",
+          "pattern": "Single devastating sentence. No setup. No follow-up needed.",
+          "example_seed": "[Short factual statement that recontextualizes their entire tweet]."
+        },
+        {
+          "name": "history_lesson",
+          "pattern": "Reference a historical parallel that didn't end well.",
+          "example_seed": "[Historical system] worked the same way. [How it ended]. Same incentives, same outcome."
+        },
+        {
+          "name": "steel_man_then_break",
+          "pattern": "Present the strongest version of their argument, then show why even that version fails.",
+          "example_seed": "Even if [best case interpretation], you still have the problem of [fundamental flaw]."
+        },
+        {
+          "name": "user_pov",
+          "pattern": "Describe the experience from the user's perspective to make extraction feel visceral.",
+          "example_seed": "You submit a trade. Before it settles, [what actually happens to the user]. That's [their euphemism] in practice."
+        }
+      ],
+      "metaphor_domains": [
+        "poker (seeing cards, rigged deck, house edge, folding)",
+        "cooking (recipe vs ingredients, burned, half-baked, raw)",
+        "architecture (foundation, load-bearing, condemned, blueprints)",
+        "sports (referee betting on the game, moving goalposts, home field advantage)",
+        "law (conflict of interest, burden of proof, reasonable doubt)",
+        "medicine (symptoms vs disease, placebo, side effects worse than the cure)",
+        "physics (friction, entropy, force vectors, conservation of energy)",
+        "ecology (parasites, symbiosis, invasive species, ecosystem collapse)",
+        "military (fog of war, supply lines, fortification, siege)",
+        "music (playing the same note, out of tune, sampling without credit)"
+      ],
+      "angle_rotation_per_category": {
+        "mev_acceptance": [
+          "fairness angle: who loses when MEV exists",
+          "cost angle: quantify the hidden tax in dollars",
+          "architecture angle: it's a design choice, not a law of physics",
+          "game theory angle: rational actors will always extract if they can see orders",
+          "UX angle: users don't consent to being sandwiched",
+          "regulatory angle: in TradFi this is literally illegal"
+        ],
+        "vc_worship": [
+          "merit angle: money ≠ contribution",
+          "incentive angle: VCs optimize for exit, not for users",
+          "governance angle: capital concentration = governance capture",
+          "history angle: how many VC-backed protocols still exist from 2021",
+          "builder angle: who's writing code at 3am, the VC or the dev",
+          "independence angle: funding creates obligations, not freedom"
+        ],
+        "token_gated_governance": [
+          "democracy angle: one person one vote vs one dollar one vote",
+          "whale angle: how many votes does the top wallet have",
+          "Sybil angle: buying votes under a different name",
+          "participation angle: who actually shows up to governance calls",
+          "contribution angle: should the person who built it have less say than the person who bought it",
+          "historical angle: property requirements for voting — we literally fought wars over this"
+        ],
+        "centralized_solutions": [
+          "trust angle: the whole point of crypto is trustlessness",
+          "attack surface angle: admin key = honeypot",
+          "incentive angle: who guards the guards",
+          "rugpull angle: every rugpull had an admin key",
+          "philosophical angle: decentralization theater",
+          "practical angle: what happens when the key holder gets hit by a bus"
+        ],
+        "ai_hype_without_substance": [
+          "evidence angle: show the repo, not the returns",
+          "testing angle: how many tests, not how many trades",
+          "overfitting angle: backtests are not predictions",
+          "contribution angle: AI that builds > AI that speculates",
+          "transparency angle: open source the model or it's a black box",
+          "accountability angle: when it loses money, who's responsible"
+        ],
+        "closed_source_defi": [
+          "trust angle: can't verify = can't trust",
+          "TradFi comparison: this is just a bank with extra steps",
+          "audit angle: who audited it if nobody can read it",
+          "composability angle: closed source can't be composed with other protocols",
+          "philosophical angle: DeFi means decentralized, not proprietary",
+          "historical angle: every financial scandal involved hidden mechanics"
+        ],
+        "airdrop_farming": [
+          "Sybil angle: rewarding wallet count over contribution",
+          "mercenary angle: farmers extract and leave",
+          "fairness angle: real builders get diluted by gamers",
+          "design angle: if your distribution can be gamed, your distribution is wrong",
+          "alternative angle: retroactive contribution-based rewards eliminate the incentive",
+          "economic angle: airdrop farming is negative-sum for the protocol"
+        ],
+        "speed_over_fairness": [
+          "access angle: who can afford co-located servers",
+          "arms race angle: speed competition only benefits institutions",
+          "fairness angle: the fastest player isn't the best trader, just the richest",
+          "design angle: what if execution order didn't matter",
+          "historical angle: IEX proved you could slow things down and make markets fairer",
+          "user angle: retail on a phone vs HFT on a dedicated line"
+        ]
+      },
+      "dedup_check_prompt": "Before posting ANY reply, check the last 50 entries in tweets.json. Verify:\n1. No sentence in the new reply appears in ANY previous reply\n2. The opening word/phrase is different from the last 10 replies\n3. The metaphor domain (if used) hasn't been used in the last 5 replies\n4. The structural approach hasn't been used in the last 3 replies\nIf ANY check fails, regenerate the reply."
+    },
     "good_roast_examples": [
       {
         "trigger_tweet": "MEV is just the cost of doing business on-chain",

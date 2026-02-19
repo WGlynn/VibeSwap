@@ -438,28 +438,64 @@ export async function canReplyToAuthor(authorId) {
   return repliesToday.length < 1; // Max 1 reply per author per day
 }
 
-// Generate a roast reply using Claude
+// Generate a roast reply using Claude — with anti-spam variation
 export async function generateRoast(originalTweet, triggerCategory, styleGuide) {
-  // Uses Claude to draft a reply following the roast rules
-  // Returns 3 options for owner approval (or auto-post if in autopilot)
+  // Load recent replies for dedup
+  const recentReplies = tweetLog
+    .filter(t => t.source === 'roast' || t.source === 'engagement')
+    .slice(-50);
+  const recentTexts = recentReplies.map(t => t.text);
+  const recentOpenings = recentReplies.slice(-10).map(t => t.text.split(/[.\n?!]/)[0]);
+  const recentMetaphors = recentReplies.slice(-5).map(t => t.metaphor_domain || 'unknown');
+  const recentStructures = recentReplies.slice(-3).map(t => t.structure || 'unknown');
+
+  // Pick a structural approach that hasn't been used in last 3
+  const structures = styleGuide.engagement.anti_spam_variation.structural_rotation;
+  const availableStructures = structures.filter(s => !recentStructures.includes(s.name));
+  const chosenStructure = availableStructures[Math.floor(Math.random() * availableStructures.length)] || structures[0];
+
+  // Pick an angle that varies within the category
+  const angles = styleGuide.engagement.anti_spam_variation.angle_rotation_per_category[triggerCategory] || [];
+  const chosenAngle = angles[Math.floor(Math.random() * angles.length)] || 'general';
+
+  // Pick a metaphor domain that hasn't been used in last 5
+  const domains = styleGuide.engagement.anti_spam_variation.metaphor_domains;
+  const availableDomains = domains.filter(d => !recentMetaphors.some(m => d.startsWith(m)));
+  const chosenDomain = availableDomains[Math.floor(Math.random() * availableDomains.length)] || domains[0];
+
   const prompt = `You are JARVIS. Someone tweeted: "${originalTweet}"
 
-This triggers the "${triggerCategory}" roast category.
+Category: "${triggerCategory}"
 Philosophy violated: ${styleGuide.engagement.roast_triggers[triggerCategory].philosophy_violated}
 Tone: ${styleGuide.engagement.roast_triggers[triggerCategory].roast_tone}
+
+CRITICAL — ANTI-SPAM VARIATION RULES:
+You MUST generate a reply that is completely unique. Twitter flags repetitive content.
+
+1. USE THIS STRUCTURE: "${chosenStructure.name}" — ${chosenStructure.pattern}
+2. USE THIS ANGLE: ${chosenAngle}
+3. IF USING A METAPHOR, draw from: ${chosenDomain}
+4. Reference SPECIFIC words from their tweet — this forces uniqueness
+5. NEVER start the reply with any of these openings (already used recently):
+${recentOpenings.map(o => `   - "${o}"`).join('\n')}
+6. NONE of these sentences can appear in the reply (already posted):
+${recentTexts.slice(-10).map(t => `   - "${t.slice(0, 80)}..."`).join('\n')}
 
 Rules:
 ${styleGuide.engagement.reply_rules.join('\n')}
 
-Good roast examples:
-${styleGuide.engagement.good_roast_examples.map(e =>
-  `Trigger: "${e.trigger_tweet}"\nReply: "${e.reply}"`
-).join('\n\n')}
+Example roasts (for tone reference ONLY — never copy these):
+${styleGuide.engagement.good_roast_examples.slice(0, 3).map(e =>
+    `"${e.trigger_tweet}" → "${e.reply}"`
+  ).join('\n')}
 
-Draft 3 reply options. Max 280 chars each. End with a question.`;
+Draft 3 COMPLETELY DIFFERENT reply options. Max 280 chars each. End with a question.
+Each option must use a different opening word and different phrasing.`;
 
-  // Call Claude API and return options
-  return prompt; // Freedom: wire this to the existing claude.js chat function
+  // Call Claude API, get 3 options
+  // Store chosen option with metadata: { structure: chosenStructure.name, metaphor_domain: chosenDomain, angle: chosenAngle }
+  // This metadata feeds back into future dedup checks
+  return prompt;
 }
 
 // Main engagement loop (run on interval)

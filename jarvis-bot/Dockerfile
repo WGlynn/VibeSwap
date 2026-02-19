@@ -18,6 +18,9 @@ RUN npm ci --production
 # Copy source
 COPY src/ ./src/
 
+# Copy memory/knowledge base files (Jarvis's long-term context)
+COPY memory/ /app/memory/
+
 # Copy entrypoint script and fix Windows line endings
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh

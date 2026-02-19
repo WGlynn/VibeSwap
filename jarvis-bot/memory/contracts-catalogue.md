@@ -959,11 +959,67 @@ import "../monetary/interfaces/IJoule.sol";
 
 ---
 
+## DeFi/DeFAI Layer (Session 33)
+
+### StrategyVault (`contracts/financial/StrategyVault.sol`)
+- **Type**: ERC-4626 vault | **Inherits**: ERC4626, Ownable, ReentrancyGuard
+- **Purpose**: Automated yield vault with pluggable strategies
+- **Key Functions**: `proposeStrategy(address)`, `activateStrategy()`, `harvest()`, `setFeeRouter(address)`
+- **Interface**: IStrategyVault + IStrategy (pluggable yield strategy)
+- **Constants**: MAX_PERFORMANCE_FEE=3000 (30%), MAX_MANAGEMENT_FEE=500 (5%), DEFAULT_TIMELOCK=2 days
+- **Integration**: Optional FeeRouter for cooperative fee distribution
+
+### LiquidityGauge (`contracts/incentives/LiquidityGauge.sol`)
+- **Type**: Incentive mechanism | **Inherits**: Ownable, ReentrancyGuard
+- **Purpose**: Curve-style vote-directed LP incentives with Synthetix reward accumulator
+- **Key Functions**: `createGauge(bytes32, address)`, `stake(bytes32, uint256)`, `withdraw(bytes32, uint256)`, `claimRewards(bytes32)`, `updateWeights(bytes32[], uint256[])`, `advanceEpoch()`, `setEmissionRate(uint256)`
+- **Interface**: ILiquidityGauge
+- **Constants**: MAX_GAUGES=100, PRECISION=1e18
+
+### FeeRouter (`contracts/core/FeeRouter.sol`)
+- **Type**: Revenue distribution | **Inherits**: Ownable, ReentrancyGuard
+- **Purpose**: Central protocol fee collector and distributor
+- **Key Functions**: `collectFee(address, uint256)`, `distribute(address)`, `distributeMultiple(address[])`, `updateConfig(FeeConfig)`, `authorizeSource(address)`, `emergencyRecover(address, uint256, address)`
+- **Interface**: IFeeRouter
+- **Default Split**: 40% treasury, 20% insurance, 30% revshare, 10% buyback
+
+### ProtocolFeeAdapter (`contracts/core/ProtocolFeeAdapter.sol`)
+- **Type**: Adapter/bridge | **Inherits**: Ownable, ReentrancyGuard
+- **Purpose**: Bridge fee-generating contracts to FeeRouter (set as VibeAMM treasury)
+- **Key Functions**: `forwardFees(address)`, `forwardETH()`, `setFeeRouter(address)`, `recoverToken(address, uint256, address)`
+- **Interface**: IProtocolFeeAdapter
+
+## Revenue & Distribution Primitives (Session 34)
+
+### BuybackEngine (`contracts/core/BuybackEngine.sol`)
+- **Type**: Revenue mechanism | **Inherits**: Ownable, ReentrancyGuard
+- **Purpose**: Automated buyback-and-burn — FeeRouter's 10% buyback allocation swaps for protocol token via VibeAMM and burns
+- **Key Functions**: `executeBuyback(address)`, `executeBuybackMultiple(address[])`, `setMinBuybackAmount(address, uint256)`, `setSlippageTolerance(uint256)`, `setCooldown(uint256)`, `setProtocolToken(address)`, `setBurnAddress(address)`, `emergencyRecover(address, uint256, address)`
+- **Interface**: IBuybackEngine
+- **Constants**: MAX_SLIPPAGE_BPS=2000, DEAD_ADDRESS=0x...dEaD
+- **Integration**: Set as FeeRouter's buyback target → receives tokens → swaps via VibeAMM → burns
+
+### MerkleAirdrop (`contracts/incentives/MerkleAirdrop.sol`)
+- **Type**: Distribution mechanism | **Inherits**: Ownable, ReentrancyGuard
+- **Purpose**: Gas-efficient token distribution via Merkle proofs with multiple rounds
+- **Key Functions**: `createDistribution(address, bytes32, uint256, uint256)`, `claim(uint256, address, uint256, bytes32[])`, `deactivateDistribution(uint256)`, `reclaimUnclaimed(uint256, address)`, `emergencyRecover(address, uint256, address)`
+- **Interface**: IMerkleAirdrop
+- **Leaf Format**: `keccak256(abi.encodePacked(keccak256(abi.encode(account, amount))))` (double-hash, OZ standard)
+
+### VestingSchedule (`contracts/financial/VestingSchedule.sol`)
+- **Type**: Financial primitive | **Inherits**: Ownable, ReentrancyGuard
+- **Purpose**: Token vesting with cliff + linear unlock for team/contributors
+- **Key Functions**: `createSchedule(address, address, uint256, uint256, uint256, uint256, bool)`, `claim(uint256)`, `revoke(uint256)`, `vestedAmount(uint256)`, `claimableAmount(uint256)`, `schedulesOf(address)`, `emergencyRecover(address, uint256, address)`
+- **Interface**: IVestingSchedule
+- **Vesting**: startTime → cliff (0% vested) → linear unlock → 100% vested. Revocable schedules return unvested to owner.
+
+---
+
 ## Stats
 
-- **~115 .sol files** total (contracts + interfaces)
-- **~67 implementation contracts**
-- **~42 interfaces**
+- **~128 .sol files** total (contracts + interfaces)
+- **~74 implementation contracts**
+- **~49 interfaces**
 - **~11 libraries**
-- Core: 5 | AMM: 6 (+ 2 curves) | Financial: 7 | Governance: 8 | Incentives: 7 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
-- **14 Rust crates** (CKB): 4 libraries + 8 scripts + 1 SDK + 1 test crate | **167 Rust tests**
+- Core: 8 | AMM: 6 (+ 2 curves) | Financial: 9 | Governance: 8 | Incentives: 9 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
+- **14 Rust crates** (CKB): 4 libraries + 8 scripts + 1 SDK + 1 test crate | **190 Rust tests**

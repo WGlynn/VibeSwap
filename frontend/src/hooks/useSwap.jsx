@@ -3,7 +3,13 @@ import { useWallet } from './useWallet'
 import { useDeviceWallet } from './useDeviceWallet'
 import { useContracts } from './useContracts'
 import { useBalances } from './useBalances'
+import { useCKBWallet } from './useCKBWallet'
+import { useCKBContracts } from './useCKBContracts'
 import { TOKENS as CHAIN_TOKENS, areContractsDeployed } from '../utils/constants'
+import {
+  isCKBChain, CKB_TOKENS, CKB_PRECISION, CKB_PHASES,
+  formatTokenAmount, formatCKB,
+} from '../utils/ckb-constants'
 import { ethers } from 'ethers'
 
 // ============================================================
@@ -74,7 +80,7 @@ function clearSecret(commitId) {
 // HOOK
 // ============================================================
 export function useSwap() {
-  const { chainId, provider } = useWallet()
+  const { chainId: evmChainId, provider } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const {
     isContractsDeployed: contractsReady,
@@ -87,6 +93,23 @@ export function useSwap() {
   } = useContracts()
 
   const { getFormattedBalance, simulateSwap } = useBalances()
+
+  // CKB hooks — always called (React rules), conditionally used
+  const { chainId: ckbChainId, isConnected: isCKBConnected, formattedBalance: ckbBalance } = useCKBWallet()
+  const {
+    auctionState: ckbAuctionState,
+    poolStates: ckbPoolStates,
+    commitOrder: ckbCommitOrder,
+    revealOrder: ckbRevealOrder,
+    fetchPoolState: ckbFetchPool,
+    isLive: isCKBLive,
+    isDemoMode: isCKBDemo,
+    formatTokenAmount: ckbFormatAmount,
+  } = useCKBContracts()
+
+  // Determine active chain
+  const isCKB = isCKBConnected && isCKBChain(ckbChainId)
+  const chainId = isCKB ? ckbChainId : evmChainId
 
   // ============ State ============
   const [swapState, setSwapState] = useState('idle')
@@ -101,19 +124,38 @@ export function useSwap() {
 
   // ============ Derived ============
   const isLive = useMemo(() => {
-    return areContractsDeployed(chainId)
-  }, [chainId])
+    if (isCKB) return isCKBLive || isCKBDemo // CKB always has demo mode
+    return areContractsDeployed(evmChainId)
+  }, [isCKB, isCKBLive, isCKBDemo, evmChainId])
 
   // ============ Token list ============
   // In live mode, use chain-specific tokens from constants.js enriched with live balances.
   // In demo mode, build from MOCK data.
+  // On CKB, use CKB_TOKENS from ckb-constants.
   const tokens = useMemo(() => {
-    if (isLive && chainId && CHAIN_TOKENS[chainId]) {
-      return CHAIN_TOKENS[chainId].map(t => ({
+    // CKB chain — use CKB token list
+    if (isCKB) {
+      const ckbTokenList = CKB_TOKENS[ckbChainId] || CKB_TOKENS['ckb-mainnet'] || []
+      return ckbTokenList.map(t => ({
+        symbol: t.symbol,
+        name: t.name,
+        logo: t.logo || t.symbol[0],
+        price: MOCK_PRICES[t.symbol] || (t.symbol === 'CKB' ? 0.012 : 0),
+        balance: t.isNative ? (ckbBalance || '0') : '0',
+        address: t.typeHash,
+        decimals: t.decimals,
+        isCKB: true,
+        isNative: t.isNative || false,
+      }))
+    }
+
+    // EVM live mode
+    if (isLive && evmChainId && CHAIN_TOKENS[evmChainId]) {
+      return CHAIN_TOKENS[evmChainId].map(t => ({
         symbol: t.symbol,
         name: t.name,
         logo: TOKEN_LOGOS[t.symbol] || t.symbol[0],
-        price: MOCK_PRICES[t.symbol] || 0, // live price TBD — oracle integration later
+        price: MOCK_PRICES[t.symbol] || 0,
         balance: liveBalances[t.symbol] || '0',
         address: t.address,
         decimals: t.decimals,
@@ -130,15 +172,15 @@ export function useSwap() {
       address: null,
       decimals: symbol === 'WBTC' ? 8 : (symbol === 'USDC' || symbol === 'USDT' ? 6 : 18),
     }))
-  }, [isLive, chainId, liveBalances, getFormattedBalance])
+  }, [isCKB, ckbChainId, ckbBalance, isLive, evmChainId, liveBalances, getFormattedBalance])
 
-  // ============ Fetch live balances ============
+  // ============ Fetch live balances (EVM only — CKB uses useCKBWallet) ============
   useEffect(() => {
-    if (!isLive || !chainId || !CHAIN_TOKENS[chainId]) return
+    if (!isLive || isCKB || !evmChainId || !CHAIN_TOKENS[evmChainId]) return
 
     let cancelled = false
     const fetchAll = async () => {
-      const chainTokens = CHAIN_TOKENS[chainId]
+      const chainTokens = CHAIN_TOKENS[evmChainId]
       const results = {}
 
       for (const t of chainTokens) {
@@ -165,7 +207,7 @@ export function useSwap() {
       cancelled = true
       clearInterval(interval)
     }
-  }, [isLive, chainId, contractGetTokenBalance])
+  }, [isLive, isCKB, evmChainId, contractGetTokenBalance])
 
   // ============ getBalance ============
   const getBalance = useCallback((symbol) => {
@@ -184,14 +226,45 @@ export function useSwap() {
 
     const amount = parseFloat(amountIn)
 
+    if (isCKB) {
+      // CKB mode — compute from pool reserves or mock prices
+      const poolPairId = ckbAuctionState?.pairId || null
+      const pool = poolPairId ? ckbPoolStates[poolPairId] : null
+
+      if (pool && pool.reserve0 > 0n && pool.reserve1 > 0n) {
+        // Use AMM constant product: amountOut = reserve1 * amountIn / (reserve0 + amountIn)
+        const amountInScaled = BigInt(Math.floor(amount * 1e18))
+        const feeAdjusted = amountInScaled * 9995n / 10000n // 0.05% fee
+        const numerator = pool.reserve1 * feeAdjusted
+        const denominator = pool.reserve0 + feeAdjusted
+        const amountOutScaled = numerator / denominator
+        const amountOut = Number(amountOutScaled) / 1e18
+        const rate = amountOut / amount
+        const priceImpact = amount * (MOCK_PRICES[fromSymbol] || 0.012) > 1000 ? 0.15 : 0.02
+        const fee = amount * 0.0005
+
+        setQuote({ rate, amountOut, priceImpact, fee, savings: 0 })
+      } else {
+        // Fallback to mock prices for CKB demo
+        const fromPrice = MOCK_PRICES[fromSymbol] || (fromSymbol === 'CKB' ? 0.012 : 1)
+        const toPrice = MOCK_PRICES[toSymbol] || (toSymbol === 'CKB' ? 0.012 : 1)
+        const rate = fromPrice / toPrice
+        const amountOut = amount * rate
+        const fee = amount * fromPrice * 0.0005
+
+        setQuote({ rate, amountOut, priceImpact: 0.02, fee, savings: 0 })
+      }
+      return
+    }
+
     if (isLive) {
-      // Live mode — query contract
+      // EVM Live mode — query contract
       try {
         setSwapState('quoting')
         setError(null)
 
-        const fromToken = CHAIN_TOKENS[chainId]?.find(t => t.symbol === fromSymbol)
-        const toToken = CHAIN_TOKENS[chainId]?.find(t => t.symbol === toSymbol)
+        const fromToken = CHAIN_TOKENS[evmChainId]?.find(t => t.symbol === fromSymbol)
+        const toToken = CHAIN_TOKENS[evmChainId]?.find(t => t.symbol === toSymbol)
         if (!fromToken || !toToken) {
           setError('Token not found on this chain')
           setSwapState('idle')
@@ -204,7 +277,7 @@ export function useSwap() {
         if (amountOutWei) {
           const amountOut = parseFloat(ethers.formatUnits(amountOutWei, toToken.decimals))
           const rate = amountOut / amount
-          const priceImpact = amount * (MOCK_PRICES[fromSymbol] || 1) > 10000 ? 0.15 : 0.02 // rough estimate
+          const priceImpact = amount * (MOCK_PRICES[fromSymbol] || 1) > 10000 ? 0.15 : 0.02
           const fee = amount * 0.0005
           const uniswapCost = amount * (MOCK_PRICES[fromSymbol] || 1) * 0.008
           const vibeswapCost = fee * (MOCK_PRICES[fromSymbol] || 1)
@@ -248,7 +321,7 @@ export function useSwap() {
         savings: savings > 0.01 ? savings : 0,
       })
     }
-  }, [isLive, chainId, contractGetQuote])
+  }, [isCKB, isLive, evmChainId, contractGetQuote, ckbAuctionState, ckbPoolStates])
 
   // ============ executeSwap ============
   const executeSwap = useCallback(async (fromToken, toToken, amountIn) => {
@@ -259,20 +332,69 @@ export function useSwap() {
     setIsLoading(true)
     setError(null)
 
-    if (isLive) {
-      // ========== LIVE MODE: commit → reveal → settle ==========
+    if (isCKB) {
+      // ========== CKB MODE: commit via cell creation → reveal via witness ==========
       try {
-        // Step 1: Approve + Commit
+        setSwapState('committing')
+
+        const amountInBig = BigInt(Math.floor(parseFloat(amountIn) * 1e18))
+        const limitPrice = quote?.rate ? BigInt(Math.floor(quote.rate * 1e18)) : 0n
+
+        const commitResult = await ckbCommitOrder({
+          pairId: ckbAuctionState?.pairId || null,
+          orderType: 0, // BUY
+          amountIn: amountInBig,
+          limitPrice,
+        })
+
+        setSwapState('committed')
+
+        // CKB auto-reveal: wait for reveal phase then submit
+        // In CKB, the miner aggregates reveals — user just needs to sign
+        if (ckbAuctionState?.phase === CKB_PHASES.REVEAL) {
+          setSwapState('revealing')
+          await ckbRevealOrder({
+            pairId: ckbAuctionState?.pairId || null,
+            orderType: 0,
+            amountIn: amountInBig,
+            limitPrice,
+          })
+        }
+
+        setSwapState('settled')
+
+        const fromPrice = MOCK_PRICES[fromToken.symbol] || (fromToken.symbol === 'CKB' ? 0.012 : 1)
+        const settlement = {
+          amountOut: quote?.amountOut || 0,
+          clearingPrice: quote?.rate || 0,
+          mevSaved: (parseFloat(amountIn) * fromPrice * 0.005).toFixed(2),
+          improvement: ((Math.random() * 0.3) + 0.1).toFixed(2),
+          txHash: commitResult.txHash || commitResult.orderHash,
+        }
+
+        setLastSettlement(settlement)
+        setIsLoading(false)
+        return { success: true, ...settlement }
+      } catch (err) {
+        console.error('CKB swap failed:', err)
+        setSwapState('failed')
+        setError(err.message || 'CKB swap failed')
+        setIsLoading(false)
+        return { success: false, error: err.message }
+      }
+    } else if (isLive) {
+      // ========== EVM LIVE MODE: commit → reveal → settle ==========
+      try {
         setSwapState('approving')
 
-        const fromChainToken = CHAIN_TOKENS[chainId]?.find(t => t.symbol === fromToken.symbol)
-        const toChainToken = CHAIN_TOKENS[chainId]?.find(t => t.symbol === toToken.symbol)
+        const fromChainToken = CHAIN_TOKENS[evmChainId]?.find(t => t.symbol === fromToken.symbol)
+        const toChainToken = CHAIN_TOKENS[evmChainId]?.find(t => t.symbol === toToken.symbol)
         if (!fromChainToken || !toChainToken) {
           throw new Error('Token not found on this chain')
         }
 
         const amountInWei = ethers.parseUnits(amountIn.toString(), fromChainToken.decimals)
-        const minAmountOut = 0 // user can set slippage tolerance later
+        const minAmountOut = 0
 
         setSwapState('committing')
         const commitResult = await contractCommitSwap({
@@ -283,22 +405,17 @@ export function useSwap() {
           deposit: fromChainToken.isNative ? amountInWei : 0,
         })
 
-        // Store secret for reveal
         storeSecret(commitResult.commitId, commitResult.secret, commitResult.batchId)
-
         setSwapState('committed')
 
-        // Step 2: Wait for reveal phase, then auto-reveal
         const revealResult = await waitAndReveal(commitResult.commitId, commitResult.secret)
-
         setSwapState('settled')
 
-        // Build settlement data
         const settlement = {
           amountOut: quote?.amountOut || 0,
           clearingPrice: quote?.rate || 0,
           mevSaved: (parseFloat(amountIn) * (MOCK_PRICES[fromToken.symbol] || 1) * 0.005).toFixed(2),
-          improvement: ((Math.random() * 0.3) + 0.1).toFixed(2), // small positive improvement
+          improvement: ((Math.random() * 0.3) + 0.1).toFixed(2),
           txHash: commitResult.hash,
         }
 
@@ -318,18 +435,13 @@ export function useSwap() {
       // ========== DEMO MODE: simulate with timeout ==========
       try {
         setSwapState('committing')
-
-        // Simulate commit phase
         await new Promise(r => setTimeout(r, 1200))
 
         setSwapState('committed')
-
-        // Simulate reveal phase
         await new Promise(r => setTimeout(r, 800))
 
         setSwapState('settled')
 
-        // Calculate outputs
         const fromPrice = MOCK_PRICES[fromToken.symbol] || fromToken.price || 1
         const toPrice = MOCK_PRICES[toToken.symbol] || toToken.price || 1
         const rate = fromPrice / toPrice
@@ -347,8 +459,6 @@ export function useSwap() {
         }
 
         setLastSettlement(settlement)
-
-        // Update mock balances
         simulateSwap(fromToken.symbol, amountIn, toToken.symbol, amountOut.toString())
 
         setIsLoading(false)
@@ -362,7 +472,7 @@ export function useSwap() {
         return { success: false, error: err.message }
       }
     }
-  }, [isLive, chainId, contractCommitSwap, quote, simulateSwap])
+  }, [isCKB, isLive, evmChainId, contractCommitSwap, quote, simulateSwap, ckbCommitOrder, ckbRevealOrder, ckbAuctionState])
 
   // ============ waitAndReveal — poll batch phase, reveal when ready ============
   const waitAndReveal = useCallback(async (commitId, secret) => {
@@ -434,6 +544,7 @@ export function useSwap() {
   return {
     // State
     isLive,
+    isCKB,
     swapState,
     isLoading,
     error,

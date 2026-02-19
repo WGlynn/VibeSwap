@@ -23,7 +23,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
 - **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
-- **Frontend contract integration: COMPLETE** — useSwap, usePool, useBridge hooks + useBatchState live mode
+- **Frontend contract integration: COMPLETE** — useSwap, usePool, useBridge hooks + useBatchState live mode + **CKB chain detection in all core hooks**
 - **Frontend mobile responsiveness: COMPLETE** — all 10 pages responsive, AnimatedNumber/ProgressRing wired
 - **GitHub webhook relayer: COMPLETE** — off-chain service with EIP-712 signing + batch submission
 - **Contribution attestation governance: COMPLETE** — 3-branch separation of powers (Executive/Judicial/Legislative)
@@ -37,7 +37,18 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 18, 2026 — Session 28)
+## Recently Completed (Feb 18, 2026 — Session 29)
+79. **Frontend CKB Integration — All Core Hooks Wired**
+    - **useBatchState**: CKB auction cell polling, phase mapping (CKB phases → PHASES strings), commit/reveal routing through useCKBContracts
+    - **useSwap**: CKB token list (CKB_TOKENS from ckb-constants), AMM quote from pool reserves, commit/reveal via CKB cell creation
+    - **usePool**: CKB pool state from indexer, CKB mock pools, isCKB flag exposed
+    - **Header**: CKB mainnet/testnet added to chain selector dropdown with "cell" badge, CKBChainOption component connects via Omnilock
+    - **.env.example**: All CKB env vars (RPC, indexer, 8 script code hashes, token type hashes)
+    - **S28 learning log**: documented checked_mul(PRECISION) overflow pattern in testing-methodology.md
+    - Frontend builds cleanly with all CKB integration (vite build passes)
+    - Commits: `378c28f`, `0036690`, `62a9758`
+
+## Previously Completed (Feb 18, 2026 — Session 28)
 78. **CKB SDK Complete + Test Expansion (190 tests)**
     - **5 new SDK transaction builders**: create_pool, create_settle_batch, update_oracle, update_config, update_compliance
     - **create_settle_batch** is the critical one: takes revealed orders → computes clearing price → Fisher-Yates shuffle → applies trades at uniform price → updates pool reserves → transitions auction → creates next batch

@@ -47,11 +47,12 @@ contract VibeAMM is
     ///      batch auctions reduce impermanent loss from MEV extraction.
     uint256 public constant DEFAULT_FEE_RATE = 5;
 
-    /// @notice Protocol's share of base fees (0% - all base fees to LPs)
-    /// @dev Pure economics model: 100% of base trading fees go to LPs.
-    ///      Dynamic volatility fees (excess above base during high vol) are
-    ///      handled separately through IncentiveController and route to insurance.
-    uint256 public constant PROTOCOL_FEE_SHARE = 0;
+    /// @notice Protocol's share of base fees in BPS (default 0 = all to LPs)
+    /// @dev Configurable via setProtocolFeeShare(). Revenue flows:
+    ///      - 0 (default): 100% of base fees to LPs (pure LP model)
+    ///      - >0: portion routed to treasury/ProtocolFeeAdapter for cooperative distribution
+    ///      Max 2500 (25%) to ensure LPs always get majority of fees.
+    uint256 public protocolFeeShare;
 
     /// @notice Minimum liquidity locked forever (prevents first depositor attack)
     uint256 public constant MINIMUM_LIQUIDITY = 10000;
@@ -804,7 +805,7 @@ contract VibeAMM is
         address tokenOut = isToken0 ? pool.token1 : pool.token0;
 
         // Calculate and track fees
-        (uint256 protocolFee, ) = BatchMath.calculateFees(amountIn, feeRate, PROTOCOL_FEE_SHARE);
+        (uint256 protocolFee, ) = BatchMath.calculateFees(amountIn, feeRate, protocolFeeShare);
         accumulatedFees[tokenIn] += protocolFee;
 
         // Update reserves unchecked
@@ -825,10 +826,9 @@ contract VibeAMM is
     }
 
     /**
-     * @notice Collect accumulated fees (reserved for future dynamic volatility fees)
-     * @dev With PROTOCOL_FEE_SHARE = 0, base fees don't accumulate here.
-     *      This function exists for future integration with dynamic volatility
-     *      fees that route to insurance pools during high volatility periods.
+     * @notice Collect accumulated protocol fees and send to treasury
+     * @dev When protocolFeeShare > 0, a portion of trading fees accumulate here.
+     *      Treasury (ProtocolFeeAdapter) forwards to FeeRouter for cooperative distribution.
      * @param token Token address to collect fees for
      */
     function collectFees(address token) external {
@@ -917,6 +917,13 @@ contract VibeAMM is
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
+    }
+
+    /// @notice Set protocol fee share (portion of trading fees routed to treasury)
+    /// @param share Fee share in BPS (0-2500). 0 = all fees to LPs, 2500 = 25% to protocol.
+    function setProtocolFeeShare(uint256 share) external onlyOwner {
+        if (share > 2500) revert("Fee share too high"); // Max 25%
+        protocolFeeShare = share;
     }
 
     // ============ Liquidity Protection Admin ============
@@ -1083,7 +1090,7 @@ contract VibeAMM is
         (protocolFee, ) = BatchMath.calculateFees(
             amountOut,
             pool.feeRate,
-            PROTOCOL_FEE_SHARE
+            protocolFeeShare
         );
 
         // Reduce output by fee

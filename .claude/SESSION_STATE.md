@@ -37,7 +37,19 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 19, 2026 — Session 36)
+## Recently Completed (Feb 19, 2026 — Session 37)
+87. **Production Blocker Audit + 5 Critical Fixes**
+    - **Full production audit**: 3 CRITICAL (CrossChainRouter stubs), 8 HIGH (identity stubs, mock prices, missing ACL), 6 MEDIUM, 4 LOW
+    - **TreasuryStabilizer._getMainPool fix**: Replaced keccak256 placeholder with configurable `tokenMainPool` mapping + `setMainPool()` admin function. 51 tests passing (41 unit + 6 fuzz + 4 invariant). Also fixed invariant handler (wasn't owner, couldn't exercise admin funcs).
+    - **DAOTreasury backstop operator role**: `provideBackstopLiquidity` and `removeBackstopLiquidity` were `onlyOwner` — TreasuryStabilizer couldn't call them. Added `backstopOperators` mapping + `onlyOwnerOrBackstopOperator` modifier + `setBackstopOperator()`. 39 tests passing.
+    - **ContributionDAG.recalculateTrustScores() access control**: Was `external` with no modifier — anyone could grief gas costs. Added `onlyOwner`. 57+193 related tests passing.
+    - **ProtocolFeeAdapter WETH wrapping**: `forwardETH()` sent raw ETH to owner, bypassing FeeRouter's cooperative distribution. Now wraps to WETH and routes through FeeRouter. Constructor takes WETH address. 34 tests passing.
+    - **AutomatedRegulator._autoFileCase real implementation**: Was stub emitting bytes32(0). Now calls `registry.openCase()` with try/catch. 33 tests passing.
+    - **ContributionDAG BFS queue 256→1024**: Prevents silent truncation of trust graph in growing networks. 50 tests passing.
+    - Commits: `9b39ba3`, `c83b635`, `03b699a`, `bebe6a0`, `3b62d1d`, `f442fd2` — all pushed to both remotes
+    - **Test coverage gap audit**: 10 contracts missing invariant tests (7 libraries + LamportLib + PoolComplianceConfig + VibeWalletFactory). No contracts missing fuzz tests.
+
+## Previously Completed (Feb 19, 2026 — Session 36)
 86. **Cross-Module Integration Test Expansion — 4 New E2E Test Suites (56 tests)**
     - **CompliancePipeline.t.sol** (9 tests): ClawbackRegistry + FederatedConsensus + ClawbackVault E2E
       - Full case→vote→clawback pipeline, cascading taint multi-hop, dismiss clears taint, insufficient votes, grace period gating, taint chain tracking, case wallets, manual propagation, unauthorized access

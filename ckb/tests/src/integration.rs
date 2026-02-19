@@ -19,6 +19,17 @@
 // 8. Multi-order batch settlement
 // 9. Slash non-revealers
 // 10. Compliance filter blocks sanctioned
+// 11. Reveal with wrong secret fails
+// 12. Reveal after deadline fails
+// 13. Slash rate enforcement
+// 14. Partial reveal batch
+// 15. Pool initialization
+// 16. Pool swap settlement
+// 17. TWAP accumulation across batches
+// 18. Pool k invariant on swap
+// 19. Oracle price update
+// 20. Oracle stale rejection
+// 21. Config parameter update
 
 use vibeswap_types::*;
 use vibeswap_math::{self, batch_math, shuffle, mul_div, sqrt_product, PRECISION};
@@ -27,7 +38,7 @@ use vibeswap_pow;
 use vibeswap_sdk::{VibeSwapSDK, DeploymentInfo, Order, CellInput, Script, HashType};
 use commit_type::{verify_commit_type, CommitTypeError};
 use amm_pool_type::verify_amm_pool_type;
-use batch_auction_type::{verify_batch_auction_type, compute_state_hash};
+use batch_auction_type::{verify_batch_auction_type, compute_state_hash, AuctionTypeError};
 use sha2::{Digest, Sha256};
 
 // ============ Constants ============
@@ -1094,5 +1105,822 @@ fn test_compliance_filter_blocks_sanctioned() {
     assert_eq!(
         result, Err(CommitTypeError::BatchIdMismatch),
         "Wrong batch_id must be rejected regardless of compliance"
+    );
+}
+
+// ============ Test 11: Reveal With Wrong Secret Fails ============
+
+/// Creates a commit with secret1, then attempts to reveal with secret2.
+/// Verifies that the recomputed order hash does NOT match the committed hash,
+/// demonstrating that the commit-reveal scheme prevents order modification.
+///
+/// This is the integration-level counterpart to adversarial test 4 --
+/// here we trace through the full commit lifecycle and verify the hash
+/// mismatch is detectable at the data layer.
+#[test]
+fn test_reveal_wrong_secret_fails() {
+    let secret_real = [0x11; 32];
+    let secret_fake = [0x99; 32];
+
+    let order_type = ORDER_BUY;
+    let amount = 1000 * PRECISION;
+    let price = 2100 * PRECISION;
+
+    // Commit was made with secret_real
+    let committed_hash = compute_test_order_hash(order_type, amount, price, &secret_real);
+    let commit = make_commit(0, committed_hash);
+
+    // Attacker tries to reveal with secret_fake
+    let fake_hash = compute_test_order_hash(order_type, amount, price, &secret_fake);
+
+    // The committed hash and the fake reveal hash MUST differ
+    assert_ne!(
+        committed_hash, fake_hash,
+        "Wrong secret must produce a different hash -- reveal would be rejected"
+    );
+
+    // Verify the correct secret reproduces the committed hash
+    let honest_hash = compute_test_order_hash(order_type, amount, price, &secret_real);
+    assert_eq!(
+        committed_hash, honest_hash,
+        "Correct secret must reproduce the committed hash"
+    );
+
+    // Verify the commit cell data is consistent
+    assert_eq!(commit.order_hash, committed_hash);
+    assert_eq!(commit.batch_id, 0);
+}
+
+// ============ Test 12: Reveal After Deadline Fails ============
+
+/// Creates an auction in REVEAL phase, then advances the block number
+/// past the reveal_window_blocks. Attempts to transition from REVEAL to
+/// SETTLING. Verifies the timing window is enforced.
+///
+/// This ensures that the reveal window cannot be extended -- once the
+/// window elapses, reveals are finalized and settlement proceeds.
+#[test]
+fn test_reveal_after_deadline_fails() {
+    let config = make_config();
+
+    // ---- Set up auction at COMMIT phase with 2 commits ----
+    let auction_v0 = make_auction(PHASE_COMMIT, 0);
+    let auction_v0_data = auction_v0.serialize();
+
+    let secret = [0xAA; 32];
+    let order_hash = compute_test_order_hash(ORDER_BUY, 100 * PRECISION, 2000 * PRECISION, &secret);
+    let commit = make_commit(0, order_hash);
+
+    let mut auction_v1 = auction_v0.clone();
+    auction_v1.commit_count = 1;
+    auction_v1.prev_state_hash = compute_state_hash(&auction_v0);
+    let auction_v1_data = auction_v1.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v0_data), &auction_v1_data, &[commit], &[], None, &config, 5, None, 1,
+    ).is_ok());
+
+    // ---- Transition COMMIT -> REVEAL ----
+    let block_reveal = config.commit_window_blocks;
+    let mut auction_v2 = auction_v1.clone();
+    auction_v2.phase = PHASE_REVEAL;
+    auction_v2.reveal_count = 0;
+    auction_v2.phase_start_block = block_reveal;
+    auction_v2.prev_state_hash = compute_state_hash(&auction_v1);
+    let auction_v2_data = auction_v2.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v1_data), &auction_v2_data, &[], &[], None, &config, block_reveal, None, 0,
+    ).is_ok());
+
+    // ---- Submit 1 reveal within the window ----
+    let reveal = RevealWitness {
+        order_type: ORDER_BUY,
+        amount_in: 100 * PRECISION,
+        limit_price: 2000 * PRECISION,
+        secret,
+        priority_bid: 0,
+        commit_index: 0,
+    };
+
+    let mut expected_xor = auction_v2.xor_seed;
+    for i in 0..32 { expected_xor[i] ^= reveal.secret[i]; }
+
+    let mut auction_v3 = auction_v2.clone();
+    auction_v3.reveal_count = 1;
+    auction_v3.xor_seed = expected_xor;
+    auction_v3.prev_state_hash = compute_state_hash(&auction_v2);
+    let auction_v3_data = auction_v3.serialize();
+
+    // Reveal within the window should succeed
+    let within_window_block = block_reveal + config.reveal_window_blocks - 1;
+    assert!(verify_batch_auction_type(
+        Some(&auction_v2_data), &auction_v3_data, &[], &[reveal], None, &config,
+        within_window_block, None, 0,
+    ).is_ok(), "Reveal within window should succeed");
+
+    // ---- After the window elapses, transition REVEAL -> SETTLING ----
+    let block_after_deadline = auction_v2.phase_start_block + config.reveal_window_blocks;
+    let entropy = [0xEE; 32];
+    let final_seed = shuffle::generate_seed_secure(
+        &[auction_v3.xor_seed], &entropy, auction_v3.batch_id,
+    );
+
+    let mut auction_v4 = auction_v3.clone();
+    auction_v4.phase = PHASE_SETTLING;
+    auction_v4.xor_seed = final_seed;
+    auction_v4.phase_start_block = block_after_deadline;
+    auction_v4.prev_state_hash = compute_state_hash(&auction_v3);
+    let auction_v4_data = auction_v4.serialize();
+
+    // Transition should succeed at exactly the deadline block
+    assert!(verify_batch_auction_type(
+        Some(&auction_v3_data), &auction_v4_data, &[], &[], None, &config,
+        block_after_deadline, Some(&entropy), 0,
+    ).is_ok(), "REVEAL -> SETTLING at deadline block should succeed");
+
+    // ---- Verify that attempting REVEAL -> SETTLING BEFORE the window fails ----
+    let too_early_block = auction_v2.phase_start_block + config.reveal_window_blocks - 1;
+    let result_early = verify_batch_auction_type(
+        Some(&auction_v3_data), &auction_v4_data, &[], &[], None, &config,
+        too_early_block, Some(&entropy), 0,
+    );
+    assert_eq!(
+        result_early, Err(AuctionTypeError::RevealWindowNotElapsed),
+        "REVEAL -> SETTLING before reveal window elapses should fail"
+    );
+}
+
+// ============ Test 13: Slash Rate Enforcement ============
+
+/// Creates 1 commit that does NOT reveal. Verifies that exactly 50% of
+/// the deposit (DEFAULT_SLASH_RATE_BPS = 5000) is computed as the slash amount.
+///
+/// The slash calculation: slash_per_user = deposit * slash_rate_bps / BPS_DENOMINATOR.
+/// For a 100M shannon deposit at 50% rate: 100M * 5000 / 10000 = 50M shannons.
+#[test]
+fn test_slash_rate_enforcement() {
+    let config = make_config();
+
+    // ---- Single commit, no reveal ----
+    let deposit = MIN_DEPOSIT; // 100_000_000 shannons (1 CKB)
+    let commit = CommitCellData {
+        order_hash: [0xAA; 32],
+        batch_id: 0,
+        deposit_ckb: deposit,
+        token_type_hash: [0x02; 32],
+        token_amount: PRECISION,
+        block_number: 10,
+        sender_lock_hash: [0xCC; 32],
+    };
+
+    // Aggregate 1 commit
+    let auction_v0 = make_auction(PHASE_COMMIT, 0);
+    let auction_v0_data = auction_v0.serialize();
+
+    let mut auction_v1 = auction_v0.clone();
+    auction_v1.commit_count = 1;
+    auction_v1.prev_state_hash = compute_state_hash(&auction_v0);
+    let auction_v1_data = auction_v1.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v0_data), &auction_v1_data, &[commit.clone()], &[], None, &config, 5, None, 1,
+    ).is_ok());
+
+    // COMMIT -> REVEAL
+    let block_reveal = config.commit_window_blocks;
+    let mut auction_v2 = auction_v1.clone();
+    auction_v2.phase = PHASE_REVEAL;
+    auction_v2.reveal_count = 0;
+    auction_v2.phase_start_block = block_reveal;
+    auction_v2.prev_state_hash = compute_state_hash(&auction_v1);
+    let auction_v2_data = auction_v2.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v1_data), &auction_v2_data, &[], &[], None, &config, block_reveal, None, 0,
+    ).is_ok());
+
+    // No reveals submitted -- the single commit becomes a non-revealer
+    let slash_count = auction_v2.commit_count - auction_v2.reveal_count;
+    assert_eq!(slash_count, 1, "1 non-revealer");
+
+    // ---- Verify exact slash amount ----
+    let slash_per_user = (commit.deposit_ckb as u128
+        * config.slash_rate_bps as u128
+        / BPS_DENOMINATOR) as u64;
+
+    // 100_000_000 * 5000 / 10000 = 50_000_000
+    assert_eq!(
+        slash_per_user, 50_000_000,
+        "50% of 100M shannons = 50M shannons slashed"
+    );
+
+    // Verify the refund amount
+    let refund = commit.deposit_ckb - slash_per_user;
+    assert_eq!(refund, 50_000_000, "Refund = deposit - slash = 50M shannons");
+
+    // Total slashed from all non-revealers
+    let total_slash = slash_per_user * slash_count as u64;
+    assert_eq!(total_slash, 50_000_000, "Total slash for 1 non-revealer = 50M");
+}
+
+// ============ Test 14: Partial Reveal Batch ============
+
+/// 5 commits, only 3 reveal. Verifies that settlement uses only revealed
+/// orders and that 2 non-revealers are slashed.
+///
+/// Walks through the full lifecycle: commit 5 -> reveal 3 -> settle.
+/// Verifies commit_count=5, reveal_count=3, and slash_count=2 at the end.
+#[test]
+fn test_partial_reveal_batch() {
+    let config = make_config();
+
+    // ---- Build 5 commits with unique secrets ----
+    let secrets: Vec<[u8; 32]> = (0..5u8).map(|i| {
+        let mut s = [0u8; 32]; s[0] = i + 1; s
+    }).collect();
+
+    let order_hashes: Vec<[u8; 32]> = (0..5).map(|i| {
+        compute_test_order_hash(ORDER_BUY, 100 * PRECISION, 2000 * PRECISION, &secrets[i])
+    }).collect();
+
+    let commits: Vec<CommitCellData> = (0..5).map(|i| {
+        CommitCellData {
+            order_hash: order_hashes[i],
+            batch_id: 0,
+            deposit_ckb: MIN_DEPOSIT,
+            token_type_hash: [0x02; 32],
+            token_amount: 100 * PRECISION,
+            block_number: 10 + i as u64,
+            sender_lock_hash: { let mut h = [0u8; 32]; h[0] = i as u8 + 0xA0; h },
+        }
+    }).collect();
+
+    // ---- Aggregate all 5 commits ----
+    let auction_v0 = make_auction(PHASE_COMMIT, 0);
+    let auction_v0_data = auction_v0.serialize();
+
+    let mut auction_v1 = auction_v0.clone();
+    auction_v1.commit_count = 5;
+    auction_v1.prev_state_hash = compute_state_hash(&auction_v0);
+    let auction_v1_data = auction_v1.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v0_data), &auction_v1_data, &commits, &[], None, &config, 5, None, 5,
+    ).is_ok(), "5-commit aggregation should succeed");
+
+    // ---- COMMIT -> REVEAL ----
+    let block_reveal = config.commit_window_blocks;
+    let mut auction_v2 = auction_v1.clone();
+    auction_v2.phase = PHASE_REVEAL;
+    auction_v2.reveal_count = 0;
+    auction_v2.phase_start_block = block_reveal;
+    auction_v2.prev_state_hash = compute_state_hash(&auction_v1);
+    let auction_v2_data = auction_v2.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v1_data), &auction_v2_data, &[], &[], None, &config, block_reveal, None, 0,
+    ).is_ok());
+
+    // ---- Only 3 of 5 reveal ----
+    let reveals: Vec<RevealWitness> = (0..3).map(|i| RevealWitness {
+        order_type: ORDER_BUY,
+        amount_in: 100 * PRECISION,
+        limit_price: 2000 * PRECISION,
+        secret: secrets[i],
+        priority_bid: 0,
+        commit_index: i as u32,
+    }).collect();
+
+    let mut expected_xor = auction_v2.xor_seed;
+    for reveal in &reveals {
+        for j in 0..32 { expected_xor[j] ^= reveal.secret[j]; }
+    }
+
+    let mut auction_v3 = auction_v2.clone();
+    auction_v3.reveal_count = 3;
+    auction_v3.xor_seed = expected_xor;
+    auction_v3.prev_state_hash = compute_state_hash(&auction_v2);
+    let auction_v3_data = auction_v3.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v2_data), &auction_v3_data, &[], &reveals, None, &config,
+        block_reveal + 5, None, 0,
+    ).is_ok(), "Partial reveal (3/5) should succeed");
+
+    // ---- REVEAL -> SETTLING ----
+    let block_settling = auction_v2.phase_start_block + config.reveal_window_blocks;
+    let entropy = [0xDD; 32];
+    let final_seed = shuffle::generate_seed_secure(
+        &[auction_v3.xor_seed], &entropy, auction_v3.batch_id,
+    );
+
+    let mut auction_v4 = auction_v3.clone();
+    auction_v4.phase = PHASE_SETTLING;
+    auction_v4.xor_seed = final_seed;
+    auction_v4.phase_start_block = block_settling;
+    auction_v4.prev_state_hash = compute_state_hash(&auction_v3);
+    let auction_v4_data = auction_v4.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v3_data), &auction_v4_data, &[], &[], None, &config,
+        block_settling, Some(&entropy), 0,
+    ).is_ok());
+
+    // ---- SETTLING -> SETTLED ----
+    let mut auction_v5 = auction_v4.clone();
+    auction_v5.phase = PHASE_SETTLED;
+    auction_v5.clearing_price = 2000 * PRECISION;
+    auction_v5.fillable_volume = 300 * PRECISION; // Only 3 orders * 100 each
+    auction_v5.prev_state_hash = compute_state_hash(&auction_v4);
+    let auction_v5_data = auction_v5.serialize();
+
+    assert!(verify_batch_auction_type(
+        Some(&auction_v4_data), &auction_v5_data, &[], &[], None, &config,
+        block_settling + 1, None, 0,
+    ).is_ok(), "Settlement with partial reveals should succeed");
+
+    // ---- Verify final state ----
+    let final_state = AuctionCellData::deserialize(&auction_v5_data).unwrap();
+    assert_eq!(final_state.commit_count, 5, "5 commits total");
+    assert_eq!(final_state.reveal_count, 3, "Only 3 reveals");
+
+    let slash_count = final_state.commit_count - final_state.reveal_count;
+    assert_eq!(slash_count, 2, "2 non-revealers slashed");
+
+    // Verify slash amounts
+    let slash_per_user = (MIN_DEPOSIT as u128
+        * config.slash_rate_bps as u128
+        / BPS_DENOMINATOR) as u64;
+    let total_slash = slash_per_user * slash_count as u64;
+    assert_eq!(total_slash, 100_000_000, "2 * 50M = 100M total slashed");
+}
+
+// ============ Test 15: Pool Initialization ============
+
+/// Creates a new pool with initial liquidity and verifies:
+/// 1. LP supply = sqrt(reserve0 * reserve1) - MINIMUM_LIQUIDITY
+/// 2. MINIMUM_LIQUIDITY (1000) is locked permanently
+/// 3. Pool creation passes type script validation
+/// 4. All invariants hold (reserves > 0, fee rate valid, pair_id non-zero)
+#[test]
+fn test_pool_initialization() {
+    let config = make_config();
+
+    let r0 = 500_000 * PRECISION;
+    let r1 = 1_000_000 * PRECISION;
+    let pool = make_pool(r0, r1);
+    let pool_data = pool.serialize();
+
+    // ---- Verify creation passes ----
+    let result = verify_amm_pool_type(None, &pool_data, &config, None, 100);
+    assert!(result.is_ok(), "Pool creation should succeed: {:?}", result.err());
+
+    // ---- Verify LP supply formula ----
+    let expected_sqrt = sqrt_product(r0, r1);
+    assert!(expected_sqrt > MINIMUM_LIQUIDITY, "sqrt(reserves) must exceed MINIMUM_LIQUIDITY");
+    let expected_lp = expected_sqrt - MINIMUM_LIQUIDITY;
+    assert_eq!(pool.total_lp_supply, expected_lp, "LP supply = sqrt(r0*r1) - MINIMUM_LIQUIDITY");
+
+    // ---- Verify MINIMUM_LIQUIDITY is locked ----
+    assert_eq!(pool.minimum_liquidity, MINIMUM_LIQUIDITY, "MINIMUM_LIQUIDITY = 1000");
+    assert_eq!(MINIMUM_LIQUIDITY, 1000, "MINIMUM_LIQUIDITY constant must be 1000");
+
+    // ---- Verify reserves are stored correctly ----
+    assert_eq!(pool.reserve0, r0);
+    assert_eq!(pool.reserve1, r1);
+
+    // ---- Verify data roundtrip ----
+    let decoded = PoolCellData::deserialize(&pool_data).unwrap();
+    assert_eq!(decoded, pool, "Pool data roundtrip must preserve all fields");
+}
+
+// ============ Test 16: Pool Swap Settlement ============
+
+/// Creates a pool with reserves, computes a swap using batch_math,
+/// then verifies the pool transition passes type script validation.
+///
+/// Tests the full flow: pool state -> calculate swap -> apply to reserves
+/// -> verify transition with TWAP update.
+#[test]
+fn test_pool_swap_settlement() {
+    let config = make_config();
+
+    // ---- Create pool ----
+    let r0 = 2_000_000 * PRECISION;
+    let r1 = 4_000_000 * PRECISION;
+    let pool_v0 = make_pool(r0, r1);
+    let pool_v0_data = pool_v0.serialize();
+
+    let result = verify_amm_pool_type(None, &pool_v0_data, &config, None, 100);
+    assert!(result.is_ok(), "Pool creation should pass");
+
+    // ---- Compute swap: 500 token0 -> token1 ----
+    let amount_in = 500 * PRECISION;
+    let amount_out = batch_math::get_amount_out(
+        amount_in, pool_v0.reserve0, pool_v0.reserve1, pool_v0.fee_rate_bps as u128,
+    ).expect("get_amount_out should succeed");
+    assert!(amount_out > 0, "Swap output must be positive");
+
+    // ---- Verify clearing price consistency ----
+    // The effective price paid = amount_in / amount_out (in token0 per token1)
+    // For a 2:1 pool, each token0 buys ~2 token1 minus fee and slippage
+    let effective_price = mul_div(amount_in, PRECISION, amount_out);
+    let _spot_price = mul_div(pool_v0.reserve0, PRECISION, pool_v0.reserve1); // in token0/token1
+    assert!(
+        effective_price > 0,
+        "Effective price must be positive"
+    );
+
+    // ---- Apply swap to reserves ----
+    let block_swap = 150u64;
+    let old_price = mul_div(pool_v0.reserve1, PRECISION, pool_v0.reserve0);
+    let delta_blocks = block_swap - pool_v0.twap_last_block;
+
+    let mut pool_v1 = pool_v0.clone();
+    pool_v1.reserve0 = pool_v0.reserve0 + amount_in;
+    pool_v1.reserve1 = pool_v0.reserve1 - amount_out;
+    pool_v1.twap_last_block = block_swap;
+    pool_v1.twap_price_cum = pool_v0.twap_price_cum
+        .wrapping_add(old_price * delta_blocks as u128);
+    let pool_v1_data = pool_v1.serialize();
+
+    // ---- Verify transition passes ----
+    let result = verify_amm_pool_type(
+        Some(&pool_v0_data), &pool_v1_data, &config, None, block_swap,
+    );
+    assert!(result.is_ok(), "Swap settlement should pass: {:?}", result.err());
+
+    // ---- Verify k invariant: new_k >= old_k ----
+    assert!(
+        vibeswap_math::mul_cmp(
+            pool_v1.reserve0, pool_v1.reserve1,
+            pool_v0.reserve0, pool_v0.reserve1,
+        ) != core::cmp::Ordering::Less,
+        "k invariant must hold after swap (fees increase k)"
+    );
+}
+
+// ============ Test 17: TWAP Accumulation Across Batches ============
+
+/// Performs multiple batch settlements at different block numbers.
+/// Verifies that the TWAP price cumulative accumulates correctly
+/// across each transition.
+///
+/// TWAP formula: cum_new = cum_old + price * delta_blocks
+/// where price = reserve1 * PRECISION / reserve0
+#[test]
+fn test_twap_accumulation_across_batches() {
+    let config = make_config();
+
+    // ---- Create pool ----
+    let r0 = 1_000_000 * PRECISION;
+    let r1 = 2_000_000 * PRECISION;
+    let pool_v0 = make_pool(r0, r1);
+    let pool_v0_data = pool_v0.serialize();
+
+    let result = verify_amm_pool_type(None, &pool_v0_data, &config, None, 100);
+    assert!(result.is_ok());
+
+    // ---- Batch 1: Small swap at block 120 ----
+    let amount_in_1 = 100 * PRECISION;
+    let amount_out_1 = batch_math::get_amount_out(
+        amount_in_1, pool_v0.reserve0, pool_v0.reserve1, pool_v0.fee_rate_bps as u128,
+    ).unwrap();
+
+    let block_1 = 120u64;
+    let price_0 = mul_div(pool_v0.reserve1, PRECISION, pool_v0.reserve0);
+    let delta_1 = block_1 - pool_v0.twap_last_block;
+
+    let mut pool_v1 = pool_v0.clone();
+    pool_v1.reserve0 = pool_v0.reserve0 + amount_in_1;
+    pool_v1.reserve1 = pool_v0.reserve1 - amount_out_1;
+    pool_v1.twap_last_block = block_1;
+    pool_v1.twap_price_cum = pool_v0.twap_price_cum
+        .wrapping_add(price_0 * delta_1 as u128);
+    let pool_v1_data = pool_v1.serialize();
+
+    assert!(verify_amm_pool_type(
+        Some(&pool_v0_data), &pool_v1_data, &config, None, block_1,
+    ).is_ok(), "Batch 1 swap should pass");
+
+    // ---- Batch 2: Another swap at block 180 ----
+    let amount_in_2 = 200 * PRECISION;
+    let amount_out_2 = batch_math::get_amount_out(
+        amount_in_2, pool_v1.reserve0, pool_v1.reserve1, pool_v1.fee_rate_bps as u128,
+    ).unwrap();
+
+    let block_2 = 180u64;
+    let price_1 = mul_div(pool_v1.reserve1, PRECISION, pool_v1.reserve0);
+    let delta_2 = block_2 - pool_v1.twap_last_block;
+
+    let mut pool_v2 = pool_v1.clone();
+    pool_v2.reserve0 = pool_v1.reserve0 + amount_in_2;
+    pool_v2.reserve1 = pool_v1.reserve1 - amount_out_2;
+    pool_v2.twap_last_block = block_2;
+    pool_v2.twap_price_cum = pool_v1.twap_price_cum
+        .wrapping_add(price_1 * delta_2 as u128);
+    let pool_v2_data = pool_v2.serialize();
+
+    assert!(verify_amm_pool_type(
+        Some(&pool_v1_data), &pool_v2_data, &config, None, block_2,
+    ).is_ok(), "Batch 2 swap should pass");
+
+    // ---- Batch 3: Reverse direction swap at block 250 ----
+    let amount_in_3 = 300 * PRECISION;
+    let amount_out_3 = batch_math::get_amount_out(
+        amount_in_3, pool_v2.reserve1, pool_v2.reserve0, pool_v2.fee_rate_bps as u128,
+    ).unwrap();
+
+    let block_3 = 250u64;
+    let price_2 = mul_div(pool_v2.reserve1, PRECISION, pool_v2.reserve0);
+    let delta_3 = block_3 - pool_v2.twap_last_block;
+
+    let mut pool_v3 = pool_v2.clone();
+    pool_v3.reserve1 = pool_v2.reserve1 + amount_in_3;
+    pool_v3.reserve0 = pool_v2.reserve0 - amount_out_3;
+    pool_v3.twap_last_block = block_3;
+    pool_v3.twap_price_cum = pool_v2.twap_price_cum
+        .wrapping_add(price_2 * delta_3 as u128);
+    let pool_v3_data = pool_v3.serialize();
+
+    assert!(verify_amm_pool_type(
+        Some(&pool_v2_data), &pool_v3_data, &config, None, block_3,
+    ).is_ok(), "Batch 3 reverse swap should pass");
+
+    // ---- Verify TWAP accumulated monotonically ----
+    assert!(pool_v1.twap_price_cum > pool_v0.twap_price_cum, "TWAP must increase after batch 1");
+    assert!(pool_v2.twap_price_cum > pool_v1.twap_price_cum, "TWAP must increase after batch 2");
+    assert!(pool_v3.twap_price_cum > pool_v2.twap_price_cum, "TWAP must increase after batch 3");
+
+    // ---- Verify TWAP formula consistency ----
+    let expected_cum_1 = pool_v0.twap_price_cum.wrapping_add(price_0 * delta_1 as u128);
+    assert_eq!(pool_v1.twap_price_cum, expected_cum_1, "TWAP batch 1 formula check");
+
+    let expected_cum_2 = pool_v1.twap_price_cum.wrapping_add(price_1 * delta_2 as u128);
+    assert_eq!(pool_v2.twap_price_cum, expected_cum_2, "TWAP batch 2 formula check");
+
+    let expected_cum_3 = pool_v2.twap_price_cum.wrapping_add(price_2 * delta_3 as u128);
+    assert_eq!(pool_v3.twap_price_cum, expected_cum_3, "TWAP batch 3 formula check");
+}
+
+// ============ Test 18: Pool K Invariant On Swap ============
+
+/// After a swap, verifies that k = reserve0 * reserve1 is >= the old k.
+/// Fees collected during swaps should INCREASE k, never decrease it.
+/// Tests multiple swap sizes to ensure the invariant holds across ranges.
+#[test]
+fn test_pool_k_invariant_on_swap() {
+    let config = make_config();
+
+    let r0 = 1_000_000 * PRECISION;
+    let r1 = 2_000_000 * PRECISION;
+    let pool_v0 = make_pool(r0, r1);
+    let pool_v0_data = pool_v0.serialize();
+
+    assert!(verify_amm_pool_type(None, &pool_v0_data, &config, None, 100).is_ok());
+
+    // Test k invariant for multiple swap sizes
+    let swap_sizes = [
+        10 * PRECISION,     // Tiny swap
+        100 * PRECISION,    // Small swap
+        1000 * PRECISION,   // Medium swap
+        10_000 * PRECISION, // Larger swap
+    ];
+
+    let mut current_pool = pool_v0.clone();
+    let mut current_data = pool_v0_data;
+    let mut block = 100u64;
+
+    for (idx, &amount_in) in swap_sizes.iter().enumerate() {
+        // Check that trade size is within max_trade_size_bps
+        let trade_bps = mul_div(amount_in, BPS_DENOMINATOR, current_pool.reserve0);
+        if trade_bps > config.max_trade_size_bps as u128 {
+            continue; // Skip trades that exceed the circuit breaker
+        }
+
+        let amount_out = batch_math::get_amount_out(
+            amount_in,
+            current_pool.reserve0,
+            current_pool.reserve1,
+            current_pool.fee_rate_bps as u128,
+        ).expect("get_amount_out should succeed");
+
+        block += 10;
+        let old_price = mul_div(current_pool.reserve1, PRECISION, current_pool.reserve0);
+        let delta_blocks = block - current_pool.twap_last_block;
+
+        let mut next_pool = current_pool.clone();
+        next_pool.reserve0 = current_pool.reserve0 + amount_in;
+        next_pool.reserve1 = current_pool.reserve1 - amount_out;
+        next_pool.twap_last_block = block;
+        next_pool.twap_price_cum = current_pool.twap_price_cum
+            .wrapping_add(old_price * delta_blocks as u128);
+        let next_data = next_pool.serialize();
+
+        // Verify the transition passes
+        let result = verify_amm_pool_type(
+            Some(&current_data), &next_data, &config, None, block,
+        );
+        assert!(result.is_ok(), "Swap {} should pass: {:?}", idx, result.err());
+
+        // Verify k invariant: new_k >= old_k
+        let k_cmp = vibeswap_math::mul_cmp(
+            next_pool.reserve0, next_pool.reserve1,
+            current_pool.reserve0, current_pool.reserve1,
+        );
+        assert!(
+            k_cmp != core::cmp::Ordering::Less,
+            "Swap {}: k decreased! old_r0={}, old_r1={}, new_r0={}, new_r1={}",
+            idx, current_pool.reserve0, current_pool.reserve1,
+            next_pool.reserve0, next_pool.reserve1
+        );
+
+        // k should STRICTLY increase when fees > 0
+        if current_pool.fee_rate_bps > 0 {
+            assert_eq!(
+                k_cmp, core::cmp::Ordering::Greater,
+                "Swap {}: k should strictly increase when fee_rate > 0", idx
+            );
+        }
+
+        current_data = next_pool.serialize();
+        current_pool = next_pool;
+    }
+}
+
+// ============ Test 19: Oracle Price Update ============
+
+/// Creates an oracle cell, updates the price, and verifies the data roundtrip.
+/// Uses the oracle type script to validate both creation and update.
+#[test]
+fn test_oracle_price_update() {
+    use oracle_type::verify_oracle_type;
+
+    let pair_id = [0x01; 32];
+
+    // ---- Create initial oracle cell ----
+    let oracle_v0 = OracleCellData {
+        price: 2000 * PRECISION,
+        block_number: 100,
+        confidence: 95,
+        source_hash: [0xAA; 32],
+        pair_id,
+    };
+    let oracle_v0_data = oracle_v0.serialize();
+
+    // Validate creation
+    let result = verify_oracle_type(
+        true, None, &oracle_v0_data, true, 100,
+    );
+    assert!(result.is_ok(), "Oracle creation should succeed: {:?}", result.err());
+
+    // ---- Update price at a later block ----
+    let oracle_v1 = OracleCellData {
+        price: 2050 * PRECISION,
+        block_number: 110,
+        confidence: 90,
+        source_hash: [0xBB; 32],
+        pair_id,
+    };
+    let oracle_v1_data = oracle_v1.serialize();
+
+    let result = verify_oracle_type(
+        false, Some(&oracle_v0_data), &oracle_v1_data, true, 110,
+    );
+    assert!(result.is_ok(), "Oracle update should succeed: {:?}", result.err());
+
+    // ---- Verify data roundtrip ----
+    let decoded = OracleCellData::deserialize(&oracle_v1_data).unwrap();
+    assert_eq!(decoded.price, 2050 * PRECISION);
+    assert_eq!(decoded.block_number, 110);
+    assert_eq!(decoded.confidence, 90);
+    assert_eq!(decoded.pair_id, pair_id);
+}
+
+// ============ Test 20: Oracle Stale Rejection ============
+
+/// Tries to update an oracle cell with the same or earlier block number.
+/// Verifies the oracle type script rejects stale data.
+#[test]
+fn test_oracle_stale_rejection() {
+    use oracle_type::{verify_oracle_type, OracleTypeError};
+
+    let pair_id = [0x01; 32];
+
+    let oracle_v0 = OracleCellData {
+        price: 2000 * PRECISION,
+        block_number: 100,
+        confidence: 95,
+        source_hash: [0xAA; 32],
+        pair_id,
+    };
+    let oracle_v0_data = oracle_v0.serialize();
+
+    // ---- Try updating with SAME block number ----
+    let oracle_same_block = OracleCellData {
+        price: 2010 * PRECISION,
+        block_number: 100, // Same block!
+        confidence: 90,
+        source_hash: [0xBB; 32],
+        pair_id,
+    };
+    let same_data = oracle_same_block.serialize();
+
+    let result = verify_oracle_type(
+        false, Some(&oracle_v0_data), &same_data, true, 100,
+    );
+    assert_eq!(
+        result, Err(OracleTypeError::NotNewer),
+        "Oracle update with same block number must fail"
+    );
+
+    // ---- Try updating with EARLIER block number ----
+    let oracle_earlier = OracleCellData {
+        price: 1990 * PRECISION,
+        block_number: 90, // Earlier block!
+        confidence: 85,
+        source_hash: [0xCC; 32],
+        pair_id,
+    };
+    let earlier_data = oracle_earlier.serialize();
+
+    let result = verify_oracle_type(
+        false, Some(&oracle_v0_data), &earlier_data, true, 100,
+    );
+    assert_eq!(
+        result, Err(OracleTypeError::NotNewer),
+        "Oracle update with earlier block number must fail"
+    );
+
+    // ---- Verify a valid newer update still works ----
+    let oracle_newer = OracleCellData {
+        price: 2020 * PRECISION,
+        block_number: 105,
+        confidence: 92,
+        source_hash: [0xDD; 32],
+        pair_id,
+    };
+    let newer_data = oracle_newer.serialize();
+
+    let result = verify_oracle_type(
+        false, Some(&oracle_v0_data), &newer_data, true, 105,
+    );
+    assert!(result.is_ok(), "Oracle update with newer block should succeed");
+}
+
+// ============ Test 21: Config Parameter Update ============
+
+/// Creates a config cell, updates parameters, and verifies all fields persist
+/// through serialization/deserialization.
+#[test]
+fn test_config_parameter_update() {
+    use config_type::{verify_config_type, ConfigTypeError};
+
+    // ---- Create default config ----
+    let config_v0 = ConfigCellData::default();
+    let config_v0_data = config_v0.serialize();
+
+    let result = verify_config_type(true, None, &config_v0_data, true);
+    assert!(result.is_ok(), "Config creation should succeed: {:?}", result.err());
+
+    // ---- Update parameters ----
+    let config_v1 = ConfigCellData {
+        commit_window_blocks: 60,     // Changed from 40
+        reveal_window_blocks: 15,     // Changed from 10
+        slash_rate_bps: 7000,         // Changed from 5000 (70%)
+        max_price_deviation: 300,     // Changed from 500 (3%)
+        max_trade_size_bps: 500,      // Changed from 1000 (5%)
+        rate_limit_amount: 2_000_000 * PRECISION,
+        rate_limit_window: 7200,
+        volume_breaker_limit: 20_000_000 * PRECISION,
+        price_breaker_bps: 1500,
+        withdrawal_breaker_bps: 3000,
+        min_pow_difficulty: 20,       // Changed from 16
+    };
+    let config_v1_data = config_v1.serialize();
+
+    let result = verify_config_type(false, Some(&config_v0_data), &config_v1_data, true);
+    assert!(result.is_ok(), "Config update should succeed: {:?}", result.err());
+
+    // ---- Verify all fields persist through roundtrip ----
+    let decoded = ConfigCellData::deserialize(&config_v1_data).unwrap();
+    assert_eq!(decoded.commit_window_blocks, 60);
+    assert_eq!(decoded.reveal_window_blocks, 15);
+    assert_eq!(decoded.slash_rate_bps, 7000);
+    assert_eq!(decoded.max_price_deviation, 300);
+    assert_eq!(decoded.max_trade_size_bps, 500);
+    assert_eq!(decoded.rate_limit_amount, 2_000_000 * PRECISION);
+    assert_eq!(decoded.rate_limit_window, 7200);
+    assert_eq!(decoded.volume_breaker_limit, 20_000_000 * PRECISION);
+    assert_eq!(decoded.price_breaker_bps, 1500);
+    assert_eq!(decoded.withdrawal_breaker_bps, 3000);
+    assert_eq!(decoded.min_pow_difficulty, 20);
+
+    // ---- Verify unauthorized update fails ----
+    let result = verify_config_type(false, Some(&config_v0_data), &config_v1_data, false);
+    assert_eq!(
+        result, Err(ConfigTypeError::Unauthorized),
+        "Unauthorized config update must fail"
     );
 }

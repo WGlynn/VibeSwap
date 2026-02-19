@@ -61,6 +61,7 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     }
 
     struct ArbitrationCase {
+        uint256 tokenId;
         uint256 requestId;
         address[] jurors;
         mapping(address => Vote) votes;
@@ -636,14 +637,28 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
         uint256 caseId = ++caseCounter;
         ArbitrationCase storage arbCase = _cases[caseId];
+        arbCase.tokenId = tokenId;
         arbCase.requestId = requestId;
         arbCase.deadline = block.timestamp + ARBITRATION_PERIOD;
 
-        // Pseudo-random juror selection (in production, use VRF)
-        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, tokenId)));
-        for (uint i = 0; i < JURORS_PER_CASE; i++) {
-            uint256 index = (seed + i) % jurorPool.length;
-            arbCase.jurors.push(jurorPool[index]);
+        // Pseudo-random juror selection using Fisher-Yates partial shuffle
+        // Uses prevrandao + multiple entropy sources; upgrade to VRF for mainnet
+        uint256 poolLen = jurorPool.length;
+        bool[] memory selected = new bool[](poolLen);
+        uint256 seed = uint256(keccak256(abi.encodePacked(
+            block.prevrandao, block.timestamp, tokenId, requestId, msg.sender, caseId
+        )));
+        uint256 assigned = 0;
+        uint256 attempts = 0;
+        while (assigned < JURORS_PER_CASE && attempts < JURORS_PER_CASE * 3) {
+            seed = uint256(keccak256(abi.encodePacked(seed, assigned)));
+            uint256 index = seed % poolLen;
+            if (!selected[index]) {
+                selected[index] = true;
+                arbCase.jurors.push(jurorPool[index]);
+                assigned++;
+            }
+            attempts++;
         }
 
         // Store case ID in request
@@ -658,8 +673,9 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
         bool approved = arbCase.votesFor > arbCase.votesAgainst;
 
-        // Find the request and update status
-        // Note: In production, store tokenId in case for direct lookup
+        // Apply verdict to recovery request
+        RecoveryRequest storage request = _requests[arbCase.tokenId][arbCase.requestId];
+        request.arbStatus = approved ? ArbitrationStatus.Approved : ArbitrationStatus.Rejected;
 
         emit ArbitrationResolved(caseId, approved);
     }

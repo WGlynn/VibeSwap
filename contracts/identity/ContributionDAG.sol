@@ -188,7 +188,7 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IContributionDAG
-    function recalculateTrustScores() external {
+    function recalculateTrustScores() external onlyOwner {
         // Clear all existing scores
         for (uint256 i = 0; i < _scoredUsers.length; i++) {
             delete _trustScores[_scoredUsers[i]];

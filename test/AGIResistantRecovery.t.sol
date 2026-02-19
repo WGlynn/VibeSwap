@@ -325,14 +325,70 @@ contract AGIResistantRecoveryTest is Test {
     // ============ Hardware Key Registration ============
 
     function test_registerHardwareKey() public {
+        bytes memory attestation = abi.encodePacked(keccak256("fido2-attestation-data"));
+        bytes32 keyId = keccak256("keyId");
         vm.prank(user1);
-        recovery.registerHardwareKey(user1, keccak256("keyId"), "");
-        // No revert = success (event emitted)
+        recovery.registerHardwareKey(user1, keyId, attestation);
+
+        // Verify stored
+        assertEq(recovery.hardwareKeys(user1, keyId), keccak256(attestation));
+        assertEq(recovery.hardwareKeyCount(user1), 1);
     }
 
     function test_registerHardwareKey_byVerifier() public {
+        bytes memory attestation = abi.encodePacked(keccak256("verifier-attestation"));
+        bytes32 keyId = keccak256("keyId");
         vm.prank(verifier);
+        recovery.registerHardwareKey(user1, keyId, attestation);
+
+        assertEq(recovery.hardwareKeyCount(user1), 1);
+    }
+
+    function test_registerHardwareKey_duplicateReverts() public {
+        bytes memory attestation = abi.encodePacked(keccak256("attestation"));
+        bytes32 keyId = keccak256("keyId");
+        vm.prank(user1);
+        recovery.registerHardwareKey(user1, keyId, attestation);
+
+        vm.expectRevert("Key already registered");
+        vm.prank(user1);
+        recovery.registerHardwareKey(user1, keyId, attestation);
+    }
+
+    function test_registerHardwareKey_emptyAttestationReverts() public {
+        vm.expectRevert("Attestation too short");
+        vm.prank(user1);
         recovery.registerHardwareKey(user1, keccak256("keyId"), "");
+    }
+
+    function test_registerHardwareKey_zeroKeyReverts() public {
+        bytes memory attestation = abi.encodePacked(keccak256("attestation"));
+        vm.expectRevert("Invalid key identifier");
+        vm.prank(user1);
+        recovery.registerHardwareKey(user1, bytes32(0), attestation);
+    }
+
+    function test_revokeHardwareKey() public {
+        bytes memory attestation = abi.encodePacked(keccak256("attestation"));
+        bytes32 keyId = keccak256("keyId");
+        vm.prank(user1);
+        recovery.registerHardwareKey(user1, keyId, attestation);
+
+        vm.prank(user1);
+        recovery.revokeHardwareKey(user1, keyId);
+
+        assertEq(recovery.hardwareKeys(user1, keyId), bytes32(0));
+        assertEq(recovery.hardwareKeyCount(user1), 0);
+    }
+
+    function test_verifyHardwareKey() public {
+        bytes memory attestation = abi.encodePacked(keccak256("attestation"));
+        bytes32 keyId = keccak256("keyId");
+        vm.prank(user1);
+        recovery.registerHardwareKey(user1, keyId, attestation);
+
+        assertTrue(recovery.verifyHardwareKey(user1, keyId, attestation));
+        assertFalse(recovery.verifyHardwareKey(user1, keyId, abi.encodePacked(keccak256("wrong"))));
     }
 
     // ============ Recovery Notification ============

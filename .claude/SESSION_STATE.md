@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6, Session 36)
+**Last Updated**: 2026-02-19 (Desktop - Claude Code Opus 4.6, Session 38)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -37,7 +37,17 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 19, 2026 — Session 37)
+## Recently Completed (Feb 19, 2026 — Session 38)
+88. **HIGH-Severity Production Fixes + 2 CRITICAL Integration Tests**
+    - **WalletRecovery _resolveCase verdict applied**: ArbitrationCase now stores tokenId, _resolveCase updates request.arbStatus (Approved/Rejected). Fisher-Yates juror selection with multi-entropy seed prevents duplicates. 48 tests passing.
+    - **DAOTreasury emergencyWithdraw governed**: Replaced instant `onlyOwner` bypass with 6-hour emergency timelock + optional guardian co-sign. Queue→approve→execute pattern. 45 tests passing (unit+fuzz+invariant).
+    - **AGIResistantRecovery attestation verification**: registerHardwareKey now validates non-empty attestation, stores hash on-chain, prevents duplicates. Added revokeHardwareKey() and verifyHardwareKey(). 46 tests passing.
+    - **ComplianceGatingPipeline.t.sol (8 tests)**: CRITICAL go-live gap filled. VibeSwapCore + ClawbackRegistry + FederatedConsensus E2E. Tainted wallets blocked from commitSwap, mid-session flagging, graceful degradation, multi-authority.
+    - **wBARLifecyclePipeline.t.sol (16 tests)**: CRITICAL go-live gap filled. Full wBAR lifecycle: mint→transfer→settle→redeem, reclaimFailed path, phase restrictions, standard transfer blocked, multiple positions, zero output.
+    - **126 integration tests across 12 suites, 0 failures**
+    - Commits: `b3cba8c`, `5a53125`, `ca41d1a`, `b29f451`, `0267870` — all pushed to both remotes
+
+## Previously Completed (Feb 19, 2026 — Session 37)
 87. **Production Blocker Audit + 5 Critical Fixes**
     - **Full production audit**: 3 CRITICAL (CrossChainRouter stubs), 8 HIGH (identity stubs, mock prices, missing ACL), 6 MEDIUM, 4 LOW
     - **TreasuryStabilizer._getMainPool fix**: Replaced keccak256 placeholder with configurable `tokenMainPool` mapping + `setMainPool()` admin function. 51 tests passing (41 unit + 6 fuzz + 4 invariant). Also fixed invariant handler (wasn't owner, couldn't exercise admin funcs).

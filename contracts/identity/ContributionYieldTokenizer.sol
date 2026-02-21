@@ -108,6 +108,15 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
     /// @notice Authorized callers (can create ideas on behalf, record milestones)
     mapping(address => bool) public authorizedCallers;
 
+    /// @notice Prevents duplicate ideas — contentHash must be unique
+    mapping(bytes32 => uint256) public contentHashToIdeaId;
+
+    /// @notice Merge tracking: sourceIdeaId => targetIdeaId
+    mapping(uint256 => uint256) public mergedInto;
+
+    /// @notice Merge bounty: 1% of remaining funding goes to whoever finds the duplicate
+    uint256 public constant MERGE_BOUNTY_BPS = 100; // 1%
+
     // ============ Constructor ============
 
     constructor(
@@ -128,6 +137,7 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         bytes32 contentHash,
         uint256 initialFunding
     ) external nonReentrant returns (uint256 ideaId) {
+        if (contentHashToIdeaId[contentHash] != 0) revert DuplicateContentHash();
         ideaId = nextIdeaId++;
 
         // Deploy Idea Token for this idea
@@ -145,6 +155,8 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
             status: IdeaStatus.ACTIVE,
             ideaToken: address(it)
         });
+
+        contentHashToIdeaId[contentHash] = ideaId;
 
         emit IdeaCreated(ideaId, msg.sender, address(it), contentHash);
 
@@ -306,6 +318,88 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         _updateAllStreamRates(stream.ideaId);
 
         emit StreamRedirected(streamId, oldExecutor, newExecutor);
+    }
+
+    // ============ Merge Functions ============
+
+    /// @notice Merge a source idea into a target idea (the opposite of a fork)
+    /// @dev Caller must hold source IdeaTokens. Transfers remaining funding,
+    ///      halts source streams, marks source as MERGED. Caller receives a
+    ///      bounty (1% of transferred funding) for finding the duplicate.
+    ///      Source IT holders can swap their tokens 1:1 for target IT via claimMerge().
+    function mergeIdeas(uint256 sourceIdeaId, uint256 targetIdeaId) external nonReentrant {
+        if (sourceIdeaId == targetIdeaId) revert CannotMergeSelf();
+
+        Idea storage source = _ideas[sourceIdeaId];
+        Idea storage target = _ideas[targetIdeaId];
+        if (source.createdAt == 0) revert IdeaNotFound();
+        if (target.createdAt == 0) revert IdeaNotFound();
+        if (source.status == IdeaStatus.MERGED) revert IdeaAlreadyMerged();
+        if (target.status == IdeaStatus.MERGED) revert IdeaAlreadyMerged();
+
+        // Caller must hold source IdeaTokens
+        IdeaToken sourceIT = IdeaToken(source.ideaToken);
+        if (sourceIT.balanceOf(msg.sender) == 0) revert NotIdeaTokenHolderForMerge();
+
+        // Settle all source streams before merging
+        _settleAllStreams(sourceIdeaId);
+
+        // Halt all active source streams
+        uint256[] storage sourceStreamIds = _ideaStreams[sourceIdeaId];
+        for (uint256 i = 0; i < sourceStreamIds.length; i++) {
+            ExecutionStream storage s = _streams[sourceStreamIds[i]];
+            if (s.status == StreamStatus.ACTIVE) {
+                s.status = StreamStatus.STALLED;
+                s.streamRate = 0;
+            }
+        }
+
+        // Calculate remaining funding to transfer
+        uint256 totalStreamed = _totalStreamedForIdea(sourceIdeaId);
+        uint256 remainingFunding = source.totalFunding > totalStreamed
+            ? source.totalFunding - totalStreamed
+            : 0;
+
+        // Bounty to merger
+        uint256 bounty = (remainingFunding * MERGE_BOUNTY_BPS) / BPS;
+        uint256 transferAmount = remainingFunding - bounty;
+
+        // Transfer remaining funding to target idea
+        if (transferAmount > 0) {
+            target.totalFunding += transferAmount;
+            _updateAllStreamRates(targetIdeaId);
+        }
+
+        // Pay bounty to merger
+        if (bounty > 0) {
+            rewardToken.safeTransfer(msg.sender, bounty);
+        }
+
+        // Mark source as merged
+        source.status = IdeaStatus.MERGED;
+        mergedInto[sourceIdeaId] = targetIdeaId;
+
+        emit IdeasMerged(sourceIdeaId, targetIdeaId, msg.sender, transferAmount, bounty);
+    }
+
+    /// @notice Swap source IdeaTokens 1:1 for target IdeaTokens after a merge
+    /// @param sourceIdeaId The merged (source) idea
+    /// @param amount How many source IT to swap
+    function claimMerge(uint256 sourceIdeaId, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
+        if (_ideas[sourceIdeaId].status != IdeaStatus.MERGED) revert IdeaNotFound();
+
+        uint256 targetIdeaId = mergedInto[sourceIdeaId];
+        Idea storage target = _ideas[targetIdeaId];
+
+        IdeaToken sourceIT = IdeaToken(_ideas[sourceIdeaId].ideaToken);
+        IdeaToken targetIT = IdeaToken(target.ideaToken);
+
+        // Burn source IT from caller
+        sourceIT.burn(msg.sender, amount);
+
+        // Mint target IT 1:1
+        targetIT.mint(msg.sender, amount);
     }
 
     // ============ View Functions ============

@@ -17,6 +17,7 @@ contract MockRewardToken2 is ERC20 {
 contract ContributionYieldTokenizerTest is Test {
     // Re-declare events for expectEmit (Solidity 0.8.20)
     event IdeaCreated(uint256 indexed ideaId, address indexed creator, address ideaToken, bytes32 contentHash);
+    event IdeasMerged(uint256 indexed sourceIdeaId, uint256 indexed targetIdeaId, address indexed merger, uint256 fundingTransferred, uint256 mergerBounty);
     ContributionYieldTokenizer public tokenizer;
     MockRewardToken2 public rewardToken;
 
@@ -56,9 +57,12 @@ contract ContributionYieldTokenizerTest is Test {
 
     // ============ Helpers ============
 
+    uint256 private _hashNonce;
+
     function _createAndFundIdea(uint256 funding) internal returns (uint256 ideaId) {
+        bytes32 hash = keccak256(abi.encodePacked("ipfs_hash", _hashNonce++));
         vm.prank(alice);
-        ideaId = tokenizer.createIdea(bytes32("ipfs_hash"), funding);
+        ideaId = tokenizer.createIdea(hash, funding);
     }
 
     function _createIdeaAndStream() internal returns (uint256 ideaId, uint256 streamId) {
@@ -580,6 +584,322 @@ contract ContributionYieldTokenizerTest is Test {
         stream = tokenizer.getStream(streamId);
         assertEq(uint256(stream.status), uint256(IContributionYieldTokenizer.StreamStatus.COMPLETED));
     }
+
+    // ============ ContentHash Uniqueness Tests ============
+
+    function test_createIdea_duplicateContentHash_reverts() public {
+        vm.prank(alice);
+        tokenizer.createIdea(bytes32("unique_hash"), 0);
+
+        // Same contentHash should revert
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.DuplicateContentHash.selector);
+        tokenizer.createIdea(bytes32("unique_hash"), 0);
+    }
+
+    function test_createIdea_duplicateContentHash_differentCreator_reverts() public {
+        vm.prank(alice);
+        tokenizer.createIdea(bytes32("shared_hash"), 0);
+
+        // Even a different creator can't use the same hash
+        vm.prank(carol);
+        vm.expectRevert(IContributionYieldTokenizer.DuplicateContentHash.selector);
+        tokenizer.createIdea(bytes32("shared_hash"), 0);
+    }
+
+    function test_contentHashToIdeaId_mapping() public {
+        vm.prank(alice);
+        uint256 ideaId = tokenizer.createIdea(bytes32("lookup_hash"), 0);
+
+        assertEq(tokenizer.contentHashToIdeaId(bytes32("lookup_hash")), ideaId);
+        assertEq(tokenizer.contentHashToIdeaId(bytes32("nonexistent")), 0);
+    }
+
+    function test_createIdea_differentHashes_succeed() public {
+        vm.prank(alice);
+        uint256 id1 = tokenizer.createIdea(bytes32("hash_a"), 0);
+
+        vm.prank(alice);
+        uint256 id2 = tokenizer.createIdea(bytes32("hash_b"), 0);
+
+        assertEq(id1, 1);
+        assertEq(id2, 2);
+        assertEq(tokenizer.contentHashToIdeaId(bytes32("hash_a")), 1);
+        assertEq(tokenizer.contentHashToIdeaId(bytes32("hash_b")), 2);
+    }
+
+    // ============ Merge Tests ============
+
+    function _createTwoIdeas() internal returns (uint256 sourceId, uint256 targetId) {
+        vm.prank(alice);
+        sourceId = tokenizer.createIdea(bytes32("source_idea"), FUND_AMOUNT);
+
+        vm.prank(alice);
+        targetId = tokenizer.createIdea(bytes32("target_idea"), FUND_AMOUNT);
+    }
+
+    function test_mergeIdeas_success() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        IContributionYieldTokenizer.Idea memory targetBefore = tokenizer.getIdea(targetId);
+        uint256 aliceBalBefore = rewardToken.balanceOf(alice);
+
+        // Alice holds source IT, so she can merge
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        // Source is now MERGED
+        IContributionYieldTokenizer.Idea memory source = tokenizer.getIdea(sourceId);
+        assertEq(uint256(source.status), uint256(IContributionYieldTokenizer.IdeaStatus.MERGED));
+
+        // mergedInto pointer set
+        assertEq(tokenizer.mergedInto(sourceId), targetId);
+
+        // Target received funding (minus 1% bounty)
+        IContributionYieldTokenizer.Idea memory target = tokenizer.getIdea(targetId);
+        uint256 bounty = (FUND_AMOUNT * 100) / 10000; // 1%
+        uint256 transferred = FUND_AMOUNT - bounty;
+        assertEq(target.totalFunding, targetBefore.totalFunding + transferred);
+
+        // Alice received the bounty
+        assertEq(rewardToken.balanceOf(alice) - aliceBalBefore, bounty);
+    }
+
+    function test_mergeIdeas_haltsSourceStreams() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        // Bob proposes execution on source
+        vm.prank(bob);
+        uint256 streamId = tokenizer.proposeExecution(sourceId);
+
+        IContributionYieldTokenizer.ExecutionStream memory streamBefore = tokenizer.getStream(streamId);
+        assertEq(uint256(streamBefore.status), uint256(IContributionYieldTokenizer.StreamStatus.ACTIVE));
+
+        // Merge
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        // Stream should be stalled
+        IContributionYieldTokenizer.ExecutionStream memory streamAfter = tokenizer.getStream(streamId);
+        assertEq(uint256(streamAfter.status), uint256(IContributionYieldTokenizer.StreamStatus.STALLED));
+        assertEq(streamAfter.streamRate, 0);
+    }
+
+    function test_mergeIdeas_afterStreaming_transfersRemaining() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        // Bob executes, streams for 10 days
+        vm.prank(bob);
+        uint256 streamId = tokenizer.proposeExecution(sourceId);
+        vm.warp(block.timestamp + 10 days);
+
+        // Claim what's streamed
+        vm.prank(bob);
+        tokenizer.claimStream(streamId);
+        uint256 bobEarned = rewardToken.balanceOf(bob);
+        assertGt(bobEarned, 0);
+
+        // Now merge — only remaining funding transfers
+        IContributionYieldTokenizer.Idea memory targetBefore = tokenizer.getIdea(targetId);
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        IContributionYieldTokenizer.Idea memory target = tokenizer.getIdea(targetId);
+        uint256 remainingFunding = FUND_AMOUNT - bobEarned;
+        uint256 bounty = (remainingFunding * 100) / 10000;
+        uint256 transferred = remainingFunding - bounty;
+        // Allow 1 wei rounding tolerance
+        assertApproxEqAbs(target.totalFunding - targetBefore.totalFunding, transferred, 1);
+    }
+
+    function test_mergeIdeas_selfMerge_reverts() public {
+        vm.prank(alice);
+        uint256 ideaId = tokenizer.createIdea(bytes32("self_merge"), FUND_AMOUNT);
+
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.CannotMergeSelf.selector);
+        tokenizer.mergeIdeas(ideaId, ideaId);
+    }
+
+    function test_mergeIdeas_sourceAlreadyMerged_reverts() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        // Try to merge the already-merged source again
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.IdeaAlreadyMerged.selector);
+        tokenizer.mergeIdeas(sourceId, targetId);
+    }
+
+    function test_mergeIdeas_targetAlreadyMerged_reverts() public {
+        vm.prank(alice);
+        uint256 id1 = tokenizer.createIdea(bytes32("idea_1"), FUND_AMOUNT);
+        vm.prank(alice);
+        uint256 id2 = tokenizer.createIdea(bytes32("idea_2"), FUND_AMOUNT);
+        vm.prank(alice);
+        uint256 id3 = tokenizer.createIdea(bytes32("idea_3"), FUND_AMOUNT);
+
+        // Merge id2 into id3
+        vm.prank(alice);
+        tokenizer.mergeIdeas(id2, id3);
+
+        // Can't merge into id2 since it's MERGED
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.IdeaAlreadyMerged.selector);
+        tokenizer.mergeIdeas(id1, id2);
+    }
+
+    function test_mergeIdeas_notHolder_reverts() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        // Bob has no source IT
+        vm.prank(bob);
+        vm.expectRevert(IContributionYieldTokenizer.NotIdeaTokenHolderForMerge.selector);
+        tokenizer.mergeIdeas(sourceId, targetId);
+    }
+
+    function test_mergeIdeas_sourceNotFound_reverts() public {
+        vm.prank(alice);
+        uint256 targetId = tokenizer.createIdea(bytes32("target_only"), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.IdeaNotFound.selector);
+        tokenizer.mergeIdeas(999, targetId);
+    }
+
+    function test_mergeIdeas_targetNotFound_reverts() public {
+        vm.prank(alice);
+        uint256 sourceId = tokenizer.createIdea(bytes32("source_only"), FUND_AMOUNT);
+
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.IdeaNotFound.selector);
+        tokenizer.mergeIdeas(sourceId, 999);
+    }
+
+    function test_mergeIdeas_noFunding_noRevert() public {
+        // Source has zero funding — should still merge cleanly
+        vm.prank(alice);
+        uint256 sourceId = tokenizer.createIdea(bytes32("empty_source"), 0);
+        vm.prank(alice);
+        uint256 targetId = tokenizer.createIdea(bytes32("empty_target"), 0);
+
+        // Alice needs source IT to merge — but with 0 funding, she has 0 IT
+        // This should revert because she's not a holder
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.NotIdeaTokenHolderForMerge.selector);
+        tokenizer.mergeIdeas(sourceId, targetId);
+    }
+
+    function test_mergeIdeas_emitsEvent() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        uint256 bounty = (FUND_AMOUNT * 100) / 10000;
+        uint256 transferred = FUND_AMOUNT - bounty;
+
+        vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit IdeasMerged(sourceId, targetId, alice, transferred, bounty);
+        tokenizer.mergeIdeas(sourceId, targetId);
+    }
+
+    // ============ Claim Merge Tests ============
+
+    function test_claimMerge_swapsTokens1to1() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        IContributionYieldTokenizer.Idea memory source = tokenizer.getIdea(sourceId);
+        IContributionYieldTokenizer.Idea memory target = tokenizer.getIdea(targetId);
+        IdeaToken sourceIT = IdeaToken(source.ideaToken);
+        IdeaToken targetIT = IdeaToken(target.ideaToken);
+
+        uint256 aliceSourceBal = sourceIT.balanceOf(alice);
+        assertEq(aliceSourceBal, FUND_AMOUNT);
+
+        // Merge
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        // Alice swaps her source IT for target IT
+        uint256 swapAmount = 5000e18;
+        vm.prank(alice);
+        tokenizer.claimMerge(sourceId, swapAmount);
+
+        assertEq(sourceIT.balanceOf(alice), aliceSourceBal - swapAmount);
+        // Alice had FUND_AMOUNT target IT from initial funding, plus swapAmount from merge
+        assertEq(targetIT.balanceOf(alice), FUND_AMOUNT + swapAmount);
+    }
+
+    function test_claimMerge_fullSwap() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        IContributionYieldTokenizer.Idea memory source = tokenizer.getIdea(sourceId);
+        IdeaToken sourceIT = IdeaToken(source.ideaToken);
+
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        // Swap entire balance
+        uint256 fullBal = sourceIT.balanceOf(alice);
+        vm.prank(alice);
+        tokenizer.claimMerge(sourceId, fullBal);
+
+        assertEq(sourceIT.balanceOf(alice), 0);
+    }
+
+    function test_claimMerge_notMerged_reverts() public {
+        vm.prank(alice);
+        uint256 ideaId = tokenizer.createIdea(bytes32("not_merged"), FUND_AMOUNT);
+
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.IdeaNotFound.selector);
+        tokenizer.claimMerge(ideaId, 100e18);
+    }
+
+    function test_claimMerge_zeroAmount_reverts() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        vm.prank(alice);
+        vm.expectRevert(IContributionYieldTokenizer.ZeroAmount.selector);
+        tokenizer.claimMerge(sourceId, 0);
+    }
+
+    function test_claimMerge_multipleHolders() public {
+        (uint256 sourceId, uint256 targetId) = _createTwoIdeas();
+
+        // Carol also funds the source idea
+        vm.prank(carol);
+        tokenizer.fundIdea(sourceId, 2000e18);
+
+        IContributionYieldTokenizer.Idea memory source = tokenizer.getIdea(sourceId);
+        IContributionYieldTokenizer.Idea memory target = tokenizer.getIdea(targetId);
+        IdeaToken sourceIT = IdeaToken(source.ideaToken);
+        IdeaToken targetIT = IdeaToken(target.ideaToken);
+
+        assertEq(sourceIT.balanceOf(alice), FUND_AMOUNT);
+        assertEq(sourceIT.balanceOf(carol), 2000e18);
+
+        // Merge (alice triggers it)
+        vm.prank(alice);
+        tokenizer.mergeIdeas(sourceId, targetId);
+
+        // Both can swap independently
+        vm.prank(alice);
+        tokenizer.claimMerge(sourceId, FUND_AMOUNT);
+        assertEq(sourceIT.balanceOf(alice), 0);
+        assertEq(targetIT.balanceOf(alice), FUND_AMOUNT + FUND_AMOUNT); // original + swapped
+
+        vm.prank(carol);
+        tokenizer.claimMerge(sourceId, 2000e18);
+        assertEq(sourceIT.balanceOf(carol), 0);
+        assertEq(targetIT.balanceOf(carol), 2000e18); // carol only had source IT
+    }
+
+    // ============ Integration Flow Tests ============
 
     function test_freeMarket_anyoneCanExecute() public {
         uint256 ideaId = _createAndFundIdea(FUND_AMOUNT);

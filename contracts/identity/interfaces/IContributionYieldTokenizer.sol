@@ -34,7 +34,7 @@ interface IContributionYieldTokenizer {
 
     // ============ Enums ============
 
-    enum IdeaStatus { ACTIVE, ARCHIVED }
+    enum IdeaStatus { ACTIVE, ARCHIVED, MERGED }
     enum StreamStatus { ACTIVE, STALLED, REDIRECTED, COMPLETED }
 
     // ============ Structs ============
@@ -76,6 +76,7 @@ interface IContributionYieldTokenizer {
     event StreamRedirected(uint256 indexed streamId, address indexed oldExecutor, address indexed newExecutor);
     event StreamCompleted(uint256 indexed streamId);
     event MilestoneReported(uint256 indexed streamId, bytes32 evidenceHash, uint256 timestamp);
+    event IdeasMerged(uint256 indexed sourceIdeaId, uint256 indexed targetIdeaId, address indexed merger, uint256 fundingTransferred, uint256 mergerBounty);
 
     // ============ Errors ============
 
@@ -90,6 +91,10 @@ interface IContributionYieldTokenizer {
     error NothingToClaim();
     error StalePeriodNotReached();
     error Unauthorized();
+    error DuplicateContentHash();
+    error IdeaAlreadyMerged();
+    error CannotMergeSelf();
+    error NotIdeaTokenHolderForMerge();
 
     // ============ Idea Functions ============
 

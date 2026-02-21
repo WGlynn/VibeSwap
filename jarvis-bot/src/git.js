@@ -1,10 +1,15 @@
 import simpleGit from 'simple-git';
+import { existsSync } from 'fs';
 import { config } from './config.js';
 
 const REPO_PATH = config.repo.path;
-const git = simpleGit(REPO_PATH);
+const repoExists = existsSync(REPO_PATH);
+const git = repoExists ? simpleGit(REPO_PATH) : null;
+
+const NO_REPO = 'Git unavailable — no local repo at ' + REPO_PATH;
 
 export async function gitStatus() {
+  if (!git) return NO_REPO;
   const status = await git.status();
   const lines = [];
 
@@ -17,6 +22,7 @@ export async function gitStatus() {
 }
 
 export async function gitPull() {
+  if (!git) return NO_REPO;
   try {
     const result = await git.pull(config.repo.remoteOrigin, 'master');
     return `Pulled from ${config.repo.remoteOrigin}: ${result.summary.changes} changes, ${result.summary.insertions} insertions, ${result.summary.deletions} deletions`;
@@ -26,6 +32,7 @@ export async function gitPull() {
 }
 
 export async function gitCommitAndPush(message) {
+  if (!git) return NO_REPO;
   try {
     const status = await git.status();
     if (!status.modified.length && !status.not_added.length && !status.staged.length) {
@@ -51,6 +58,7 @@ export async function gitCommitAndPush(message) {
 }
 
 export async function gitLog(count = 5) {
+  if (!git) return NO_REPO;
   const log = await git.log({ maxCount: count });
   return log.all
     .map(c => `${c.hash.slice(0, 7)} ${c.message.split('\n')[0]}`)
@@ -61,6 +69,7 @@ export async function gitLog(count = 5) {
 // Commits contribution/user/interaction data to git for off-machine recovery
 
 export async function backupData() {
+  if (!git) return NO_REPO;
   try {
     const dataFiles = [
       'jarvis-bot/data/contributions.json',

@@ -24,41 +24,30 @@ const TOKEN_LOGOS = {
   WMATIC: '\uD83D\uDFEA',
 }
 
-// ============ Mock Pool Data ============
-// Returned when contracts are not deployed (demo mode)
-const MOCK_POOLS = [
+// ============ Launch Pool Data ============
+// Real pools available on Base mainnet — values start at zero until liquidity is added
+const LAUNCH_POOLS = [
   {
     id: '1',
     token0: { symbol: 'ETH', logo: '\u27E0' },
     token1: { symbol: 'USDC', logo: '\uD83D\uDCB5' },
-    tvl: 12500000,
-    volume24h: 2300000,
-    fees24h: 6900,
-    apr: 18.2,
-    myLiquidity: 5230,
-    myShare: '0.042%',
-  },
-  {
-    id: '2',
-    token0: { symbol: 'ETH', logo: '\u27E0' },
-    token1: { symbol: 'WBTC', logo: '\u20BF' },
-    tvl: 8200000,
-    volume24h: 1100000,
-    fees24h: 3300,
-    apr: 14.7,
+    tvl: 0,
+    volume24h: 0,
+    fees24h: 0,
+    apr: 0,
     myLiquidity: 0,
     myShare: '0%',
   },
   {
-    id: '3',
-    token0: { symbol: 'USDC', logo: '\uD83D\uDCB5' },
-    token1: { symbol: 'ARB', logo: '\uD83D\uDD35' },
-    tvl: 4100000,
-    volume24h: 890000,
-    fees24h: 2670,
-    apr: 23.8,
-    myLiquidity: 1500,
-    myShare: '0.037%',
+    id: '2',
+    token0: { symbol: 'ETH', logo: '\u27E0' },
+    token1: { symbol: 'DAI', logo: '\uD83D\uDCB5' },
+    tvl: 0,
+    volume24h: 0,
+    fees24h: 0,
+    apr: 0,
+    myLiquidity: 0,
+    myShare: '0%',
   },
 ]
 
@@ -101,17 +90,19 @@ const KNOWN_PAIRS = {
 // ============ Rough USD Prices ============
 // Used to compute TVL from reserves in demo/fallback scenarios.
 // In production these should come from the oracle or a price feed.
+// Approximate USD prices — used for TVL display only, not for trading
+// These should be replaced with oracle price feeds in production
 const USD_PRICES = {
-  ETH: 2000,
-  WETH: 2000,
+  ETH: 2800,
+  WETH: 2800,
   USDC: 1,
   USDT: 1,
   DAI: 1,
-  WBTC: 40000,
-  ARB: 1.2,
-  OP: 2.5,
-  MATIC: 0.8,
-  WMATIC: 0.8,
+  WBTC: 96000,
+  ARB: 0.50,
+  OP: 1.60,
+  MATIC: 0.35,
+  WMATIC: 0.35,
 }
 
 // ERC20 minimal ABI for LP balance lookups
@@ -122,15 +113,15 @@ const ERC20_BALANCE_ABI = [
 ]
 
 // ============ CKB Mock Pools ============
-const CKB_MOCK_POOLS = [
+const CKB_LAUNCH_POOLS = [
   {
     id: 'ckb-pool-1',
     token0: { symbol: 'CKB', logo: '◎' },
     token1: { symbol: 'dCKB', logo: '◎' },
-    tvl: 250000,
-    volume24h: 45000,
-    fees24h: 22.5,
-    apr: 3.3,
+    tvl: 0,
+    volume24h: 0,
+    fees24h: 0,
+    apr: 0,
     myLiquidity: 0,
     myShare: '0%',
   },
@@ -162,7 +153,7 @@ export function usePool() {
   const isLive = isCKB ? (isCKBLive || isCKBDemo) : evmLive
   const account = externalAccount || deviceAddress
 
-  const [pools, setPools] = useState(MOCK_POOLS)
+  const [pools, setPools] = useState(LAUNCH_POOLS)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -289,13 +280,13 @@ export function usePool() {
             myShare: '0%',
           }
         })
-        setPools(ckbPools.length > 0 ? ckbPools : CKB_MOCK_POOLS)
+        setPools(ckbPools.length > 0 ? ckbPools : CKB_LAUNCH_POOLS)
         setError(null)
         return
       }
 
       if (!isLive) {
-        setPools(MOCK_POOLS)
+        setPools(LAUNCH_POOLS)
         setError(null)
         return
       }
@@ -306,13 +297,13 @@ export function usePool() {
       try {
         const livePools = await fetchLivePools()
         if (!cancelled) {
-          setPools(livePools || MOCK_POOLS)
+          setPools(livePools || LAUNCH_POOLS)
         }
       } catch (err) {
         console.error('Failed to fetch pools:', err)
         if (!cancelled) {
           setError(err.message || 'Failed to load pools')
-          setPools(MOCK_POOLS)
+          setPools(LAUNCH_POOLS)
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -333,7 +324,7 @@ export function usePool() {
       setIsLoading(true)
       try {
         const livePools = await fetchLivePools()
-        setPools(livePools || MOCK_POOLS)
+        setPools(livePools || LAUNCH_POOLS)
       } catch (err) {
         console.error('Refresh failed:', err)
         setError(err.message)

@@ -106,21 +106,22 @@ function PoolPage() {
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Community Savings</p>
             <p className="text-2xl font-bold mt-1"><AnimatedNumber value={tvlFormatted.value} prefix="$" suffix={tvlFormatted.suffix} decimals={tvlFormatted.decimals} /></p>
-            <p className="text-sm text-green-500 mt-1">+5.2% (24h)</p>
+            {totalTVL === 0 && <p className="text-sm text-matrix-500 mt-1">Just launched</p>}
+            {totalTVL > 0 && <p className="text-sm text-green-500 mt-1">Live on Base</p>}
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Exchanged Today</p>
             <p className="text-2xl font-bold mt-1"><AnimatedNumber value={volumeFormatted.value} prefix="$" suffix={volumeFormatted.suffix} decimals={volumeFormatted.decimals} /></p>
-            <p className="text-sm text-green-500 mt-1">+12.8% (24h)</p>
+            {totalVolume24h > 0 && <p className="text-sm text-green-500 mt-1">Active</p>}
           </GlassCard>
         </StaggerItem>
         <StaggerItem>
           <GlassCard className="p-4">
             <p className="text-sm text-black-400">Earnings Paid Out</p>
             <p className="text-2xl font-bold mt-1"><AnimatedNumber value={earningsFormatted.value} prefix="$" suffix={earningsFormatted.suffix} decimals={earningsFormatted.decimals} /></p>
-            <p className="text-sm text-green-500 mt-1">+8.3% (24h)</p>
+            {totalEarnings > 0 && <p className="text-sm text-green-500 mt-1">Earning</p>}
           </GlassCard>
         </StaggerItem>
       </StaggerContainer>
@@ -341,7 +342,7 @@ function AddLiquidityModal({ pool, addLiquidity, onClose }) {
           <div className="p-4 rounded-2xl bg-black-900 border border-black-700">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-black-400">Amount</span>
-              <span className="text-sm text-black-400">Balance: 2.5</span>
+              <span className="text-sm text-black-400">Balance: {isConnected ? '—' : 'Connect wallet'}</span>
             </div>
             <div className="flex items-center space-x-3">
               <input
@@ -374,7 +375,7 @@ function AddLiquidityModal({ pool, addLiquidity, onClose }) {
           <div className="p-4 rounded-2xl bg-black-900 border border-black-700">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-black-400">Amount</span>
-              <span className="text-sm text-black-400">Balance: 5,000</span>
+              <span className="text-sm text-black-400">Balance: {isConnected ? '—' : 'Connect wallet'}</span>
             </div>
             <div className="flex items-center space-x-3">
               <input
@@ -398,11 +399,11 @@ function AddLiquidityModal({ pool, addLiquidity, onClose }) {
           <div className="p-4 rounded-2xl bg-black-700/50 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-black-400">Exchange Rate</span>
-              <span>1 {token0Symbol} = 2,000 {token1Symbol}</span>
+              <span>Market rate</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black-400">Your Share</span>
-              <span>{pool?.myShare || '0.05%'}</span>
+              <span>{pool?.myShare || '0%'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black-400">Earnings Rate</span>

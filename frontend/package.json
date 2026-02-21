@@ -20,8 +20,9 @@
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
+    "@reown/appkit": "^1.8.18",
+    "@reown/appkit-adapter-ethers": "^1.8.18",
     "@simplewebauthn/browser": "^13.2.2",
-    "@web3modal/ethers": "^5.1.11",
     "ethers": "^6.16.0",
     "framer-motion": "^10.16.0",
     "react": "^18.2.0",

@@ -49,6 +49,11 @@ contract PCCInvariantHandler is Test {
     mapping(bytes32 => bytes2[]) public poolBlockedJurisdictions;
     bytes32[] public createdPools;
 
+    // Ghost state for tier ordering: track minTierRequired per preset
+    mapping(uint8 => uint8) public presetMinTier; // preset -> minTierRequired
+    mapping(uint8 => bool) public presetSeen;     // preset -> has been created
+    bool public tierOrderingViolated;              // set true if violation detected
+
     constructor(PCCInvariantHarness _harness) {
         harness = _harness;
     }
@@ -61,6 +66,22 @@ contract PCCInvariantHandler is Test {
         harness.storeFromPreset(poolId, preset);
         poolPresets[poolId] = preset;
         createdPools.push(poolId);
+
+        // Track tier per preset for O(1) ordering check
+        PoolComplianceConfig.Config memory cfg = harness.getConfig(poolId);
+        if (!presetSeen[preset]) {
+            presetSeen[preset] = true;
+            presetMinTier[preset] = cfg.minTierRequired;
+        }
+        // Check ordering against all seen presets
+        for (uint8 p = 0; p < 4; p++) {
+            if (presetSeen[p] && p < preset && presetMinTier[p] > cfg.minTierRequired) {
+                tierOrderingViolated = true;
+            }
+            if (presetSeen[p] && p > preset && presetMinTier[p] < cfg.minTierRequired) {
+                tierOrderingViolated = true;
+            }
+        }
     }
 
     function addBlockedJurisdiction(uint256 poolIndex, bytes2 jurisdiction) external {
@@ -115,22 +136,7 @@ contract PoolComplianceConfigInvariantTest is Test {
 
     /// @notice Tier ordering: higher presets must have higher or equal tier requirements
     function invariant_tierOrdering() public view {
-        bytes32[] memory pools = handler.getCreatedPools();
-        for (uint256 i = 0; i < pools.length; i++) {
-            for (uint256 j = i + 1; j < pools.length; j++) {
-                uint8 presetI = handler.poolPresets(pools[i]);
-                uint8 presetJ = handler.poolPresets(pools[j]);
-
-                if (presetI < presetJ) {
-                    PoolComplianceConfig.Config memory cfgI = harness.getConfig(pools[i]);
-                    PoolComplianceConfig.Config memory cfgJ = harness.getConfig(pools[j]);
-                    assertTrue(
-                        cfgI.minTierRequired <= cfgJ.minTierRequired,
-                        "Higher preset must have >= tier"
-                    );
-                }
-            }
-        }
+        assertFalse(handler.tierOrderingViolated(), "Higher preset must have >= tier");
     }
 
     /// @notice All blocked jurisdictions must be detected

@@ -141,6 +141,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/prompts', label: 'Prompt Feed', icon: '>' },
     { path: '/docs', label: 'Learn', icon: '📚' },
     { path: '/about', label: 'About', icon: '💡' },
+    { path: '/jarvis', label: 'JARVIS', icon: '>' },
   ]
 
   // Admin items - TODO: Add proper role check

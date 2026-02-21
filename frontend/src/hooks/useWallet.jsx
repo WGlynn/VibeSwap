@@ -95,6 +95,7 @@ const modal = createWeb3Modal({
     enableEIP6963: true,
     enableInjected: true,
     enableCoinbase: true,
+    coinbasePreference: 'eoaOnly',
   }),
   chains,
   projectId,

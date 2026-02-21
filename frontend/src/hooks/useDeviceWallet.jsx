@@ -53,11 +53,11 @@ const derivePrivateKey = (credentialId, userHandle) => {
 }
 
 // Generate registration options (normally from server, but we do it client-side for simplicity)
-const generateRegistrationOptions = (userId) => {
+const generateRegistrationOptions = (userId, preferPlatform = true) => {
   const challenge = crypto.getRandomValues(new Uint8Array(32))
   const userIdBytes = new TextEncoder().encode(userId)
 
-  return {
+  const options = {
     challenge: challenge,
     rp: {
       name: APP_NAME,
@@ -75,11 +75,17 @@ const generateRegistrationOptions = (userId) => {
     timeout: 60000,
     attestation: 'none',
     authenticatorSelection: {
-      authenticatorAttachment: 'platform', // Use device's secure element
-      userVerification: 'required',        // Require biometrics
-      residentKey: 'required',             // Store on device
+      userVerification: 'preferred',
+      residentKey: 'preferred',
     },
   }
+
+  // Only force platform attachment if we know it's available
+  if (preferPlatform) {
+    options.authenticatorSelection.authenticatorAttachment = 'platform'
+  }
+
+  return options
 }
 
 // Generate authentication options
@@ -171,13 +177,18 @@ export function DeviceWalletProvider({ children }) {
       // Generate a unique user ID
       const userId = crypto.randomUUID()
 
-      // Create registration options
-      const options = generateRegistrationOptions(userId)
+      let credential = null
 
-      // Start WebAuthn registration (triggers biometric prompt)
-      const credential = await navigator.credentials.create({
-        publicKey: options
-      })
+      // Try platform authenticator first (biometrics), fall back to any authenticator
+      try {
+        const options = generateRegistrationOptions(userId, true)
+        credential = await navigator.credentials.create({ publicKey: options })
+      } catch (platformErr) {
+        console.warn('Platform authenticator failed, trying without restriction:', platformErr.message)
+        // Retry without forcing platform attachment
+        const fallbackOptions = generateRegistrationOptions(userId, false)
+        credential = await navigator.credentials.create({ publicKey: fallbackOptions })
+      }
 
       if (!credential) {
         throw new Error('Failed to create credential')

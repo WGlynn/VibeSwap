@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import "../contracts/core/VibeSwapCore.sol";
 import "../contracts/core/CommitRevealAuction.sol";
-import "../contracts/amm/VibeAMMLite.sol";
+import "../contracts/amm/VibeAMM.sol";
 import "../contracts/governance/DAOTreasury.sol";
 import "../contracts/messaging/CrossChainRouter.sol";
 import "../contracts/oracles/TruePriceOracle.sol";
@@ -169,13 +169,13 @@ contract DeployProduction is Script {
 
     function _deployImplementations() internal {
         auctionImpl = address(new CommitRevealAuction());
-        ammImpl = address(new VibeAMMLite());
+        ammImpl = address(new VibeAMM());
         treasuryImpl = address(new DAOTreasury());
         routerImpl = address(new CrossChainRouter());
         coreImpl = address(new VibeSwapCore());
 
         console.log("  CommitRevealAuction impl:", auctionImpl);
-        console.log("  VibeAMMLite impl:", ammImpl);
+        console.log("  VibeAMM impl:", ammImpl);
         console.log("  DAOTreasury impl:", treasuryImpl);
         console.log("  CrossChainRouter impl:", routerImpl);
         console.log("  VibeSwapCore impl:", coreImpl);
@@ -192,12 +192,12 @@ contract DeployProduction is Script {
     function _deployProxies() internal {
         // Deploy AMM first (Treasury needs it)
         bytes memory ammInit = abi.encodeWithSelector(
-            VibeAMMLite.initialize.selector,
+            VibeAMM.initialize.selector,
             owner,
             address(0x1) // Placeholder treasury
         );
         amm = address(new ERC1967Proxy(ammImpl, ammInit));
-        console.log("  VibeAMMLite proxy:", amm);
+        console.log("  VibeAMM proxy:", amm);
 
         // Deploy Treasury (needs AMM)
         bytes memory treasuryInit = abi.encodeWithSelector(
@@ -209,7 +209,7 @@ contract DeployProduction is Script {
         console.log("  DAOTreasury proxy:", treasury);
 
         // Set AMM treasury to DAOTreasury initially (overridden by fee pipeline in Step 5)
-        VibeAMMLite(amm).setTreasury(treasury);
+        VibeAMM(amm).setTreasury(treasury);
 
         // Deploy Auction
         bytes memory auctionInit = abi.encodeWithSelector(
@@ -305,11 +305,11 @@ contract DeployProduction is Script {
         console.log("  ProtocolFeeAdapter authorized as FeeRouter source");
 
         // Wire up: VibeAMM treasury -> ProtocolFeeAdapter (fees flow through cooperative pipeline)
-        VibeAMMLite(amm).setTreasury(feeAdapter);
+        VibeAMM(amm).setTreasury(feeAdapter);
         console.log("  VibeAMM treasury -> ProtocolFeeAdapter");
 
         // Enable protocol fee share (10% of trading fees to protocol)
-        VibeAMMLite(amm).setProtocolFeeShare(1000);
+        VibeAMM(amm).setProtocolFeeShare(1000);
         console.log("  VibeAMM protocolFeeShare -> 10% (1000 bps)");
     }
 
@@ -320,7 +320,7 @@ contract DeployProduction is Script {
         console.log("  Auction: Core and Router authorized as settlers");
 
         // AMM authorizations
-        VibeAMMLite(amm).setAuthorizedExecutor(core, true);
+        VibeAMM(amm).setAuthorizedExecutor(core, true);
         console.log("  AMM: Core authorized as executor");
 
         // Treasury authorizations
@@ -342,13 +342,13 @@ contract DeployProduction is Script {
         StablecoinFlowRegistry(stablecoinRegistry).setAuthorizedUpdater(oracleSigner, true);
         console.log("  StablecoinFlowRegistry: Updater authorized:", oracleSigner);
 
-        // Note: VibeAMMLite has liquidity protection baked in (no toggle needed)
+        // Note: VibeAMM has liquidity protection baked in (no toggle needed)
     }
 
     function _configureSecurity() internal {
         // AMM security
-        VibeAMMLite(amm).setFlashLoanProtection(true);
-        VibeAMMLite(amm).setTWAPValidation(true);
+        VibeAMM(amm).setFlashLoanProtection(true);
+        VibeAMM(amm).setTWAPValidation(true);
         console.log("  AMM: Flash loan protection enabled, TWAP validation enabled");
 
         // Core security - guardian
@@ -388,7 +388,7 @@ contract DeployProduction is Script {
         // Verify core ownership
         require(VibeSwapCore(payable(core)).owner() == owner, "Core owner mismatch");
         require(CommitRevealAuction(payable(auction)).owner() == owner, "Auction owner mismatch");
-        require(VibeAMMLite(amm).owner() == owner, "AMM owner mismatch");
+        require(VibeAMM(amm).owner() == owner, "AMM owner mismatch");
         require(DAOTreasury(payable(treasury)).owner() == owner, "Treasury owner mismatch");
         require(CrossChainRouter(payable(router)).owner() == owner, "Router owner mismatch");
 
@@ -398,7 +398,7 @@ contract DeployProduction is Script {
 
         // Verify critical authorizations
         require(CommitRevealAuction(payable(auction)).authorizedSettlers(core), "Core not settler");
-        require(VibeAMMLite(amm).authorizedExecutors(core), "Core not executor");
+        require(VibeAMM(amm).authorizedExecutors(core), "Core not executor");
         require(DAOTreasury(payable(treasury)).authorizedFeeSenders(amm), "AMM not fee sender");
 
         // Verify oracle authorizations
@@ -417,8 +417,8 @@ contract DeployProduction is Script {
         require(feeRouter.code.length > 0, "FeeRouter has no code");
         require(feeAdapter.code.length > 0, "FeeAdapter has no code");
         require(buybackEngine.code.length > 0, "BuybackEngine has no code");
-        require(VibeAMMLite(amm).treasury() == feeAdapter, "AMM treasury should be FeeAdapter");
-        require(VibeAMMLite(amm).protocolFeeShare() == 1000, "AMM protocolFeeShare should be 1000");
+        require(VibeAMM(amm).treasury() == feeAdapter, "AMM treasury should be FeeAdapter");
+        require(VibeAMM(amm).protocolFeeShare() == 1000, "AMM protocolFeeShare should be 1000");
         require(FeeRouter(feeRouter).isAuthorizedSource(feeAdapter), "FeeAdapter not authorized on FeeRouter");
         require(ProtocolFeeAdapter(payable(feeAdapter)).feeRouter() == feeRouter, "FeeAdapter feeRouter mismatch");
 
@@ -431,7 +431,7 @@ contract DeployProduction is Script {
         console.log("");
         console.log("Core Implementations:");
         console.log("  CommitRevealAuction:", auctionImpl);
-        console.log("  VibeAMMLite:", ammImpl);
+        console.log("  VibeAMM:", ammImpl);
         console.log("  DAOTreasury:", treasuryImpl);
         console.log("  CrossChainRouter:", routerImpl);
         console.log("  VibeSwapCore:", coreImpl);
@@ -545,7 +545,7 @@ contract TransferOwnership is Script {
         // Transfer core contract ownership
         VibeSwapCore(payable(core)).transferOwnership(multisig);
         CommitRevealAuction(payable(auction)).transferOwnership(multisig);
-        VibeAMMLite(amm).transferOwnership(multisig);
+        VibeAMM(amm).transferOwnership(multisig);
         DAOTreasury(payable(treasury)).transferOwnership(multisig);
         CrossChainRouter(payable(router)).transferOwnership(multisig);
 

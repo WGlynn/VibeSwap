@@ -9,66 +9,53 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./VibeLP.sol";
 import "../core/interfaces/IVibeAMM.sol";
-import "../core/CircuitBreaker.sol";
 import "../libraries/BatchMath.sol";
-import "../libraries/SecurityLib.sol";
 import "../libraries/TWAPOracle.sol";
 
 /**
  * @title VibeAMMLite
  * @notice Deployment-optimized AMM for Base mainnet (< 24KB)
- * @dev Core AMM functionality: pools, liquidity, swaps, batch execution, TWAP.
- *      Full VibeAMM (Fibonacci, PoW, VWAP, LiquidityProtection) available via UUPS upgrade.
+ * @dev Core AMM: pools, liquidity, swaps, batch execution, TWAP.
+ *      Inline circuit breakers (no CircuitBreaker inheritance) for size.
+ *      Full VibeAMM (Fibonacci, PoW, VWAP, full CircuitBreaker) via UUPS upgrade.
  */
 contract VibeAMMLite is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    CircuitBreaker,
     IVibeAMM
 {
     using SafeERC20 for IERC20;
     using BatchMath for uint256;
     using TWAPOracle for TWAPOracle.OracleState;
 
-    // ============ Constants ============
-
     uint256 public constant DEFAULT_FEE_RATE = 5;
-    uint256 public protocolFeeShare;
     uint256 public constant MINIMUM_LIQUIDITY = 10000;
     uint256 public constant MAX_PRICE_DEVIATION_BPS = 500;
-    uint256 public constant MAX_DONATION_BPS = 100;
     uint32 public constant DEFAULT_TWAP_PERIOD = 10 minutes;
-    uint256 public constant MAX_TRADE_SIZE_BPS = 1000;
 
-    // ============ Structs ============
-
-    struct SwapParams {
-        bytes32 poolId;
-        address tokenIn;
-        uint256 amountIn;
-        uint256 minAmountOut;
-        address recipient;
-    }
-
-    // ============ State ============
+    // ============ Core State ============
 
     mapping(bytes32 => Pool) public pools;
     mapping(bytes32 => address) public lpTokens;
-    mapping(bytes32 => mapping(address => uint256)) public liquidityBalance;
     address public treasury;
     mapping(address => bool) public authorizedExecutors;
     mapping(address => uint256) public accumulatedFees;
-
-    // ============ Security State ============
-
     mapping(bytes32 => TWAPOracle.OracleState) internal poolOracles;
-    mapping(address => uint256) public trackedBalances;
-    mapping(address => uint256) public lastInteractionBlock;
     mapping(bytes32 => bool) internal sameBlockInteraction;
-    mapping(bytes32 => uint256) public poolMaxTradeSize;
 
-    // ============ Packed Flags ============
+    // ============ Inline Circuit Breakers ============
+
+    bool public globalPaused;
+    struct BreakerState { bool tripped; uint256 trippedAt; uint256 windowStart; uint256 windowValue; }
+    struct BreakerConfig { uint256 threshold; uint256 cooldown; uint256 window; }
+    bytes32 private constant _VOL = keccak256("VOLUME_BREAKER");
+    bytes32 private constant _PRC = keccak256("PRICE_BREAKER");
+    bytes32 private constant _WDR = keccak256("WITHDRAWAL_BREAKER");
+    mapping(bytes32 => BreakerConfig) internal brkCfg;
+    mapping(bytes32 => BreakerState) internal brkState;
+
+    // ============ Protection Flags ============
 
     uint8 public protectionFlags;
     uint8 private constant FLAG_FLASH_LOAN = 1 << 0;
@@ -76,12 +63,8 @@ contract VibeAMMLite is
 
     // ============ Events ============
 
-    event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
-    event PriceManipulationDetected(bytes32 indexed poolId, uint256 spotPrice, uint256 twapPrice);
-    event DonationAttackDetected(address indexed token, uint256 tracked, uint256 actual);
-    event LargeTradeLimited(bytes32 indexed poolId, uint256 requested, uint256 allowed);
     event FeesCollected(address indexed token, uint256 amount);
-    event SwapFailed(bytes32 indexed poolId, address indexed trader, address tokenIn, uint256 amountIn, uint256 amountOut, uint256 minAmountOut);
+    event BreakerTripped(bytes32 indexed breakerType, uint256 value);
 
     // ============ Errors ============
 
@@ -99,32 +82,27 @@ contract VibeAMMLite is
     error InvalidLiquidity();
     error InsufficientLiquidityBalance();
     error InsufficientOutput();
-    error NoFeesToCollect();
+    error Paused();
     error SameBlockInteraction();
-    error TradeTooLarge(uint256 maxAllowed);
-    error DonationAttackSuspected();
-    error PriceDeviationTooHigh(uint256 spotPrice, uint256 twapPrice);
+    error PriceDeviationTooHigh();
 
     // ============ Modifiers ============
 
-    modifier onlyAuthorizedExecutor() {
-        if (!authorizedExecutors[msg.sender]) revert NotAuthorized();
-        _;
-    }
+    modifier onlyAuthorizedExecutor() { if (!authorizedExecutors[msg.sender]) revert NotAuthorized(); _; }
+    modifier poolExists(bytes32 poolId) { if (!pools[poolId].initialized) revert PoolNotFound(); _; }
+    modifier notPaused() { if (globalPaused) revert Paused(); _; }
 
-    modifier poolExists(bytes32 poolId) {
-        if (!pools[poolId].initialized) revert PoolNotFound();
+    modifier brkOk(bytes32 bt) {
+        BreakerState storage s = brkState[bt];
+        if (s.tripped && block.timestamp < s.trippedAt + brkCfg[bt].cooldown) revert Paused();
         _;
     }
 
     modifier noFlashLoan(bytes32 poolId) {
         if ((protectionFlags & FLAG_FLASH_LOAN) != 0) {
-            bytes32 interactionKey = keccak256(abi.encodePacked(msg.sender, poolId, block.number));
-            if (sameBlockInteraction[interactionKey]) {
-                emit FlashLoanAttemptBlocked(msg.sender, poolId);
-                revert SameBlockInteraction();
-            }
-            sameBlockInteraction[interactionKey] = true;
+            bytes32 k = keccak256(abi.encodePacked(msg.sender, poolId, block.number));
+            if (sameBlockInteraction[k]) revert SameBlockInteraction();
+            sameBlockInteraction[k] = true;
         }
         _;
     }
@@ -132,16 +110,20 @@ contract VibeAMMLite is
     modifier validatePrice(bytes32 poolId) {
         _;
         if ((protectionFlags & FLAG_TWAP) != 0 && poolOracles[poolId].cardinality >= 2) {
-            _validatePriceAgainstTWAP(poolId);
+            Pool storage p = pools[poolId];
+            if (p.reserve0 > 0 && poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
+                uint256 spot = (p.reserve1 * 1e18) / p.reserve0;
+                uint256 twap = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+                uint256 diff = spot > twap ? spot - twap : twap - spot;
+                if (diff * 10000 / twap > MAX_PRICE_DEVIATION_BPS) revert PriceDeviationTooHigh();
+            }
         }
     }
 
     // ============ Initialization ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+    constructor() { _disableInitializers(); }
 
     function initialize(address _owner, address _treasury) external initializer {
         __Ownable_init(_owner);
@@ -149,13 +131,9 @@ contract VibeAMMLite is
         if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
         protectionFlags = FLAG_FLASH_LOAN | FLAG_TWAP;
-        _configureDefaultBreakers();
-    }
-
-    function _configureDefaultBreakers() internal {
-        breakerConfigs[VOLUME_BREAKER] = BreakerConfig({ enabled: true, threshold: 10_000_000 * 1e18, cooldownPeriod: 1 hours, windowDuration: 1 hours });
-        breakerConfigs[PRICE_BREAKER] = BreakerConfig({ enabled: true, threshold: 5000, cooldownPeriod: 30 minutes, windowDuration: 15 minutes });
-        breakerConfigs[WITHDRAWAL_BREAKER] = BreakerConfig({ enabled: true, threshold: 2500, cooldownPeriod: 2 hours, windowDuration: 1 hours });
+        brkCfg[_VOL] = BreakerConfig(10_000_000 * 1e18, 1 hours, 1 hours);
+        brkCfg[_PRC] = BreakerConfig(5000, 30 minutes, 15 minutes);
+        brkCfg[_WDR] = BreakerConfig(2500, 2 hours, 1 hours);
     }
 
     // ============ Pool Management ============
@@ -166,65 +144,51 @@ contract VibeAMMLite is
         (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
         poolId = getPoolId(token0, token1);
         if (pools[poolId].initialized) revert PoolAlreadyExists();
-        uint256 actualFeeRate = feeRate == 0 ? DEFAULT_FEE_RATE : feeRate;
-        if (actualFeeRate > 1000) revert FeeTooHigh();
-        pools[poolId] = Pool({ token0: token0, token1: token1, reserve0: 0, reserve1: 0, totalLiquidity: 0, feeRate: actualFeeRate, initialized: true });
-        VibeLP lpToken = new VibeLP(token0, token1, address(this));
-        lpTokens[poolId] = address(lpToken);
-        emit PoolCreated(poolId, token0, token1, actualFeeRate);
+        uint256 fee = feeRate == 0 ? DEFAULT_FEE_RATE : feeRate;
+        if (fee > 1000) revert FeeTooHigh();
+        pools[poolId] = Pool({ token0: token0, token1: token1, reserve0: 0, reserve1: 0, totalLiquidity: 0, feeRate: fee, initialized: true });
+        lpTokens[poolId] = address(new VibeLP(token0, token1, address(this)));
+        emit PoolCreated(poolId, token0, token1, fee);
     }
 
     function addLiquidity(
         bytes32 poolId, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min
-    ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) whenNotGloballyPaused returns (uint256 amount0, uint256 amount1, uint256 liquidity) {
+    ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) notPaused returns (uint256 amount0, uint256 amount1, uint256 liquidity) {
         Pool storage pool = pools[poolId];
-        _checkDonationAttack(pool.token0);
-        _checkDonationAttack(pool.token1);
         (amount0, amount1) = BatchMath.calculateOptimalLiquidity(amount0Desired, amount1Desired, pool.reserve0, pool.reserve1);
         if (amount0 < amount0Min) revert InsufficientToken0();
         if (amount1 < amount1Min) revert InsufficientToken1();
         IERC20(pool.token0).safeTransferFrom(msg.sender, address(this), amount0);
         IERC20(pool.token1).safeTransferFrom(msg.sender, address(this), amount1);
-        bool isFirstDeposit = pool.totalLiquidity == 0;
         liquidity = BatchMath.calculateLiquidity(amount0, amount1, pool.reserve0, pool.reserve1, pool.totalLiquidity);
-        if (isFirstDeposit) {
+        if (pool.totalLiquidity == 0) {
             if (liquidity <= MINIMUM_LIQUIDITY) revert InitialLiquidityTooLow();
             unchecked { liquidity -= MINIMUM_LIQUIDITY; }
             VibeLP(lpTokens[poolId]).mint(address(0xdead), MINIMUM_LIQUIDITY);
             pool.totalLiquidity += MINIMUM_LIQUIDITY;
-            uint256 initialPrice = amount0 > 0 ? (amount1 * 1e18) / amount0 : 0;
-            poolOracles[poolId].initialize(initialPrice);
+            poolOracles[poolId].initialize(amount0 > 0 ? (amount1 * 1e18) / amount0 : 0);
         }
         if (liquidity == 0) revert InsufficientLiquidityMinted();
         unchecked { pool.reserve0 += amount0; pool.reserve1 += amount1; pool.totalLiquidity += liquidity; }
-        trackedBalances[pool.token0] += amount0;
-        trackedBalances[pool.token1] += amount1;
         _updateOracle(poolId);
         VibeLP(lpTokens[poolId]).mint(msg.sender, liquidity);
-        liquidityBalance[poolId][msg.sender] += liquidity;
         emit LiquidityAdded(poolId, msg.sender, amount0, amount1, liquidity);
     }
 
     function removeLiquidity(
         bytes32 poolId, uint256 liquidity, uint256 amount0Min, uint256 amount1Min
-    ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) whenNotGloballyPaused whenBreakerNotTripped(WITHDRAWAL_BREAKER) returns (uint256 amount0, uint256 amount1) {
+    ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) notPaused brkOk(_WDR) returns (uint256 amount0, uint256 amount1) {
         Pool storage pool = pools[poolId];
-        address lpToken = lpTokens[poolId];
-        if (liquidity == 0) revert InvalidLiquidity();
-        if (pool.totalLiquidity < liquidity) revert InvalidLiquidity();
-        if (IERC20(lpToken).balanceOf(msg.sender) < liquidity) revert InsufficientLiquidityBalance();
+        address lp = lpTokens[poolId];
+        if (liquidity == 0 || pool.totalLiquidity < liquidity) revert InvalidLiquidity();
+        if (IERC20(lp).balanceOf(msg.sender) < liquidity) revert InsufficientLiquidityBalance();
         amount0 = (liquidity * pool.reserve0) / pool.totalLiquidity;
         amount1 = (liquidity * pool.reserve1) / pool.totalLiquidity;
         if (amount0 < amount0Min) revert InsufficientToken0();
         if (amount1 < amount1Min) revert InsufficientToken1();
-        uint256 withdrawalValueBps = pool.totalLiquidity > 0 ? (liquidity * 10000) / pool.totalLiquidity : 0;
-        _updateBreaker(WITHDRAWAL_BREAKER, withdrawalValueBps);
+        _updBrk(_WDR, pool.totalLiquidity > 0 ? (liquidity * 10000) / pool.totalLiquidity : 0);
         unchecked { pool.reserve0 -= amount0; pool.reserve1 -= amount1; pool.totalLiquidity -= liquidity; }
-        if (trackedBalances[pool.token0] >= amount0) { unchecked { trackedBalances[pool.token0] -= amount0; } }
-        if (trackedBalances[pool.token1] >= amount1) { unchecked { trackedBalances[pool.token1] -= amount1; } }
-        uint256 tracked = liquidityBalance[poolId][msg.sender];
-        unchecked { liquidityBalance[poolId][msg.sender] = tracked >= liquidity ? tracked - liquidity : 0; }
-        VibeLP(lpToken).burn(msg.sender, liquidity);
+        VibeLP(lp).burn(msg.sender, liquidity);
         IERC20(pool.token0).safeTransfer(msg.sender, amount0);
         IERC20(pool.token1).safeTransfer(msg.sender, amount1);
         _updateOracle(poolId);
@@ -235,197 +199,119 @@ contract VibeAMMLite is
 
     function executeBatchSwap(
         bytes32 poolId, uint64 batchId, SwapOrder[] calldata orders
-    ) external nonReentrant onlyAuthorizedExecutor poolExists(poolId) whenNotGloballyPaused whenBreakerNotTripped(VOLUME_BREAKER) returns (BatchSwapResult memory result) {
-        if (orders.length == 0) return BatchSwapResult({ clearingPrice: 0, totalTokenInSwapped: 0, totalTokenOutSwapped: 0, protocolFees: 0 });
+    ) external nonReentrant onlyAuthorizedExecutor poolExists(poolId) notPaused brkOk(_VOL) returns (BatchSwapResult memory result) {
+        if (orders.length == 0) return BatchSwapResult(0, 0, 0, 0);
         Pool storage pool = pools[poolId];
-        _checkDonationAttack(pool.token0);
-        _checkDonationAttack(pool.token1);
-        (uint256[] memory buyOrders, uint256[] memory sellOrders) = _categorizeOrders(orders, pool.token0, pool.reserve0, pool.reserve1);
-        (uint256 clearingPrice, ) = BatchMath.calculateClearingPrice(buyOrders, sellOrders, pool.reserve0, pool.reserve1);
-        result.clearingPrice = clearingPrice;
+        (uint256[] memory buys, uint256[] memory sells) = _catOrders(orders, pool.token0, pool.reserve0, pool.reserve1);
+        (uint256 cp, ) = BatchMath.calculateClearingPrice(buys, sells, pool.reserve0, pool.reserve1);
+        result.clearingPrice = cp;
         for (uint256 i = 0; i < orders.length; i++) {
-            (uint256 amountIn, uint256 amountOut, uint256 fee) = _executeSwapAtClearing(pool, orders[i], clearingPrice);
-            result.totalTokenInSwapped += amountIn;
-            result.totalTokenOutSwapped += amountOut;
-            result.protocolFees += fee;
+            (uint256 ai, uint256 ao, uint256 f) = _batchSwap(pool, orders[i], cp);
+            result.totalTokenInSwapped += ai; result.totalTokenOutSwapped += ao; result.protocolFees += f;
         }
-        _updateBreaker(VOLUME_BREAKER, result.totalTokenInSwapped);
+        _updBrk(_VOL, result.totalTokenInSwapped);
         _updateOracle(poolId);
-        _checkAndUpdatePriceBreaker(poolId);
-        trackedBalances[pool.token0] = IERC20(pool.token0).balanceOf(address(this));
-        trackedBalances[pool.token1] = IERC20(pool.token1).balanceOf(address(this));
-        emit BatchSwapExecuted(poolId, batchId, clearingPrice, orders.length, result.protocolFees);
+        emit BatchSwapExecuted(poolId, batchId, cp, orders.length, result.protocolFees);
     }
 
     function swap(
         bytes32 poolId, address tokenIn, uint256 amountIn, uint256 minAmountOut, address recipient
-    ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) whenNotGloballyPaused
-      whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(PRICE_BREAKER) validatePrice(poolId)
-      returns (uint256 amountOut) {
-        return _executeSwap(SwapParams(poolId, tokenIn, amountIn, minAmountOut, recipient));
-    }
-
-    function _executeSwap(SwapParams memory p) internal returns (uint256 amountOut) {
-        Pool storage pool = pools[p.poolId];
-        if (p.tokenIn != pool.token0 && p.tokenIn != pool.token1) revert InvalidToken();
-        bool isToken0 = p.tokenIn == pool.token0;
-        uint256 feeRate = pool.feeRate;
-        {
-            uint256 reserveIn = isToken0 ? pool.reserve0 : pool.reserve1;
-            uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-            uint256 maxTradeSize = poolMaxTradeSize[p.poolId] > 0 ? poolMaxTradeSize[p.poolId] : (reserveIn * MAX_TRADE_SIZE_BPS) / 10000;
-            if (p.amountIn > maxTradeSize) { emit LargeTradeLimited(p.poolId, p.amountIn, maxTradeSize); revert TradeTooLarge(maxTradeSize); }
-            amountOut = BatchMath.getAmountOut(p.amountIn, reserveIn, reserveOut, feeRate);
-        }
-        if (amountOut < p.minAmountOut) revert InsufficientOutput();
-        address tokenOut = isToken0 ? pool.token1 : pool.token0;
-        IERC20(p.tokenIn).safeTransferFrom(msg.sender, address(this), p.amountIn);
-        IERC20(tokenOut).safeTransfer(p.recipient, amountOut);
-        _updateSwapState(pool, p.poolId, p.tokenIn, isToken0, p.amountIn, amountOut, feeRate);
-    }
-
-    function _updateSwapState(Pool storage pool, bytes32 poolId, address tokenIn, bool isToken0, uint256 amountIn, uint256 amountOut, uint256 feeRate) internal {
-        address tokenOut = isToken0 ? pool.token1 : pool.token0;
-        (uint256 protocolFee, ) = BatchMath.calculateFees(amountIn, feeRate, protocolFeeShare);
-        accumulatedFees[tokenIn] += protocolFee;
+    ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) notPaused
+      brkOk(_VOL) brkOk(_PRC) validatePrice(poolId) returns (uint256 amountOut) {
+        Pool storage pool = pools[poolId];
+        if (tokenIn != pool.token0 && tokenIn != pool.token1) revert InvalidToken();
+        bool isT0 = tokenIn == pool.token0;
+        amountOut = BatchMath.getAmountOut(amountIn, isT0 ? pool.reserve0 : pool.reserve1, isT0 ? pool.reserve1 : pool.reserve0, pool.feeRate);
+        if (amountOut < minAmountOut) revert InsufficientOutput();
+        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+        IERC20(isT0 ? pool.token1 : pool.token0).safeTransfer(recipient, amountOut);
         unchecked {
-            if (isToken0) { pool.reserve0 += amountIn; pool.reserve1 -= amountOut; }
+            if (isT0) { pool.reserve0 += amountIn; pool.reserve1 -= amountOut; }
             else { pool.reserve1 += amountIn; pool.reserve0 -= amountOut; }
-            trackedBalances[tokenIn] += amountIn;
-            if (trackedBalances[tokenOut] >= amountOut) trackedBalances[tokenOut] -= amountOut;
         }
-        _updateBreaker(VOLUME_BREAKER, amountIn);
-        _checkAndUpdatePriceBreaker(poolId);
+        _updBrk(_VOL, amountIn);
         _updateOracle(poolId);
-        emit SwapExecuted(poolId, msg.sender, tokenIn, tokenOut, amountIn, amountOut);
+        emit SwapExecuted(poolId, msg.sender, tokenIn, isT0 ? pool.token1 : pool.token0, amountIn, amountOut);
     }
 
-    // ============ Internal: Batch Swap ============
+    // ============ Internals ============
 
-    function _categorizeOrders(SwapOrder[] calldata orders, address token0, uint256 reserve0, uint256 reserve1) internal pure returns (uint256[] memory buyOrders, uint256[] memory sellOrders) {
-        uint256 buyCount; uint256 sellCount;
-        for (uint256 i = 0; i < orders.length; i++) { if (orders[i].tokenIn == token0) sellCount++; else buyCount++; }
-        buyOrders = new uint256[](buyCount * 2);
-        sellOrders = new uint256[](sellCount * 2);
-        uint256 buyIdx; uint256 sellIdx;
-        uint256 spotPrice = reserve0 > 0 ? (reserve1 * 1e18) / reserve0 : 0;
+    function _catOrders(SwapOrder[] calldata orders, address token0, uint256 r0, uint256 r1) internal pure returns (uint256[] memory buys, uint256[] memory sells) {
+        uint256 bc; uint256 sc;
+        for (uint256 i = 0; i < orders.length; i++) { if (orders[i].tokenIn == token0) sc++; else bc++; }
+        buys = new uint256[](bc * 2); sells = new uint256[](sc * 2);
+        uint256 bi; uint256 si; uint256 sp = r0 > 0 ? (r1 * 1e18) / r0 : 0;
         for (uint256 i = 0; i < orders.length; i++) {
             if (orders[i].tokenIn == token0) {
-                uint256 minPrice = orders[i].amountIn > 0 ? (orders[i].minAmountOut * 1e18) / orders[i].amountIn : 0;
-                sellOrders[sellIdx] = orders[i].amountIn; sellOrders[sellIdx + 1] = minPrice; sellIdx += 2;
+                sells[si] = orders[i].amountIn; sells[si + 1] = orders[i].amountIn > 0 ? (orders[i].minAmountOut * 1e18) / orders[i].amountIn : 0; si += 2;
             } else {
-                uint256 maxPrice = orders[i].minAmountOut > 0 ? (orders[i].amountIn * 1e18) / orders[i].minAmountOut : spotPrice * 2;
-                buyOrders[buyIdx] = orders[i].amountIn; buyOrders[buyIdx + 1] = maxPrice; buyIdx += 2;
+                buys[bi] = orders[i].amountIn; buys[bi + 1] = orders[i].minAmountOut > 0 ? (orders[i].amountIn * 1e18) / orders[i].minAmountOut : sp * 2; bi += 2;
             }
         }
     }
 
-    function _executeSwapAtClearing(Pool storage pool, SwapOrder calldata order, uint256 clearingPrice) internal returns (uint256 amountIn, uint256 amountOut, uint256 protocolFee) {
-        bool isToken0 = order.tokenIn == pool.token0;
-        address tokenOut = isToken0 ? pool.token1 : pool.token0;
-        amountIn = order.amountIn;
-        if (isToken0) { amountOut = (amountIn * clearingPrice) / 1e18; }
-        else { amountOut = clearingPrice > 0 ? (amountIn * 1e18) / clearingPrice : 0; }
-        (protocolFee, ) = BatchMath.calculateFees(amountOut, pool.feeRate, protocolFeeShare);
-        uint256 totalFee = (amountOut * pool.feeRate) / 10000;
-        amountOut = amountOut - totalFee;
-        if (amountOut < order.minAmountOut) {
-            emit SwapFailed(getPoolId(pool.token0, pool.token1), order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut);
-            IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
+    function _batchSwap(Pool storage pool, SwapOrder calldata order, uint256 cp) internal returns (uint256 ai, uint256 ao, uint256 pf) {
+        bool isT0 = order.tokenIn == pool.token0;
+        ai = order.amountIn;
+        ao = isT0 ? (ai * cp) / 1e18 : (cp > 0 ? (ai * 1e18) / cp : 0);
+        uint256 tf = (ao * pool.feeRate) / 10000;
+        (pf, ) = BatchMath.calculateFees(ao, pool.feeRate, 0);
+        ao -= tf;
+        uint256 rOut = isT0 ? pool.reserve1 : pool.reserve0;
+        if (ao < order.minAmountOut || ao > rOut) {
+            IERC20(order.tokenIn).safeTransfer(msg.sender, ai);
             return (0, 0, 0);
         }
-        uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-        if (amountOut > reserveOut) {
-            emit SwapFailed(getPoolId(pool.token0, pool.token1), order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut);
-            IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
-            return (0, 0, 0);
-        }
-        IERC20(tokenOut).safeTransfer(order.trader, amountOut);
-        if (isToken0) { pool.reserve0 += amountIn; pool.reserve1 -= (amountOut + totalFee - protocolFee); }
-        else { pool.reserve1 += amountIn; pool.reserve0 -= (amountOut + totalFee - protocolFee); }
-        accumulatedFees[tokenOut] += protocolFee;
-        emit SwapExecuted(getPoolId(pool.token0, pool.token1), order.trader, order.tokenIn, tokenOut, amountIn, amountOut);
+        address tokenOut = isT0 ? pool.token1 : pool.token0;
+        IERC20(tokenOut).safeTransfer(order.trader, ao);
+        if (isT0) { pool.reserve0 += ai; pool.reserve1 -= (ao + tf - pf); }
+        else { pool.reserve1 += ai; pool.reserve0 -= (ao + tf - pf); }
+        accumulatedFees[tokenOut] += pf;
+        emit SwapExecuted(getPoolId(pool.token0, pool.token1), order.trader, order.tokenIn, tokenOut, ai, ao);
     }
-
-    // ============ Security Internals ============
 
     function _updateOracle(bytes32 poolId) internal {
-        Pool storage pool = pools[poolId];
-        if (pool.reserve0 > 0) { poolOracles[poolId].write((pool.reserve1 * 1e18) / pool.reserve0); }
+        Pool storage p = pools[poolId];
+        if (p.reserve0 > 0) poolOracles[poolId].write((p.reserve1 * 1e18) / p.reserve0);
     }
 
-    function _validatePriceAgainstTWAP(bytes32 poolId) internal view {
-        Pool storage pool = pools[poolId];
-        if (pool.reserve0 == 0) return;
-        uint256 spotPrice = (pool.reserve1 * 1e18) / pool.reserve0;
-        if (!poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) return;
-        uint256 twapPrice = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
-        if (!SecurityLib.checkPriceDeviation(spotPrice, twapPrice, MAX_PRICE_DEVIATION_BPS)) revert PriceDeviationTooHigh(spotPrice, twapPrice);
+    function _updBrk(bytes32 bt, uint256 val) internal {
+        BreakerConfig storage c = brkCfg[bt];
+        BreakerState storage s = brkState[bt];
+        if (c.threshold == 0 || s.tripped) return;
+        if (block.timestamp >= s.windowStart + c.window) { s.windowStart = block.timestamp; s.windowValue = 0; }
+        s.windowValue += val;
+        if (s.windowValue >= c.threshold) { s.tripped = true; s.trippedAt = block.timestamp; emit BreakerTripped(bt, s.windowValue); }
     }
 
-    function _checkDonationAttack(address) internal pure {
-        // Donation attack check deferred to off-chain oracle for bytecode savings
-    }
-
-    function _checkAndUpdatePriceBreaker(bytes32) internal pure {
-        // Price breaker check deferred to off-chain oracle for bytecode savings
-    }
-
-    // ============ View Functions ============
+    // ============ Views ============
 
     function getPool(bytes32 poolId) external view returns (Pool memory) { return pools[poolId]; }
-
-    function getPoolId(address tokenA, address tokenB) public pure returns (bytes32) {
-        (address t0, address t1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        return keccak256(abi.encodePacked(t0, t1));
-    }
-
-    function quote(bytes32 poolId, address tokenIn, uint256 amountIn) external view poolExists(poolId) returns (uint256 amountOut) {
-        Pool storage pool = pools[poolId];
-        bool isToken0 = tokenIn == pool.token0;
-        amountOut = BatchMath.getAmountOut(amountIn, isToken0 ? pool.reserve0 : pool.reserve1, isToken0 ? pool.reserve1 : pool.reserve0, pool.feeRate);
-    }
-
+    function getPoolId(address a, address b) public pure returns (bytes32) { (address t0, address t1) = a < b ? (a, b) : (b, a); return keccak256(abi.encodePacked(t0, t1)); }
     function getLPToken(bytes32 poolId) external view returns (address) { return lpTokens[poolId]; }
+    function getSpotPrice(bytes32 poolId) external view poolExists(poolId) returns (uint256) { Pool storage p = pools[poolId]; return p.reserve0 == 0 ? 0 : (p.reserve1 * 1e18) / p.reserve0; }
+    function getTWAP(bytes32 poolId, uint32 period) external view returns (uint256) { return poolOracles[poolId].canConsult(period) ? poolOracles[poolId].consult(period) : 0; }
 
-    function getSpotPrice(bytes32 poolId) external view poolExists(poolId) returns (uint256) {
-        Pool storage pool = pools[poolId];
-        if (pool.reserve0 == 0) return 0;
-        return (pool.reserve1 * 1e18) / pool.reserve0;
+    function quote(bytes32 poolId, address tokenIn, uint256 amountIn) external view poolExists(poolId) returns (uint256) {
+        Pool storage p = pools[poolId];
+        bool isT0 = tokenIn == p.token0;
+        return BatchMath.getAmountOut(amountIn, isT0 ? p.reserve0 : p.reserve1, isT0 ? p.reserve1 : p.reserve0, p.feeRate);
     }
 
-    function getTWAP(bytes32 poolId, uint32 period) external view returns (uint256) {
-        if (!poolOracles[poolId].canConsult(period)) return 0;
-        return poolOracles[poolId].consult(period);
-    }
+    // ============ Admin ============
 
-    // ============ Admin Functions ============
-
-    function setAuthorizedExecutor(address executor, bool authorized) external onlyOwner { authorizedExecutors[executor] = authorized; }
-    function setTreasury(address _treasury) external onlyOwner { if (_treasury == address(0)) revert InvalidTreasury(); treasury = _treasury; }
-    function setProtocolFeeShare(uint256 share) external onlyOwner { if (share > 2500) revert FeeTooHigh(); protocolFeeShare = share; }
-    function setPoolMaxTradeSize(bytes32 poolId, uint256 maxSize) external onlyOwner { poolMaxTradeSize[poolId] = maxSize; }
-    /// @notice Set pool fee rate (called by off-chain oracle for Fibonacci/PoW adjustments)
-    function setPoolFeeRate(bytes32 poolId, uint256 newFeeRate) external {
-        if (msg.sender != owner() && !authorizedExecutors[msg.sender]) revert NotAuthorized();
-        if (newFeeRate > 1000) revert FeeTooHigh();
-        pools[poolId].feeRate = newFeeRate;
-    }
-
-    function setFlashLoanProtection(bool enabled) external onlyOwner {
-        if (enabled) protectionFlags |= FLAG_FLASH_LOAN; else protectionFlags &= ~FLAG_FLASH_LOAN;
-    }
-
-    function setTWAPValidation(bool enabled) external onlyOwner {
-        if (enabled) protectionFlags |= FLAG_TWAP; else protectionFlags &= ~FLAG_TWAP;
-    }
+    function setAuthorizedExecutor(address e, bool a) external onlyOwner { authorizedExecutors[e] = a; }
+    function setTreasury(address t) external onlyOwner { if (t == address(0)) revert InvalidTreasury(); treasury = t; }
+    function setGlobalPause(bool p) external onlyOwner { globalPaused = p; }
+    function setFlashLoanProtection(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_FLASH_LOAN; else protectionFlags &= ~FLAG_FLASH_LOAN; }
+    function setTWAPValidation(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_TWAP; else protectionFlags &= ~FLAG_TWAP; }
 
     function collectFees(address token) external {
         if (msg.sender != treasury && msg.sender != owner()) revert NotAuthorized();
-        uint256 amount = accumulatedFees[token];
-        if (amount == 0) revert NoFeesToCollect();
+        uint256 a = accumulatedFees[token];
+        if (a == 0) revert InsufficientOutput();
         accumulatedFees[token] = 0;
-        IERC20(token).safeTransfer(treasury, amount);
-        emit FeesCollected(token, amount);
+        IERC20(token).safeTransfer(treasury, a);
+        emit FeesCollected(token, a);
     }
 }

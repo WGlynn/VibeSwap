@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { createAppKit } from '@reown/appkit/react'
-import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect, useAppKitEvents } from '@reown/appkit/react'
+import { useAppKit, useAppKitAccount, useAppKitNetwork, useAppKitProvider, useDisconnect, useAppKitEvents } from '@reown/appkit/react'
 import { EthersAdapter } from '@reown/appkit-adapter-ethers'
 import { mainnet, arbitrum, optimism, base, polygon, sepolia, arbitrumSepolia } from '@reown/appkit/networks'
 import { BrowserProvider } from 'ethers'
@@ -60,7 +60,8 @@ const WalletContext = createContext(null)
 
 export function WalletProvider({ children }) {
   const { open, close } = useAppKit()
-  const { address, chainId, isConnected } = useAppKitAccount()
+  const { address, isConnected } = useAppKitAccount()
+  const { chainId } = useAppKitNetwork()
   const { walletProvider } = useAppKitProvider('eip155')
   const { disconnect: appKitDisconnect } = useDisconnect()
   const events = useAppKitEvents()

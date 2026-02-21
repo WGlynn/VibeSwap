@@ -5,19 +5,6 @@ const JARVIS_GREETING = `> JARVIS ONLINE
 > Systems initialized. All protocols active.
 > Ready to assist, sir.`
 
-const MOCK_RESPONSES = [
-  "I've analyzed the current market conditions. ETH volatility is within normal parameters.",
-  "Running diagnostics on the VibeSwap protocol... All systems nominal.",
-  "I've cross-referenced your portfolio against current sentiment indicators. Shall I elaborate?",
-  "The batch auction mechanism is operating within expected thresholds. No MEV detected in the last 24 hours.",
-  "I've prepared a summary of recent governance proposals. Three are pending review.",
-  "Security scan complete. No anomalies detected across deployed contracts.",
-  "I should note that the True Price Oracle is currently tracking a 0.02% deviation. Well within tolerance.",
-  "Calculating optimal entry points based on the Kalman filter output... One moment.",
-  "The Shapley distribution for this epoch is ready for review. Shall I display the allocations?",
-  "Sir, I believe you'll find the current liquidity depth sufficient for the proposed trade.",
-]
-
 function JarvisPage() {
   const [messages, setMessages] = useState([
     { role: 'jarvis', text: JARVIS_GREETING, timestamp: new Date() }
@@ -46,25 +33,50 @@ function JarvisPage() {
     const userMessage = input.trim()
     setInput('')
 
-    setMessages(prev => [...prev, {
+    const updatedMessages = [...messages, {
       role: 'user',
       text: userMessage,
       timestamp: new Date()
-    }])
+    }]
+    setMessages(updatedMessages)
 
     setIsTyping(true)
 
-    // Simulate JARVIS thinking
-    const delay = 800 + Math.random() * 1500
-    setTimeout(() => {
-      const response = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
+    try {
+      // Build API messages — exclude the static greeting, convert format
+      const apiMessages = updatedMessages
+        .filter(m => m.role !== 'jarvis' || m.text !== JARVIS_GREETING)
+        .map(m => ({
+          role: m.role === 'jarvis' ? 'assistant' : 'user',
+          content: m.text,
+        }))
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'JARVIS is unreachable.')
+      }
+
       setMessages(prev => [...prev, {
         role: 'jarvis',
-        text: `> ${response}`,
+        text: data.reply,
         timestamp: new Date()
       }])
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: 'jarvis',
+        text: `> System error: ${err.message}`,
+        timestamp: new Date()
+      }])
+    } finally {
       setIsTyping(false)
-    }, delay)
+    }
   }
 
   const formatTime = (date) => {

@@ -5,8 +5,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node src/index.js",
+    "build": "cp -r src dist",
+    "start": "node dist/index.js",
     "dev": "node --watch src/index.js"
   },
   "dependencies": {

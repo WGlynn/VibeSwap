@@ -17,17 +17,28 @@ max_test_rejects = 65536
 runs = 256
 depth = 500
 
+# Deploy profile: optimizer_runs=1 for smallest bytecode
+[profile.deploy]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+solc = "0.8.20"
+optimizer = true
+optimizer_runs = 1
+via_ir = true
+ffi = false
+
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 optimism = "${OPTIMISM_RPC_URL}"
+base = "${BASE_RPC_URL}"
 
-[lint]
-unsafe-typecast = false  # 500+ warnings in test files, all intentional
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
 arbitrum = { key = "${ARBISCAN_API_KEY}" }
 optimism = { key = "${OPSCAN_API_KEY}" }
+base = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }

@@ -40,3 +40,5 @@ jarvis-bot/data/*.json
 
 # Build logs
 *.log
+__pycache__/
+*.egg-info/

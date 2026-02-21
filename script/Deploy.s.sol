@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import "../contracts/core/VibeSwapCore.sol";
 import "../contracts/core/CommitRevealAuction.sol";
-import "../contracts/amm/VibeAMM.sol";
+import "../contracts/amm/VibeAMMLite.sol";
 import "../contracts/governance/DAOTreasury.sol";
 import "../contracts/messaging/CrossChainRouter.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -41,7 +41,7 @@ contract DeployVibeSwap is Script {
 
         // 1. Deploy implementations
         CommitRevealAuction auctionImpl = new CommitRevealAuction();
-        VibeAMM ammImpl = new VibeAMM();
+        VibeAMMLite ammImpl = new VibeAMMLite();
         DAOTreasury treasuryImpl = new DAOTreasury();
         CrossChainRouter routerImpl = new CrossChainRouter();
         VibeSwapCore coreImpl = new VibeSwapCore();
@@ -50,13 +50,13 @@ contract DeployVibeSwap is Script {
 
         // 2. Deploy AMM proxy first (Treasury needs it)
         bytes memory ammInit = abi.encodeWithSelector(
-            VibeAMM.initialize.selector,
+            VibeAMMLite.initialize.selector,
             owner,
             address(0x1) // Placeholder, will update
         );
         ERC1967Proxy ammProxy = new ERC1967Proxy(address(ammImpl), ammInit);
         amm = address(ammProxy);
-        console.log("VibeAMM:", amm);
+        console.log("VibeAMMLite:", amm);
 
         // 3. Deploy Treasury proxy
         bytes memory treasuryInit = abi.encodeWithSelector(
@@ -69,7 +69,7 @@ contract DeployVibeSwap is Script {
         console.log("DAOTreasury:", treasury);
 
         // 4. Update AMM treasury
-        VibeAMM(amm).setTreasury(treasury);
+        VibeAMMLite(amm).setTreasury(treasury);
 
         // 5. Deploy Auction proxy
         bytes memory auctionInit = abi.encodeWithSelector(
@@ -109,7 +109,7 @@ contract DeployVibeSwap is Script {
         // 8. Configure authorizations
         CommitRevealAuction(payable(auction)).setAuthorizedSettler(core, true);
         CommitRevealAuction(payable(auction)).setAuthorizedSettler(router, true);
-        VibeAMM(amm).setAuthorizedExecutor(core, true);
+        VibeAMMLite(amm).setAuthorizedExecutor(core, true);
         DAOTreasury(payable(treasury)).setAuthorizedFeeSender(amm, true);
         DAOTreasury(payable(treasury)).setAuthorizedFeeSender(core, true);
         CrossChainRouter(payable(router)).setAuthorized(core, true);
@@ -126,7 +126,7 @@ contract DeployVibeSwap is Script {
         console.log("\n=== Deployment Summary ===");
         console.log("Chain ID:", block.chainid);
         console.log("CommitRevealAuction:", auction);
-        console.log("VibeAMM:", amm);
+        console.log("VibeAMMLite:", amm);
         console.log("DAOTreasury:", treasury);
         console.log("CrossChainRouter:", router);
         console.log("VibeSwapCore:", core);
@@ -143,8 +143,8 @@ contract DeployVibeSwap is Script {
         VibeSwapCore(payable(core)).setGuardian(owner);
 
         // Enable TWAP validation and flash loan protection on AMM
-        VibeAMM(amm).setFlashLoanProtection(true);
-        VibeAMM(amm).setTWAPValidation(true);
+        VibeAMMLite(amm).setFlashLoanProtection(true);
+        VibeAMMLite(amm).setTWAPValidation(true);
 
         console.log("Security: Flash loan protection enabled");
         console.log("Security: TWAP validation enabled");

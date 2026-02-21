@@ -2,12 +2,13 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-20 (Desktop - Claude Code Opus 4.6, Session 39)
+**Last Updated**: 2026-02-21 (Desktop - Claude Code Opus 4.6, Session 40 — GO-LIVE)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
+- **BASE MAINNET DEPLOYMENT: LIVE** (5 UUPS proxy contracts deployed 2026-02-21)
 - **Phase 2: Protocol/Framework — 10/10 COMPLETE**
 - **Phase 2: Mechanism Design — 10/10 COMPLETE**
 - **3000+ Solidity tests passing, 0 failures** (full suite green, 21 backend tests)
@@ -809,6 +810,33 @@ This file maintains continuity between Claude Code sessions across devices.
 - Frontend price oracle: live mode uses contract getQuote(), could add TruePriceOracle/Chainlink for spot display
 - 2 TODOs in TreasuryStabilizer, 1 in AdaptiveBatchTiming — review before mainnet
 - Oracle service needs production packaging (Dockerfile/systemd)
+
+## Session 40 — Base Mainnet Go-Live (2026-02-21)
+
+### Deployed Contracts (Base, Chain ID 8453)
+| Contract | Proxy Address |
+|----------|--------------|
+| VibeSwapCore | `0xc19E0f7E8820fa505532aBcAE012e90959149825` |
+| VibeAMMLite | `0xA67bb9cC43782095B1383b9082c9E877fDD20657` |
+| CommitRevealAuction | `0x9FAB278838e743CD31E3AD3b8DE28F1e4e099666` |
+| DAOTreasury | `0xe3C1Cc21114358161Ce4DaDfc676aa9471D6c6f2` |
+| CrossChainRouter | `0xCC034e5464d2dDCF06c8A939dec7005Fb5aF292E` |
+
+### Key Changes
+- Created `VibeAMMLite.sol` — stripped AMM (22.5KB, under 24KB EIP-170 limit) for Base deployment
+- Removed: Fibonacci, PoW swap, VWAP, LiquidityProtection, donation attack checks, TruePriceOracle
+- Kept: Core AMM, TWAP, flash loan protection, circuit breakers, batch swap
+- `Deploy.s.sol` uses VibeAMMLite; `DeployProduction.s.sol` still uses full VibeAMM
+- Owner/guardian: deployer wallet `0xaE0Fc55d6F8478918076B5Bb85E8Cf37385492a2`
+- `foundry.toml`: added Base to rpc_endpoints + etherscan sections
+- `frontend/.env`: populated with Base addresses + production flags
+- Gas spent: ~0.00025 ETH (~$0.67)
+
+### Next Steps
+- Frontend redeploy on Vercel with new env vars
+- CKB Aggron testnet deployment (Phase 4)
+- Kernel architecture refactor (post go-live) — upgrade VibeAMMLite → full modular kernel
+- BaseScan verification (optional, needs API key)
 
 ## Session Handoff Notes
 When starting a new session, tell Claude:

@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => ({
             return 'vendor-ethers'
           }
           // Combined to fix circular dependency warning
-          if (id.includes('node_modules/@walletconnect') || id.includes('node_modules/@web3modal')) {
+          if (id.includes('node_modules/@walletconnect') || id.includes('node_modules/@web3modal') || id.includes('node_modules/@reown')) {
             return 'vendor-wallet'
           }
           if (id.includes('node_modules/framer-motion')) {

@@ -58,6 +58,7 @@ const PersonalityPage = lazy(() => import('./components/PersonalityPage'))
 const MessageBoard = lazy(() => import('./components/MessageBoard'))
 const PromptsPage = lazy(() => import('./components/PromptsPage'))
 const JarvisPage = lazy(() => import('./components/JarvisPage'))
+const MinePage = lazy(() => import('./components/MinePage'))
 
 // Rocketship page transitions — blur + slide + opacity
 const pageVariants = {
@@ -102,6 +103,7 @@ function AnimatedRoutes() {
             <Route path="/personality" element={<PersonalityPage />} />
             <Route path="/prompts" element={<PromptsPage />} />
             <Route path="/jarvis" element={<JarvisPage />} />
+            <Route path="/mine" element={<MinePage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

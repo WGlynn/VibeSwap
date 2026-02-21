@@ -5,6 +5,7 @@ import { useIdentity } from '../hooks/useIdentity'
 import { useDeviceWallet, isPlatformAuthenticatorAvailable } from '../hooks/useDeviceWallet'
 import { useSwap } from '../hooks/useSwap'
 import RecoverySetup from './RecoverySetup'
+import JarvisIntro from './JarvisIntro'
 import GlassCard from './ui/GlassCard'
 import InteractiveButton from './ui/InteractiveButton'
 import toast from 'react-hot-toast'
@@ -861,17 +862,22 @@ function SwapCore() {
   // ============================================================
   // MODAL STATE - Simple, explicit, no magic
   // ============================================================
-  // Which modal is open: 'welcome' | 'existingWallet' | 'walletCreated' | 'icloudBackup' | 'recoverySetup' | null
+  // Which modal is open: 'jarvisIntro' | 'welcome' | 'existingWallet' | 'walletCreated' | 'icloudBackup' | 'recoverySetup' | null
   const [activeModal, setActiveModal] = useState(() => {
     // On mount: decide which modal to show
     const hasStoredWallet = localStorage.getItem('vibeswap_device_wallet')
+    const hasSeenIntro = localStorage.getItem('vibeswap_jarvis_intro_seen')
 
     if (hasStoredWallet) {
       console.log('[SwapCore] INIT -> existingWallet (found stored wallet)')
       return 'existingWallet' // Show sign-in or create new options
     }
+    if (!hasSeenIntro) {
+      console.log('[SwapCore] INIT -> jarvisIntro (first visit)')
+      return 'jarvisIntro' // First contact — meet JARVIS
+    }
     console.log('[SwapCore] INIT -> welcome (no wallet)')
-    return 'welcome' // New user
+    return 'welcome' // New user, already met JARVIS
   })
 
   // Track signing in state
@@ -883,6 +889,7 @@ function SwapCore() {
   const activeShortAddress = shortAddress || deviceWallet.shortAddress
 
   // Simple booleans for which modal to show
+  const showJarvisIntro = activeModal === 'jarvisIntro'
   const showWelcome = activeModal === 'welcome'
   const showExistingWallet = activeModal === 'existingWallet'
   const showWalletCreated = activeModal === 'walletCreated'
@@ -905,6 +912,11 @@ function SwapCore() {
   // ============================================================
   // MODAL HANDLERS - Simple state transitions
   // ============================================================
+
+  const handleJarvisIntroContinue = () => {
+    localStorage.setItem('vibeswap_jarvis_intro_seen', '1')
+    setActiveModal('welcome')
+  }
 
   const handleWelcomeClose = () => {
     // Do nothing - they need to choose an option
@@ -1322,6 +1334,12 @@ function SwapCore() {
           setToToken(t)
           setShowToTokens(false)
         }}
+      />
+
+      {/* JARVIS intro — first contact */}
+      <JarvisIntro
+        isOpen={showJarvisIntro}
+        onContinue={handleJarvisIntroContinue}
       />
 
       {/* Welcome modal for first-time visitors */}

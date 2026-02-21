@@ -131,7 +131,7 @@ class OracleRunner:
         logger.info(
             f"  True Price: ${estimate.price:,.2f} | "
             f"Spot: ${estimate.spot_median:,.2f} | "
-            f"Dev: {z:+.2f}σ {dev_indicator}"
+            f"Dev: {z:+.2f} sigma {dev_indicator}"
         )
         logger.info(
             f"  Regime: {estimate.regime.type.name} | "
@@ -198,7 +198,7 @@ def main():
     parser.add_argument(
         "--venues", "-v",
         nargs="+",
-        default=["binance", "coinbase", "okx"],
+        default=["coinbase", "okx"],
         help="Venues to use (default: binance coinbase okx)"
     )
     parser.add_argument(
@@ -233,7 +233,7 @@ def main():
             )
             print(f"\nTrue Price: ${estimate.price:,.2f}")
             print(f"Spot Median: ${estimate.spot_median:,.2f}")
-            print(f"Deviation: {estimate.deviation_zscore:+.2f}σ")
+            print(f"Deviation: {estimate.deviation_zscore:+.2f} sigma")
             print(f"Regime: {estimate.regime.type.name}")
             print(f"Signal: {sig.type.value} ({sig.confidence:.0%} confidence)")
         else:

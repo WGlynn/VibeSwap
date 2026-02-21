@@ -987,15 +987,6 @@ function SwapCore() {
   const handleUseDevice = async () => {
     console.log('[handleUseDevice] CALLED, deviceWalletAvailable:', deviceWalletAvailable)
 
-    // Check if device supports biometric wallet
-    if (!deviceWalletAvailable) {
-      toast.error(
-        'This device doesn\'t support biometric wallets. Enable Windows Hello, Face ID, or Touch ID in your device settings, then try again.',
-        { duration: 6000 }
-      )
-      return
-    }
-
     // Clear any stale acknowledged flag
     localStorage.removeItem('vibeswap_wallet_acknowledged')
 
@@ -1011,11 +1002,11 @@ function SwapCore() {
         console.log('[handleUseDevice] setActiveModal called')
       } else {
         console.log('[handleUseDevice] FAILED - no address in result')
-        toast.error(deviceWallet.error || 'Failed to create wallet')
+        toast.error(deviceWallet.error || 'Failed to create wallet. Try enabling Windows Hello, Face ID, or Touch ID in your device settings.')
       }
     } catch (err) {
       console.error('[handleUseDevice] EXCEPTION:', err)
-      toast.error('Failed to create device wallet')
+      toast.error('Failed to create device wallet. Check that biometric auth is enabled on your device.')
     }
   }
 

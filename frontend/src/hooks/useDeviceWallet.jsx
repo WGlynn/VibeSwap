@@ -159,8 +159,8 @@ export function DeviceWalletProvider({ children }) {
 
   // Create a new device wallet
   const createWallet = useCallback(async () => {
-    if (!isAvailable) {
-      setError('Device wallet not available on this device')
+    if (!isWebAuthnSupported()) {
+      setError('WebAuthn is not supported in this browser')
       return null
     }
 

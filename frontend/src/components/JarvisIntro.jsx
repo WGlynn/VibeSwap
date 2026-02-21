@@ -226,14 +226,14 @@ function JarvisIntro({ isOpen, onContinue }) {
                 )}
               </AnimatePresence>
 
-              {/* Skip option — always visible but subtle */}
+              {/* Skip option — always visible */}
               {!showContinue && (
                 <div className="mt-4 text-center">
                   <button
                     onClick={onContinue}
-                    className="text-xs text-black-600 hover:text-black-400 transition-colors"
+                    className="text-sm text-black-400 hover:text-matrix-500 transition-colors"
                   >
-                    skip
+                    Skip &rarr;
                   </button>
                 </div>
               )}

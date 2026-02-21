@@ -126,6 +126,14 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
               </svg>
             </div>
           </a>
+
+          {/* Just browse option */}
+          <button
+            onClick={onClose}
+            className="block w-full mt-3 text-center text-sm text-black-400 hover:text-black-200 transition-colors py-2"
+          >
+            Just looking around
+          </button>
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -919,7 +927,7 @@ function SwapCore() {
   }
 
   const handleWelcomeClose = () => {
-    // Do nothing - they need to choose an option
+    setActiveModal(null) // Let them browse in demo mode
   }
 
   const handleWelcomeGetStarted = () => {

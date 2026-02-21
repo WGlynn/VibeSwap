@@ -1,85 +1,18 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
-import { createWeb3Modal, defaultConfig } from '@web3modal/ethers/react'
-import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider, useDisconnect, useWeb3ModalEvents } from '@web3modal/ethers/react'
+import { createAppKit } from '@reown/appkit/react'
+import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect, useAppKitEvents } from '@reown/appkit/react'
+import { EthersAdapter } from '@reown/appkit-adapter-ethers'
+import { mainnet, arbitrum, optimism, base, polygon, sepolia, arbitrumSepolia } from '@reown/appkit/networks'
 import { BrowserProvider } from 'ethers'
 import toast from 'react-hot-toast'
 
 // ============================================
 // PRODUCTION CONFIGURATION
 // ============================================
-// WalletConnect Project ID - get your own at https://cloud.walletconnect.com
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '3a8170812b534d0ff9d794f19a901d64'
-
-// Production mode flag - disables testnets when true
 const isProduction = import.meta.env.VITE_PRODUCTION_MODE === 'true'
 const disableTestnets = import.meta.env.VITE_DISABLE_TESTNETS === 'true'
-
-// App URL for metadata
-const appUrl = import.meta.env.VITE_APP_URL || 'https://vibeswap.io'
-
-// ============================================
-// MAINNET CHAINS
-// ============================================
-const mainnetChains = [
-  {
-    chainId: 1,
-    name: 'Ethereum',
-    currency: 'ETH',
-    explorerUrl: 'https://etherscan.io',
-    rpcUrl: import.meta.env.VITE_ETH_RPC_URL || 'https://eth.llamarpc.com'
-  },
-  {
-    chainId: 42161,
-    name: 'Arbitrum',
-    currency: 'ETH',
-    explorerUrl: 'https://arbiscan.io',
-    rpcUrl: import.meta.env.VITE_ARB_RPC_URL || 'https://arb1.arbitrum.io/rpc'
-  },
-  {
-    chainId: 10,
-    name: 'Optimism',
-    currency: 'ETH',
-    explorerUrl: 'https://optimistic.etherscan.io',
-    rpcUrl: import.meta.env.VITE_OP_RPC_URL || 'https://mainnet.optimism.io'
-  },
-  {
-    chainId: 8453,
-    name: 'Base',
-    currency: 'ETH',
-    explorerUrl: 'https://basescan.org',
-    rpcUrl: import.meta.env.VITE_BASE_RPC_URL || 'https://mainnet.base.org'
-  },
-  {
-    chainId: 137,
-    name: 'Polygon',
-    currency: 'MATIC',
-    explorerUrl: 'https://polygonscan.com',
-    rpcUrl: import.meta.env.VITE_POLYGON_RPC_URL || 'https://polygon-rpc.com'
-  },
-]
-
-// ============================================
-// TESTNET CHAINS (disabled in production)
-// ============================================
-const testnetChains = [
-  {
-    chainId: 11155111,
-    name: 'Sepolia',
-    currency: 'ETH',
-    explorerUrl: 'https://sepolia.etherscan.io',
-    rpcUrl: 'https://rpc.sepolia.org'
-  },
-  {
-    chainId: 421614,
-    name: 'Arbitrum Sepolia',
-    currency: 'ETH',
-    explorerUrl: 'https://sepolia.arbiscan.io',
-    rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc'
-  },
-]
-
-// Build chains array based on environment
-const chains = disableTestnets ? mainnetChains : [...mainnetChains, ...testnetChains]
+const appUrl = import.meta.env.VITE_APP_URL || 'https://frontend-jade-five-87.vercel.app'
 
 const metadata = {
   name: 'VibeSwap',
@@ -88,18 +21,18 @@ const metadata = {
   icons: [`${appUrl}/logo.png`]
 }
 
-// Initialize Web3Modal
-const modal = createWeb3Modal({
-  ethersConfig: defaultConfig({
-    metadata,
-    enableEIP6963: true,
-    enableInjected: true,
-    enableCoinbase: true,
-    coinbasePreference: 'eoaOnly',
-  }),
-  chains,
+// Build networks array based on environment
+const networks = disableTestnets
+  ? [base, mainnet, arbitrum, optimism, polygon]
+  : [base, mainnet, arbitrum, optimism, polygon, sepolia, arbitrumSepolia]
+
+// Initialize AppKit (Reown — replaces deprecated Web3Modal)
+const modal = createAppKit({
+  adapters: [new EthersAdapter()],
+  networks,
+  defaultNetwork: base,
+  metadata,
   projectId,
-  enableAnalytics: false,
   themeMode: 'dark',
   themeVariables: {
     '--w3m-color-mix': '#00ff41',
@@ -107,31 +40,30 @@ const modal = createWeb3Modal({
     '--w3m-accent': '#00ff41',
     '--w3m-border-radius-master': '8px'
   },
-  // Featured wallets - prioritize these
   featuredWalletIds: [
     'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
     '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust
     'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa', // Coinbase
   ],
-  // Disable social/email login — requires WalletConnect Cloud configuration we haven't done yet
-  // When ready: set email: true, socials: ['google', 'apple', 'discord'] and configure in Cloud dashboard
   features: {
     email: false,
     socials: false,
     emailShowWallets: true,
     swaps: false,
+    analytics: false,
   },
+  coinbasePreference: 'eoaOnly',
   allWallets: 'SHOW',
 })
 
 const WalletContext = createContext(null)
 
 export function WalletProvider({ children }) {
-  const { open, close } = useWeb3Modal()
-  const { address, chainId, isConnected } = useWeb3ModalAccount()
-  const { walletProvider } = useWeb3ModalProvider()
-  const { disconnect: web3Disconnect } = useDisconnect()
-  const events = useWeb3ModalEvents()
+  const { open, close } = useAppKit()
+  const { address, chainId, isConnected } = useAppKitAccount()
+  const { walletProvider } = useAppKitProvider('eip155')
+  const { disconnect: appKitDisconnect } = useDisconnect()
+  const events = useAppKitEvents()
 
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
@@ -140,16 +72,15 @@ export function WalletProvider({ children }) {
   const hasShownConnectToast = useRef(false)
 
   // Supported chains lookup
-  const supportedChains = chains.reduce((acc, chain) => {
-    acc[chain.chainId] = chain
+  const supportedChains = networks.reduce((acc, network) => {
+    acc[network.id] = { chainId: network.id, name: network.name, currency: network.nativeCurrency?.symbol || 'ETH' }
     return acc
   }, {})
 
-  // Listen for connection events and handle auto-close
+  // Listen for connection events
   useEffect(() => {
     if (events.data?.event === 'CONNECT_SUCCESS' || events.data?.event === 'MODAL_CLOSE') {
       setIsConnecting(false)
-      // Force close modal after successful connection
       if (isConnected) {
         close()
       }
@@ -205,14 +136,14 @@ export function WalletProvider({ children }) {
 
   const disconnect = useCallback(async () => {
     try {
-      await web3Disconnect()
+      await appKitDisconnect()
       setProvider(null)
       setSigner(null)
       toast.success('Wallet disconnected')
     } catch (err) {
       console.error('Failed to disconnect:', err)
     }
-  }, [web3Disconnect])
+  }, [appKitDisconnect])
 
   const switchChain = useCallback(async (targetChainId) => {
     if (!walletProvider) return

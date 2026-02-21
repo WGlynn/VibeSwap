@@ -505,8 +505,18 @@ def _dict_to_config(d: Dict) -> OracleConfig:
 
     # Convert chains
     chains = {}
-    for name, c in d.get("chains", get_default_chains()).items():
+    default_chains = get_default_chains()
+    for name, c in d.get("chains", default_chains).items():
         if isinstance(c, dict):
+            # Env overrides may create partial dicts — merge with defaults
+            if name in default_chains:
+                defaults = {k: v for k, v in default_chains[name].__dict__.items()}
+                defaults.update(c)
+                c = defaults
+            else:
+                # Unknown chain from config — ensure required fields
+                c.setdefault("chain_id", 0)
+                c.setdefault("name", name)
             chains[name] = ChainConfig(**c)
         else:
             chains[name] = c

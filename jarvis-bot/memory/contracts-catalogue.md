@@ -1029,6 +1029,20 @@ import "../monetary/interfaces/IJoule.sol";
 - **Key Functions**: `beforeSwap(bytes32, bytes)`, `afterSwap(bytes32, bytes)`, `setParameters(...)`, `setWindowDuration(uint256)`, `calculateFeeForVolume(uint256)`
 - **Fee Logic**: fee = baseFee below threshold, fee = baseFee + surge increase above threshold, capped at maxFee
 
+### EmissionController (`contracts/incentives/EmissionController.sol`)
+- **Type**: Emission controller | **Inherits**: OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
+- **Purpose**: Wall-clock halving emission controller — mints VIBE and splits to three sinks (50% Shapley pool / 35% LiquidityGauge / 15% SingleStaking)
+- **Key Functions**: `drip()` (permissionless), `createContributionGame(bytes32, Participant[], uint256)` (onlyDrainer), `fundStaking()` (permissionless)
+- **Views**: `getCurrentEra()`, `getCurrentRate()`, `pendingEmissions()`, `getEmissionInfo()`
+- **Admin**: `setBudget(uint256, uint256, uint256)`, `setMaxDrainBps(uint256)`, `setMinDrain(uint256, uint256)`, `setAuthorizedDrainer(address, bool)`, `setLiquidityGauge(address)`, `setSingleStaking(address)`, `setShapleyDistributor(address)`, `setStakingRewardDuration(uint256)`
+- **Constants**: MAX_ERAS=32, BASE_EMISSION_RATE=332,880,110,000,000,000 (~0.333 VIBE/sec), DEFAULT_ERA_DURATION=31,557,600 (365.25 days)
+- **Emission Math**: `rate = BASE_RATE >> era`, cross-era accrual O(32) bounded loop, MAX_SUPPLY cap via vibeToken.mintableSupply()
+- **Accumulation Pool**: shapleyShare accrues in pool, drained via createContributionGame(), FEE_DISTRIBUTION game type (no double-halving)
+- **Security**: nonReentrant on all 3 core functions, CEI pattern, zero-drain guard, percentage-based min drain (trustless price scaling)
+- **Interfaces Used**: IVIBEMintable (mint, mintableSupply, MAX_SUPPLY), IShapleyCreate (createGameTyped, computeShapleyValues), ISingleStakingNotify (notifyRewardAmount)
+- **Tests**: 92 total (38 unit + 6 fuzz + 7 invariant + 41 security)
+- **Size**: 7,485 bytes (31% of 24KB Base limit)
+
 ### SingleStaking (`contracts/incentives/SingleStaking.sol`)
 - **Type**: Incentive primitive | **Inherits**: ISingleStaking, Ownable, ReentrancyGuard
 - **Purpose**: Synthetix-style single-sided staking — stake any ERC-20, earn reward tokens proportional to share × time
@@ -1045,5 +1059,5 @@ import "../monetary/interfaces/IJoule.sol";
 - **~76 implementation contracts**
 - **~49 interfaces**
 - **~11 libraries**
-- Core: 8 | AMM: 6 (+ 2 curves) | Financial: 9 | Governance: 8 | Incentives: 10 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
+- Core: 8 | AMM: 6 (+ 2 curves) | Financial: 9 | Governance: 8 | Incentives: 11 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
 - **14 Rust crates** (CKB): 4 libraries + 8 scripts + 1 SDK + 1 test crate | **190 Rust tests**

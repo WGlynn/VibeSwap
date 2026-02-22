@@ -171,8 +171,26 @@ contract IncentiveController is
 
         IncentiveConfig memory config = _getConfig(poolId);
 
+        // Base ratio from config, boosted by real-time volatility
+        uint256 effectiveRatio = config.volatilityFeeRatioBps;
+
+        // Wire VolatilityOracle: boost insurance pool routing during high volatility
+        // Insurance pool fills faster during turbulent markets (when it's most needed)
+        if (address(volatilityOracle) != address(0)) {
+            try volatilityOracle.getVolatilityTier(poolId) returns (IVolatilityOracle.VolatilityTier tier) {
+                if (tier == IVolatilityOracle.VolatilityTier.HIGH) {
+                    // HIGH: route 50% more to insurance pool
+                    effectiveRatio = (effectiveRatio * 15000) / BPS_PRECISION;
+                } else if (tier == IVolatilityOracle.VolatilityTier.EXTREME) {
+                    // EXTREME: route 100% more to insurance pool (cap at 10000 bps)
+                    effectiveRatio = (effectiveRatio * 20000) / BPS_PRECISION;
+                }
+                if (effectiveRatio > BPS_PRECISION) effectiveRatio = BPS_PRECISION;
+            } catch {}
+        }
+
         // Calculate portion for volatility pool
-        uint256 toVolatilityPool = (amount * config.volatilityFeeRatioBps) / BPS_PRECISION;
+        uint256 toVolatilityPool = (amount * effectiveRatio) / BPS_PRECISION;
 
         if (toVolatilityPool > 0 && volatilityInsurancePool != address(0)) {
             // Transfer to this contract first, then forward

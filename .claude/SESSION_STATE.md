@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-21 (Desktop - Claude Code Opus 4.6, Session 28 continued — Security Hardening)
+**Last Updated**: 2026-02-22 (Desktop - Claude Code Opus 4.6, Session 32 — True Price Hardening)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -38,7 +38,44 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - ~~**GenesisContributions.s.sol** — founder addresses are placeholders~~ FIXED (Session 29: now uses vm.envAddress)
 
-## Recently Completed (Feb 22, 2026 — Session 30: Incentive Layer Activation)
+## Recently Completed (Feb 22, 2026 — Session 32: True Price Hardening)
+94. **True Price Pipeline — Intelligence-Enforcement Gap Closed**
+    - **CRITICAL**: TruePriceOracle was declared in VibeAMM but NEVER used in batch execution
+    - Added `_validateAndDampClearingPrice()` — three-tier enforcement: pass-through, golden ratio damping, circuit breaker
+    - Regime-adjusted deviation bounds (CASCADE 60%, MANIPULATION 70%, TREND 130%, etc.)
+    - Stablecoin-aware bounds (USDT dominant tightens 20%, USDC dominant loosens 20%)
+    - Admin functions: `setTruePriceOracle`, `setTruePriceValidation`, `setTruePriceMaxStaleness`
+    - Added TRUE_PRICE_BREAKER config (30% threshold, 30min window, 1hr cooldown)
+    - TWAP validation added to `executeBatchSwap` pre-execution with golden ratio damping
+
+95. **Batch Order Aggregation — Individual-Batch Gap Closed**
+    - VibeSwapCore `_executeOrders` was calling `executeBatchSwap` per-order (single-element array)
+    - Rewrote to group all orders by poolId, execute once per pool with full SwapOrder array
+    - Per-order output estimated via pro-rata share of total pool output
+    - Delivers TRUE uniform clearing price across all orders in same pool
+
+96. **TRUE_PRICE_BREAKER Actually Blocks Execution**
+    - Was configured and accumulated deviation but NO function was gated by it
+    - Added `whenBreakerNotTripped(TRUE_PRICE_BREAKER)` to `executeBatchSwap`
+    - Auto-resets after 1hr cooldown
+
+97. **VWAP Corroboration in True Price Validation**
+    - When True Price AND VWAP both disagree with clearing price direction, bounds tighten 20%
+    - Two independent price signals = stronger enforcement (100% signal, 0% noise)
+
+98. **VolatilityOracle Wired into Fee Routing (was dead reference)**
+    - IncentiveController.routeVolatilityFee now queries VolatilityOracle
+    - HIGH vol: 50% more to insurance pool; EXTREME: 100% more
+    - Insurance pool self-fills during turbulent markets
+
+99. **50 True Price Validation Tests**
+    - 37 unit tests: three-tier enforcement, regime bounds, stablecoin context, staleness, oracle failures
+    - 9 fuzz tests: reserves stay positive, damping bounds, deviation symmetry, no-revert guarantee
+    - 4 invariant tests: reserves above minimum, oracle consistency, flag persistence
+
+- Commits: `e4dfa07`, `41cbbfe`, `6da70d5`, `e118eb7` — pushed to both remotes
+
+## Previously Completed (Feb 22, 2026 — Session 30: Incentive Layer Activation)
 93. **CRITICAL: Full Incentive Layer Activation — VibeAMM + VibeSwapCore + FeeRouter**
     - **CRITICAL FIX #1**: VibeAMM never called IncentiveController hooks — entire incentive layer was dead code
       - `addLiquidity` → `onLiquidityAdded()` for IL protection + loyalty registration

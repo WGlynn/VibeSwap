@@ -286,6 +286,7 @@ contract DecentralizedTribunal is
         Trial storage trial = trials[trialId];
         if (trial.caseId == bytes32(0)) revert TrialNotFound();
         if (trial.phase != TrialPhase.EVIDENCE) revert WrongPhase();
+        if (!jurors[trialId][msg.sender].summoned && msg.sender != owner()) revert NotSummoned();
 
         trial.evidenceHashes.push(evidenceHash);
         emit EvidenceSubmitted(trialId, evidenceHash, msg.sender);
@@ -374,6 +375,10 @@ contract DecentralizedTribunal is
         if (trial.phase != TrialPhase.VERDICT) revert WrongPhase();
         if (block.timestamp >= trial.phaseDeadline) revert PhaseNotExpired();
         if (trial.appealCount >= maxAppeals) revert MaxAppealsReached();
+        // Only past jurors or owner can file appeals (prevents external griefing)
+        if (!jurors[trialId][msg.sender].summoned && msg.sender != owner()) revert NotSummoned();
+        // Require appeal stake (escalates with each appeal round)
+        if (msg.value < trial.jurorStake) revert InsufficientStake();
 
         trial.appealCount++;
         trial.phase = TrialPhase.APPEAL;

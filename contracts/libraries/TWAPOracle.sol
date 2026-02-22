@@ -133,6 +133,8 @@ library TWAPOracle {
             uint224 priceDelta = after_.priceCumulative - before.priceCumulative;
             uint32 targetDelta = targetTime - before.timestamp;
 
+            // Guard against div-by-zero when two observations share a timestamp
+            require(timeDelta > 0, "TWAP: zero time delta");
             targetCumulative = before.priceCumulative +
                 uint224((uint256(priceDelta) * targetDelta) / timeDelta);
         }
@@ -141,6 +143,8 @@ library TWAPOracle {
         uint224 cumulativeDelta = current.priceCumulative - targetCumulative;
         uint32 twapTimeDelta = current.timestamp - targetTime;
 
+        // Guard against div-by-zero when current timestamp equals target
+        require(twapTimeDelta > 0, "TWAP: no time elapsed");
         twap = uint256(cumulativeDelta) / twapTimeDelta;
     }
 

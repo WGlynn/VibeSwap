@@ -181,6 +181,10 @@ contract CommitRevealAuction is
     // ============ Security Fix #7: Excess ETH Refund ============
 
     event ExcessETHRefundFailed(address indexed user, uint256 amount);
+    event AuthorizedSettlerUpdated(address indexed settler, bool authorized);
+    event TreasuryUpdated(address indexed treasury);
+    event PoWBaseValueUpdated(uint256 powBaseValue);
+    event ReputationOracleUpdated(address indexed oracle);
 
     // ============ Modifiers ============
 
@@ -898,6 +902,7 @@ contract CommitRevealAuction is
         bool authorized
     ) external onlyOwner {
         authorizedSettlers[settler] = authorized;
+        emit AuthorizedSettlerUpdated(settler, authorized);
     }
 
     /**
@@ -907,6 +912,7 @@ contract CommitRevealAuction is
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
     }
 
     /**
@@ -915,6 +921,7 @@ contract CommitRevealAuction is
      */
     function setPoWBaseValue(uint256 _baseValue) external onlyOwner {
         powBaseValue = _baseValue;
+        emit PoWBaseValueUpdated(_baseValue);
     }
 
     /**
@@ -923,6 +930,7 @@ contract CommitRevealAuction is
      */
     function setReputationOracle(address _oracle) external onlyOwner {
         reputationOracle = IReputationOracle(_oracle);
+        emit ReputationOracleUpdated(_oracle);
     }
 
     // ============ Pool View Functions ============

@@ -225,6 +225,27 @@ contract VibeAMM is
         string reason
     );
 
+    // ============ Admin Events ============
+
+    event AuthorizedExecutorUpdated(address indexed executor, bool authorized);
+    event TreasuryUpdated(address indexed treasury);
+    event ProtocolFeeShareUpdated(uint256 feeBps);
+    event LiquidityProtectionToggled(bool enabled);
+    event TokenPriceUpdated(address indexed token, uint256 price);
+    event PriceOracleUpdated(address indexed oracle);
+    event PriorityRegistryUpdated(address indexed registry);
+    event VWAPCardinalityGrown(bytes32 indexed poolId, uint16 cardinality);
+    event FlashLoanProtectionToggled(bool enabled);
+    event TWAPValidationToggled(bool enabled);
+    event PoolMaxTradeSizeUpdated(bytes32 indexed poolId, uint256 maxSize);
+    event OracleCardinalityGrown(bytes32 indexed poolId, uint16 cardinality);
+    event TrackedBalanceSynced(address indexed token, uint256 balance);
+    event FibonacciScalingToggled(bool enabled);
+    event FibonacciBaseUnitUpdated(bytes32 indexed poolId, uint256 baseUnit);
+    event FibonacciWindowDurationUpdated(uint256 duration);
+    event FibonacciPriceLevelsReset(bytes32 indexed poolId);
+    event MaxPoWFeeDiscountUpdated(uint256 maxDiscountBps);
+
     // ============ Security Errors ============
 
     error FlashLoanDetected();
@@ -909,6 +930,7 @@ contract VibeAMM is
         bool authorized
     ) external onlyOwner {
         authorizedExecutors[executor] = authorized;
+        emit AuthorizedExecutorUpdated(executor, authorized);
     }
 
     /**
@@ -917,6 +939,7 @@ contract VibeAMM is
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
     }
 
     /// @notice Set protocol fee share (portion of trading fees routed to treasury)
@@ -924,6 +947,7 @@ contract VibeAMM is
     function setProtocolFeeShare(uint256 share) external onlyOwner {
         if (share > 2500) revert("Fee share too high"); // Max 25%
         protocolFeeShare = share;
+        emit ProtocolFeeShareUpdated(share);
     }
 
     // ============ Liquidity Protection Admin ============
@@ -938,6 +962,7 @@ contract VibeAMM is
         } else {
             protectionFlags &= ~FLAG_LIQUIDITY;
         }
+        emit LiquidityProtectionToggled(enabled);
     }
 
     /**
@@ -982,6 +1007,7 @@ contract VibeAMM is
     function updateTokenPrice(address token, uint256 priceUsd) external {
         if (msg.sender != owner() && msg.sender != priceOracle) revert NotAuthorized();
         tokenUsdPrices[token] = priceUsd;
+        emit TokenPriceUpdated(token, priceUsd);
     }
 
     /**
@@ -990,6 +1016,7 @@ contract VibeAMM is
     function setPriceOracle(address oracle) external onlyOwner {
         require(oracle != address(0), "Invalid oracle");
         priceOracle = oracle;
+        emit PriceOracleUpdated(oracle);
     }
 
     /**
@@ -997,6 +1024,7 @@ contract VibeAMM is
      */
     function setPriorityRegistry(address _registry) external onlyOwner {
         priorityRegistry = IPriorityRegistry(_registry);
+        emit PriorityRegistryUpdated(_registry);
     }
 
     /**
@@ -1004,6 +1032,7 @@ contract VibeAMM is
      */
     function growVWAPCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
         poolVWAP[poolId].grow(newCardinality);
+        emit VWAPCardinalityGrown(poolId, newCardinality);
     }
 
     // ============ Internal Functions ============
@@ -1425,6 +1454,7 @@ contract VibeAMM is
         } else {
             protectionFlags &= ~FLAG_FLASH_LOAN;
         }
+        emit FlashLoanProtectionToggled(enabled);
     }
 
     /**
@@ -1437,6 +1467,7 @@ contract VibeAMM is
         } else {
             protectionFlags &= ~FLAG_TWAP;
         }
+        emit TWAPValidationToggled(enabled);
     }
 
     /// @notice Check if flash loan protection is enabled
@@ -1469,6 +1500,7 @@ contract VibeAMM is
      */
     function setPoolMaxTradeSize(bytes32 poolId, uint256 maxSize) external onlyOwner {
         poolMaxTradeSize[poolId] = maxSize;
+        emit PoolMaxTradeSizeUpdated(poolId, maxSize);
     }
 
     /**
@@ -1476,6 +1508,7 @@ contract VibeAMM is
      */
     function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
         poolOracles[poolId].grow(newCardinality);
+        emit OracleCardinalityGrown(poolId, newCardinality);
     }
 
     /**
@@ -1483,6 +1516,7 @@ contract VibeAMM is
      */
     function syncTrackedBalance(address token) external onlyOwner {
         trackedBalances[token] = IERC20(token).balanceOf(address(this));
+        emit TrackedBalanceSynced(token, trackedBalances[token]);
     }
 
     // ============ Security View Functions ============
@@ -1609,6 +1643,7 @@ contract VibeAMM is
         } else {
             protectionFlags &= ~FLAG_FIBONACCI;
         }
+        emit FibonacciScalingToggled(enabled);
     }
 
     /**
@@ -1619,6 +1654,7 @@ contract VibeAMM is
     function setFibonacciBaseUnit(bytes32 poolId, uint256 baseUnit) external onlyOwner {
         if (baseUnit == 0) revert InvalidBaseUnit();
         fibonacciBaseUnit[poolId] = baseUnit;
+        emit FibonacciBaseUnitUpdated(poolId, baseUnit);
     }
 
     /**
@@ -1628,6 +1664,7 @@ contract VibeAMM is
     function setFibonacciWindowDuration(uint256 duration) external onlyOwner {
         if (duration < 1 minutes || duration > 24 hours) revert InvalidDuration();
         fibonacciWindowDuration = duration;
+        emit FibonacciWindowDurationUpdated(duration);
     }
 
     /**
@@ -1641,6 +1678,7 @@ contract VibeAMM is
             recentHighPrice[poolId] = currentPrice;
             recentLowPrice[poolId] = currentPrice;
         }
+        emit FibonacciPriceLevelsReset(poolId);
     }
 
     // ============ Proof-of-Work Admin Functions ============
@@ -1652,6 +1690,7 @@ contract VibeAMM is
     function setMaxPoWFeeDiscount(uint256 _maxDiscount) external onlyOwner {
         if (_maxDiscount > 10000) revert InvalidDiscount();
         maxPoWFeeDiscount = _maxDiscount;
+        emit MaxPoWFeeDiscountUpdated(_maxDiscount);
     }
 
     // ============ Fibonacci Scaling View Functions ============

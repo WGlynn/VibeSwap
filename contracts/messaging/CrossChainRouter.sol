@@ -561,7 +561,8 @@ contract CrossChainRouter is
             )
         );
 
-        if (success && result.length > 0) {
+        require(success, "LayerZero send failed");
+        if (result.length > 0) {
             receipt = abi.decode(result, (MessagingReceipt));
         }
     }

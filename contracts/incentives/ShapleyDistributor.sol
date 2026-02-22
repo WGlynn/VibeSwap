@@ -216,6 +216,13 @@ contract ShapleyDistributor is
     event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
     event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
     event FairnessVerified(bytes32 indexed gameId, address indexed participant1, address indexed participant2, bool fair, uint256 deviation);
+    event AuthorizedCreatorUpdated(address indexed creator, bool authorized);
+    event ParticipantLimitsUpdated(uint256 minParticipants, uint256 maxParticipants);
+    event QualityWeightsToggled(bool enabled);
+    event PriorityRegistryUpdated(address indexed registry);
+    event HalvingToggled(bool enabled);
+    event GamesPerEraUpdated(uint256 gamesPerEra);
+    event GenesisTimestampReset(uint256 newTimestamp);
 
     // ============ Errors ============
 
@@ -825,15 +832,18 @@ contract ShapleyDistributor is
 
     function setAuthorizedCreator(address creator, bool authorized) external onlyOwner {
         authorizedCreators[creator] = authorized;
+        emit AuthorizedCreatorUpdated(creator, authorized);
     }
 
     function setParticipantLimits(uint256 _min, uint256 _max) external onlyOwner {
         minParticipants = _min;
         maxParticipants = _max;
+        emit ParticipantLimitsUpdated(_min, _max);
     }
 
     function setUseQualityWeights(bool _use) external onlyOwner {
         useQualityWeights = _use;
+        emit QualityWeightsToggled(_use);
     }
 
     // ============ Pioneer Admin Functions ============
@@ -845,6 +855,7 @@ contract ShapleyDistributor is
      */
     function setPriorityRegistry(address _registry) external onlyOwner {
         priorityRegistry = IPriorityRegistry(_registry);
+        emit PriorityRegistryUpdated(_registry);
     }
 
     // ============ Halving Admin Functions ============
@@ -855,6 +866,7 @@ contract ShapleyDistributor is
      */
     function setHalvingEnabled(bool _enabled) external onlyOwner {
         halvingEnabled = _enabled;
+        emit HalvingToggled(_enabled);
     }
 
     /**
@@ -865,6 +877,7 @@ contract ShapleyDistributor is
     function setGamesPerEra(uint256 _gamesPerEra) external onlyOwner {
         if (_gamesPerEra == 0) revert InvalidGamesPerEra();
         gamesPerEra = _gamesPerEra;
+        emit GamesPerEraUpdated(_gamesPerEra);
     }
 
     /**
@@ -873,6 +886,7 @@ contract ShapleyDistributor is
      */
     function resetGenesisTimestamp() external onlyOwner {
         genesisTimestamp = block.timestamp;
+        emit GenesisTimestampReset(block.timestamp);
     }
 
     // ============ Receive ETH ============

@@ -440,6 +440,7 @@ contract DAOTreasury is
         bool authorized
     ) external onlyOwner {
         authorizedFeeSenders[sender] = authorized;
+        emit AuthorizedFeeSenderUpdated(sender, authorized);
     }
 
     /**
@@ -449,6 +450,7 @@ contract DAOTreasury is
         require(duration >= MIN_TIMELOCK, "Below minimum");
         require(duration <= MAX_TIMELOCK, "Exceeds maximum");
         timelockDuration = duration;
+        emit TimelockDurationUpdated(duration);
     }
 
     /**
@@ -457,6 +459,7 @@ contract DAOTreasury is
     function setVibeAMM(address _vibeAMM) external onlyOwner {
         require(_vibeAMM != address(0), "Invalid AMM");
         vibeAMM = _vibeAMM;
+        emit VibeAMMUpdated(_vibeAMM);
     }
 
     /**
@@ -465,6 +468,7 @@ contract DAOTreasury is
     function setBackstopOperator(address operator, bool authorized) external onlyOwner {
         require(operator != address(0), "Invalid operator");
         backstopOperators[operator] = authorized;
+        emit BackstopOperatorUpdated(operator, authorized);
     }
 
     /**
@@ -472,6 +476,7 @@ contract DAOTreasury is
      */
     function deactivateBackstop(address token) external onlyOwner {
         backstopConfigs[token].isActive = false;
+        emit BackstopDeactivated(token);
     }
 
     // ============ Emergency Withdrawal (Governed) ============
@@ -481,6 +486,11 @@ contract DAOTreasury is
     event EmergencyWithdrawalCancelled(uint256 indexed emergencyId);
     event EmergencyGuardianApproved(uint256 indexed emergencyId);
     event EmergencyGuardianSet(address indexed guardian);
+    event AuthorizedFeeSenderUpdated(address indexed sender, bool authorized);
+    event TimelockDurationUpdated(uint256 duration);
+    event VibeAMMUpdated(address indexed amm);
+    event BackstopOperatorUpdated(address indexed operator, bool authorized);
+    event BackstopDeactivated(address indexed token);
 
     /**
      * @notice Queue an emergency withdrawal (6-hour timelock)

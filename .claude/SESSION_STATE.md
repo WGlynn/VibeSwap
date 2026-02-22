@@ -21,7 +21,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**)
 - **PsiNet × VibeSwap merge: COMPLETE** — ERC-8004 AI agent identities, CRPC verification, context graph anchoring
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
-- Protocol security hardening COMPLETE (10 audit passes, 65+ findings fixed)
+- Protocol security hardening COMPLETE (11 audit passes, 83+ findings fixed, 15 security tests)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
 - **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
 - **Frontend contract integration: COMPLETE** — useSwap, usePool, useBridge hooks + useBatchState live mode + **CKB chain detection in all core hooks**
@@ -57,8 +57,12 @@ This file maintains continuity between Claude Code sessions across devices.
     - **CrossChainRouter._lzSend**: added `require(success)` on LayerZero endpoint call (HIGH: silent ETH loss)
     - **42 missing event emissions added** across 7 contracts: VibeSwapCore (6), VibeAMM (18), ShapleyDistributor (7), DAOTreasury (5), CommitRevealAuction (4), CircuitBreaker (1)
     - **Reclassified** DisputeResolver.defaultJudgment and advanceToArbitration as intentionally permissionless (keeper pattern)
+    - **42 missing event emissions added** across 7 contracts: VibeSwapCore (6), VibeAMM (18), ShapleyDistributor (7), DAOTreasury (5), CommitRevealAuction (4), CircuitBreaker (1)
+    - **11 magic numbers extracted to named constants**: VibeAMM reserve cap, DAOTreasury slippage, VolatilityOracle annualization, TruePriceLib 7 regime multipliers
+    - **Verified**: all 31 UUPS contracts have `_disableInitializers()` + `_authorizeUpgrade(onlyOwner)`, 0 bare `.approve()`, 0 unchecked `.call{value}` returns
+    - **83 total findings fixed + 15 security tests** across Session 28
     - **320+ regression tests passing, 0 failures**
-    - Commits: `3cd1f59`, `e7445f7` — pushed to both remotes
+    - Commits: `3cd1f59`, `e7445f7`, `4a107f6`, `382053c` — pushed to both remotes
 
 ## Previously Completed (Feb 20, 2026 — Session 39)
 89. **3 Cross-Module Integration Tests — All 5 Identified Gaps Filled**

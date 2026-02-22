@@ -102,7 +102,71 @@ forge script script/DeployTokenomics.s.sol --rpc-url $RPC_URL --broadcast --veri
 - Create gauges: `DeployTokenomics.s.sol:SetupGauges`
 - Start emissions: `DeployTokenomics.s.sol:StartEmissions`
 
-### Phase 5: Identity Layer
+### Phase 5: Compliance Layer
+
+```bash
+export VIBESWAP_CORE=0x...  # From Phase 1 output
+
+forge script script/DeployCompliance.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** FederatedConsensus, ClawbackRegistry, ClawbackVault, ComplianceRegistry
+
+**Auto-configured:**
+- FederatedConsensus.setExecutor(ClawbackRegistry)
+- ClawbackRegistry.setVault(ClawbackVault)
+- ClawbackRegistry.setAuthorizedTracker(VibeSwapCore)
+- ComplianceRegistry.setAuthorizedContract(VibeSwapCore)
+
+**Post-deploy:**
+- Add compliance authorities: `FederatedConsensus.addAuthority(addr, role, jurisdiction)`
+- Set compliance officers: `ComplianceRegistry.setComplianceOfficer(addr, true)`
+- Set KYC providers: `ComplianceRegistry.setKYCProvider(addr, true)`
+
+### Phase 6: Governance Layer
+
+```bash
+export VIBE_AMM=0x...            # From Phase 1 output
+export DAO_TREASURY=0x...        # From Phase 1 output
+export VOLATILITY_ORACLE=0x...   # From Phase 3 output
+export JOULE_TOKEN=0x...         # From Phase 4 output (optional)
+export FEDERATED_CONSENSUS=0x... # From Phase 5 output (optional)
+
+forge script script/DeployGovernance.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** TreasuryStabilizer, VibeTimelock, VibeKeeperNetwork, DisputeResolver
+
+**Post-deploy:**
+- TreasuryStabilizer.setMainPool(token, poolId) for each managed token
+- VibeKeeperNetwork.registerTask(...) for automated jobs (drip, settle, etc.)
+- DisputeResolver.setTribunal(tribunalAddress) if DecentralizedTribunal deployed
+
+### Phase 7: Financial Instruments
+
+```bash
+export JOULE_TOKEN=0x...         # From Phase 4 output
+export VIBE_AMM=0x...            # From Phase 1 output
+export VOLATILITY_ORACLE=0x...   # From Phase 3 output
+export FEE_ROUTER=0x...          # From Phase 1 output
+export REVENUE_TOKEN=0x...       # Stablecoin address (e.g., USDC)
+export COLLATERAL_TOKEN=0x...    # Insurance collateral token
+
+forge script script/DeployFinancial.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** VibeRevShare, VibeInsurance, VibeBonds, VibeOptions, VibeStream, VestingSchedule
+
+**Auto-configured:**
+- FeeRouter.setRevShare(VibeRevShare) -- completes 30% revenue share pipeline
+- VibeRevShare.setRevenueSource(FeeRouter) -- authorizes revenue deposits
+
+**Post-deploy:**
+- VibeInsurance.setTriggerResolver(keeperAddr, true)
+- VestingSchedule.createSchedule(...) for team/investor vesting
+- BuybackEngine.setProtocolToken(VIBE_TOKEN) if not already set
+
+### Phase 8: Identity Layer
 
 ```bash
 export VIBE_TOKEN=0x...  # From Phase 3 output
@@ -112,7 +176,7 @@ forge script script/DeployIdentity.s.sol --rpc-url $RPC_URL --broadcast --verify
 
 **Deploys:** SoulboundIdentity, AgentRegistry, ContributionDAG, VibeCode, RewardLedger, ContributionAttestor
 
-### Phase 6: Genesis Contributions
+### Phase 9: Genesis Contributions
 
 ```bash
 export CONTRIBUTION_DAG=0x...    # From Phase 4
@@ -126,7 +190,7 @@ forge script script/GenesisContributions.s.sol --rpc-url $RPC_URL --broadcast
 
 **Records:** Retroactive contributions for founders (NOT finalized — requires 3-factor validation)
 
-### Phase 7: Cross-Chain Setup
+### Phase 10: Cross-Chain Setup
 
 ```bash
 forge script script/ConfigurePeers.s.sol --rpc-url $RPC_URL --broadcast
@@ -134,7 +198,7 @@ forge script script/ConfigurePeers.s.sol --rpc-url $RPC_URL --broadcast
 
 **Configures:** LayerZero V2 peer connections to other deployed chains
 
-### Phase 8: Ownership Transfer
+### Phase 11: Ownership Transfer
 
 ```bash
 export MULTISIG_ADDRESS=0x...
@@ -149,9 +213,20 @@ forge script script/DeployIncentives.s.sol:TransferIncentivesOwnership --rpc-url
 forge script script/DeployTokenomics.s.sol:TransferTokenomicsOwnership --rpc-url $RPC_URL --broadcast
 ```
 
-**Transfers:** All contract ownership to multisig (20+ contracts)
+**Transfers:** All contract ownership to multisig (40+ contracts)
 
-### Phase 9: Start Operations
+```bash
+# Transfer governance contracts
+forge script script/DeployGovernance.s.sol:TransferGovernanceOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer compliance contracts
+forge script script/DeployCompliance.s.sol:TransferComplianceOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer financial contracts
+forge script script/DeployFinancial.s.sol:TransferFinancialOwnership --rpc-url $RPC_URL --broadcast
+```
+
+### Phase 12: Start Operations
 
 1. **Oracle**: `python -m oracle.main` (off-chain Kalman filter)
 2. **Keeper bot**: Schedule `EmissionController.drip()` calls (every ~10 min)
@@ -182,6 +257,15 @@ After full deployment, verify:
 - [ ] Fee pipeline: AMM → FeeAdapter → FeeRouter → (Treasury 40%, Insurance 20%, RevShare 30%, Buyback 10%)
 - [ ] EmissionController.drip() succeeds
 - [ ] Test swap completes full commit → reveal → settle cycle
+- [ ] FederatedConsensus.executor = ClawbackRegistry
+- [ ] ClawbackRegistry.vault = ClawbackVault
+- [ ] ClawbackRegistry authorized trackers include VibeSwapCore
+- [ ] ComplianceRegistry authorized contracts include VibeSwapCore
+- [ ] FederatedConsensus has >= approvalThreshold authorities registered
+- [ ] TreasuryStabilizer wired to VibeAMM + DAOTreasury + VolatilityOracle
+- [ ] VibeTimelock min delay >= 2 days
+- [ ] FeeRouter.revShare = VibeRevShare (after DeployFinancial)
+- [ ] VibeRevShare.revenueSource(FeeRouter) = true
 
 ## Emergency Procedures
 

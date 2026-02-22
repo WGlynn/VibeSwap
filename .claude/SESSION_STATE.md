@@ -39,18 +39,23 @@ This file maintains continuity between Claude Code sessions across devices.
 - ~~**GenesisContributions.s.sol** — founder addresses are placeholders~~ FIXED (Session 29: now uses vm.envAddress)
 
 ## Recently Completed (Feb 22, 2026 — Session 30: Incentive Layer Activation)
-93. **CRITICAL: Wire VibeAMM to IncentiveController + Deploy Incentives Script**
-    - **CRITICAL FIX**: VibeAMM never called IncentiveController hooks — entire incentive layer (IL protection, loyalty rewards, volatility insurance, Shapley distribution) was dead code
-    - **VibeAMM.addLiquidity**: Now calls `incentiveController.onLiquidityAdded()` for IL protection + loyalty registration
-    - **VibeAMM.removeLiquidity**: Now calls `incentiveController.onLiquidityRemoved()` for loyalty tracking
-    - **VibeAMM._updateSwapState**: Routes volatility fee surplus (dynamic fee - base fee) to IncentiveController for VolatilityInsurancePool funding
-    - All hooks use try/catch — incentive layer issues cannot block core AMM operations
-    - **IncentiveController.distributeAuctionProceeds**: Added nonReentrant guard (defense-in-depth)
-    - **DeployIncentives.s.sol** (NEW): Deploys 7 contracts (VolatilityOracle, IncentiveController, VolatilityInsurancePool, ILProtectionVault, SlippageGuaranteeFund, LoyaltyRewardsManager, MerkleAirdrop) + full wiring + TransferIncentivesOwnership sub-script
-    - **Deployment runbook**: Updated to 9 phases (added Phase 3: Incentive Vaults), new verification checklist items
-    - **77 tests passing** (VibeAMM + IncentiveController: unit + fuzz + invariant)
-    - Confirmed FeeRouter is correctly wired via ProtocolFeeAdapter in DeployProduction.s.sol (not disconnected)
-    - Commits: `586f301` — pushed to both remotes
+93. **CRITICAL: Full Incentive Layer Activation — VibeAMM + VibeSwapCore + FeeRouter**
+    - **CRITICAL FIX #1**: VibeAMM never called IncentiveController hooks — entire incentive layer was dead code
+      - `addLiquidity` → `onLiquidityAdded()` for IL protection + loyalty registration
+      - `removeLiquidity` → `onLiquidityRemoved()` for loyalty tracking
+      - `_updateSwapState` → Routes volatility fee surplus to VolatilityInsurancePool
+      - All hooks use try/catch — cannot block core AMM
+    - **CRITICAL FIX #2**: VibeSwapCore had no IncentiveController integration
+      - `_executeOrders` → `recordExecution()` after each batch swap for slippage tracking
+      - Enables SlippageGuaranteeFund compensation claims for traders
+    - **HIGH FIX**: FeeRouter.setInsurance was never called — 20% of fees went to deployer
+      - DeployIncentives.s.sol now calls `FeeRouter.setInsurance(volatilityInsurancePool)`
+      - Documented revShare wiring as post-tokenomics step
+    - **IncentiveController.distributeAuctionProceeds**: Added nonReentrant guard
+    - **DeployIncentives.s.sol** (NEW): 7 contracts + full wiring + FeeRouter update + TransferOwnership
+    - **Deployment runbook**: 9 phases, verification checklist, emergency procedures
+    - **141 tests passing** across 9 suites (VibeAMM + VibeSwapCore + IncentiveController)
+    - Commits: `586f301`, `6576a57`, `497bcc9` — pushed to both remotes
 
 ## Previously Completed (Feb 22, 2026 — Session 29: Go-Live Deployment Readiness)
 92. **Deployment Script Gap Analysis + Tokenomics Deploy Script**

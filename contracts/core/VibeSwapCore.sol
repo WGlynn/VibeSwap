@@ -152,6 +152,12 @@ contract VibeSwapCore is
     event ContractWhitelisted(address indexed contractAddr, bool status);
     event RateLimitExceeded(address indexed user, uint256 requested, uint256 limit);
     event GuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
+    event ContractsUpdated(address auction, address amm, address treasury, address router);
+    event WBARUpdated(address indexed wbar);
+    event MaxSwapPerHourUpdated(uint256 amount);
+    event RequireEOAUpdated(bool required);
+    event CommitCooldownUpdated(uint256 cooldown);
+    event ClawbackRegistryUpdated(address indexed registry);
 
     // FIX #5: Events for order failures (no more silent failures)
     event OrderFailed(
@@ -592,6 +598,7 @@ contract VibeSwapCore is
         if (_amm != address(0)) amm = IVibeAMM(_amm);
         if (_treasury != address(0)) treasury = IDAOTreasury(_treasury);
         if (_router != address(0)) router = CrossChainRouter(payable(_router));
+        emit ContractsUpdated(_auction, _amm, _treasury, _router);
     }
 
     // ============ wBAR Functions ============
@@ -602,6 +609,7 @@ contract VibeSwapCore is
      */
     function setWBAR(address _wbar) external onlyOwner {
         wbar = IwBAR(_wbar);
+        emit WBARUpdated(_wbar);
     }
 
     /**
@@ -813,6 +821,7 @@ contract VibeSwapCore is
      */
     function setMaxSwapPerHour(uint256 amount) external onlyOwner {
         maxSwapPerHour = amount;
+        emit MaxSwapPerHourUpdated(amount);
     }
 
     /**
@@ -820,6 +829,7 @@ contract VibeSwapCore is
      */
     function setRequireEOA(bool required) external onlyOwner {
         requireEOA = required;
+        emit RequireEOAUpdated(required);
     }
 
     /**
@@ -827,6 +837,7 @@ contract VibeSwapCore is
      */
     function setCommitCooldown(uint256 cooldown) external onlyOwner {
         commitCooldown = cooldown;
+        emit CommitCooldownUpdated(cooldown);
     }
 
     /**
@@ -843,6 +854,7 @@ contract VibeSwapCore is
      */
     function setClawbackRegistry(address _registry) external onlyOwner {
         clawbackRegistry = ClawbackRegistry(_registry);
+        emit ClawbackRegistryUpdated(_registry);
     }
 
     /**

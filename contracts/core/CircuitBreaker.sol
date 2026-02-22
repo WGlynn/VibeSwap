@@ -58,6 +58,7 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     event BreakerTripped(bytes32 indexed breakerType, uint256 value, uint256 threshold);
     event BreakerReset(bytes32 indexed breakerType, address indexed by);
     event AnomalyDetected(bytes32 indexed anomalyType, uint256 value, string description);
+    event BreakerDisabled(bytes32 indexed breakerType);
 
     // ============ Errors ============
 
@@ -179,6 +180,7 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
      */
     function disableBreaker(bytes32 breakerType) external onlyOwner {
         breakerConfigs[breakerType].enabled = false;
+        emit BreakerDisabled(breakerType);
     }
 
     // ============ Internal Functions ============

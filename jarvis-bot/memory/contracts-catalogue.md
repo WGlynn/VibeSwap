@@ -140,8 +140,9 @@ uint256 private constant PRECISION = 1e18;
 - **Path**: `contracts/core/VibeSwapCore.sol`
 - **Type**: Upgradeable (UUPS)
 - **Init**: `initialize(address _owner, address _auction, address _amm, address _treasury, address _router)`
-- **Key deps**: `ICommitRevealAuction`, `IVibeAMM`, `IDAOTreasury`, `IwBAR`, `CircuitBreaker`, `CrossChainRouter`, `SecurityLib`, `ClawbackRegistry`
-- **Key functions**: `commitSwap()`, `revealSwap()`, `settleBatch()`, `createPool()`, `getQuote()`
+- **Key deps**: `ICommitRevealAuction`, `IVibeAMM`, `IDAOTreasury`, `IwBAR`, `IIncentiveController`, `CircuitBreaker`, `CrossChainRouter`, `SecurityLib`, `ClawbackRegistry`
+- **Key functions**: `commitSwap()`, `revealSwap()`, `settleBatch()`, `createPool()`, `getQuote()`, `setIncentiveController()`
+- **IncentiveController hook** (Session 30): `_executeOrders` → `recordExecution` for slippage tracking after each batch swap
 
 ### CircuitBreaker
 - **Path**: `contracts/core/CircuitBreaker.sol`
@@ -164,7 +165,8 @@ uint256 private constant PRECISION = 1e18;
 - **Path**: `contracts/amm/VibeAMM.sol`
 - **Type**: Upgradeable + CircuitBreaker
 - **Init**: `initialize(address _owner, address _vibeSwapCore)`
-- **Key functions**: `createPool()`, `addLiquidity()`, `removeLiquidity()`, `swap()`, `executeBatchSwap()`, `quote()`, `getPool()`, `getPoolId()`, `getLPToken()`
+- **Key functions**: `createPool()`, `addLiquidity()`, `removeLiquidity()`, `swap()`, `executeBatchSwap()`, `quote()`, `getPool()`, `getPoolId()`, `getLPToken()`, `setIncentiveController()`
+- **IncentiveController hooks** (Session 30): `addLiquidity` → `onLiquidityAdded`, `removeLiquidity` → `onLiquidityRemoved`, `_updateSwapState` → volatility fee surplus routing
 
 ### VibeLP
 - **Path**: `contracts/amm/VibeLP.sol`

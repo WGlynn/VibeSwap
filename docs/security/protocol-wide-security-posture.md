@@ -161,16 +161,25 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 
 ## Hardening Changes Made (Session 28)
 
-### Contract Changes (Minimal — 4 lines total)
+### EmissionController (4 lines)
 
 1. **EmissionController.sol:232-237** — Redirect gaugeShare to shapleyPool when gauge is unset (prevents orphaned tokens, fixes accounting invariant)
 2. **EmissionController.sol:264** — Explicit `if (drainAmount == 0) revert DrainTooSmall()` (defense-in-depth for zero-value games)
 
-### Contract Size After Hardening
+### Protocol-Wide Reentrancy Hardening (3 lines)
+
+3. **VibeSwapCore.releaseFailedDeposit()** — Added `nonReentrant` (HIGH: cross-contract path from wBAR.reclaimFailed had reentrancy on one side only)
+4. **VibeAMM.collectFees()** — Added `nonReentrant` (MEDIUM: fee collection transfers without guard)
+5. **VibeAMMLite.collectFees()** — Added `nonReentrant` (MEDIUM: same pattern)
+
+### Contract Sizes After Hardening
 
 | Contract | Size | Base 24KB Limit |
 |----------|------|-----------------|
 | EmissionController | 7,485 bytes | 31% (safe) |
+| VibeSwapCore | 14,946 bytes | 62% (safe) |
+| VibeAMMLite | 19,950 bytes | 83% (safe) |
+| VibeAMM | 43,265 bytes | N/A (not for Base) |
 
 ---
 

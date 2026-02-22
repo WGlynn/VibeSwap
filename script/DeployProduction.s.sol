@@ -282,8 +282,7 @@ contract DeployProduction is Script {
         console.log("  FeeRouter:", feeRouter);
 
         // Deploy ProtocolFeeAdapter (bridges VibeAMM fees to FeeRouter)
-        // WETH address is chain-specific (e.g. 0xC02a...6Cc2 on Ethereum mainnet)
-        address weth = vm.envOr("WETH_ADDRESS", address(0x4200000000000000000000000000000000000006));
+        address weth = _getWETH(block.chainid);
         feeAdapter = address(new ProtocolFeeAdapter(feeRouter, weth));
         console.log("  ProtocolFeeAdapter:", feeAdapter);
 
@@ -458,9 +457,12 @@ contract DeployProduction is Script {
         console.log("1. Verify contracts on block explorer");
         console.log("2. Run VerifyDeployment.s.sol to validate");
         console.log("3. Run SetupMVP.s.sol to create pools");
-        console.log("4. Start off-chain oracle (python -m oracle.main)");
+        console.log("4. Run DeployTokenomics.s.sol to deploy VIBE + emissions");
+        console.log("5. Run DeployIdentity.s.sol to deploy identity layer");
+        console.log("6. Update BuybackEngine.setProtocolToken(VIBE_TOKEN)");
+        console.log("7. Start off-chain oracle (python -m oracle.main)");
         if (multisig != address(0)) {
-            console.log("5. Transfer ownership to multisig:", multisig);
+            console.log("8. Transfer ownership to multisig:", multisig);
         }
         console.log("=============================");
     }
@@ -512,6 +514,18 @@ contract DeployProduction is Script {
         if (chainId == 31337) return address(0); // Anvil/Hardhat
 
         revert("Unsupported chain - add LZ endpoint");
+    }
+
+    function _getWETH(uint256 chainId) internal view returns (address) {
+        if (chainId == 1) return 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;       // Ethereum
+        if (chainId == 42161) return 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;     // Arbitrum
+        if (chainId == 10) return 0x4200000000000000000000000000000000000006;         // Optimism
+        if (chainId == 8453) return 0x4200000000000000000000000000000000000006;       // Base
+        if (chainId == 137) return 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;       // Polygon (WETH)
+        if (chainId == 43114) return 0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB;     // Avalanche (WETH.e)
+        if (chainId == 56) return 0x2170Ed0880ac9A755fd29B2688956BD959F933F8;        // BSC (ETH)
+        // Testnets + local: use env var
+        return vm.envOr("WETH_ADDRESS", address(0x4200000000000000000000000000000000000006));
     }
 }
 

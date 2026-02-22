@@ -298,8 +298,10 @@ contract IncentiveController is
 
         // Record with slippage guarantee fund if shortfall
         if (address(slippageGuaranteeFund) != address(0) && amountOut < expectedMinOut) {
-            // Get quote token for pool (simplified - would need pool lookup)
-            // claimId = slippageGuaranteeFund.recordExecution(poolId, trader, quoteToken, expectedMinOut, amountOut);
+            // Get quote token from pool (token1 is the output side by convention)
+            IAMMLiquidityQuery.Pool memory pool = IAMMLiquidityQuery(vibeAMM).getPool(poolId);
+            address quoteToken = pool.token1;
+            claimId = slippageGuaranteeFund.recordExecution(poolId, trader, quoteToken, expectedMinOut, amountOut);
         }
 
         return claimId;

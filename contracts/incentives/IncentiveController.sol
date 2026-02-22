@@ -13,6 +13,21 @@ import "./interfaces/ILoyaltyRewardsManager.sol";
 import "./interfaces/ISlippageGuaranteeFund.sol";
 import "./interfaces/IShapleyDistributor.sol";
 
+// Minimal interface for querying AMM LP state (avoids circular import)
+interface IAMMLiquidityQuery {
+    struct Pool {
+        address token0;
+        address token1;
+        uint256 reserve0;
+        uint256 reserve1;
+        uint256 totalLiquidity;
+        uint256 feeRate;
+        bool initialized;
+    }
+    function liquidityBalance(bytes32 poolId, address user) external view returns (uint256);
+    function getPool(bytes32 poolId) external view returns (Pool memory);
+}
+
 /**
  * @title IncentiveController
  * @notice Central coordinator for all VibeSwap incentive mechanisms
@@ -339,18 +354,25 @@ contract IncentiveController is
      * @param poolId Pool identifier
      */
     function claimAuctionProceeds(bytes32 poolId) external override nonReentrant returns (uint256 amount) {
-        // Get LP's share of pool liquidity
-        // This would need integration with AMM to get LP balances
-        // For now, simplified implementation
-
         uint256 totalProceeds = poolAuctionProceeds[poolId];
         uint256 claimed = lpAuctionClaims[poolId][msg.sender];
 
         if (totalProceeds <= claimed) revert NothingToClaim();
 
-        // Simplified: would need to calculate pro-rata share
-        amount = totalProceeds - claimed;
-        lpAuctionClaims[poolId][msg.sender] = totalProceeds;
+        // Pro-rata share based on LP's liquidity in the pool
+        IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
+        uint256 lpBalance = amm.liquidityBalance(poolId, msg.sender);
+        IAMMLiquidityQuery.Pool memory pool = amm.getPool(poolId);
+
+        if (lpBalance == 0 || pool.totalLiquidity == 0) revert NothingToClaim();
+
+        // LP's proportional share of total unclaimed proceeds
+        uint256 proRataShare = (totalProceeds * lpBalance) / pool.totalLiquidity;
+
+        if (proRataShare <= claimed) revert NothingToClaim();
+
+        amount = proRataShare - claimed;
+        lpAuctionClaims[poolId][msg.sender] = proRataShare;
 
         (bool success, ) = msg.sender.call{value: amount}("");
         require(success, "Transfer failed");
@@ -361,13 +383,16 @@ contract IncentiveController is
     // ============ View Functions ============
 
     function getPoolIncentiveStats(bytes32 poolId) external view override returns (PoolIncentiveStats memory stats) {
-        // Aggregate stats from all vaults
-        // This would need to query each vault
+        // Query vault balances (ETH held as reserve proxy)
         stats = PoolIncentiveStats({
-            volatilityReserve: 0, // Would query volatility pool
-            ilReserve: 0,         // Would query IL vault
-            slippageReserve: 0,   // Would query slippage fund
-            totalLoyaltyStaked: 0, // Would query loyalty manager
+            volatilityReserve: volatilityInsurancePool != address(0)
+                ? volatilityInsurancePool.balance : 0,
+            ilReserve: address(ilProtectionVault) != address(0)
+                ? address(ilProtectionVault).balance : 0,
+            slippageReserve: address(slippageGuaranteeFund) != address(0)
+                ? address(slippageGuaranteeFund).balance : 0,
+            totalLoyaltyStaked: address(loyaltyRewardsManager) != address(0)
+                ? address(loyaltyRewardsManager).balance : 0,
             totalAuctionProceedsDistributed: poolAuctionProceeds[poolId]
         });
     }
@@ -389,7 +414,16 @@ contract IncentiveController is
     function getPendingAuctionProceeds(bytes32 poolId, address lp) external view override returns (uint256) {
         uint256 totalProceeds = poolAuctionProceeds[poolId];
         uint256 claimed = lpAuctionClaims[poolId][lp];
-        return totalProceeds > claimed ? totalProceeds - claimed : 0;
+
+        // Pro-rata share based on LP's liquidity
+        IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
+        uint256 lpBalance = amm.liquidityBalance(poolId, lp);
+        IAMMLiquidityQuery.Pool memory pool = amm.getPool(poolId);
+
+        if (lpBalance == 0 || pool.totalLiquidity == 0) return 0;
+
+        uint256 proRataShare = (totalProceeds * lpBalance) / pool.totalLiquidity;
+        return proRataShare > claimed ? proRataShare - claimed : 0;
     }
 
     // ============ Internal Functions ============

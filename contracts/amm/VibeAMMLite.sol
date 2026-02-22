@@ -306,7 +306,7 @@ contract VibeAMMLite is
     function setFlashLoanProtection(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_FLASH_LOAN; else protectionFlags &= ~FLAG_FLASH_LOAN; }
     function setTWAPValidation(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_TWAP; else protectionFlags &= ~FLAG_TWAP; }
 
-    function collectFees(address token) external {
+    function collectFees(address token) external nonReentrant {
         if (msg.sender != treasury && msg.sender != owner()) revert NotAuthorized();
         uint256 a = accumulatedFees[token];
         if (a == 0) revert InsufficientOutput();

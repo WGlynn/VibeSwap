@@ -612,7 +612,7 @@ contract VibeSwapCore is
      * @param token Token to release
      * @param amount Amount to release
      */
-    function releaseFailedDeposit(bytes32 commitId, address to, address token, uint256 amount) external {
+    function releaseFailedDeposit(bytes32 commitId, address to, address token, uint256 amount) external nonReentrant {
         require(msg.sender == address(wbar), "Only wBAR");
         require(deposits[commitOwners[commitId]][token] >= amount, "Insufficient deposit");
         deposits[commitOwners[commitId]][token] -= amount;

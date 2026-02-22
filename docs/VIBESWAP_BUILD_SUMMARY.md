@@ -9,7 +9,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 
 **Philosophy:** Cooperative Capitalism — mutualized risk (insurance, treasury stabilization) + free market competition (priority auctions, arbitrage).
 
-**Codebase:** 121 Solidity contracts | 132 test files | 1100+ tests passing | 51 frontend components | 14 hooks | 5 deploy scripts
+**Codebase:** 122 Solidity contracts | 136 test files | 1200+ tests passing | 51 frontend components | 14 hooks | 5 deploy scripts
 
 ---
 
@@ -126,6 +126,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 - **AGIResistantRecovery** — Future-proof recovery mechanisms
 
 ### Incentives
+- **EmissionController** — VIBE Accumulation Pool: wall-clock halving emission (baseRate >> era), three sinks (50% Shapley pool / 35% gauge / 15% staking), permissionless drip(), percentage-based drain minimums (trustless price scaling), zero pre-mine, zero team allocation. 51 tests (38 unit + 6 fuzz + 7 invariant).
 - **ShapleyDistributor** — Game-theoretic reward distribution using Shapley values
 - **RewardLedger** — Retroactive + active Shapley rewards; dual-mode: pre-launch retroactive claims + real-time trust-chain-weighted distribution; efficiency axiom: all value fully distributed
 - **ContributionYieldTokenizer** — Pendle-inspired tokenization: Idea Tokens (instant full-value, never expire, instantly liquid) + Execution Streams (conviction-voted, stale decay, redirectable)
@@ -215,22 +216,32 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 
 | Category | Tests |
 |----------|-------|
-| Unit tests | 665+ |
-| Fuzz tests (256 runs each) | 230+ |
-| Invariant tests (128K calls each) | 150+ |
+| Unit tests | 700+ |
+| Fuzz tests (256 runs each) | 235+ |
+| Invariant tests (128K calls each) | 155+ |
 | Integration tests | 30+ |
-| Security/adversarial tests | 40+ |
+| Security/adversarial tests | 86+ |
 | Game theory tests | 20+ |
-| **Total** | **1100+** |
+| **Total** | **1200+** |
 
 All tests passing. Zero failures. Zero skipped.
 
 ---
 
+## Security Audit Status
+
+- **EmissionController**: Full security audit (41 tests) — reentrancy, game collision, access control, accounting, timing attacks, upgrade safety
+- **Core Protocol**: 22+ security attack tests (flash loan, price manipulation, circuit breakers)
+- **Money Paths**: 23+ adversarial tests (LP sandwich, double spend, Shapley claims, cross-chain bypass)
+- **Clawback/Sybil**: Compliance + identity layer security tests
+- **Protocol-wide posture document**: `docs/security/protocol-wide-security-posture.md`
+
+---
+
 ## What's Next
 
-- **Off-chain relayer service** for GitHub webhook ingestion
-- **IPFS/Arweave integration** for Merkle tree data archival
 - **Testnet deployment** (deploy scripts ready, verified)
 - **Frontend redesign** — cypherpunk aesthetic, deeper game-like abstraction
-- **18 remaining contracts** need unit+fuzz+invariant test coverage
+- **Off-chain relayer service** for GitHub webhook ingestion
+- **IPFS/Arweave integration** for Merkle tree data archival
+- **Bug bounty program** (Immunefi) for EmissionController + ShapleyDistributor

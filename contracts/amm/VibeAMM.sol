@@ -831,7 +831,7 @@ contract VibeAMM is
      *      Treasury (ProtocolFeeAdapter) forwards to FeeRouter for cooperative distribution.
      * @param token Token address to collect fees for
      */
-    function collectFees(address token) external {
+    function collectFees(address token) external nonReentrant {
         if (msg.sender != treasury && msg.sender != owner()) revert NotAuthorized();
         uint256 amount = accumulatedFees[token];
         if (amount == 0) revert NoFeesToCollect();

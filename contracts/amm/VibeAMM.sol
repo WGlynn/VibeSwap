@@ -1479,6 +1479,7 @@ contract VibeAMM is
         // Get TWAP if available
         if (poolOracles[poolId].cardinality >= 2 && poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
             uint256 twapPrice = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+            if (twapPrice == 0) return; // TWAP not yet meaningful
 
             // Calculate deviation in basis points
             uint256 deviation;

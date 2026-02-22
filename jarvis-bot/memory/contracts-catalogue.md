@@ -311,8 +311,10 @@ uint256 private constant PRECISION = 1e18;
 ### IncentiveController
 - **Path**: `contracts/incentives/IncentiveController.sol`
 - **Type**: Upgradeable (UUPS)
+- **Interfaces**: Defines `IAMMLiquidityQuery` (for pro-rata LP queries against VibeAMM)
 - **Init**: `initialize(address _owner, address _vibeAMM, address _vibeSwapCore, address _treasury)`
-- **Key functions**: `notifySwapExecuted()`, `notifyLiquidityChange()`, `claimLPRewards()`
+- **Key functions**: `notifySwapExecuted()`, `notifyLiquidityChange()`, `claimLPRewards()`, `claimAuctionProceeds(poolId)` (pro-rata by LP share), `recordExecution(poolId, trader, expectedMinOut, amountOut)` (wired to SlippageGuaranteeFund), `getPoolIncentiveStats(poolId)` (queries vault ETH balances)
+- **Session 29 fixes**: Pro-rata auction proceeds (was first-come-first-served), slippage recording wired, pool stats return real balances
 
 ### LoyaltyRewardsManager
 - **Path**: `contracts/incentives/LoyaltyRewardsManager.sol`

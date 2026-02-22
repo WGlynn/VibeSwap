@@ -50,10 +50,35 @@ forge script script/SetupMVP.s.sol --rpc-url $RPC_URL --broadcast
 - Add initial liquidity: `SetupMVP.s.sol:AddInitialLiquidity`
 - Set token prices: `SetupMVP.s.sol:UpdateTokenPrices`
 
-### Phase 3: Tokenomics Layer
+### Phase 3: Incentive Vaults
 
 ```bash
 # Set Phase 1 addresses
+export VIBE_AMM=0x...       # From Phase 1 output
+export VIBESWAP_CORE=0x...  # From Phase 1 output
+export DAO_TREASURY=0x...   # From Phase 1 output
+
+forge script script/DeployIncentives.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** VolatilityOracle, IncentiveController, VolatilityInsurancePool, ILProtectionVault, SlippageGuaranteeFund, LoyaltyRewardsManager, MerkleAirdrop
+
+**Auto-configured:**
+- IncentiveController.setVolatilityOracle(VolatilityOracle)
+- IncentiveController.setVolatilityInsurancePool(VolatilityInsurancePool)
+- IncentiveController.setILProtectionVault(ILProtectionVault)
+- IncentiveController.setSlippageGuaranteeFund(SlippageGuaranteeFund)
+- IncentiveController.setLoyaltyRewardsManager(LoyaltyRewardsManager)
+- IncentiveController authorizes VibeAMM + VibeSwapCore as callers
+- VibeAMM.setIncentiveController(IncentiveController) -- enables LP lifecycle hooks + volatility fee routing
+
+**Post-deploy:**
+- Fund VolatilityInsurancePool with initial reserves
+- Fund SlippageGuaranteeFund with initial reserves
+
+### Phase 4: Tokenomics Layer
+
+```bash
 export VIBESWAP_CORE=0x...  # From Phase 1 output
 
 forge script script/DeployTokenomics.s.sol --rpc-url $RPC_URL --broadcast --verify
@@ -70,10 +95,11 @@ forge script script/DeployTokenomics.s.sol --rpc-url $RPC_URL --broadcast --veri
 
 **Post-deploy:**
 - Update BuybackEngine: `BuybackEngine.setProtocolToken(VIBE_TOKEN)`
+- Wire IncentiveController: `IncentiveController.setShapleyDistributor(SHAPLEY_DISTRIBUTOR)`
 - Create gauges: `DeployTokenomics.s.sol:SetupGauges`
 - Start emissions: `DeployTokenomics.s.sol:StartEmissions`
 
-### Phase 4: Identity Layer
+### Phase 5: Identity Layer
 
 ```bash
 export VIBE_TOKEN=0x...  # From Phase 3 output
@@ -83,7 +109,7 @@ forge script script/DeployIdentity.s.sol --rpc-url $RPC_URL --broadcast --verify
 
 **Deploys:** SoulboundIdentity, AgentRegistry, ContributionDAG, VibeCode, RewardLedger, ContributionAttestor
 
-### Phase 5: Genesis Contributions
+### Phase 6: Genesis Contributions
 
 ```bash
 export CONTRIBUTION_DAG=0x...    # From Phase 4
@@ -97,7 +123,7 @@ forge script script/GenesisContributions.s.sol --rpc-url $RPC_URL --broadcast
 
 **Records:** Retroactive contributions for founders (NOT finalized — requires 3-factor validation)
 
-### Phase 6: Cross-Chain Setup
+### Phase 7: Cross-Chain Setup
 
 ```bash
 forge script script/ConfigurePeers.s.sol --rpc-url $RPC_URL --broadcast
@@ -105,7 +131,7 @@ forge script script/ConfigurePeers.s.sol --rpc-url $RPC_URL --broadcast
 
 **Configures:** LayerZero V2 peer connections to other deployed chains
 
-### Phase 7: Ownership Transfer
+### Phase 8: Ownership Transfer
 
 ```bash
 export MULTISIG_ADDRESS=0x...
@@ -113,13 +139,16 @@ export MULTISIG_ADDRESS=0x...
 # Transfer core contracts
 forge script script/DeployProduction.s.sol:TransferOwnership --rpc-url $RPC_URL --broadcast
 
+# Transfer incentive contracts
+forge script script/DeployIncentives.s.sol:TransferIncentivesOwnership --rpc-url $RPC_URL --broadcast
+
 # Transfer tokenomics contracts
 forge script script/DeployTokenomics.s.sol:TransferTokenomicsOwnership --rpc-url $RPC_URL --broadcast
 ```
 
-**Transfers:** All contract ownership to multisig (15+ contracts)
+**Transfers:** All contract ownership to multisig (20+ contracts)
 
-### Phase 8: Start Operations
+### Phase 9: Start Operations
 
 1. **Oracle**: `python -m oracle.main` (off-chain Kalman filter)
 2. **Keeper bot**: Schedule `EmissionController.drip()` calls (every ~10 min)
@@ -143,6 +172,10 @@ After full deployment, verify:
 - [ ] Oracle signer authorized on TruePriceOracle + StablecoinFlowRegistry
 - [ ] Pools created with liquidity protection
 - [ ] Token prices set (for liquidity protection USD calculations)
+- [ ] IncentiveController vaults wired (VolatilityInsurancePool, ILProtectionVault, SlippageGuaranteeFund, LoyaltyRewardsManager)
+- [ ] IncentiveController authorized callers = [VibeAMM, VibeSwapCore]
+- [ ] IncentiveController.shapleyDistributor set (after DeployTokenomics)
+- [ ] VolatilityInsurancePool + SlippageGuaranteeFund funded with initial reserves
 - [ ] Fee pipeline: AMM → FeeAdapter → FeeRouter → (Treasury 40%, Insurance 20%, RevShare 30%, Buyback 10%)
 - [ ] EmissionController.drip() succeeds
 - [ ] Test swap completes full commit → reveal → settle cycle

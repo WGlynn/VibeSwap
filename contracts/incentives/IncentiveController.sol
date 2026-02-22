@@ -293,7 +293,7 @@ contract IncentiveController is
         uint256 amountIn,
         uint256 amountOut,
         uint256 expectedMinOut
-    ) external override onlyAMM returns (bytes32 claimId) {
+    ) external override onlyAuthorized returns (bytes32 claimId) {
         emit ExecutionRecorded(poolId, trader, amountIn, amountOut);
 
         // Record with slippage guarantee fund if shortfall

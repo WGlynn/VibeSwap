@@ -2,7 +2,7 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-02-21 (Desktop - Claude Code Opus 4.6, Session 40 — GO-LIVE)
+**Last Updated**: 2026-02-21 (Desktop - Claude Code Opus 4.6, Session 28 continued — Security Hardening)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
@@ -21,7 +21,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**)
 - **PsiNet × VibeSwap merge: COMPLETE** — ERC-8004 AI agent identities, CRPC verification, context graph anchoring
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
-- Protocol security hardening COMPLETE (7 audit passes, 35+ findings fixed)
+- Protocol security hardening COMPLETE (9 audit passes, 48+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
 - **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
 - **Frontend contract integration: COMPLETE** — useSwap, usePool, useBridge hooks + useBatchState live mode + **CKB chain detection in all core hooks**
@@ -38,7 +38,19 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 20, 2026 — Session 39)
+## Recently Completed (Feb 21, 2026 — Session 28 continued)
+90. **Protocol-Wide Security Hardening — 4-Agent Parallel Audit**
+    - **15 new reentrancy hardening tests** (`test/security/ReentrancyHardeningTests.t.sol`): Malicious ERC20 tokens with transfer-callback reentrancy, all 3 hardened functions verified, access control + edge cases
+    - **VibeLPNFT USDT fix**: 9 `approve()` → `forceApprove()` calls (HIGH: USDT pools would permanently revert)
+    - **3 CRITICAL zero-address guards**: VibeSwapCore.setGuardian, VibeTimelock.setGuardian, VibeAMM.setPriceOracle — all would disable emergency mechanisms if set to address(0)
+    - **2 HIGH access control fixes**: TreasuryStabilizer.executeDeployment (added onlyOwner), DAOTreasury.receiveAuctionProceeds (added authorizedFeeSenders check)
+    - **2 HIGH zero-address guards**: EmissionController.setSingleStaking (would DoS staking rewards), DecentralizedTribunal.setSoulboundIdentity documented
+    - **1 MEDIUM div-by-zero fix**: LiquidityProtection.getRecommendedFee() when liquidityUsd == 0
+    - **321 regression tests passing, 0 failures** (19 test suites including invariant tests with 128K calls each)
+    - **Documented remaining MEDIUM findings**: tribunal evidence/appeal party checks, TWAPOracle timeDelta edge case, batch swap fee deduction reserve boundary
+    - Commits: `30c20e1` — pushed to both remotes
+
+## Previously Completed (Feb 20, 2026 — Session 39)
 89. **3 Cross-Module Integration Tests — All 5 Identified Gaps Filled**
     - **RegulatoryPipeline.t.sol (13 tests)**: AutomatedRegulator → FederatedConsensus → ClawbackRegistry. Full pipeline: wash trading detection → auto case filing → dual-authority voting → grace period → clawback execution → wallet frozen. Sybil cluster detection, sanctions (CRITICAL), market manipulation, taint propagation, case dismissal, activity window reset, layering detection.
     - **ThreeBranchGovernancePipeline.t.sol (10 tests)**: ContributionAttestor → ContributionDAG → DecentralizedTribunal → QuadraticVoting. Full 3-branch lifecycle: executive attestation via trust scores → judicial tribunal trial (7 jurors, evidence, deliberation, verdict) → legislative governance override via quadratic voting. All three branches tested independently + combined lifecycle.

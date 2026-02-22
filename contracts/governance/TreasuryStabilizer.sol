@@ -217,7 +217,7 @@ contract TreasuryStabilizer is
     function executeDeployment(
         address token,
         bytes32 poolId
-    ) external override nonReentrant whenNotPaused returns (uint256 deployed) {
+    ) external override onlyOwner nonReentrant whenNotPaused returns (uint256 deployed) {
         if (emergencyMode[token]) revert EmergencyModeActive();
 
         StabilizerConfig storage config = tokenConfigs[token];

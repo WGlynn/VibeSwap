@@ -384,6 +384,7 @@ contract VibeTimelock is Ownable, ReentrancyGuard, IVibeTimelock {
     }
 
     function setGuardian(address newGuardian) external onlyOwner {
+        if (newGuardian == address(0)) revert ZeroAddress();
         address old = _guardian;
         _guardian = newGuardian;
         emit GuardianUpdated(old, newGuardian);

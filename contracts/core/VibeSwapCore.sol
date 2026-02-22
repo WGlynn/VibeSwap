@@ -833,6 +833,7 @@ contract VibeSwapCore is
      * @notice Set guardian address
      */
     function setGuardian(address newGuardian) external onlyOwner {
+        require(newGuardian != address(0), "Invalid guardian");
         emit GuardianUpdated(guardian, newGuardian);
         guardian = newGuardian;
     }

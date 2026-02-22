@@ -94,8 +94,8 @@ contract VibeLPNFT is ERC721, Ownable, ReentrancyGuard, IVibeLPNFT {
         IERC20(pool.token1).safeTransferFrom(msg.sender, address(this), params.amount1Desired);
 
         // Approve AMM to pull tokens
-        IERC20(pool.token0).approve(address(vibeAMM), params.amount0Desired);
-        IERC20(pool.token1).approve(address(vibeAMM), params.amount1Desired);
+        IERC20(pool.token0).forceApprove(address(vibeAMM), params.amount0Desired);
+        IERC20(pool.token1).forceApprove(address(vibeAMM), params.amount1Desired);
 
         // Add liquidity — AMM pulls actual amounts, mints VibeLP to us
         (amount0, amount1, liquidity) = vibeAMM.addLiquidity(
@@ -113,8 +113,8 @@ contract VibeLPNFT is ERC721, Ownable, ReentrancyGuard, IVibeLPNFT {
         if (refund1 > 0) IERC20(pool.token1).safeTransfer(msg.sender, refund1);
 
         // Reset approvals (security: no dangling approvals)
-        IERC20(pool.token0).approve(address(vibeAMM), 0);
-        IERC20(pool.token1).approve(address(vibeAMM), 0);
+        IERC20(pool.token0).forceApprove(address(vibeAMM), 0);
+        IERC20(pool.token1).forceApprove(address(vibeAMM), 0);
 
         // Get entry price: TWAP preferred, fallback to spot
         uint256 entryPrice = vibeAMM.getTWAP(params.poolId, 600);
@@ -165,8 +165,8 @@ contract VibeLPNFT is ERC721, Ownable, ReentrancyGuard, IVibeLPNFT {
         IERC20(pool.token1).safeTransferFrom(msg.sender, address(this), params.amount1Desired);
 
         // Approve AMM
-        IERC20(pool.token0).approve(address(vibeAMM), params.amount0Desired);
-        IERC20(pool.token1).approve(address(vibeAMM), params.amount1Desired);
+        IERC20(pool.token0).forceApprove(address(vibeAMM), params.amount0Desired);
+        IERC20(pool.token1).forceApprove(address(vibeAMM), params.amount1Desired);
 
         // Add liquidity
         (amount0, amount1, liquidity) = vibeAMM.addLiquidity(
@@ -184,8 +184,8 @@ contract VibeLPNFT is ERC721, Ownable, ReentrancyGuard, IVibeLPNFT {
         if (refund1 > 0) IERC20(pool.token1).safeTransfer(msg.sender, refund1);
 
         // Reset approvals
-        IERC20(pool.token0).approve(address(vibeAMM), 0);
-        IERC20(pool.token1).approve(address(vibeAMM), 0);
+        IERC20(pool.token0).forceApprove(address(vibeAMM), 0);
+        IERC20(pool.token1).forceApprove(address(vibeAMM), 0);
 
         // Weight-average entry price
         uint256 currentPrice = vibeAMM.getTWAP(position.poolId, 600);
@@ -226,7 +226,7 @@ contract VibeLPNFT is ERC721, Ownable, ReentrancyGuard, IVibeLPNFT {
 
         // Approve AMM to burn our VibeLP tokens
         address lpToken = vibeAMM.getLPToken(position.poolId);
-        IERC20(lpToken).approve(address(vibeAMM), params.liquidityAmount);
+        IERC20(lpToken).forceApprove(address(vibeAMM), params.liquidityAmount);
 
         // Remove liquidity — AMM burns VibeLP from us, sends tokens to us
         (amount0, amount1) = vibeAMM.removeLiquidity(

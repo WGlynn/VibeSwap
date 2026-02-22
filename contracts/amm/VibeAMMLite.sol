@@ -114,8 +114,10 @@ contract VibeAMMLite is
             if (p.reserve0 > 0 && poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
                 uint256 spot = (p.reserve1 * 1e18) / p.reserve0;
                 uint256 twap = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
-                uint256 diff = spot > twap ? spot - twap : twap - spot;
-                if (diff * 10000 / twap > MAX_PRICE_DEVIATION_BPS) revert PriceDeviationTooHigh();
+                if (twap > 0) {
+                    uint256 diff = spot > twap ? spot - twap : twap - spot;
+                    if (diff * 10000 / twap > MAX_PRICE_DEVIATION_BPS) revert PriceDeviationTooHigh();
+                }
             }
         }
     }

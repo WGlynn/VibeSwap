@@ -412,6 +412,9 @@ contract ShapleyDistributor is
             weightedContributions[gameId][participants[i].participant] = weights[i];
         }
 
+        // Guard: all participants have zero contribution → cannot distribute
+        if (totalWeight == 0) revert GameNotFound(); // No meaningful contributions to distribute
+
         // Store total weight for pairwise verification tolerance
         totalWeightedContrib[gameId] = totalWeight;
 

@@ -145,7 +145,7 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 | Fuzz tests (256 runs) | 45+ | 235+ |
 | Invariant tests (128K calls) | 41+ | 155+ |
 | Integration tests | 3 | 30+ |
-| **Security tests** | **5** | **86+** |
+| **Security tests** | **6** | **152+** |
 | Game theory tests | 6 | 20+ |
 | **Total** | **180+** | **1200+** |
 
@@ -156,6 +156,7 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 3. `test/security/MoneyPathAdversarial.t.sol` — 23+ tests (LP sandwich, inflation, rounding theft, double spend, Shapley claims, TWAP, cross-chain bypass)
 4. `test/security/ClawbackResistance.t.sol` — Regulatory compliance security
 5. `test/security/SybilResistanceIntegration.t.sol` — Identity layer security
+6. `test/security/ReentrancyHardeningTests.t.sol` — 15 tests (reentrancy attacks on 3 hardened functions, malicious ERC20 callbacks, access control, edge cases)
 
 ---
 
@@ -180,6 +181,45 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 | VibeSwapCore | 14,946 bytes | 62% (safe) |
 | VibeAMMLite | 19,950 bytes | 83% (safe) |
 | VibeAMM | 43,265 bytes | N/A (not for Base) |
+
+### Session 28 Continuation — 4-Agent Parallel Audit (10 fixes across 8 contracts)
+
+**Agent 1: USDT Approve Compatibility**
+
+6. **VibeLPNFT.sol** — 9 `approve()` → `forceApprove()` calls (HIGH: USDT pools would permanently revert on `increaseLiquidity` if prior allowance nonzero)
+
+**Agent 2: Access Control Gaps**
+
+7. **TreasuryStabilizer.executeDeployment()** — Added `onlyOwner` (HIGH: anyone could trigger treasury capital deployment into AMM pools)
+8. **DAOTreasury.receiveAuctionProceeds()** — Added `authorizedFeeSenders` check (HIGH: anyone could inflate `totalAuctionProceeds` accounting)
+
+**Agent 3: Integer Overflow / Division-by-Zero**
+
+9. **LiquidityProtection.getRecommendedFee()** — Added `if (liquidityUsd == 0) return MAX_FEE_BPS` (MEDIUM: div-by-zero panic)
+
+**Agent 4: Zero-Address Validation**
+
+10. **VibeSwapCore.setGuardian()** — Added `require(newGuardian != address(0))` (CRITICAL: would disable emergency pause)
+11. **VibeTimelock.setGuardian()** — Added `if (newGuardian == address(0)) revert ZeroAddress()` (CRITICAL: would disable emergency governance fast-track)
+12. **VibeAMM.setPriceOracle()** — Added `require(oracle != address(0))` (CRITICAL: would disable automated price feeds)
+13. **EmissionController.setSingleStaking()** — Added `if (_staking == address(0)) revert ZeroAddress()` (HIGH: would DoS staking reward distribution)
+
+### Reentrancy Hardening Tests (NEW — 15 tests)
+
+- `test/security/ReentrancyHardeningTests.t.sol` — Malicious ERC20 tokens that attempt reentrancy during transfer callbacks
+- Covers all 3 reentrancy-hardened functions + access control + edge cases
+- Confirms `nonReentrant` blocks reentry in all cases
+
+### Remaining Documented Findings (Lower Priority)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| DecentralizedTribunal.submitEvidence — no party check | MEDIUM | Documented, not exploitable for fund loss |
+| DecentralizedTribunal.fileAppeal — no party check | MEDIUM | Documented, not exploitable for fund loss |
+| DisputeResolver.defaultJudgment — no claimant check | MEDIUM | Documented, time-gated |
+| TWAPOracle timeDelta==0 div-by-zero | MEDIUM | Fail-safe revert, no state corruption |
+| Batch swap reserve underflow from fee deduction | MEDIUM | Fail-safe revert, no fund loss |
+| Y2106 uint32 timestamp overflow | LOW | Not urgent (80 years) |
 
 ---
 

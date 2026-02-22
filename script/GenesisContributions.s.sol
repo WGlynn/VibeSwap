@@ -36,15 +36,15 @@ import "../contracts/identity/interfaces/IRewardLedger.sol";
  */
 contract GenesisContributions is Script {
 
-    // ============ Addresses (set before mainnet deploy) ============
-
-    // Founders — addresses TBD at deploy time
-    address constant FARADAY1 = address(0x1); // Will — placeholder
-    address constant JARVIS = address(0x2);   // Claude/Jarvis — placeholder
-    address constant FREEDOM_WARRIOR_13 = address(0x3); // placeholder
+    // ============ Addresses (from environment variables) ============
 
     function run() external {
-        // These will be set via environment variables at deploy time
+        // Founder addresses — set via environment at deploy time
+        address FARADAY1 = vm.envAddress("FARADAY1_ADDRESS");           // Will
+        address JARVIS = vm.envAddress("JARVIS_ADDRESS");               // Claude/Jarvis
+        address FREEDOM_WARRIOR_13 = vm.envAddress("FREEDOM_WARRIOR_ADDRESS"); // FreedomWarrior13
+
+        // Contract addresses
         address dagAddr = vm.envAddress("CONTRIBUTION_DAG");
         address ledgerAddr = vm.envAddress("REWARD_LEDGER");
 

@@ -91,6 +91,28 @@ contract MockICSlippageGuaranteeFund {
     }
 }
 
+contract MockICAMM {
+    mapping(bytes32 => mapping(address => uint256)) public liquidityBalance;
+    mapping(bytes32 => uint256) public poolTotalLiquidity;
+
+    function setLiquidity(bytes32 poolId, address user, uint256 balance, uint256 total) external {
+        liquidityBalance[poolId][user] = balance;
+        poolTotalLiquidity[poolId] = total;
+    }
+
+    function getPool(bytes32 poolId) external view returns (IAMMLiquidityQuery.Pool memory) {
+        return IAMMLiquidityQuery.Pool({
+            token0: address(0),
+            token1: address(0),
+            reserve0: 0,
+            reserve1: 0,
+            totalLiquidity: poolTotalLiquidity[poolId],
+            feeRate: 30,
+            initialized: true
+        });
+    }
+}
+
 contract MockICShapleyDistributor {
     bool public gameCreated;
     bool public valuesComputed;
@@ -129,6 +151,7 @@ contract IncentiveControllerTest is Test {
     MockICLoyaltyRewardsManager public loyaltyManager;
     MockICSlippageGuaranteeFund public slippageFund;
     MockICShapleyDistributor public shapley;
+    MockICAMM public mockAMM;
     address public owner;
     address public ammAddr;
     address public coreAddr;
@@ -136,7 +159,8 @@ contract IncentiveControllerTest is Test {
 
     function setUp() public {
         owner = address(this);
-        ammAddr = makeAddr("vibeAMM");
+        mockAMM = new MockICAMM();
+        ammAddr = address(mockAMM);
         coreAddr = makeAddr("vibeSwapCore");
         treasuryAddr = makeAddr("treasury");
 
@@ -380,16 +404,63 @@ contract IncentiveControllerTest is Test {
         vm.prank(coreAddr);
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
 
+        // Set up LP with 100% of pool liquidity (pro-rata = full share)
         address lp = makeAddr("lp");
+        mockAMM.setLiquidity(poolId, lp, 1000e18, 1000e18);
+
         vm.prank(lp);
         uint256 amount = controller.claimAuctionProceeds(poolId);
         assertEq(amount, 10 ether);
+    }
+
+    function test_claimAuctionProceeds_proRata() public {
+        bytes32 poolId = keccak256("pool1");
+        bytes32[] memory poolIds = new bytes32[](1);
+        poolIds[0] = poolId;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 10 ether;
+
+        vm.deal(coreAddr, 10 ether);
+        vm.prank(coreAddr);
+        controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
+
+        // LP1 has 30%, LP2 has 70%
+        address lp1 = makeAddr("lp1");
+        address lp2 = makeAddr("lp2");
+        mockAMM.setLiquidity(poolId, lp1, 300e18, 1000e18);
+        mockAMM.setLiquidity(poolId, lp2, 700e18, 1000e18);
+
+        vm.prank(lp1);
+        uint256 amount1 = controller.claimAuctionProceeds(poolId);
+        assertEq(amount1, 3 ether); // 30% of 10 ETH
+
+        vm.prank(lp2);
+        uint256 amount2 = controller.claimAuctionProceeds(poolId);
+        assertEq(amount2, 7 ether); // 70% of 10 ETH
     }
 
     function test_claimAuctionProceeds_nothingToClaim() public {
         bytes32 poolId = keccak256("pool1");
         address lp = makeAddr("lp");
 
+        vm.prank(lp);
+        vm.expectRevert(IncentiveController.NothingToClaim.selector);
+        controller.claimAuctionProceeds(poolId);
+    }
+
+    function test_claimAuctionProceeds_noLiquidity() public {
+        bytes32 poolId = keccak256("pool1");
+        bytes32[] memory poolIds = new bytes32[](1);
+        poolIds[0] = poolId;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 10 ether;
+
+        vm.deal(coreAddr, 10 ether);
+        vm.prank(coreAddr);
+        controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
+
+        // LP has no liquidity → should revert
+        address lp = makeAddr("lp");
         vm.prank(lp);
         vm.expectRevert(IncentiveController.NothingToClaim.selector);
         controller.claimAuctionProceeds(poolId);
@@ -521,8 +592,12 @@ contract IncentiveControllerTest is Test {
         vm.prank(coreAddr);
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
 
-        uint256 pending = controller.getPendingAuctionProceeds(poolId, makeAddr("lp"));
-        assertEq(pending, 10 ether);
+        // LP has 50% of pool → should get 5 ether
+        address lp = makeAddr("lp");
+        mockAMM.setLiquidity(poolId, lp, 500e18, 1000e18);
+
+        uint256 pending = controller.getPendingAuctionProceeds(poolId, lp);
+        assertEq(pending, 5 ether);
     }
 
     function test_getPoolIncentiveStats() public {
@@ -536,8 +611,14 @@ contract IncentiveControllerTest is Test {
         vm.prank(coreAddr);
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
 
+        // Fund vaults with ETH to verify stats query
+        vm.deal(address(volPool), 5 ether);
+        vm.deal(address(ilVault), 3 ether);
+
         IIncentiveController.PoolIncentiveStats memory stats = controller.getPoolIncentiveStats(poolId);
         assertEq(stats.totalAuctionProceedsDistributed, 10 ether);
+        assertEq(stats.volatilityReserve, 5 ether);
+        assertEq(stats.ilReserve, 3 ether);
     }
 
     // ============ Receive ETH ============

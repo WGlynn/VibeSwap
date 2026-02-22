@@ -16,6 +16,7 @@ import "./CircuitBreaker.sol";
 import "../messaging/CrossChainRouter.sol";
 import "../libraries/SecurityLib.sol";
 import "../compliance/ClawbackRegistry.sol";
+import "../incentives/interfaces/IIncentiveController.sol";
 
 /**
  * @title VibeSwapCore
@@ -113,6 +114,9 @@ contract VibeSwapCore is
     /// @notice Mapping of batchId => trader => commitId (for wBAR output routing)
     mapping(uint64 => mapping(address => bytes32)) public batchTraderCommitId;
 
+    /// @notice IncentiveController for auction proceeds distribution and execution tracking
+    IIncentiveController public incentiveController;
+
     // ============ Events ============
 
     event SwapCommitted(
@@ -154,6 +158,7 @@ contract VibeSwapCore is
     event GuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
     event ContractsUpdated(address auction, address amm, address treasury, address router);
     event WBARUpdated(address indexed wbar);
+    event IncentiveControllerUpdated(address indexed controller);
     event MaxSwapPerHourUpdated(uint256 amount);
     event RequireEOAUpdated(bool required);
     event CommitCooldownUpdated(uint256 cooldown);
@@ -613,6 +618,15 @@ contract VibeSwapCore is
     }
 
     /**
+     * @notice Set the IncentiveController for auction proceeds and execution tracking
+     * @param _controller IncentiveController proxy address (or address(0) to disable)
+     */
+    function setIncentiveController(address _controller) external onlyOwner {
+        incentiveController = IIncentiveController(_controller);
+        emit IncentiveControllerUpdated(_controller);
+    }
+
+    /**
      * @notice Release failed deposit to wBAR holder
      * @dev Only callable by wBAR contract for failed swap reclaims
      * @param commitId The commit that failed
@@ -706,6 +720,17 @@ contract VibeSwapCore is
                 // Settle wBAR position with actual output amount
                 if (address(wbar) != address(0) && traderCommitId != bytes32(0)) {
                     wbar.settle(traderCommitId, result.totalTokenOutSwapped);
+                }
+
+                // Record execution for slippage tracking (IncentiveController → SlippageGuaranteeFund)
+                if (address(incentiveController) != address(0)) {
+                    try incentiveController.recordExecution(
+                        poolId,
+                        order.trader,
+                        order.amountIn,
+                        result.totalTokenOutSwapped,
+                        order.minAmountOut
+                    ) {} catch {}
                 }
 
                 // Record transaction for clawback taint tracking

@@ -10,6 +10,7 @@ import "../contracts/incentives/LoyaltyRewardsManager.sol";
 import "../contracts/incentives/MerkleAirdrop.sol";
 import "../contracts/oracles/VolatilityOracle.sol";
 import "../contracts/amm/VibeAMM.sol";
+import "../contracts/core/VibeSwapCore.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -203,11 +204,14 @@ contract DeployIncentives is Script {
             console.log("  SKIP ShapleyDistributor (not provided - wire after DeployTokenomics)");
         }
 
-        // Wire IncentiveController into VibeAMM for LP lifecycle hooks
+        // Wire IncentiveController into VibeAMM and VibeSwapCore
         console.log("");
-        console.log("=== Wiring VibeAMM to IncentiveController ===");
+        console.log("=== Wiring AMM + Core to IncentiveController ===");
         VibeAMM(vibeAMM).setIncentiveController(incentiveController);
         console.log("  VibeAMM.setIncentiveController set");
+
+        VibeSwapCore(payable(vibeSwapCore)).setIncentiveController(incentiveController);
+        console.log("  VibeSwapCore.setIncentiveController set");
 
         vm.stopBroadcast();
 

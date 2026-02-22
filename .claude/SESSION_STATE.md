@@ -21,7 +21,7 @@ This file maintains continuity between Claude Code sessions across devices.
 - Identity Layer: ALL COMPLETE (ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**)
 - **PsiNet × VibeSwap merge: COMPLETE** — ERC-8004 AI agent identities, CRPC verification, context graph anchoring
 - Merkle Compression: IncrementalMerkleTree library + vouch tree in ContributionDAG
-- Protocol security hardening COMPLETE (9 audit passes, 48+ findings fixed)
+- Protocol security hardening COMPLETE (10 audit passes, 65+ findings fixed)
 - **Zero-test contract coverage: COMPLETE** — ALL contracts have unit+fuzz+invariant tests
 - **Frontend go-live hardening: COMPLETE** — build passes, 10 ABIs, dynamic contract hook
 - **Frontend contract integration: COMPLETE** — useSwap, usePool, useBridge hooks + useBatchState live mode + **CKB chain detection in all core hooks**
@@ -48,7 +48,17 @@ This file maintains continuity between Claude Code sessions across devices.
     - **1 MEDIUM div-by-zero fix**: LiquidityProtection.getRecommendedFee() when liquidityUsd == 0
     - **321 regression tests passing, 0 failures** (19 test suites including invariant tests with 128K calls each)
     - **Documented remaining MEDIUM findings**: tribunal evidence/appeal party checks, TWAPOracle timeDelta edge case, batch swap fee deduction reserve boundary
-    - Commits: `30c20e1` — pushed to both remotes
+    - Commits: `30c20e1`, `4f0af1a`, `ca94e4a` — pushed to both remotes
+
+91. **Security Hardening Continuation — ACL + Div-by-Zero + Events + Silent ETH Loss**
+    - **DecentralizedTribunal.submitEvidence**: restricted to summoned jurors or owner (MEDIUM: evidence pollution)
+    - **DecentralizedTribunal.fileAppeal**: added juror/owner check + stake requirement (MEDIUM: free appeal griefing)
+    - **TWAPOracle.consult**: added `require(timeDelta > 0)` and `require(twapTimeDelta > 0)` (MEDIUM: div-by-zero)
+    - **CrossChainRouter._lzSend**: added `require(success)` on LayerZero endpoint call (HIGH: silent ETH loss)
+    - **42 missing event emissions added** across 7 contracts: VibeSwapCore (6), VibeAMM (18), ShapleyDistributor (7), DAOTreasury (5), CommitRevealAuction (4), CircuitBreaker (1)
+    - **Reclassified** DisputeResolver.defaultJudgment and advanceToArbitration as intentionally permissionless (keeper pattern)
+    - **320+ regression tests passing, 0 failures**
+    - Commits: `3cd1f59`, `e7445f7` — pushed to both remotes
 
 ## Previously Completed (Feb 20, 2026 — Session 39)
 89. **3 Cross-Module Integration Tests — All 5 Identified Gaps Filled**

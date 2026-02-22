@@ -224,6 +224,16 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 
 16. **TWAPOracle.consult()** — Added `require(timeDelta > 0)` and `require(twapTimeDelta > 0)` guards (MEDIUM: div-by-zero panic if two observations share timestamp or current==target)
 
+### Session 28 Continuation — Event Emissions + CrossChainRouter Fix (42 changes across 7 contracts)
+
+17. **CrossChainRouter._lzSend()** — Added `require(success, "LayerZero send failed")` (HIGH: was silently losing ETH on failed LayerZero endpoint calls)
+18. **VibeSwapCore** — 6 events added: ContractsUpdated, WBARUpdated, MaxSwapPerHourUpdated, RequireEOAUpdated, CommitCooldownUpdated, ClawbackRegistryUpdated
+19. **VibeAMM** — 18 events added: executor, treasury, fee share, protection flags (liquidity/flash loan/TWAP/fibonacci), oracle, price, priority registry, cardinality, trade size, tracked balance, PoW discount
+20. **ShapleyDistributor** — 7 events added: AuthorizedCreatorUpdated, ParticipantLimitsUpdated, QualityWeightsToggled, PriorityRegistryUpdated, HalvingToggled, GamesPerEraUpdated, GenesisTimestampReset
+21. **DAOTreasury** — 5 events added: AuthorizedFeeSenderUpdated, TimelockDurationUpdated, VibeAMMUpdated, BackstopOperatorUpdated, BackstopDeactivated
+22. **CommitRevealAuction** — 4 events added: AuthorizedSettlerUpdated, TreasuryUpdated, PoWBaseValueUpdated, ReputationOracleUpdated
+23. **CircuitBreaker** — 1 event added: BreakerDisabled (was asymmetric with existing BreakerConfigured)
+
 ### Remaining Documented Findings (Lower Priority)
 
 | Finding | Severity | Status |

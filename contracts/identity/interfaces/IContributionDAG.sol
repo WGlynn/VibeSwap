@@ -66,6 +66,14 @@ interface IContributionDAG {
     /// @return isHandshake True if this creates a bidirectional handshake
     function addVouch(address to, bytes32 messageHash) external returns (bool isHandshake);
 
+    /// @notice Add a vouch on behalf of a verified human (bridge pattern)
+    /// @dev Only callable by authorized bridges (e.g., AgentRegistry)
+    /// @param from Address doing the vouching (must be verified by bridge)
+    /// @param to Address being vouched for
+    /// @param messageHash IPFS hash of endorsement message
+    /// @return isHandshake True if this creates a bidirectional handshake
+    function addVouchOnBehalf(address from, address to, bytes32 messageHash) external returns (bool isHandshake);
+
     /// @notice Revoke a previously given vouch
     /// @param to Address whose vouch is being revoked
     function revokeVouch(address to) external;

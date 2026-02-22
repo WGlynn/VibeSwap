@@ -79,6 +79,11 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     IncrementalMerkleTree.Tree private _vouchTree;
     bool private _vouchTreeInitialized;
 
+    // Authorized bridge contracts that can vouch on behalf of verified humans
+    mapping(address => bool) public authorizedBridges;
+
+    event AuthorizedBridgeUpdated(address indexed bridge, bool authorized);
+
     // ============ Constructor ============
 
     constructor(address _soulbound) Ownable(msg.sender) {
@@ -166,6 +171,56 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
                 emit HandshakeConfirmed(msg.sender, to);
             }
         }
+    }
+
+    /// @notice Add a vouch on behalf of a verified human (bridge pattern)
+    /// @dev Only authorized bridges (e.g., AgentRegistry) can call this.
+    ///      The bridge is responsible for verifying that `from` has a SoulboundIdentity.
+    function addVouchOnBehalf(
+        address from,
+        address to,
+        bytes32 messageHash
+    ) external returns (bool isHandshake_) {
+        require(authorizedBridges[msg.sender], "Not authorized bridge");
+
+        if (from == to) revert CannotVouchSelf();
+        if (_vouchesFrom[from].length >= MAX_VOUCH_PER_USER) revert MaxVouchesReached();
+
+        Vouch storage existing = _vouches[from][to];
+        if (existing.timestamp != 0) {
+            uint256 elapsed = block.timestamp - existing.timestamp;
+            if (elapsed < HANDSHAKE_COOLDOWN) revert VouchCooldown(HANDSHAKE_COOLDOWN - elapsed);
+            existing.timestamp = block.timestamp;
+            existing.messageHash = messageHash;
+            emit VouchAdded(from, to, messageHash);
+            isHandshake_ = _vouches[to][from].timestamp != 0;
+            return isHandshake_;
+        }
+
+        _vouches[from][to] = Vouch({ timestamp: block.timestamp, messageHash: messageHash });
+        _vouchesFrom[from].push(to);
+        _vouchedBy[to].push(from);
+
+        if (_vouchTreeInitialized) {
+            bytes32 vouchLeaf = keccak256(abi.encodePacked(from, to, block.timestamp, messageHash));
+            _vouchTree.insert(vouchLeaf);
+        }
+
+        emit VouchAdded(from, to, messageHash);
+
+        isHandshake_ = _vouches[to][from].timestamp != 0;
+        if (isHandshake_) {
+            if (!_handshakeExists(from, to)) {
+                _handshakes.push(Handshake({ user1: from, user2: to, timestamp: block.timestamp }));
+                emit HandshakeConfirmed(from, to);
+            }
+        }
+    }
+
+    /// @notice Set authorized bridge contract (e.g., AgentRegistry)
+    function setAuthorizedBridge(address bridge, bool authorized) external onlyOwner {
+        authorizedBridges[bridge] = authorized;
+        emit AuthorizedBridgeUpdated(bridge, authorized);
     }
 
     /// @inheritdoc IContributionDAG

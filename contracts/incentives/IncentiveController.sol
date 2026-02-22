@@ -442,39 +442,48 @@ contract IncentiveController is
     function setPoolConfig(bytes32 poolId, IncentiveConfig calldata config) external override onlyOwner {
         poolConfigs[poolId] = config;
         hasPoolConfig[poolId] = true;
+        emit PoolConfigUpdated(poolId);
     }
 
     function setDefaultConfig(IncentiveConfig calldata config) external override onlyOwner {
         defaultConfig = config;
+        emit DefaultConfigUpdated();
     }
 
     function setVolatilityOracle(address _oracle) external onlyOwner {
         if (_oracle == address(0)) revert ZeroAddress();
         volatilityOracle = IVolatilityOracle(_oracle);
+        emit VolatilityOracleUpdated(_oracle);
     }
 
     function setVolatilityInsurancePool(address _pool) external onlyOwner {
         volatilityInsurancePool = _pool;
+        emit VolatilityInsurancePoolUpdated(_pool);
     }
 
     function setILProtectionVault(address _vault) external onlyOwner {
         ilProtectionVault = IILProtectionVault(_vault);
+        emit ILProtectionVaultUpdated(_vault);
     }
 
     function setSlippageGuaranteeFund(address _fund) external onlyOwner {
         slippageGuaranteeFund = ISlippageGuaranteeFund(_fund);
+        emit SlippageGuaranteeFundUpdated(_fund);
     }
 
     function setLoyaltyRewardsManager(address _manager) external onlyOwner {
         loyaltyRewardsManager = ILoyaltyRewardsManager(_manager);
+        emit LoyaltyRewardsManagerUpdated(_manager);
     }
 
     function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
         authorizedCallers[caller] = authorized;
+        emit AuthorizedCallerUpdated(caller, authorized);
     }
 
     function setShapleyDistributor(address _distributor) external onlyOwner {
         shapleyDistributor = IShapleyDistributor(_distributor);
+        emit ShapleyDistributorUpdated(_distributor);
     }
 
     /**
@@ -486,6 +495,7 @@ contract IncentiveController is
      */
     function setShapleyEnabled(bytes32 poolId, bool enabled) external onlyOwner {
         useShapleyDistribution[poolId] = enabled;
+        emit ShapleyEnabledUpdated(poolId, enabled);
     }
 
     // ============ Shapley Distribution ============

@@ -71,6 +71,7 @@ forge script script/DeployIncentives.s.sol --rpc-url $RPC_URL --broadcast --veri
 - IncentiveController.setLoyaltyRewardsManager(LoyaltyRewardsManager)
 - IncentiveController authorizes VibeAMM + VibeSwapCore as callers
 - VibeAMM.setIncentiveController(IncentiveController) -- enables LP lifecycle hooks + volatility fee routing
+- VibeSwapCore.setIncentiveController(IncentiveController) -- enables execution tracking + slippage compensation
 
 **Post-deploy:**
 - Fund VolatilityInsurancePool with initial reserves

@@ -157,6 +157,7 @@ contract DAOTreasury is
      * @param batchId Batch that generated proceeds
      */
     function receiveAuctionProceeds(uint64 batchId) external payable {
+        require(authorizedFeeSenders[msg.sender] || msg.sender == owner(), "Not authorized");
         require(msg.value > 0, "Zero amount");
 
         totalAuctionProceeds += msg.value;

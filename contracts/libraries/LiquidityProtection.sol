@@ -223,6 +223,7 @@ library LiquidityProtection {
         }
 
         // Adjust for liquidity
+        if (liquidityUsd == 0) return MAX_FEE_BPS;
         if (liquidityUsd < LOW_LIQUIDITY_THRESHOLD) {
             feeBps = (feeBps * LOW_LIQUIDITY_THRESHOLD) / liquidityUsd;
             if (feeBps > MAX_FEE_BPS) feeBps = MAX_FEE_BPS;

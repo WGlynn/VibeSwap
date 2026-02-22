@@ -424,6 +424,7 @@ contract EmissionController is
     }
 
     function setSingleStaking(address _staking) external onlyOwner {
+        if (_staking == address(0)) revert ZeroAddress();
         singleStaking = ISingleStakingNotify(_staking);
         emit SinkUpdated("staking", _staking);
     }

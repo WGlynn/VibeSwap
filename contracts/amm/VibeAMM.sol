@@ -988,6 +988,7 @@ contract VibeAMM is
      * @notice Set price oracle address
      */
     function setPriceOracle(address oracle) external onlyOwner {
+        require(oracle != address(0), "Invalid oracle");
         priceOracle = oracle;
     }
 

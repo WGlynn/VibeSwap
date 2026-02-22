@@ -17,6 +17,16 @@ interface IIncentiveController {
     event ILProtectionClaimed(bytes32 indexed poolId, address indexed lp, uint256 amount);
     event SlippageCompensationClaimed(bytes32 indexed claimId, address indexed trader, uint256 amount);
     event LoyaltyRewardsClaimed(bytes32 indexed poolId, address indexed lp, uint256 amount);
+    event PoolConfigUpdated(bytes32 indexed poolId);
+    event DefaultConfigUpdated();
+    event VolatilityOracleUpdated(address indexed oracle);
+    event VolatilityInsurancePoolUpdated(address indexed pool);
+    event ILProtectionVaultUpdated(address indexed vault);
+    event SlippageGuaranteeFundUpdated(address indexed fund);
+    event LoyaltyRewardsManagerUpdated(address indexed manager);
+    event AuthorizedCallerUpdated(address indexed caller, bool authorized);
+    event ShapleyDistributorUpdated(address indexed distributor);
+    event ShapleyEnabledUpdated(bytes32 indexed poolId, bool enabled);
 
     // Structs
     struct IncentiveConfig {

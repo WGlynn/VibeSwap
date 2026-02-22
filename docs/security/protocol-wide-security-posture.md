@@ -210,15 +210,24 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 - Covers all 3 reentrancy-hardened functions + access control + edge cases
 - Confirms `nonReentrant` blocks reentry in all cases
 
+### Session 28 Continuation — DecentralizedTribunal ACL (2 fixes)
+
+14. **DecentralizedTribunal.submitEvidence()** — Added `if (!jurors[trialId][msg.sender].summoned && msg.sender != owner()) revert NotSummoned()` (MEDIUM: prevents evidence pollution from non-parties)
+15. **DecentralizedTribunal.fileAppeal()** — Added juror/owner check + `if (msg.value < trial.jurorStake) revert InsufficientStake()` (MEDIUM: prevents free appeal griefing that resets trials)
+
+### Reclassified Findings (By Design, Not Vulnerabilities)
+
+| Function | Original | Reclassified | Rationale |
+|----------|----------|--------------|-----------|
+| DisputeResolver.defaultJudgment | MEDIUM | By Design | Permissionless phase-advancement (keeper pattern). Time lock + phase guard provide security. Only fires when respondent genuinely didn't respond. |
+| DisputeResolver.advanceToArbitration | MEDIUM | By Design | Same keeper pattern. Anyone can advance state after deadline. Required for bot automation. |
+
+16. **TWAPOracle.consult()** — Added `require(timeDelta > 0)` and `require(twapTimeDelta > 0)` guards (MEDIUM: div-by-zero panic if two observations share timestamp or current==target)
+
 ### Remaining Documented Findings (Lower Priority)
 
 | Finding | Severity | Status |
 |---------|----------|--------|
-| DecentralizedTribunal.submitEvidence — no party check | MEDIUM | Documented, not exploitable for fund loss |
-| DecentralizedTribunal.fileAppeal — no party check | MEDIUM | Documented, not exploitable for fund loss |
-| DisputeResolver.defaultJudgment — no claimant check | MEDIUM | Documented, time-gated |
-| TWAPOracle timeDelta==0 div-by-zero | MEDIUM | Fail-safe revert, no state corruption |
-| Batch swap reserve underflow from fee deduction | MEDIUM | Fail-safe revert, no fund loss |
 | Y2106 uint32 timestamp overflow | LOW | Not urgent (80 years) |
 
 ---

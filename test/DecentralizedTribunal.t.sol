@@ -463,8 +463,8 @@ contract DecentralizedTribunalTest is Test {
         vm.warp(block.timestamp + 3 days + 1);
         tribunal.renderVerdict(trialId);
 
-        // File appeal within appeal window
-        tribunal.fileAppeal(trialId);
+        // File appeal within appeal window (requires stake)
+        tribunal.fileAppeal{value: 0.1 ether}(trialId);
 
         DecentralizedTribunal.Trial memory trial = tribunal.getTrial(trialId);
         assertEq(uint8(trial.phase), uint8(DecentralizedTribunal.TrialPhase.JURY_SELECTION));
@@ -492,7 +492,7 @@ contract DecentralizedTribunalTest is Test {
         }
         vm.warp(block.timestamp + 3 days + 1);
         tribunal.renderVerdict(trialId);
-        tribunal.fileAppeal(trialId);
+        tribunal.fileAppeal{value: 0.1 ether}(trialId);
 
         // Appeal round 2: jury size is now 11
         DecentralizedTribunal.Trial memory t2 = tribunal.getTrial(trialId);
@@ -512,7 +512,7 @@ contract DecentralizedTribunalTest is Test {
         }
         vm.warp(block.timestamp + 3 days + 1);
         tribunal.renderVerdict(trialId);
-        tribunal.fileAppeal(trialId);
+        tribunal.fileAppeal{value: 0.1 ether}(trialId);
 
         // Appeal round 3: jury size is now 15, but max appeals (2) reached
         DecentralizedTribunal.Trial memory t3 = tribunal.getTrial(trialId);
@@ -535,7 +535,7 @@ contract DecentralizedTribunalTest is Test {
         tribunal.renderVerdict(trialId);
 
         vm.expectRevert(DecentralizedTribunal.MaxAppealsReached.selector);
-        tribunal.fileAppeal(trialId);
+        tribunal.fileAppeal{value: 0.1 ether}(trialId);
     }
 
     // ============ Close Trial ============

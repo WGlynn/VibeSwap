@@ -6,6 +6,43 @@ Captured at end of each building session. Most recent first.
 
 ---
 
+## Session 32: True Price Hardening (Feb 22, 2026)
+
+**Will's directive**: "spend some time today on our 'true Price' ideology, claim, tech... in the same way bitcoin was simply useful for online permissionless payments, we need vibeswap to be useful in getting a true price. 100% signal. 0% noise."
+
+### What was built
+- **True Price Oracle wired into AMM execution** — TruePriceOracle was declared but NEVER used in batch execution. Now `_validateAndDampClearingPrice()` enforces three-tier: within bounds → pass, beyond bounds → golden ratio damping, extreme → circuit breaker.
+- **Batch order aggregation** — VibeSwapCore was calling `executeBatchSwap` per-order (single-element array), defeating uniform clearing price. Rewrote to group by poolId, one call per pool.
+- **TRUE_PRICE_BREAKER wired** — Was configured (30% threshold, 30min window) but no function was gated by it. Added `whenBreakerNotTripped(TRUE_PRICE_BREAKER)` to `executeBatchSwap`.
+- **VWAP corroboration** — When True Price AND VWAP agree that clearing price is off, bounds tighten by 20%. Two independent signals = stronger enforcement.
+- **VolatilityOracle wired into fee routing** — Was stored in IncentiveController but never called. HIGH vol = 50% more to insurance pool, EXTREME = 100% more.
+- **TWAP validation added to batch execution** — `executeBatchSwap` had no pre-execution TWAP check.
+- **50 dedicated True Price tests** — 37 unit, 9 fuzz, 4 invariant.
+- **Admin functions** — `setTruePriceOracle`, `setTruePriceValidation`, `setTruePriceMaxStaleness`
+
+### Key insight: K invariant doesn't apply to batch auctions
+Batch clearing prices are uniform (not constant-product). True Price damping deliberately overrides the AMM curve. K can change in either direction when damped clearing price differs from spot. This is by design — the oracle pulls execution toward equilibrium. K invariant only applies to individual swaps via constant product formula.
+
+### Remaining True Price gaps (discovered by audit)
+1. **No True Price → dynamic fee surcharge** — Manipulative trades should pay higher fees. When deviation or manipulation probability is high, surcharge the base fee. HIGH priority.
+2. **VolatilityOracle ↔ regime validation** — On-chain volatility tiers (LOW/MED/HIGH/EXTREME) could corroborate off-chain regime (NORMAL/TREND/CASCADE etc). Currently independent. MEDIUM priority.
+3. **Cross-chain True Price relay** — No `TRUE_PRICE_SYNC` message type in CrossChainRouter. For omnichain launch, Chain A's True Price should inform Chain B. MEDIUM priority.
+4. **VWAPOracle largely orphaned** — Records trades but only used for liquidity metrics and now VWAP corroboration. Could be a stronger signal in Python Kalman filter input. LOW priority.
+
+### Regime-adjusted deviation bounds (for reference)
+| Regime | Multiplier | Effective BPS (base 500) |
+|--------|-----------|-------------------------|
+| CASCADE | 60% | 300 |
+| MANIPULATION | 70% | 350 |
+| LOW_VOLATILITY | 70% | 350 |
+| HIGH_LEVERAGE | 85% | 425 |
+| NORMAL | 100% | 500 |
+| TREND | 130% | 650 |
+
+Stablecoin adjustments stack: USDT dominant (×0.8), USDC dominant (×1.2)
+
+---
+
 ## Session 23: CKB Phase 7 — Test Suite Complete (Feb 18, 2026)
 
 **What was built:**

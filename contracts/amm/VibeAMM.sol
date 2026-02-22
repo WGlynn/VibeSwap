@@ -633,7 +633,7 @@ contract VibeAMM is
         uint64 batchId,
         SwapOrder[] calldata orders
     ) external nonReentrant onlyAuthorizedExecutor poolExists(poolId) whenNotGloballyPaused
-      whenBreakerNotTripped(VOLUME_BREAKER) returns (
+      whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(TRUE_PRICE_BREAKER) returns (
         BatchSwapResult memory result
     ) {
         if (orders.length == 0) {
@@ -1793,6 +1793,22 @@ contract VibeAMM is
                     adjustedMaxDeviation, ctx.usdtDominant, ctx.usdcDominant
                 );
             } catch {}
+
+            // VWAP corroboration: if VWAP agrees with True Price direction, tighten bounds
+            // Two independent price signals agreeing = stronger enforcement (100% signal, 0% noise)
+            if (poolVWAP[poolId].cardinality >= 2) {
+                try this.getVWAP(poolId, 10 minutes) returns (uint256 vwapPrice) {
+                    if (vwapPrice > 0) {
+                        // Check if both True Price and VWAP are on the same side of clearing price
+                        bool tpAbove = truePrice > clearingPrice;
+                        bool vwapAbove = vwapPrice > clearingPrice;
+                        if (tpAbove == vwapAbove) {
+                            // Both agree clearing price is off — tighten bounds by 20%
+                            adjustedMaxDeviation = (adjustedMaxDeviation * 8000) / 10000;
+                        }
+                    }
+                } catch {}
+            }
 
             // Check if clearing price is within adjusted bounds
             bool withinBounds = TruePriceLib.validatePriceDeviation(

@@ -1116,9 +1116,10 @@ contract VibeAMM is
             return (0, 0, 0);
         }
 
-        // Verify we have enough output tokens
+        // Verify we have enough output tokens (including LP fee deduction)
         uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-        if (amountOut > reserveOut) {
+        uint256 reserveDeduction = amountOut + totalFee - protocolFee;
+        if (reserveDeduction > reserveOut) {
             // FIX #5: Emit failure event
             emit SwapFailed(
                 getPoolId(pool.token0, pool.token1),

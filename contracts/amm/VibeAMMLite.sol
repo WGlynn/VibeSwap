@@ -258,7 +258,8 @@ contract VibeAMMLite is
         (pf, ) = BatchMath.calculateFees(ao, pool.feeRate, 0);
         ao -= tf;
         uint256 rOut = isT0 ? pool.reserve1 : pool.reserve0;
-        if (ao < order.minAmountOut || ao > rOut) {
+        uint256 reserveDeduction = ao + tf - pf;
+        if (ao < order.minAmountOut || reserveDeduction > rOut) {
             IERC20(order.tokenIn).safeTransfer(msg.sender, ai);
             return (0, 0, 0);
         }

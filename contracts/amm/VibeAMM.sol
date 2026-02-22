@@ -20,6 +20,7 @@ import "../libraries/FibonacciScaling.sol";
 import "../libraries/ProofOfWorkLib.sol";
 import "../oracles/interfaces/ITruePriceOracle.sol";
 import "../incentives/IPriorityRegistry.sol";
+import "../incentives/interfaces/IIncentiveController.sol";
 
 /**
  * @title VibeAMM
@@ -200,6 +201,13 @@ contract VibeAMM is
     /// @notice Used PoW proofs for fee discounts (prevents replay)
     mapping(bytes32 => bool) public usedFeePoWProofs;
 
+    // ============ Incentive Controller Integration ============
+
+    /// @notice IncentiveController for LP lifecycle hooks and volatility fee routing
+    /// @dev Set via setIncentiveController(). All hook calls are try/catch to prevent
+    ///      incentive layer issues from blocking core AMM operations.
+    IIncentiveController public incentiveController;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
@@ -216,6 +224,8 @@ contract VibeAMM is
     event FibonacciPriceLevelDetected(bytes32 indexed poolId, uint256 price, uint256 fibLevel, bool isSupport);
     event FibonacciFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 fibFee, uint8 tier);
     event PoWFeeDiscountApplied(bytes32 indexed poolId, address indexed user, uint8 difficulty, uint256 discountBps);
+    event IncentiveControllerUpdated(address indexed controller);
+    event VolatilityFeeRouted(bytes32 indexed poolId, address token, uint256 amount);
 
     // FIX #5: Event for swap failures
     event SwapFailed(
@@ -512,6 +522,12 @@ contract VibeAMM is
         VibeLP(lpTokens[poolId]).mint(msg.sender, liquidity);
         liquidityBalance[poolId][msg.sender] += liquidity;
 
+        // Notify IncentiveController for IL protection and loyalty tracking
+        if (address(incentiveController) != address(0)) {
+            uint256 entryPrice = amount0 > 0 ? (amount1 * 1e18) / amount0 : 0;
+            try incentiveController.onLiquidityAdded(poolId, msg.sender, liquidity, entryPrice) {} catch {}
+        }
+
         emit LiquidityAdded(poolId, msg.sender, amount0, amount1, liquidity);
     }
 
@@ -576,6 +592,11 @@ contract VibeAMM is
         uint256 tracked = liquidityBalance[poolId][msg.sender];
         unchecked {
             liquidityBalance[poolId][msg.sender] = tracked >= liquidity ? tracked - liquidity : 0;
+        }
+
+        // Notify IncentiveController for loyalty tracking (before burn)
+        if (address(incentiveController) != address(0)) {
+            try incentiveController.onLiquidityRemoved(poolId, msg.sender, liquidity) {} catch {}
         }
 
         // Burn LP tokens
@@ -830,7 +851,27 @@ contract VibeAMM is
 
         // Calculate and track fees
         (uint256 protocolFee, ) = BatchMath.calculateFees(amountIn, feeRate, protocolFeeShare);
-        accumulatedFees[tokenIn] += protocolFee;
+
+        // Route volatility fee surplus to IncentiveController for insurance pool
+        // When dynamic fee > base fee, the protocol's share of the surplus goes to
+        // VolatilityInsurancePool instead of the general treasury fee accumulator.
+        // LP base fees remain untouched (they're in reserves via x*y=k).
+        uint256 volatilitySurplus;
+        if (address(incentiveController) != address(0) && feeRate > pool.feeRate && protocolFee > 0) {
+            (uint256 basePFee, ) = BatchMath.calculateFees(amountIn, pool.feeRate, protocolFeeShare);
+            volatilitySurplus = protocolFee > basePFee ? protocolFee - basePFee : 0;
+            if (volatilitySurplus > 0) {
+                // Base portion accumulates normally; surplus routes to incentive layer
+                accumulatedFees[tokenIn] += protocolFee - volatilitySurplus;
+                IERC20(tokenIn).safeTransfer(address(incentiveController), volatilitySurplus);
+                try incentiveController.routeVolatilityFee(poolId, tokenIn, volatilitySurplus) {} catch {}
+                emit VolatilityFeeRouted(poolId, tokenIn, volatilitySurplus);
+            } else {
+                accumulatedFees[tokenIn] += protocolFee;
+            }
+        } else {
+            accumulatedFees[tokenIn] += protocolFee;
+        }
 
         // Update reserves unchecked
         unchecked {
@@ -1028,6 +1069,15 @@ contract VibeAMM is
     function setPriorityRegistry(address _registry) external onlyOwner {
         priorityRegistry = IPriorityRegistry(_registry);
         emit PriorityRegistryUpdated(_registry);
+    }
+
+    /**
+     * @notice Set the IncentiveController for LP lifecycle hooks and fee routing
+     * @param _controller IncentiveController proxy address (or address(0) to disable)
+     */
+    function setIncentiveController(address _controller) external onlyOwner {
+        incentiveController = IIncentiveController(_controller);
+        emit IncentiveControllerUpdated(_controller);
     }
 
     /**

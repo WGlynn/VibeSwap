@@ -206,7 +206,7 @@ contract IncentiveController is
         uint64 batchId,
         bytes32[] calldata poolIds,
         uint256[] calldata amounts
-    ) external payable override onlyCore {
+    ) external payable override onlyCore nonReentrant {
         if (poolIds.length != amounts.length) revert InvalidConfig();
 
         uint256 totalDistributed;

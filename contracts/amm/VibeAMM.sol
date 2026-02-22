@@ -216,6 +216,7 @@ contract VibeAMM is
     event LargeTradeLimited(bytes32 indexed poolId, uint256 requested, uint256 allowed);
     event FeesCollected(address indexed token, uint256 amount);
     event TruePriceOracleUpdated(address indexed oracle);
+    event TruePriceValidationToggled(bool enabled);
     event TruePriceValidationResult(bytes32 indexed poolId, uint256 spotPrice, uint256 truePrice, bool passed);
     event LiquidityProtectionConfigured(bytes32 indexed poolId, uint256 amplification, uint256 maxImpactBps);
     event DynamicFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 adjustedFee);
@@ -381,6 +382,14 @@ contract VibeAMM is
             threshold: 2500, // 25% in basis points
             cooldownPeriod: 2 hours,
             windowDuration: 1 hours
+        });
+
+        // True Price breaker: trips if cumulative True Price deviation exceeds 30% in window
+        breakerConfigs[TRUE_PRICE_BREAKER] = BreakerConfig({
+            enabled: true,
+            threshold: 3000, // 30% cumulative deviation in basis points
+            cooldownPeriod: 1 hours,
+            windowDuration: 30 minutes
         });
     }
 
@@ -657,6 +666,28 @@ contract VibeAMM is
             pool.reserve0,
             pool.reserve1
         );
+
+        // ============ True Price Validation + Damping ============
+        // Validate clearing price against True Price Oracle (if enabled and available)
+        // Applies golden ratio damping when deviation exceeds soft threshold
+        if ((protectionFlags & FLAG_TRUE_PRICE) != 0 && address(truePriceOracle) != address(0)) {
+            clearingPrice = _validateAndDampClearingPrice(poolId, clearingPrice, pool.reserve0, pool.reserve1);
+        }
+
+        // ============ TWAP Validation for Batch Execution ============
+        // Validate clearing price against TWAP (post-calculation, pre-execution)
+        if ((protectionFlags & FLAG_TWAP) != 0 && poolOracles[poolId].cardinality >= 2) {
+            if (poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
+                uint256 twapPrice = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+                if (!SecurityLib.checkPriceDeviation(clearingPrice, twapPrice, MAX_PRICE_DEVIATION_BPS)) {
+                    // Apply golden ratio damping instead of hard revert
+                    // This preserves liquidity while capping manipulation
+                    clearingPrice = BatchMath.applyGoldenRatioDamping(
+                        twapPrice, clearingPrice, MAX_PRICE_DEVIATION_BPS
+                    );
+                }
+            }
+        }
 
         result.clearingPrice = clearingPrice;
 
@@ -1683,6 +1714,126 @@ contract VibeAMM is
             tradeValueUsd,
             pool.feeRate
         );
+    }
+
+    // ============ True Price Admin Functions ============
+
+    /**
+     * @notice Set the True Price Oracle address
+     * @param _oracle TruePriceOracle contract address
+     */
+    function setTruePriceOracle(address _oracle) external onlyOwner {
+        truePriceOracle = ITruePriceOracle(_oracle);
+        emit TruePriceOracleUpdated(_oracle);
+    }
+
+    /**
+     * @notice Enable/disable True Price validation
+     * @dev When enabled, batch clearing prices are validated against the Kalman filter True Price.
+     *      Deviation beyond bounds triggers golden ratio damping (soft enforcement).
+     *      Extreme deviation triggers the TRUE_PRICE_BREAKER circuit breaker (hard enforcement).
+     */
+    function setTruePriceValidation(bool enabled) external onlyOwner {
+        if (enabled) {
+            protectionFlags |= FLAG_TRUE_PRICE;
+        } else {
+            protectionFlags &= ~FLAG_TRUE_PRICE;
+        }
+        emit TruePriceValidationToggled(enabled);
+    }
+
+    /**
+     * @notice Set max staleness for True Price data
+     * @param maxStaleness Maximum age in seconds (default 5 minutes)
+     */
+    function setTruePriceMaxStaleness(uint256 maxStaleness) external onlyOwner {
+        require(maxStaleness >= 30 && maxStaleness <= 30 minutes, "Staleness out of range");
+        truePriceMaxStaleness = maxStaleness;
+    }
+
+    // ============ True Price Internal Functions ============
+
+    /**
+     * @notice Validate clearing price against True Price Oracle and apply golden ratio damping
+     * @dev Three-tier enforcement:
+     *      1. Within bounds → clearing price passes unchanged
+     *      2. Beyond bounds → golden ratio damping clamps the price (soft enforcement)
+     *      3. Extreme deviation → TRUE_PRICE_BREAKER trips (hard enforcement for future batches)
+     *
+     * @param poolId Pool identifier
+     * @param clearingPrice Raw clearing price from BatchMath
+     * @param reserve0 Current reserve0 (for spot price reference)
+     * @param reserve1 Current reserve1 (for spot price reference)
+     * @return dampedPrice Clearing price after validation and potential damping
+     */
+    function _validateAndDampClearingPrice(
+        bytes32 poolId,
+        uint256 clearingPrice,
+        uint256 reserve0,
+        uint256 reserve1
+    ) internal returns (uint256 dampedPrice) {
+        // Try to get True Price data (graceful fallback if unavailable)
+        try truePriceOracle.getTruePrice(poolId) returns (ITruePriceOracle.TruePriceData memory tpData) {
+            uint256 truePrice = tpData.price;
+            if (truePrice == 0) return clearingPrice;
+
+            // Check staleness
+            if (!TruePriceLib.isFresh(tpData.timestamp, truePriceMaxStaleness)) {
+                return clearingPrice; // Stale data — don't enforce
+            }
+
+            // Get regime-adjusted deviation bounds
+            uint256 adjustedMaxDeviation = TruePriceLib.adjustDeviationForRegime(
+                MAX_PRICE_DEVIATION_BPS, tpData.regime
+            );
+
+            // Also adjust for stablecoin context
+            try truePriceOracle.getStablecoinContext() returns (ITruePriceOracle.StablecoinContext memory ctx) {
+                adjustedMaxDeviation = TruePriceLib.adjustDeviationForStablecoin(
+                    adjustedMaxDeviation, ctx.usdtDominant, ctx.usdcDominant
+                );
+            } catch {}
+
+            // Check if clearing price is within adjusted bounds
+            bool withinBounds = TruePriceLib.validatePriceDeviation(
+                clearingPrice, truePrice, adjustedMaxDeviation
+            );
+
+            if (withinBounds) {
+                // Price is within bounds — pass through
+                emit TruePriceValidationResult(poolId, clearingPrice, truePrice, true);
+                return clearingPrice;
+            }
+
+            // Price deviates beyond bounds — apply golden ratio damping
+            // Use True Price as the anchor (not TWAP), with regime-adjusted bounds
+            dampedPrice = BatchMath.applyGoldenRatioDamping(
+                truePrice, clearingPrice, adjustedMaxDeviation
+            );
+
+            emit TruePriceValidationResult(poolId, clearingPrice, truePrice, false);
+
+            // Calculate actual deviation for circuit breaker accumulation
+            uint256 deviation;
+            if (clearingPrice > truePrice) {
+                deviation = ((clearingPrice - truePrice) * 10000) / truePrice;
+            } else {
+                deviation = ((truePrice - clearingPrice) * 10000) / truePrice;
+            }
+
+            // Feed deviation into TRUE_PRICE_BREAKER (trips on cumulative extreme deviation)
+            _updateBreaker(TRUE_PRICE_BREAKER, deviation);
+
+            // If manipulation is highly likely, also check manipulation probability
+            if (tpData.manipulationProb > 7e17) { // >70% manipulation probability
+                emit PriceManipulationDetected(poolId, clearingPrice, truePrice);
+            }
+
+            return dampedPrice;
+        } catch {
+            // Oracle unavailable — pass through (don't block trading)
+            return clearingPrice;
+        }
     }
 
     // ============ Fibonacci Scaling Admin Functions ============

@@ -654,106 +654,162 @@ contract VibeSwapCore is
         uint256 totalVolume = 0;
         uint256 lastClearingPrice = 0;
 
-        // Group by pool and execute batch swaps
-        // Simplified: execute each order individually for now
+        // ============ Phase 1: Validate deposits and group by pool ============
+        // We aggregate all orders for the same pool into a single executeBatchSwap call
+        // so the AMM computes one uniform clearing price per pool (not per order).
+
+        // Track pool IDs seen and their order indices
+        bytes32[] memory poolIds = new bytes32[](executionOrder.length);
+        uint256 uniquePoolCount = 0;
+
+        // Map: execution index -> poolId (for grouping)
+        bytes32[] memory orderPoolIds = new bytes32[](executionOrder.length);
+        // Track which orders are valid (have sufficient deposits)
+        bool[] memory orderValid = new bool[](executionOrder.length);
+
         for (uint256 i = 0; i < executionOrder.length; i++) {
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
-            // Verify we have the deposit
+            // Verify deposit
             uint256 userDeposit = deposits[order.trader][order.tokenIn];
             if (userDeposit < order.amountIn) {
-                // FIX #5: Emit event instead of silently skipping
-                emit OrderFailed(
-                    batchId,
-                    order.trader,
-                    order.tokenIn,
-                    order.tokenOut,
-                    order.amountIn,
-                    "Insufficient deposit"
-                );
+                emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Insufficient deposit");
                 continue;
             }
 
             bytes32 poolId = amm.getPoolId(order.tokenIn, order.tokenOut);
+            orderPoolIds[i] = poolId;
+            orderValid[i] = true;
 
-            // Transfer tokens to AMM before swap
-            IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
+            // Track unique pools
+            bool found = false;
+            for (uint256 j = 0; j < uniquePoolCount; j++) {
+                if (poolIds[j] == poolId) { found = true; break; }
+            }
+            if (!found) {
+                poolIds[uniquePoolCount] = poolId;
+                uniquePoolCount++;
+            }
+        }
 
-            // Determine recipient: if wBAR position was transferred, route output to wBAR contract
-            address recipient = order.trader;
-            bytes32 traderCommitId;
-            if (address(wbar) != address(0)) {
-                traderCommitId = batchTraderCommitId[batchId][order.trader];
-                if (traderCommitId != bytes32(0)) {
-                    address wbarHolder = wbar.holderOf(traderCommitId);
-                    if (wbarHolder != order.trader) {
-                        recipient = address(wbar);
+        // ============ Phase 2: Execute per-pool batch swaps ============
+        // For each unique pool, collect all valid orders and execute in one call.
+        // This gives a TRUE uniform clearing price across all orders in the pool.
+
+        for (uint256 p = 0; p < uniquePoolCount; p++) {
+            bytes32 poolId = poolIds[p];
+
+            // Count valid orders for this pool
+            uint256 count = 0;
+            for (uint256 i = 0; i < executionOrder.length; i++) {
+                if (orderValid[i] && orderPoolIds[i] == poolId) count++;
+            }
+            if (count == 0) continue;
+
+            // Build SwapOrder array and transfer tokens to AMM
+            IVibeAMM.SwapOrder[] memory swapOrders = new IVibeAMM.SwapOrder[](count);
+            // Track original order indices for post-execution accounting
+            uint256[] memory originalIndices = new uint256[](count);
+            uint256 cursor = 0;
+
+            for (uint256 i = 0; i < executionOrder.length; i++) {
+                if (!orderValid[i] || orderPoolIds[i] != poolId) continue;
+
+                uint256 idx = executionOrder[i];
+                ICommitRevealAuction.RevealedOrder memory order = orders[idx];
+
+                // Determine recipient (wBAR routing)
+                address recipient = order.trader;
+                if (address(wbar) != address(0)) {
+                    bytes32 traderCommitId = batchTraderCommitId[batchId][order.trader];
+                    if (traderCommitId != bytes32(0)) {
+                        address wbarHolder = wbar.holderOf(traderCommitId);
+                        if (wbarHolder != order.trader) {
+                            recipient = address(wbar);
+                        }
                     }
                 }
+
+                // Transfer tokens to AMM
+                IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
+
+                swapOrders[cursor] = IVibeAMM.SwapOrder({
+                    trader: recipient,
+                    tokenIn: order.tokenIn,
+                    tokenOut: order.tokenOut,
+                    amountIn: order.amountIn,
+                    minAmountOut: order.minAmountOut,
+                    isPriority: order.priorityBid > 0
+                });
+                originalIndices[cursor] = idx;
+                cursor++;
             }
 
-            // Prepare swap order
-            IVibeAMM.SwapOrder[] memory swapOrders = new IVibeAMM.SwapOrder[](1);
-            swapOrders[0] = IVibeAMM.SwapOrder({
-                trader: recipient,
-                tokenIn: order.tokenIn,
-                tokenOut: order.tokenOut,
-                amountIn: order.amountIn,
-                minAmountOut: order.minAmountOut,
-                isPriority: order.priorityBid > 0
-            });
-
-            // Execute batch swap
+            // Execute ALL orders for this pool in one batch → one uniform clearing price
             IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(
                 poolId,
                 batchId,
                 swapOrders
             );
 
-            // Only clear deposit if swap was executed
+            // ============ Phase 3: Per-order post-execution accounting ============
             if (result.totalTokenInSwapped > 0) {
                 totalVolume += result.totalTokenInSwapped;
                 lastClearingPrice = result.clearingPrice;
-                deposits[order.trader][order.tokenIn] -= order.amountIn;
 
-                // Settle wBAR position with actual output amount
-                if (address(wbar) != address(0) && traderCommitId != bytes32(0)) {
-                    wbar.settle(traderCommitId, result.totalTokenOutSwapped);
-                }
+                for (uint256 k = 0; k < count; k++) {
+                    uint256 idx = originalIndices[k];
+                    ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
-                // Record execution for slippage tracking (IncentiveController → SlippageGuaranteeFund)
-                if (address(incentiveController) != address(0)) {
-                    try incentiveController.recordExecution(
-                        poolId,
-                        order.trader,
-                        order.amountIn,
-                        result.totalTokenOutSwapped,
-                        order.minAmountOut
-                    ) {} catch {}
-                }
+                    // Clear deposit
+                    deposits[order.trader][order.tokenIn] -= order.amountIn;
 
-                // Record transaction for clawback taint tracking
-                if (address(clawbackRegistry) != address(0)) {
-                    clawbackRegistry.recordTransaction(
-                        order.trader,
-                        address(amm),
-                        order.amountIn,
-                        order.tokenIn
-                    );
+                    // Compute per-order output from uniform clearing price
+                    // AMM uses: amountOut = amountIn * clearingPrice / 1e18 (or inverse) minus fees
+                    // For post-settlement tracking, use the clearing price ratio
+                    uint256 estimatedOut = 0;
+                    if (result.clearingPrice > 0 && result.totalTokenInSwapped > 0) {
+                        // Pro-rata share of total output based on input contribution
+                        estimatedOut = (order.amountIn * result.totalTokenOutSwapped) / result.totalTokenInSwapped;
+                    }
+
+                    // Settle wBAR position
+                    if (address(wbar) != address(0)) {
+                        bytes32 traderCommitId = batchTraderCommitId[batchId][order.trader];
+                        if (traderCommitId != bytes32(0)) {
+                            wbar.settle(traderCommitId, estimatedOut);
+                        }
+                    }
+
+                    // Record execution for slippage tracking
+                    if (address(incentiveController) != address(0)) {
+                        try incentiveController.recordExecution(
+                            poolId,
+                            order.trader,
+                            order.amountIn,
+                            estimatedOut,
+                            order.minAmountOut
+                        ) {} catch {}
+                    }
+
+                    // Record transaction for clawback taint tracking
+                    if (address(clawbackRegistry) != address(0)) {
+                        clawbackRegistry.recordTransaction(
+                            order.trader,
+                            address(amm),
+                            order.amountIn,
+                            order.tokenIn
+                        );
+                    }
                 }
             } else {
-                // FIX #6: Swap failed - AMM returned tokens to us (msg.sender)
-                // Tokens are back in VibeSwapCore, deposit accounting unchanged
-                // User can withdraw via withdrawDeposit() - no double-spend possible
-                emit OrderFailed(
-                    batchId,
-                    order.trader,
-                    order.tokenIn,
-                    order.tokenOut,
-                    order.amountIn,
-                    "Swap execution failed"
-                );
+                // Batch execution failed — all tokens returned to Core
+                for (uint256 k = 0; k < count; k++) {
+                    uint256 idx = originalIndices[k];
+                    ICommitRevealAuction.RevealedOrder memory order = orders[idx];
+                    emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Swap execution failed");
+                }
             }
         }
 

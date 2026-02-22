@@ -12,6 +12,15 @@ library TruePriceLib {
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BPS_PRECISION = 10000;
 
+    // Regime deviation multipliers (applied to base deviation, BPS-scaled)
+    uint256 private constant USDT_DOMINANT_BPS = 8000;     // 80% of base (tighter — manipulation risk)
+    uint256 private constant USDC_DOMINANT_BPS = 12000;    // 120% of base (looser — genuine trend)
+    uint256 private constant CASCADE_BPS = 6000;           // 60% — very tight during cascades
+    uint256 private constant MANIPULATION_BPS = 7000;      // 70% — tight during manipulation
+    uint256 private constant HIGH_LEVERAGE_BPS = 8500;     // 85% — somewhat tight
+    uint256 private constant TREND_BPS = 13000;            // 130% — loose during confirmed trends
+    uint256 private constant LOW_VOLATILITY_BPS = 7000;    // 70% — tighter, smaller moves expected
+
     // ============ Errors ============
 
     error PriceDeviationTooHigh(uint256 spot, uint256 truePrice, uint256 deviationBps);
@@ -80,12 +89,10 @@ library TruePriceLib {
     ) internal pure returns (uint256 adjustedDeviationBps) {
         if (usdtDominant) {
             // Tighter bounds during USDT-dominant (manipulation more likely)
-            // 80% of normal bounds
-            return (baseDeviationBps * 8000) / BPS_PRECISION;
+            return (baseDeviationBps * USDT_DOMINANT_BPS) / BPS_PRECISION;
         } else if (usdcDominant) {
             // Looser bounds during USDC-dominant (genuine trend more likely)
-            // 120% of normal bounds
-            return (baseDeviationBps * 12000) / BPS_PRECISION;
+            return (baseDeviationBps * USDC_DOMINANT_BPS) / BPS_PRECISION;
         }
         return baseDeviationBps;
     }
@@ -101,20 +108,15 @@ library TruePriceLib {
         ITruePriceOracle.RegimeType regime
     ) internal pure returns (uint256 adjustedDeviationBps) {
         if (regime == ITruePriceOracle.RegimeType.CASCADE) {
-            // Very tight during cascades
-            return (baseDeviationBps * 6000) / BPS_PRECISION; // 60%
+            return (baseDeviationBps * CASCADE_BPS) / BPS_PRECISION;
         } else if (regime == ITruePriceOracle.RegimeType.MANIPULATION) {
-            // Tight during manipulation
-            return (baseDeviationBps * 7000) / BPS_PRECISION; // 70%
+            return (baseDeviationBps * MANIPULATION_BPS) / BPS_PRECISION;
         } else if (regime == ITruePriceOracle.RegimeType.HIGH_LEVERAGE) {
-            // Somewhat tight during high leverage
-            return (baseDeviationBps * 8500) / BPS_PRECISION; // 85%
+            return (baseDeviationBps * HIGH_LEVERAGE_BPS) / BPS_PRECISION;
         } else if (regime == ITruePriceOracle.RegimeType.TREND) {
-            // Looser during confirmed trends
-            return (baseDeviationBps * 13000) / BPS_PRECISION; // 130%
+            return (baseDeviationBps * TREND_BPS) / BPS_PRECISION;
         } else if (regime == ITruePriceOracle.RegimeType.LOW_VOLATILITY) {
-            // Tighter during low volatility (smaller moves expected)
-            return (baseDeviationBps * 7000) / BPS_PRECISION; // 70%
+            return (baseDeviationBps * LOW_VOLATILITY_BPS) / BPS_PRECISION;
         }
         return baseDeviationBps; // NORMAL
     }

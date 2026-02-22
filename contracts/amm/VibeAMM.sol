@@ -69,6 +69,9 @@ contract VibeAMM is
     /// @notice Maximum single trade as percentage of reserves (10%)
     uint256 public constant MAX_TRADE_SIZE_BPS = 1000;
 
+    /// @notice Maximum reserve drain per swap (99% — prevents total reserve depletion)
+    uint256 private constant MAX_RESERVE_DRAIN_PERCENT = 99;
+
     // ============ Structs for Parameter Bundling ============
 
     /// @notice Parameters for basic swap to reduce stack depth
@@ -730,7 +733,7 @@ contract VibeAMM is
             if (p.amountIn > maxTradeSize) { emit LargeTradeLimited(p.poolId, p.amountIn, maxTradeSize); revert TradeTooLarge(maxTradeSize); }
 
             amountOut = BatchMath.getAmountOut(p.amountIn, effResIn, effResOut, feeRate);
-            if (effResIn != reserveIn && amountOut > reserveOut * 99 / 100) amountOut = reserveOut * 99 / 100;
+            if (effResIn != reserveIn && amountOut > reserveOut * MAX_RESERVE_DRAIN_PERCENT / 100) amountOut = reserveOut * MAX_RESERVE_DRAIN_PERCENT / 100;
         }
 
         if (amountOut < p.minAmountOut) revert InsufficientOutput();

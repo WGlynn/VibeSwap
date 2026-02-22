@@ -26,6 +26,9 @@ contract VolatilityOracle is
     uint32 public constant OBSERVATION_INTERVAL = 5 minutes;
     uint8 public constant MAX_OBSERVATIONS = 24; // 2 hours of 5-min observations
 
+    /// @notice sqrt(365.25 * 24 * 12) = sqrt(105,192) ≈ 324 — annualization factor for 5-min observations
+    uint256 private constant ANNUALIZATION_FACTOR = 324;
+
     // Volatility tier thresholds (annualized, in bps)
     uint256 public constant LOW_THRESHOLD = 2000;      // 0-20%
     uint256 public constant MEDIUM_THRESHOLD = 5000;   // 20-50%
@@ -300,7 +303,7 @@ contract VolatilityOracle is
         // Annualize: multiply by sqrt(periods per year)
         // Assuming 5-minute observations: 365 * 24 * 12 = 105,120 periods/year
         // sqrt(105120) ≈ 324
-        uint256 annualizedVol = (stdDev * 324) / PRECISION;
+        uint256 annualizedVol = (stdDev * ANNUALIZATION_FACTOR) / PRECISION;
 
         // Convert to basis points
         volatility = (annualizedVol * BPS_PRECISION) / PRECISION;

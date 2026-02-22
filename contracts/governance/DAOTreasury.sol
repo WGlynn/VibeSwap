@@ -37,6 +37,9 @@ contract DAOTreasury is
     /// @notice Precision for price calculations
     uint256 public constant PRECISION = 1e18;
 
+    /// @notice LP slippage tolerance (95% = max 5% slippage on backstop liquidity operations)
+    uint256 private constant LP_SLIPPAGE_PERCENT = 95;
+
     // ============ State ============
 
     /// @notice Current timelock duration
@@ -215,8 +218,8 @@ contract DAOTreasury is
         IERC20(pool.token1).safeIncreaseAllowance(vibeAMM, token1Amount);
 
         // Add liquidity with 95% slippage protection against sandwich attacks
-        uint256 minToken0 = (token0Amount * 95) / 100;
-        uint256 minToken1 = (token1Amount * 95) / 100;
+        uint256 minToken0 = (token0Amount * LP_SLIPPAGE_PERCENT) / 100;
+        uint256 minToken1 = (token1Amount * LP_SLIPPAGE_PERCENT) / 100;
 
         (,, uint256 liquidity) = amm.addLiquidity(
             poolId,

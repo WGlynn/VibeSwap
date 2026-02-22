@@ -234,11 +234,47 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 22. **CommitRevealAuction** — 4 events added: AuthorizedSettlerUpdated, TreasuryUpdated, PoWBaseValueUpdated, ReputationOracleUpdated
 23. **CircuitBreaker** — 1 event added: BreakerDisabled (was asymmetric with existing BreakerConfigured)
 
+### Session 28 Continuation — Magic Number Extraction (4 contracts)
+
+24. **VibeAMM** — `MAX_RESERVE_DRAIN_PERCENT = 99` extracted from inline `99/100` reserve cap
+25. **DAOTreasury** — `LP_SLIPPAGE_PERCENT = 95` extracted from inline backstop slippage
+26. **VolatilityOracle** — `ANNUALIZATION_FACTOR = 324` extracted from inline sqrt(periods/year)
+27. **TruePriceLib** — 7 regime deviation constants extracted (CASCADE_BPS through LOW_VOLATILITY_BPS)
+
+### Verified Safe Patterns
+
+| Pattern | Count | Status |
+|---------|-------|--------|
+| UUPS `_disableInitializers()` | 31/31 | All constructors protected |
+| UUPS `_authorizeUpgrade(onlyOwner)` | 31/31 | All upgrade paths gated |
+| OZ v5 namespaced storage (ERC-7201) | N/A | No `__gap` needed |
+| `receive() external payable` contracts | 17 | All have withdrawal paths |
+| `.approve()` in production | 0 | All use `forceApprove()` |
+| `.call{value}` unchecked returns | 0 remaining | All checked or by-design |
+
 ### Remaining Documented Findings (Lower Priority)
 
 | Finding | Severity | Status |
 |---------|----------|--------|
 | Y2106 uint32 timestamp overflow | LOW | Not urgent (80 years) |
+| 3 core contracts (DAOTreasury, CommitRevealAuction, CrossChainRouter) not UUPS | INFO | By design — immutable after deployment |
+
+---
+
+## Audit Summary (Session 28 — Full)
+
+| Category | Findings | Fixed |
+|----------|----------|-------|
+| Reentrancy gaps | 3 | 3 + 15 tests |
+| USDT approve compatibility | 9 | 9 (VibeLPNFT) |
+| Access control gaps | 6 | 6 (5 HIGH/CRITICAL + 1 MEDIUM) |
+| Zero-address validation | 5 | 5 (3 CRITICAL + 2 HIGH) |
+| Integer overflow / div-by-zero | 4 | 4 (batch swap, LiquidityProtection, TWAPOracle) |
+| Missing event emissions | 42 | 42 (across 7 contracts) |
+| Unchecked return values | 1 | 1 (CrossChainRouter._lzSend) |
+| Magic numbers | 11 | 11 (4 contracts) |
+| Tribunal ACL | 2 | 2 (submitEvidence, fileAppeal) |
+| **Total** | **83** | **83 + 15 tests** |
 
 ---
 

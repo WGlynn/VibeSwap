@@ -38,7 +38,21 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - **GenesisContributions.s.sol** — founder addresses are placeholders (address(0x1/0x2/0x3))
 
-## Recently Completed (Feb 21, 2026 — Session 28 continued)
+## Recently Completed (Feb 22, 2026 — Session 29: Go-Live Deployment Readiness)
+92. **Deployment Script Gap Analysis + Tokenomics Deploy Script**
+    - **Production stub audit**: 3 CRITICAL (CrossChainRouter — documented), 6 HIGH, 3 LOW
+    - **Deploy gap audit**: identified 30+ contracts missing from deploy scripts
+    - **DeployTokenomics.s.sol** (NEW): deploys VIBEToken, Joule, ShapleyDistributor, PriorityRegistry, LiquidityGauge, SingleStaking, EmissionController. Full post-deploy wiring: minter auth, creator auth, ownership transfer, drainer auth. Includes SetupGauges, StartEmissions, TransferTokenomicsOwnership sub-scripts.
+    - **DeployIdentity.s.sol** (NEW): deploys SoulboundIdentity, AgentRegistry, ContributionDAG, VibeCode, RewardLedger, ContributionAttestor.
+    - **GenesisContributions.s.sol fix**: replaced hardcoded `address(0x1/0x2/0x3)` with `vm.envAddress()` calls
+    - **DeployProduction.s.sol fix**: chain-aware `_getWETH()` (7 mainnets + testnet fallback), updated next-steps to include tokenomics + identity deploy
+    - **IncentiveController.claimAuctionProceeds fix** (HIGH): first-come-first-served bug — first LP got ALL proceeds. Now uses pro-rata share from AMM liquidityBalance/totalLiquidity.
+    - **IncentiveController.getPoolIncentiveStats fix** (HIGH): returned all zeros — now queries vault ETH balances.
+    - **IncentiveController.recordExecution fix** (HIGH): slippage recording was commented out — now wires to SlippageGuaranteeFund.recordExecution with pool quote token lookup.
+    - **43 IncentiveController tests passing** (35 unit + 5 fuzz + 3 invariant, 128K calls)
+    - Commits: `612bf11`, `278ed88` — pushed to both remotes
+
+## Previously Completed (Feb 21, 2026 — Session 28 continued)
 90. **Protocol-Wide Security Hardening — 4-Agent Parallel Audit**
     - **15 new reentrancy hardening tests** (`test/security/ReentrancyHardeningTests.t.sol`): Malicious ERC20 tokens with transfer-callback reentrancy, all 3 hardened functions verified, access control + edge cases
     - **VibeLPNFT USDT fix**: 9 `approve()` → `forceApprove()` calls (HIGH: USDT pools would permanently revert)

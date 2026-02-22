@@ -1,0 +1,181 @@
+# VibeSwap Deployment Runbook
+
+## Prerequisites
+
+- **Private key** with sufficient ETH for gas (~0.5 ETH on L2, ~2 ETH on mainnet)
+- **Multisig wallet** (e.g., Safe) deployed on target chain
+- **Guardian address** for emergency pause capability
+- **Oracle signer** key pair for off-chain price feeds
+- **Keeper bot** address for automated emission drip/drain
+
+## Environment Variables
+
+```bash
+# Required
+export PRIVATE_KEY=0x...
+export GUARDIAN_ADDRESS=0x...
+export ORACLE_SIGNER=0x...
+
+# Optional (defaults to deployer)
+export OWNER_ADDRESS=0x...
+export MULTISIG_ADDRESS=0x...
+export KEEPER_ADDRESS=0x...
+```
+
+## Deployment Order
+
+Contracts must be deployed in this exact sequence due to inter-contract dependencies.
+
+### Phase 1: Core Trading System
+
+```bash
+forge script script/DeployProduction.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** VibeSwapCore, CommitRevealAuction, VibeAMM, DAOTreasury, CrossChainRouter, TruePriceOracle, StablecoinFlowRegistry, FeeRouter, ProtocolFeeAdapter, BuybackEngine
+
+**Post-deploy:**
+- Copy all output addresses to `.env`
+- Run `VerifyDeployment.s.sol` to validate
+
+### Phase 2: Pool Creation
+
+```bash
+forge script script/SetupMVP.s.sol --rpc-url $RPC_URL --broadcast
+```
+
+**Creates:** ETH/USDC, ETH/USDT, USDC/USDT, WBTC/USDC, ETH/WBTC pools with liquidity protection
+
+**Post-deploy:**
+- Add initial liquidity: `SetupMVP.s.sol:AddInitialLiquidity`
+- Set token prices: `SetupMVP.s.sol:UpdateTokenPrices`
+
+### Phase 3: Tokenomics Layer
+
+```bash
+# Set Phase 1 addresses
+export VIBESWAP_CORE=0x...  # From Phase 1 output
+
+forge script script/DeployTokenomics.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** VIBEToken, Joule, ShapleyDistributor, PriorityRegistry, LiquidityGauge, SingleStaking, EmissionController
+
+**Auto-configured:**
+- VIBEToken.setMinter(EmissionController)
+- ShapleyDistributor.setAuthorizedCreator(EmissionController)
+- ShapleyDistributor.setAuthorizedCreator(VibeSwapCore)
+- SingleStaking ownership → EmissionController
+- EmissionController.setAuthorizedDrainer(owner)
+
+**Post-deploy:**
+- Update BuybackEngine: `BuybackEngine.setProtocolToken(VIBE_TOKEN)`
+- Create gauges: `DeployTokenomics.s.sol:SetupGauges`
+- Start emissions: `DeployTokenomics.s.sol:StartEmissions`
+
+### Phase 4: Identity Layer
+
+```bash
+export VIBE_TOKEN=0x...  # From Phase 3 output
+
+forge script script/DeployIdentity.s.sol --rpc-url $RPC_URL --broadcast --verify
+```
+
+**Deploys:** SoulboundIdentity, AgentRegistry, ContributionDAG, VibeCode, RewardLedger, ContributionAttestor
+
+### Phase 5: Genesis Contributions
+
+```bash
+export CONTRIBUTION_DAG=0x...    # From Phase 4
+export REWARD_LEDGER=0x...       # From Phase 4
+export FARADAY1_ADDRESS=0x...    # Will's address
+export JARVIS_ADDRESS=0x...      # Jarvis agent address
+export FREEDOM_WARRIOR_ADDRESS=0x... # FreedomWarrior13's address
+
+forge script script/GenesisContributions.s.sol --rpc-url $RPC_URL --broadcast
+```
+
+**Records:** Retroactive contributions for founders (NOT finalized — requires 3-factor validation)
+
+### Phase 6: Cross-Chain Setup
+
+```bash
+forge script script/ConfigurePeers.s.sol --rpc-url $RPC_URL --broadcast
+```
+
+**Configures:** LayerZero V2 peer connections to other deployed chains
+
+### Phase 7: Ownership Transfer
+
+```bash
+export MULTISIG_ADDRESS=0x...
+
+# Transfer core contracts
+forge script script/DeployProduction.s.sol:TransferOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer tokenomics contracts
+forge script script/DeployTokenomics.s.sol:TransferTokenomicsOwnership --rpc-url $RPC_URL --broadcast
+```
+
+**Transfers:** All contract ownership to multisig (15+ contracts)
+
+### Phase 8: Start Operations
+
+1. **Oracle**: `python -m oracle.main` (off-chain Kalman filter)
+2. **Keeper bot**: Schedule `EmissionController.drip()` calls (every ~10 min)
+3. **Frontend**: Update `.env` with all contract addresses, deploy to Vercel
+4. **Monitor**: Watch events for first drip, first swap, first Shapley game
+
+## Verification Checklist
+
+After full deployment, verify:
+
+- [ ] All proxy contracts have correct implementation code
+- [ ] All ownership is set to intended addresses
+- [ ] VIBEToken has EmissionController as only minter
+- [ ] ShapleyDistributor authorized creators = [EmissionController, VibeSwapCore]
+- [ ] SingleStaking owner = EmissionController
+- [ ] Guardian can pause VibeSwapCore
+- [ ] CircuitBreaker thresholds are configured
+- [ ] Flash loan protection enabled
+- [ ] TWAP validation enabled
+- [ ] Rate limiting configured (1M/hr/user)
+- [ ] Oracle signer authorized on TruePriceOracle + StablecoinFlowRegistry
+- [ ] Pools created with liquidity protection
+- [ ] Token prices set (for liquidity protection USD calculations)
+- [ ] Fee pipeline: AMM → FeeAdapter → FeeRouter → (Treasury 40%, Insurance 20%, RevShare 30%, Buyback 10%)
+- [ ] EmissionController.drip() succeeds
+- [ ] Test swap completes full commit → reveal → settle cycle
+
+## Emergency Procedures
+
+### Pause All Trading
+```bash
+forge script script/DeployProduction.s.sol:EmergencyPause --rpc-url $RPC_URL --broadcast
+```
+Guardian or owner can call. Resumes with `VibeSwapCore.unpause()`.
+
+### Contract Upgrade
+UUPS upgrades require:
+1. Deploy new implementation
+2. Call `upgradeToAndCall(newImpl, "")` from owner/multisig
+3. Verify new implementation on block explorer
+
+### Emission Emergency
+If EmissionController is compromised:
+1. `VIBEToken.setMinter(emissionController, false)` — revoke minting
+2. MAX_SUPPLY hard cap in VIBEToken prevents over-minting regardless
+
+## Supported Chains
+
+| Chain | Chain ID | LZ Endpoint | WETH |
+|-------|----------|-------------|------|
+| Ethereum | 1 | 0x1a44...728c | 0xC02a...6Cc2 |
+| Arbitrum | 42161 | 0x1a44...728c | 0x82aF...Bab1 |
+| Optimism | 10 | 0x1a44...728c | 0x4200...0006 |
+| Base | 8453 | 0x1a44...728c | 0x4200...0006 |
+| Polygon | 137 | 0x1a44...728c | 0x7ceB...f619 |
+| Avalanche | 43114 | 0x1a44...728c | 0x49D5...0bAB |
+| BSC | 56 | 0x1a44...728c | 0x2170...33F8 |
+| Sepolia | 11155111 | 0x6EDC...f10f | env var |
+| Base Sepolia | 84532 | 0x6EDC...f10f | env var |

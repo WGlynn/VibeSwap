@@ -11,6 +11,7 @@ import "../contracts/incentives/MerkleAirdrop.sol";
 import "../contracts/oracles/VolatilityOracle.sol";
 import "../contracts/amm/VibeAMM.sol";
 import "../contracts/core/VibeSwapCore.sol";
+import "../contracts/core/FeeRouter.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -82,6 +83,7 @@ contract DeployIncentives is Script {
         address owner = vm.envOr("OWNER_ADDRESS", deployer);
         address vibeToken = vm.envOr("VIBE_TOKEN", address(0));
         address shapleyDistributor = vm.envOr("SHAPLEY_DISTRIBUTOR", address(0));
+        address feeRouterAddr = vm.envOr("FEE_ROUTER", address(0));
 
         vm.startBroadcast(deployerKey);
 
@@ -212,6 +214,19 @@ contract DeployIncentives is Script {
 
         VibeSwapCore(payable(vibeSwapCore)).setIncentiveController(incentiveController);
         console.log("  VibeSwapCore.setIncentiveController set");
+
+        // Update FeeRouter insurance target from deployer placeholder to actual insurance pool
+        if (feeRouterAddr != address(0)) {
+            console.log("");
+            console.log("=== Updating FeeRouter targets ===");
+            FeeRouter(feeRouterAddr).setInsurance(volatilityInsurancePool);
+            console.log("  FeeRouter.setInsurance -> VolatilityInsurancePool");
+            // Note: FeeRouter.setRevShare should be called after DeployTokenomics
+            // when VibeRevShare contract is deployed with JUL token address
+        } else {
+            console.log("  SKIP FeeRouter update (FEE_ROUTER not provided)");
+            console.log("  IMPORTANT: Call FeeRouter.setInsurance(VOLATILITY_INSURANCE_POOL) manually!");
+        }
 
         vm.stopBroadcast();
 

@@ -72,6 +72,7 @@ forge script script/DeployIncentives.s.sol --rpc-url $RPC_URL --broadcast --veri
 - IncentiveController authorizes VibeAMM + VibeSwapCore as callers
 - VibeAMM.setIncentiveController(IncentiveController) -- enables LP lifecycle hooks + volatility fee routing
 - VibeSwapCore.setIncentiveController(IncentiveController) -- enables execution tracking + slippage compensation
+- FeeRouter.setInsurance(VolatilityInsurancePool) -- redirects 20% fee split from deployer to actual insurance pool
 
 **Post-deploy:**
 - Fund VolatilityInsurancePool with initial reserves
@@ -97,6 +98,7 @@ forge script script/DeployTokenomics.s.sol --rpc-url $RPC_URL --broadcast --veri
 **Post-deploy:**
 - Update BuybackEngine: `BuybackEngine.setProtocolToken(VIBE_TOKEN)`
 - Wire IncentiveController: `IncentiveController.setShapleyDistributor(SHAPLEY_DISTRIBUTOR)`
+- Wire FeeRouter revShare: `FeeRouter.setRevShare(VIBE_REVSHARE)` (deploy VibeRevShare first)
 - Create gauges: `DeployTokenomics.s.sol:SetupGauges`
 - Start emissions: `DeployTokenomics.s.sol:StartEmissions`
 

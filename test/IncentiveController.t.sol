@@ -20,13 +20,39 @@ contract MockICToken is ERC20 {
 contract MockICVolatilityPool {
     uint256 public totalDeposited;
 
+    // Per-pool per-token reserves for getPoolInsurance queries
+    mapping(bytes32 => mapping(address => uint256)) public reserveBalances;
+
     function depositFees(bytes32, address, uint256 amount) external {
         totalDeposited += amount;
+    }
+
+    function setReserveBalance(bytes32 poolId, address token, uint256 amount) external {
+        reserveBalances[poolId][token] = amount;
+    }
+
+    struct PoolInsurance {
+        uint256 reserveBalance;
+        uint256 targetReserve;
+        uint256 totalDeposited;
+        uint256 totalClaimsPaid;
+        uint64 lastClaimTimestamp;
+    }
+
+    function getPoolInsurance(bytes32 poolId, address token) external view returns (PoolInsurance memory) {
+        return PoolInsurance({
+            reserveBalance: reserveBalances[poolId][token],
+            targetReserve: 0,
+            totalDeposited: 0,
+            totalClaimsPaid: 0,
+            lastClaimTimestamp: 0
+        });
     }
 }
 
 contract MockICILProtectionVault {
     mapping(bytes32 => mapping(address => uint256)) public claimableAmounts;
+    mapping(address => uint256) public totalReserves;
     bool public positionRegistered;
 
     function registerPosition(bytes32, address, uint256, uint256, uint8) external {
@@ -46,12 +72,21 @@ contract MockICILProtectionVault {
     function setClaimable(bytes32 poolId, address lp, uint256 amount) external {
         claimableAmounts[poolId][lp] = amount;
     }
+
+    function getTotalReserves(address token) external view returns (uint256) {
+        return totalReserves[token];
+    }
+
+    function setTotalReserves(address token, uint256 amount) external {
+        totalReserves[token] = amount;
+    }
 }
 
 contract MockICLoyaltyRewardsManager {
     bool public stakeRegistered;
     bool public unstakeRecorded;
     mapping(bytes32 => mapping(address => uint256)) public rewards;
+    mapping(bytes32 => uint256) public poolTotalStaked;
 
     function registerStake(bytes32, address, uint256) external {
         stakeRegistered = true;
@@ -75,10 +110,31 @@ contract MockICLoyaltyRewardsManager {
     function setRewards(bytes32 poolId, address lp, uint256 amount) external {
         rewards[poolId][lp] = amount;
     }
+
+    function setPoolTotalStaked(bytes32 poolId, uint256 amount) external {
+        poolTotalStaked[poolId] = amount;
+    }
+
+    struct PoolRewardState {
+        uint256 rewardPerShareAccumulated;
+        uint256 totalStaked;
+        uint256 pendingPenalties;
+        uint64 lastRewardTimestamp;
+    }
+
+    function getPoolState(bytes32 poolId) external view returns (PoolRewardState memory) {
+        return PoolRewardState({
+            rewardPerShareAccumulated: 0,
+            totalStaked: poolTotalStaked[poolId],
+            pendingPenalties: 0,
+            lastRewardTimestamp: 0
+        });
+    }
 }
 
 contract MockICSlippageGuaranteeFund {
     mapping(bytes32 => uint256) public claimAmounts;
+    mapping(address => uint256) public totalReserves;
 
     function processClaim(bytes32 claimId) external returns (uint256) {
         uint256 amount = claimAmounts[claimId];
@@ -89,21 +145,36 @@ contract MockICSlippageGuaranteeFund {
     function setClaimAmount(bytes32 claimId, uint256 amount) external {
         claimAmounts[claimId] = amount;
     }
+
+    function getTotalReserves(address token) external view returns (uint256) {
+        return totalReserves[token];
+    }
+
+    function setTotalReserves(address token, uint256 amount) external {
+        totalReserves[token] = amount;
+    }
 }
 
 contract MockICAMM {
     mapping(bytes32 => mapping(address => uint256)) public liquidityBalance;
     mapping(bytes32 => uint256) public poolTotalLiquidity;
+    mapping(bytes32 => address) public poolToken0;
+    mapping(bytes32 => address) public poolToken1;
 
     function setLiquidity(bytes32 poolId, address user, uint256 balance, uint256 total) external {
         liquidityBalance[poolId][user] = balance;
         poolTotalLiquidity[poolId] = total;
     }
 
+    function setPoolTokens(bytes32 poolId, address _token0, address _token1) external {
+        poolToken0[poolId] = _token0;
+        poolToken1[poolId] = _token1;
+    }
+
     function getPool(bytes32 poolId) external view returns (IAMMLiquidityQuery.Pool memory) {
         return IAMMLiquidityQuery.Pool({
-            token0: address(0),
-            token1: address(0),
+            token0: poolToken0[poolId],
+            token1: poolToken1[poolId],
             reserve0: 0,
             reserve1: 0,
             totalLiquidity: poolTotalLiquidity[poolId],
@@ -611,14 +682,21 @@ contract IncentiveControllerTest is Test {
         vm.prank(coreAddr);
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
 
-        // Fund vaults with ETH to verify stats query
-        vm.deal(address(volPool), 5 ether);
-        vm.deal(address(ilVault), 3 ether);
+        // Set pool tokens on AMM mock so stats can query reserves by token
+        mockAMM.setPoolTokens(poolId, address(token), address(0xBEEF));
+
+        // Set ERC20 reserves in vault mocks (not ETH balance)
+        volPool.setReserveBalance(poolId, address(token), 5 ether);
+        ilVault.setTotalReserves(address(token), 3 ether);
+        slippageFund.setTotalReserves(address(token), 2 ether);
+        loyaltyManager.setPoolTotalStaked(poolId, 100 ether);
 
         IIncentiveController.PoolIncentiveStats memory stats = controller.getPoolIncentiveStats(poolId);
         assertEq(stats.totalAuctionProceedsDistributed, 10 ether);
-        assertEq(stats.volatilityReserve, 5 ether);
-        assertEq(stats.ilReserve, 3 ether);
+        assertEq(stats.volatilityReserve, 5 ether); // token0 reserve only
+        assertEq(stats.ilReserve, 3 ether); // token0 reserve only
+        assertEq(stats.slippageReserve, 2 ether); // token0 reserve only
+        assertEq(stats.totalLoyaltyStaked, 100 ether);
     }
 
     // ============ Receive ETH ============

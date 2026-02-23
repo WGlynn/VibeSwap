@@ -28,6 +28,18 @@ interface IAMMLiquidityQuery {
     function getPool(bytes32 poolId) external view returns (Pool memory);
 }
 
+// Minimal interface for querying volatility insurance reserves
+interface IVolatilityInsuranceQuery {
+    struct PoolInsurance {
+        uint256 reserveBalance;
+        uint256 targetReserve;
+        uint256 totalDeposited;
+        uint256 totalClaimsPaid;
+        uint64 lastClaimTimestamp;
+    }
+    function getPoolInsurance(bytes32 poolId, address token) external view returns (PoolInsurance memory);
+}
+
 /**
  * @title IncentiveController
  * @notice Central coordinator for all VibeSwap incentive mechanisms
@@ -403,16 +415,60 @@ contract IncentiveController is
     // ============ View Functions ============
 
     function getPoolIncentiveStats(bytes32 poolId) external view override returns (PoolIncentiveStats memory stats) {
-        // Query vault balances (ETH held as reserve proxy)
+        // Query pool tokens from AMM for ERC20 reserve lookups
+        IAMMLiquidityQuery.Pool memory pool;
+        if (vibeAMM != address(0)) {
+            try IAMMLiquidityQuery(vibeAMM).getPool(poolId) returns (IAMMLiquidityQuery.Pool memory p) {
+                pool = p;
+            } catch {}
+        }
+
+        // Volatility insurance: sum ERC20 reserves for both pool tokens
+        uint256 volReserve;
+        if (volatilityInsurancePool != address(0) && pool.initialized) {
+            try IVolatilityInsuranceQuery(volatilityInsurancePool).getPoolInsurance(poolId, pool.token0) returns (IVolatilityInsuranceQuery.PoolInsurance memory ins0) {
+                volReserve += ins0.reserveBalance;
+            } catch {}
+            try IVolatilityInsuranceQuery(volatilityInsurancePool).getPoolInsurance(poolId, pool.token1) returns (IVolatilityInsuranceQuery.PoolInsurance memory ins1) {
+                volReserve += ins1.reserveBalance;
+            } catch {}
+        }
+
+        // IL protection: sum ERC20 reserves for both pool tokens
+        uint256 ilReserve;
+        if (address(ilProtectionVault) != address(0) && pool.initialized) {
+            try ilProtectionVault.getTotalReserves(pool.token0) returns (uint256 r0) {
+                ilReserve += r0;
+            } catch {}
+            try ilProtectionVault.getTotalReserves(pool.token1) returns (uint256 r1) {
+                ilReserve += r1;
+            } catch {}
+        }
+
+        // Slippage guarantee: sum ERC20 reserves for both pool tokens
+        uint256 slipReserve;
+        if (address(slippageGuaranteeFund) != address(0) && pool.initialized) {
+            try slippageGuaranteeFund.getTotalReserves(pool.token0) returns (uint256 r0) {
+                slipReserve += r0;
+            } catch {}
+            try slippageGuaranteeFund.getTotalReserves(pool.token1) returns (uint256 r1) {
+                slipReserve += r1;
+            } catch {}
+        }
+
+        // Loyalty: query pool-specific staked amount
+        uint256 loyaltyStaked;
+        if (address(loyaltyRewardsManager) != address(0)) {
+            try loyaltyRewardsManager.getPoolState(poolId) returns (ILoyaltyRewardsManager.PoolRewardState memory state) {
+                loyaltyStaked = state.totalStaked;
+            } catch {}
+        }
+
         stats = PoolIncentiveStats({
-            volatilityReserve: volatilityInsurancePool != address(0)
-                ? volatilityInsurancePool.balance : 0,
-            ilReserve: address(ilProtectionVault) != address(0)
-                ? address(ilProtectionVault).balance : 0,
-            slippageReserve: address(slippageGuaranteeFund) != address(0)
-                ? address(slippageGuaranteeFund).balance : 0,
-            totalLoyaltyStaked: address(loyaltyRewardsManager) != address(0)
-                ? address(loyaltyRewardsManager).balance : 0,
+            volatilityReserve: volReserve,
+            ilReserve: ilReserve,
+            slippageReserve: slipReserve,
+            totalLoyaltyStaked: loyaltyStaked,
             totalAuctionProceedsDistributed: poolAuctionProceeds[poolId]
         });
     }

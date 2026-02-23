@@ -34,6 +34,9 @@ library TWAPOracle {
      * @param state Oracle state to initialize
      * @param initialPrice Initial spot price (used to seed cumulative for immediate TWAP availability)
      */
+    /// @notice Default cardinality for new pools (allows TWAP to bootstrap automatically)
+    uint16 constant DEFAULT_CARDINALITY = 10;
+
     function initialize(
         OracleState storage state,
         uint256 initialPrice
@@ -46,7 +49,11 @@ library TWAPOracle {
         });
         state.index = 0;
         state.cardinality = 1;
-        state.cardinalityNext = 1;
+        // Auto-grow to DEFAULT_CARDINALITY so subsequent write() calls
+        // actually accumulate distinct observations. Without this,
+        // cardinalityNext=1 causes write() to overwrite index 0 forever,
+        // leaving cardinality stuck at 1 and all TWAP validation disabled.
+        state.cardinalityNext = DEFAULT_CARDINALITY;
     }
 
     /**

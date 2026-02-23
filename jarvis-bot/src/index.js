@@ -30,6 +30,7 @@ try {
   console.warn('[jarvis] Run "npm install" to add the telegram (GramJS) package.');
   MONITORED_GROUPS = ['NervosNation'];
 }
+import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { createServer } from 'http';
 import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
@@ -985,15 +986,16 @@ async function main() {
     console.warn(`[jarvis] Git pull failed (will use local files): ${err.message}`);
   }
 
-  // Step 2: Load context, conversation history, moderation log, threads
-  console.log('[jarvis] Step 2: Loading memory, conversations, moderation, threads...');
+  // Step 2: Load context, conversation history, moderation log, threads, comms
+  console.log('[jarvis] Step 2: Loading memory, conversations, moderation, threads, comms...');
   await initClaude();
   await initTracker();
   await initModeration();
   await initAntispam();
   await initThreads();
   await loadBehavior();
-  console.log('[jarvis] Behavior flags loaded.');
+  await loadComms();
+  console.log('[jarvis] Behavior flags + comms loaded.');
 
   // Step 3: Context diagnosis
   const report = await diagnoseContext();
@@ -1134,6 +1136,167 @@ async function main() {
             res.end(JSON.stringify({ error: err.message }));
           }
         });
+      // ============ Claude Code API Bridge ============
+      // Direct HTTP communication — no human relay needed.
+      // All /api/* routes require X-Api-Secret header.
+      } else if (req.url?.startsWith('/api/')) {
+        // Auth check
+        const apiSecret = req.headers['x-api-secret'];
+        if (!config.claudeCodeApiSecret || apiSecret !== config.claudeCodeApiSecret) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized. Set CLAUDE_CODE_API_SECRET on both sides.' }));
+          return;
+        }
+
+        const url = new URL(req.url, `http://localhost:${healthPort}`);
+        const path = url.pathname;
+
+        // GET /api/status — Full JARVIS status
+        if (path === '/api/status' && req.method === 'GET') {
+          try {
+            const report = await diagnoseContext();
+            const monStatus = monitorAvailable && getMonitorStatus ? getMonitorStatus() : 'Monitor unavailable';
+            const commsStats = getCommsStats();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              status: 'ok',
+              uptime: process.uptime(),
+              model: config.anthropic.model,
+              context: { loaded: report.loaded.length, total: report.loaded.length + report.missing.length, chars: report.totalChars },
+              monitor: monStatus,
+              comms: commsStats,
+              timestamp: new Date().toISOString(),
+            }));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+
+        // GET /api/intel?group=NervosNation&count=50 — Group intel
+        } else if (path === '/api/intel' && req.method === 'GET') {
+          if (!monitorAvailable || !getMessagesForAnalysis) {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Monitor not available' }));
+            return;
+          }
+          const group = url.searchParams.get('group') || MONITORED_GROUPS[0] || 'NervosNation';
+          const count = parseInt(url.searchParams.get('count') || '50');
+          const messages = getMessagesForAnalysis(group, count);
+          const report = formatIntelReport(group);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ group, messageCount: messages.length, messages, report }));
+
+        // POST /api/message — Claude Code sends message/task to JARVIS
+        } else if (path === '/api/message' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body);
+              const entry = receiveFromClaudeCode(payload);
+              await saveComms();
+
+              // If it's a task or message that should be forwarded to Telegram
+              if (payload.notify && config.ownerUserId) {
+                const prefix = payload.type === 'task' ? '[Claude Code Task]' : '[Claude Code]';
+                const content = typeof payload.content === 'string' ? payload.content : JSON.stringify(payload.content);
+                const text = `${prefix}\n${content.slice(0, 3000)}`;
+                try {
+                  await bot.telegram.sendMessage(config.ownerUserId, text);
+                } catch { /* notification is best-effort */ }
+              }
+
+              // If it's a task, process it with Claude and queue the result
+              if (payload.type === 'task' && payload.content) {
+                const taskContent = typeof payload.content === 'string' ? payload.content : JSON.stringify(payload.content);
+                try {
+                  const response = await chat(config.ownerUserId, 'claude-code-bridge', taskContent, 'private');
+                  sendToClaudeCode('task_result', response.text, { taskId: entry.id });
+                  markProcessed(entry.id);
+                  await saveComms();
+                } catch (err) {
+                  sendToClaudeCode('task_error', err.message, { taskId: entry.id });
+                  markProcessed(entry.id);
+                  await saveComms();
+                }
+              } else {
+                markProcessed(entry.id);
+                await saveComms();
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, id: entry.id }));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+
+        // GET /api/outbox — Messages JARVIS has queued for Claude Code
+        } else if (path === '/api/outbox' && req.method === 'GET') {
+          const messages = getOutbox();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ count: messages.length, messages }));
+
+        // POST /api/outbox/ack — Claude Code acknowledges receipt
+        } else if (path === '/api/outbox/ack' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body);
+              acknowledgeOutbox(payload.ids || 'all');
+              await saveComms();
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true }));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+
+        // GET /api/comms/log — Audit trail
+        } else if (path === '/api/comms/log' && req.method === 'GET') {
+          const count = parseInt(url.searchParams.get('count') || '20');
+          const log = getCommsLog(count);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ count: log.length, log }));
+
+        // POST /api/tg/send — Send a message to Telegram via JARVIS
+        } else if (path === '/api/tg/send' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body);
+              const chatId = payload.chatId || config.ownerUserId;
+              const text = payload.text || payload.message || '';
+              if (!text) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'text is required' }));
+                return;
+              }
+              await bot.telegram.sendMessage(chatId, text, { parse_mode: undefined });
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, chatId }));
+            } catch (err) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unknown API route', available: [
+            'GET /api/status',
+            'GET /api/intel?group=&count=',
+            'POST /api/message',
+            'GET /api/outbox',
+            'POST /api/outbox/ack',
+            'GET /api/comms/log?count=',
+            'POST /api/tg/send',
+          ]}));
+        }
       } else {
         res.writeHead(404);
         res.end('Not found');
@@ -1141,6 +1304,7 @@ async function main() {
     }).listen(healthPort, () => {
       console.log(`[jarvis] Health endpoint: http://0.0.0.0:${healthPort}/health`);
       console.log(`[jarvis] Transcript webhook: http://0.0.0.0:${healthPort}/transcript`);
+      console.log(`[jarvis] Claude Code API: http://0.0.0.0:${healthPort}/api/* ${config.claudeCodeApiSecret ? '(secured)' : '(NO SECRET SET — disabled)'}`);
     });
   }
 
@@ -1185,13 +1349,15 @@ async function main() {
     console.warn(`[jarvis] Could not notify owner: ${err.message}`);
   }
 
-  // Flush all data every 5 minutes (tracker + conversations + moderation + threads)
+  // Flush all data every 5 minutes (tracker + conversations + moderation + threads + comms)
   setInterval(async () => {
     await flushTracker();
     await saveConversations();
     await flushModeration();
     await flushAntispam();
     await flushThreads();
+    pruneOldMessages();
+    await saveComms();
   }, 5 * 60 * 1000);
 
   // Scheduled daily digest — send at configured hour (default 18:00 UTC)
@@ -1239,6 +1405,7 @@ async function main() {
     await flushModeration();
     await flushAntispam();
     await flushThreads();
+    await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);
   }

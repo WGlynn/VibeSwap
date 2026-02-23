@@ -173,6 +173,12 @@ contract VolatilityOracle is
 
         // Invalidate cache
         data.lastCacheUpdate = 0;
+
+        // Emit event for off-chain monitoring (only if enough data for calculation)
+        if (data.count >= 3) {
+            uint256 vol = _calculateVolatility(poolId);
+            emit VolatilityUpdated(poolId, vol, _volatilityToTier(vol));
+        }
     }
 
     /**

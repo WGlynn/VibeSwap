@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt } from './claude.js';
-import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData } from './git.js';
+import { initClaude, chat, codeGenChat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt } from './claude.js';
+import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
@@ -687,6 +687,76 @@ bot.command('backlog', async (ctx) => {
   }
 
   ctx.reply('Usage:\n/backlog — list open items\n/backlog 003 — view item\n/backlog add <suggestion> — add new\n/backlog close 003 — close item');
+});
+
+// ============ Idea-to-Code Pipeline ============
+
+bot.command('idea', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+
+  const ideaText = ctx.message.text.replace('/idea', '').trim();
+  if (!ideaText || ideaText.length < 20) {
+    return ctx.reply(
+      'Usage: /idea <description of your idea>\n\n' +
+      'Describe what you want to build. Jarvis will:\n' +
+      '1. Analyze the idea\n' +
+      '2. Generate code drafts\n' +
+      '3. Create a branch and push\n' +
+      '4. Give you a summary\n\n' +
+      'Example: /idea Add a reputation-weighted voting system where LP providers with higher trust tiers get quadratic vote weight'
+    );
+  }
+
+  const author = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const slug = ideaText.slice(0, 40).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+  const branch = `idea/${slug}`;
+
+  await ctx.reply(`Processing idea from @${author}...\n\nCreating branch: ${branch}`);
+  await ctx.sendChatAction('typing');
+
+  try {
+    // 1. Create branch
+    const branchResult = await gitCreateBranch(branch);
+    if (!branchResult.ok) {
+      await gitReturnToMaster();
+      return ctx.reply(`Failed to create branch: ${branchResult.error}`);
+    }
+
+    // 2. Generate code with Claude
+    const { text, filesWritten } = await codeGenChat(ideaText, author);
+
+    if (filesWritten.length === 0) {
+      await gitReturnToMaster();
+      return ctx.reply(`Jarvis analyzed the idea but didn't generate files:\n\n${text.slice(0, 1500)}`);
+    }
+
+    // 3. Commit and push
+    const commitMsg = `idea: ${ideaText.slice(0, 72)}\n\nAuthor: @${author} (via Telegram)\nFiles: ${filesWritten.join(', ')}`;
+    const pushResult = await gitCommitAndPushBranch(commitMsg, branch);
+
+    // 4. Return to master
+    await gitReturnToMaster();
+
+    // 5. Report back
+    const fileList = filesWritten.map(f => `  - ${f}`).join('\n');
+    const summary = text.length > 800 ? text.slice(0, 800) + '...' : text;
+
+    await ctx.reply(
+      `Idea drafted and pushed!\n\n` +
+      `Branch: ${branch}\n` +
+      `Files (${filesWritten.length}):\n${fileList}\n\n` +
+      `${pushResult}\n\n` +
+      `Summary:\n${summary}\n\n` +
+      `Create a PR at: https://github.com/wglynn/vibeswap/compare/${branch}?expand=1`
+    );
+
+    // Track the contribution
+    await trackMessage(ctx);
+
+  } catch (error) {
+    await gitReturnToMaster();
+    ctx.reply(`Idea generation failed: ${error.message}`);
+  }
 });
 
 // ============ Message Handler ============

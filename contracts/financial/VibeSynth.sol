@@ -63,6 +63,9 @@ contract VibeSynth is ERC721, Ownable, ReentrancyGuard, IVibeSynth {
     mapping(uint256 => SynthPosition) private _positions;
     mapping(address => bool) public authorizedPriceSetters;
 
+    /// @notice Maximum allowed price change per update in BPS (2000 = 20%). Owner bypasses this.
+    uint16 public maxPriceJumpBps = 2000;
+
     // ============ Constructor ============
 
     constructor(
@@ -142,6 +145,14 @@ contract VibeSynth is ERC721, Ownable, ReentrancyGuard, IVibeSynth {
 
         SynthAsset storage asset = _synthAssets[synthAssetId];
         uint256 oldPrice = asset.currentPrice;
+
+        // Price jump validation — owner bypasses for emergencies
+        if (msg.sender != owner() && maxPriceJumpBps > 0 && oldPrice > 0) {
+            uint256 delta = newPrice > oldPrice ? newPrice - oldPrice : oldPrice - newPrice;
+            uint256 maxDelta = (oldPrice * maxPriceJumpBps) / BPS;
+            if (delta > maxDelta) revert PriceJumpExceeded();
+        }
+
         asset.currentPrice = newPrice;
         asset.lastPriceUpdate = uint40(block.timestamp);
 
@@ -155,6 +166,17 @@ contract VibeSynth is ERC721, Ownable, ReentrancyGuard, IVibeSynth {
         if (setter == address(0)) revert ZeroAddress();
         authorizedPriceSetters[setter] = authorized;
         emit PriceSetterUpdated(setter, authorized);
+    }
+
+    /**
+     * @notice Set maximum allowed price jump per update (BPS)
+     * @param bps New limit (0 = disabled, max 5000 = 50%)
+     */
+    function setMaxPriceJump(uint16 bps) external onlyOwner {
+        if (bps > 5000) revert InvalidJumpLimit();
+        uint16 old = maxPriceJumpBps;
+        maxPriceJumpBps = bps;
+        emit MaxPriceJumpUpdated(old, bps);
     }
 
     /**

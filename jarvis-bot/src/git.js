@@ -65,6 +65,48 @@ export async function gitLog(count = 5) {
     .join('\n');
 }
 
+// ============ Branch Operations ============
+
+export async function gitCreateBranch(branchName) {
+  if (!git) return { ok: false, error: NO_REPO };
+  try {
+    // Ensure we're up to date
+    await git.checkout('master');
+    await git.pull(config.repo.remoteOrigin, 'master');
+    // Create and switch to new branch
+    await git.checkoutLocalBranch(branchName);
+    return { ok: true, branch: branchName };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+export async function gitCommitAndPushBranch(message, branch) {
+  if (!git) return NO_REPO;
+  try {
+    const status = await git.status();
+    if (!status.modified.length && !status.not_added.length && !status.staged.length) {
+      return 'Nothing to commit.';
+    }
+    await git.add('-A');
+    const fullMessage = `${message}\n\nCo-Authored-By: JARVIS <noreply@anthropic.com>`;
+    await git.commit(fullMessage);
+    await git.push(config.repo.remoteOrigin, branch, ['--set-upstream']);
+    await git.push(config.repo.remoteStealth, branch, ['--set-upstream']);
+    const log = await git.log({ maxCount: 1 });
+    return `Committed and pushed branch ${branch}: ${log.latest.hash.slice(0, 7)}`;
+  } catch (error) {
+    return `Git operation failed: ${error.message}`;
+  }
+}
+
+export async function gitReturnToMaster() {
+  if (!git) return;
+  try {
+    await git.checkout('master');
+  } catch {}
+}
+
 // ============ Data Backup ============
 // Commits contribution/user/interaction data to git for off-machine recovery
 

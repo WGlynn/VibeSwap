@@ -317,4 +317,8 @@ contract VibeAMMLite is
         IERC20(token).safeTransfer(treasury, a);
         emit FeesCollected(token, a);
     }
+
+    function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
+        poolOracles[poolId].grow(newCardinality);
+    }
 }

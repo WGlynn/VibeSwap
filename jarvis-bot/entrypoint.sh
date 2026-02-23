@@ -40,8 +40,18 @@ if [ -n "$GITHUB_STEALTH_URL" ]; then
 fi
 
 # ============ Context Files ============
+# If clone failed, seed core context from bundled fallback so Jarvis always has context
+if [ ! -f "$REPO_DIR/CLAUDE.md" ] && [ -f "/app/context-fallback/CLAUDE.md" ]; then
+    echo "Clone failed or incomplete — seeding core context from bundled fallback..."
+    mkdir -p "$REPO_DIR/.claude"
+    cp /app/context-fallback/CLAUDE.md "$REPO_DIR/" 2>/dev/null || true
+    cp /app/context-fallback/.claude/SESSION_STATE.md "$REPO_DIR/.claude/" 2>/dev/null || true
+    cp /app/context-fallback/.claude/JarvisxWill_CKB.md "$REPO_DIR/.claude/" 2>/dev/null || true
+    echo "  Fallback context files deployed to $REPO_DIR"
+fi
+
 # Memory files are bundled in /app/memory/ at build time.
-# If the repo clone has them (local dev), use those. Otherwise use bundled.
+# If the repo clone has them, prefer those (fresher). Otherwise use bundled.
 REPO_MEMORY="/repo/.claude/projects/C--Users-Will/memory"
 if [ -f "$REPO_MEMORY/MEMORY.md" ]; then
     MEMORY_DIR="${MEMORY_DIR:-$REPO_MEMORY}"
@@ -96,7 +106,15 @@ for f in CLAUDE.md .claude/SESSION_STATE.md .claude/JarvisxWill_CKB.md; do
         CONTEXT_COUNT=$((CONTEXT_COUNT + 1))
     fi
 done
-echo "  Context files: $CONTEXT_COUNT/3 core files found"
+MEMORY_COUNT=0
+for f in MEMORY.md it-token-vision.md gentu-substrate.md freedom-micro-interfaces.md matt-pow-mmr.md; do
+    if [ -f "$MEMORY_DIR/$f" ]; then
+        MEMORY_COUNT=$((MEMORY_COUNT + 1))
+    fi
+done
+echo "  Core context: $CONTEXT_COUNT/3 files found"
+echo "  Memory files: $MEMORY_COUNT/5 files found"
+echo "  Total context: $((CONTEXT_COUNT + MEMORY_COUNT))/8 files loaded"
 echo ""
 echo "============ STARTING JARVIS ============"
 

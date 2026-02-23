@@ -206,3 +206,113 @@ fly ssh console               # SSH into running machine
 fly logs --no-tail | tail -20  # Check startup succeeded
 curl -s https://APP.fly.dev/health  # Verify external reachability
 ```
+
+---
+
+## Vercel Post-Deploy Verification Primitive (MANDATORY — Session 33)
+
+**Anti-pattern observed**: Pushed fixes to GitHub, told user "it's live", user tested and NOTHING was fixed. Vercel git integration was NOT auto-deploying. User was testing old code and getting increasingly frustrated. Multiple rounds of "it's still broken" before discovering the deploy never happened.
+
+**Root cause**: Vercel git integration silently stops triggering rebuilds. No error, no notification. The dashboard shows green but the live bundle is stale.
+
+### The Primitive: ALWAYS Verify After Deploy
+
+After EVERY `vercel --prod` or git push that should trigger a deploy, run this verification:
+
+```bash
+# 1. Get the live HTML and extract bundle hash
+BUNDLE=$(curl -s https://YOUR-APP.vercel.app/ | grep -oP 'index-[A-Za-z0-9_-]+\.js' | head -1)
+echo "Live bundle: $BUNDLE"
+
+# 2. Compare against local build
+LOCAL=$(ls frontend/dist/assets/index-*.js 2>/dev/null | head -1 | xargs basename)
+echo "Local bundle: $LOCAL"
+
+# 3. Check that your fix strings are IN the live bundle
+curl -s "https://YOUR-APP.vercel.app/assets/$BUNDLE" | grep -c "YOUR_FIX_STRING"
+# Must return >= 1. If 0, the fix is NOT deployed.
+
+# 4. Check that old broken code is REMOVED from the live bundle
+curl -s "https://YOUR-APP.vercel.app/assets/$BUNDLE" | grep -c "OLD_BROKEN_STRING"
+# Must return 0. If > 0, old code is still live.
+
+# 5. Verify lazy-loaded chunks (for route-level components)
+CHUNK=$(curl -s "https://YOUR-APP.vercel.app/assets/$BUNDLE" | grep -oP '[A-Za-z]+-[A-Za-z0-9_-]+\.js' | head -5)
+for c in $CHUNK; do
+  SIZE=$(curl -s -o /dev/null -w "%{size_download}" "https://YOUR-APP.vercel.app/assets/$c")
+  echo "Chunk $c: ${SIZE} bytes"
+done
+```
+
+### When Git Integration Fails (KNOWN ISSUE)
+
+If bundle hashes don't match after git push:
+
+```bash
+# Force deploy from CLI — bypasses git integration entirely
+cd frontend && vercel --prod --yes
+```
+
+Then re-run the verification. The CLI deploy is authoritative — if it succeeds, the live site is updated.
+
+### Generalizable Principle
+
+**"Never trust the deploy pipeline. Trust the live bundle."**
+
+- CI/CD dashboards can show green while serving stale code
+- Git push ≠ deployed. Build success ≠ served to users.
+- The ONLY source of truth is what `curl` returns from the live URL
+- This applies to ALL platforms: Vercel, Netlify, Cloudflare Pages, Fly.io, etc.
+
+### Checklist (run after every frontend deploy)
+
+1. [ ] `curl` live URL → extract bundle filename
+2. [ ] Compare bundle hash: live vs local build
+3. [ ] Grep live bundle for fix strings → all present
+4. [ ] Grep live bundle for removed code → all absent
+5. [ ] Check lazy chunks load (non-zero byte sizes)
+6. [ ] Test critical routes respond (/, /jarvis, /buy, etc.)
+
+---
+
+## Basescan Contract Verification (Session 33)
+
+### Command Template
+
+```bash
+# Implementation contracts (no constructor args):
+forge verify-contract CONTRACT_ADDRESS \
+  src/path/Contract.sol:ContractName \
+  --etherscan-api-key $BASESCAN_API_KEY \
+  --chain-id 8453 \
+  --optimizer-runs 1 \
+  --compiler-version 0.8.20 \
+  --via-ir \
+  --rpc-url https://mainnet.base.org
+
+# Contracts WITH constructor args:
+forge verify-contract CONTRACT_ADDRESS \
+  src/path/Contract.sol:ContractName \
+  --etherscan-api-key $BASESCAN_API_KEY \
+  --chain-id 8453 \
+  --optimizer-runs 1 \
+  --compiler-version 0.8.20 \
+  --via-ir \
+  --rpc-url https://mainnet.base.org \
+  --constructor-args $(cast abi-encode "constructor(address,address)" ARG1 ARG2)
+```
+
+### Key Flags (MUST match deploy settings)
+- `--chain-id 8453` — Base mainnet
+- `--optimizer-runs 1` — Must match foundry.toml
+- `--compiler-version 0.8.20` — Must match pragma
+- `--via-ir` — If used during compilation, MUST be included for verification
+- `--rpc-url https://mainnet.base.org` — Required, otherwise "invalid provider URL" error
+
+### ERC1967Proxy Verification
+Basescan auto-detects and verifies identical proxy bytecode. If you deploy standard OZ ERC1967Proxy, it's likely already verified. Check before wasting API calls.
+
+### Gotchas
+- Contract source paths use `src/` prefix (Foundry convention), not `contracts/`
+- Fee contracts (FeeRouter, ProtocolFeeAdapter, BuybackEngine) live in `contracts/core/`, not `contracts/fees/`
+- API key env var: `BASESCAN_API_KEY` in `.env`

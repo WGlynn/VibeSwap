@@ -10,6 +10,25 @@ import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
+// Group monitor — graceful fallback if 'telegram' package not installed
+let initMonitor, interactiveAuth, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
+let monitorAvailable = false;
+try {
+  const monitor = await import('./telegram-monitor.js');
+  initMonitor = monitor.initMonitor;
+  interactiveAuth = monitor.interactiveAuth;
+  formatIntelReport = monitor.formatIntelReport;
+  getMonitorStatus = monitor.getMonitorStatus;
+  getMessagesForAnalysis = monitor.getMessagesForAnalysis;
+  startPolling = monitor.startPolling;
+  stopPolling = monitor.stopPolling;
+  MONITORED_GROUPS = monitor.MONITORED_GROUPS;
+  monitorAvailable = true;
+} catch (err) {
+  console.warn(`[jarvis] Group monitor unavailable: ${err.message}`);
+  console.warn('[jarvis] Run "npm install" to add the telegram (GramJS) package.');
+  MONITORED_GROUPS = ['NervosNation'];
+}
 import { createServer } from 'http';
 import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
@@ -689,6 +708,86 @@ bot.command('backlog', async (ctx) => {
   ctx.reply('Usage:\n/backlog — list open items\n/backlog 003 — view item\n/backlog add <suggestion> — add new\n/backlog close 003 — close item');
 });
 
+// ============ Group Monitor (MTProto) ============
+
+bot.command('monitor_setup', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  if (!monitorAvailable) return ctx.reply('Monitor module not loaded. Run npm install to add GramJS.');
+  await interactiveAuth(ctx, bot);
+});
+
+bot.command('monitor', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  if (!monitorAvailable) return ctx.reply('Monitor module not loaded. Run npm install to add GramJS.');
+  const arg = ctx.message.text.replace('/monitor', '').trim();
+
+  if (arg === 'status') {
+    return ctx.reply(getMonitorStatus());
+  }
+
+  if (arg === 'start') {
+    startPolling();
+    return ctx.reply('Monitor polling started.');
+  }
+
+  if (arg === 'stop') {
+    stopPolling();
+    return ctx.reply('Monitor polling stopped.');
+  }
+
+  ctx.reply('Usage:\n/monitor status — connection & group stats\n/monitor start — start polling\n/monitor stop — stop polling\n/monitor_setup — authenticate MTProto');
+});
+
+bot.command('intel', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (!monitorAvailable) return ctx.reply('Monitor module not loaded.');
+  const arg = ctx.message.text.replace('/intel', '').trim();
+  const group = arg || MONITORED_GROUPS[0] || 'NervosNation';
+
+  const report = formatIntelReport(group);
+
+  if (report.length <= 4096) {
+    await ctx.reply(report, { parse_mode: undefined });
+  } else {
+    // Split long intel reports
+    for (let i = 0; i < report.length; i += 4096) {
+      await ctx.reply(report.slice(i, i + 4096), { parse_mode: undefined });
+    }
+  }
+});
+
+bot.command('analyze_intel', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  if (!monitorAvailable) return ctx.reply('Monitor module not loaded.');
+  const arg = ctx.message.text.replace('/analyze_intel', '').trim();
+  const group = arg || MONITORED_GROUPS[0] || 'NervosNation';
+
+  const messages = getMessagesForAnalysis(group, 50);
+  if (messages.length === 0) {
+    return ctx.reply(`No messages from ${group} to analyze.`);
+  }
+
+  await ctx.sendChatAction('typing');
+
+  const transcript = messages.map(m => {
+    const time = new Date(m.date * 1000).toISOString().slice(11, 16);
+    return `[${time}] ${m.sender}: ${m.text}`;
+  }).join('\n');
+
+  const prompt =
+    `Analyze these recent messages from the ${group} Telegram group.\n` +
+    `Identify: key topics discussed, sentiment, any mentions of VibeSwap or related projects, ` +
+    `actionable insights, and potential collaboration opportunities.\n` +
+    `Be concise.\n\n${transcript}`;
+
+  try {
+    const response = await chat(ctx.chat.id, 'intel-analyst', prompt, 'private');
+    await ctx.reply(`Intel Analysis — ${group}:\n\n${response.text}`, { parse_mode: undefined });
+  } catch (err) {
+    await ctx.reply(`Analysis failed: ${err.message}`);
+  }
+});
+
 // ============ Idea-to-Code Pipeline ============
 
 bot.command('idea', async (ctx) => {
@@ -903,8 +1002,20 @@ async function main() {
     console.warn(`[jarvis] WARNING: Unclean shutdown detected. Last seen: ${lastShutdown.lastSeen}, downtime: ~${lastShutdown.downtime}min`);
   }
 
+  // Step 5: Initialize group monitor (MTProto — reads public groups without joining)
+  if (monitorAvailable) {
+    console.log('[jarvis] Step 5: Initializing group monitor...');
+    try {
+      await initMonitor();
+    } catch (err) {
+      console.warn(`[jarvis] Monitor init failed (non-fatal): ${err.message}`);
+    }
+  } else {
+    console.log('[jarvis] Step 5: Group monitor skipped (telegram package not installed).');
+  }
+
   console.log(`[jarvis] Model: ${config.anthropic.model}`);
-  console.log('[jarvis] Step 4: Starting Telegram bot...');
+  console.log('[jarvis] Step 6: Starting Telegram bot...');
 
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');

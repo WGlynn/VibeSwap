@@ -122,6 +122,36 @@ async function connectClient() {
 
 // ============ Interactive Auth (via Telegram bot) ============
 
+// Shared auth state — checked by the main text handler in index.js
+// When active, messages from the owner in the auth chat are intercepted here
+// instead of being processed by Claude.
+let _authState = null;
+
+/**
+ * Check if a message should be intercepted by the auth flow.
+ * Called from the main text handler in index.js BEFORE Claude processing.
+ * Returns true if the message was consumed by auth.
+ */
+function interceptAuthMessage(chatId, userId, text) {
+  if (!_authState) return false;
+  if (chatId !== _authState.chatId || userId !== config.ownerUserId) return false;
+  if (!text || text.startsWith('/')) return false;
+
+  if (_authState.step === 'phone') {
+    _authState.resolvePhone(text);
+    _authState.step = 'code';
+    return true;
+  } else if (_authState.step === 'code') {
+    _authState.resolveCode(text);
+    _authState.step = 'password';
+    return true;
+  } else if (_authState.step === 'password') {
+    _authState.resolvePassword(text);
+    return true;
+  }
+  return false;
+}
+
 /**
  * Runs interactive phone auth through the Telegram bot chat.
  * Will sends /monitor-setup, then responds to prompts for phone, code, password.
@@ -142,33 +172,19 @@ async function interactiveAuth(ctx, botInstance) {
     connectionRetries: 3,
   });
 
-  // We need to collect phone, code, and maybe password interactively
+  // Set up shared auth state so the main text handler can intercept messages
   let resolvePhone, resolveCode, resolvePassword;
   const phonePromise = new Promise(r => { resolvePhone = r; });
   const codePromise = new Promise(r => { resolveCode = r; });
   const passwordPromise = new Promise(r => { resolvePassword = r; });
 
-  // Set up a temporary message listener
-  let authStep = 'phone'; // phone → code → password
-  const chatId = ctx.chat.id;
-
-  const tempHandler = (msgCtx) => {
-    if (msgCtx.chat.id !== chatId || msgCtx.from.id !== config.ownerUserId) return;
-    const text = msgCtx.message?.text?.trim();
-    if (!text || text.startsWith('/')) return;
-
-    if (authStep === 'phone') {
-      resolvePhone(text);
-      authStep = 'code';
-    } else if (authStep === 'code') {
-      resolveCode(text);
-      authStep = 'password';
-    } else if (authStep === 'password') {
-      resolvePassword(text);
-    }
+  _authState = {
+    chatId: ctx.chat.id,
+    step: 'phone',
+    resolvePhone,
+    resolveCode,
+    resolvePassword,
   };
-
-  botInstance.on('text', tempHandler);
 
   try {
     await ctx.reply('Starting MTProto auth. Send your phone number (with country code, e.g. +1234567890):');
@@ -202,8 +218,10 @@ async function interactiveAuth(ctx, botInstance) {
       'Use /intel to see latest group activity.'
     );
 
+    _authState = null; // Clear auth interceptor
     return true;
   } catch (err) {
+    _authState = null; // Clear auth interceptor
     await ctx.reply(`Auth failed: ${err.message}`);
     return false;
   }
@@ -381,6 +399,7 @@ async function initMonitor() {
 export {
   initMonitor,
   interactiveAuth,
+  interceptAuthMessage,
   fetchGroupMessages,
   formatIntelReport,
   getMonitorStatus,

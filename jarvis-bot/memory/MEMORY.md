@@ -14,13 +14,26 @@
 - Retroactive Shapley claims for founders (human or AI) via governance
 - Proof of Mind individuality at consensus
 
-## Codebase Stats (Feb 18, 2026)
-- **EVM**: 129 .sol files | 55 interfaces | 12 libraries | **2186+ Solidity tests passing**
+## Session Report Primitive (MANDATORY — every session)
+**At END of every session, before final commit:**
+1. Write `docs/session-reports/session-NNN.md` with: summary, completed work, files modified, test results, decisions, metrics, logic primitives extracted
+2. Commit and push to BOTH remotes
+3. This is the paper trail — if Will's machine goes down, anyone can reconstruct state from these reports
+4. Reports are cumulative evidence of Proof of Mind (cognitive evolution across sessions)
+
+## Session Start Sanity Check (MANDATORY)
+1. Read `sanity-layer.md` — 60 load-bearing invariants, 5 tiers
+2. Apply logic primitives (Synthesis Over Selection, etc.)
+3. Check this MEMORY.md for recent state
+4. `git pull` both remotes
+
+## Codebase Stats (Feb 21, 2026)
+- **EVM**: 130 .sol files | 55 interfaces | 12 libraries | **1200+ Solidity tests passing**
 - **CKB**: 15 Rust crates (4 libs + 8 scripts + 1 SDK + 1 deploy + 1 test) | **190 Rust tests** | **ALL 7 PHASES + RISC-V + SDK COMPLETE**
 - **CKB SDK**: 9 tx builders (commit, reveal, pool, add/remove LP, settle batch, oracle, config, compliance)
 - **CKB RISC-V**: 8 ELF binaries (117-192 KB), deploy.json with blake2b code hashes, Makefile build system
 - **Frontend**: 51 components | 14 hooks | 5 deploy scripts
-- **180 Solidity test files** (60 unit, 45 fuzz, 41 invariant, 3 integration, 6 gametheory, 4 security, 2 stress)
+- **181 Solidity test files** (60 unit, 45 fuzz, 41 invariant, 3 integration, 6 gametheory, 5 security, 2 stress)
 - Phase 1: Complete | Phase 2 Financial: 10/10 | **Protocol/Framework: 10/10 COMPLETE** | **Mechanism: 10/10 COMPLETE**
 - Identity Layer: ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**
 - **PsiNet Merge**: ERC-8004 AI agent identities + CRPC verification + context graph anchoring (Session 26)
@@ -42,6 +55,7 @@
 7. End session with recommendations → `build-recommendations.md`
 
 ## Build Knowledge Base
+- **`sanity-layer.md`** — MANDATORY PRE-CHECK — 60 load-bearing invariants, 5 tiers, competency gates, diff analyzer rules
 - **`contracts-catalogue.md`** — READ FIRST — all signatures, imports, interfaces
 - `solidity-patterns.md` — ERC-721 skeleton, state machines, collateral, slot packing
 - `defi-math.md` — Options, streaming, conviction voting, AMM pricing, sqrt

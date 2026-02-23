@@ -2,6 +2,7 @@ node_modules
 .git
 data/*.json
 .env
-*.md
 .env.example
 fly.toml
+README.md
+CHANGELOG.md

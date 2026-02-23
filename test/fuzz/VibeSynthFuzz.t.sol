@@ -207,7 +207,7 @@ contract VibeSynthFuzzTest is Test {
         assertFalse(synth.isLiquidatable(posId), "Should not be liquidatable initially");
 
         // Double the price → C-ratio halves → should be liquidatable
-        vm.prank(priceSetter);
+        // Owner bypasses price jump limit (emergency scenario)
         synth.updatePrice(0, SYNTH_PRICE * 2);
 
         assertTrue(synth.isLiquidatable(posId), "Should be liquidatable after price increase");

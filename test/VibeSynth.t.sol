@@ -196,10 +196,11 @@ contract VibeSynthTest is Test {
     function test_updatePrice_authorized() public {
         _registerVBTC();
 
+        // Price setter bounded by maxPriceJumpBps (20%) — update within limit
         vm.prank(priceSetter);
-        synth.updatePrice(0, 2000 ether);
+        synth.updatePrice(0, 1200 ether); // +20% from 1000
 
-        assertEq(synth.getSynthAsset(0).currentPrice, 2000 ether);
+        assertEq(synth.getSynthAsset(0).currentPrice, 1200 ether);
     }
 
     function test_updatePrice_ownerCanUpdate() public {
@@ -427,9 +428,8 @@ contract VibeSynthTest is Test {
         // C-ratio = 10000 / (6*1000) = 166% → not liquidatable
         assertFalse(synth.isLiquidatable(id));
 
-        // Price jumps to 750 → debt = 6*750=4500 → CR = 10000/4500 = 222% → still fine
         // Price jumps to 1500 → debt = 6*1500=9000 → CR = 10000/9000 = 111% → below 120%
-        vm.prank(priceSetter);
+        // Owner bypasses price jump limit for emergency simulation
         synth.updatePrice(0, 1500 ether);
 
         assertTrue(synth.isLiquidatable(id));
@@ -448,8 +448,7 @@ contract VibeSynthTest is Test {
 
         uint256 id = _openAndMint(COLLATERAL, 6 ether);
 
-        // Make liquidatable
-        vm.prank(priceSetter);
+        // Make liquidatable — owner bypasses jump limit
         synth.updatePrice(0, 1500 ether);
 
         uint256 charlieBefore = jul.balanceOf(charlie);
@@ -469,7 +468,7 @@ contract VibeSynthTest is Test {
         // Penalty = 9000 * 10% = 900
         // Total seized = 9000 + 900 = 9900
         // Collateral returned = 10000 - 9900 = 100
-        vm.prank(priceSetter);
+        // Owner bypasses jump limit
         synth.updatePrice(0, 1500 ether);
 
         uint256 aliceBefore = usdc.balanceOf(alice);
@@ -492,8 +491,7 @@ contract VibeSynthTest is Test {
         uint256 id = _openAndMint(COLLATERAL, 6 ether);
 
         // Price = 2000, debt = 12000, penalty = 1200, total = 13200 > 10000 collateral
-        // All collateral seized, nothing returned
-        vm.prank(priceSetter);
+        // All collateral seized, nothing returned — owner bypasses jump limit
         synth.updatePrice(0, 2000 ether);
 
         uint256 aliceBefore = usdc.balanceOf(alice);
@@ -607,6 +605,7 @@ contract VibeSynthTest is Test {
         assertEq(synth.collateralRatio(id), 20000);
 
         // 5. Price goes up to 1200 → debt = 6000 → CR = 166%
+        // Within 20% jump limit, price setter can do this
         vm.prank(priceSetter);
         synth.updatePrice(0, 1200 ether);
         assertEq(synth.collateralRatio(id), 16666); // 166.66%
@@ -660,8 +659,7 @@ contract VibeSynthTest is Test {
         vm.prank(alice);
         synth.mintSynth(id, 7 ether); // debt = 7000, CR = 142%
 
-        // Price spike makes it liquidatable
-        vm.prank(priceSetter);
+        // Price spike makes it liquidatable — owner bypasses jump limit
         synth.updatePrice(0, 1200 ether); // debt = 8400, CR = 119% < 120%
 
         assertTrue(synth.isLiquidatable(id));
@@ -696,13 +694,108 @@ contract VibeSynthTest is Test {
         assertEq(synth.collateralRatio(id), 20000);
     }
 
+    // ============ Price Jump Validation Tests ============
+
+    function test_priceJump_default20percent() public view {
+        assertEq(synth.maxPriceJumpBps(), 2000);
+    }
+
+    function test_priceJump_withinLimit_succeeds() public {
+        _registerVBTC();
+        // 20% up from 1000 = 1200 — exactly at limit
+        vm.prank(priceSetter);
+        synth.updatePrice(0, 1200 ether);
+        assertEq(synth.getSynthAsset(0).currentPrice, 1200 ether);
+
+        // 20% down from 1200 = 960 — exactly at limit
+        vm.prank(priceSetter);
+        synth.updatePrice(0, 960 ether);
+        assertEq(synth.getSynthAsset(0).currentPrice, 960 ether);
+    }
+
+    function test_priceJump_exceedsLimit_reverts() public {
+        _registerVBTC();
+        // 21% up from 1000 = 1210 — over limit
+        vm.expectRevert(IVibeSynth.PriceJumpExceeded.selector);
+        vm.prank(priceSetter);
+        synth.updatePrice(0, 1210 ether);
+    }
+
+    function test_priceJump_exceedsLimitDown_reverts() public {
+        _registerVBTC();
+        // 21% down from 1000 = 790 — over limit
+        vm.expectRevert(IVibeSynth.PriceJumpExceeded.selector);
+        vm.prank(priceSetter);
+        synth.updatePrice(0, 790 ether);
+    }
+
+    function test_priceJump_ownerBypasses() public {
+        _registerVBTC();
+        // Owner can make 100% jump
+        synth.updatePrice(0, 2000 ether);
+        assertEq(synth.getSynthAsset(0).currentPrice, 2000 ether);
+    }
+
+    function test_priceJump_incrementalUpdates() public {
+        _registerVBTC();
+        // Price setter can reach 2000 via incremental updates
+        vm.startPrank(priceSetter);
+        synth.updatePrice(0, 1200 ether); // +20%
+        synth.updatePrice(0, 1440 ether); // +20%
+        synth.updatePrice(0, 1728 ether); // +20%
+        synth.updatePrice(0, 2073 ether); // +19.9%
+        vm.stopPrank();
+        assertGt(synth.getSynthAsset(0).currentPrice, 2000 ether);
+    }
+
+    function test_setMaxPriceJump_succeeds() public {
+        synth.setMaxPriceJump(3000); // 30%
+        assertEq(synth.maxPriceJumpBps(), 3000);
+
+        // Now price setter can do 30% jumps
+        _registerVBTC();
+        vm.prank(priceSetter);
+        synth.updatePrice(0, 1300 ether); // +30%
+        assertEq(synth.getSynthAsset(0).currentPrice, 1300 ether);
+    }
+
+    function test_setMaxPriceJump_disabled() public {
+        synth.setMaxPriceJump(0); // Disable
+        assertEq(synth.maxPriceJumpBps(), 0);
+
+        // Price setter can do any jump
+        _registerVBTC();
+        vm.prank(priceSetter);
+        synth.updatePrice(0, 5000 ether); // +400%
+        assertEq(synth.getSynthAsset(0).currentPrice, 5000 ether);
+    }
+
+    function test_setMaxPriceJump_exceedsMax_reverts() public {
+        vm.expectRevert(IVibeSynth.InvalidJumpLimit.selector);
+        synth.setMaxPriceJump(5001); // Over 50% cap
+    }
+
+    function test_setMaxPriceJump_onlyOwner_reverts() public {
+        vm.expectRevert();
+        vm.prank(alice);
+        synth.setMaxPriceJump(3000);
+    }
+
+    event MaxPriceJumpUpdated(uint16 oldBps, uint16 newBps);
+
+    function test_setMaxPriceJump_emitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit MaxPriceJumpUpdated(2000, 1000);
+        synth.setMaxPriceJump(1000);
+    }
+
     // ============ Protocol Revenue Tests ============
 
     function test_withdrawRevenue_success() public {
         synth.depositJulRewards(100 ether);
         uint256 id = _openAndMint(COLLATERAL, 6 ether);
 
-        vm.prank(priceSetter);
+        // Owner bypasses jump limit for liquidation test
         synth.updatePrice(0, 1500 ether);
         vm.prank(charlie);
         synth.liquidate(id);

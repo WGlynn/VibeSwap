@@ -134,6 +134,7 @@ interface IVibeSynth {
 
     event JulRewardsDeposited(address indexed depositor, uint256 amount);
     event PriceSetterUpdated(address indexed setter, bool authorized);
+    event MaxPriceJumpUpdated(uint16 oldBps, uint16 newBps);
 
     // ============ Errors ============
 
@@ -152,6 +153,8 @@ interface IVibeSynth {
     error HasOutstandingDebt();
     error NotAuthorizedPriceSetter();
     error InvalidSynthAsset();
+    error PriceJumpExceeded();
+    error InvalidJumpLimit();
 
     // ============ Admin Functions ============
 
@@ -159,6 +162,7 @@ interface IVibeSynth {
     function deactivateSynthAsset(uint8 synthAssetId) external;
     function updatePrice(uint8 synthAssetId, uint256 newPrice) external;
     function setPriceSetter(address setter, bool authorized) external;
+    function setMaxPriceJump(uint16 bps) external;
     function depositJulRewards(uint256 amount) external;
     function withdrawProtocolRevenue(uint256 amount) external;
 

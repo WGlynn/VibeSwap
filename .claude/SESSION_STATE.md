@@ -38,7 +38,32 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - ~~**GenesisContributions.s.sol** — founder addresses are placeholders~~ FIXED (Session 29: now uses vm.envAddress)
 
-## Recently Completed (Feb 22, 2026 — Session 33: True Price Deep Hardening)
+## Recently Completed (Feb 22, 2026 — Session 34: Protocol Hardening + Infrastructure)
+105. **VibeSynth Price Jump Validation**
+    - `updatePrice()` now bounded by `maxPriceJumpBps` (default 20%) for price setters
+    - Owner bypasses for emergencies; configurable via `setMaxPriceJump()`
+    - 70 VibeSynth tests passing (59 unit + 6 fuzz + 5 invariant)
+
+106. **Frontend Balance Fix — Real On-Chain Data**
+    - `useBalances` hook: connected wallets show real balances (or 0), never mock data
+    - Added public RPC fallback for device wallets, Base chain token addresses
+    - Mock data only in demo mode (no wallet connected)
+
+107. **Telegram-to-Code Pipeline (`/idea` command)**
+    - New `/idea <description>` command in Jarvis bot
+    - Claude generates code with sandboxed file tools, creates branch, pushes
+    - Files go to `contracts/ideas/`, `docs/ideas/`, `test/ideas/`
+    - Returns file list + PR creation link
+
+108. **Session Report Primitive**
+    - Added to MEMORY.md: every session produces `docs/session-reports/session-NNN.md`
+    - Paper trail survives machine failures
+
+109. **Disaster Recovery Guide**
+    - `docs/DISASTER_RECOVERY.md` — what works without Will's machine, step-by-step recovery
+    - Backup operator protocol for 48+ hour unreachability
+
+## Previously Completed (Feb 22, 2026 — Session 33: True Price Deep Hardening)
 100. **True Price Fee Surcharge — Extractive Behavior Tax**
     - Regime-based fee surcharges: CASCADE +200%, MANIPULATION +100%, HIGH_LEVERAGE +50%
     - Manipulation probability surcharges: >80% adds +200%, >50% adds +100% (additive)

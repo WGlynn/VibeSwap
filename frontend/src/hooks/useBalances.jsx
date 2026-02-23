@@ -27,14 +27,18 @@ const ERC20_ABI = [
   'function decimals() view returns (uint8)',
 ]
 
-// Token addresses (mainnet)
+// Token addresses per chain
 const TOKEN_ADDRESSES = {
-  1: {
+  1: { // Ethereum Mainnet
     USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
     USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
     WBTC: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
   },
-  42161: {
+  8453: { // Base
+    USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    USDT: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
+  },
+  42161: { // Arbitrum
     USDC: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     USDT: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
     WBTC: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
@@ -49,10 +53,14 @@ export function BalanceProvider({ children }) {
   const { address: deviceAddress } = useDeviceWallet()
   const { isConnected: isCKBConnected, chainId: ckbChainId, address: ckbAddress, balance: ckbBalance } = useCKBWallet()
 
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isAnyWalletConnected = isExternalConnected || isDeviceConnected || isCKBConnected
+
   const isCKB = isCKBConnected && isCKBChain(ckbChainId)
   const account = isCKB ? ckbAddress : (externalAccount || deviceAddress)
 
-  // Mock balances state (for demo mode)
+  // Mock balances state (for demo mode ONLY — when no wallet connected)
   const [mockBalances, setMockBalances] = useState(INITIAL_BALANCES)
 
   // Real balances from blockchain
@@ -64,20 +72,35 @@ export function BalanceProvider({ children }) {
   // Loading state
   const [isLoading, setIsLoading] = useState(false)
 
+  // Get a provider — use wallet provider if available, else fall back to public RPC
+  const getProvider = useCallback(() => {
+    if (provider) return provider
+    // Fallback to public RPC for device wallets or when wallet provider isn't ready
+    const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://mainnet.base.org'
+    try {
+      return new ethers.JsonRpcProvider(rpcUrl)
+    } catch {
+      return null
+    }
+  }, [provider])
+
   // Fetch real balance for a token
   const fetchRealBalance = useCallback(async (symbol) => {
-    if (!provider || !account) return null
+    const activeProvider = getProvider()
+    if (!activeProvider || !account) return null
 
     try {
       if (symbol === 'ETH') {
-        const balance = await provider.getBalance(account)
+        const balance = await activeProvider.getBalance(account)
         return parseFloat(ethers.formatEther(balance))
       }
 
-      const addresses = TOKEN_ADDRESSES[chainId]
+      // Determine which chain to query token addresses for
+      const activeChainId = chainId || 8453 // Default to Base
+      const addresses = TOKEN_ADDRESSES[activeChainId]
       if (!addresses || !addresses[symbol]) return null
 
-      const token = new ethers.Contract(addresses[symbol], ERC20_ABI, provider)
+      const token = new ethers.Contract(addresses[symbol], ERC20_ABI, activeProvider)
       const decimals = await token.decimals()
       const balance = await token.balanceOf(account)
       return parseFloat(ethers.formatUnits(balance, decimals))
@@ -85,23 +108,25 @@ export function BalanceProvider({ children }) {
       console.error(`Error fetching ${symbol} balance:`, error)
       return null
     }
-  }, [provider, account, chainId])
+  }, [getProvider, account, chainId])
 
   // Fetch all real balances
   const fetchAllBalances = useCallback(async () => {
-    if (!provider || !account) return
+    if (!account) return
+    const activeProvider = getProvider()
+    if (!activeProvider) return
 
     setIsLoading(true)
     const balances = {}
 
-    // Fetch ETH
+    // Fetch ETH (native token)
     const ethBalance = await fetchRealBalance('ETH')
     if (ethBalance !== null) {
       balances.ETH = ethBalance
       setIsRealMode(true)
     }
 
-    // Fetch other tokens
+    // Fetch ERC20 tokens
     const tokens = ['USDC', 'USDT', 'WBTC', 'ARB']
     for (const token of tokens) {
       const balance = await fetchRealBalance(token)
@@ -112,7 +137,7 @@ export function BalanceProvider({ children }) {
 
     setRealBalances(balances)
     setIsLoading(false)
-  }, [provider, account, fetchRealBalance])
+  }, [account, getProvider, fetchRealBalance])
 
   // Sync CKB balances when connected to CKB
   useEffect(() => {
@@ -124,28 +149,33 @@ export function BalanceProvider({ children }) {
     }
   }, [isCKB, ckbBalance])
 
-  // Refresh balances when account/provider changes (EVM only)
+  // Refresh balances when account changes (EVM only — works with both wallet types)
   useEffect(() => {
     if (isCKB) return // CKB balances come from useCKBWallet
-    if (provider && account) {
+    if (account) {
       fetchAllBalances()
     } else {
       setIsRealMode(false)
       setRealBalances({})
     }
-  }, [provider, account, fetchAllBalances, isCKB])
+  }, [account, fetchAllBalances, isCKB])
 
   // Get balance for a symbol
   const getBalance = useCallback((symbol) => {
-    if (isRealMode && realBalances[symbol] !== undefined) {
+    // Real balance available — always prefer
+    if (realBalances[symbol] !== undefined) {
       return realBalances[symbol]
     }
-    // Use CKB mock balances when on CKB in demo mode
+    // Wallet connected but balance not fetched yet — show 0, NOT mock data
+    if (isAnyWalletConnected) {
+      return 0
+    }
+    // No wallet connected — demo mode, show mock balances
     if (isCKB && CKB_MOCK_BALANCES[symbol] !== undefined) {
       return CKB_MOCK_BALANCES[symbol]
     }
     return mockBalances[symbol] || 0
-  }, [isRealMode, realBalances, mockBalances, isCKB])
+  }, [realBalances, mockBalances, isCKB, isAnyWalletConnected])
 
   // Get formatted balance string
   const getFormattedBalance = useCallback((symbol) => {
@@ -192,10 +222,10 @@ export function BalanceProvider({ children }) {
   // Refresh balances (for real mode)
   const refresh = useCallback(() => {
     if (isCKB) return // CKB balances auto-refresh via useCKBWallet
-    if (provider && account) {
+    if (account) {
       fetchAllBalances()
     }
-  }, [provider, account, fetchAllBalances, isCKB])
+  }, [account, fetchAllBalances, isCKB])
 
   const value = {
     getBalance,

@@ -21,6 +21,7 @@ import "../libraries/ProofOfWorkLib.sol";
 import "../oracles/interfaces/ITruePriceOracle.sol";
 import "../incentives/IPriorityRegistry.sol";
 import "../incentives/interfaces/IIncentiveController.sol";
+import "../incentives/interfaces/IVolatilityOracle.sol";
 
 /**
  * @title VibeAMM
@@ -208,6 +209,14 @@ contract VibeAMM is
     ///      incentive layer issues from blocking core AMM operations.
     IIncentiveController public incentiveController;
 
+    // ============ Volatility Oracle Cross-Validation ============
+
+    /// @notice VolatilityOracle for cross-validating True Price regime with realized volatility
+    /// @dev Two independent signal sources: when they disagree, it reveals hidden information.
+    ///      Low vol + manipulation regime = sophisticated attack (stealth manipulation)
+    ///      High vol + normal regime = organic volatility (don't over-dampen)
+    IVolatilityOracle public volatilityOracle;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
@@ -227,6 +236,15 @@ contract VibeAMM is
     event PoWFeeDiscountApplied(bytes32 indexed poolId, address indexed user, uint8 difficulty, uint256 discountBps);
     event IncentiveControllerUpdated(address indexed controller);
     event VolatilityFeeRouted(bytes32 indexed poolId, address token, uint256 amount);
+    event TruePriceFeeSurcharge(bytes32 indexed poolId, uint256 baseFee, uint256 effectiveFee);
+    event VolatilityOracleUpdated(address indexed oracle);
+    event VolatilityCrossValidation(
+        bytes32 indexed poolId,
+        uint8 regime,
+        uint8 volTier,
+        bool mismatch,
+        uint256 adjustedDeviation
+    );
 
     // FIX #5: Event for swap failures
     event SwapFailed(
@@ -691,6 +709,14 @@ contract VibeAMM is
 
         result.clearingPrice = clearingPrice;
 
+        // ============ True Price Fee Surcharge ============
+        // When True Price detects adverse conditions, increase fees to penalize
+        // extractive behavior. Honest traders face normal fees. Manipulators pay more.
+        uint256 batchFeeRate = pool.feeRate;
+        if ((protectionFlags & FLAG_TRUE_PRICE) != 0 && address(truePriceOracle) != address(0)) {
+            batchFeeRate = _computeTruePriceFeeSurcharge(poolId, pool.feeRate);
+        }
+
         // Execute each order at clearing price
         for (uint256 i = 0; i < orders.length; i++) {
             SwapOrder calldata order = orders[i];
@@ -698,7 +724,8 @@ contract VibeAMM is
             (uint256 amountIn, uint256 amountOut, uint256 fee) = _executeSwap(
                 pool,
                 order,
-                clearingPrice
+                clearingPrice,
+                batchFeeRate
             );
 
             result.totalTokenInSwapped += amountIn;
@@ -745,6 +772,7 @@ contract VibeAMM is
         address recipient
     ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) whenNotGloballyPaused
       whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(PRICE_BREAKER)
+      whenBreakerNotTripped(TRUE_PRICE_BREAKER)
       validatePrice(poolId) returns (uint256 amountOut) {
         return _executeSwap(SwapParams(poolId, tokenIn, amountIn, minAmountOut, recipient));
     }
@@ -804,6 +832,7 @@ contract VibeAMM is
     function swapWithPoW(PoWSwapParams calldata params) external nonReentrant
       poolExists(params.poolId) noFlashLoan(params.poolId) whenNotGloballyPaused
       whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(PRICE_BREAKER)
+      whenBreakerNotTripped(TRUE_PRICE_BREAKER)
       validatePrice(params.poolId) returns (uint256 amountOut) {
         return _executePoWSwap(params);
     }
@@ -1112,6 +1141,15 @@ contract VibeAMM is
     }
 
     /**
+     * @notice Set VolatilityOracle for cross-validation with True Price regime
+     * @param _oracle VolatilityOracle contract address
+     */
+    function setVolatilityOracle(address _oracle) external onlyOwner {
+        volatilityOracle = IVolatilityOracle(_oracle);
+        emit VolatilityOracleUpdated(_oracle);
+    }
+
+    /**
      * @notice Grow VWAP oracle cardinality for longer windows
      */
     function growVWAPCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
@@ -1175,12 +1213,14 @@ contract VibeAMM is
     }
 
     /**
-     * @notice Execute a single swap at clearing price
+     * @notice Execute a single swap at clearing price with effective fee rate
+     * @param feeRate Effective fee rate (may include True Price surcharge)
      */
     function _executeSwap(
         Pool storage pool,
         SwapOrder calldata order,
-        uint256 clearingPrice
+        uint256 clearingPrice,
+        uint256 feeRate
     ) internal returns (
         uint256 amountIn,
         uint256 amountOut,
@@ -1200,15 +1240,15 @@ contract VibeAMM is
             amountOut = clearingPrice > 0 ? (amountIn * 1e18) / clearingPrice : 0;
         }
 
-        // Apply fee - deduct from output
+        // Apply fee - deduct from output (uses effective feeRate, may include True Price surcharge)
         (protocolFee, ) = BatchMath.calculateFees(
             amountOut,
-            pool.feeRate,
+            feeRate,
             protocolFeeShare
         );
 
         // Reduce output by fee
-        uint256 totalFee = (amountOut * pool.feeRate) / 10000;
+        uint256 totalFee = (amountOut * feeRate) / 10000;
         amountOut = amountOut - totalFee;
 
         // Check minimum output after fees
@@ -1260,8 +1300,20 @@ contract VibeAMM is
             pool.reserve0 -= (amountOut + totalFee - protocolFee);
         }
 
-        // Track protocol fees (from output token, not input)
-        accumulatedFees[tokenOut] += protocolFee;
+        // Track protocol fees — route surcharge surplus to insurance pool
+        if (address(incentiveController) != address(0) && feeRate > pool.feeRate && protocolFee > 0) {
+            (uint256 basePFee, ) = BatchMath.calculateFees(amountOut, pool.feeRate, protocolFeeShare);
+            uint256 surplus = protocolFee > basePFee ? protocolFee - basePFee : 0;
+            if (surplus > 0) {
+                accumulatedFees[tokenOut] += protocolFee - surplus;
+                IERC20(tokenOut).safeTransfer(address(incentiveController), surplus);
+                try incentiveController.routeVolatilityFee(getPoolId(pool.token0, pool.token1), tokenOut, surplus) {} catch {}
+            } else {
+                accumulatedFees[tokenOut] += protocolFee;
+            }
+        } else {
+            accumulatedFees[tokenOut] += protocolFee;
+        }
 
         emit SwapExecuted(
             getPoolId(pool.token0, pool.token1),
@@ -1794,6 +1846,15 @@ contract VibeAMM is
                 );
             } catch {}
 
+            // ============ Volatility Oracle Cross-Validation ============
+            // Two independent systems: True Price (Bayesian regime) vs VolatilityOracle (realized vol)
+            // Mismatch = hidden information. Agreement = confirmed signal.
+            if (address(volatilityOracle) != address(0)) {
+                adjustedMaxDeviation = _crossValidateVolatility(
+                    poolId, tpData.regime, adjustedMaxDeviation
+                );
+            }
+
             // VWAP corroboration: if VWAP agrees with True Price direction, tighten bounds
             // Two independent price signals agreeing = stronger enforcement (100% signal, 0% noise)
             if (poolVWAP[poolId].cardinality >= 2) {
@@ -1849,6 +1910,137 @@ contract VibeAMM is
         } catch {
             // Oracle unavailable — pass through (don't block trading)
             return clearingPrice;
+        }
+    }
+
+    /**
+     * @notice Cross-validate True Price regime with VolatilityOracle tier
+     * @dev Two independent signal sources revealing hidden information:
+     *
+     *      STEALTH MANIPULATION (low vol + danger regime):
+     *        True Price says MANIPULATION/CASCADE but realized vol is LOW/MEDIUM.
+     *        This means price is being moved without triggering vol detection —
+     *        classic sophisticated attack. Tighten bounds by 30%.
+     *
+     *      CONFIRMED DANGER (high vol + danger regime):
+     *        Both oracles agree something is wrong. Tighten bounds by 15%.
+     *
+     *      ORGANIC VOLATILITY (high vol + normal regime):
+     *        True Price says market is normal, vol is just high organically.
+     *        Don't over-dampen — widen bounds by 15% to avoid false positives.
+     *
+     *      100% signal, 0% noise: disagreement reveals what neither oracle sees alone.
+     */
+    function _crossValidateVolatility(
+        bytes32 poolId,
+        ITruePriceOracle.RegimeType regime,
+        uint256 currentDeviation
+    ) internal returns (uint256 adjustedDeviation) {
+        adjustedDeviation = currentDeviation;
+
+        try volatilityOracle.getVolatilityTier(poolId) returns (IVolatilityOracle.VolatilityTier tier) {
+            bool dangerRegime = (regime == ITruePriceOracle.RegimeType.MANIPULATION ||
+                                 regime == ITruePriceOracle.RegimeType.CASCADE);
+            bool lowVol = (tier == IVolatilityOracle.VolatilityTier.LOW ||
+                          tier == IVolatilityOracle.VolatilityTier.MEDIUM);
+            bool highVol = (tier == IVolatilityOracle.VolatilityTier.HIGH ||
+                           tier == IVolatilityOracle.VolatilityTier.EXTREME);
+
+            bool mismatch = false;
+
+            if (dangerRegime && lowVol) {
+                // STEALTH MANIPULATION: danger regime but vol hasn't caught up yet
+                // Tighten bounds by 30% — aggressive response to hidden manipulation
+                adjustedDeviation = (adjustedDeviation * 7000) / 10000;
+                mismatch = true;
+            } else if (dangerRegime && highVol) {
+                // CONFIRMED DANGER: both signals agree — tighten by 15%
+                adjustedDeviation = (adjustedDeviation * 8500) / 10000;
+            } else if (!dangerRegime && highVol) {
+                // ORGANIC VOLATILITY: market is just volatile, not manipulated
+                // Widen by 15% to reduce false positive damping
+                adjustedDeviation = (adjustedDeviation * 11500) / 10000;
+            }
+            // Normal regime + low vol = everything fine, no adjustment
+
+            emit VolatilityCrossValidation(
+                poolId, uint8(regime), uint8(tier), mismatch, adjustedDeviation
+            );
+        } catch {
+            // VolatilityOracle unavailable — no adjustment
+        }
+    }
+
+    /**
+     * @notice Compute True Price fee surcharge based on oracle regime and manipulation signals
+     * @dev Fee surcharge makes extractive behavior more expensive during adverse conditions.
+     *      Honest traders face normal fees. Manipulators pay more — 100% signal, 0% noise.
+     *
+     *      Regime surcharge (additive with base):
+     *        - NORMAL/TREND/LOW_VOLATILITY: no surcharge
+     *        - HIGH_LEVERAGE: +50% of base fee
+     *        - MANIPULATION: +100% of base fee
+     *        - CASCADE: +200% of base fee
+     *
+     *      Manipulation probability surcharge (additive):
+     *        - >80%: +200% of base fee
+     *        - >50%: +100% of base fee
+     *
+     *      Capped at 500 bps (5%) max — harsh but not ruinous.
+     */
+    function _computeTruePriceFeeSurcharge(
+        bytes32 poolId,
+        uint256 baseFeeRate
+    ) internal returns (uint256 effectiveFeeRate) {
+        effectiveFeeRate = baseFeeRate;
+
+        try truePriceOracle.getTruePrice(poolId) returns (ITruePriceOracle.TruePriceData memory tpData) {
+            if (tpData.price == 0 || !TruePriceLib.isFresh(tpData.timestamp, truePriceMaxStaleness)) {
+                return effectiveFeeRate;
+            }
+
+            uint256 surcharge = 0;
+
+            // Regime-based surcharge
+            if (tpData.regime == ITruePriceOracle.RegimeType.CASCADE) {
+                surcharge += baseFeeRate * 2; // +200%
+            } else if (tpData.regime == ITruePriceOracle.RegimeType.MANIPULATION) {
+                surcharge += baseFeeRate; // +100%
+            } else if (tpData.regime == ITruePriceOracle.RegimeType.HIGH_LEVERAGE) {
+                surcharge += baseFeeRate / 2; // +50%
+            }
+
+            // Manipulation probability surcharge (additive)
+            if (tpData.manipulationProb > 8e17) { // >80%
+                surcharge += baseFeeRate * 2; // +200%
+            } else if (tpData.manipulationProb > 5e17) { // >50%
+                surcharge += baseFeeRate; // +100%
+            }
+
+            // Cross-validation surcharge: stealth manipulation detection
+            // If True Price says danger but VolatilityOracle says calm, add stealth tax
+            if (address(volatilityOracle) != address(0)) {
+                bool dangerRegime = (tpData.regime == ITruePriceOracle.RegimeType.MANIPULATION ||
+                                     tpData.regime == ITruePriceOracle.RegimeType.CASCADE);
+                if (dangerRegime) {
+                    try volatilityOracle.getVolatilityTier(poolId) returns (IVolatilityOracle.VolatilityTier tier) {
+                        if (tier == IVolatilityOracle.VolatilityTier.LOW ||
+                            tier == IVolatilityOracle.VolatilityTier.MEDIUM) {
+                            // Stealth manipulation: +50% base fee
+                            surcharge += baseFeeRate / 2;
+                        }
+                    } catch {}
+                }
+            }
+
+            if (surcharge > 0) {
+                effectiveFeeRate += surcharge;
+                // Cap at 500 bps (5%) — harsh deterrent but not ruinous
+                if (effectiveFeeRate > 500) effectiveFeeRate = 500;
+                emit TruePriceFeeSurcharge(poolId, baseFeeRate, effectiveFeeRate);
+            }
+        } catch {
+            // Oracle unavailable — no surcharge
         }
     }
 

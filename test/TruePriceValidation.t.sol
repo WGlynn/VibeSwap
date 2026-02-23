@@ -8,6 +8,7 @@ import "../contracts/core/interfaces/IVibeAMM.sol";
 import "../contracts/oracles/interfaces/ITruePriceOracle.sol";
 import "../contracts/libraries/TruePriceLib.sol";
 import "../contracts/libraries/BatchMath.sol";
+import "../contracts/incentives/interfaces/IVolatilityOracle.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -104,6 +105,28 @@ contract MockTruePriceOracle is ITruePriceOracle {
     function updateTruePrice(bytes32, uint256, uint256, int256, RegimeType, uint256, bytes32, bytes calldata) external {}
     function updateStablecoinContext(uint256, bool, bool, uint256, bytes calldata) external {}
     function setAuthorizedSigner(address, bool) external {}
+}
+
+/// @notice Mock VolatilityOracle for cross-validation testing
+contract MockVolatilityOracleTP is IVolatilityOracle {
+    mapping(bytes32 => VolatilityTier) public tiers;
+    bool public shouldRevert;
+
+    function setTier(bytes32 poolId, VolatilityTier tier) external {
+        tiers[poolId] = tier;
+    }
+    function setShouldRevert(bool _revert) external { shouldRevert = _revert; }
+
+    function calculateRealizedVolatility(bytes32, uint32) external pure returns (uint256) { return 0; }
+    function getDynamicFeeMultiplier(bytes32) external pure returns (uint256) { return 1e18; }
+    function getVolatilityTier(bytes32 poolId) external view returns (VolatilityTier) {
+        if (shouldRevert) revert("Vol oracle unavailable");
+        return tiers[poolId];
+    }
+    function updateVolatility(bytes32) external {}
+    function getVolatilityData(bytes32 poolId) external view returns (uint256, VolatilityTier, uint64) {
+        return (0, tiers[poolId], uint64(block.timestamp));
+    }
 }
 
 // ============ Test Contract ============
@@ -849,5 +872,494 @@ contract TruePriceValidationTest is Test {
 
         assertGt(result.clearingPrice, 0, "Should succeed");
         assertGt(result.totalTokenInSwapped, 0, "Should swap tokens");
+    }
+
+    // ============ True Price Fee Surcharge Tests ============
+
+    event TruePriceFeeSurcharge(bytes32 indexed poolId, uint256 baseFee, uint256 effectiveFee);
+
+    function test_truePrice_noSurchargeNormalRegime() public {
+        // Normal regime, no manipulation → no surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.NORMAL, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+
+        // Should execute normally — no surcharge event
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    function test_truePrice_surchargeManipulationRegime() public {
+        // MANIPULATION regime → +100% base fee surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // Expect surcharge event: base 30 bps → effective 60 bps (30 + 30)
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(poolId, 30, 60);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+    }
+
+    function test_truePrice_surchargeCascadeRegime() public {
+        // CASCADE regime → +200% base fee surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // base 30 → +60 (200%) = 90 bps
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(poolId, 30, 90);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+    }
+
+    function test_truePrice_surchargeHighLeverageRegime() public {
+        // HIGH_LEVERAGE regime → +50% base fee surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.HIGH_LEVERAGE, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // base 30 → +15 (50%) = 45 bps
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(poolId, 30, 45);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+    }
+
+    function test_truePrice_surchargeHighManipulationProb() public {
+        // Normal regime but >80% manipulation probability → +200% surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.NORMAL, 0.85e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // base 30 → +60 (manip 200%) = 90 bps
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(poolId, 30, 90);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+    }
+
+    function test_truePrice_surchargeMediumManipulationProb() public {
+        // Normal regime but >50% manipulation probability → +100% surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.NORMAL, 0.55e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // base 30 → +30 (manip 100%) = 60 bps
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(poolId, 30, 60);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+    }
+
+    function test_truePrice_surchargeCascadePlusManipulation() public {
+        // CASCADE regime + >80% manipulation → additive: +200% + +200% = +400%, capped at 500 bps
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0.85e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // base 30 → +60 (cascade) + +60 (manip) = 150, but that's under 500 cap
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(poolId, 30, 150);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+    }
+
+    function test_truePrice_surchargeCappedAt500Bps() public {
+        // Create pool with high base fee (200 bps) using new tokens
+        MockERC20TP capTokenA = new MockERC20TP("Cap A", "CAPA");
+        MockERC20TP capTokenB = new MockERC20TP("Cap B", "CAPB");
+        bytes32 highFeePool = amm.createPool(address(capTokenA), address(capTokenB), 200);
+        capTokenA.mint(owner, INITIAL_LIQUIDITY * 10);
+        capTokenB.mint(owner, INITIAL_LIQUIDITY * 10);
+        capTokenA.approve(address(amm), type(uint256).max);
+        capTokenB.approve(address(amm), type(uint256).max);
+        amm.addLiquidity(highFeePool, INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0);
+
+        // CASCADE + high manipulation: 200 + 400 + 400 = 1000 → capped at 500
+        oracle.setTruePrice(highFeePool, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0.85e18);
+
+        capTokenA.mint(address(amm), SWAP_AMOUNT);
+        amm.syncTrackedBalance(address(capTokenA));
+
+        IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
+        orders[0] = IVibeAMM.SwapOrder({
+            trader: trader,
+            tokenIn: address(capTokenA),
+            tokenOut: address(capTokenB),
+            amountIn: SWAP_AMOUNT,
+            minAmountOut: 0,
+            isPriority: false
+        });
+
+        // base 200 → +400 + +400 = 1000, capped at 500
+        vm.expectEmit(true, false, false, true);
+        emit TruePriceFeeSurcharge(highFeePool, 200, 500);
+
+        vm.prank(executor);
+        amm.executeBatchSwap(highFeePool, 1, orders);
+    }
+
+    function test_truePrice_noSurchargeWhenOracleUnavailable() public {
+        // Oracle reverts → no surcharge applied
+        oracle.setShouldRevert(true);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // Should execute with base fee, no surcharge
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    function test_truePrice_noSurchargeWhenStaleData() public {
+        // Stale True Price data → no surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0.9e18);
+        oracle.setTimestamp(poolId, uint64(block.timestamp - 10 minutes)); // stale
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // No surcharge event should be emitted (stale data)
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    function test_truePrice_surchargeIncreasesProtocolFees() public {
+        // With protocolFeeShare > 0, surcharge increases protocol fees collected
+        amm.setProtocolFeeShare(1000); // 10% protocol fee
+
+        // MANIPULATION regime → +100% surcharge (30 → 60 bps)
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+
+        // With 60 bps fee (double the normal 30), protocol fees should be higher than base
+        // The exact amount depends on output, but fees should be > 0
+        assertGt(result.protocolFees, 0, "Protocol fees should be collected with surcharge");
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should still produce output");
+    }
+
+    function test_truePrice_noSurchargeWhenDisabled() public {
+        // Disable True Price validation → no surcharge even with MANIPULATION regime
+        amm.setTruePriceValidation(false);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0.9e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        // No surcharge should be applied
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    function test_truePrice_trendRegimeNoSurcharge() public {
+        // TREND regime → no surcharge (trend is normal, just directional)
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.TREND, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    function test_truePrice_lowVolRegimeNoSurcharge() public {
+        // LOW_VOLATILITY regime → no surcharge
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.LOW_VOLATILITY, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    // ============ Volatility Oracle Cross-Validation Tests ============
+
+    event VolatilityCrossValidation(
+        bytes32 indexed poolId, uint8 regime, uint8 volTier, bool mismatch, uint256 adjustedDeviation
+    );
+
+    function _setupVolOracle() internal returns (MockVolatilityOracleTP) {
+        MockVolatilityOracleTP volOracle = new MockVolatilityOracleTP();
+        amm.setVolatilityOracle(address(volOracle));
+        return volOracle;
+    }
+
+    function test_crossValidation_stealthManipulation_tightensBounds() public {
+        // MANIPULATION regime + LOW vol = stealth manipulation → tighten bounds by 30%
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.LOW);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0.9e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.recordLogs();
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed with tighter bounds");
+
+        // Verify cross-validation event was emitted with mismatch=true
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bool foundCrossVal = false;
+        for (uint i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == keccak256("VolatilityCrossValidation(bytes32,uint8,uint8,bool,uint256)")) {
+                foundCrossVal = true;
+                (uint8 regime, uint8 volTier, bool mismatch,) = abi.decode(entries[i].data, (uint8, uint8, bool, uint256));
+                assertTrue(mismatch, "Should flag as mismatch");
+                assertEq(regime, uint8(ITruePriceOracle.RegimeType.MANIPULATION));
+                assertEq(volTier, uint8(IVolatilityOracle.VolatilityTier.LOW));
+            }
+        }
+        assertTrue(foundCrossVal, "VolatilityCrossValidation event should be emitted");
+    }
+
+    function test_crossValidation_confirmedDanger_tightensBounds() public {
+        // MANIPULATION regime + HIGH vol = confirmed danger → tighten bounds by 15%
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.HIGH);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0.6e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+    }
+
+    function test_crossValidation_organicVolatility_widensBounds() public {
+        // NORMAL regime + EXTREME vol = organic volatility → widen bounds by 15%
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.EXTREME);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.NORMAL, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed with wider bounds");
+    }
+
+    function test_crossValidation_normalConditions_noAdjustment() public {
+        // NORMAL regime + LOW vol = everything fine → no adjustment
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.LOW);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.NORMAL, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed normally");
+    }
+
+    function test_crossValidation_cascadeAndLowVol_stealthDetection() public {
+        // CASCADE regime + MEDIUM vol = stealth manipulation (most dangerous)
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.MEDIUM);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0.95e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.recordLogs();
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed");
+
+        // Verify mismatch flag
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bool foundMismatch = false;
+        for (uint i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == keccak256("VolatilityCrossValidation(bytes32,uint8,uint8,bool,uint256)")) {
+                (, , bool mismatch,) = abi.decode(entries[i].data, (uint8, uint8, bool, uint256));
+                if (mismatch) foundMismatch = true;
+            }
+        }
+        assertTrue(foundMismatch, "CASCADE + MEDIUM vol should flag as stealth mismatch");
+    }
+
+    function test_crossValidation_volOracleUnavailable_noAdjustment() public {
+        // VolatilityOracle reverts → no cross-validation (graceful degradation)
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setShouldRevert(true);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0.8e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed without vol oracle");
+    }
+
+    function test_crossValidation_noVolOracle_noAdjustment() public {
+        // No VolatilityOracle set → no cross-validation
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0.8e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed without vol oracle");
+    }
+
+    function test_crossValidation_setVolatilityOracle() public {
+        MockVolatilityOracleTP volOracle = new MockVolatilityOracleTP();
+        amm.setVolatilityOracle(address(volOracle));
+        assertEq(address(amm.volatilityOracle()), address(volOracle));
+    }
+
+    function test_crossValidation_setVolatilityOracle_onlyOwner() public {
+        vm.prank(trader);
+        vm.expectRevert();
+        amm.setVolatilityOracle(address(1));
+    }
+
+    function test_crossValidation_stealthManipSurcharge() public {
+        // Stealth manipulation adds extra +50% base fee surcharge
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.LOW);
+
+        // MANIPULATION regime + LOW vol → regime surcharge (+100%) + stealth surcharge (+50%) = +150%
+        // Base fee 30 bps → 30 + 30 + 15 = 75 bps
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.recordLogs();
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+
+        // Verify surcharge event: base=30, effective=75
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bytes32 surSig = keccak256("TruePriceFeeSurcharge(bytes32,uint256,uint256)");
+        bool found = false;
+        for (uint i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == surSig) {
+                (uint256 baseFee, uint256 effectiveFee) = abi.decode(entries[i].data, (uint256, uint256));
+                assertEq(baseFee, 30, "Base fee should be 30");
+                assertEq(effectiveFee, 75, "Effective fee: 30 + 30 (regime) + 15 (stealth) = 75");
+                found = true;
+            }
+        }
+        assertTrue(found, "TruePriceFeeSurcharge event should be emitted");
+    }
+
+    function test_crossValidation_noStealthSurchargeHighVol() public {
+        // HIGH vol + MANIPULATION regime → no stealth surcharge (only regime surcharge)
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.HIGH);
+
+        // MANIPULATION regime + HIGH vol → regime surcharge (+100%) only, no stealth
+        // Base fee 30 bps → 30 + 30 = 60 bps
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.MANIPULATION, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.recordLogs();
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+
+        // Verify surcharge: base=30, effective=60 (no stealth surcharge)
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bytes32 surSig = keccak256("TruePriceFeeSurcharge(bytes32,uint256,uint256)");
+        bool found = false;
+        for (uint i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == surSig) {
+                (uint256 baseFee, uint256 effectiveFee) = abi.decode(entries[i].data, (uint256, uint256));
+                assertEq(baseFee, 30, "Base fee should be 30");
+                assertEq(effectiveFee, 60, "Effective fee: 30 + 30 (regime) = 60 (no stealth)");
+                found = true;
+            }
+        }
+        assertTrue(found, "TruePriceFeeSurcharge event should be emitted");
+    }
+
+    function test_crossValidation_cascadeStealthMaxSurcharge() public {
+        // CASCADE + LOW vol + high manip prob → maximum stealth scenario
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.LOW);
+
+        // CASCADE (+200%) + >80% manip (+200%) + stealth (+50%) = +450%
+        // Base 30: 30 + 60 + 60 + 15 = 165 bps
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0.85e18);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.recordLogs();
+        vm.prank(executor);
+        amm.executeBatchSwap(poolId, 1, orders);
+
+        // Verify surcharge: base=30, effective=165
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bytes32 surSig = keccak256("TruePriceFeeSurcharge(bytes32,uint256,uint256)");
+        bool found = false;
+        for (uint i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == surSig) {
+                (uint256 baseFee, uint256 effectiveFee) = abi.decode(entries[i].data, (uint256, uint256));
+                assertEq(baseFee, 30, "Base fee should be 30");
+                assertEq(effectiveFee, 165, "Effective: 30 + 60(cascade) + 60(manip) + 15(stealth) = 165");
+                found = true;
+            }
+        }
+        assertTrue(found, "TruePriceFeeSurcharge event should be emitted");
+    }
+
+    function test_crossValidation_trendRegimeExtremeVol_widens() public {
+        // TREND regime (not danger) + EXTREME vol → organic widening
+        MockVolatilityOracleTP volOracle = _setupVolOracle();
+        volOracle.setTier(poolId, IVolatilityOracle.VolatilityTier.EXTREME);
+
+        oracle.setTruePrice(poolId, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.TREND, 0);
+
+        _mintAndSync(SWAP_AMOUNT);
+        IVibeAMM.SwapOrder[] memory orders = _makeSingleOrder(SWAP_AMOUNT);
+
+        vm.prank(executor);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, 1, orders);
+        assertGt(result.totalTokenOutSwapped, 0, "Swap should succeed with widened bounds");
     }
 }

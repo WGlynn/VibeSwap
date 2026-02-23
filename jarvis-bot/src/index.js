@@ -11,12 +11,13 @@ import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntel
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
-let initMonitor, interactiveAuth, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
+let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
 try {
   const monitor = await import('./telegram-monitor.js');
   initMonitor = monitor.initMonitor;
   interactiveAuth = monitor.interactiveAuth;
+  interceptAuthMessage = monitor.interceptAuthMessage;
   formatIntelReport = monitor.formatIntelReport;
   getMonitorStatus = monitor.getMonitorStatus;
   getMessagesForAnalysis = monitor.getMessagesForAnalysis;
@@ -861,6 +862,11 @@ bot.command('idea', async (ctx) => {
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
+  // Monitor auth intercept — if auth flow is active, capture phone/code/password
+  if (monitorAvailable && interceptAuthMessage && interceptAuthMessage(ctx.chat.id, ctx.from.id, ctx.message?.text?.trim())) {
+    return; // Message consumed by auth flow
+  }
+
   // Anti-spam check FIRST — before anything else
   const spamResult = await checkMessage(bot, ctx);
   if (spamResult.action !== 'allow') return; // Message handled by antispam

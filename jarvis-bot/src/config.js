@@ -56,6 +56,8 @@ export const config = {
   autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '1800000'),
   // Daily digest: UTC hour to send (default 18 = 6pm UTC)
   digestHour: parseInt(process.env.DIGEST_HOUR || '18'),
+  // Claude Code API bridge — shared secret for direct communication
+  claudeCodeApiSecret: process.env.CLAUDE_CODE_API_SECRET || null,
   // Runtime info
   isDocker,
 };

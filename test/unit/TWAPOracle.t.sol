@@ -52,7 +52,7 @@ contract TWAPOracleTest is Test {
 
     function test_initialize_setsState() public view {
         assertEq(oracle.getCardinality(), 1);
-        assertEq(oracle.getCardinalityNext(), 1);
+        assertEq(oracle.getCardinalityNext(), 10); // DEFAULT_CARDINALITY auto-bootstrap
         assertEq(oracle.getIndex(), 0);
     }
 

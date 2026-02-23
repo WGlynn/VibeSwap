@@ -38,7 +38,41 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - ~~**GenesisContributions.s.sol** — founder addresses are placeholders~~ FIXED (Session 29: now uses vm.envAddress)
 
-## Recently Completed (Feb 22, 2026 — Session 32: True Price Hardening)
+## Recently Completed (Feb 22, 2026 — Session 33: True Price Deep Hardening)
+100. **True Price Fee Surcharge — Extractive Behavior Tax**
+    - Regime-based fee surcharges: CASCADE +200%, MANIPULATION +100%, HIGH_LEVERAGE +50%
+    - Manipulation probability surcharges: >80% adds +200%, >50% adds +100% (additive)
+    - Capped at 500 bps (5%) max — harsh deterrent but not ruinous
+    - Surplus fees (above base) routed to insurance pool via IncentiveController
+    - 14 surcharge tests passing
+
+101. **Volatility Oracle Cross-Validation — Two-Signal Synthesis**
+    - Added IVolatilityOracle reference to VibeAMM (was only in IncentiveController)
+    - `_crossValidateVolatility()`: compares True Price regime with VolatilityOracle tier
+    - Stealth manipulation (danger regime + low vol): tightens bounds 30% + adds +50% fee surcharge
+    - Confirmed danger (danger regime + high vol): tightens bounds 15%
+    - Organic volatility (normal regime + high vol): widens bounds 15% (reduces false positives)
+    - 13 cross-validation tests passing (event verification via vm.recordLogs)
+
+102. **TRUE_PRICE_BREAKER on Individual Swaps — Bypass Gap Closed**
+    - `swap()` and `swapWithPoW()` were missing `whenBreakerNotTripped(TRUE_PRICE_BREAKER)`
+    - Attacker could bypass breaker by switching from batch to individual swaps
+    - Now all swap paths (batch, individual, PoW) are guarded
+
+103. **VolatilityOracle Event Emission Fix**
+    - `VolatilityUpdated` event was declared in IVolatilityOracle but never emitted
+    - Now emits after each observation update (when ≥3 observations available)
+    - Enables off-chain monitoring, subgraphs, and keeper systems
+
+104. **EmissionController — VIBE Token Distribution System**
+    - Already built (discovered existing from prior session) — all 92 tests pass
+    - Wall-clock halving, 50/35/15 budget split (Shapley/Gauge/Staking)
+
+- Commits: `021779c` — pushed to both remotes
+- Regression: 146 tests across 9 suites, 0 failures
+- True Price test count: 77 (51 original + 14 surcharge + 12 cross-validation)
+
+## Previously Completed (Feb 22, 2026 — Session 32: True Price Hardening)
 94. **True Price Pipeline — Intelligence-Enforcement Gap Closed**
     - **CRITICAL**: TruePriceOracle was declared in VibeAMM but NEVER used in batch execution
     - Added `_validateAndDampClearingPrice()` — three-tier enforcement: pass-through, golden ratio damping, circuit breaker

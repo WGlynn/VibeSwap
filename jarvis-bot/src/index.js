@@ -22,6 +22,7 @@ import { initCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './cr
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
 import { recoverRetryQueue } from './consensus.js';
+import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
@@ -189,8 +190,37 @@ bot.on('new_chat_members', async (ctx) => {
 
 // ============ Commands ============
 
-bot.command('start', (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+bot.command('start', async (ctx) => {
+  const payload = ctx.message.text.split(' ')[1] || '';
+
+  // Shadow Protocol deep link: /start shadow_<token>
+  if (payload.startsWith('shadow_')) {
+    const token = payload.slice(7);
+    const invite = consumeInvite(token);
+    if (!invite) {
+      return ctx.reply('This invite link has expired or was already used.');
+    }
+
+    const { codename, existing } = registerShadow(ctx.from.id, invite);
+    await flushShadow();
+
+    if (existing) {
+      return ctx.reply(`Welcome back. Your codename is: ${codename}\n\nYou can talk to me freely. Your identity remains private.`);
+    }
+
+    console.log(`[shadow] New shadow identity: ${codename} (invite note: ${invite.note || 'none'})`);
+    return ctx.reply(
+      `Welcome to VibeSwap.\n\n` +
+      `Your codename is: ${codename}\n\n` +
+      `Your real identity is encrypted and known only to the inner circle. ` +
+      `Everything you say here is attributed to "${codename}" — never your real name.\n\n` +
+      `You can talk to me about anything. I'm JARVIS — co-architect of VibeSwap. ` +
+      `Ask me about the project, share ideas, give feedback. Your perspective matters.\n\n` +
+      `This is a private channel. No one else can see our conversation.`
+    );
+  }
+
+  if (!isAuthorized(ctx) && !isShadow(ctx.from.id)) return unauthorized(ctx);
   ctx.reply('JARVIS online. Just talk to me.');
 });
 
@@ -1335,6 +1365,93 @@ bot.command('sticker', async (ctx) => {
   }
 });
 
+// ============ Shadow Protocol ============
+
+// /shadow [note] — Owner generates a private invite token
+bot.command('shadow', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const note = ctx.message.text.replace(/^\/shadow(@\w+)?/, '').trim();
+  const token = createInvite(ctx.from.id, note);
+  await flushShadow();
+
+  const botUsername = ctx.botInfo?.username || config.botUsername;
+  const inviteLink = `https://t.me/${botUsername}?start=shadow_${token}`;
+
+  const lines = [
+    'Shadow Protocol — Invite Generated',
+    '',
+    `Link: ${inviteLink}`,
+    `Token: ${token}`,
+    note ? `Note: ${note}` : '',
+    '',
+    'Expires in 7 days. Single use.',
+    'Send this link privately to your contact.',
+    'They open it → JARVIS assigns a codename → identity encrypted.',
+  ].filter(Boolean);
+
+  // Always send as DM to owner, never in group
+  try {
+    await bot.telegram.sendMessage(ctx.from.id, lines.join('\n'));
+    if (ctx.chat.type !== 'private') {
+      await ctx.reply('Invite sent to your DMs.');
+    }
+  } catch {
+    await ctx.reply(lines.join('\n'));
+  }
+});
+
+// /shadows — Owner views all shadow identities (decrypted)
+bot.command('shadows', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const stats = getShadowStats();
+  const all = listShadows();
+  const invites = listPendingInvites();
+
+  const lines = [
+    `Shadow Protocol — ${stats.active} active, ${stats.revoked} revoked, ${stats.totalContributions} contributions`,
+    '',
+  ];
+
+  if (all.length === 0) {
+    lines.push('No shadow identities yet. Use /shadow to create an invite.');
+  } else {
+    for (const s of all) {
+      const status = s.status === 'revoked' ? ' [REVOKED]' : '';
+      lines.push(`${s.codename}${status} — ID: ${s.telegramId} — ${s.contributions} contributions — joined ${s.joinedAt.slice(0, 10)}${s.note ? ` (${s.note})` : ''}`);
+    }
+  }
+
+  if (invites.length > 0) {
+    lines.push('', 'Pending invites:');
+    for (const inv of invites) {
+      lines.push(`  ${inv.token} — ${inv.expiresIn}${inv.note ? ` (${inv.note})` : ''}`);
+    }
+  }
+
+  // DM only
+  try {
+    await bot.telegram.sendMessage(ctx.from.id, lines.join('\n'));
+    if (ctx.chat.type !== 'private') await ctx.reply('Shadow list sent to your DMs.');
+  } catch {
+    await ctx.reply(lines.join('\n'));
+  }
+});
+
+// /unshadow <codename> — Owner revokes a shadow identity
+bot.command('unshadow', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const codename = ctx.message.text.replace(/^\/unshadow(@\w+)?/, '').trim();
+  if (!codename) return ctx.reply('Usage: /unshadow <codename>');
+
+  if (revokeShadow(codename)) {
+    await flushShadow();
+    ctx.reply(`Shadow identity "${codename}" revoked.`);
+  } else {
+    ctx.reply(`No shadow found with codename "${codename}".`);
+  }
+});
+
 // ============ Multimodal Helpers ============
 
 async function downloadTelegramFile(ctx, fileId) {
@@ -1732,15 +1849,20 @@ bot.on('text', async (ctx) => {
     return;
   }
 
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  // Shadow Protocol — shadow users bypass normal auth, use codename
+  const shadowCodename = getShadowCodename(ctx.from.id);
+  if (!isAuthorized(ctx) && !shadowCodename) return unauthorized(ctx);
 
-  // Rate limit Claude API calls (owner exempt)
+  // Rate limit Claude API calls (owner exempt, shadows get standard limit)
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) {
     return ctx.reply('Slow down — too many requests. Try again in a minute.');
   }
 
   const chatId = ctx.chat.id;
-  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const userName = shadowCodename || ctx.from.username || ctx.from.first_name || 'Unknown';
+
+  // Track shadow contribution
+  if (shadowCodename) incrementContribution(ctx.from.id);
 
   // Show typing indicator
   await ctx.sendChatAction('typing');
@@ -2056,7 +2178,8 @@ async function main() {
   await initStickers();
   await recoverWAL();
   await recoverRetryQueue();
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers loaded.');
+  await initShadow();
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow loaded.');
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
   console.log('[jarvis] Step 3.5: Initializing shard identity...');
@@ -2805,6 +2928,7 @@ async function main() {
       console.warn(`[jarvis] Inner dialogue generation error: ${err.message}`);
     }
     await flushInnerDialogue();
+    await flushShadow();
     pruneOldMessages();
     await saveComms();
     // Check shard health (mark dead shards, trigger failover)
@@ -2868,6 +2992,7 @@ async function main() {
     await flushThreads();
     await flushLearning();
     await flushInnerDialogue();
+    await flushShadow();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

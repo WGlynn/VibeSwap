@@ -21,11 +21,15 @@ import { getShadowStats, consumeInvite, registerShadow } from './shadow.js';
 import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
+import { getCurrentTarget, submitProof, getMiningStats } from './mining.js';
+import { createHmac } from 'crypto';
 
 // ============ Rate Limiter ============
 
 const rateBuckets = new Map(); // IP -> [timestamps]
+const miningRateBuckets = new Map(); // IP -> [timestamps]
 const RATE_LIMIT = config.web?.rateLimitPerMinute || 5;
+const MINING_RATE_LIMIT = 10; // mining submissions per minute per IP
 const RATE_WINDOW = 60_000; // 1 minute
 
 function checkRateLimit(ip) {
@@ -42,6 +46,19 @@ function checkRateLimit(ip) {
   return true;
 }
 
+function checkMiningRateLimit(ip) {
+  const now = Date.now();
+  const bucket = miningRateBuckets.get(ip) || [];
+  const recent = bucket.filter(t => now - t < RATE_WINDOW);
+  if (recent.length >= MINING_RATE_LIMIT) {
+    miningRateBuckets.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  miningRateBuckets.set(ip, recent);
+  return true;
+}
+
 // Periodic cleanup (every 5 min)
 setInterval(() => {
   const now = Date.now();
@@ -50,7 +67,36 @@ setInterval(() => {
     if (recent.length === 0) rateBuckets.delete(ip);
     else rateBuckets.set(ip, recent);
   }
+  for (const [ip, bucket] of miningRateBuckets) {
+    const recent = bucket.filter(t => now - t < RATE_WINDOW);
+    if (recent.length === 0) miningRateBuckets.delete(ip);
+    else miningRateBuckets.set(ip, recent);
+  }
 }, 5 * 60_000);
+
+// ============ Telegram initData HMAC Validation ============
+
+function validateTelegramInitData(initData) {
+  const botToken = config.telegram?.token;
+  if (!botToken) return true; // Skip validation if no bot token configured
+
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) return false;
+
+    params.delete('hash');
+    const entries = [...params.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const dataCheckString = entries.map(([k, v]) => `${k}=${v}`).join('\n');
+
+    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const computed = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+    return computed === hash;
+  } catch {
+    return false;
+  }
+}
 
 // ============ CORS ============
 
@@ -280,6 +326,67 @@ export async function handleWebRequest(req, res, pathname) {
     } catch (err) {
       console.error('[web-api] Shadow verify error:', err.message);
       jsonResponse(res, 500, { error: 'Shadow verification failed' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/mining/target ============
+  if (pathname === '/web/mining/target' && req.method === 'GET') {
+    try {
+      const target = getCurrentTarget();
+      jsonResponse(res, 200, target);
+    } catch (err) {
+      console.error('[web-api] Mining target error:', err.message);
+      jsonResponse(res, 500, { error: 'Could not fetch mining target' });
+    }
+    return true;
+  }
+
+  // ============ POST /web/mining/submit ============
+  if (pathname === '/web/mining/submit' && req.method === 'POST') {
+    if (!checkMiningRateLimit(ip)) {
+      jsonResponse(res, 429, { error: 'Mining rate limited. Max 10 submissions per minute.', retryAfter: 60 });
+      return true;
+    }
+
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { userId, nonce, hash, challenge, initData } = body;
+
+      if (!userId || !nonce || !hash || !challenge) {
+        jsonResponse(res, 400, { error: 'Missing required fields: userId, nonce, hash, challenge' });
+        return true;
+      }
+
+      // Validate Telegram initData if provided (prevents non-Telegram clients)
+      if (initData && !validateTelegramInitData(initData)) {
+        jsonResponse(res, 403, { error: 'Invalid Telegram initData' });
+        return true;
+      }
+
+      const result = submitProof(userId, nonce, hash, challenge);
+      const status = result.accepted ? 200 : 400;
+      jsonResponse(res, status, result);
+    } catch (err) {
+      console.error('[web-api] Mining submit error:', err.message);
+      jsonResponse(res, 500, { error: 'Mining submission failed' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/mining/stats/:userId ============
+  if (pathname.startsWith('/web/mining/stats/') && req.method === 'GET') {
+    try {
+      const userId = pathname.split('/web/mining/stats/')[1];
+      if (!userId) {
+        jsonResponse(res, 400, { error: 'Missing userId' });
+        return true;
+      }
+      const stats = getMiningStats(decodeURIComponent(userId));
+      jsonResponse(res, 200, stats);
+    } catch (err) {
+      console.error('[web-api] Mining stats error:', err.message);
+      jsonResponse(res, 500, { error: 'Could not fetch mining stats' });
     }
     return true;
   }

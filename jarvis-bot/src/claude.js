@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve, relative } from 'path';
@@ -6,8 +5,8 @@ import { config } from './config.js';
 import { loadSystemPrompt } from './memory.js';
 import { setFlag, getBehavior } from './behavior.js';
 import { learnFact, buildKnowledgeContext } from './learning.js';
+import { llmChat, getProvider, getProviderName, getModelName } from './llm-provider.js';
 
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 const REPO_PATH = config.repo.path;
 
 // Per-chat conversation history — persisted to disk
@@ -261,8 +260,8 @@ Use the tools to read existing files for reference and write new files.`;
   let rounds = 0;
 
   try {
-    let response = await client.messages.create({
-      model: config.anthropic.model,
+    let response = await llmChat({
+      model: getModelName(),
       max_tokens: 8192,
       system: codeGenPrompt,
       messages,
@@ -285,8 +284,8 @@ Use the tools to read existing files for reference and write new files.`;
       }
       messages.push({ role: 'user', content: toolResults });
 
-      response = await client.messages.create({
-        model: config.anthropic.model,
+      response = await llmChat({
+        model: getModelName(),
         max_tokens: 8192,
         system: codeGenPrompt,
         messages,
@@ -419,8 +418,8 @@ export async function chat(chatId, userName, message, chatType = 'private') {
   ];
 
   try {
-    let response = await client.messages.create({
-      model: config.anthropic.model,
+    let response = await llmChat({
+      model: getModelName(),
       max_tokens: config.maxTokens,
       system: fullSystemPrompt,
       messages: history,
@@ -463,8 +462,8 @@ export async function chat(chatId, userName, message, chatType = 'private') {
       }
       history.push({ role: 'user', content: toolResults });
 
-      response = await client.messages.create({
-        model: config.anthropic.model,
+      response = await llmChat({
+        model: getModelName(),
         max_tokens: config.maxTokens,
         system: fullSystemPrompt,
         messages: history,

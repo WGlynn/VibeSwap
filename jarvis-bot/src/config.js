@@ -75,6 +75,16 @@ export const config = {
     // Auto-detected when TELEGRAM_BOT_TOKEN is missing and SHARD_MODE=worker
     mode: process.env.SHARD_MODE || (process.env.TELEGRAM_BOT_TOKEN ? 'primary' : 'worker'),
   },
+  // LLM Provider (Multi-Model Mind Network)
+  llm: {
+    provider: process.env.LLM_PROVIDER || 'claude', // 'claude' | 'openai' | 'ollama' | 'gemini' | 'deepseek'
+    model: process.env.LLM_MODEL || process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929',
+    baseUrl: process.env.LLM_BASE_URL || null, // Custom endpoint (e.g., self-hosted Ollama)
+    openaiApiKey: process.env.OPENAI_API_KEY || null,
+    geminiApiKey: process.env.GEMINI_API_KEY || null,
+    deepseekApiKey: process.env.DEEPSEEK_API_KEY || null,
+    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+  },
   // Runtime info
   isDocker,
 };

@@ -14,6 +14,7 @@ import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSumm
 import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
 import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue } from './inner-dialogue.js';
 import { initStateStore } from './state-store.js';
+import { initProvider, getProviderName, getModelName } from './llm-provider.js';
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
@@ -62,8 +63,11 @@ if (IS_WORKER) {
   console.log('[jarvis] ============ WORKER SHARD MODE ============');
   console.log('[jarvis] No Telegram token — running as headless consensus node.');
   console.log('[jarvis] This shard participates in: BFT consensus, CRPC, Knowledge Chain.');
-  if (!config.anthropic.apiKey) {
-    console.error('ANTHROPIC_API_KEY is required even for worker shards (CRPC needs Claude).');
+  const provider = config.llm?.provider || 'claude';
+  const hasKey = provider === 'ollama' || config.anthropic.apiKey || config.llm?.openaiApiKey || config.llm?.geminiApiKey || config.llm?.deepseekApiKey;
+  if (!hasKey) {
+    console.error('An LLM API key is required for worker shards (CRPC needs an LLM).');
+    console.error('Set one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or use LLM_PROVIDER=ollama');
     process.exit(1);
   }
 } else {
@@ -1387,6 +1391,9 @@ async function main() {
     console.log('[jarvis] Step 2: Initializing state store...');
     await initStateStore();
 
+    console.log('[jarvis] Step 2.5: Initializing LLM provider...');
+    initProvider();
+
     console.log('[jarvis] Step 3: Loading learning + inner dialogue...');
     await initLearning();
     await initInnerDialogue();
@@ -1410,6 +1417,8 @@ async function main() {
         res.end(JSON.stringify({
           status: 'ok',
           mode: 'worker',
+          provider: getProviderName(),
+          model: getModelName(),
           shard: info.id,
           nodeType: info.nodeType,
           uptime: process.uptime(),
@@ -1603,6 +1612,10 @@ async function main() {
   console.log('[jarvis] Step 2.5: Initializing state store...');
   await initStateStore();
 
+  // Step 2.7: Initialize LLM provider (multi-model support)
+  console.log('[jarvis] Step 2.7: Initializing LLM provider...');
+  initProvider();
+
   // Step 3: Load context, conversation history, moderation log, threads, comms
   console.log('[jarvis] Step 3: Loading memory, conversations, moderation, threads, comms...');
   await initClaude();
@@ -1668,7 +1681,8 @@ async function main() {
           res.end(JSON.stringify({
             status: 'ok',
             uptime: process.uptime(),
-            model: config.anthropic.model,
+            provider: getProviderName(),
+            model: getModelName(),
             context: { loaded: report.loaded.length, total: report.loaded.length + report.missing.length, chars: report.totalChars },
           }));
         } catch {

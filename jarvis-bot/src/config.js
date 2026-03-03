@@ -86,6 +86,11 @@ export const config = {
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     whisperModel: process.env.WHISPER_MODEL || 'whisper-1',
   },
+  // Fireflies.ai integration (meeting transcription)
+  fireflies: {
+    apiKey: process.env.FIREFLIES_API_KEY || null,
+    webhookSecret: process.env.FIREFLIES_WEBHOOK_SECRET || null, // HMAC verification
+  },
   // Runtime info
   isDocker,
 };

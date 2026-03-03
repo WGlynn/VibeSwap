@@ -45,6 +45,7 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { createServer } from 'http';
+import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
@@ -2207,6 +2208,221 @@ async function main() {
             res.end(JSON.stringify({ error: err.message }));
           }
         });
+      // ============ Fireflies.ai Webhook ============
+      // Receives "Transcription completed" event, fetches full transcript via GraphQL,
+      // generates meeting notes, sends to Telegram.
+      } else if (req.url === '/fireflies' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            // Verify HMAC signature if secret is configured
+            if (config.fireflies?.webhookSecret) {
+              const signature = req.headers['x-hub-signature'];
+              const expected = createHmac('sha256', config.fireflies.webhookSecret).update(body).digest('hex');
+              if (signature !== expected) {
+                console.warn('[fireflies] Invalid webhook signature');
+                res.writeHead(401);
+                res.end('Unauthorized');
+                return;
+              }
+            }
+
+            const payload = JSON.parse(body);
+            const { meetingId, eventType } = payload;
+            console.log(`[fireflies] Webhook received: ${eventType} (meetingId: ${meetingId})`);
+
+            if (eventType !== 'Transcription completed') {
+              res.writeHead(200);
+              res.end('OK — event ignored');
+              return;
+            }
+
+            if (!config.fireflies?.apiKey) {
+              console.warn('[fireflies] No FIREFLIES_API_KEY set — cannot fetch transcript');
+              res.writeHead(200);
+              res.end('OK — no API key configured');
+              return;
+            }
+
+            // Fetch transcript from Fireflies GraphQL API
+            const query = `query Transcript($transcriptId: String!) {
+              transcript(id: $transcriptId) {
+                title
+                duration
+                date
+                host_email
+                organizer_email
+                participants
+                speakers { id name }
+                sentences { index speaker_name text start_time end_time }
+                summary {
+                  overview
+                  short_summary
+                  action_items
+                  keywords
+                  outline
+                }
+                meeting_attendees { displayName email }
+                transcript_url
+              }
+            }`;
+
+            console.log(`[fireflies] Fetching transcript ${meetingId} from Fireflies API...`);
+            const gqlResponse = await fetch('https://api.fireflies.ai/graphql', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.fireflies.apiKey}`,
+              },
+              body: JSON.stringify({ query, variables: { transcriptId: meetingId } }),
+              signal: AbortSignal.timeout(30000),
+            });
+
+            if (!gqlResponse.ok) {
+              const errText = await gqlResponse.text();
+              console.error(`[fireflies] GraphQL API error ${gqlResponse.status}: ${errText}`);
+              res.writeHead(200);
+              res.end('OK — API fetch failed');
+              return;
+            }
+
+            const gqlData = await gqlResponse.json();
+            const transcript = gqlData.data?.transcript;
+            if (!transcript) {
+              console.warn('[fireflies] No transcript data in response');
+              res.writeHead(200);
+              res.end('OK — no transcript data');
+              return;
+            }
+
+            const { title, duration, sentences, summary, speakers, meeting_attendees, transcript_url } = transcript;
+            const durationMin = duration ? Math.round(duration / 60) : '?';
+            const attendeeNames = (meeting_attendees || []).map(a => a.displayName || a.email).filter(Boolean).join(', ');
+            console.log(`[fireflies] Transcript: "${title}" (${durationMin}min, ${sentences?.length || 0} sentences, ${speakers?.length || 0} speakers)`);
+
+            // ============ Build meeting notes document ============
+            const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+            let notes = `# ${title || 'Meeting'}\n`;
+            notes += `**Date**: ${timestamp} | **Duration**: ${durationMin} min\n`;
+            if (attendeeNames) notes += `**Attendees**: ${attendeeNames}\n`;
+            if (transcript_url) notes += `**Transcript**: ${transcript_url}\n`;
+            notes += '\n---\n\n';
+
+            // Summary section
+            if (summary) {
+              if (summary.overview) notes += `## Overview\n${summary.overview}\n\n`;
+              if (summary.action_items) notes += `## Action Items\n${summary.action_items}\n\n`;
+              if (summary.keywords) notes += `## Keywords\n${summary.keywords}\n\n`;
+              if (summary.outline) notes += `## Outline\n${summary.outline}\n\n`;
+            }
+
+            // Full transcript (speaker-grouped)
+            if (sentences && sentences.length > 0) {
+              notes += `## Transcript\n\n`;
+              let lastSpeaker = '';
+              for (const s of sentences) {
+                if (s.speaker_name !== lastSpeaker) {
+                  lastSpeaker = s.speaker_name;
+                  notes += `\n**${s.speaker_name}**:\n`;
+                }
+                notes += `${s.text} `;
+              }
+              notes += '\n';
+            }
+
+            // ============ Persist to file ============
+            const transcriptFile = join(config.dataDir, 'meeting-transcripts.md');
+            const fileEntry = `\n\n---\n\n${notes}`;
+            try {
+              await appendFile(transcriptFile, fileEntry);
+            } catch {
+              await writeFile(transcriptFile, `# Meeting Transcripts\n\nPersisted automatically by Jarvis from Fireflies.ai.\n${fileEntry}`);
+            }
+
+            // ============ Send to JARVIS for analysis ============
+            const chatId = config.transcriptChatId || config.ownerUserId;
+            const shortSummary = summary?.short_summary || summary?.overview || 'No summary available.';
+            const actionItems = summary?.action_items || 'None identified.';
+
+            // Build condensed transcript for JARVIS (max ~3000 chars to avoid token blow-up)
+            let condensed = '';
+            if (sentences && sentences.length > 0) {
+              let lastSpeaker = '';
+              for (const s of sentences) {
+                if (s.speaker_name !== lastSpeaker) {
+                  lastSpeaker = s.speaker_name;
+                  condensed += `\n[${s.speaker_name}]: `;
+                }
+                condensed += `${s.text} `;
+                if (condensed.length > 3000) {
+                  condensed += '\n... [transcript truncated]';
+                  break;
+                }
+              }
+            }
+
+            const prompt = `[MEETING TRANSCRIPT COMPLETE: ${title || 'Meeting'}]\nDuration: ${durationMin} min | Attendees: ${attendeeNames || 'unknown'}\n\nSummary: ${shortSummary}\n\nAction Items: ${actionItems}\n\nTranscript:\n${condensed}\n\nYou are JARVIS. A meeting just ended. Provide:\n1. Your 2-3 sentence assessment of the key decisions/direction\n2. Anything you think was missed or under-discussed\n3. Concrete next steps you recommend\n4. Any concerns or risks you see\n\nBe direct and opinionated. This is your co-founder debrief.`;
+
+            await bot.telegram.sendChatAction(chatId, 'typing');
+            const response = await chat(chatId, 'fireflies-transcript', prompt, 'private');
+            const jarvisText = response.text;
+
+            // ============ Send to Telegram ============
+            // Meeting header
+            let tgHeader = `[Fireflies] Meeting: ${title || 'Meeting'}\n`;
+            tgHeader += `Duration: ${durationMin}min | Speakers: ${speakers?.length || '?'}\n`;
+            if (attendeeNames) tgHeader += `Attendees: ${attendeeNames}\n`;
+            await bot.telegram.sendMessage(chatId, tgHeader);
+
+            // AI summary
+            if (shortSummary && shortSummary !== 'No summary available.') {
+              await bot.telegram.sendMessage(chatId, `Summary: ${shortSummary.slice(0, 3000)}`);
+            }
+
+            // JARVIS analysis
+            if (jarvisText) {
+              const reply = `Jarvis: ${jarvisText}`;
+              if (reply.length <= 4096) {
+                await bot.telegram.sendMessage(chatId, reply);
+              } else {
+                for (let i = 0; i < reply.length; i += 4096) {
+                  await bot.telegram.sendMessage(chatId, reply.slice(i, i + 4096));
+                }
+              }
+
+              // TTS voice response
+              try {
+                const audioSegments = await googleTTS.getAllAudioBase64(jarvisText.slice(0, 500), {
+                  lang: 'en', slow: false,
+                  host: 'https://translate.google.co.uk',
+                });
+                const audioBuffers = audioSegments.map(seg => Buffer.from(seg.base64, 'base64'));
+                const fullAudio = Buffer.concat(audioBuffers);
+                const tmpFile = join(config.dataDir, `tts_${Date.now()}.mp3`);
+                await writeFile(tmpFile, fullAudio);
+                await bot.telegram.sendVoice(chatId, { source: tmpFile }, { caption: 'Jarvis' });
+                await unlink(tmpFile).catch(() => {});
+              } catch (ttsErr) {
+                console.warn('[fireflies] TTS failed:', ttsErr.message);
+              }
+            }
+
+            // Persist JARVIS response
+            try {
+              await appendFile(transcriptFile, `\n## JARVIS Analysis\n${jarvisText}\n`);
+            } catch { /* ignore */ }
+
+            console.log(`[fireflies] Meeting "${title}" processed — ${sentences?.length || 0} sentences, notes saved`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', title, sentences: sentences?.length || 0 }));
+          } catch (err) {
+            console.error('[fireflies] Webhook error:', err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+
       // ============ Claude Code API Bridge ============
       // Direct HTTP communication — no human relay needed.
       // All /api/* routes require X-Api-Secret header.
@@ -2514,6 +2730,7 @@ async function main() {
     }).listen(healthPort, () => {
       console.log(`[jarvis] Health endpoint: http://0.0.0.0:${healthPort}/health`);
       console.log(`[jarvis] Transcript webhook: http://0.0.0.0:${healthPort}/transcript`);
+      console.log(`[jarvis] Fireflies webhook: http://0.0.0.0:${healthPort}/fireflies ${config.fireflies?.apiKey ? '(API key set)' : '(no API key)'}`);
       console.log(`[jarvis] Claude Code API: http://0.0.0.0:${healthPort}/api/* ${config.claudeCodeApiSecret ? '(secured)' : '(NO SECRET SET — disabled)'}`);
     });
   }

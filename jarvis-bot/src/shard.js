@@ -26,7 +26,9 @@ let shardInfo = null;
 let peers = new Map(); // shardId -> { url, status, load, lastHeartbeat }
 let userAssignments = new Map(); // userId -> shardId (local cache)
 let heartbeatInterval = null;
-const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+let consecutiveFailures = 0;
+const HEARTBEAT_BASE_MS = 30000; // 30 seconds
+const HEARTBEAT_MAX_MS = 5 * 60 * 1000; // 5 minute cap
 const HEARTBEAT_TIMEOUT_MS = 5000;
 
 // ============ Init ============
@@ -138,6 +140,8 @@ export async function sendHeartbeat() {
 
     if (!response.ok) {
       console.warn(`[shard] Heartbeat failed: ${response.status}`);
+      consecutiveFailures++;
+      rescheduleHeartbeat();
       return false;
     }
 
@@ -152,16 +156,35 @@ export async function sendHeartbeat() {
       }
     }
 
+    // Reconnection — reset backoff if we were in failure state
+    if (consecutiveFailures > 0) {
+      console.log(`[shard] Heartbeat recovered after ${consecutiveFailures} failures — resetting to ${HEARTBEAT_BASE_MS / 1000}s interval`);
+      consecutiveFailures = 0;
+      rescheduleHeartbeat();
+    }
+
     return true;
   } catch (err) {
-    console.warn(`[shard] Heartbeat error: ${err.message}`);
+    consecutiveFailures++;
+    const backoff = Math.min(HEARTBEAT_BASE_MS * Math.pow(2, consecutiveFailures), HEARTBEAT_MAX_MS);
+    console.warn(`[shard] Heartbeat error (${consecutiveFailures}x, next in ${Math.round(backoff / 1000)}s): ${err.message}`);
+    rescheduleHeartbeat();
     return false;
   }
 }
 
-function startHeartbeat() {
+function rescheduleHeartbeat() {
   if (heartbeatInterval) clearInterval(heartbeatInterval);
-  heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+  const interval = consecutiveFailures === 0
+    ? HEARTBEAT_BASE_MS
+    : Math.min(HEARTBEAT_BASE_MS * Math.pow(2, consecutiveFailures), HEARTBEAT_MAX_MS);
+  heartbeatInterval = setInterval(sendHeartbeat, interval);
+}
+
+function startHeartbeat() {
+  consecutiveFailures = 0;
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_BASE_MS);
 }
 
 // ============ User Assignment ============

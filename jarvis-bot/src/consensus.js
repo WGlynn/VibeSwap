@@ -29,6 +29,8 @@
 // ============
 
 import { createHash, randomBytes } from 'crypto';
+import { writeFile, readFile } from 'fs/promises';
+import { join } from 'path';
 import { config } from './config.js';
 import { getShardInfo, getShardPeers } from './shard.js';
 
@@ -38,6 +40,9 @@ const PROPOSAL_TIMEOUT_MS = 15000; // 15s per round
 const PHASE_TIMEOUT_MS = 5000; // 5s per phase within a round
 const MAX_PENDING_PROPOSALS = 50;
 const HTTP_TIMEOUT_MS = 3000;
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 5000;
+const PROPOSAL_JOURNAL_FILE = join(config.dataDir, 'knowledge', 'proposal-journal.json');
 
 // Proposal types that require BFT consensus
 const PROPOSAL_TYPES = {
@@ -45,6 +50,7 @@ const PROPOSAL_TYPES = {
   BEHAVIOR_CHANGE: 'behavior_change',
   INNER_PROMOTION: 'inner_promotion',
   AGENT_REGISTRATION: 'agent_registration',
+  APOPTOSIS_BATCH: 'apoptosis_batch',
 };
 
 // Consensus phases
@@ -68,6 +74,7 @@ const pendingProposals = new Map(); // proposalId -> ProposalState
 const committedProposals = []; // History of committed proposals
 const commitHandlers = []; // Callbacks for committed state changes
 const proposalHandlers = []; // Callbacks for incoming proposals (validation)
+const retryQueue = []; // { proposal, retryCount, nextRetryAt }
 
 let roundCounter = 0;
 
@@ -328,9 +335,75 @@ function checkProposalTimeouts() {
     if (now - state.createdAt > PROPOSAL_TIMEOUT_MS && !state.committed) {
       state.timedOut = true;
       pendingProposals.delete(id);
-      console.warn(`[consensus] Proposal timed out: ${id} (${state.type}) at phase ${state.phase}`);
+      // Push to retry queue instead of silent discard
+      const existing = retryQueue.find(r => r.proposal.id === id);
+      if (!existing) {
+        const retryCount = 0;
+        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount);
+        retryQueue.push({
+          proposal: { type: state.type, data: state.data },
+          retryCount,
+          nextRetryAt: now + delay,
+        });
+        console.warn(`[consensus] Proposal timed out → retry queue: ${id} (${state.type}) at phase ${state.phase}`);
+      } else {
+        console.warn(`[consensus] Proposal timed out (already queued): ${id} (${state.type})`);
+      }
     }
   }
+  processRetryQueue();
+}
+
+async function processRetryQueue() {
+  const now = Date.now();
+  let i = 0;
+  while (i < retryQueue.length) {
+    const entry = retryQueue[i];
+    if (now < entry.nextRetryAt) { i++; continue; }
+
+    entry.retryCount++;
+    if (entry.retryCount > MAX_RETRIES) {
+      console.warn(`[consensus] Retry exhausted (${MAX_RETRIES}x): ${entry.proposal.type}`);
+      retryQueue.splice(i, 1);
+      continue;
+    }
+
+    // Re-propose — non-upgraded shards see this as a normal new proposal
+    console.log(`[consensus] Retrying proposal: ${entry.proposal.type} (attempt ${entry.retryCount}/${MAX_RETRIES})`);
+    try {
+      const result = await propose(entry.proposal.type, entry.proposal.data);
+      if (result.committed) {
+        retryQueue.splice(i, 1);
+        continue;
+      }
+    } catch (err) {
+      console.warn(`[consensus] Retry failed: ${err.message}`);
+    }
+
+    // Schedule next retry with exponential backoff
+    entry.nextRetryAt = now + RETRY_BASE_DELAY_MS * Math.pow(2, entry.retryCount);
+    i++;
+  }
+  // Persist retry queue for crash recovery
+  persistRetryQueue();
+}
+
+async function persistRetryQueue() {
+  if (retryQueue.length === 0) return;
+  try {
+    await writeFile(PROPOSAL_JOURNAL_FILE, JSON.stringify(retryQueue));
+  } catch { /* non-fatal */ }
+}
+
+export async function recoverRetryQueue() {
+  try {
+    const data = await readFile(PROPOSAL_JOURNAL_FILE, 'utf-8');
+    const entries = JSON.parse(data);
+    retryQueue.push(...entries);
+    if (entries.length > 0) {
+      console.log(`[consensus] Recovered ${entries.length} proposals from journal`);
+    }
+  } catch { /* no journal — clean start */ }
 }
 
 // ============ Hashing ============

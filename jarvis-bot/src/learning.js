@@ -703,11 +703,57 @@ function applySkillPromotion(newSkill) {
   console.log(`[learning] New skill: ${newSkill.id} — "${newSkill.lesson.slice(0, 60)}" (${newSkill.tokenCost} tokens)`);
 }
 
-// Register consensus commit handler for skill promotions
+// ============ Coordinated Skill Apoptosis ============
+// Network-tier skills: propose pruning via BFT, only apply if committed.
+// User/group CKBs remain local — no consensus needed.
+
+async function runSkillApoptosis() {
+  const now = Date.now();
+  const scored = skills.map((s, idx) => ({
+    idx,
+    skill: s,
+    valueDensity: computeValueDensity(s, now),
+  }));
+
+  // Identify skills below prune threshold
+  const toPrune = scored.filter(s => s.valueDensity < ECONOMICS.PRUNE_THRESHOLD);
+  if (toPrune.length === 0) return;
+
+  const pruneIds = toPrune.map(s => s.skill.id);
+
+  if (isMultiShard()) {
+    // Propose pruning via BFT — non-upgraded shards ignore unknown type (safe)
+    console.log(`[learning] Proposing skill apoptosis via BFT: ${pruneIds.length} skills`);
+    const result = await propose(PROPOSAL_TYPES.APOPTOSIS_BATCH, { skillIds: pruneIds });
+    if (!result.committed) {
+      console.warn(`[learning] Apoptosis proposal rejected/timed out — keeping all skills`);
+      return;
+    }
+    // Committed — applySkillApoptosis will be called by the onCommit handler
+  } else {
+    // Single-shard: apply directly
+    applySkillApoptosis(pruneIds);
+  }
+}
+
+function applySkillApoptosis(skillIds) {
+  const before = skills.length;
+  skills = skills.filter(s => !skillIds.includes(s.id));
+  const pruned = before - skills.length;
+  if (pruned > 0) {
+    console.log(`[learning] Apoptosis: pruned ${pruned} low-density skills (${skills.length} remain)`);
+    saveSkills();
+  }
+}
+
+// Register consensus commit handler for skill promotions + apoptosis
 export function registerConsensusHandlers() {
   onCommit(async (type, data) => {
     if (type === PROPOSAL_TYPES.SKILL_PROMOTION && data.skill) {
       applySkillPromotion(data.skill);
+    }
+    if (type === PROPOSAL_TYPES.APOPTOSIS_BATCH && data.skillIds) {
+      applySkillApoptosis(data.skillIds);
     }
   });
 }
@@ -878,8 +924,9 @@ export async function buildKnowledgeContext(userId, chatId, chatType) {
 
   // ---- Network Knowledge: Skills ----
   if (skills.length > 0) {
-    // Apoptosis on skills too
-    skills = apoptosis(skills, ECONOMICS.SKILL_BUDGET);
+    // Coordinated apoptosis: multi-shard proposes pruning via BFT,
+    // single-shard applies directly. User/group CKBs are local-only (no change).
+    await runSkillApoptosis();
 
     const skillTokens = computeCKBOccupation(skills);
     parts.push(`--- NETWORK KNOWLEDGE: Skills (${skillTokens}/${ECONOMICS.SKILL_BUDGET} tokens) ---`);

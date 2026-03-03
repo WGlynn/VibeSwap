@@ -14,6 +14,7 @@ export function useJarvis() {
   const [mind, setMind] = useState(null)
   const [health, setHealth] = useState(null)
   const [error, setError] = useState(null)
+  const [budget, setBudget] = useState(null)
   const sessionIdRef = useRef(crypto.randomUUID())
 
   const sendMessage = useCallback(async (text) => {
@@ -39,6 +40,8 @@ export function useJarvis() {
       if (!res.ok) {
         throw new Error(data.error || `HTTP ${res.status}`)
       }
+
+      if (data.budget) setBudget(data.budget)
 
       setMessages(prev => [...prev, {
         role: 'jarvis',
@@ -96,5 +99,5 @@ export function useJarvis() {
     }
   }, [fetchHealth, fetchMind])
 
-  return { messages, isLoading, mind, health, error, sendMessage }
+  return { messages, isLoading, mind, health, error, budget, sendMessage }
 }

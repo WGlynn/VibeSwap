@@ -46,6 +46,7 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
+import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics } from './compute-economics.js';
 import { createServer } from 'http';
 import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
@@ -1512,6 +1513,11 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
     clearInterval(typingInterval);
     await saveConversations();
 
+    // Record compute usage (non-blocking)
+    if (response.usage) {
+      recordComputeUsage(String(chatId), response.usage).catch(() => {});
+    }
+
     const reply = response.text;
     if (reply.length <= 4096) {
       await ctx.reply(reply, { parse_mode: undefined });
@@ -1901,6 +1907,11 @@ bot.on('text', async (ctx) => {
 
     clearInterval(typingInterval);
 
+    // Record compute usage (non-blocking)
+    if (response.usage) {
+      recordComputeUsage(String(chatId), response.usage).catch(() => {});
+    }
+
     // Save conversation after every Claude response (resilience)
     await saveConversations();
 
@@ -2180,7 +2191,8 @@ async function main() {
   await recoverWAL();
   await recoverRetryQueue();
   await initShadow();
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow loaded.');
+  await initComputeEconomics();
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics loaded.');
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
   console.log('[jarvis] Step 3.5: Initializing shard identity...');
@@ -3006,6 +3018,7 @@ async function main() {
     await flushLearning();
     await flushInnerDialogue();
     await flushShadow();
+    await flushComputeEconomics();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

@@ -306,6 +306,28 @@ function MindPanels({ mind }) {
         </MindCard>
       )}
 
+      {/* Compute Economics */}
+      {mind.computeEconomics && (
+        <MindCard title="COMPUTE ECONOMICS" icon="$" defaultOpen={false}>
+          <StatRow
+            label="Pool utilization"
+            value={`${mind.computeEconomics.poolUtilization || 0}%`}
+            color={mind.computeEconomics.poolUtilization > 80 ? 'text-amber-400' : 'text-matrix-400'}
+          />
+          <StatRow
+            label="Pool remaining"
+            value={`${((mind.computeEconomics.poolRemaining || 0) / 1000).toFixed(0)}K tokens`}
+          />
+          <StatRow label="Active users" value={mind.computeEconomics.activeUsers || 0} color="text-terminal-400" />
+          <StatRow label="Total users" value={mind.computeEconomics.totalUsers || 0} />
+          <StatRow
+            label="Shapley sum"
+            value={mind.computeEconomics.shapleySum || 0}
+            color="text-matrix-600"
+          />
+        </MindCard>
+      )}
+
       {/* Shadow Protocol */}
       {mind.shadows?.active > 0 && (
         <MindCard title="SHADOW PROTOCOL" icon="&" defaultOpen={false}>
@@ -320,7 +342,7 @@ function MindPanels({ mind }) {
 // ============ Main Page ============
 
 function JarvisPage() {
-  const { messages, isLoading, mind, health, sendMessage } = useJarvis()
+  const { messages, isLoading, mind, health, budget, sendMessage } = useJarvis()
 
   return (
     <div className="flex flex-col h-full max-w-7xl mx-auto px-4 py-2">
@@ -345,9 +367,27 @@ function JarvisPage() {
         <span className="text-black-500 font-mono text-[10px]">
           ENCRYPTED | VIBESWAP MIND NETWORK | {health?.model || 'claude'}
         </span>
-        <span className="text-black-500 font-mono text-[10px]">
-          {messages.length - 1} messages
-        </span>
+        <div className="flex items-center space-x-3">
+          {budget && (
+            <div className="flex items-center space-x-1.5">
+              <span className="text-black-500 font-mono text-[10px]">BUDGET</span>
+              <div className="w-16 h-1.5 bg-black-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    budget.degraded ? 'bg-amber-500' : 'bg-matrix-500'
+                  }`}
+                  style={{ width: `${Math.min(100, budget.daily > 0 ? (budget.used / budget.daily) * 100 : 0)}%` }}
+                />
+              </div>
+              <span className={`font-mono text-[10px] ${budget.degraded ? 'text-amber-400' : 'text-black-400'}`}>
+                {budget.daily > 0 ? Math.round((budget.used / budget.daily) * 100) : 0}%
+              </span>
+            </div>
+          )}
+          <span className="text-black-500 font-mono text-[10px]">
+            {messages.length - 1} messages
+          </span>
+        </div>
       </div>
     </div>
   )

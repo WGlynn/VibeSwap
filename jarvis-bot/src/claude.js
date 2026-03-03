@@ -334,7 +334,7 @@ export function bufferMessage(chatId, userName, message) {
   conversationsDirty = true;
 }
 
-export async function chat(chatId, userName, message, chatType = 'private') {
+export async function chat(chatId, userName, message, chatType = 'private', media = []) {
   if (!conversations.has(chatId)) {
     conversations.set(chatId, []);
   }
@@ -346,6 +346,49 @@ export async function chat(chatId, userName, message, chatType = 'private') {
   const contextPrefix = isDM ? '[DM] ' : '[GROUP] ';
   const taggedMessage = contextPrefix + (userName ? `[${userName}]: ${message}` : message);
 
+  // Build content: multimodal array if media present, plain string otherwise
+  if (media.length > 0) {
+    // Multimodal message — content array with media blocks + text
+    const contentBlocks = [];
+    for (const m of media) {
+      if (m.type === 'image') {
+        contentBlocks.push({
+          type: 'image',
+          source: { type: 'base64', media_type: m.mimeType, data: m.data },
+        });
+      } else if (m.type === 'document') {
+        contentBlocks.push({
+          type: 'document',
+          source: { type: 'base64', media_type: m.mimeType, data: m.data },
+        });
+      }
+    }
+    contentBlocks.push({ type: 'text', text: taggedMessage });
+
+    // Store text-only placeholder in history (no base64 bloat)
+    const mediaDesc = media.map(m => `[${m.type}: ${m.filename || m.mimeType}]`).join(' ');
+    history.push({ role: 'user', content: `${mediaDesc} ${taggedMessage}` });
+
+    // Swap last history entry's content for the API call, restore after
+    const historyEntry = history[history.length - 1];
+    const savedContent = historyEntry.content;
+    historyEntry.content = contentBlocks;
+
+    // Trim + sanitize before API call
+    while (history.length > config.maxConversationHistory) {
+      history.shift();
+    }
+    sanitizeHistory(history);
+
+    try {
+      return await _sendToLLM(chatId, userName, chatType, history);
+    } finally {
+      // Restore text-only content for persistence (no base64 stored)
+      historyEntry.content = savedContent;
+    }
+  }
+
+  // Plain text path (original behavior)
   // Append to existing user block or create new one
   // Only merge if the last message is a plain string (not tool_result array)
   const last = history[history.length - 1];
@@ -361,14 +404,16 @@ export async function chat(chatId, userName, message, chatType = 'private') {
   }
   sanitizeHistory(history);
 
+  return _sendToLLM(chatId, userName, chatType, history);
+}
+
+// ============ LLM Call + Tool Loop (shared by text and multimodal paths) ============
+
+async function _sendToLLM(chatId, userName, chatType, history) {
   // Build knowledge context for this user/chat
   let knowledgeContext = '';
   try {
-    knowledgeContext = await buildKnowledgeContext(
-      chatId, // userId — in DMs this is the user, in groups we use chatId as context key
-      chatId,
-      chatType
-    );
+    knowledgeContext = await buildKnowledgeContext(chatId, chatId, chatType);
   } catch {}
 
   const fullSystemPrompt = knowledgeContext

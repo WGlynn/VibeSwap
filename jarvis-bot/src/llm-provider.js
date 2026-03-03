@@ -115,7 +115,7 @@ function createOpenAIProvider(providerConfig) {
     for (const msg of messages) {
       if (msg.role === 'user') {
         if (Array.isArray(msg.content)) {
-          // Could be tool_results
+          // Could be tool_results or multimodal content
           const toolResults = msg.content.filter(b => b.type === 'tool_result');
           if (toolResults.length > 0) {
             for (const tr of toolResults) {
@@ -126,7 +126,25 @@ function createOpenAIProvider(providerConfig) {
               });
             }
           } else {
-            result.push({ role: 'user', content: msg.content.map(b => b.text || '').join('') });
+            // Multimodal content — convert image/document blocks to OpenAI format
+            const hasMedia = msg.content.some(b => b.type === 'image' || b.type === 'document');
+            if (hasMedia) {
+              const parts = [];
+              for (const block of msg.content) {
+                if (block.type === 'text') {
+                  parts.push({ type: 'text', text: block.text });
+                } else if (block.type === 'image' && block.source?.type === 'base64') {
+                  parts.push({
+                    type: 'image_url',
+                    image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
+                  });
+                }
+                // Documents not natively supported by OpenAI — skip
+              }
+              result.push({ role: 'user', content: parts });
+            } else {
+              result.push({ role: 'user', content: msg.content.map(b => b.text || '').join('') });
+            }
           }
         } else {
           result.push({ role: 'user', content: msg.content });
@@ -240,7 +258,11 @@ function createOllamaProvider(providerConfig) {
             ).join('\n');
             result.push({ role: 'user', content: resultText });
           } else {
-            result.push({ role: 'user', content: msg.content.map(b => b.text || '').join('') });
+            // Strip media blocks — Ollama is text-only, extract text parts
+            const textParts = msg.content.filter(b => b.type === 'text').map(b => b.text);
+            const mediaDescs = msg.content.filter(b => b.type === 'image' || b.type === 'document')
+              .map(b => `[${b.type} attached]`);
+            result.push({ role: 'user', content: [...mediaDescs, ...textParts].join('\n') || '' });
           }
         } else {
           result.push({ role: 'user', content: msg.content });
@@ -353,6 +375,10 @@ function createGeminiProvider(providerConfig) {
         for (const block of msg.content) {
           if (block.type === 'text') {
             parts.push({ text: block.text });
+          } else if (block.type === 'image' && block.source?.type === 'base64') {
+            parts.push({
+              inlineData: { mimeType: block.source.media_type, data: block.source.data },
+            });
           } else if (block.type === 'tool_use') {
             parts.push({
               functionCall: { name: block.name, args: block.input },

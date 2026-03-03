@@ -84,6 +84,7 @@ export const config = {
     geminiApiKey: process.env.GEMINI_API_KEY || null,
     deepseekApiKey: process.env.DEEPSEEK_API_KEY || null,
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+    whisperModel: process.env.WHISPER_MODEL || 'whisper-1',
   },
   // Runtime info
   isDocker,

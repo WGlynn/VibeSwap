@@ -1515,7 +1515,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
 
     // Record compute usage (non-blocking)
     if (response.usage) {
-      recordComputeUsage(String(chatId), response.usage).catch(() => {});
+      try { recordComputeUsage(String(chatId), response.usage); } catch {}
     }
 
     const reply = response.text;
@@ -1909,7 +1909,7 @@ bot.on('text', async (ctx) => {
 
     // Record compute usage (non-blocking)
     if (response.usage) {
-      recordComputeUsage(String(chatId), response.usage).catch(() => {});
+      try { recordComputeUsage(String(chatId), response.usage); } catch {}
     }
 
     // Save conversation after every Claude response (resilience)

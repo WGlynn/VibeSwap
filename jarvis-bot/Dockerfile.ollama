@@ -1,0 +1,38 @@
+FROM ollama/ollama:latest AS ollama
+
+FROM node:20-slim
+
+# Copy Ollama binary from official image (avoids slow download during build)
+COPY --from=ollama /bin/ollama /usr/bin/ollama
+
+# Install git for repo clone/pull operations
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install dependencies first (layer caching)
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Copy source code
+COPY src/ ./src/
+
+# Bundle memory files into /app/memory/ (Jarvis context)
+COPY memory/ /app/memory/
+
+# Bundle core context files as fallback
+COPY context-fallback/ /app/context-fallback/
+
+# Copy entrypoints and fix Windows CRLF line endings
+COPY entrypoint.sh ./
+COPY entrypoint-ollama.sh ./
+RUN sed -i 's/\r$//' entrypoint.sh entrypoint-ollama.sh && \
+    chmod +x entrypoint.sh entrypoint-ollama.sh
+
+# Data directory
+RUN mkdir -p /app/data
+
+EXPOSE 8080
+
+ENTRYPOINT ["./entrypoint-ollama.sh"]

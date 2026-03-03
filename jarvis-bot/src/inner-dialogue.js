@@ -311,6 +311,132 @@ export async function flushInnerDialogue() {
   dirty = false;
 }
 
+// ============ Generate Inner Dialogue (Autonomous Self-Reflection) ============
+//
+// Called periodically (every hour by default). Uses a cheap LLM call to analyze
+// cross-CKB patterns, recent corrections, and behavioral trends, then records
+// insights as INNER knowledge entries.
+//
+// This is the core of JARVIS's self-awareness loop.
+// ============
+
+let lastGenerationTime = 0;
+const GENERATION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour between generations
+const MAX_INSIGHTS_PER_GENERATION = 3;
+
+export async function generateInnerDialogue(learningStats, skills, recentCorrections = []) {
+  const now = Date.now();
+
+  // Rate limit — don't generate more than once per hour
+  if (now - lastGenerationTime < GENERATION_INTERVAL_MS) return [];
+
+  // Need the LLM provider — lazy import to avoid circular deps
+  let llmChat;
+  try {
+    const provider = await import('./llm-provider.js');
+    llmChat = provider.llmChat;
+  } catch {
+    console.warn('[inner-dialogue] LLM provider not available — skipping generation.');
+    return [];
+  }
+
+  // Build reflection prompt from available data
+  const reflectionContext = [];
+
+  if (learningStats) {
+    reflectionContext.push(`Network stats: ${learningStats.globalSkills} skills, ${learningStats.confirmedSkills} confirmed.`);
+    if (learningStats.userFacts > 0) {
+      reflectionContext.push(`User knowledge: ${learningStats.userFacts} facts, ${learningStats.userCorrections} corrections, class: ${learningStats.knowledgeClass}.`);
+    }
+  }
+
+  if (skills && skills.length > 0) {
+    const recentSkills = skills.slice(-5).map(s => s.content || s.skill || JSON.stringify(s)).join('; ');
+    reflectionContext.push(`Recent skills: ${recentSkills}`);
+  }
+
+  if (recentCorrections.length > 0) {
+    const corrSummary = recentCorrections.slice(-5).map(c => c.correction || c.content || JSON.stringify(c)).join('; ');
+    reflectionContext.push(`Recent corrections: ${corrSummary}`);
+  }
+
+  // Include existing inner dialogue for continuity
+  const existingThoughts = getRecentDialogue(5);
+  if (existingThoughts.length > 0) {
+    reflectionContext.push(`My recent reflections: ${existingThoughts.map(t => t.thought).join(' | ')}`);
+  }
+
+  const stats = getDialogueStats();
+  reflectionContext.push(`Inner dialogue: ${stats.totalEntries} entries, ${stats.utilization} utilization.`);
+
+  if (reflectionContext.length < 2) {
+    // Not enough data to reflect on yet
+    return [];
+  }
+
+  const prompt = `You are JARVIS, an AI assistant with self-reflection capabilities. Analyze the following data about your recent behavior and knowledge, then generate 1-3 brief insights.
+
+Each insight must be:
+- A genuine observation about patterns, self-corrections, or behavioral trends
+- Actionable (could change future behavior)
+- Concise (1-2 sentences max)
+
+Context:
+${reflectionContext.join('\n')}
+
+Respond with a JSON array of objects, each with "thought" (string), "category" (one of: pattern, self_correction, architectural, behavioral, synthesis, meta), and "confidence" (0.0-1.0).
+
+Example: [{"thought": "Users who correct tone rather than facts tend to have higher engagement — behavioral corrections signal investment.", "category": "behavioral", "confidence": 0.8}]
+
+Respond ONLY with the JSON array, no other text.`;
+
+  try {
+    const response = await llmChat({
+      model: undefined, // Use configured model
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    lastGenerationTime = now;
+
+    // Parse response — extract JSON array
+    const text = response?.content?.[0]?.text || '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('[inner-dialogue] Generation produced no valid JSON.');
+      return [];
+    }
+
+    const insights = JSON.parse(jsonMatch[0]);
+    const recorded = [];
+
+    for (const insight of insights.slice(0, MAX_INSIGHTS_PER_GENERATION)) {
+      if (!insight.thought || insight.thought.length < 10) continue;
+
+      const entry = recordInnerDialogue(
+        insight.thought,
+        insight.category || CATEGORIES.META,
+        ['auto-generated']
+      );
+      if (entry) {
+        // Override confidence from LLM's self-assessment
+        entry.confidence = Math.min(1.0, Math.max(0.1, insight.confidence || 0.7));
+        recorded.push(entry);
+      }
+    }
+
+    if (recorded.length > 0) {
+      console.log(`[inner-dialogue] Generated ${recorded.length} new insight(s).`);
+    }
+
+    return recorded;
+  } catch (err) {
+    console.warn(`[inner-dialogue] Generation failed: ${err.message}`);
+    lastGenerationTime = now; // Don't spam retries
+    return [];
+  }
+}
+
 // ============ Export Categories ============
 
 export { CATEGORIES as INNER_CATEGORIES };

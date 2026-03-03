@@ -12,7 +12,7 @@ import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getR
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName } from './learning.js';
 import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
-import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue } from './inner-dialogue.js';
+import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue, generateInnerDialogue } from './inner-dialogue.js';
 import { initStateStore } from './state-store.js';
 import { initProvider, getProviderName, getModelName } from './llm-provider.js';
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
@@ -2147,6 +2147,14 @@ async function main() {
     await flushAntispam();
     await flushThreads();
     await flushLearning();
+    // Inner dialogue: generate self-reflections (rate-limited to 1x/hour internally)
+    try {
+      const stats = await getLearningStats(config.ownerUserId, null);
+      const skills = getSkills();
+      await generateInnerDialogue(stats, skills);
+    } catch (err) {
+      console.warn(`[jarvis] Inner dialogue generation error: ${err.message}`);
+    }
     await flushInnerDialogue();
     pruneOldMessages();
     await saveComms();

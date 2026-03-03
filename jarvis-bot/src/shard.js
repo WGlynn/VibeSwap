@@ -82,7 +82,7 @@ export async function initShard() {
 async function registerWithRouter() {
   if (!shardInfo?.routerUrl) return;
 
-  const response = await fetch(`${shardInfo.routerUrl}/register`, {
+  const response = await fetch(`${shardInfo.routerUrl}/router/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -122,7 +122,7 @@ export async function sendHeartbeat() {
   if (!shardInfo?.routerUrl) return;
 
   try {
-    const response = await fetch(`${shardInfo.routerUrl}/heartbeat`, {
+    const response = await fetch(`${shardInfo.routerUrl}/router/heartbeat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,0 +1,46 @@
+# JARVIS Mind Network — Worker Shard: shard-1
+# First live worker node in the decentralized Mind Network
+
+app = 'jarvis-shard-1'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
+  NODE_ENV = 'production'
+  HEALTH_PORT = '8080'
+  SHARD_MODE = 'worker'
+  TOTAL_SHARDS = '2'
+  NODE_TYPE = 'full'
+  ROUTER_URL = 'https://jarvis-vibeswap.fly.dev'
+  CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
+
+[[mounts]]
+  source = 'jarvis_data'
+  destination = '/app/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+
+[checks]
+  [checks.health]
+    port = 8080
+    type = 'http'
+    interval = '1m0s'
+    timeout = '10s'
+    path = '/health'
+
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'

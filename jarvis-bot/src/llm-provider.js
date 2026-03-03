@@ -361,7 +361,7 @@ registerProvider('ollama', createOllamaProvider);
 
 function createGeminiProvider(providerConfig) {
   const apiKey = providerConfig.apiKey;
-  const defaultModel = providerConfig.model || 'gemini-2.0-flash';
+  const defaultModel = providerConfig.model || 'gemini-2.5-flash';
   const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
 
   function convertMessages(messages, system) {
@@ -553,7 +553,7 @@ function getProviderConfig(providerName) {
       switch (providerName) {
         case 'claude': return config.llm?.model || config.anthropic?.model;
         case 'openai': return 'gpt-4o';
-        case 'gemini': return 'gemini-2.0-flash';
+        case 'gemini': return 'gemini-2.5-flash';
         case 'deepseek': return 'deepseek-chat';
         case 'ollama': return config.llm?.model || 'llama3.1';
         default: return config.llm?.model;

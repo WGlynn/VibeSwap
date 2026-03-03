@@ -13,7 +13,19 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Set your Anthropic API key}
+      # LLM Provider — pick ONE:
+      #   claude:   set ANTHROPIC_API_KEY (paid API)
+      #   openai:   set OPENAI_API_KEY (paid API)
+      #   gemini:   set GEMINI_API_KEY (free tier available)
+      #   ollama:   set OLLAMA_URL (local, no API key, zero cost)
+      #   deepseek: set DEEPSEEK_API_KEY (cheap API)
+      - LLM_PROVIDER=${LLM_PROVIDER:-claude}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OLLAMA_URL=${OLLAMA_URL:-}
       - SHARD_ID=${SHARD_ID:-shard-community}
       - SHARD_MODE=worker
       - TOTAL_SHARDS=${TOTAL_SHARDS:-3}

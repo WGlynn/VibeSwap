@@ -79,39 +79,9 @@ contract SetupMVP is Script {
             ethWbtcPool = _createPool(vibeCore, vibeAMM, tokens.weth, tokens.wbtc, 5, "ETH/WBTC");
         }
 
-        console.log("");
-        console.log("Configuring liquidity protection...");
-
-        // Configure volatile pair protection
-        _configureVolatilePairProtection(vibeAMM, ethUsdcPool, "ETH/USDC");
-
-        if (tokens.usdt != address(0)) {
-            _configureVolatilePairProtection(vibeAMM, ethUsdtPool, "ETH/USDT");
-        }
-
-        if (tokens.wbtc != address(0)) {
-            _configureVolatilePairProtection(vibeAMM, wbtcUsdcPool, "WBTC/USDC");
-            _configureVolatilePairProtection(vibeAMM, ethWbtcPool, "ETH/WBTC");
-        }
-
-        // Configure stablecoin pair protection (high amplification)
-        if (tokens.usdt != address(0)) {
-            _configureStablePairProtection(vibeAMM, usdcUsdtPool, "USDC/USDT");
-        }
-
-        console.log("");
-        console.log("Configuring oracle settings...");
-
-        // Grow oracle cardinality for longer TWAP/VWAP windows
-        vibeAMM.growOracleCardinality(ethUsdcPool, 120); // 1 hour of 30s observations
-        vibeAMM.growVWAPCardinality(ethUsdcPool, 120);
-        console.log("  ETH/USDC: Oracle cardinality set to 120");
-
-        if (tokens.wbtc != address(0)) {
-            vibeAMM.growOracleCardinality(wbtcUsdcPool, 120);
-            vibeAMM.growVWAPCardinality(wbtcUsdcPool, 120);
-            console.log("  WBTC/USDC: Oracle cardinality set to 120");
-        }
+        // NOTE: Liquidity protection config + oracle cardinality require AMM proxy upgrade
+        // (setPoolProtectionConfig, growOracleCardinality, growVWAPCardinality not in deployed impl)
+        // Apply these after upgrading AMM implementation.
 
         vm.stopBroadcast();
 
@@ -225,8 +195,8 @@ contract SetupMVP is Script {
             return ChainTokens({
                 weth: 0x4200000000000000000000000000000000000006,
                 usdc: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,
-                usdt: address(0),
-                wbtc: address(0)
+                usdt: address(0), // No canonical USDT on Base
+                wbtc: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf // cbBTC
             });
         }
 

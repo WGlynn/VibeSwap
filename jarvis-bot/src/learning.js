@@ -30,6 +30,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { writeFile, readFile, mkdir, appendFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
+import { encryptUserCKB, decryptUserCKB, encryptGroupCKB, decryptGroupCKB, encryptSkills, verifySkills, signCorrection, isEncryptionEnabled } from './privacy.js';
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
@@ -204,6 +205,14 @@ export async function initLearning() {
 
   skills = await loadJson(SKILLS_FILE, []);
 
+  // Verify skills integrity (HMAC check)
+  if (isEncryptionEnabled()) {
+    const { tampered } = verifySkills(skills);
+    if (tampered.length > 0) {
+      console.warn(`[learning] WARNING: ${tampered.length} skills failed integrity check: ${tampered.join(', ')}`);
+    }
+  }
+
   // Backcompat: add economic fields to existing skills
   for (const skill of skills) {
     if (!skill.tokenCost) skill.tokenCost = estimateTokenCost(skill);
@@ -245,6 +254,11 @@ async function loadUserCKB(userId) {
     lastUpdated: null,
   });
 
+  // Decrypt sensitive fields (compute-to-data: plaintext exists only in memory)
+  if (isEncryptionEnabled()) {
+    decryptUserCKB(data, id);
+  }
+
   // Backcompat: add economic fields to existing facts + CKB
   if (!data.tokenBudget) data.tokenBudget = ECONOMICS.USER_CKB_BUDGET;
   if (!data.knowledgeClass) data.knowledgeClass = KNOWLEDGE_CLASSES.SHARED;
@@ -266,7 +280,10 @@ async function saveUserCKB(userId) {
   if (!data) return;
   data.lastUpdated = new Date().toISOString();
   const filePath = join(USERS_DIR, `${id}.json`);
-  await writeFile(filePath, JSON.stringify(data, null, 2));
+
+  // Encrypt sensitive fields before writing to disk (RSP: no plaintext at rest)
+  const toSave = isEncryptionEnabled() ? encryptUserCKB(data, id) : data;
+  await writeFile(filePath, JSON.stringify(toSave, null, 2));
 }
 
 // ============ Per-Group CKB ============
@@ -287,6 +304,11 @@ async function loadGroupCKB(groupId) {
     lastUpdated: null,
   });
 
+  // Decrypt sensitive fields
+  if (isEncryptionEnabled()) {
+    decryptGroupCKB(data, id);
+  }
+
   // Backcompat
   if (!data.tokenBudget) data.tokenBudget = ECONOMICS.GROUP_CKB_BUDGET;
   for (const fact of data.facts) {
@@ -306,7 +328,10 @@ async function saveGroupCKB(groupId) {
   if (!data) return;
   data.lastUpdated = new Date().toISOString();
   const filePath = join(GROUPS_DIR, `${id}.json`);
-  await writeFile(filePath, JSON.stringify(data, null, 2));
+
+  // Encrypt before writing to disk
+  const toSave = isEncryptionEnabled() ? encryptGroupCKB(data, id) : data;
+  await writeFile(filePath, JSON.stringify(toSave, null, 2));
 }
 
 // ============ Correction Detection ============
@@ -416,6 +441,11 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
     scope: lesson?.scope || 'universal',
     tags: lesson?.tags || [],
   };
+
+  // Sign correction entry for integrity verification
+  if (isEncryptionEnabled()) {
+    signCorrection(entry);
+  }
 
   // 1. Append to corrections log (raw, never deleted — this is the blockchain)
   try {
@@ -632,7 +662,9 @@ async function maybePromoteToSkill(correction, lesson) {
 }
 
 async function saveSkills() {
-  await writeFile(SKILLS_FILE, JSON.stringify(skills, null, 2));
+  // HMAC integrity for Network knowledge
+  const toSave = isEncryptionEnabled() ? encryptSkills(skills) : skills;
+  await writeFile(SKILLS_FILE, JSON.stringify(toSave, null, 2));
 }
 
 // ============ Learn Fact (Tool-Invoked) ============

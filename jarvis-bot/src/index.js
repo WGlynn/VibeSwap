@@ -11,6 +11,7 @@ import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntel
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName } from './learning.js';
+import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
@@ -636,6 +637,32 @@ bot.command('skills', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
+// ============ Privacy Command ============
+
+bot.command('privacy', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const status = getPrivacyStatus();
+  const lines = [
+    'Privacy Fortress (Rosetta Stone Protocol)',
+    '',
+    `Encryption: ${status.enabled ? 'ENABLED' : 'DISABLED'}`,
+    `Key loaded: ${status.keyLoaded ? 'yes' : 'no'}`,
+    `Fingerprint: ${status.fingerprint}`,
+    `Algorithm: ${status.algorithm}`,
+    `Key derivation: ${status.keyDerivation}`,
+    `PBKDF2 iterations: ${status.pbkdf2Iterations}`,
+    '',
+    'Per-user CKBs: AES-256-GCM (per-user derived key)',
+    'Per-group CKBs: AES-256-GCM (per-group derived key)',
+    'Skills: HMAC-SHA256 integrity verification',
+    'Corrections log: HMAC signed',
+    '',
+    'At rest: encrypted. In memory: decrypted (compute-to-data).',
+    'Knowledge never leaves its encryption boundary.',
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
 // ============ Health Check ============
 
 bot.command('health', async (ctx) => {
@@ -1092,8 +1119,12 @@ async function main() {
     console.warn(`[jarvis] Git pull failed (will use local files): ${err.message}`);
   }
 
-  // Step 2: Load context, conversation history, moderation log, threads, comms
-  console.log('[jarvis] Step 2: Loading memory, conversations, moderation, threads, comms...');
+  // Step 2: Initialize privacy engine BEFORE loading any CKBs
+  console.log('[jarvis] Step 2: Initializing privacy engine...');
+  await initPrivacy();
+
+  // Step 3: Load context, conversation history, moderation log, threads, comms
+  console.log('[jarvis] Step 3: Loading memory, conversations, moderation, threads, comms...');
   await initClaude();
   await initTracker();
   await initModeration();
@@ -1104,33 +1135,33 @@ async function main() {
   await initLearning();
   console.log('[jarvis] Behavior flags + comms + learning loaded.');
 
-  // Step 3: Context diagnosis
+  // Step 4: Context diagnosis
   const report = await diagnoseContext();
   console.log(`[jarvis] Context: ${report.loaded.length} files loaded (${report.totalChars} chars)`);
   if (report.missing.length > 0) {
     console.warn(`[jarvis] WARNING — Missing context files: ${report.missing.join(', ')}`);
   }
 
-  // Step 4: Check for unclean shutdown
+  // Step 5: Check for unclean shutdown
   const lastShutdown = await checkLastShutdown();
   if (!lastShutdown.clean && !lastShutdown.firstBoot) {
     console.warn(`[jarvis] WARNING: Unclean shutdown detected. Last seen: ${lastShutdown.lastSeen}, downtime: ~${lastShutdown.downtime}min`);
   }
 
-  // Step 5: Initialize group monitor (MTProto — reads public groups without joining)
+  // Step 6: Initialize group monitor (MTProto — reads public groups without joining)
   if (monitorAvailable) {
-    console.log('[jarvis] Step 5: Initializing group monitor...');
+    console.log('[jarvis] Step 6: Initializing group monitor...');
     try {
       await initMonitor();
     } catch (err) {
       console.warn(`[jarvis] Monitor init failed (non-fatal): ${err.message}`);
     }
   } else {
-    console.log('[jarvis] Step 5: Group monitor skipped (telegram package not installed).');
+    console.log('[jarvis] Step 6: Group monitor skipped (telegram package not installed).');
   }
 
   console.log(`[jarvis] Model: ${config.anthropic.model}`);
-  console.log('[jarvis] Step 6: Starting Telegram bot...');
+  console.log('[jarvis] Step 7: Starting Telegram bot...');
 
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
@@ -1437,6 +1468,7 @@ async function main() {
       { command: 'learned', description: 'Learning stats' },
       { command: 'knowledge', description: 'View learned knowledge (add "group" for group)' },
       { command: 'skills', description: 'View skills learned from corrections' },
+      { command: 'privacy', description: 'Encryption status (owner only)' },
     ]);
   } catch {}
 

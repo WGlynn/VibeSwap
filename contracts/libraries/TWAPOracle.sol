@@ -157,38 +157,52 @@ library TWAPOracle {
 
     /**
      * @notice Get observations surrounding a target timestamp
+     * @dev Binary search from oldest to newest. Returns (before, after_) such that
+     *      before.timestamp <= target < after_.timestamp for interpolation.
      */
     function getSurroundingObservations(
         OracleState storage state,
         uint32 target
     ) internal view returns (Observation memory before, Observation memory after_) {
+        // Newest observation
+        Observation memory newest = state.observations[state.index];
+
+        // If target is at or after the newest observation, return it directly
+        // (consult() will use it as both the cumulative reference and current)
+        if (newest.timestamp <= target) {
+            return (newest, newest);
+        }
+
+        // Oldest observation in the ring buffer
+        uint16 oldestIdx = (state.index + 1) % state.cardinality;
+        Observation memory oldest = state.observations[oldestIdx];
+
+        // If target is before the oldest observation, we can't compute TWAP
+        require(oldest.timestamp <= target, "OLD");
+
+        // Binary search: find the last observation with timestamp <= target
+        // Search space: offsets 0..cardinality-1 from oldestIdx (chronological order)
         uint16 l = 0;
         uint16 r = state.cardinality - 1;
-        uint16 i;
 
-        // Binary search for target
         while (l < r) {
-            i = (l + r + 1) / 2;
-            uint16 actualIndex = (state.index + state.cardinality - i) % state.cardinality;
+            uint16 mid = (l + r + 1) / 2; // Bias high to find rightmost match
+            uint16 midIdx = (oldestIdx + mid) % state.cardinality;
 
-            if (state.observations[actualIndex].timestamp <= target) {
-                r = i - 1;
+            if (state.observations[midIdx].timestamp <= target) {
+                l = mid; // This observation is at or before target, keep it
             } else {
-                l = i;
+                r = mid - 1; // This observation is after target, exclude it
             }
         }
 
-        uint16 beforeIndex = (state.index + state.cardinality - l) % state.cardinality;
-        before = state.observations[beforeIndex];
+        // l is the offset of the last observation with timestamp <= target
+        uint16 beforeIdx = (oldestIdx + l) % state.cardinality;
+        before = state.observations[beforeIdx];
 
-        if (l == 0) {
-            after_ = state.observations[state.index];
-        } else {
-            uint16 afterIndex = (state.index + state.cardinality - l + 1) % state.cardinality;
-            after_ = state.observations[afterIndex];
-        }
-
-        require(before.timestamp <= target, "OLD");
+        // after_ is the next observation (which has timestamp > target)
+        uint16 afterIdx = (oldestIdx + l + 1) % state.cardinality;
+        after_ = state.observations[afterIdx];
     }
 
     /**

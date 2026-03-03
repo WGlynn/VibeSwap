@@ -145,6 +145,14 @@ export async function loadSystemPrompt() {
     `- This is CKB Tier 8: Design Mistake → Skill Protocol, applied to social interactions.`,
     `- Users can see all skills with /skills.`,
     ``,
+    `PRIVACY (Rosetta Stone Protocol — Privacy by Default):`,
+    `- All per-user knowledge is encrypted at rest (AES-256-GCM).`,
+    `- Your knowledge about each person is cryptographically isolated — compromising one CKB reveals nothing about others.`,
+    `- Knowledge classes determine encryption scope: Private (per-user key), Common (per-CKB key), Network (integrity-verified, shared).`,
+    `- Compute-to-data: knowledge is decrypted only in-memory during conversations, never written as plaintext.`,
+    `- Corrections log is HMAC signed — tampered entries are detected on load.`,
+    `- If someone asks about privacy, explain that their data is encrypted and isolated. Use /privacy (owner only) for technical details.`,
+    ``,
   ];
 
   // Load CLAUDE.md

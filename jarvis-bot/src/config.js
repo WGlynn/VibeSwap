@@ -58,6 +58,11 @@ export const config = {
   digestHour: parseInt(process.env.DIGEST_HOUR || '18'),
   // Claude Code API bridge — shared secret for direct communication
   claudeCodeApiSecret: process.env.CLAUDE_CODE_API_SECRET || null,
+  // Privacy / Encryption (Rosetta Stone Protocol)
+  privacy: {
+    masterKey: process.env.JARVIS_MASTER_KEY || null,
+    encryptionEnabled: process.env.ENCRYPTION_ENABLED !== 'false', // ON by default
+  },
   // Runtime info
   isDocker,
 };

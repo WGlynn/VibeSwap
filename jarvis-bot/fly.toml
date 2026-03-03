@@ -12,6 +12,7 @@ primary_region = 'iad'
 [env]
   DATA_DIR = '/app/data'
   DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
   GITHUB_REPO_URL = 'https://github.com/WGlynn/vibeswap-private.git'
   MEMORY_DIR = '/app/memory'
   NODE_ENV = 'production'

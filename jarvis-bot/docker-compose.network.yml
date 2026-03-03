@@ -1,0 +1,126 @@
+# ============ JARVIS Mind Network — Multi-Shard Local Development ============
+#
+# Spins up a 3-shard network locally for testing BFT consensus, CRPC, and
+# the Knowledge Chain. One primary (with Telegram) + two worker shards.
+#
+# Usage:
+#   cp .env.example .env  # Fill in TELEGRAM_BOT_TOKEN + ANTHROPIC_API_KEY
+#   docker compose -f docker-compose.network.yml up -d --build
+#   docker compose -f docker-compose.network.yml logs -f
+#   docker compose -f docker-compose.network.yml down
+#
+# Topology:
+#   shard-0 (primary, full)  — Telegram bot + router + consensus + CRPC
+#   shard-1 (worker, full)   — consensus + CRPC (no Telegram)
+#   shard-2 (worker, light)  — consensus + CRPC (no Telegram, pruned storage)
+#
+# All shards share the same Docker image. Mode determined by environment.
+# ============
+
+services:
+  # ============ Primary Shard (shard-0) ============
+  # Runs the Telegram bot, acts as router, participates in consensus
+  shard-0:
+    build: .
+    container_name: jarvis-shard-0
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - DOCKER=1
+      - NODE_ENV=production
+      - VIBESWAP_REPO=/repo
+      - MEMORY_DIR=/repo/.claude/projects/C--Users-Will/memory
+      - DATA_DIR=/app/data
+      - OWNER_USER_ID=8366932263
+      - GITHUB_REPO_URL=${GITHUB_REPO_URL:-https://github.com/WGlynn/vibeswap-private.git}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      - ENCRYPTION_ENABLED=true
+      - HEALTH_PORT=8080
+      # Shard config
+      - SHARD_ID=shard-0
+      - SHARD_MODE=primary
+      - TOTAL_SHARDS=3
+      - NODE_TYPE=full
+      - ROUTER_URL=http://shard-0:8080
+    volumes:
+      - shard0-data:/app/data
+      - shard0-repo:/repo
+    networks:
+      - mind-network
+
+  # ============ Worker Shard 1 (shard-1) ============
+  # Full node — retains history, participates in consensus + CRPC
+  shard-1:
+    build: .
+    container_name: jarvis-shard-1
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DOCKER=1
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - ENCRYPTION_ENABLED=true
+      - HEALTH_PORT=8080
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      # Shard config — NO TELEGRAM_BOT_TOKEN = worker mode
+      - SHARD_ID=shard-1
+      - SHARD_MODE=worker
+      - TOTAL_SHARDS=3
+      - NODE_TYPE=full
+      - ROUTER_URL=http://shard-0:8080
+    volumes:
+      - shard1-data:/app/data
+    networks:
+      - mind-network
+    depends_on:
+      - shard-0
+
+  # ============ Worker Shard 2 (shard-2) ============
+  # Light node — pruned storage, consensus quorum participant
+  shard-2:
+    build: .
+    container_name: jarvis-shard-2
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DOCKER=1
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - ENCRYPTION_ENABLED=true
+      - HEALTH_PORT=8080
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      # Shard config — light node
+      - SHARD_ID=shard-2
+      - SHARD_MODE=worker
+      - TOTAL_SHARDS=3
+      - NODE_TYPE=light
+      - ROUTER_URL=http://shard-0:8080
+    volumes:
+      - shard2-data:/app/data
+    networks:
+      - mind-network
+    depends_on:
+      - shard-0
+
+volumes:
+  shard0-data:
+    name: jarvis-shard0-data
+  shard0-repo:
+    name: jarvis-shard0-repo
+  shard1-data:
+    name: jarvis-shard1-data
+  shard2-data:
+    name: jarvis-shard2-data
+
+networks:
+  mind-network:
+    name: jarvis-mind-network
+    driver: bridge

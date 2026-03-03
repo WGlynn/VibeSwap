@@ -1,0 +1,62 @@
+# ============ JARVIS Mind Network — Worker Shard (Fly.io) ============
+#
+# Template for deploying a secondary shard to the JARVIS Mind Network.
+# Worker shards participate in consensus, CRPC, and knowledge chain
+# WITHOUT needing a Telegram bot token.
+#
+# Usage:
+#   1. Copy this file: cp fly-shard.toml fly-shard-1.toml
+#   2. Change app name below
+#   3. Deploy: fly deploy --config fly-shard-1.toml
+#
+# Or use the one-command script: bash scripts/join-network.sh
+# ============
+
+app = 'jarvis-shard-1'                       # CHANGE THIS — unique name per shard
+primary_region = 'iad'                        # Choose: iad, lhr, nrt, syd, etc.
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
+  NODE_ENV = 'production'
+  HEALTH_PORT = '8080'
+  # Shard identity
+  SHARD_MODE = 'worker'
+  TOTAL_SHARDS = '2'                          # Total shards in network
+  NODE_TYPE = 'full'                          # 'light' | 'full' | 'archive'
+  # Router URL — points to primary shard's Fly.io internal address
+  ROUTER_URL = 'http://jarvis-vibeswap.fly.dev'
+
+# Secrets (set via CLI, not in this file):
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-...  --app jarvis-shard-1
+#   fly secrets set SHARD_ID=shard-1              --app jarvis-shard-1
+
+[[mounts]]
+  source = 'jarvis_data'
+  destination = '/app/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+
+[checks]
+  [checks.health]
+    port = 8080
+    type = 'http'
+    interval = '1m0s'
+    timeout = '10s'
+    path = '/health'
+
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'                            # Workers need less RAM than primary

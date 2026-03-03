@@ -71,6 +71,9 @@ export const config = {
     stateBackend: process.env.STATE_BACKEND || 'file', // 'file' | 'redis'
     redisUrl: process.env.REDIS_URL || null,
     routerUrl: process.env.ROUTER_URL || null,
+    // Worker mode: shard runs without Telegram bot, participates in consensus/CRPC only
+    // Auto-detected when TELEGRAM_BOT_TOKEN is missing and SHARD_MODE=worker
+    mode: process.env.SHARD_MODE || (process.env.TELEGRAM_BOT_TOKEN ? 'primary' : 'worker'),
   },
   // Runtime info
   isDocker,

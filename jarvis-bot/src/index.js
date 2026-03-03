@@ -1334,17 +1334,101 @@ bot.command('sticker', async (ctx) => {
   }
 });
 
-// Photo handler — offer sticker conversion when image is sent
+// ============ Multimodal Helpers ============
+
+async function downloadTelegramFile(ctx, fileId) {
+  const fileLink = await ctx.telegram.getFileLink(fileId);
+  const response = await fetch(fileLink.href);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  // Infer mime type from URL extension
+  const url = fileLink.href;
+  const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase();
+  const mimeMap = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+    webp: 'image/webp', pdf: 'application/pdf', ogg: 'audio/ogg', oga: 'audio/ogg',
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', mp4: 'video/mp4',
+  };
+  const mimeType = mimeMap[ext] || 'application/octet-stream';
+  return { buffer, mimeType };
+}
+
+async function transcribeAudio(buffer, filename) {
+  const apiKey = config.llm?.openaiApiKey || process.env.OPENAI_API_KEY;
+  if (!apiKey) return null; // No key — caller handles fallback
+
+  try {
+    const formData = new FormData();
+    formData.append('file', new Blob([buffer]), filename);
+    formData.append('model', config.llm?.whisperModel || 'whisper-1');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: formData,
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      console.warn(`[multimodal] Whisper API error ${response.status}: ${await response.text()}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.text || null;
+  } catch (err) {
+    console.warn(`[multimodal] Transcription failed: ${err.message}`);
+    return null;
+  }
+}
+
+// Shared response sender (avoids duplication across media handlers)
+async function sendChatResponse(ctx, chatId, userName, text, chatType, media = []) {
+  await ctx.sendChatAction('typing');
+  const typingInterval = setInterval(() => {
+    ctx.sendChatAction('typing').catch(() => {});
+  }, 4000);
+
+  try {
+    const response = await chat(chatId, userName, text, chatType, media);
+    clearInterval(typingInterval);
+    await saveConversations();
+
+    const reply = response.text;
+    if (reply.length <= 4096) {
+      await ctx.reply(reply, { parse_mode: undefined });
+    } else {
+      for (let i = 0; i < reply.length; i += 4096) {
+        await ctx.reply(reply.slice(i, i + 4096), { parse_mode: undefined });
+      }
+    }
+  } catch (error) {
+    clearInterval(typingInterval);
+    console.error('[bot] Media response error:', error.message);
+    ctx.reply(`Error: ${error.message}`);
+  }
+}
+
+// Check if bot is addressed in a group (mentioned, replied to, or called by name)
+function isBotAddressed(ctx) {
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  if (!isGroup) return true; // DMs always addressed
+  const botUsername = ctx.botInfo?.username?.toLowerCase();
+  const caption = (ctx.message.caption || '').toLowerCase();
+  const isMentioned = botUsername && caption.includes(`@${botUsername}`);
+  const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
+  const isCalledByName = caption.includes('jarvis');
+  return isMentioned || isReplyToBot || isCalledByName;
+}
+
+// ============ Photo Handler (multimodal + sticker) ============
+
 bot.on('photo', async (ctx) => {
-  // Only in private chats, and only if not a forwarded message
-  if (ctx.chat.type !== 'private') return;
-  if (ctx.message.forward_date) return;
   if (!isAuthorized(ctx)) return;
 
-  // If the photo has a caption starting with /sticker, the command handler won't fire
-  // (Telegraf treats photo messages separately). Handle it here.
   const caption = ctx.message.caption || '';
-  if (caption.startsWith('/sticker')) {
+
+  // Sticker conversion path — /sticker caption in DMs
+  if (caption.startsWith('/sticker') && ctx.chat.type === 'private') {
     const args = caption.replace(/^\/sticker(@\w+)?/, '').trim();
     const photo = ctx.message.photo[ctx.message.photo.length - 1];
     const fileLink = await ctx.telegram.getFileLink(photo.file_id);
@@ -1368,6 +1452,203 @@ bot.on('photo', async (ctx) => {
     } catch (err) {
       await ctx.reply(`Sticker generation failed: ${err.message}`);
     }
+    return;
+  }
+
+  // Multimodal vision path — send image to LLM for analysis
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Largest size
+  try {
+    const { buffer, mimeType } = await downloadTelegramFile(ctx, photo.file_id);
+    const media = [{
+      type: 'image',
+      mimeType,
+      data: buffer.toString('base64'),
+      filename: `photo_${photo.file_id.slice(0, 8)}.jpg`,
+    }];
+    const text = caption || 'The user sent this image. Describe what you see and respond naturally.';
+    const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+    console.log(`[multimodal] Photo from ${userName} (${Math.round(buffer.length / 1024)}KB)`);
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
+  } catch (err) {
+    console.error('[multimodal] Photo processing failed:', err.message);
+    await ctx.reply(`Couldn't process that image: ${err.message}`);
+  }
+});
+
+// ============ Voice Message Handler ============
+
+bot.on('voice', async (ctx) => {
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const voice = ctx.message.voice;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const duration = voice.duration;
+
+  try {
+    const { buffer } = await downloadTelegramFile(ctx, voice.file_id);
+    console.log(`[multimodal] Voice from ${userName} (${duration}s, ${Math.round(buffer.length / 1024)}KB)`);
+
+    const transcript = await transcribeAudio(buffer, 'voice.ogg');
+    if (transcript) {
+      const text = `[Voice message transcription]: "${transcript}"`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    } else {
+      // No API key or transcription failed — graceful fallback
+      const text = `[User sent a ${duration}s voice message but transcription is unavailable. Acknowledge it and let them know you can't process audio without an OPENAI_API_KEY configured.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+  } catch (err) {
+    console.error('[multimodal] Voice processing failed:', err.message);
+    await ctx.reply(`Couldn't process that voice message: ${err.message}`);
+  }
+});
+
+// ============ Audio File Handler ============
+
+bot.on('audio', async (ctx) => {
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const audio = ctx.message.audio;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const title = audio.title || audio.file_name || 'audio';
+
+  try {
+    const { buffer } = await downloadTelegramFile(ctx, audio.file_id);
+    console.log(`[multimodal] Audio from ${userName}: "${title}" (${audio.duration}s, ${Math.round(buffer.length / 1024)}KB)`);
+
+    const transcript = await transcribeAudio(buffer, audio.file_name || 'audio.mp3');
+    if (transcript) {
+      const text = `[Audio file "${title}" transcription]: "${transcript}"`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    } else {
+      const text = `[User sent an audio file: "${title}" (${audio.duration}s). Transcription unavailable.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+  } catch (err) {
+    console.error('[multimodal] Audio processing failed:', err.message);
+    await ctx.reply(`Couldn't process that audio: ${err.message}`);
+  }
+});
+
+// ============ Document Handler (PDF, images) ============
+
+bot.on('document', async (ctx) => {
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const doc = ctx.message.document;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const filename = doc.file_name || 'document';
+  const mime = doc.mime_type || '';
+  const caption = ctx.message.caption || '';
+
+  // Only process supported types (images + PDF)
+  const isImage = mime.startsWith('image/');
+  const isPDF = mime === 'application/pdf';
+  if (!isImage && !isPDF) {
+    // Unsupported document type — acknowledge but don't download
+    const text = `[User sent a document: "${filename}" (${mime}). This file type is not supported for analysis. Let them know you can process images and PDFs.]`;
+    if (ctx.chat.type === 'private') {
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+    return;
+  }
+
+  // Size guard — skip files over 20MB (API limit for base64)
+  if (doc.file_size > 20 * 1024 * 1024) {
+    await ctx.reply('That file is too large (>20MB). Send a smaller version.');
+    return;
+  }
+
+  try {
+    const { buffer, mimeType } = await downloadTelegramFile(ctx, doc.file_id);
+    console.log(`[multimodal] Document from ${userName}: "${filename}" (${mime}, ${Math.round(buffer.length / 1024)}KB)`);
+
+    const media = [{
+      type: isImage ? 'image' : 'document',
+      mimeType: mimeType === 'application/octet-stream' ? mime : mimeType,
+      data: buffer.toString('base64'),
+      filename,
+    }];
+    const text = caption || `The user sent a ${isImage ? 'image' : 'PDF'} document: "${filename}". Analyze its contents and respond.`;
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
+  } catch (err) {
+    console.error('[multimodal] Document processing failed:', err.message);
+    await ctx.reply(`Couldn't process that document: ${err.message}`);
+  }
+});
+
+// ============ Video Handler (thumbnail analysis) ============
+
+bot.on('video', async (ctx) => {
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const video = ctx.message.video;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const caption = ctx.message.caption || '';
+
+  // Use Telegram-provided thumbnail for visual context
+  if (video.thumbnail) {
+    try {
+      const { buffer, mimeType } = await downloadTelegramFile(ctx, video.thumbnail.file_id);
+      console.log(`[multimodal] Video thumbnail from ${userName} (${video.duration}s video)`);
+
+      const media = [{
+        type: 'image',
+        mimeType,
+        data: buffer.toString('base64'),
+        filename: `video_thumb_${Date.now()}.jpg`,
+      }];
+      const text = caption || `[User sent a ${video.duration}s video. This is the thumbnail/preview frame. Describe what you see and respond.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
+    } catch (err) {
+      console.error('[multimodal] Video thumbnail failed:', err.message);
+      const text = `[User sent a ${video.duration}s video. Thumbnail processing failed. Acknowledge the video.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+  } else {
+    const text = `[User sent a ${video.duration}s video but no thumbnail is available. Acknowledge it.]`;
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+  }
+});
+
+// ============ Video Note Handler (circular videos) ============
+
+bot.on('video_note', async (ctx) => {
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const videoNote = ctx.message.video_note;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+
+  // Try to transcribe the audio track
+  try {
+    const { buffer } = await downloadTelegramFile(ctx, videoNote.file_id);
+    console.log(`[multimodal] Video note from ${userName} (${videoNote.duration}s, ${Math.round(buffer.length / 1024)}KB)`);
+
+    const transcript = await transcribeAudio(buffer, 'video_note.mp4');
+    if (transcript) {
+      const text = `[Video note (circular video) transcription]: "${transcript}"`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    } else {
+      const text = `[User sent a ${videoNote.duration}s video note (circular video). Transcription unavailable. Acknowledge it.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+  } catch (err) {
+    console.error('[multimodal] Video note processing failed:', err.message);
+    const text = `[User sent a ${videoNote.duration}s video note. Processing failed. Acknowledge it.]`;
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
   }
 });
 

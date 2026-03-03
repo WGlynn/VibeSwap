@@ -1,8 +1,11 @@
 FROM node:20-slim
 
-# Install git for repo clone/pull operations (entrypoint.sh)
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+# Install git + fonts for repo operations and sticker generation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates \
+    fonts-noto-core fonts-noto-mono fontconfig \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -fv
 
 WORKDIR /app
 

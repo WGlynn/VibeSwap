@@ -1,0 +1,32 @@
+# JARVIS Mind Network — Standalone Worker Shard
+#
+# Quick start:
+#   curl -O https://raw.githubusercontent.com/WGlynn/vibeswap-private/master/jarvis-bot/docker-compose.shard.yml
+#   ANTHROPIC_API_KEY=sk-ant-... docker compose -f docker-compose.shard.yml up -d
+#
+# Your shard will register with the primary router automatically.
+
+services:
+  jarvis-shard:
+    image: ghcr.io/wglynn/jarvis-shard:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Set your Anthropic API key}
+      - SHARD_ID=${SHARD_ID:-shard-community}
+      - SHARD_MODE=worker
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
+      - NODE_TYPE=${NODE_TYPE:-light}
+      - ROUTER_URL=${ROUTER_URL:-https://jarvis-vibeswap.fly.dev}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      - DATA_DIR=/app/data
+      - DOCKER=1
+      - ENCRYPTION_ENABLED=true
+      - NODE_ENV=production
+      - HEALTH_PORT=8080
+    volumes:
+      - jarvis_data:/app/data
+
+volumes:
+  jarvis_data:

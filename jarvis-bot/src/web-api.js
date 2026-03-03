@@ -222,6 +222,12 @@ export async function handleWebRequest(req, res, pathname) {
           totalContributions: shadowStats.totalContributions,
         },
         computeEconomics: computeEcon.pool,
+        tipJar: {
+          address: config.tipJarAddress,
+          dailyCost: '$5',
+          perPerson: '$0.33',
+          teamSize: 15,
+        },
         timestamp: new Date().toISOString(),
       });
     } catch (err) {

@@ -203,6 +203,35 @@ function StatRow({ label, value, color = 'text-white' }) {
   )
 }
 
+// ============ Tip Jar Address (Copy-to-Clipboard) ============
+
+function TipJarAddress({ address }) {
+  const [copied, setCopied] = useState(false)
+
+  if (!address) return <span className="text-black-500">Not configured</span>
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(address).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {})
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="w-full flex items-center justify-between mt-1 px-2 py-1.5 bg-black-800 rounded border border-black-600 hover:border-matrix-600 transition-colors group"
+    >
+      <span className="text-matrix-400 text-[11px] truncate mr-2 font-mono">
+        {address.slice(0, 6)}...{address.slice(-4)}
+      </span>
+      <span className={`text-[10px] shrink-0 ${copied ? 'text-matrix-500' : 'text-black-400 group-hover:text-matrix-500'}`}>
+        {copied ? 'COPIED' : 'COPY'}
+      </span>
+    </button>
+  )
+}
+
 // ============ Mind Panels ============
 
 function MindPanels({ mind }) {
@@ -327,6 +356,28 @@ function MindPanels({ mind }) {
           />
         </MindCard>
       )}
+
+      {/* Support JARVIS — Tip Jar */}
+      <MindCard title="SUPPORT JARVIS" icon="+" defaultOpen={false}>
+        <div className="space-y-2">
+          <p className="text-black-300 leading-relaxed">
+            JARVIS costs ~$5/day in API credits. For 15 team members, that's $0.33/person.
+          </p>
+          <div className="pt-1">
+            <span className="text-black-400 text-[10px]">TIP JAR (ETH)</span>
+            <TipJarAddress address={mind.tipJar?.address} />
+          </div>
+          <StatRow
+            label="Pool utilization"
+            value={`${mind.computeEconomics?.poolUtilization || 0}%`}
+            color={mind.computeEconomics?.poolUtilization > 80 ? 'text-amber-400' : 'text-matrix-400'}
+          />
+          <StatRow label="Active users today" value={mind.computeEconomics?.activeUsers || 0} color="text-terminal-400" />
+          <p className="text-black-500 text-[10px] pt-1">
+            Every tip helps fund JARVIS's compute. Cooperative capitalism in action.
+          </p>
+        </div>
+      </MindCard>
 
       {/* Shadow Protocol */}
       {mind.shadows?.active > 0 && (

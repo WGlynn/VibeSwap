@@ -34,10 +34,11 @@ async function loadConversations() {
     const parsed = JSON.parse(data);
     let totalMessages = 0;
     for (const [chatId, messages] of Object.entries(parsed)) {
+      sanitizeHistory(messages);
       conversations.set(Number(chatId), messages);
       totalMessages += messages.length;
     }
-    console.log(`[claude] Loaded ${conversations.size} conversation(s), ${totalMessages} messages from disk`);
+    console.log(`[claude] Loaded ${conversations.size} conversation(s), ${totalMessages} messages from disk (sanitized)`);
   } catch {
     console.log('[claude] No saved conversations found — starting fresh');
   }
@@ -50,7 +51,9 @@ export async function saveConversations() {
     const obj = {};
     for (const [chatId, messages] of conversations) {
       // Only persist last 30 messages per chat to keep file reasonable
-      obj[chatId] = messages.slice(-30);
+      const trimmed = messages.slice(-30);
+      sanitizeHistory(trimmed);
+      obj[chatId] = trimmed;
     }
     await writeFile(CONVERSATIONS_FILE, JSON.stringify(obj, null, 2));
     conversationsDirty = false;
@@ -79,6 +82,74 @@ export function getSystemPrompt() {
 export function clearHistory(chatId) {
   conversations.delete(chatId);
   conversationsDirty = true;
+}
+
+// ============ History Sanitization ============
+// Ensures no orphaned tool_result blocks exist without their matching tool_use.
+// This can happen when history is trimmed (shift or slice) mid-tool-exchange,
+// or when conversations are loaded from disk after a crash.
+
+function sanitizeHistory(history) {
+  if (!history || history.length === 0) return history;
+
+  // Collect all tool_use IDs from assistant messages
+  const toolUseIds = new Set();
+  for (const msg of history) {
+    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block.type === 'tool_use' && block.id) {
+          toolUseIds.add(block.id);
+        }
+      }
+    }
+  }
+
+  // Filter out tool_result entries that reference missing tool_use IDs
+  for (let i = 0; i < history.length; i++) {
+    const msg = history[i];
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      const filtered = msg.content.filter(block => {
+        if (block.type === 'tool_result') {
+          return toolUseIds.has(block.tool_use_id);
+        }
+        return true;
+      });
+      if (filtered.length === 0) {
+        // Entire message was orphaned tool_results — remove it
+        history.splice(i, 1);
+        i--;
+      } else if (filtered.length !== msg.content.length) {
+        msg.content = filtered;
+      }
+    }
+  }
+
+  // Ensure history starts with a user message (API requirement)
+  while (history.length > 0 && history[0].role !== 'user') {
+    history.shift();
+  }
+
+  // Ensure alternating roles — collapse same-role adjacents
+  for (let i = 1; i < history.length; i++) {
+    if (history[i].role === history[i - 1].role) {
+      if (history[i].role === 'user') {
+        // Merge user messages (both must be strings for merging)
+        const prev = typeof history[i - 1].content === 'string' ? history[i - 1].content : '';
+        const curr = typeof history[i].content === 'string' ? history[i].content : '';
+        if (prev && curr) {
+          history[i - 1].content = prev + '\n' + curr;
+          history.splice(i, 1);
+          i--;
+        }
+      } else {
+        // Remove duplicate assistant messages
+        history.splice(i, 1);
+        i--;
+      }
+    }
+  }
+
+  return history;
 }
 
 // ============ Idea-to-Code Generation ============
@@ -247,8 +318,9 @@ export function bufferMessage(chatId, userName, message) {
 
   // Claude API requires alternating user/assistant messages.
   // Buffer consecutive user messages by appending to the last user message.
+  // But only if the last user message is a string (not tool_result array).
   const last = history[history.length - 1];
-  if (last && last.role === 'user') {
+  if (last && last.role === 'user' && typeof last.content === 'string') {
     last.content += '\n' + taggedMessage;
   } else {
     history.push({ role: 'user', content: taggedMessage });
@@ -258,6 +330,7 @@ export function bufferMessage(chatId, userName, message) {
   while (history.length > config.maxConversationHistory) {
     history.shift();
   }
+  sanitizeHistory(history);
 
   conversationsDirty = true;
 }
@@ -275,17 +348,19 @@ export async function chat(chatId, userName, message, chatType = 'private') {
   const taggedMessage = contextPrefix + (userName ? `[${userName}]: ${message}` : message);
 
   // Append to existing user block or create new one
+  // Only merge if the last message is a plain string (not tool_result array)
   const last = history[history.length - 1];
-  if (last && last.role === 'user') {
+  if (last && last.role === 'user' && typeof last.content === 'string') {
     last.content += '\n' + taggedMessage;
   } else {
     history.push({ role: 'user', content: taggedMessage });
   }
 
-  // Trim history if too long
+  // Trim history if too long — but never cut inside a tool_use/tool_result pair
   while (history.length > config.maxConversationHistory) {
     history.shift();
   }
+  sanitizeHistory(history);
 
   // Build knowledge context for this user/chat
   let knowledgeContext = '';

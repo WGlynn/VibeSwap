@@ -1,24 +1,33 @@
-// ============ Learning Engine ============
-// Implements the CKB epistemological framework from JarvisxWill_CKB.md:
+// ============ Learning Engine — CKB Economic Model ============
 //
-// Knowledge Lifecycle: Private → Shared → Mutual → Common → Public/Network
+// Implements the Nervos CKB cryptoeconomic model for AI knowledge:
 //
-// This module handles:
-// - Shared Knowledge: Facts exchanged in current conversation
-// - Mutual Knowledge: Acknowledged by both parties (corrections = mutual)
-// - Common Knowledge: Promoted to persistent CKB (skills = common)
+//   1 CKB = 1 byte of state occupation
+//   1 token ≈ 4 chars of knowledge occupation
 //
-// Per-user CKBs (dyadic): JarvisxUser knowledge — unique per relationship
-// Per-group CKBs: Shared group knowledge — norms, decisions, facts
-// Skills: Network Knowledge — patterns that work for all users
+// Core principles:
+// - State is scarce. Every fact occupies tokens from a finite budget.
+// - Value density = utility / cost. High-density facts survive, low-density die.
+// - Utility decays over time (synaptic pruning). Unused knowledge fades.
+// - Bounded capacity. New knowledge at capacity displaces the weakest.
+// - Self-correcting. The system naturally selects for compressed, useful knowledge.
 //
-// CKB Governance:
-// - Promotion requires: explicit statement OR proven utility OR non-contradiction
-// - Demotion: explicit deprecation OR superseded OR proven false
+// Knowledge Lifecycle: SHARED → MUTUAL → COMMON → NETWORK
+// Economic Lifecycle: occupy → access → decay → prune/promote
+//
+// Tragedy of the Commons Prevention:
+// - No fact persists without ongoing utility (state rent)
+// - Total state is bounded by token budget (finite organism resources)
+// - Apoptosis removes low-value-density facts (immune system)
+// - Cancer (unbounded growth) is structurally impossible
+//
+// CKB Governance (from JarvisxWill_CKB.md):
+// - Promotion: explicit statement OR proven utility OR non-contradiction
+// - Demotion: explicit deprecation OR superseded OR proven false OR decayed
 // ============
 
 import Anthropic from '@anthropic-ai/sdk';
-import { writeFile, readFile, mkdir } from 'fs/promises';
+import { writeFile, readFile, mkdir, appendFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
 
@@ -31,21 +40,161 @@ const USERS_DIR = join(KNOWLEDGE_DIR, 'users');
 const GROUPS_DIR = join(KNOWLEDGE_DIR, 'groups');
 const CORRECTIONS_FILE = join(KNOWLEDGE_DIR, 'corrections.jsonl');
 const SKILLS_FILE = join(KNOWLEDGE_DIR, 'skills.json');
+const ECONOMICS_LOG = join(KNOWLEDGE_DIR, 'economics.jsonl');
 
-// CKB-aligned knowledge classes
+// ============ Economic Constants ============
+// These are the "protocol parameters" — the CKB equivalent of block size limits.
+
+const ECONOMICS = {
+  // Token budgets (1 token ≈ 4 chars)
+  USER_CKB_BUDGET: 2000,      // Max tokens per user CKB in system prompt
+  GROUP_CKB_BUDGET: 3000,     // Max tokens per group CKB
+  SKILL_BUDGET: 1500,         // Max tokens for network skills
+
+  // Fact costs
+  FACT_OVERHEAD: 12,          // Base token cost per fact (formatting, category tag, etc.)
+  CHARS_PER_TOKEN: 4,         // Approximation: 4 chars ≈ 1 token
+
+  // Utility decay (synaptic pruning)
+  DECAY_HALF_LIFE_MS: 7 * 24 * 60 * 60 * 1000,  // 7 days — utility halves weekly
+  MIN_UTILITY: 0.01,          // Below this = effectively dead (prune candidate)
+
+  // Value density thresholds
+  PRUNE_THRESHOLD: 0.05,      // Value density below this → apoptosis
+  PROMOTE_THRESHOLD: 5.0,     // Value density above this → candidate for compression
+
+  // Confirmation bonuses (CKB state rent = ongoing cost, confirmations = ongoing value)
+  CONFIRMATION_MULTIPLIER: 1.5, // Each confirmation multiplies utility by this
+
+  // Capacity enforcement
+  MAX_FACTS_PER_USER: 100,    // Hard cap on raw fact count
+  MAX_FACTS_PER_GROUP: 150,
+  MAX_SKILLS: 50,
+};
+
+// ============ CKB Knowledge Classes ============
+
 const KNOWLEDGE_CLASSES = {
-  SHARED: 'shared',       // Exchanged in session, not yet confirmed
-  MUTUAL: 'mutual',       // Both parties know, acknowledged
-  COMMON: 'common',       // Persisted, proven utility across sessions
-  NETWORK: 'network',     // Applies to all users (promoted skills)
+  SHARED: 'shared',       // Just exchanged. Cost: full token price. Low utility.
+  MUTUAL: 'mutual',       // Confirmed. Cost: full. Moderate utility.
+  COMMON: 'common',       // Proven reliable. Cost: reduced (compressed). High utility.
+  NETWORK: 'network',     // Universal skill. Cost: shared across all CKBs.
 };
 
 // ============ In-Memory State ============
 
-const userKnowledge = new Map();   // userId -> { facts, preferences, corrections }
-const groupKnowledge = new Map();  // groupId -> { facts, norms }
+const userKnowledge = new Map();
+const groupKnowledge = new Map();
 let skills = [];
 let dirty = false;
+
+// ============ Token Economics ============
+
+function estimateTokenCost(fact) {
+  const contentTokens = Math.ceil((fact.content || '').length / ECONOMICS.CHARS_PER_TOKEN);
+  return ECONOMICS.FACT_OVERHEAD + contentTokens;
+}
+
+function computeUtility(fact, now) {
+  // Base utility from confirmations
+  let utility = Math.pow(ECONOMICS.CONFIRMATION_MULTIPLIER, fact.confirmed - 1);
+
+  // Multiply by confidence
+  utility *= (fact.confidence || 0.8);
+
+  // Multiply by access count (how often this fact was loaded into context)
+  utility *= Math.max(1, fact.accessCount || 1);
+
+  // Apply time decay (exponential half-life)
+  const lastActive = fact.lastAccessed || fact.lastConfirmed || fact.created;
+  const age = now - new Date(lastActive).getTime();
+  const decayFactor = Math.pow(0.5, age / ECONOMICS.DECAY_HALF_LIFE_MS);
+  utility *= decayFactor;
+
+  // Knowledge class bonus — higher classes resist decay
+  const classBonus = {
+    [KNOWLEDGE_CLASSES.SHARED]: 1.0,
+    [KNOWLEDGE_CLASSES.MUTUAL]: 1.5,
+    [KNOWLEDGE_CLASSES.COMMON]: 3.0,
+    [KNOWLEDGE_CLASSES.NETWORK]: 5.0,
+  };
+  utility *= classBonus[fact.knowledgeClass || KNOWLEDGE_CLASSES.SHARED] || 1.0;
+
+  return utility;
+}
+
+function computeValueDensity(fact, now) {
+  const utility = computeUtility(fact, now);
+  const cost = estimateTokenCost(fact);
+  return utility / cost;
+}
+
+function computeCKBOccupation(facts) {
+  let totalTokens = 0;
+  for (const fact of facts) {
+    totalTokens += estimateTokenCost(fact);
+  }
+  return totalTokens;
+}
+
+// ============ Apoptosis (Pruning) ============
+// Remove facts whose value density has fallen below threshold.
+// This is the immune system — it prevents knowledge cancer.
+
+function apoptosis(facts, budget) {
+  const now = Date.now();
+  const scored = facts.map(f => ({
+    fact: f,
+    valueDensity: computeValueDensity(f, now),
+    tokenCost: estimateTokenCost(f),
+  }));
+
+  // Remove facts below prune threshold
+  const alive = scored.filter(s => s.valueDensity >= ECONOMICS.PRUNE_THRESHOLD);
+  const pruned = scored.length - alive.length;
+
+  // If still over budget, remove lowest value-density facts until under budget
+  alive.sort((a, b) => b.valueDensity - a.valueDensity);
+  let totalTokens = 0;
+  const survivors = [];
+  for (const entry of alive) {
+    if (totalTokens + entry.tokenCost <= budget) {
+      totalTokens += entry.tokenCost;
+      survivors.push(entry.fact);
+    }
+    // else: this fact gets pruned due to budget pressure
+  }
+
+  const budgetPruned = alive.length - survivors.length;
+  if (pruned > 0 || budgetPruned > 0) {
+    console.log(`[learning] Apoptosis: ${pruned} decayed, ${budgetPruned} displaced by budget. ${survivors.length} survive (${totalTokens}/${budget} tokens).`);
+  }
+
+  return survivors;
+}
+
+// ============ Displacement ============
+// When adding a new fact at capacity, displace the lowest value-density fact.
+// Returns the displaced fact (or null if there's room).
+
+function findDisplacementCandidate(facts, newFactCost, budget) {
+  const currentOccupation = computeCKBOccupation(facts);
+  if (currentOccupation + newFactCost <= budget) return null; // room available
+
+  const now = Date.now();
+  let lowestVD = Infinity;
+  let lowestIdx = -1;
+
+  for (let i = 0; i < facts.length; i++) {
+    const vd = computeValueDensity(facts[i], now);
+    if (vd < lowestVD) {
+      lowestVD = vd;
+      lowestIdx = i;
+    }
+  }
+
+  return lowestIdx >= 0 ? lowestIdx : null;
+}
 
 // ============ Init ============
 
@@ -53,9 +202,17 @@ export async function initLearning() {
   await mkdir(USERS_DIR, { recursive: true });
   await mkdir(GROUPS_DIR, { recursive: true });
 
-  // Load skills
   skills = await loadJson(SKILLS_FILE, []);
-  console.log(`[learning] Loaded ${skills.length} learned skills`);
+
+  // Backcompat: add economic fields to existing skills
+  for (const skill of skills) {
+    if (!skill.tokenCost) skill.tokenCost = estimateTokenCost(skill);
+    if (!skill.accessCount) skill.accessCount = 0;
+    if (!skill.lastAccessed) skill.lastAccessed = skill.lastConfirmed || skill.created;
+  }
+
+  const totalSkillTokens = computeCKBOccupation(skills);
+  console.log(`[learning] Loaded ${skills.length} skills (${totalSkillTokens}/${ECONOMICS.SKILL_BUDGET} tokens)`);
 }
 
 async function loadJson(path, fallback) {
@@ -75,21 +232,30 @@ async function loadUserCKB(userId) {
 
   const filePath = join(USERS_DIR, `${id}.json`);
   const data = await loadJson(filePath, {
-    // CKB header — mirrors JarvisxWill_CKB.md dyadic structure
     userId: Number(id),
     username: null,
-    // Knowledge stores
-    facts: [],           // Persistent learned facts
-    preferences: {},     // User-specific preferences
-    corrections: [],     // Raw correction log
-    // CKB metadata
-    knowledgeClass: KNOWLEDGE_CLASSES.SHARED, // elevates as relationship deepens
-    interactionCount: 0, // tracks depth of dyad
+    facts: [],
+    preferences: {},
+    corrections: [],
+    knowledgeClass: KNOWLEDGE_CLASSES.SHARED,
+    interactionCount: 0,
+    // Economic state
+    tokenBudget: ECONOMICS.USER_CKB_BUDGET,
+    lastPruned: null,
     lastUpdated: null,
   });
-  // Backcompat: ensure new fields exist on old records
+
+  // Backcompat: add economic fields to existing facts + CKB
+  if (!data.tokenBudget) data.tokenBudget = ECONOMICS.USER_CKB_BUDGET;
   if (!data.knowledgeClass) data.knowledgeClass = KNOWLEDGE_CLASSES.SHARED;
   if (!data.interactionCount) data.interactionCount = 0;
+  for (const fact of data.facts) {
+    if (!fact.tokenCost) fact.tokenCost = estimateTokenCost(fact);
+    if (!fact.accessCount) fact.accessCount = 0;
+    if (!fact.lastAccessed) fact.lastAccessed = fact.lastConfirmed || fact.created;
+    if (!fact.knowledgeClass) fact.knowledgeClass = KNOWLEDGE_CLASSES.SHARED;
+  }
+
   userKnowledge.set(id, data);
   return data;
 }
@@ -116,8 +282,20 @@ async function loadGroupCKB(groupId) {
     facts: [],
     norms: [],
     topicsDiscussed: [],
+    tokenBudget: ECONOMICS.GROUP_CKB_BUDGET,
+    lastPruned: null,
     lastUpdated: null,
   });
+
+  // Backcompat
+  if (!data.tokenBudget) data.tokenBudget = ECONOMICS.GROUP_CKB_BUDGET;
+  for (const fact of data.facts) {
+    if (!fact.tokenCost) fact.tokenCost = estimateTokenCost(fact);
+    if (!fact.accessCount) fact.accessCount = 0;
+    if (!fact.lastAccessed) fact.lastAccessed = fact.lastConfirmed || fact.created;
+    if (!fact.knowledgeClass) fact.knowledgeClass = KNOWLEDGE_CLASSES.SHARED;
+  }
+
   groupKnowledge.set(id, data);
   return data;
 }
@@ -132,8 +310,6 @@ async function saveGroupCKB(groupId) {
 }
 
 // ============ Correction Detection ============
-// Uses Haiku to cheaply detect if a user message is correcting JARVIS.
-// Only runs when the message is a reply to JARVIS or directly addressed.
 
 export async function detectCorrection(userMessage, previousJarvisResponse, userName) {
   if (!previousJarvisResponse || userMessage.length < 10) return null;
@@ -187,7 +363,6 @@ Important: Disagreement is NOT a correction. The user must be saying the AI is W
 }
 
 // ============ Lesson Extraction ============
-// When a correction is detected, extract a generalizable lesson.
 
 async function extractLesson(correction, userMessage, context) {
   try {
@@ -196,14 +371,14 @@ async function extractLesson(correction, userMessage, context) {
       max_tokens: 300,
       system: `Extract a concise, actionable lesson from a correction. The lesson should be written as an instruction that a future AI can follow.
 
+IMPORTANT: Be as CONCISE as possible. Every character costs tokens. Compress the lesson into the shortest useful form.
+
 Return JSON:
 {
-  "lesson": "Clear, imperative instruction (e.g., 'When discussing X, always Y instead of Z')",
+  "lesson": "Clear, imperative instruction — max 50 words",
   "scope": "universal" | "user_specific" | "group_specific",
   "tags": ["topic1", "topic2"]
-}
-
-Keep the lesson under 100 words. Make it specific enough to be useful, general enough to apply broadly.`,
+}`,
       messages: [{
         role: 'user',
         content: `Correction: ${JSON.stringify(correction)}\nUser said: "${userMessage}"\nContext: ${context || 'none'}`
@@ -220,7 +395,6 @@ Keep the lesson under 100 words. Make it specific enough to be useful, general e
 }
 
 // ============ Process Correction ============
-// The main entry point: detect, extract, store, maybe promote.
 
 export async function processCorrection(userMessage, previousJarvisResponse, userId, userName, chatId, chatType) {
   const correction = await detectCorrection(userMessage, previousJarvisResponse, userName);
@@ -243,19 +417,17 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
     tags: lesson?.tags || [],
   };
 
-  // 1. Append to corrections log (raw, never deleted)
+  // 1. Append to corrections log (raw, never deleted — this is the blockchain)
   try {
-    const { appendFile } = await import('fs/promises');
     await appendFile(CORRECTIONS_FILE, JSON.stringify(entry) + '\n');
   } catch { /* first write */ }
 
-  // 2. Update per-user CKB
+  // 2. Update per-user CKB with economic accounting
   const userCKB = await loadUserCKB(userId);
   userCKB.username = userName;
   userCKB.interactionCount++;
 
-  // CKB Governance: elevate knowledge class based on interaction depth
-  // Shared (new) → Mutual (5+ interactions) → Common (20+ interactions with corrections)
+  // Elevate CKB relationship class
   if (userCKB.interactionCount >= 20 && userCKB.corrections.length >= 3) {
     userCKB.knowledgeClass = KNOWLEDGE_CLASSES.COMMON;
   } else if (userCKB.interactionCount >= 5) {
@@ -270,70 +442,52 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
     timestamp,
   });
 
-  // Add as a fact if it's a preference or generalizable
-  if (correction.category === 'preference' || lesson?.scope === 'user_specific') {
-    const existingFact = userCKB.facts.find(f =>
-      f.content === correction.what_is_right && f.source === 'correction'
-    );
-    if (existingFact) {
-      existingFact.confirmed++;
-      existingFact.lastConfirmed = timestamp;
-    } else {
-      userCKB.facts.push({
-        id: `fact-${Date.now()}`,
-        content: lesson?.lesson || correction.what_is_right,
-        source: 'correction',
-        category: correction.category,
-        confidence: correction.confidence,
-        confirmed: 1,
-        created: timestamp,
-        lastConfirmed: timestamp,
-        tags: lesson?.tags || [],
-      });
-    }
+  // Add as a fact with economic accounting
+  if (correction.category === 'preference' || lesson?.scope === 'user_specific' || correction.generalizable) {
+    const factContent = lesson?.lesson || correction.what_is_right;
+    addFactWithEconomics(userCKB, {
+      content: factContent,
+      source: 'correction',
+      category: correction.category,
+      confidence: correction.confidence,
+      tags: lesson?.tags || [],
+    });
   }
 
-  // Keep only last 50 corrections per user
+  // Trim corrections log (corrections are cheap — they're the audit trail)
   if (userCKB.corrections.length > 50) {
     userCKB.corrections = userCKB.corrections.slice(-50);
   }
   await saveUserCKB(userId);
 
-  // 3. Update per-group CKB if in a group
+  // 3. Group CKB
   if (chatType !== 'private' && (correction.generalizable || lesson?.scope === 'group_specific')) {
     const groupCKB = await loadGroupCKB(chatId);
-    const existingFact = groupCKB.facts.find(f =>
-      f.content === correction.what_is_right
-    );
-    if (existingFact) {
-      existingFact.confirmed++;
-      existingFact.lastConfirmed = timestamp;
-    } else {
-      groupCKB.facts.push({
-        id: `gfact-${Date.now()}`,
-        content: lesson?.lesson || correction.what_is_right,
-        source: 'correction',
-        sourceUser: userName,
-        category: correction.category,
-        confidence: correction.confidence,
-        confirmed: 1,
-        created: timestamp,
-        lastConfirmed: timestamp,
-        tags: lesson?.tags || [],
-      });
-    }
-
-    // Keep only last 100 group facts
-    if (groupCKB.facts.length > 100) {
-      groupCKB.facts = groupCKB.facts.slice(-100);
-    }
+    addFactWithEconomics(groupCKB, {
+      content: lesson?.lesson || correction.what_is_right,
+      source: 'correction',
+      sourceUser: userName,
+      category: correction.category,
+      confidence: correction.confidence,
+      tags: lesson?.tags || [],
+    });
     await saveGroupCKB(chatId);
   }
 
-  // 4. Check if this lesson should be promoted to a skill
+  // 4. Skill promotion
   if (correction.generalizable && lesson?.scope === 'universal') {
     await maybePromoteToSkill(entry, lesson);
   }
+
+  // Log economic event
+  await logEconomicEvent('correction_stored', {
+    correctionId,
+    userId,
+    category: correction.category,
+    tokenCost: estimateTokenCost({ content: lesson?.lesson || correction.what_is_right }),
+    userOccupation: computeCKBOccupation(userCKB.facts),
+    userBudget: userCKB.tokenBudget,
+  });
 
   console.log(`[learning] Correction processed: ${correction.category} — "${correction.what_is_right?.slice(0, 60)}"`);
   dirty = true;
@@ -342,18 +496,83 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
     correctionId,
     category: correction.category,
     lesson: lesson?.lesson,
-    promoted: false, // will be set by maybePromoteToSkill
   };
 }
 
+// ============ Add Fact With Economics ============
+// The core economic function: add a fact, respecting budget constraints.
+// If at capacity, displace the lowest value-density fact.
+
+function addFactWithEconomics(ckb, factData) {
+  const timestamp = new Date().toISOString();
+  const content = factData.content;
+  if (!content) return null;
+
+  // Check for duplicate
+  const existing = ckb.facts.find(f => f.content === content);
+  if (existing) {
+    existing.confirmed++;
+    existing.lastConfirmed = timestamp;
+    existing.lastAccessed = timestamp;
+    // Elevate knowledge class on confirmation
+    if (existing.confirmed >= 3) {
+      existing.knowledgeClass = KNOWLEDGE_CLASSES.COMMON;
+    } else if (existing.confirmed >= 2) {
+      existing.knowledgeClass = KNOWLEDGE_CLASSES.MUTUAL;
+    }
+    return existing;
+  }
+
+  const newFact = {
+    id: `fact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    content,
+    source: factData.source || 'conversation',
+    sourceUser: factData.sourceUser || null,
+    category: factData.category || 'general',
+    knowledgeClass: KNOWLEDGE_CLASSES.SHARED,
+    confidence: factData.confidence || 0.8,
+    confirmed: 1,
+    created: timestamp,
+    lastConfirmed: timestamp,
+    lastAccessed: timestamp,
+    accessCount: 0,
+    tokenCost: 0,
+    tags: factData.tags || [],
+  };
+  newFact.tokenCost = estimateTokenCost(newFact);
+
+  const budget = ckb.tokenBudget || ECONOMICS.USER_CKB_BUDGET;
+  const maxFacts = budget === ECONOMICS.GROUP_CKB_BUDGET
+    ? ECONOMICS.MAX_FACTS_PER_GROUP
+    : ECONOMICS.MAX_FACTS_PER_USER;
+
+  // Hard count cap
+  if (ckb.facts.length >= maxFacts) {
+    const idx = findDisplacementCandidate(ckb.facts, newFact.tokenCost, budget);
+    if (idx !== null) {
+      const displaced = ckb.facts[idx];
+      console.log(`[learning] Displacement: "${displaced.content.slice(0, 40)}..." (vd=${computeValueDensity(displaced, Date.now()).toFixed(3)}) → "${content.slice(0, 40)}..."`);
+      ckb.facts.splice(idx, 1);
+    }
+  }
+
+  // Token budget enforcement via displacement
+  const displacementIdx = findDisplacementCandidate(ckb.facts, newFact.tokenCost, budget);
+  if (displacementIdx !== null) {
+    const displaced = ckb.facts[displacementIdx];
+    console.log(`[learning] Budget displacement: "${displaced.content.slice(0, 40)}..." freed ${displaced.tokenCost} tokens`);
+    ckb.facts.splice(displacementIdx, 1);
+  }
+
+  ckb.facts.push(newFact);
+  return newFact;
+}
+
 // ============ Skill Promotion ============
-// When a universal lesson has been confirmed by multiple corrections,
-// promote it to a reusable skill primitive.
 
 async function maybePromoteToSkill(correction, lesson) {
   if (!lesson?.lesson) return;
 
-  // Check if a similar skill already exists
   const existing = skills.find(s =>
     s.tags.some(t => lesson.tags.includes(t)) &&
     s.lesson.toLowerCase().includes(correction.what_is_right?.toLowerCase().slice(0, 30) || '')
@@ -367,24 +586,49 @@ async function maybePromoteToSkill(correction, lesson) {
     return;
   }
 
-  // Create new skill
-  const skillId = `SOCIAL-${String(skills.length + 1).padStart(3, '0')}`;
-  skills.push({
-    id: skillId,
+  const newSkill = {
+    id: `SOCIAL-${String(skills.length + 1).padStart(3, '0')}`,
     title: lesson.lesson.slice(0, 80),
     lesson: lesson.lesson,
+    content: lesson.lesson, // for tokenCost estimation
     category: correction.category,
     tags: lesson.tags,
     sourceCorrections: [correction.id],
     confirmations: 1,
     confidence: correction.confidence,
+    knowledgeClass: KNOWLEDGE_CLASSES.NETWORK,
     created: new Date().toISOString(),
     lastConfirmed: new Date().toISOString(),
+    lastAccessed: new Date().toISOString(),
+    accessCount: 0,
+    tokenCost: 0,
     appliesTo: 'all',
-  });
+  };
+  newSkill.tokenCost = estimateTokenCost(newSkill);
 
+  // Budget check for skills
+  const currentSkillTokens = computeCKBOccupation(skills);
+  if (currentSkillTokens + newSkill.tokenCost > ECONOMICS.SKILL_BUDGET) {
+    // Displace lowest value-density skill
+    const now = Date.now();
+    let lowestVD = Infinity;
+    let lowestIdx = -1;
+    for (let i = 0; i < skills.length; i++) {
+      const vd = computeValueDensity(skills[i], now);
+      if (vd < lowestVD) {
+        lowestVD = vd;
+        lowestIdx = i;
+      }
+    }
+    if (lowestIdx >= 0) {
+      console.log(`[learning] Skill displacement: ${skills[lowestIdx].id} (vd=${lowestVD.toFixed(3)})`);
+      skills.splice(lowestIdx, 1);
+    }
+  }
+
+  skills.push(newSkill);
   await saveSkills();
-  console.log(`[learning] New skill promoted: ${skillId} — ${lesson.lesson.slice(0, 60)}`);
+  console.log(`[learning] New skill: ${newSkill.id} — "${lesson.lesson.slice(0, 60)}" (${newSkill.tokenCost} tokens)`);
 }
 
 async function saveSkills() {
@@ -392,86 +636,46 @@ async function saveSkills() {
 }
 
 // ============ Learn Fact (Tool-Invoked) ============
-// JARVIS can proactively learn facts during conversation via tool use.
 
 export async function learnFact(userId, userName, chatId, chatType, fact, category, tags) {
-  const timestamp = new Date().toISOString();
-
-  // ============ Knowledge Lifecycle ============
-  // New facts enter as SHARED (just exchanged in session).
-  // When confirmed by the user (repeated or corrected), they become MUTUAL.
-  // After 3+ confirmations, they become COMMON (persisted as reliable).
-  // Skills promoted across users become NETWORK knowledge.
-
   const userCKB = await loadUserCKB(userId);
   userCKB.username = userName;
   userCKB.interactionCount++;
 
-  // Deduplicate — if fact already exists, confirm it (elevates its class)
-  const existing = userCKB.facts.find(f => f.content === fact);
-  if (existing) {
-    existing.confirmed++;
-    existing.lastConfirmed = timestamp;
-    // Knowledge class elevation
-    if (existing.confirmed >= 3) {
-      existing.knowledgeClass = KNOWLEDGE_CLASSES.COMMON;
-    } else if (existing.confirmed >= 2) {
-      existing.knowledgeClass = KNOWLEDGE_CLASSES.MUTUAL;
-    }
-  } else {
-    userCKB.facts.push({
-      id: `fact-${Date.now()}`,
-      content: fact,
-      source: 'conversation',
-      category: category || 'general',
-      knowledgeClass: KNOWLEDGE_CLASSES.SHARED, // starts as shared
-      confidence: 0.8,
-      confirmed: 1,
-      created: timestamp,
-      lastConfirmed: timestamp,
-      tags: tags || [],
-    });
-  }
-
-  // Elevate user CKB class based on depth
+  // Elevate user CKB class
   if (userCKB.interactionCount >= 20) {
     userCKB.knowledgeClass = KNOWLEDGE_CLASSES.COMMON;
   } else if (userCKB.interactionCount >= 5) {
     userCKB.knowledgeClass = KNOWLEDGE_CLASSES.MUTUAL;
   }
 
+  // Add with economic accounting
+  const newFact = addFactWithEconomics(userCKB, {
+    content: fact,
+    category: category || 'general',
+    tags: tags || [],
+  });
+
   await saveUserCKB(userId);
 
-  // Group knowledge — only add to group CKB if in a group chat
+  // Group knowledge
   if (chatType !== 'private') {
     const groupCKB = await loadGroupCKB(chatId);
-    const existingGroup = groupCKB.facts.find(f => f.content === fact);
-    if (existingGroup) {
-      existingGroup.confirmed++;
-      existingGroup.lastConfirmed = timestamp;
-    } else {
-      groupCKB.facts.push({
-        id: `gfact-${Date.now()}`,
-        content: fact,
-        source: 'conversation',
-        sourceUser: userName,
-        category: category || 'general',
-        knowledgeClass: KNOWLEDGE_CLASSES.SHARED,
-        confidence: 0.8,
-        confirmed: 1,
-        created: timestamp,
-        lastConfirmed: timestamp,
-        tags: tags || [],
-      });
-    }
+    addFactWithEconomics(groupCKB, {
+      content: fact,
+      sourceUser: userName,
+      category: category || 'general',
+      tags: tags || [],
+    });
     await saveGroupCKB(chatId);
   }
 
   dirty = true;
-  const classLabel = existing
-    ? `elevated to ${existing.knowledgeClass}`
-    : KNOWLEDGE_CLASSES.SHARED;
-  console.log(`[learning] Fact learned: "${fact.slice(0, 60)}" [${classLabel}]`);
+
+  const occupation = computeCKBOccupation(userCKB.facts);
+  const classLabel = newFact?.knowledgeClass || KNOWLEDGE_CLASSES.SHARED;
+  console.log(`[learning] Fact learned: "${fact.slice(0, 50)}" [${classLabel}] (${occupation}/${userCKB.tokenBudget} tokens)`);
+
   return true;
 }
 
@@ -480,49 +684,94 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
 export async function forgetFact(userId, factId) {
   const userCKB = await loadUserCKB(userId);
   const before = userCKB.facts.length;
+  const removed = userCKB.facts.find(f => f.id === factId);
   userCKB.facts = userCKB.facts.filter(f => f.id !== factId);
   if (userCKB.facts.length < before) {
     await saveUserCKB(userId);
+    if (removed) {
+      console.log(`[learning] Fact forgotten: "${removed.content.slice(0, 40)}..." freed ${removed.tokenCost} tokens`);
+    }
     return true;
   }
   return false;
 }
 
 // ============ Knowledge Context Builder ============
-// Builds a string to inject into the system prompt with relevant learned knowledge.
+// Builds a string to inject into the system prompt.
+// Marks facts as "accessed" (increases their utility, resets decay timer).
+// This is the "state rent payment" — being useful keeps you alive.
 
 export async function buildKnowledgeContext(userId, chatId, chatType) {
   const parts = [];
+  const now = Date.now();
 
-  // Per-user CKB (dyadic knowledge — JarvisxUser)
+  // ---- Per-user CKB (dyadic) ----
   const userCKB = await loadUserCKB(userId);
   if (userCKB.facts.length > 0) {
+    // Run apoptosis before building context
+    userCKB.facts = apoptosis(userCKB.facts, userCKB.tokenBudget);
+
     const ckbLabel = userCKB.username
       ? `Jarvisx${userCKB.username}`
       : `JarvisxUser${userId}`;
-    parts.push(`--- CKB: ${ckbLabel} [${userCKB.knowledgeClass}] ---`);
-    // Sort by confidence * confirmations, take top 20
-    const topFacts = [...userCKB.facts]
-      .sort((a, b) => (b.confidence * b.confirmed) - (a.confidence * a.confirmed))
-      .slice(0, 20);
-    for (const fact of topFacts) {
-      const conf = fact.confirmed > 1 ? ` (confirmed x${fact.confirmed})` : '';
-      parts.push(`- [${fact.category}] ${fact.content}${conf}`);
+    const occupation = computeCKBOccupation(userCKB.facts);
+
+    parts.push(`--- CKB: ${ckbLabel} [${userCKB.knowledgeClass}] (${occupation}/${userCKB.tokenBudget} tokens, ${userCKB.facts.length} facts) ---`);
+
+    // Sort by value density (highest first) — best knowledge surfaces first
+    const scored = userCKB.facts.map(f => ({
+      fact: f,
+      valueDensity: computeValueDensity(f, now),
+    }));
+    scored.sort((a, b) => b.valueDensity - a.valueDensity);
+
+    // Build context string within budget
+    let tokensUsed = 0;
+    for (const { fact, valueDensity } of scored) {
+      const cost = estimateTokenCost(fact);
+      if (tokensUsed + cost > userCKB.tokenBudget) break;
+
+      const classTag = fact.knowledgeClass === KNOWLEDGE_CLASSES.COMMON ? 'C'
+        : fact.knowledgeClass === KNOWLEDGE_CLASSES.MUTUAL ? 'M' : 'S';
+      const conf = fact.confirmed > 1 ? ` x${fact.confirmed}` : '';
+      parts.push(`- [${classTag}|${fact.category}] ${fact.content}${conf}`);
+
+      // Mark accessed — this is the utility signal (state rent payment)
+      fact.lastAccessed = new Date().toISOString();
+      fact.accessCount = (fact.accessCount || 0) + 1;
+
+      tokensUsed += cost;
     }
     parts.push('');
+    dirty = true;
   }
 
-  // Per-group CKB (shared group knowledge)
+  // ---- Per-group CKB ----
   if (chatType !== 'private') {
     const groupCKB = await loadGroupCKB(chatId);
     if (groupCKB.facts.length > 0) {
+      groupCKB.facts = apoptosis(groupCKB.facts, groupCKB.tokenBudget);
+
       const groupLabel = groupCKB.groupName || `Group${chatId}`;
-      parts.push(`--- GROUP CKB: ${groupLabel} ---`);
-      const topFacts = [...groupCKB.facts]
-        .sort((a, b) => (b.confidence * b.confirmed) - (a.confidence * a.confirmed))
-        .slice(0, 15);
-      for (const fact of topFacts) {
+      const occupation = computeCKBOccupation(groupCKB.facts);
+
+      parts.push(`--- GROUP CKB: ${groupLabel} (${occupation}/${groupCKB.tokenBudget} tokens) ---`);
+
+      const scored = groupCKB.facts.map(f => ({
+        fact: f,
+        valueDensity: computeValueDensity(f, now),
+      }));
+      scored.sort((a, b) => b.valueDensity - a.valueDensity);
+
+      let tokensUsed = 0;
+      for (const { fact } of scored) {
+        const cost = estimateTokenCost(fact);
+        if (tokensUsed + cost > groupCKB.tokenBudget) break;
+
         parts.push(`- [${fact.category}] ${fact.content}`);
+        fact.lastAccessed = new Date().toISOString();
+        fact.accessCount = (fact.accessCount || 0) + 1;
+        tokensUsed += cost;
       }
 
       if (groupCKB.norms.length > 0) {
@@ -533,25 +782,53 @@ export async function buildKnowledgeContext(userId, chatId, chatType) {
         }
       }
       parts.push('');
+      dirty = true;
     }
   }
 
-  // Network Knowledge: Skills learned from corrections across all users
-  // These are CKB Tier 8 equivalent — Mistake → Skill Protocol
+  // ---- Network Knowledge: Skills ----
   if (skills.length > 0) {
-    parts.push('--- NETWORK KNOWLEDGE: Learned Skills ---');
-    // Only include confirmed skills (2+ confirmations) or recent ones (< 7 days)
-    const relevantSkills = skills.filter(s =>
-      s.confirmations >= 2 || (Date.now() - new Date(s.created).getTime() < 7 * 24 * 60 * 60 * 1000)
-    );
-    for (const skill of relevantSkills.slice(0, 15)) {
+    // Apoptosis on skills too
+    skills = apoptosis(skills, ECONOMICS.SKILL_BUDGET);
+
+    const skillTokens = computeCKBOccupation(skills);
+    parts.push(`--- NETWORK KNOWLEDGE: Skills (${skillTokens}/${ECONOMICS.SKILL_BUDGET} tokens) ---`);
+
+    const scored = skills.map(s => ({
+      skill: s,
+      valueDensity: computeValueDensity(s, now),
+    }));
+    scored.sort((a, b) => b.valueDensity - a.valueDensity);
+
+    let tokensUsed = 0;
+    for (const { skill } of scored) {
+      const cost = estimateTokenCost(skill);
+      if (tokensUsed + cost > ECONOMICS.SKILL_BUDGET) break;
+
       const conf = skill.confirmations > 1 ? ` (x${skill.confirmations})` : '';
-      parts.push(`- [${skill.id}] ${skill.lesson}${conf}`);
+      parts.push(`- [${skill.id}] ${skill.lesson || skill.content}${conf}`);
+      skill.lastAccessed = new Date().toISOString();
+      skill.accessCount = (skill.accessCount || 0) + 1;
+      tokensUsed += cost;
     }
     parts.push('');
+    dirty = true;
   }
 
   return parts.join('\n');
+}
+
+// ============ Economic Logging ============
+
+async function logEconomicEvent(event, data) {
+  const entry = {
+    event,
+    timestamp: new Date().toISOString(),
+    ...data,
+  };
+  try {
+    await appendFile(ECONOMICS_LOG, JSON.stringify(entry) + '\n');
+  } catch { /* ignore */ }
 }
 
 // ============ Stats & Queries ============
@@ -560,25 +837,51 @@ export async function getLearningStats(userId, chatId) {
   const userCKB = await loadUserCKB(userId);
   const groupCKB = chatId ? await loadGroupCKB(chatId) : null;
 
+  const userOccupation = computeCKBOccupation(userCKB.facts);
+  const groupOccupation = groupCKB ? computeCKBOccupation(groupCKB.facts) : 0;
+  const skillOccupation = computeCKBOccupation(skills);
+
   return {
+    // Counts
     userFacts: userCKB.facts.length,
     userCorrections: userCKB.corrections.length,
     groupFacts: groupCKB?.facts.length || 0,
     groupNorms: groupCKB?.norms.length || 0,
     globalSkills: skills.length,
     confirmedSkills: skills.filter(s => s.confirmations >= 2).length,
+    // Economics
+    userTokens: userOccupation,
+    userBudget: userCKB.tokenBudget,
+    userUtilization: `${Math.round(userOccupation / userCKB.tokenBudget * 100)}%`,
+    groupTokens: groupOccupation,
+    groupBudget: groupCKB?.tokenBudget || ECONOMICS.GROUP_CKB_BUDGET,
+    skillTokens: skillOccupation,
+    skillBudget: ECONOMICS.SKILL_BUDGET,
+    // Relationship
+    knowledgeClass: userCKB.knowledgeClass,
+    interactionCount: userCKB.interactionCount,
   };
 }
 
 export async function getUserKnowledgeSummary(userId) {
   const userCKB = await loadUserCKB(userId);
-  if (userCKB.facts.length === 0 && userCKB.corrections.length === 0) {
-    return null;
-  }
+  if (userCKB.facts.length === 0 && userCKB.corrections.length === 0) return null;
+
+  const now = Date.now();
+  const factsWithVD = userCKB.facts.map(f => ({
+    ...f,
+    valueDensity: computeValueDensity(f, now).toFixed(3),
+    decayPercent: Math.round(
+      (1 - Math.pow(0.5, (now - new Date(f.lastAccessed || f.created).getTime()) / ECONOMICS.DECAY_HALF_LIFE_MS)) * 100
+    ),
+  }));
+
   return {
-    facts: userCKB.facts.slice(-20),
+    facts: factsWithVD.sort((a, b) => b.valueDensity - a.valueDensity).slice(0, 20),
     corrections: userCKB.corrections.slice(-10),
     preferences: userCKB.preferences,
+    occupation: computeCKBOccupation(userCKB.facts),
+    budget: userCKB.tokenBudget,
   };
 }
 
@@ -588,6 +891,8 @@ export async function getGroupKnowledgeSummary(chatId) {
   return {
     facts: groupCKB.facts.slice(-20),
     norms: groupCKB.norms,
+    occupation: computeCKBOccupation(groupCKB.facts),
+    budget: groupCKB.tokenBudget,
   };
 }
 
@@ -595,7 +900,7 @@ export function getSkills() {
   return [...skills];
 }
 
-// ============ Set Group Norms ============
+// ============ Set Group Norms / Name ============
 
 export async function addGroupNorm(chatId, norm) {
   const groupCKB = await loadGroupCKB(chatId);
@@ -604,8 +909,6 @@ export async function addGroupNorm(chatId, norm) {
     await saveGroupCKB(chatId);
   }
 }
-
-// ============ Set Group Name ============
 
 export async function setGroupName(chatId, name) {
   const groupCKB = await loadGroupCKB(chatId);
@@ -617,7 +920,6 @@ export async function setGroupName(chatId, name) {
 
 export async function flushLearning() {
   if (!dirty) return;
-  // Save any loaded user/group CKBs
   for (const [id] of userKnowledge) {
     await saveUserCKB(id);
   }

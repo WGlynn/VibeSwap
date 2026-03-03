@@ -563,13 +563,17 @@ bot.command('learned', async (ctx) => {
   const stats = await getLearningStats(userId, chatId);
 
   const lines = [
-    'JARVIS Learning Stats',
+    'JARVIS Learning Engine',
     '',
-    `Your facts: ${stats.userFacts}`,
-    `Your corrections: ${stats.userCorrections}`,
-    `Group facts: ${stats.groupFacts}`,
+    `Relationship: ${stats.knowledgeClass} (${stats.interactionCount} interactions)`,
+    '',
+    `Your CKB: ${stats.userFacts} facts (${stats.userTokens}/${stats.userBudget} tokens, ${stats.userUtilization})`,
+    `Corrections: ${stats.userCorrections}`,
+    '',
+    `Group CKB: ${stats.groupFacts} facts (${stats.groupTokens}/${stats.groupBudget} tokens)`,
     `Group norms: ${stats.groupNorms}`,
-    `Global skills: ${stats.globalSkills} (${stats.confirmedSkills} confirmed)`,
+    '',
+    `Network skills: ${stats.globalSkills} (${stats.confirmedSkills} confirmed, ${stats.skillTokens}/${stats.skillBudget} tokens)`,
   ];
   ctx.reply(lines.join('\n'));
 });
@@ -582,7 +586,7 @@ bot.command('knowledge', async (ctx) => {
     const summary = await getGroupKnowledgeSummary(ctx.chat.id);
     if (!summary) return ctx.reply('No group knowledge learned yet.');
 
-    const lines = ['Group Knowledge:'];
+    const lines = [`Group Knowledge (${summary.occupation}/${summary.budget} tokens):`];
     for (const fact of summary.facts) {
       const age = Math.floor((Date.now() - new Date(fact.created).getTime()) / 86400000);
       lines.push(`  [${fact.category}] ${fact.content} (${age}d ago, x${fact.confirmed})`);
@@ -601,10 +605,13 @@ bot.command('knowledge', async (ctx) => {
   const summary = await getUserKnowledgeSummary(ctx.from.id);
   if (!summary) return ctx.reply('No personal knowledge learned yet. Just keep talking.');
 
-  const lines = ['Your Knowledge Profile:'];
+  const lines = [
+    `Your Knowledge Profile (${summary.occupation}/${summary.budget} tokens):`,
+  ];
   for (const fact of summary.facts) {
     const age = Math.floor((Date.now() - new Date(fact.created).getTime()) / 86400000);
-    lines.push(`  [${fact.category}] ${fact.content} (${age}d ago, x${fact.confirmed})`);
+    const classTag = fact.knowledgeClass === 'common' ? 'C' : fact.knowledgeClass === 'mutual' ? 'M' : 'S';
+    lines.push(`  [${classTag}|${fact.category}] ${fact.content} (vd:${fact.valueDensity}, ${fact.decayPercent}% decayed, x${fact.confirmed})`);
   }
   if (summary.corrections.length > 0) {
     lines.push('');

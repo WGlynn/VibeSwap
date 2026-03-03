@@ -497,6 +497,8 @@ registerProvider('deepseek', createDeepSeekProvider);
 // ============ Factory ============
 
 let activeProvider = null;
+let fallbackProviders = [];   // Pre-initialized fallbacks, ordered by priority
+let primaryProviderName = ''; // Remember the primary for recovery
 
 export function createProvider(providerName, providerConfig) {
   const factory = providers.get(providerName);
@@ -520,39 +522,113 @@ export function getModelName() {
   return activeProvider?.model || 'unknown';
 }
 
+// ============ Credit/Billing Error Detection ============
+
+function isCreditError(error) {
+  const msg = (error?.message || '').toLowerCase();
+  return msg.includes('credit balance is too low') ||
+    msg.includes('insufficient_quota') ||
+    msg.includes('rate_limit') && msg.includes('billing') ||
+    msg.includes('exceeded your current quota') ||
+    msg.includes('payment required') ||
+    /\b402\b/.test(msg) ||
+    (msg.includes('400') && msg.includes('credit'));
+}
+
+// ============ Fallback: Activate Next Provider ============
+
+function activateFallback() {
+  if (fallbackProviders.length === 0) return false;
+  const next = fallbackProviders.shift();
+  console.warn(`[llm] PRIMARY PROVIDER CREDIT EXHAUSTED — falling back to ${next.name} (${next.model})`);
+  activeProvider = next;
+  return true;
+}
+
 // ============ Init from Config ============
 
-export function initProvider() {
-  const providerName = config.llm?.provider || 'claude';
-
-  const providerConfig = {
-    // Common
-    model: config.llm?.model || config.anthropic?.model,
-
-    // Provider-specific keys
+function getProviderConfig(providerName) {
+  return {
+    model: (() => {
+      switch (providerName) {
+        case 'claude': return config.llm?.model || config.anthropic?.model;
+        case 'openai': return 'gpt-4o';
+        case 'gemini': return 'gemini-2.0-flash';
+        case 'deepseek': return 'deepseek-chat';
+        case 'ollama': return config.llm?.model || 'llama3.1';
+        default: return config.llm?.model;
+      }
+    })(),
     apiKey: (() => {
       switch (providerName) {
         case 'claude': return config.anthropic?.apiKey;
         case 'openai': return config.llm?.openaiApiKey || process.env.OPENAI_API_KEY;
         case 'gemini': return config.llm?.geminiApiKey || process.env.GEMINI_API_KEY;
         case 'deepseek': return config.llm?.deepseekApiKey || process.env.DEEPSEEK_API_KEY;
-        case 'ollama': return null; // No key needed
+        case 'ollama': return null;
         default: return config.anthropic?.apiKey;
       }
     })(),
-
-    // Base URLs (for self-hosted or custom endpoints)
-    baseUrl: config.llm?.baseUrl || process.env.LLM_BASE_URL || undefined,
+    baseUrl: (() => {
+      switch (providerName) {
+        case 'deepseek': return 'https://api.deepseek.com/v1';
+        case 'ollama': return config.llm?.ollamaUrl || 'http://localhost:11434';
+        default: return config.llm?.baseUrl || process.env.LLM_BASE_URL || undefined;
+      }
+    })(),
   };
-
-  return createProvider(providerName, providerConfig);
 }
 
-// ============ Convenience: Direct Chat ============
+export function initProvider() {
+  const providerName = config.llm?.provider || 'claude';
+  primaryProviderName = providerName;
+
+  // Init primary
+  const providerConfig = getProviderConfig(providerName);
+  createProvider(providerName, providerConfig);
+
+  // Init fallbacks — any provider with a configured API key that isn't the primary
+  const fallbackOrder = ['claude', 'deepseek', 'gemini', 'openai'];
+  fallbackProviders = [];
+
+  for (const name of fallbackOrder) {
+    if (name === providerName) continue; // Skip primary
+    const fbConfig = getProviderConfig(name);
+    if (name === 'ollama' || fbConfig.apiKey) {
+      try {
+        const factory = providers.get(name);
+        if (factory) {
+          const fb = factory(fbConfig);
+          fallbackProviders.push(fb);
+          console.log(`[llm] Fallback registered: ${name} (${fb.model})`);
+        }
+      } catch { /* skip broken fallbacks */ }
+    }
+  }
+
+  if (fallbackProviders.length > 0) {
+    console.log(`[llm] ${fallbackProviders.length} fallback provider(s) ready — auto-switch on credit exhaustion`);
+  } else {
+    console.warn('[llm] No fallback providers configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY for resilience.');
+  }
+
+  return activeProvider;
+}
+
+// ============ Convenience: Direct Chat (with auto-fallback) ============
 
 export async function llmChat(request) {
   if (!activeProvider) {
     throw new Error('LLM provider not initialized. Call initProvider() first.');
   }
-  return activeProvider.chat(request);
+
+  try {
+    return await activeProvider.chat(request);
+  } catch (error) {
+    if (isCreditError(error) && activateFallback()) {
+      console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name}`);
+      return await activeProvider.chat(request);
+    }
+    throw error; // Not a credit error, or no fallbacks left
+  }
 }

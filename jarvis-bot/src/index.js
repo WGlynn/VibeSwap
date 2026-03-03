@@ -1409,6 +1409,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
 }
 
 // Check if bot is addressed in a group (mentioned, replied to, or called by name)
+// For media without captions (voice, video_note), check reply-to only
 function isBotAddressed(ctx) {
   const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
   if (!isGroup) return true; // DMs always addressed
@@ -1417,12 +1418,17 @@ function isBotAddressed(ctx) {
   const isMentioned = botUsername && caption.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
   const isCalledByName = caption.includes('jarvis');
+  // Voice/video_note can't have captions — if user replies to bot with media, honor it
+  // Also: if media has NO caption at all, treat reply-to as the only addressing check
+  const isMediaWithoutCaption = !ctx.message.caption && (ctx.message.voice || ctx.message.video_note || ctx.message.audio);
+  if (isMediaWithoutCaption) return isReplyToBot;
   return isMentioned || isReplyToBot || isCalledByName;
 }
 
 // ============ Photo Handler (multimodal + sticker) ============
 
 bot.on('photo', async (ctx) => {
+  console.log(`[multimodal] Photo handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
 
   const caption = ctx.message.caption || '';
@@ -1481,6 +1487,7 @@ bot.on('photo', async (ctx) => {
 // ============ Voice Message Handler ============
 
 bot.on('voice', async (ctx) => {
+  console.log(`[multimodal] Voice handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}, authorized: ${isAuthorized(ctx)}, addressed: ${isBotAddressed(ctx)}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
@@ -1511,6 +1518,7 @@ bot.on('voice', async (ctx) => {
 // ============ Audio File Handler ============
 
 bot.on('audio', async (ctx) => {
+  console.log(`[multimodal] Audio handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
@@ -1540,6 +1548,7 @@ bot.on('audio', async (ctx) => {
 // ============ Document Handler (PDF, images) ============
 
 bot.on('document', async (ctx) => {
+  console.log(`[multimodal] Document handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}, mime: ${ctx.message.document?.mime_type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
@@ -1589,6 +1598,7 @@ bot.on('document', async (ctx) => {
 // ============ Video Handler (thumbnail analysis) ============
 
 bot.on('video', async (ctx) => {
+  console.log(`[multimodal] Video handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
@@ -1625,6 +1635,7 @@ bot.on('video', async (ctx) => {
 // ============ Video Note Handler (circular videos) ============
 
 bot.on('video_note', async (ctx) => {
+  console.log(`[multimodal] VideoNote handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;

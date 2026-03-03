@@ -20,6 +20,7 @@ import { getSkills, getLearningStats } from './learning.js';
 import { getShadowStats, consumeInvite, registerShadow } from './shadow.js';
 import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
+import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
 
 // ============ Rate Limiter ============
 
@@ -125,11 +126,42 @@ export async function handleWebRequest(req, res, pathname) {
 
       console.log(`[web-api] Chat from ${ip} (session: ${sessionId.slice(0, 8)}...): "${message.slice(0, 80)}"`);
 
-      const response = await chat(chatId, name, message, 'web');
+      // Budget check — enforce compute limits before calling LLM
+      const budgetCheck = checkBudget(sessionId);
+      if (!budgetCheck.allowed) {
+        jsonResponse(res, 429, {
+          error: budgetCheck.message,
+          budget: {
+            daily: budgetCheck.budget,
+            used: budgetCheck.used,
+            remaining: 0,
+          },
+        });
+        return true;
+      }
+
+      // Mark identified if they provided a username
+      if (userName) markIdentified(sessionId);
+
+      const chatOptions = budgetCheck.degraded
+        ? { maxTokensOverride: budgetCheck.maxTokens }
+        : {};
+
+      const response = await chat(chatId, name, message, 'web', [], chatOptions);
+
+      // Record usage after successful response
+      const quality = computeWebQuality(message);
+      recordUsage(sessionId, response.usage, quality);
 
       jsonResponse(res, 200, {
         reply: response.text,
         timestamp: new Date().toISOString(),
+        budget: {
+          daily: budgetCheck.budget,
+          used: budgetCheck.used + (response.usage?.input || 0) + (response.usage?.output || 0),
+          remaining: Math.max(0, budgetCheck.remaining - (response.usage?.input || 0) - (response.usage?.output || 0)),
+          degraded: budgetCheck.degraded,
+        },
       });
     } catch (err) {
       console.error('[web-api] Chat error:', err.message);
@@ -148,6 +180,7 @@ export async function handleWebRequest(req, res, pathname) {
       const dialogue = getRecentDialogue(5);
       const dialogueStats = getDialogueStats();
       const shadowStats = getShadowStats();
+      const computeEcon = getComputeStats();
 
       jsonResponse(res, 200, {
         knowledgeChain: {
@@ -188,6 +221,7 @@ export async function handleWebRequest(req, res, pathname) {
           active: shadowStats.active,
           totalContributions: shadowStats.totalContributions,
         },
+        computeEconomics: computeEcon.pool,
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -246,4 +280,16 @@ export async function handleWebRequest(req, res, pathname) {
 
   // Not a /web/ route we handle
   return false;
+}
+
+// ============ Quality Signal ============
+
+function computeWebQuality(text) {
+  let score = 0;
+  if (text.length > 50) score += 1;
+  if (text.length > 200) score += 1;
+  if (text.includes('?')) score += 1;
+  if (text.includes('http') || text.includes('github')) score += 1;
+  if (text.includes('```') || text.includes('function') || text.includes('contract')) score += 1;
+  return Math.min(score, 5);
 }

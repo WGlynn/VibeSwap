@@ -334,7 +334,7 @@ export function bufferMessage(chatId, userName, message) {
   conversationsDirty = true;
 }
 
-export async function chat(chatId, userName, message, chatType = 'private', media = []) {
+export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride } = {}) {
   if (!conversations.has(chatId)) {
     conversations.set(chatId, []);
   }
@@ -381,7 +381,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
     sanitizeHistory(history);
 
     try {
-      return await _sendToLLM(chatId, userName, chatType, history);
+      return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride);
     } finally {
       // Restore text-only content for persistence (no base64 stored)
       historyEntry.content = savedContent;
@@ -404,12 +404,12 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
   }
   sanitizeHistory(history);
 
-  return _sendToLLM(chatId, userName, chatType, history);
+  return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride);
 }
 
 // ============ LLM Call + Tool Loop (shared by text and multimodal paths) ============
 
-async function _sendToLLM(chatId, userName, chatType, history) {
+async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride) {
   // Build knowledge context for this user/chat
   let knowledgeContext = '';
   try {
@@ -463,9 +463,11 @@ async function _sendToLLM(chatId, userName, chatType, history) {
   ];
 
   try {
+    const effectiveMaxTokens = maxTokensOverride || config.maxTokens;
+
     let response = await llmChat({
       model: getModelName(),
-      max_tokens: config.maxTokens,
+      max_tokens: effectiveMaxTokens,
       system: fullSystemPrompt,
       messages: history,
       tools,
@@ -509,7 +511,7 @@ async function _sendToLLM(chatId, userName, chatType, history) {
 
       response = await llmChat({
         model: getModelName(),
-        max_tokens: config.maxTokens,
+        max_tokens: effectiveMaxTokens,
         system: fullSystemPrompt,
         messages: history,
         tools,

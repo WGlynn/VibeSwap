@@ -157,31 +157,31 @@ export async function handleWebRequest(req, res, pathname) {
           recentEpochs: knowledgeChain.recentEpochs?.slice(0, 5),
         },
         network: {
-          shardId: shard.shardId,
+          shardId: shard.shardId || shard.id || config.shard?.id || 'shard-0',
           nodeType: shard.nodeType,
           peers: shard.peers,
           uptime: shard.uptime,
           memory: shard.memory,
           topology: topology ? {
-            shardCount: topology.shards?.length || 0,
-            healthy: topology.healthy,
+            shardCount: topology.shards?.length || topology.totalShards || 0,
+            healthy: topology.healthy !== undefined ? topology.healthy : (topology.shards?.length > 0),
           } : null,
         },
         learning: {
           totalSkills: skills.length,
           confirmedSkills: skills.filter(s => s.confirmations >= 2).length,
-          recentSkills: skills.slice(-5).map(s => ({ pattern: s.pattern, category: s.category })),
+          recentSkills: skills.slice(-5).map(s => ({ pattern: s.title || s.lesson?.slice(0, 80) || '', category: s.category || 'general' })),
         },
         innerDialogue: {
           recentThoughts: dialogue.map(d => ({
-            content: d.content?.slice(0, 200),
+            content: (d.thought || d.content || '').slice(0, 200),
             category: d.category,
             created: d.created,
           })),
           stats: {
-            totalThoughts: dialogueStats.totalThoughts,
-            promoted: dialogueStats.promoted,
-            categories: dialogueStats.categoryCounts,
+            totalThoughts: dialogueStats.totalEntries || dialogueStats.totalThoughts || 0,
+            promoted: dialogueStats.promotedToNetwork || dialogueStats.promoted || 0,
+            categories: dialogueStats.categoryCounts || {},
           },
         },
         shadows: {

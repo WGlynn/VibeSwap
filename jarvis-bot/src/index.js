@@ -2209,8 +2209,12 @@ async function main() {
           }
         });
       // ============ Fireflies.ai Webhook ============
-      // Receives "Transcription completed" event, fetches full transcript via GraphQL,
-      // generates meeting notes, sends to Telegram.
+      // GET = verification ping (Fireflies checks URL is live before activating)
+      // POST = transcription event
+      } else if (req.url === '/fireflies' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', service: 'jarvis-fireflies-webhook' }));
+
       } else if (req.url === '/fireflies' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });

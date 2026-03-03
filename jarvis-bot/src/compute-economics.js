@@ -48,6 +48,8 @@ const W_STABILITY = 0.10;
 // Total categories from tracker
 const TOTAL_CATEGORIES = 6; // IDEA, CODE, GOVERNANCE, COMMUNITY, DESIGN, REVIEW
 
+const FREE_TELEGRAM_DMS = 3;          // free DMs/day for non-team users
+
 const SAVE_INTERVAL = 60_000; // 60s
 
 // ============ State ============
@@ -84,7 +86,7 @@ function todayKey() {
 function ensureUser(userId) {
   if (!state.users[userId]) {
     state.users[userId] = {
-      today: { input: 0, output: 0 },
+      today: { input: 0, output: 0, telegramDMs: 0 },
       allTime: { input: 0, output: 0 },
       quality: { sum: 0, count: 0 },
       facts: 0,
@@ -160,7 +162,7 @@ function checkDayRollover() {
 
   // Zero daily counters
   for (const user of Object.values(state.users)) {
-    user.today = { input: 0, output: 0 };
+    user.today = { input: 0, output: 0, telegramDMs: 0 };
   }
 
   // Recompute Shapley weights for the new day
@@ -265,6 +267,23 @@ export function creditFact(userId) {
   user.facts += 1;
   dirty = true;
 }
+
+// ============ Telegram DM Paywall ============
+
+export function recordTelegramMessage(userId) {
+  checkDayRollover();
+  const user = ensureUser(userId);
+  user.today.telegramDMs = (user.today.telegramDMs || 0) + 1;
+  dirty = true;
+}
+
+export function getTelegramMessageCount(userId) {
+  checkDayRollover();
+  const user = ensureUser(userId);
+  return user.today.telegramDMs || 0;
+}
+
+export { FREE_TELEGRAM_DMS };
 
 // ============ Stats ============
 

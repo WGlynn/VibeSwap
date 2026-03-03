@@ -46,7 +46,7 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
-import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics } from './compute-economics.js';
+import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS } from './compute-economics.js';
 import { createServer } from 'http';
 import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
@@ -1858,7 +1858,24 @@ bot.on('text', async (ctx) => {
 
   // Shadow Protocol — shadow users bypass normal auth, use codename
   const shadowCodename = getShadowCodename(ctx.from.id);
-  if (!isAuthorized(ctx) && !shadowCodename) return unauthorized(ctx);
+  if (!isAuthorized(ctx) && !shadowCodename) {
+    // DMs get a soft paywall — 3 free messages/day, then tip jar prompt
+    if (ctx.chat.type === 'private') {
+      const dmCount = getTelegramMessageCount(String(ctx.from.id));
+      if (dmCount >= FREE_TELEGRAM_DMS) {
+        const tipAddr = config.tipJarAddress;
+        return ctx.reply(
+          `You've used your ${FREE_TELEGRAM_DMS} free messages for today.\n\n` +
+          `JARVIS costs ~$5/day in API credits. Want to keep chatting?\n\n` +
+          `Send a tip to help fund compute:\n${tipAddr}\n\n` +
+          `Or ask a team member to vouch for you — resets at midnight UTC.`
+        );
+      }
+      recordTelegramMessage(String(ctx.from.id));
+    } else {
+      return unauthorized(ctx);
+    }
+  }
 
   // Rate limit Claude API calls (owner exempt, shadows get standard limit)
   if (!isOwner(ctx) && isRateLimited(ctx.from.id)) {

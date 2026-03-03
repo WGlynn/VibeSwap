@@ -97,6 +97,8 @@ export const config = {
     apiKey: process.env.FIREFLIES_API_KEY || null,
     webhookSecret: process.env.FIREFLIES_WEBHOOK_SECRET || null, // HMAC verification
   },
+  // Tip jar — ETH address for voluntary contributions
+  tipJarAddress: process.env.TIP_JAR_ADDRESS || '0x0000000000000000000000000000000000000000',
   // Runtime info
   isDocker,
 };

@@ -1,3 +1,12 @@
+# Stage 1: Build Mini App
+FROM node:20-slim AS webapp-build
+WORKDIR /build
+COPY webapp/package.json webapp/package-lock.json* ./
+RUN npm ci || npm install
+COPY webapp/ ./
+RUN npm run build
+
+# Stage 2: Main app
 FROM node:20-slim
 
 # Install git + fonts for repo operations and sticker generation
@@ -15,6 +24,9 @@ RUN npm ci --omit=dev
 
 # Copy source code
 COPY src/ ./src/
+
+# Copy built Mini App from stage 1
+COPY --from=webapp-build /build/dist ./webapp/dist/
 
 # Bundle memory files into /app/memory/ (Jarvis context)
 COPY memory/ /app/memory/

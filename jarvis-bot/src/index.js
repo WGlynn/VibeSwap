@@ -47,6 +47,7 @@ import { initStickers, textToSticker, imageToSticker, imageWithText, addToSticke
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
 import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS } from './compute-economics.js';
+import { initMining, flushMining } from './mining.js';
 import { createServer } from 'http';
 import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
@@ -833,6 +834,41 @@ bot.command('network', async (ctx) => {
   }
 
   ctx.reply(lines.join('\n'));
+});
+
+// ============ Mine — Launch Shard Miner Mini App ============
+
+bot.command('mine', async (ctx) => {
+  const healthPort = parseInt(process.env.HEALTH_PORT || '8080');
+  const webAppUrl = process.env.WEBAPP_URL || `https://jarvis-vibeswap.fly.dev/app/`;
+
+  await ctx.reply(
+    'Launch a Jarvis shard on your phone.\nMine JUL, join consensus, earn compute credits.',
+    {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: 'Launch Shard', web_app: { url: webAppUrl } }
+        ]]
+      }
+    }
+  );
+});
+
+// Handle data sent back when Mini App closes
+bot.on('web_app_data', async (ctx) => {
+  try {
+    const data = JSON.parse(ctx.webAppData.data);
+    if (data.type === 'mining_report') {
+      await ctx.reply(
+        `Mining session complete.\n` +
+        `JUL mined: ${data.julMined?.toFixed(2) || 0}\n` +
+        `Proofs submitted: ${data.proofsAccepted || 0}\n` +
+        `Hashrate: ${data.hashrate || 0} H/s`
+      );
+    }
+  } catch {
+    // Silently ignore malformed data
+  }
 });
 
 // ============ Spawn Shard (One-Click via Telegram) ============
@@ -2279,7 +2315,8 @@ async function main() {
   await recoverRetryQueue();
   await initShadow();
   await initComputeEconomics();
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics loaded.');
+  await initMining();
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining loaded.');
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
   console.log('[jarvis] Step 3.5: Initializing shard identity...');
@@ -2650,6 +2687,61 @@ async function main() {
           }
         });
 
+      // ============ Mini App Static Files ============
+      // Serves the built Jarvis Shard Miner webapp at /app/*
+      } else if (req.url?.startsWith('/app/') || req.url === '/app') {
+        const WEBAPP_DIR = join(process.cwd(), 'webapp', 'dist');
+        const CONTENT_TYPES = {
+          '.html': 'text/html; charset=utf-8',
+          '.js': 'application/javascript; charset=utf-8',
+          '.css': 'text/css; charset=utf-8',
+          '.json': 'application/json; charset=utf-8',
+          '.svg': 'image/svg+xml',
+          '.png': 'image/png',
+          '.ico': 'image/x-icon',
+          '.woff2': 'font/woff2',
+          '.woff': 'font/woff',
+        };
+
+        try {
+          let filePath = req.url.replace(/^\/app\/?/, '') || 'index.html';
+          // SPA fallback: if no extension, serve index.html
+          if (!filePath.includes('.')) filePath = 'index.html';
+
+          const fullPath = join(WEBAPP_DIR, filePath);
+          // Prevent directory traversal
+          if (!fullPath.startsWith(WEBAPP_DIR)) {
+            res.writeHead(403);
+            res.end('Forbidden');
+            return;
+          }
+
+          const content = await readFile(fullPath);
+          const ext = '.' + filePath.split('.').pop();
+          const contentType = CONTENT_TYPES[ext] || 'application/octet-stream';
+
+          // Cache hashed assets immutably, index.html never
+          const cacheControl = filePath === 'index.html'
+            ? 'no-cache'
+            : 'public, max-age=31536000, immutable';
+
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Cache-Control': cacheControl,
+          });
+          res.end(content);
+        } catch (err) {
+          // Fallback to index.html for SPA routing
+          try {
+            const content = await readFile(join(WEBAPP_DIR, 'index.html'));
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+            res.end(content);
+          } catch {
+            res.writeHead(404);
+            res.end('Mini App not found. Run: cd webapp && npm run build');
+          }
+        }
+
       // ============ Web Portal API ============
       // Public-facing endpoints for the VibeSwap frontend.
       // Rate-limited per IP, CORS-restricted. No API secret needed.
@@ -2971,6 +3063,7 @@ async function main() {
       console.log(`[jarvis] Fireflies webhook: http://0.0.0.0:${healthPort}/fireflies ${config.fireflies?.apiKey ? '(API key set)' : '(no API key)'}`);
       console.log(`[jarvis] Claude Code API: http://0.0.0.0:${healthPort}/api/* ${config.claudeCodeApiSecret ? '(secured)' : '(NO SECRET SET — disabled)'}`);
       console.log(`[jarvis] Web Portal API: http://0.0.0.0:${healthPort}/web/* (public, rate-limited)`);
+      console.log(`[jarvis] Mini App: http://0.0.0.0:${healthPort}/app/ (Telegram WebApp)`);
     });
   }
 
@@ -3000,6 +3093,7 @@ async function main() {
       { command: 'inner', description: 'Inner dialogue / self-reflection (owner only)' },
       { command: 'shard', description: 'Shard identity and status (owner only)' },
       { command: 'network', description: 'Mind Network topology (owner only)' },
+      { command: 'mine', description: 'Launch shard miner (Mini App)' },
     ]);
   } catch {}
 
@@ -3106,6 +3200,7 @@ async function main() {
     await flushInnerDialogue();
     await flushShadow();
     await flushComputeEconomics();
+    await flushMining();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

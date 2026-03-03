@@ -30,6 +30,8 @@ Thumbs.db
 *.swo
 frontend/dist/
 frontend/.vercel/
+jarvis-bot/webapp/dist/
+jarvis-bot/webapp/node_modules/
 
 # Generated document exports (originals stay in docs/*.md)
 docs/pdf/

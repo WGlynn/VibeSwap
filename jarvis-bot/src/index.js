@@ -147,6 +147,16 @@ function isRateLimited(userId) {
   return false;
 }
 
+// Evict stale rate limit entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, timestamps] of rateLimitMap) {
+    if (timestamps.length === 0 || now - timestamps[timestamps.length - 1] > 120000) {
+      rateLimitMap.delete(userId);
+    }
+  }
+}, 10 * 60 * 1000);
+
 // ============ Heartbeat + Crash Detection ============
 
 async function writeHeartbeat(status) {
@@ -1509,7 +1519,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
   }, 4000);
 
   try {
-    const response = await chat(chatId, userName, text, chatType, media);
+    const response = await chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id });
     clearInterval(typingInterval);
     await saveConversations();
 
@@ -1518,7 +1528,11 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       try { recordComputeUsage(String(chatId), response.usage); } catch {}
     }
 
-    const reply = response.text;
+    const reply = response.text?.trim();
+    if (!reply) {
+      console.warn('[bot] Empty response from LLM — skipping send');
+      return;
+    }
     if (reply.length <= 4096) {
       await ctx.reply(reply, { parse_mode: undefined });
     } else {
@@ -1529,7 +1543,11 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
   } catch (error) {
     clearInterval(typingInterval);
     console.error('[bot] Media response error:', error.message);
-    ctx.reply(`Error: ${error.message}`);
+    try {
+      await ctx.reply(`Error: ${error.message?.slice(0, 200) || 'Unknown error'}`, { parse_mode: undefined });
+    } catch {
+      console.error('[bot] Failed to send error reply to chat', ctx.chat?.id);
+    }
   }
 }
 
@@ -1757,6 +1775,43 @@ bot.on('video', async (ctx) => {
   }
 });
 
+// ============ GIF/Animation Handler ============
+
+bot.on('animation', async (ctx) => {
+  console.log(`[multimodal] Animation/GIF handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const animation = ctx.message.animation;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const caption = ctx.message.caption || '';
+
+  // Use thumbnail for visual context (GIFs always have one)
+  if (animation.thumbnail) {
+    try {
+      const { buffer, mimeType } = await downloadTelegramFile(ctx, animation.thumbnail.file_id);
+      console.log(`[multimodal] GIF thumbnail from ${userName} (${animation.duration}s, ${animation.file_name || 'unnamed'})`);
+
+      const media = [{
+        type: 'image',
+        mimeType,
+        data: buffer.toString('base64'),
+        filename: `gif_thumb_${Date.now()}.jpg`,
+      }];
+      const text = caption || `[User sent a GIF/animation (${animation.duration}s). This is the preview frame. Describe what you see and respond naturally.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
+    } catch (err) {
+      console.error('[multimodal] GIF thumbnail failed:', err.message);
+      const text = caption || `[User sent a GIF/animation. Thumbnail processing failed. Acknowledge it.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+  } else {
+    const text = caption || `[User sent a GIF/animation but no thumbnail is available. Acknowledge it.]`;
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+  }
+});
+
 // ============ Video Note Handler (circular videos) ============
 
 bot.on('video_note', async (ctx) => {
@@ -1831,25 +1886,30 @@ bot.on('text', async (ctx) => {
 
     // Proactive intelligence — JARVIS is a full team member, not a wallflower
     if (msgText.length >= 5) {
-      const recentContext = ''; // Could build from buffered messages
-      const analysis = await analyzeMessage(msgText, userName, recentContext);
+      try {
+        const recentContext = ''; // Could build from buffered messages
+        const analysis = await analyzeMessage(msgText, userName, recentContext);
 
-      if (analysis.action === 'engage' && analysis.response_hint) {
-        const proactiveReply = await generateProactiveResponse(
-          msgText, userName, analysis.response_hint, getSystemPrompt()
-        );
-        if (proactiveReply) {
-          await ctx.reply(proactiveReply, { parse_mode: undefined });
+        if (analysis.action === 'engage' && analysis.response_hint) {
+          const proactiveReply = await generateProactiveResponse(
+            msgText, userName, analysis.response_hint, getSystemPrompt()
+          );
+          if (proactiveReply) {
+            await ctx.reply(proactiveReply, { parse_mode: undefined });
+          }
+        } else if (analysis.action === 'moderate') {
+          const modAction = await evaluateModeration(msgText, userName, analysis.violation, analysis.severity);
+          if (modAction.action === 'warn') {
+            await warnUser(bot, ctx.chat.id, ctx.from.id, modAction.reason, 'jarvis-ai');
+            await ctx.reply(`${ctx.from.first_name} — heads up: ${modAction.reason}`);
+          } else if (modAction.action === 'mute') {
+            await muteUser(bot, ctx.chat.id, ctx.from.id, 600, modAction.reason, 'jarvis-ai');
+          }
+          // Bans from AI moderation should be rare and reviewed — log but don't auto-execute
         }
-      } else if (analysis.action === 'moderate') {
-        const modAction = await evaluateModeration(msgText, userName, analysis.violation, analysis.severity);
-        if (modAction.action === 'warn') {
-          await warnUser(bot, ctx.chat.id, ctx.from.id, modAction.reason, 'jarvis-ai');
-          await ctx.reply(`${ctx.from.first_name} — heads up: ${modAction.reason}`);
-        } else if (modAction.action === 'mute') {
-          await muteUser(bot, ctx.chat.id, ctx.from.id, 600, modAction.reason, 'jarvis-ai');
-        }
-        // Bans from AI moderation should be rare and reviewed — log but don't auto-execute
+      } catch (err) {
+        // Swallow proactive intelligence errors — don't let Haiku 529s crash group handling
+        console.error('[intelligence] Proactive analysis failed:', err.message?.slice(0, 100));
       }
     }
 
@@ -1920,7 +1980,7 @@ bot.on('text', async (ctx) => {
       }
     }
 
-    const response = await chat(chatId, userName, ctx.message.text, ctx.chat.type);
+    const response = await chat(chatId, userName, ctx.message.text, ctx.chat.type, [], { userId: ctx.from.id });
 
     clearInterval(typingInterval);
 
@@ -1932,7 +1992,12 @@ bot.on('text', async (ctx) => {
     // Save conversation after every Claude response (resilience)
     await saveConversations();
 
-    const text = response.text;
+    const text = response.text?.trim();
+    if (!text) {
+      clearInterval(typingInterval);
+      console.warn('[bot] Empty response from LLM — skipping send');
+      return;
+    }
     if (text.length <= 4096) {
       await ctx.reply(text, { parse_mode: undefined });
     } else {
@@ -1947,7 +2012,12 @@ bot.on('text', async (ctx) => {
   } catch (error) {
     clearInterval(typingInterval);
     console.error('[bot] Error:', error.message);
-    ctx.reply(`Error: ${error.message}`);
+    try {
+      await ctx.reply(`Error: ${error.message?.slice(0, 200) || 'Unknown error'}`, { parse_mode: undefined });
+    } catch {
+      // If even the error reply fails (user blocked bot, chat deleted, TG down), just log
+      console.error('[bot] Failed to send error reply to chat', ctx.chat?.id);
+    }
   }
 });
 

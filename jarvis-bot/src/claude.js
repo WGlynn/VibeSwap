@@ -1,4 +1,4 @@
-import { writeFile, readFile, mkdir } from 'fs/promises';
+import { writeFile, readFile, mkdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve, relative } from 'path';
 import { config } from './config.js';
@@ -20,6 +20,37 @@ let conversationsDirty = false;
 
 // Track last JARVIS response per chat for correction detection
 const lastResponses = new Map(); // chatId -> { text, timestamp }
+
+// ============ Per-Chat Async Lock ============
+// Prevents concurrent messages from corrupting the same conversation history.
+const chatLocks = new Map(); // chatId -> Promise
+
+async function withChatLock(chatId, fn) {
+  // Wait for any pending operation on this chat to finish
+  const prev = chatLocks.get(chatId) || Promise.resolve();
+  let release;
+  const lock = new Promise(resolve => { release = resolve; });
+  chatLocks.set(chatId, lock);
+  try {
+    await prev; // Wait for previous operation
+    return await fn();
+  } finally {
+    release();
+    // Clean up if no one else is queued (the lock is still ours)
+    if (chatLocks.get(chatId) === lock) {
+      chatLocks.delete(chatId);
+    }
+  }
+}
+
+// ============ Periodic Cleanup ============
+// Evict stale entries from lastResponses and chatLocks every 30 minutes
+setInterval(() => {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [chatId, entry] of lastResponses) {
+    if (entry.timestamp < cutoff) lastResponses.delete(chatId);
+  }
+}, 30 * 60 * 1000);
 
 export function getLastResponse(chatId) {
   return lastResponses.get(chatId) || null;
@@ -54,7 +85,10 @@ export async function saveConversations() {
       sanitizeHistory(trimmed);
       obj[chatId] = trimmed;
     }
-    await writeFile(CONVERSATIONS_FILE, JSON.stringify(obj, null, 2));
+    // Atomic write: write to temp file, then rename (prevents corruption on crash)
+    const tmpFile = CONVERSATIONS_FILE + '.tmp';
+    await writeFile(tmpFile, JSON.stringify(obj, null, 2));
+    await rename(tmpFile, CONVERSATIONS_FILE);
     conversationsDirty = false;
   } catch (err) {
     console.error('[claude] Failed to save conversations:', err.message);
@@ -91,44 +125,12 @@ export function clearHistory(chatId) {
 function sanitizeHistory(history) {
   if (!history || history.length === 0) return history;
 
-  // Collect all tool_use IDs from assistant messages
-  const toolUseIds = new Set();
-  for (const msg of history) {
-    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-      for (const block of msg.content) {
-        if (block.type === 'tool_use' && block.id) {
-          toolUseIds.add(block.id);
-        }
-      }
-    }
-  }
-
-  // Filter out tool_result entries that reference missing tool_use IDs
-  for (let i = 0; i < history.length; i++) {
-    const msg = history[i];
-    if (msg.role === 'user' && Array.isArray(msg.content)) {
-      const filtered = msg.content.filter(block => {
-        if (block.type === 'tool_result') {
-          return toolUseIds.has(block.tool_use_id);
-        }
-        return true;
-      });
-      if (filtered.length === 0) {
-        // Entire message was orphaned tool_results — remove it
-        history.splice(i, 1);
-        i--;
-      } else if (filtered.length !== msg.content.length) {
-        msg.content = filtered;
-      }
-    }
-  }
-
-  // Ensure history starts with a user message (API requirement)
+  // Step 1: Ensure history starts with a user message (API requirement)
   while (history.length > 0 && history[0].role !== 'user') {
     history.shift();
   }
 
-  // Ensure alternating roles — collapse same-role adjacents
+  // Step 2: Ensure alternating roles — collapse same-role adjacents
   for (let i = 1; i < history.length; i++) {
     if (history[i].role === history[i - 1].role) {
       if (history[i].role === 'user') {
@@ -146,6 +148,57 @@ function sanitizeHistory(history) {
         i--;
       }
     }
+  }
+
+  // Step 3: Collect all tool_use IDs from assistant messages
+  // MUST run after structural cleanup so removed messages don't contribute phantom IDs
+  const toolUseIds = new Set();
+  for (const msg of history) {
+    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block.type === 'tool_use' && block.id) {
+          toolUseIds.add(block.id);
+        }
+      }
+    }
+  }
+
+  // Step 4: Also enforce adjacency — each tool_result must reference a tool_use
+  // in the immediately preceding assistant message (Claude API requirement)
+  for (let i = 0; i < history.length; i++) {
+    const msg = history[i];
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      // Get tool_use IDs from the immediately preceding assistant message
+      const prevMsg = i > 0 ? history[i - 1] : null;
+      const prevToolIds = new Set();
+      if (prevMsg && prevMsg.role === 'assistant' && Array.isArray(prevMsg.content)) {
+        for (const block of prevMsg.content) {
+          if (block.type === 'tool_use' && block.id) {
+            prevToolIds.add(block.id);
+          }
+        }
+      }
+
+      const filtered = msg.content.filter(block => {
+        if (block.type === 'tool_result') {
+          // Must match a tool_use in the immediately preceding assistant message
+          return prevToolIds.has(block.tool_use_id);
+        }
+        return true;
+      });
+      if (filtered.length === 0) {
+        // Entire message was orphaned tool_results — remove it
+        history.splice(i, 1);
+        i--;
+      } else if (filtered.length !== msg.content.length) {
+        msg.content = filtered;
+      }
+    }
+  }
+
+  // Step 5: Re-check structure after tool_result cleanup (may have created gaps)
+  while (history.length > 0 && history[0].role !== 'user') {
+    history.shift();
   }
 
   return history;
@@ -308,6 +361,9 @@ Use the tools to read existing files for reference and write new files.`;
 // Buffer a message into conversation history WITHOUT calling Claude.
 // Used for group chat messages so JARVIS has situational awareness.
 export function bufferMessage(chatId, userName, message) {
+  // Synchronous lock-free path — bufferMessage doesn't await anything,
+  // but we still guard the mutations for safety with the lock.
+  // Since this is sync, we just do it inline (lock is for async chat()).
   if (!conversations.has(chatId)) {
     conversations.set(chatId, []);
   }
@@ -334,86 +390,91 @@ export function bufferMessage(chatId, userName, message) {
   conversationsDirty = true;
 }
 
-export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride } = {}) {
-  if (!conversations.has(chatId)) {
-    conversations.set(chatId, []);
-  }
+export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId } = {}) {
+  return withChatLock(chatId, async () => {
+    if (!conversations.has(chatId)) {
+      conversations.set(chatId, []);
+    }
 
-  const history = conversations.get(chatId);
+    const history = conversations.get(chatId);
 
-  // Add user message with name tag and chat context
-  const isDM = chatType === 'private';
-  const contextPrefix = isDM ? '[DM] ' : '[GROUP] ';
-  const taggedMessage = contextPrefix + (userName ? `[${userName}]: ${message}` : message);
+    // Add user message with name tag and chat context
+    const isDM = chatType === 'private';
+    const contextPrefix = isDM ? '[DM] ' : '[GROUP] ';
+    const taggedMessage = contextPrefix + (userName ? `[${userName}]: ${message}` : message);
 
-  // Build content: multimodal array if media present, plain string otherwise
-  if (media.length > 0) {
-    // Multimodal message — content array with media blocks + text
-    const contentBlocks = [];
-    for (const m of media) {
-      if (m.type === 'image') {
-        contentBlocks.push({
-          type: 'image',
-          source: { type: 'base64', media_type: m.mimeType, data: m.data },
-        });
-      } else if (m.type === 'document') {
-        contentBlocks.push({
-          type: 'document',
-          source: { type: 'base64', media_type: m.mimeType, data: m.data },
-        });
+    // Build content: multimodal array if media present, plain string otherwise
+    if (media.length > 0) {
+      // Multimodal message — content array with media blocks + text
+      const contentBlocks = [];
+      for (const m of media) {
+        if (m.type === 'image') {
+          contentBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: m.mimeType, data: m.data },
+          });
+        } else if (m.type === 'document') {
+          contentBlocks.push({
+            type: 'document',
+            source: { type: 'base64', media_type: m.mimeType, data: m.data },
+          });
+        }
+      }
+      contentBlocks.push({ type: 'text', text: taggedMessage });
+
+      // Store text-only placeholder in history (no base64 bloat)
+      const mediaDesc = media.map(m => `[${m.type}: ${m.filename || m.mimeType}]`).join(' ');
+      history.push({ role: 'user', content: `${mediaDesc} ${taggedMessage}` });
+
+      // Swap last history entry's content for the API call, restore after
+      const historyEntry = history[history.length - 1];
+      const savedContent = historyEntry.content;
+      historyEntry.content = contentBlocks;
+
+      // Trim + sanitize before API call
+      while (history.length > config.maxConversationHistory) {
+        history.shift();
+      }
+      sanitizeHistory(history);
+
+      try {
+        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId);
+      } finally {
+        // Restore text-only content for persistence (no base64 stored)
+        historyEntry.content = savedContent;
       }
     }
-    contentBlocks.push({ type: 'text', text: taggedMessage });
 
-    // Store text-only placeholder in history (no base64 bloat)
-    const mediaDesc = media.map(m => `[${m.type}: ${m.filename || m.mimeType}]`).join(' ');
-    history.push({ role: 'user', content: `${mediaDesc} ${taggedMessage}` });
+    // Plain text path (original behavior)
+    // Append to existing user block or create new one
+    // Only merge if the last message is a plain string (not tool_result array)
+    const last = history[history.length - 1];
+    if (last && last.role === 'user' && typeof last.content === 'string') {
+      last.content += '\n' + taggedMessage;
+    } else {
+      history.push({ role: 'user', content: taggedMessage });
+    }
 
-    // Swap last history entry's content for the API call, restore after
-    const historyEntry = history[history.length - 1];
-    const savedContent = historyEntry.content;
-    historyEntry.content = contentBlocks;
-
-    // Trim + sanitize before API call
+    // Trim history if too long — but never cut inside a tool_use/tool_result pair
     while (history.length > config.maxConversationHistory) {
       history.shift();
     }
     sanitizeHistory(history);
 
-    try {
-      return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride);
-    } finally {
-      // Restore text-only content for persistence (no base64 stored)
-      historyEntry.content = savedContent;
-    }
-  }
-
-  // Plain text path (original behavior)
-  // Append to existing user block or create new one
-  // Only merge if the last message is a plain string (not tool_result array)
-  const last = history[history.length - 1];
-  if (last && last.role === 'user' && typeof last.content === 'string') {
-    last.content += '\n' + taggedMessage;
-  } else {
-    history.push({ role: 'user', content: taggedMessage });
-  }
-
-  // Trim history if too long — but never cut inside a tool_use/tool_result pair
-  while (history.length > config.maxConversationHistory) {
-    history.shift();
-  }
-  sanitizeHistory(history);
-
-  return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride);
+    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId);
+  });
 }
 
 // ============ LLM Call + Tool Loop (shared by text and multimodal paths) ============
 
-async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride) {
+async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId) {
+  // In DMs, chatId IS the userId. In groups, userId must be passed explicitly.
+  const effectiveUserId = userId || chatId;
+
   // Build knowledge context for this user/chat
   let knowledgeContext = '';
   try {
-    knowledgeContext = await buildKnowledgeContext(chatId, chatId, chatType);
+    knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType);
   } catch {}
 
   const fullSystemPrompt = knowledgeContext
@@ -475,6 +536,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
     // Handle tool use loop (max 5 rounds to prevent infinite loops)
     let rounds = 0;
+    const historyLenBeforeTools = history.length;
     while (response.stop_reason === 'tool_use' && rounds < 5) {
       rounds++;
       const toolBlocks = response.content.filter(b => b.type === 'tool_use');
@@ -494,7 +556,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         } else if (tb.name === 'learn_fact') {
           try {
             await learnFact(
-              chatId, userName, chatId, chatType,
+              effectiveUserId, userName, chatId, chatType,
               tb.input.fact, tb.input.category, tb.input.tags || []
             );
             result = `Learned: "${tb.input.fact}" — stored in persistent knowledge base.`;
@@ -509,19 +571,29 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       }
       history.push({ role: 'user', content: toolResults });
 
-      response = await llmChat({
-        model: getModelName(),
-        max_tokens: effectiveMaxTokens,
-        system: fullSystemPrompt,
-        messages: history,
-        tools,
-      });
+      try {
+        response = await llmChat({
+          model: getModelName(),
+          max_tokens: effectiveMaxTokens,
+          system: fullSystemPrompt,
+          messages: history,
+          tools,
+        });
+      } catch (toolLoopError) {
+        // API failed mid-tool-loop — roll back partial tool exchange to prevent
+        // corrupted history (consecutive user messages, orphaned tool_results)
+        console.error(`[claude] Tool loop failed at round ${rounds}, rolling back ${history.length - historyLenBeforeTools} messages`);
+        history.length = historyLenBeforeTools;
+        sanitizeHistory(history);
+        throw toolLoopError;
+      }
     }
 
     const assistantMessage = response.content
       .filter(block => block.type === 'text')
       .map(block => block.text)
-      .join('\n');
+      .join('\n')
+      || '...';
 
     // Add assistant response to history
     history.push({ role: 'assistant', content: assistantMessage });

@@ -604,6 +604,114 @@ impl PoWLockArgs {
     }
 }
 
+// ============ Knowledge Cell Data ============
+
+/// Knowledge cell data — PoW-gated shared state for Jarvis multi-instance sync
+/// Each knowledge cell stores a key-value pair with header chain linking and MMR history.
+/// PoW lock script gates write access; this type script validates state transitions.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct KnowledgeCellData {
+    /// blake2b(namespace + key) — unique identifier for this knowledge slot
+    pub key_hash: [u8; 32],
+    /// blake2b(value) — integrity check for off-chain value (IPFS/local)
+    pub value_hash: [u8; 32],
+    /// Size of the off-chain value in bytes
+    pub value_size: u32,
+    /// SHA-256(previous cell data) — header chain linking
+    pub prev_state_hash: [u8; 32],
+    /// MMR root of all historical states for this cell
+    pub mmr_root: [u8; 32],
+    /// Monotonic update counter (0 = genesis)
+    pub update_count: u64,
+    /// Lock hash of the writer who last updated this cell
+    pub author_lock_hash: [u8; 32],
+    /// CKB block number at write time
+    pub timestamp_block: u64,
+    /// Current PoW difficulty required to update this cell
+    pub difficulty: u8,
+}
+
+impl KnowledgeCellData {
+    pub const SERIALIZED_SIZE: usize = 32 + 32 + 4 + 32 + 32 + 8 + 32 + 8 + 1; // 181
+
+    pub fn serialize(&self) -> [u8; Self::SERIALIZED_SIZE] {
+        let mut buf = [0u8; Self::SERIALIZED_SIZE];
+        let mut offset = 0;
+
+        buf[offset..offset + 32].copy_from_slice(&self.key_hash);
+        offset += 32;
+
+        buf[offset..offset + 32].copy_from_slice(&self.value_hash);
+        offset += 32;
+
+        buf[offset..offset + 4].copy_from_slice(&self.value_size.to_le_bytes());
+        offset += 4;
+
+        buf[offset..offset + 32].copy_from_slice(&self.prev_state_hash);
+        offset += 32;
+
+        buf[offset..offset + 32].copy_from_slice(&self.mmr_root);
+        offset += 32;
+
+        buf[offset..offset + 8].copy_from_slice(&self.update_count.to_le_bytes());
+        offset += 8;
+
+        buf[offset..offset + 32].copy_from_slice(&self.author_lock_hash);
+        offset += 32;
+
+        buf[offset..offset + 8].copy_from_slice(&self.timestamp_block.to_le_bytes());
+        offset += 8;
+
+        buf[offset] = self.difficulty;
+
+        buf
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SERIALIZED_SIZE {
+            return None;
+        }
+        let mut offset = 0;
+        let mut result = Self::default();
+
+        result.key_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.value_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.value_size = u32::from_le_bytes(data[offset..offset + 4].try_into().ok()?);
+        offset += 4;
+
+        result.prev_state_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.mmr_root.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.update_count = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+
+        result.author_lock_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.timestamp_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+
+        result.difficulty = data[offset];
+
+        Some(result)
+    }
+}
+
+// ============ Knowledge Constants ============
+
+/// Minimum PoW difficulty for knowledge cells
+pub const KNOWLEDGE_MIN_DIFFICULTY: u8 = 8;
+
+/// Maximum allowed difficulty adjustment per update (±1)
+pub const KNOWLEDGE_MAX_DIFFICULTY_DELTA: u8 = 1;
+
 // ============ Merkle Proof ============
 
 /// Merkle proof for compliance verification
@@ -695,6 +803,55 @@ mod tests {
         assert_eq!(config.commit_window_blocks, 40);
         assert_eq!(config.slash_rate_bps, 5000);
         assert_eq!(config.min_pow_difficulty, 16);
+    }
+
+    #[test]
+    fn test_knowledge_cell_roundtrip() {
+        let data = KnowledgeCellData {
+            key_hash: [0xAA; 32],
+            value_hash: [0xBB; 32],
+            value_size: 1024,
+            prev_state_hash: [0xCC; 32],
+            mmr_root: [0xDD; 32],
+            update_count: 42,
+            author_lock_hash: [0xEE; 32],
+            timestamp_block: 100_000,
+            difficulty: 16,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), KnowledgeCellData::SERIALIZED_SIZE);
+        let decoded = KnowledgeCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_knowledge_cell_genesis() {
+        let genesis = KnowledgeCellData {
+            key_hash: [0x01; 32],
+            value_hash: [0x02; 32],
+            value_size: 256,
+            prev_state_hash: [0u8; 32], // Genesis: all zeros
+            mmr_root: [0u8; 32],        // Empty MMR
+            update_count: 0,            // First state
+            author_lock_hash: [0xFF; 32],
+            timestamp_block: 1,
+            difficulty: KNOWLEDGE_MIN_DIFFICULTY,
+        };
+        let bytes = genesis.serialize();
+        let decoded = KnowledgeCellData::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.update_count, 0);
+        assert_eq!(decoded.prev_state_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_knowledge_cell_deserialize_too_short() {
+        let short_data = [0u8; 100]; // Less than 181
+        assert!(KnowledgeCellData::deserialize(&short_data).is_none());
+    }
+
+    #[test]
+    fn test_knowledge_cell_serialized_size() {
+        assert_eq!(KnowledgeCellData::SERIALIZED_SIZE, 181);
     }
 
     #[test]

@@ -26,7 +26,7 @@
 // - Demotion: explicit deprecation OR superseded OR proven false OR decayed
 // ============
 
-import Anthropic from '@anthropic-ai/sdk';
+import { llmChat } from './llm-provider.js';
 import { writeFile, readFile, mkdir, appendFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
@@ -36,7 +36,7 @@ import { buildInnerDialogueContext } from './inner-dialogue.js';
 import { propose, PROPOSAL_TYPES, onCommit } from './consensus.js';
 import { isMultiShard } from './shard.js';
 
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+// LLM calls use llmChat from llm-provider.js (supports fallback chain)
 
 // ============ Paths ============
 
@@ -364,8 +364,7 @@ export async function detectCorrection(userMessage, previousJarvisResponse, user
   if (!previousJarvisResponse || userMessage.length < 10) return null;
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const response = await llmChat({
       max_tokens: 400,
       system: `You detect when a user is correcting an AI assistant. Analyze whether the user's message corrects something the assistant said previously.
 
@@ -415,8 +414,7 @@ Important: Disagreement is NOT a correction. The user must be saying the AI is W
 
 async function extractLesson(correction, userMessage, context) {
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const response = await llmChat({
       max_tokens: 300,
       system: `Extract a concise, actionable lesson from a correction. The lesson should be written as an instruction that a future AI can follow.
 

@@ -615,22 +615,59 @@ export function initProvider() {
   return activeProvider;
 }
 
-// ============ Convenience: Direct Chat (with auto-fallback) ============
+// ============ Retry helpers ============
+
+function isTransientError(error) {
+  const status = error?.status || error?.statusCode || error?.response?.status;
+  if ([429, 500, 502, 503, 529].includes(status)) return true;
+  const msg = (error?.message || '').toLowerCase();
+  if (msg.includes('overloaded') || msg.includes('rate limit') || msg.includes('econnreset')
+      || msg.includes('socket hang up') || msg.includes('timeout') || msg.includes('fetch failed')) {
+    return true;
+  }
+  return false;
+}
+
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ============ Convenience: Direct Chat (with auto-fallback + retry) ============
 
 export async function llmChat(request) {
   if (!activeProvider) {
     throw new Error('LLM provider not initialized. Call initProvider() first.');
   }
 
-  try {
-    return await activeProvider.chat(request);
-  } catch (error) {
-    if (isCreditError(error) && activateFallback()) {
-      console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
-      // Strip the original model — let fallback use its own default
-      const { model, ...rest } = request;
-      return await activeProvider.chat(rest);
+  const MAX_RETRIES = 3;
+  let lastError;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await activeProvider.chat(request);
+    } catch (error) {
+      lastError = error;
+
+      // Credit exhaustion — try fallback provider immediately
+      if (isCreditError(error) && activateFallback()) {
+        console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
+        const { model, ...rest } = request;
+        return await activeProvider.chat(rest);
+      }
+
+      // Transient errors — retry with exponential backoff + jitter
+      if (isTransientError(error) && attempt < MAX_RETRIES) {
+        const baseDelay = Math.min(1000 * Math.pow(2, attempt), 8000);
+        const jitter = Math.random() * 1000;
+        const delay = baseDelay + jitter;
+        console.warn(`[llm] Transient error (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${Math.round(delay)}ms: ${error.message?.slice(0, 80)}`);
+        await sleep(delay);
+        continue;
+      }
+
+      throw error; // Non-transient, non-credit error — give up
     }
-    throw error; // Not a credit error, or no fallbacks left
   }
+
+  throw lastError; // Exhausted retries
 }

@@ -13,6 +13,7 @@ members = [
     "scripts/compliance-type",
     "scripts/config-type",
     "scripts/oracle-type",
+    "scripts/knowledge-type",
     "sdk",
     "deploy",
     "tests",
@@ -47,4 +48,6 @@ opt-level = "s"
 [profile.release.package.config-type]
 opt-level = "s"
 [profile.release.package.oracle-type]
+opt-level = "s"
+[profile.release.package.knowledge-type]
 opt-level = "s"

@@ -1,14 +1,17 @@
 name: Publish JARVIS Shard Image
 
 on:
+  workflow_dispatch:  # Manual trigger
   push:
     branches: [master]
     paths:
       - 'jarvis-bot/src/**'
       - 'jarvis-bot/Dockerfile'
-      - 'jarvis-bot/entrypoint.sh'
+      - 'jarvis-bot/Dockerfile.*'
+      - 'jarvis-bot/entrypoint*.sh'
       - 'jarvis-bot/package.json'
       - 'jarvis-bot/package-lock.json'
+      - 'jarvis-bot/memory/**'
 
 env:
   REGISTRY: ghcr.io

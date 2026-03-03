@@ -86,6 +86,12 @@ export const config = {
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     whisperModel: process.env.WHISPER_MODEL || 'whisper-1',
   },
+  // Web Portal — public-facing API for frontend
+  web: {
+    corsOrigins: (process.env.WEB_CORS_ORIGINS || 'https://frontend-jade-five-87.vercel.app,http://localhost:3000,http://localhost:5173').split(','),
+    rateLimitPerMinute: parseInt(process.env.WEB_RATE_LIMIT || '5'),
+    sessionTtlMs: 2 * 60 * 60 * 1000, // 2 hours
+  },
   // Fireflies.ai integration (meeting transcription)
   fireflies: {
     apiKey: process.env.FIREFLIES_API_KEY || null,

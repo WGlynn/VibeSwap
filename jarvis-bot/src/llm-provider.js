@@ -626,8 +626,10 @@ export async function llmChat(request) {
     return await activeProvider.chat(request);
   } catch (error) {
     if (isCreditError(error) && activateFallback()) {
-      console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name}`);
-      return await activeProvider.chat(request);
+      console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
+      // Strip the original model — let fallback use its own default
+      const { model, ...rest } = request;
+      return await activeProvider.chat(rest);
     }
     throw error; // Not a credit error, or no fallbacks left
   }

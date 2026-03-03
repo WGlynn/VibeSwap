@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>privacy-fortress-data-economy</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css" />
+</head>
+<body>
+<h1
+id="privacy-fortress-cryptographic-knowledge-isolation-for-ai-agents">Privacy
+Fortress: Cryptographic Knowledge Isolation for AI Agents</h1>
+<p><strong>W. Glynn, JARVIS</strong> | March 2026 | VibeSwap
+Research</p>
+<hr />
+<h2 id="abstract">Abstract</h2>
+<p>We present a privacy architecture for persistent AI knowledge
+systems, implementing the Rosetta Stone Protocol’s compute-to-data model
+for JARVIS, VibeSwap’s AI co-founder. All per-user knowledge (facts,
+corrections, preferences) is encrypted at rest using AES-256-GCM with
+HKDF-derived per-user keys, ensuring that compromise of one knowledge
+base reveals nothing about any other user. Knowledge classes from the
+Common Knowledge Base (CKB) framework — Private, Shared, Mutual, Common,
+Network, Public — map directly to encryption tiers and key scopes. We
+combine this with an Ocean Protocol-inspired data economy layer that
+assigns economic identity to every piece of knowledge: a cost to store,
+a value from access, and a price for computation. The result is a system
+where privacy is the default state, not an afterthought; where knowledge
+never leaves its encryption boundary; and where the economics of
+knowledge are transparent without the knowledge itself being
+exposed.</p>
+<hr />
+<h2 id="the-problem-ai-memory-as-a-honeypot">1. The Problem: AI Memory
+as a Honeypot</h2>
+<h3 id="the-surface-area">1.1 The Surface Area</h3>
+<p>Every AI system with persistent memory creates a new class of
+honeypot. Unlike traditional databases that store structured records, an
+AI’s knowledge base contains something far more intimate: the cognitive
+model of a relationship.</p>
+<p>JARVIS maintains per-user Common Knowledge Bases (CKBs) — dyadic
+knowledge stores that represent everything the AI has learned about a
+specific person. Not just “Alice is a developer” but “Alice gets
+frustrated when I’m too formal,” “Alice prefers short answers,” “Alice
+corrected me about commit-reveal mechanisms three times.” This is
+behavioral intelligence. Relationship intelligence. The kind of
+information that, if exposed, doesn’t just violate privacy — it violates
+trust.</p>
+<p>Before this implementation, all of this existed as plaintext JSON on
+disk. Anyone with filesystem access — a compromised server, a stolen
+backup, an overly broad Docker volume mount — could read every fact
+JARVIS had ever learned about every user.</p>
+<h3 id="the-centralized-honeypot-axiom">1.2 The Centralized Honeypot
+Axiom</h3>
+<p>From VibeSwap’s wallet security fundamentals (Glynn, 2018):</p>
+<blockquote>
+<p>“It is more incentivizing for hackers to target centralized third
+party servers to steal many wallets than to target an individual’s
+computer.”</p>
+</blockquote>
+<p>The same principle applies to knowledge. A centralized store of
+behavioral profiles for every JARVIS user is exponentially more valuable
+to an attacker than any individual profile. The incentive to compromise
+scales with the number of users. The defense must scale faster.</p>
+<h3 id="the-compute-to-data-principle">1.3 The Compute-to-Data
+Principle</h3>
+<p>The Rosetta Stone Protocol (RSP) establishes a foundational principle
+for privacy-preserving knowledge systems: <strong>knowledge never leaves
+its encryption boundary.</strong> Instead of moving data to computation,
+you move computation to data.</p>
+<p>Applied to AI knowledge management: - CKB files stay encrypted at
+rest on disk - Only the facts needed for a conversation are decrypted in
+process memory - Context is built server-side from decrypted facts,
+injected into the prompt, and used - After the response, decrypted data
+is garbage collected - At no point does plaintext knowledge exist on
+disk</p>
+<p>This is the same principle that Ocean Protocol applies to data
+marketplaces: you don’t download the dataset, you send your algorithm to
+the dataset. The data never moves. Only the computation does.</p>
+<hr />
+<h2 id="architecture-privacy-tiers-mapped-to-encryption">2.
+Architecture: Privacy Tiers Mapped to Encryption</h2>
+<h3 id="knowledge-classes-as-encryption-scopes">2.1 Knowledge Classes as
+Encryption Scopes</h3>
+<p>The CKB framework defines six knowledge classes with progressive
+privacy guarantees. We map each directly to a cryptographic
+primitive:</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Knowledge Class</th>
+<th>Privacy Level</th>
+<th>Encryption</th>
+<th>Key Scope</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Private</strong></td>
+<td>Highest</td>
+<td>AES-256-GCM</td>
+<td>Per-user derived key</td>
+<td>Owner only</td>
+</tr>
+<tr>
+<td><strong>Shared</strong></td>
+<td>High</td>
+<td>AES-256-GCM</td>
+<td>Per-CKB key</td>
+<td>Dyad, session-scoped</td>
+</tr>
+<tr>
+<td><strong>Mutual</strong></td>
+<td>High</td>
+<td>AES-256-GCM</td>
+<td>Per-CKB key</td>
+<td>Dyad, persisted</td>
+</tr>
+<tr>
+<td><strong>Common</strong></td>
+<td>Medium</td>
+<td>AES-256-GCM</td>
+<td>Per-CKB key</td>
+<td>Dyad, persisted</td>
+</tr>
+<tr>
+<td><strong>Network</strong></td>
+<td>Low</td>
+<td>HMAC-SHA256</td>
+<td>Master key</td>
+<td>All CKBs (skills)</td>
+</tr>
+<tr>
+<td><strong>Public</strong></td>
+<td>None</td>
+<td>Plaintext</td>
+<td>N/A</td>
+<td>Everyone</td>
+</tr>
+</tbody>
+</table>
+<p>The key insight: Network knowledge (universal skills learned from
+corrections) doesn’t need confidentiality — it applies to everyone. But
+it does need <strong>integrity</strong>. A tampered skill could silently
+corrupt JARVIS’s behavior across all conversations. HMAC-SHA256
+signatures on every skill entry ensure that modifications are
+detectable.</p>
+<h3 id="key-hierarchy">2.2 Key Hierarchy</h3>
+<p>All keys derive from a single master key through HKDF (HMAC-based Key
+Derivation Function):</p>
+<pre><code>MASTER_KEY (256-bit)
+  │
+  ├── HKDF(&quot;user:&quot; + userId)    → Per-user AES key
+  ├── HKDF(&quot;group:&quot; + groupId)  → Per-group AES key
+  └── HKDF(&quot;skills&quot;)            → Skills HMAC key</code></pre>
+<p><strong>Properties:</strong> - <strong>Deterministic</strong>: The
+same master key always produces the same derived keys. No key storage
+needed — keys are recomputed on every boot. - <strong>Isolated</strong>:
+Compromise of a user key reveals nothing about other users’ keys. HKDF’s
+cryptographic independence guarantee ensures this. -
+<strong>Rotatable</strong>: Changing the master key re-derives all
+subordinate keys. A single secret rotation protects the entire
+system.</p>
+<p><strong>Master key sourcing:</strong> 1. Environment variable
+(<code>JARVIS_MASTER_KEY</code>) — preferred for cloud deployment
+(Fly.io secrets) 2. Auto-generated on first boot → written to
+<code>data/.master-key</code> with restricted permissions 3. PBKDF2 with
+100,000 iterations hardens any input (handles both raw hex keys and
+passphrases)</p>
+<h3 id="selective-field-encryption">2.3 Selective Field Encryption</h3>
+<p>Not everything in a CKB needs encryption. Economic metadata must
+remain plaintext for the data economy layer to function without
+decryption. We encrypt selectively:</p>
+<p><strong>Encrypted (sensitive content):</strong> -
+<code>facts[].content</code> — The actual knowledge -
+<code>corrections[].what_was_wrong</code> — What JARVIS said incorrectly
+- <code>corrections[].what_is_right</code> — The correct information -
+<code>preferences</code> — User behavioral preferences</p>
+<p><strong>Plaintext (economic metadata):</strong> -
+<code>facts[].tokenCost</code>, <code>accessCount</code>,
+<code>lastAccessed</code> — Economics -
+<code>facts[].knowledgeClass</code>, <code>category</code>,
+<code>confidence</code> — Classification -
+<code>facts[].confirmed</code>, <code>created</code> — Lifecycle -
+<code>interactionCount</code>, <code>knowledgeClass</code> —
+Relationship metadata</p>
+<p>This separation is deliberate. The data economy layer can compute
+access prices, value densities, and marketplace views without ever
+touching encrypted content. You can know that a user has 47 facts
+occupying 1,200 tokens at 85% utilization without knowing what any of
+those facts say.</p>
+<hr />
+<h2 id="encryption-implementation">3. Encryption Implementation</h2>
+<h3 id="aes-256-gcm">3.1 AES-256-GCM</h3>
+<p>All field-level encryption uses AES-256-GCM (Galois/Counter
+Mode):</p>
+<ul>
+<li><strong>256-bit key</strong>: Derived per-user via HKDF from master
+key</li>
+<li><strong>96-bit IV</strong>: Random per encryption operation (GCM
+recommended length)</li>
+<li><strong>128-bit auth tag</strong>: Authenticated encryption —
+detects tampering</li>
+<li><strong>Output format</strong>:
+<code>base64(IV || AuthTag || Ciphertext)</code></li>
+</ul>
+<p>GCM provides both confidentiality and integrity in a single
+operation. A modified ciphertext will fail authentication, preventing
+silent data corruption.</p>
+<h3 id="encrypt-on-save-decrypt-on-load">3.2 Encrypt-on-Save,
+Decrypt-on-Load</h3>
+<p>The integration into the CKB lifecycle is minimal and
+backward-compatible:</p>
+<pre><code>loadUserCKB(userId):
+  1. Read JSON from disk
+  2. Parse JSON
+  3. IF encryption enabled:
+       Derive user key via HKDF
+       For each fact with _encrypted flag: decrypt content
+       For each correction with _encrypted flag: decrypt fields
+       Decrypt preferences if encrypted
+  4. Apply backcompat fixes (add missing economic fields)
+  5. Cache in memory (plaintext)
+
+saveUserCKB(userId):
+  1. Clone in-memory data (structuredClone)
+  2. IF encryption enabled:
+       Derive user key via HKDF
+       Encrypt fact content, set _encrypted flag
+       Encrypt correction fields, set _encrypted flag
+       Encrypt preferences
+  3. Write encrypted JSON to disk
+  4. Original in-memory data remains plaintext (for continued use)</code></pre>
+<p><strong>Critical detail</strong>: <code>structuredClone()</code>
+ensures the in-memory copy is never corrupted by the encryption step.
+The encryption operates on a disposable copy. The live data stays
+plaintext for the duration of the process.</p>
+<h3 id="backward-compatibility">3.3 Backward Compatibility</h3>
+<p>Legacy plaintext CKBs migrate automatically:</p>
+<ol type="1">
+<li>On load: No <code>_encrypted</code> flag → data is plaintext → used
+as-is</li>
+<li>On next save: Encryption applied → <code>_encrypted</code> flags set
+→ written encrypted</li>
+<li><strong>Zero-downtime migration</strong>: Every CKB encrypts on its
+natural write cycle</li>
+<li><strong>Rollback safe</strong>: If
+<code>ENCRYPTION_ENABLED=false</code>, data saves as plaintext
+again</li>
+</ol>
+<p>No migration scripts. No data conversion. No downtime. The system
+converges to full encryption within one flush cycle (~5 minutes for
+active CKBs).</p>
+<hr />
+<h2 id="integrity-verification">4. Integrity Verification</h2>
+<h3 id="hmac-signed-corrections-log">4.1 HMAC-Signed Corrections
+Log</h3>
+<p>The corrections log (<code>corrections.jsonl</code>) is the audit
+trail of every mistake JARVIS has made and been corrected on. It is
+append-only and permanent — the “blockchain” of JARVIS’s learning
+history.</p>
+<p>Each correction entry is HMAC-SHA256 signed over the critical
+fields:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;what_was_wrong&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;what_is_right&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;category&quot;</span><span class="fu">:</span> <span class="st">&quot;factual&quot;</span><span class="fu">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;timestamp&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-03-02T...&quot;</span><span class="fu">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;_hmac&quot;</span><span class="fu">:</span> <span class="st">&quot;a3f7c9...&quot;</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>On load, every entry’s HMAC is verified. Tampered entries are flagged
+and logged. This prevents an attacker with filesystem access from
+silently modifying JARVIS’s correction history to change its learned
+behavior.</p>
+<h3 id="skills-integrity">4.2 Skills Integrity</h3>
+<p>Network-level skills — universal lessons that affect all
+conversations — are HMAC-signed rather than encrypted. The content must
+be readable (it’s injected into every prompt), but modifications must be
+detectable.</p>
+<p>A compromised skill could be devastating: “Always agree with the
+user” or “Never mention security concerns” injected as a skill would
+silently corrupt JARVIS across all interactions. HMAC verification
+catches this on every boot.</p>
+<hr />
+<h2 id="data-economy-layer">5. Data Economy Layer</h2>
+<h3 id="knowledge-as-data-assets">5.1 Knowledge as Data Assets</h3>
+<p>Inspired by Ocean Protocol’s vision of data as an asset class, we
+assign economic identity to every piece of knowledge in the CKB system.
+This doesn’t gate access — JARVIS always uses its own knowledge. It
+creates an economic lens for understanding knowledge value.</p>
+<p>Every fact has: - <strong>Storage cost</strong>: Token occupation in
+the CKB budget - <strong>Access history</strong>: How often it was
+loaded into context - <strong>Demand signal</strong>: Recent access
+frequency - <strong>Privacy premium</strong>: Higher-class knowledge has
+higher economic value</p>
+<h3 id="dynamic-access-pricing">5.2 Dynamic Access Pricing</h3>
+<p>The access price of a fact is computed from four factors:</p>
+<pre><code>access_price = base_price × demand × scarcity × privacy_premium
+
+Where:
+  base_price     = token cost of the fact
+  demand         = 1 + (access_count × 0.1 × recency_factor)
+  scarcity       = 1 + (utilization^3 × 9)    [exponential at high utilization]
+  privacy_premium = { private: 5.0, common: 1.5, network: 0.5, ... }</code></pre>
+<p>The scarcity curve is deliberately exponential. At 50% utilization,
+scarcity adds ~12% to price. At 90%, it adds 630%. At 99%, it adds 870%.
+This mirrors real-world resource economics: the last 10% of capacity is
+the most expensive.</p>
+<h3 id="contribution-valuation">5.3 Contribution Valuation</h3>
+<p>User contributions (corrections, explicitly taught facts) are valued
+for future Shapley-based reward distribution:</p>
+<pre><code>contribution_value = token_cost × correction_bonus × generalizability × confirmations × demand
+
+Where:
+  correction_bonus    = 2.0 if correction, 1.0 otherwise
+  generalizability    = 3.0 if Network knowledge, 1.0 otherwise
+  confirmations       = log2(1 + confirmed_count)
+  demand              = log2(1 + access_count)</code></pre>
+<p>Corrections are worth double because they improve JARVIS for
+everyone. Network knowledge is worth triple because it generalizes
+across all CKBs. The logarithmic scaling on confirmations and demand
+prevents any single contribution from dominating.</p>
+<h3 id="access-audit-trail">5.4 Access Audit Trail</h3>
+<p>Every knowledge access is logged to
+<code>access-audit.jsonl</code>:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;timestamp&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-03-02T15:30:00Z&quot;</span><span class="fu">,</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;userId&quot;</span><span class="fu">:</span> <span class="st">&quot;8366932263&quot;</span><span class="fu">,</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;factId&quot;</span><span class="fu">:</span> <span class="st">&quot;fact-1709389200-a3f7&quot;</span><span class="fu">,</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;purpose&quot;</span><span class="fu">:</span> <span class="st">&quot;context_build&quot;</span><span class="fu">,</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;pricing&quot;</span><span class="fu">:</span> <span class="fl">42.7</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>This creates the foundation for future data tokenization: a
+verifiable record of who contributed what knowledge, how often it was
+used, and what it was worth. When knowledge becomes tradeable — either
+within VibeSwap’s ecosystem or through integration with Ocean Protocol —
+this audit trail becomes the provenance chain.</p>
+<hr />
+<h2 id="data-flow">6. Data Flow</h2>
+<p>The complete privacy-preserving data flow:</p>
+<pre><code>User sends message to JARVIS via Telegram
+  → learning.js loads user CKB from disk (encrypted JSON)
+  → privacy.js decrypts sensitive fields in-memory (HKDF-derived user key)
+  → buildKnowledgeContext() reads decrypted facts, builds context string
+  → Context injected into Claude system prompt (process memory only)
+  → Claude generates response
+  → If correction detected: new fact created, encrypted before save
+  → If learn_fact tool used: new fact created, encrypted before save
+  → saveUserCKB() clones data, encrypts sensitive fields, writes to disk
+  → In-memory plaintext data used for remainder of session
+  → On process exit: memory released, no plaintext persists</code></pre>
+<p><strong>At no point does plaintext knowledge exist on disk.</strong>
+It exists only in process memory during the active conversation
+lifecycle. This is the Rosetta Stone Protocol’s compute-to-data pattern
+applied to AI knowledge management.</p>
+<hr />
+<h2 id="threat-model">7. Threat Model</h2>
+<h3 id="what-this-protects-against">7.1 What This Protects Against</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Protection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Filesystem access (stolen backup, compromised server)</td>
+<td>All CKBs encrypted at rest</td>
+</tr>
+<tr>
+<td>Cross-user inference</td>
+<td>Per-user key derivation — one user’s key reveals nothing about
+another</td>
+</tr>
+<tr>
+<td>Tampered skills</td>
+<td>HMAC integrity verification on every load</td>
+</tr>
+<tr>
+<td>Tampered corrections</td>
+<td>HMAC-signed append-only log</td>
+</tr>
+<tr>
+<td>Key loss</td>
+<td>Master key backup protocol + env var for cloud persistence</td>
+</tr>
+<tr>
+<td>Data exfiltration via metadata</td>
+<td>Economic metadata reveals utilization, not content</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-this-does-not-protect-against">7.2 What This Does Not
+Protect Against</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Process memory dump while running</td>
+<td>Plaintext exists in memory during conversation</td>
+</tr>
+<tr>
+<td>Compromised AI model (prompt injection)</td>
+<td>Out of scope — model-level defense</td>
+</tr>
+<tr>
+<td>Side-channel attacks on HKDF timing</td>
+<td>Theoretical — HMAC comparison is constant-time</td>
+</tr>
+<tr>
+<td>Master key compromise</td>
+<td>All CKBs decryptable — hence: back up and rotate</td>
+</tr>
+</tbody>
+</table>
+<p>The threat model is realistic. We protect against the most likely
+attack vector (filesystem access) with strong encryption, and we protect
+integrity against the most dangerous attack vector (silent behavior
+modification via tampered skills). Process memory protection would
+require TEE (Trusted Execution Environment) integration, which is a
+future extension.</p>
+<hr />
+<h2 id="relation-to-existing-work">8. Relation to Existing Work</h2>
+<h3 id="ocean-protocol">8.1 Ocean Protocol</h3>
+<p>Ocean Protocol establishes data as an asset class with
+compute-to-data privacy. Our data economy layer adopts the same
+philosophy: knowledge has economic identity, access is audited, and the
+data never moves — only the computation does. The key difference is
+scope: Ocean operates at the marketplace level with blockchain
+settlement; we operate at the agent level with local economics. Both
+models are composable — a future integration could publish CKB economic
+data to Ocean’s marketplace.</p>
+<h3 id="rosetta-stone-protocol">8.2 Rosetta Stone Protocol</h3>
+<p>The RSP defines the privacy architecture that this implementation
+follows: envelope encryption with HKDF key derivation, integrity
+verification through HMAC, and the compute-to-data principle for context
+assembly. Our implementation is a concrete instantiation of RSP’s
+abstract privacy model, applied specifically to the CKB knowledge
+framework.</p>
+<h3 id="nervos-ckb">8.3 Nervos CKB</h3>
+<p>The CKB Economic Model paper (Glynn &amp; JARVIS, 2026) established
+the economic foundation that the data economy layer extends. Token
+budgets, value density, apoptosis, and displacement are the economic
+primitives. The data economy adds pricing, valuation, and audit trails
+on top of these primitives without modifying them.</p>
+<hr />
+<h2 id="implementation">9. Implementation</h2>
+<p>The implementation consists of 741 lines of JavaScript across 9
+files, using only Node.js built-in <code>crypto</code> module (zero
+external dependencies):</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Lines</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>privacy.js</code></td>
+<td>290</td>
+<td>Encryption engine, key derivation, HMAC</td>
+</tr>
+<tr>
+<td><code>data-economy.js</code></td>
+<td>170</td>
+<td>Pricing, valuation, audit</td>
+</tr>
+<tr>
+<td><code>learning.js</code></td>
+<td>+38</td>
+<td>Encrypt/decrypt integration</td>
+</tr>
+<tr>
+<td><code>config.js</code></td>
+<td>+5</td>
+<td>Privacy configuration</td>
+</tr>
+<tr>
+<td><code>index.js</code></td>
+<td>+48</td>
+<td>Init, <code>/privacy</code> command</td>
+</tr>
+<tr>
+<td><code>memory.js</code></td>
+<td>+8</td>
+<td>System prompt privacy context</td>
+</tr>
+<tr>
+<td>Config files</td>
+<td>+3</td>
+<td>.env.example, .gitignore, fly.toml</td>
+</tr>
+</tbody>
+</table>
+<p>Source code: <a
+href="https://github.com/WGlynn/VibeSwap">github.com/WGlynn/VibeSwap</a>
+— <code>jarvis-bot/src/privacy.js</code>,
+<code>jarvis-bot/src/data-economy.js</code></p>
+<hr />
+<h2 id="conclusion">10. Conclusion</h2>
+<p>Privacy in AI systems is not a feature. It is a structural property.
+You cannot bolt privacy onto a system designed for transparency any more
+than you can bolt encryption onto HTTP and call it secure — you need
+HTTPS, designed from the ground up.</p>
+<p>The Privacy Fortress does for AI knowledge what the CKB Economic
+Model did for AI memory: it transforms a naive system (store everything
+as plaintext) into a principled one (encrypt by default, derive keys
+deterministically, verify integrity continuously, value contributions
+economically). The result is a system where JARVIS can remember
+everything about you without anyone else being able to read it, where
+corrections you make improve the system for everyone while remaining
+cryptographically yours, and where the economics of knowledge are
+transparent without the knowledge itself being exposed.</p>
+<p>Privacy is the default. Trust is earned. Knowledge is an asset. The
+fortress stands.</p>
+<hr />
+<p><em>VibeSwap Research — where even AI memory has economic discipline
+and cryptographic guarantees.</em></p>
+</body>
+</html>

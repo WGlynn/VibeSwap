@@ -35,6 +35,10 @@ primary_region = 'iad'
     timeout = '10s'
     path = '/health'
 
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
 [[vm]]
   size = 'shared-cpu-1x'
   memory = '512mb'

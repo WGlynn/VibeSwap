@@ -5,6 +5,7 @@ import { join, resolve, relative } from 'path';
 import { config } from './config.js';
 import { loadSystemPrompt } from './memory.js';
 import { setFlag, getBehavior } from './behavior.js';
+import { learnFact, buildKnowledgeContext } from './learning.js';
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 const REPO_PATH = config.repo.path;
@@ -17,6 +18,13 @@ const CONVERSATIONS_FILE = join(DATA_DIR, 'conversations.json');
 
 let systemPrompt = '';
 let conversationsDirty = false;
+
+// Track last JARVIS response per chat for correction detection
+const lastResponses = new Map(); // chatId -> { text, timestamp }
+
+export function getLastResponse(chatId) {
+  return lastResponses.get(chatId) || null;
+}
 
 // ============ Conversation Persistence ============
 
@@ -279,6 +287,20 @@ export async function chat(chatId, userName, message, chatType = 'private') {
     history.shift();
   }
 
+  // Build knowledge context for this user/chat
+  let knowledgeContext = '';
+  try {
+    knowledgeContext = await buildKnowledgeContext(
+      chatId, // userId — in DMs this is the user, in groups we use chatId as context key
+      chatId,
+      chatType
+    );
+  } catch {}
+
+  const fullSystemPrompt = knowledgeContext
+    ? systemPrompt + '\n\n' + knowledgeContext
+    : systemPrompt;
+
   // Tools Jarvis can use to take real actions (not just generate text)
   const tools = [
     {
@@ -298,20 +320,41 @@ export async function chat(chatId, userName, message, chatType = 'private') {
       description: 'Read current behavior flags to see what is enabled/disabled.',
       input_schema: { type: 'object', properties: {} },
     },
+    {
+      name: 'learn_fact',
+      description: 'Persistently learn a fact about a user, group, or topic. Use this when someone tells you something you should remember for future conversations — preferences, facts about them, project decisions, corrections, or important context. This writes to your persistent knowledge base and survives restarts. Examples: "User prefers short answers", "The group decided to use X over Y", "User\'s timezone is EST".',
+      input_schema: {
+        type: 'object',
+        properties: {
+          fact: { type: 'string', description: 'The fact to remember. Write it as a clear statement.' },
+          category: {
+            type: 'string',
+            enum: ['preference', 'factual', 'technical', 'social', 'project', 'behavioral'],
+            description: 'Category of the fact',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional tags for retrieval (e.g., ["timezone", "communication"])',
+          },
+        },
+        required: ['fact', 'category'],
+      },
+    },
   ];
 
   try {
     let response = await client.messages.create({
       model: config.anthropic.model,
       max_tokens: config.maxTokens,
-      system: systemPrompt,
+      system: fullSystemPrompt,
       messages: history,
       tools,
     });
 
-    // Handle tool use loop (max 3 rounds to prevent infinite loops)
+    // Handle tool use loop (max 5 rounds to prevent infinite loops)
     let rounds = 0;
-    while (response.stop_reason === 'tool_use' && rounds < 3) {
+    while (response.stop_reason === 'tool_use' && rounds < 5) {
       rounds++;
       const toolBlocks = response.content.filter(b => b.type === 'tool_use');
       history.push({ role: 'assistant', content: response.content });
@@ -327,6 +370,17 @@ export async function chat(chatId, userName, message, chatType = 'private') {
           console.log(`[claude] Tool: set_behavior(${tb.input.flag}, ${tb.input.value}) → ${ok ? 'ok' : 'failed'}`);
         } else if (tb.name === 'get_behavior') {
           result = JSON.stringify(getBehavior(), null, 2);
+        } else if (tb.name === 'learn_fact') {
+          try {
+            await learnFact(
+              chatId, userName, chatId, chatType,
+              tb.input.fact, tb.input.category, tb.input.tags || []
+            );
+            result = `Learned: "${tb.input.fact}" — stored in persistent knowledge base.`;
+            console.log(`[claude] Tool: learn_fact("${tb.input.fact.slice(0, 50)}...")`);
+          } catch (err) {
+            result = `Failed to learn: ${err.message}`;
+          }
         } else {
           result = 'Unknown tool.';
         }
@@ -337,7 +391,7 @@ export async function chat(chatId, userName, message, chatType = 'private') {
       response = await client.messages.create({
         model: config.anthropic.model,
         max_tokens: config.maxTokens,
-        system: systemPrompt,
+        system: fullSystemPrompt,
         messages: history,
         tools,
       });
@@ -350,6 +404,12 @@ export async function chat(chatId, userName, message, chatType = 'private') {
 
     // Add assistant response to history
     history.push({ role: 'assistant', content: assistantMessage });
+
+    // Track last response for correction detection
+    lastResponses.set(chatId, {
+      text: assistantMessage,
+      timestamp: Date.now(),
+    });
 
     // Mark dirty for periodic save
     conversationsDirty = true;

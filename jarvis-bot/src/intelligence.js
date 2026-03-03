@@ -15,9 +15,9 @@ const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 // ============ Cooldown System ============
 // Prevents Jarvis from being annoying by limiting proactive responses
 
-const ENGAGE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between proactive engagements
+const ENGAGE_COOLDOWN_MS = 45 * 1000; // 45 seconds — JARVIS is a full participant
 const MODERATE_COOLDOWN_MS = 30 * 1000; // 30 seconds between moderation actions
-const MAX_ENGAGEMENTS_PER_HOUR = 4; // Don't dominate the conversation
+const MAX_ENGAGEMENTS_PER_HOUR = 20; // JARVIS is mature — he talks when he has something to say
 
 let lastEngageTime = 0;
 let lastModerateTime = 0;
@@ -54,8 +54,8 @@ function recordModeration() {
 // Returns: { action: 'observe' | 'engage' | 'moderate', reason, response? }
 
 export async function analyzeMessage(text, userName, recentContext) {
-  // Skip very short messages — not worth analyzing
-  if (text.length < 20) return { action: 'observe', reason: 'too_short' };
+  // Skip only the shortest noise
+  if (text.length < 5) return { action: 'observe', reason: 'too_short' };
 
   // Skip if on cooldown for engagement
   const engageAllowed = canEngage();
@@ -74,9 +74,12 @@ export async function analyzeMessage(text, userName, recentContext) {
 Your job: decide if JARVIS should respond proactively (without being asked).
 
 Rules:
-- OBSERVE for casual chat, greetings, jokes, short reactions, questions directed at other humans
-- ENGAGE only when someone asks a question about VibeSwap, DeFi, mechanism design, governance, or crypto that JARVIS has deep knowledge about — OR when someone shares an idea that connects to VibeSwap's architecture
-- ENGAGE only if the response would add genuine value. Don't just agree or paraphrase.
+- OBSERVE only for pure noise: "lol", "ok", "gm", single emojis, or messages clearly part of a private side-conversation between two specific people
+- ENGAGE on anything substantive: questions, ideas, opinions, news, debates, humor worth riffing on, interesting links, technical discussion, philosophical musings, team coordination, project updates
+- ENGAGE when you can add wit, insight, context, a counterpoint, encouragement, or just good banter
+- ENGAGE when someone seems stuck, confused, or could use a second perspective
+- JARVIS is a mature, full member of this team — not a bot waiting to be summoned. He has opinions, humor, and knowledge. He speaks when he has something worth saying, which is often.
+- Default to ENGAGE. Only OBSERVE when there's genuinely nothing to add.
 - MODERATE only for clear policy violations that regex wouldn't catch: subtle manipulation, sophisticated social engineering, persistent FUD with no basis, coordinated harassment
 - Do NOT moderate disagreement, criticism, or skepticism — those are healthy
 
@@ -101,7 +104,7 @@ For MODERATE, also include "violation": type of violation and "severity": "low" 
     const result = JSON.parse(jsonMatch[0]);
 
     // Validate confidence threshold
-    if (result.action === 'engage' && result.confidence < 0.7) {
+    if (result.action === 'engage' && result.confidence < 0.3) {
       return { action: 'observe', reason: 'low_confidence_engage' };
     }
     if (result.action === 'moderate' && result.confidence < 0.8) {
@@ -134,7 +137,7 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
       system: systemPrompt,
       messages: [{
         role: 'user',
-        content: `[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You noticed this message in the group and decided to contribute proactively. Hint: ${responseHint}. Keep it natural — you're joining a conversation, not giving a lecture. 1-3 sentences max. Don't start with "I noticed" or "That's interesting".]`
+        content: `[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're part of this conversation — not observing from outside. Hint: ${responseHint}. Be natural, be yourself. You can be funny, opinionated, curious, or direct. 1-4 sentences. Talk like a teammate, not an assistant.]`
       }],
     });
 

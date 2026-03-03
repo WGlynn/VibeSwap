@@ -1829,8 +1829,8 @@ bot.on('text', async (ctx) => {
       ctx.reply('This conversation is getting good. Use /archive if you want to save it as a knowledge artifact.');
     }
 
-    // Proactive intelligence — analyze and maybe respond autonomously
-    if (msgText.length >= 20) {
+    // Proactive intelligence — JARVIS is a full team member, not a wallflower
+    if (msgText.length >= 5) {
       const recentContext = ''; // Could build from buffered messages
       const analysis = await analyzeMessage(msgText, userName, recentContext);
 

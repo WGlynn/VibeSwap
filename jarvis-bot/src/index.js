@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, codeGenChat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt } from './claude.js';
+import { initClaude, chat, codeGenChat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
@@ -10,6 +10,7 @@ import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
+import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName } from './learning.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
@@ -554,6 +555,80 @@ bot.command('brain', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
+// ============ Learning Commands ============
+
+bot.command('learned', async (ctx) => {
+  const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
+  const stats = await getLearningStats(userId, chatId);
+
+  const lines = [
+    'JARVIS Learning Stats',
+    '',
+    `Your facts: ${stats.userFacts}`,
+    `Your corrections: ${stats.userCorrections}`,
+    `Group facts: ${stats.groupFacts}`,
+    `Group norms: ${stats.groupNorms}`,
+    `Global skills: ${stats.globalSkills} (${stats.confirmedSkills} confirmed)`,
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('knowledge', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const arg = ctx.message.text.replace('/knowledge', '').trim();
+
+  if (arg === 'group') {
+    const summary = await getGroupKnowledgeSummary(ctx.chat.id);
+    if (!summary) return ctx.reply('No group knowledge learned yet.');
+
+    const lines = ['Group Knowledge:'];
+    for (const fact of summary.facts) {
+      const age = Math.floor((Date.now() - new Date(fact.created).getTime()) / 86400000);
+      lines.push(`  [${fact.category}] ${fact.content} (${age}d ago, x${fact.confirmed})`);
+    }
+    if (summary.norms.length > 0) {
+      lines.push('');
+      lines.push('Norms:');
+      for (const norm of summary.norms) {
+        lines.push(`  - ${norm}`);
+      }
+    }
+    return ctx.reply(lines.join('\n'));
+  }
+
+  // Default: show user knowledge
+  const summary = await getUserKnowledgeSummary(ctx.from.id);
+  if (!summary) return ctx.reply('No personal knowledge learned yet. Just keep talking.');
+
+  const lines = ['Your Knowledge Profile:'];
+  for (const fact of summary.facts) {
+    const age = Math.floor((Date.now() - new Date(fact.created).getTime()) / 86400000);
+    lines.push(`  [${fact.category}] ${fact.content} (${age}d ago, x${fact.confirmed})`);
+  }
+  if (summary.corrections.length > 0) {
+    lines.push('');
+    lines.push('Recent corrections:');
+    for (const c of summary.corrections.slice(-5)) {
+      lines.push(`  ${c.what_is_right?.slice(0, 80) || 'N/A'}`);
+    }
+  }
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('skills', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const skills = getSkills();
+  if (skills.length === 0) return ctx.reply('No skills learned yet. Correct me and I will learn.');
+
+  const lines = ['Learned Skills (from corrections):'];
+  for (const skill of skills) {
+    const conf = skill.confirmations > 1 ? ` (confirmed x${skill.confirmations})` : ' (new)';
+    lines.push(`  [${skill.id}] ${skill.lesson.slice(0, 100)}${conf}`);
+  }
+  ctx.reply(lines.join('\n'));
+});
+
 // ============ Health Check ============
 
 bot.command('health', async (ctx) => {
@@ -946,6 +1021,30 @@ bot.on('text', async (ctx) => {
   }, 4000);
 
   try {
+    // Check if this message is a correction of a previous JARVIS response
+    const isReply = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
+    const lastResponse = getLastResponse(chatId);
+    if (isReply || lastResponse) {
+      const prevText = isReply
+        ? ctx.message.reply_to_message?.text
+        : lastResponse?.text;
+      // Only check for corrections if previous response was recent (< 10 min)
+      const isRecent = !lastResponse || (Date.now() - lastResponse.timestamp < 600000);
+      if (prevText && isRecent) {
+        // Fire and forget — don't block the response
+        processCorrection(
+          ctx.message.text, prevText,
+          ctx.from.id, userName, chatId, ctx.chat.type
+        ).then(result => {
+          if (result) {
+            console.log(`[learning] Correction from ${userName}: ${result.category} — ${result.lesson?.slice(0, 60) || 'no lesson'}`);
+          }
+        }).catch(err => {
+          console.error('[learning] Correction processing failed:', err.message);
+        });
+      }
+    }
+
     const response = await chat(chatId, userName, ctx.message.text, ctx.chat.type);
 
     clearInterval(typingInterval);
@@ -995,7 +1094,8 @@ async function main() {
   await initThreads();
   await loadBehavior();
   await loadComms();
-  console.log('[jarvis] Behavior flags + comms loaded.');
+  await initLearning();
+  console.log('[jarvis] Behavior flags + comms + learning loaded.');
 
   // Step 3: Context diagnosis
   const report = await diagnoseContext();
@@ -1327,6 +1427,9 @@ async function main() {
       { command: 'model', description: 'Switch AI model (opus/sonnet)' },
       { command: 'clear', description: 'Clear conversation history' },
       { command: 'backlog', description: 'View/add suggestion backlog' },
+      { command: 'learned', description: 'Learning stats' },
+      { command: 'knowledge', description: 'View learned knowledge (add "group" for group)' },
+      { command: 'skills', description: 'View skills learned from corrections' },
     ]);
   } catch {}
 
@@ -1349,13 +1452,14 @@ async function main() {
     console.warn(`[jarvis] Could not notify owner: ${err.message}`);
   }
 
-  // Flush all data every 5 minutes (tracker + conversations + moderation + threads + comms)
+  // Flush all data every 5 minutes (tracker + conversations + moderation + threads + comms + learning)
   setInterval(async () => {
     await flushTracker();
     await saveConversations();
     await flushModeration();
     await flushAntispam();
     await flushThreads();
+    await flushLearning();
     pruneOldMessages();
     await saveComms();
   }, 5 * 60 * 1000);
@@ -1405,6 +1509,7 @@ async function main() {
     await flushModeration();
     await flushAntispam();
     await flushThreads();
+    await flushLearning();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);
@@ -1413,4 +1518,59 @@ async function main() {
   process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 }
 
-main().catch(console.error);
+// ============ Persistent Crash Log ============
+// Writes errors to DATA_DIR so they survive restarts.
+// Fly.io logs are ephemeral — this is the permanent record.
+
+const CRASH_LOG_FILE = join(config.dataDir, 'crash-log.jsonl');
+const MAX_CRASH_LOG_BYTES = 512 * 1024; // 512KB cap
+
+async function persistCrashEntry(type, error) {
+  const entry = {
+    type,
+    timestamp: new Date().toISOString(),
+    message: error?.message || String(error),
+    stack: error?.stack || null,
+    uptime: process.uptime(),
+    pid: process.pid,
+    memory: process.memoryUsage(),
+  };
+  const line = JSON.stringify(entry) + '\n';
+  try {
+    // Rotate if too large
+    try {
+      const { size } = await import('fs').then(fs => fs.promises.stat(CRASH_LOG_FILE));
+      if (size > MAX_CRASH_LOG_BYTES) {
+        const data = await readFile(CRASH_LOG_FILE, 'utf-8');
+        const lines = data.trim().split('\n');
+        // Keep the most recent half
+        await writeFile(CRASH_LOG_FILE, lines.slice(Math.floor(lines.length / 2)).join('\n') + '\n');
+      }
+    } catch { /* file doesn't exist yet */ }
+    await appendFile(CRASH_LOG_FILE, line);
+  } catch { /* last resort — can't write to disk */ }
+}
+
+// ============ Process-Level Crash Guards ============
+// Prevent transient errors (API timeouts, network blips, Telegram errors)
+// from killing the entire process. Log to console AND persistent file.
+
+process.on('uncaughtException', (err) => {
+  console.error('[jarvis] UNCAUGHT EXCEPTION (process survived):', err.message);
+  console.error(err.stack);
+  persistCrashEntry('uncaughtException', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[jarvis] UNHANDLED REJECTION (process survived):', reason);
+  persistCrashEntry('unhandledRejection', reason instanceof Error ? reason : { message: String(reason) });
+});
+
+main().catch((err) => {
+  console.error('[jarvis] FATAL — main() crashed:', err.message);
+  console.error(err.stack);
+  persistCrashEntry('fatal', err).finally(() => {
+    // If main() itself fails (startup error), exit so Fly restarts us
+    process.exit(1);
+  });
+});

@@ -42,8 +42,11 @@ try {
 }
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { createServer } from 'http';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
+const execFileAsync = promisify(execFile);
 import googleTTS from 'google-tts-api';
 
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
@@ -781,6 +784,151 @@ bot.command('network', async (ctx) => {
   }
 
   ctx.reply(lines.join('\n'));
+});
+
+// ============ Spawn Shard (One-Click via Telegram) ============
+
+bot.command('spawnshard', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const shardName = args[0];
+  const nodeType = args[1] || 'light';
+
+  if (!shardName) {
+    return ctx.reply(
+      'Usage: /spawnshard <name> [node_type]\n\n' +
+      'Examples:\n' +
+      '  /spawnshard alpha\n' +
+      '  /spawnshard bravo full\n' +
+      '  /spawnshard node-42 archive\n\n' +
+      'Node types: light (cheapest), full (retains history), archive (pure storage)\n\n' +
+      'This creates a new worker shard on Fly.io that auto-registers with the network.'
+    );
+  }
+
+  if (!['light', 'full', 'archive'].includes(nodeType)) {
+    return ctx.reply(`Invalid node type "${nodeType}". Use: light, full, or archive`);
+  }
+
+  const appName = `jarvis-shard-${shardName}`;
+  const shardId = `shard-${shardName}`;
+  const region = 'iad';
+
+  ctx.reply(`Spawning ${appName} (${nodeType} node) in ${region}...`);
+
+  try {
+    // Step 1: Create app
+    try {
+      await execFileAsync('fly', ['apps', 'create', appName, '--org', 'personal'], { timeout: 30000 });
+      ctx.reply(`App ${appName} created.`);
+    } catch (e) {
+      if (e.stderr?.includes('already exists')) {
+        ctx.reply(`App ${appName} already exists, continuing...`);
+      } else throw e;
+    }
+
+    // Step 2: Create volume
+    try {
+      await execFileAsync('fly', ['volumes', 'create', 'jarvis_data', '--size', '1', '--region', region, '--app', appName, '--yes'], { timeout: 30000 });
+      ctx.reply('Volume created (1GB).');
+    } catch (e) {
+      if (e.stderr?.includes('already exists')) {
+        ctx.reply('Volume already exists, continuing...');
+      } else throw e;
+    }
+
+    // Step 3: Set secrets (use the same Anthropic key as this shard)
+    const apiKey = config.anthropic.apiKey;
+    await execFileAsync('fly', ['secrets', 'set', `ANTHROPIC_API_KEY=${apiKey}`, `SHARD_ID=${shardId}`, '--app', appName], { timeout: 30000 });
+    ctx.reply('Secrets configured.');
+
+    // Step 4: Generate fly.toml for this shard
+    const currentShards = (config.shard?.totalShards || 1) + 1;
+    const routerUrl = 'https://jarvis-vibeswap.fly.dev';
+    const model = config.anthropic.model || 'claude-sonnet-4-5-20250929';
+
+    const tomlContent = [
+      `# JARVIS Mind Network — Worker Shard: ${shardName}`,
+      `# Auto-spawned via /spawnshard command`,
+      '',
+      `app = '${appName}'`,
+      `primary_region = '${region}'`,
+      '',
+      '[build]',
+      `  image = 'ghcr.io/wglynn/jarvis-shard:latest'`,
+      '',
+      '[env]',
+      `  DATA_DIR = '/app/data'`,
+      `  DOCKER = '1'`,
+      `  ENCRYPTION_ENABLED = 'true'`,
+      `  NODE_ENV = 'production'`,
+      `  HEALTH_PORT = '8080'`,
+      `  SHARD_MODE = 'worker'`,
+      `  TOTAL_SHARDS = '${currentShards}'`,
+      `  NODE_TYPE = '${nodeType}'`,
+      `  ROUTER_URL = '${routerUrl}'`,
+      `  CLAUDE_MODEL = '${model}'`,
+      '',
+      '[[mounts]]',
+      `  source = 'jarvis_data'`,
+      `  destination = '/app/data'`,
+      '',
+      '[http_service]',
+      '  internal_port = 8080',
+      '  force_https = true',
+      `  auto_stop_machines = 'off'`,
+      '  auto_start_machines = true',
+      '',
+      '[checks]',
+      '  [checks.health]',
+      '    port = 8080',
+      `    type = 'http'`,
+      `    interval = '1m0s'`,
+      `    timeout = '10s'`,
+      `    path = '/health'`,
+      '',
+      '[[restart]]',
+      `  policy = 'always'`,
+      '  max_retries = 10',
+      '',
+      '[[vm]]',
+      `  size = 'shared-cpu-1x'`,
+      `  memory = '256mb'`,
+    ].join('\n');
+
+    const tomlPath = join(config.dataDir, `fly-${shardName}.toml`);
+    await writeFile(tomlPath, tomlContent);
+
+    // Step 5: Deploy
+    ctx.reply('Deploying shard (this takes ~60 seconds)...');
+    await execFileAsync('fly', ['deploy', '--config', tomlPath, '--app', appName], { timeout: 300000 });
+
+    // Step 6: Verify health
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const healthRes = await fetch(`https://${appName}.fly.dev/health`, { signal: AbortSignal.timeout(10000) });
+      const health = await healthRes.json();
+      ctx.reply(
+        `Shard ${shardId} is LIVE\n\n` +
+        `App: https://${appName}.fly.dev\n` +
+        `Health: ${health.status}\n` +
+        `Type: ${nodeType}\n` +
+        `Region: ${region}\n\n` +
+        `Monitor: fly logs --app ${appName}\n` +
+        `Destroy: fly apps destroy ${appName}`
+      );
+    } catch {
+      ctx.reply(
+        `Shard deployed but health check pending.\n\n` +
+        `App: https://${appName}.fly.dev\n` +
+        `Check: fly status --app ${appName}\n` +
+        `Logs: fly logs --app ${appName}`
+      );
+    }
+  } catch (err) {
+    ctx.reply(`Shard deployment failed: ${err.message}\n\nCheck: fly logs --app ${appName}`);
+  }
 });
 
 // ============ Health Check ============

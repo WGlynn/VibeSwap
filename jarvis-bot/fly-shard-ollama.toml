@@ -1,0 +1,50 @@
+# JARVIS Mind Network — Ollama Worker Shard
+# Runs a local LLM (no API key, zero token cost)
+# Uses qwen2.5:0.5b (~400MB) — tiny but functional for consensus
+
+app = 'jarvis-shard-ollama'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile.ollama'
+
+[env]
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
+  NODE_ENV = 'production'
+  HEALTH_PORT = '8080'
+  SHARD_MODE = 'worker'
+  TOTAL_SHARDS = '4'
+  NODE_TYPE = 'light'
+  ROUTER_URL = 'https://jarvis-vibeswap.fly.dev'
+  LLM_PROVIDER = 'ollama'
+  LLM_MODEL = 'qwen2.5:0.5b'
+  OLLAMA_URL = 'http://localhost:11434'
+
+# Single volume for both app data + Ollama models
+[[mounts]]
+  source = 'jarvis_ollama_data'
+  destination = '/app/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+
+[checks]
+  [checks.health]
+    port = 8080
+    type = 'http'
+    interval = '2m0s'
+    timeout = '30s'
+    path = '/health'
+
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
+[[vm]]
+  size = 'shared-cpu-2x'
+  memory = '2048mb'

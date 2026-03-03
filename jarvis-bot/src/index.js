@@ -48,40 +48,50 @@ import googleTTS from 'google-tts-api';
 
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
 
-// ============ Startup Checks ============
-// Graceful degradation: diagnose what's available instead of hard crash
+// ============ Mode Detection ============
+// Primary mode: full JARVIS with Telegram bot + all features
+// Worker mode: headless shard — consensus, CRPC, knowledge chain only (no Telegram)
 
-if (!config.telegram.token) {
-  console.error('============================================================');
-  console.error('TELEGRAM_BOT_TOKEN is missing.');
-  console.error('');
-  console.error('To fix:');
-  console.error('  1. Go to @BotFather on Telegram');
-  console.error('  2. Create or select a bot');
-  console.error('  3. Copy the token');
-  console.error('  4. Set it in jarvis-bot/.env as TELEGRAM_BOT_TOKEN=...');
-  console.error('');
-  console.error('Your context and contribution data are INTACT:');
-  console.error('  - jarvis-bot/data/contributions.json (contribution history)');
-  console.error('  - jarvis-bot/data/users.json (user registry)');
-  console.error('  - jarvis-bot/data/conversations.json (chat history)');
-  console.error('  - CLAUDE.md + SESSION_STATE.md + memory files (project context)');
-  console.error('');
-  console.error('Nothing is lost. Just add the token and restart.');
-  console.error('============================================================');
-  process.exit(1);
-}
-if (!config.anthropic.apiKey) {
-  console.error('ANTHROPIC_API_KEY is required. Copy .env.example to .env and fill it in.');
-  console.error('All local data (contributions, conversations, users) is safe.');
-  process.exit(1);
+const SHARD_MODE = config.shard?.mode || 'primary';
+const IS_WORKER = SHARD_MODE === 'worker';
+
+if (IS_WORKER) {
+  console.log('[jarvis] ============ WORKER SHARD MODE ============');
+  console.log('[jarvis] No Telegram token — running as headless consensus node.');
+  console.log('[jarvis] This shard participates in: BFT consensus, CRPC, Knowledge Chain.');
+  if (!config.anthropic.apiKey) {
+    console.error('ANTHROPIC_API_KEY is required even for worker shards (CRPC needs Claude).');
+    process.exit(1);
+  }
+} else {
+  // Primary mode: full startup checks
+  if (!config.telegram.token) {
+    console.error('============================================================');
+    console.error('TELEGRAM_BOT_TOKEN is missing.');
+    console.error('');
+    console.error('Options:');
+    console.error('  1. Set TELEGRAM_BOT_TOKEN in .env for full primary mode');
+    console.error('  2. Set SHARD_MODE=worker in .env for headless consensus node');
+    console.error('');
+    console.error('Worker mode requires: ANTHROPIC_API_KEY, SHARD_ID, ROUTER_URL');
+    console.error('============================================================');
+    process.exit(1);
+  }
+  if (!config.anthropic.apiKey) {
+    console.error('ANTHROPIC_API_KEY is required. Copy .env.example to .env and fill it in.');
+    process.exit(1);
+  }
 }
 
-const bot = new Telegraf(config.telegram.token, {
+// Only create Telegram bot in primary mode
+// Worker mode: noop proxy that silently ignores all bot registrations
+const NOOP = () => {};
+const noopBot = new Proxy({}, { get: () => (...args) => typeof args[args.length - 1] === 'function' ? undefined : NOOP });
+const bot = IS_WORKER ? noopBot : new Telegraf(config.telegram.token, {
   telegram: { allowedUpdates: ['message', 'callback_query'] },
 });
 
-// Auth middleware
+// Auth middleware (only used in primary mode)
 function isAuthorized(ctx) {
   if (config.authorizedUsers.length === 0) return true;
   return config.authorizedUsers.includes(ctx.from.id);
@@ -98,6 +108,7 @@ function isOwner(ctx) {
 function ownerOnly(ctx) {
   return ctx.reply('Only Will can do that.');
 }
+
 
 // ============ Rate Limiting ============
 
@@ -1217,6 +1228,214 @@ bot.on('text', async (ctx) => {
 // ============ Startup ============
 
 async function main() {
+  // ============ Worker Mode Startup ============
+  if (IS_WORKER) {
+    console.log('[jarvis] ============ WORKER SHARD STARTUP ============');
+
+    // Worker shards: privacy → state store → learning → shard → consensus → HTTP server
+    console.log('[jarvis] Step 1: Initializing privacy engine...');
+    await initPrivacy();
+
+    console.log('[jarvis] Step 2: Initializing state store...');
+    await initStateStore();
+
+    console.log('[jarvis] Step 3: Loading learning + inner dialogue...');
+    await initLearning();
+    await initInnerDialogue();
+
+    console.log('[jarvis] Step 4: Initializing shard identity...');
+    const shardResult = await initShard();
+    console.log(`[jarvis] Shard: ${shardResult.id} (${shardResult.totalShards} total, mode: WORKER)`);
+
+    console.log('[jarvis] Step 5: Initializing consensus + CRPC...');
+    initConsensus();
+    initCRPC();
+    registerConsensusHandlers();
+
+    // Worker HTTP server — consensus, CRPC, knowledge chain, health, proxy processing
+    const healthPort = parseInt(process.env.HEALTH_PORT || '8080');
+    createServer(async (req, res) => {
+      // Health check
+      if (req.url === '/health') {
+        const info = getShardInfo();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          mode: 'worker',
+          shard: info.id,
+          nodeType: info.nodeType,
+          uptime: process.uptime(),
+          memory: info.memory,
+          peers: info.peers,
+        }));
+        return;
+      }
+
+      // Proxy processing — primary shard forwards a message for this shard to process
+      if (req.url === '/shard/process' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body);
+            // Process the message with Claude (for CRPC multi-shard response generation)
+            const { chat: chatFn } = await import('./claude.js');
+            const response = await chatFn(
+              payload.chatId || 'proxy',
+              payload.userName || 'proxy',
+              payload.text,
+              payload.chatType || 'private'
+            );
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, text: response.text, shardId: shardResult.id }));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      // Router API
+      if (req.url?.startsWith('/router/')) {
+        const routerUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const routerResult = handleRouterRequest(req, routerUrl);
+        if (!routerResult) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unknown router route' }));
+        } else if (routerResult.parse) {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body);
+              const data = processRouterBody(routerResult.handler, payload, routerResult.userId);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(routerResult.data));
+        }
+        return;
+      }
+
+      // Consensus + CRPC + Knowledge Chain endpoints (same as primary)
+      if (req.url?.startsWith('/consensus/') || req.url?.startsWith('/crpc/')) {
+        const reqUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const path = reqUrl.pathname;
+        const consensusHandler = handleConsensusRequest(path, req.method);
+        if (consensusHandler) {
+          if (consensusHandler === 'state') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(getConsensusState()));
+          } else {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', async () => {
+              try {
+                const payload = JSON.parse(body);
+                const data = await processConsensusBody(consensusHandler, payload);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data || { ok: true }));
+              } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+              }
+            });
+          }
+          return;
+        }
+        const crpcHandler = handleCRPCRequest(path, req.method);
+        if (crpcHandler) {
+          if (crpcHandler === 'stats') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(getCRPCStats()));
+          } else {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const payload = JSON.parse(body);
+                const data = processCRPCBody(crpcHandler, payload);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+              } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+              }
+            });
+          }
+          return;
+        }
+      }
+
+      if (req.url?.startsWith('/knowledge-chain/')) {
+        const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const kcPath = kcUrl.pathname;
+        const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
+        if (kcHandler === 'epoch') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body);
+              const data = processKnowledgeChainBody(kcHandler, payload);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        } else if (kcHandler) {
+          const query = Object.fromEntries(kcUrl.searchParams);
+          const data = processKnowledgeChainBody(kcHandler, null, query);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
+          return;
+        }
+      }
+
+      res.writeHead(404);
+      res.end('Not found');
+    }).listen(healthPort, () => {
+      console.log(`[jarvis] Worker shard listening on http://0.0.0.0:${healthPort}`);
+    });
+
+    // Flush cycles for worker
+    setInterval(async () => {
+      await flushLearning();
+      await flushInnerDialogue();
+      if (isMultiShard()) checkShardHealth();
+      const epoch = produceEpoch();
+      if (epoch && isMultiShard()) {
+        await broadcastEpoch(epoch);
+        await syncWithPeers();
+      }
+    }, 5 * 60 * 1000);
+
+    // Graceful shutdown for worker
+    async function workerShutdown(signal) {
+      console.log(`[jarvis] Worker shutting down (${signal})...`);
+      await shutdownShard();
+      await flushLearning();
+      await flushInnerDialogue();
+      process.exit(0);
+    }
+    process.once('SIGINT', () => workerShutdown('SIGINT'));
+    process.once('SIGTERM', () => workerShutdown('SIGTERM'));
+
+    console.log('[jarvis] ============ WORKER SHARD ONLINE ============');
+    return; // Worker startup complete — don't run primary path
+  }
+
+  // ============ Primary Mode Startup ============
   console.log('[jarvis] ============ STARTUP ============');
 
   // Step 1: Pull latest from git BEFORE loading context
@@ -1563,6 +1782,28 @@ async function main() {
             'GET /router/topology',
           ]}));
         }
+
+      // ============ Shard Proxy Processing ============
+      // Allows any shard (including primary) to process messages forwarded from peers
+      } else if (req.url === '/shard/process' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body);
+            const response = await chat(
+              payload.chatId || 'proxy',
+              payload.userName || 'proxy',
+              payload.text,
+              payload.chatType || 'private'
+            );
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, text: response.text, shardId: getShardInfo().id }));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
 
       // ============ Router API (Shard Network) ============
       } else if (req.url?.startsWith('/router/')) {

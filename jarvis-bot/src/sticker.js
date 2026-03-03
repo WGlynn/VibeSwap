@@ -68,11 +68,35 @@ const STYLES = {
   },
 };
 
+// Font family — Noto Sans on Docker (installed via Dockerfile), system sans-serif locally
+const FONT_FAMILY = 'Noto Sans, Arial, Helvetica, sans-serif';
+
 // ============ Initialization ============
 
 export async function initStickers() {
   await mkdir(STICKER_DIR, { recursive: true });
-  console.log('[sticker] Sticker engine initialized');
+
+  // Register system fonts so @napi-rs/canvas can find them
+  const fontDirs = [
+    '/usr/share/fonts',           // Linux (Docker)
+    '/usr/local/share/fonts',     // Linux alt
+    'C:\\Windows\\Fonts',         // Windows
+  ];
+
+  let registered = 0;
+  for (const dir of fontDirs) {
+    try {
+      registered += GlobalFonts.loadFontsFromDir(dir);
+    } catch {
+      // Directory doesn't exist on this platform — skip
+    }
+  }
+
+  const families = GlobalFonts.families;
+  console.log(`[sticker] Sticker engine initialized (${registered} fonts from ${families.length} families)`);
+  if (families.length === 0) {
+    console.warn('[sticker] WARNING: No fonts found! Stickers will render blank text.');
+  }
 }
 
 // ============ Text-to-Sticker ============
@@ -118,12 +142,12 @@ export async function textToSticker(text, style = 'default') {
   const startY = STICKER_SIZE / 2 - totalHeight / 2 + lineHeight / 2;
 
   for (let i = 0; i < lines.length; i++) {
-    ctx.font = `${s.fontWeight} ${s.fontSize}px sans-serif`;
+    ctx.font = `${s.fontWeight} ${s.fontSize}px ${FONT_FAMILY}`;
     ctx.fillText(lines[i], STICKER_SIZE / 2, startY + i * lineHeight, maxWidth);
   }
 
   // Add "VIBESWAP" watermark at bottom
-  ctx.font = 'bold 14px sans-serif';
+  ctx.font = `bold 14px ${FONT_FAMILY}`;
   ctx.fillStyle = s.accent;
   ctx.globalAlpha = 0.6;
   ctx.fillText('VIBESWAP', STICKER_SIZE / 2, STICKER_SIZE - padding - 12);
@@ -214,7 +238,7 @@ export async function imageWithText(imageBuffer, text, position = 'bottom') {
   ctx.fillRect(0, lineY, STICKER_SIZE, 3);
 
   // Text
-  ctx.font = 'bold 32px sans-serif';
+  ctx.font = `bold 32px ${FONT_FAMILY}`;
   ctx.fillStyle = BRAND.white;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -300,7 +324,7 @@ function drawVibeLogo(ctx, x, y, size, color) {
 }
 
 function wrapText(ctx, text, maxWidth, fontSize, fontWeight) {
-  ctx.font = `${fontWeight} ${fontSize}px sans-serif`;
+  ctx.font = `${fontWeight} ${fontSize}px ${FONT_FAMILY}`;
   const words = text.split(' ');
   const lines = [];
   let currentLine = '';
@@ -324,7 +348,7 @@ function wrapText(ctx, text, maxWidth, fontSize, fontWeight) {
   // If text is too long, reduce font size and re-wrap
   if (lines.length > 5) {
     const smallerSize = Math.max(24, fontSize - 8);
-    ctx.font = `${fontWeight} ${smallerSize}px sans-serif`;
+    ctx.font = `${fontWeight} ${smallerSize}px ${FONT_FAMILY}`;
     return wrapText(ctx, text, maxWidth, smallerSize, fontWeight);
   }
 

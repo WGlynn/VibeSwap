@@ -31,6 +31,10 @@ import { writeFile, readFile, mkdir, appendFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
 import { encryptUserCKB, decryptUserCKB, encryptGroupCKB, decryptGroupCKB, encryptSkills, verifySkills, signCorrection, isEncryptionEnabled } from './privacy.js';
+import { getStateStore } from './state-store.js';
+import { buildInnerDialogueContext } from './inner-dialogue.js';
+import { propose, PROPOSAL_TYPES, onCommit } from './consensus.js';
+import { isMultiShard } from './shard.js';
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
@@ -78,6 +82,7 @@ const ECONOMICS = {
 const KNOWLEDGE_CLASSES = {
   SHARED: 'shared',       // Just exchanged. Cost: full token price. Low utility.
   MUTUAL: 'mutual',       // Confirmed. Cost: full. Moderate utility.
+  INNER: 'inner',         // Self-reflection. Cost: full. Higher base utility (JARVIS trusts own analysis).
   COMMON: 'common',       // Proven reliable. Cost: reduced (compressed). High utility.
   NETWORK: 'network',     // Universal skill. Cost: shared across all CKBs.
 };
@@ -116,6 +121,7 @@ function computeUtility(fact, now) {
   const classBonus = {
     [KNOWLEDGE_CLASSES.SHARED]: 1.0,
     [KNOWLEDGE_CLASSES.MUTUAL]: 1.5,
+    [KNOWLEDGE_CLASSES.INNER]: 2.0,
     [KNOWLEDGE_CLASSES.COMMON]: 3.0,
     [KNOWLEDGE_CLASSES.NETWORK]: 5.0,
   };
@@ -203,7 +209,9 @@ export async function initLearning() {
   await mkdir(USERS_DIR, { recursive: true });
   await mkdir(GROUPS_DIR, { recursive: true });
 
-  skills = await loadJson(SKILLS_FILE, []);
+  // Load skills via StateStore (falls back to file)
+  const store = getStateStore();
+  skills = await store.get('skills') || await loadJson(SKILLS_FILE, []);
 
   // Verify skills integrity (HMAC check)
   if (isEncryptionEnabled()) {
@@ -239,20 +247,27 @@ async function loadUserCKB(userId) {
   const id = String(userId);
   if (userKnowledge.has(id)) return userKnowledge.get(id);
 
-  const filePath = join(USERS_DIR, `${id}.json`);
-  const data = await loadJson(filePath, {
-    userId: Number(id),
-    username: null,
-    facts: [],
-    preferences: {},
-    corrections: [],
-    knowledgeClass: KNOWLEDGE_CLASSES.SHARED,
-    interactionCount: 0,
-    // Economic state
-    tokenBudget: ECONOMICS.USER_CKB_BUDGET,
-    lastPruned: null,
-    lastUpdated: null,
-  });
+  // Try StateStore first, fall back to direct file read
+  const store = getStateStore();
+  let data = await store.get(`user:${id}`);
+  if (!data) {
+    // Fallback for backward compat (first load before StateStore existed)
+    data = await loadJson(join(USERS_DIR, `${id}.json`), null);
+  }
+  if (!data) {
+    data = {
+      userId: Number(id),
+      username: null,
+      facts: [],
+      preferences: {},
+      corrections: [],
+      knowledgeClass: KNOWLEDGE_CLASSES.SHARED,
+      interactionCount: 0,
+      tokenBudget: ECONOMICS.USER_CKB_BUDGET,
+      lastPruned: null,
+      lastUpdated: null,
+    };
+  }
 
   // Decrypt sensitive fields (compute-to-data: plaintext exists only in memory)
   if (isEncryptionEnabled()) {
@@ -279,11 +294,13 @@ async function saveUserCKB(userId) {
   const data = userKnowledge.get(id);
   if (!data) return;
   data.lastUpdated = new Date().toISOString();
-  const filePath = join(USERS_DIR, `${id}.json`);
 
   // Encrypt sensitive fields before writing to disk (RSP: no plaintext at rest)
   const toSave = isEncryptionEnabled() ? encryptUserCKB(data, id) : data;
-  await writeFile(filePath, JSON.stringify(toSave, null, 2));
+
+  // Write via StateStore (abstracts file vs redis vs future backends)
+  const store = getStateStore();
+  await store.set(`user:${id}`, toSave);
 }
 
 // ============ Per-Group CKB ============
@@ -292,17 +309,24 @@ async function loadGroupCKB(groupId) {
   const id = String(groupId);
   if (groupKnowledge.has(id)) return groupKnowledge.get(id);
 
-  const filePath = join(GROUPS_DIR, `${id}.json`);
-  const data = await loadJson(filePath, {
-    groupId: Number(id),
-    groupName: null,
-    facts: [],
-    norms: [],
-    topicsDiscussed: [],
-    tokenBudget: ECONOMICS.GROUP_CKB_BUDGET,
-    lastPruned: null,
-    lastUpdated: null,
-  });
+  // Try StateStore first, fall back to direct file read
+  const store = getStateStore();
+  let data = await store.get(`group:${id}`);
+  if (!data) {
+    data = await loadJson(join(GROUPS_DIR, `${id}.json`), null);
+  }
+  if (!data) {
+    data = {
+      groupId: Number(id),
+      groupName: null,
+      facts: [],
+      norms: [],
+      topicsDiscussed: [],
+      tokenBudget: ECONOMICS.GROUP_CKB_BUDGET,
+      lastPruned: null,
+      lastUpdated: null,
+    };
+  }
 
   // Decrypt sensitive fields
   if (isEncryptionEnabled()) {
@@ -327,11 +351,11 @@ async function saveGroupCKB(groupId) {
   const data = groupKnowledge.get(id);
   if (!data) return;
   data.lastUpdated = new Date().toISOString();
-  const filePath = join(GROUPS_DIR, `${id}.json`);
 
-  // Encrypt before writing to disk
+  // Encrypt before writing via StateStore
   const toSave = isEncryptionEnabled() ? encryptGroupCKB(data, id) : data;
-  await writeFile(filePath, JSON.stringify(toSave, null, 2));
+  const store = getStateStore();
+  await store.set(`group:${id}`, toSave);
 }
 
 // ============ Correction Detection ============
@@ -636,6 +660,24 @@ async function maybePromoteToSkill(correction, lesson) {
   };
   newSkill.tokenCost = estimateTokenCost(newSkill);
 
+  // Multi-shard: propose via BFT consensus (skill changes global behavior)
+  if (isMultiShard()) {
+    console.log(`[learning] Proposing skill via BFT consensus: "${lesson.lesson.slice(0, 60)}..."`);
+    const result = await propose(PROPOSAL_TYPES.SKILL_PROMOTION, { skill: newSkill });
+    if (!result.committed) {
+      console.warn(`[learning] Skill proposal rejected/timed out: ${newSkill.id}`);
+      return;
+    }
+    // Committed via consensus — skill will be applied by the onCommit handler
+    return;
+  }
+
+  // Single-shard: apply directly
+  applySkillPromotion(newSkill);
+}
+
+// Apply a skill promotion (called directly in single-shard, or via consensus commit handler)
+function applySkillPromotion(newSkill) {
   // Budget check for skills
   const currentSkillTokens = computeCKBOccupation(skills);
   if (currentSkillTokens + newSkill.tokenCost > ECONOMICS.SKILL_BUDGET) {
@@ -657,14 +699,24 @@ async function maybePromoteToSkill(correction, lesson) {
   }
 
   skills.push(newSkill);
-  await saveSkills();
-  console.log(`[learning] New skill: ${newSkill.id} — "${lesson.lesson.slice(0, 60)}" (${newSkill.tokenCost} tokens)`);
+  saveSkills();
+  console.log(`[learning] New skill: ${newSkill.id} — "${newSkill.lesson.slice(0, 60)}" (${newSkill.tokenCost} tokens)`);
+}
+
+// Register consensus commit handler for skill promotions
+export function registerConsensusHandlers() {
+  onCommit(async (type, data) => {
+    if (type === PROPOSAL_TYPES.SKILL_PROMOTION && data.skill) {
+      applySkillPromotion(data.skill);
+    }
+  });
 }
 
 async function saveSkills() {
   // HMAC integrity for Network knowledge
   const toSave = isEncryptionEnabled() ? encryptSkills(skills) : skills;
-  await writeFile(SKILLS_FILE, JSON.stringify(toSave, null, 2));
+  const store = getStateStore();
+  await store.set('skills', toSave);
 }
 
 // ============ Learn Fact (Tool-Invoked) ============
@@ -816,6 +868,12 @@ export async function buildKnowledgeContext(userId, chatId, chatType) {
       parts.push('');
       dirty = true;
     }
+  }
+
+  // ---- Inner Dialogue (Self-Reflection) ----
+  const innerContext = buildInnerDialogueContext();
+  if (innerContext) {
+    parts.push(innerContext);
   }
 
   // ---- Network Knowledge: Skills ----

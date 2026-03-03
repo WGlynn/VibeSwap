@@ -12,6 +12,14 @@ import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getR
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName } from './learning.js';
 import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
+import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue } from './inner-dialogue.js';
+import { initStateStore } from './state-store.js';
+import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
+import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
+import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
+import { initCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
+import { registerConsensusHandlers } from './learning.js';
+import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody } from './knowledge-chain.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
@@ -663,6 +671,107 @@ bot.command('privacy', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
+// ============ Inner Dialogue Command ============
+
+bot.command('inner', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const stats = getDialogueStats();
+  const recent = getRecentDialogue(8);
+
+  const lines = [
+    'JARVIS Inner Dialogue (Self-Reflection)',
+    '',
+    `Entries: ${stats.totalEntries} (${stats.totalTokens}/${stats.budget} tokens, ${stats.utilization})`,
+    `Promoted to network: ${stats.promotedToNetwork}`,
+    '',
+  ];
+
+  if (stats.totalEntries > 0) {
+    lines.push('Categories:');
+    for (const [cat, count] of Object.entries(stats.categoryCounts)) {
+      lines.push(`  ${cat}: ${count}`);
+    }
+    lines.push('');
+  }
+
+  if (recent.length > 0) {
+    lines.push('Recent:');
+    for (const entry of recent) {
+      const age = Math.floor((Date.now() - new Date(entry.created).getTime()) / (60 * 60 * 1000));
+      const ageLabel = age < 1 ? 'just now' : age < 24 ? `${age}h ago` : `${Math.floor(age / 24)}d ago`;
+      lines.push(`  [${ageLabel}] [${entry.category}] ${entry.thought.slice(0, 120)}`);
+    }
+  } else {
+    lines.push('No inner dialogue entries yet. Self-reflection begins after first flush cycle.');
+  }
+
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ Shard / Network Commands ============
+
+bot.command('shard', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const info = getShardInfo();
+  const lines = [
+    'JARVIS Shard Identity',
+    '',
+    `Shard ID: ${info.id}`,
+    `Mode: ${info.totalShards > 1 ? 'MULTI-SHARD' : 'SINGLE-SHARD'}`,
+    `Status: ${info.status}`,
+    `State backend: ${info.capabilities.stateBackend}`,
+    `Encryption: ${info.capabilities.encryption ? 'enabled' : 'disabled'}`,
+    `Model: ${info.capabilities.model}`,
+    `Load: ${info.load}%`,
+    `Local users: ${info.localUsers}`,
+    `Peers: ${info.peers}`,
+    `Uptime: ${Math.round(info.uptime / 60)}m`,
+    `Memory: ${info.memory}MB`,
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('network', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const topo = getTopology();
+  const archives = getArchiveStatus();
+  const consensus = getConsensusState();
+  const crpc = getCRPCStats();
+  const kchain = getChainStats();
+
+  const lines = [
+    'JARVIS Mind Network',
+    '',
+    `Shards: ${topo.runningShards} active, ${topo.downShards} down`,
+    `Total users: ${topo.totalUsers}`,
+    `Network health: ${topo.networkHealth.healthy ? 'HEALTHY' : 'DEGRADED'}`,
+    '',
+  ];
+
+  if (topo.shards.length > 0) {
+    for (const shard of topo.shards) {
+      const uptimeStr = shard.uptime > 86400
+        ? `${Math.floor(shard.uptime / 86400)}d ${Math.floor((shard.uptime % 86400) / 3600)}h`
+        : shard.uptime > 3600
+        ? `${Math.floor(shard.uptime / 3600)}h ${Math.floor((shard.uptime % 3600) / 60)}m`
+        : `${Math.floor(shard.uptime / 60)}m`;
+      lines.push(`  ${shard.shardId} (${shard.nodeType}): ${shard.userCount} users, ${shard.load}% load, uptime ${uptimeStr} [${shard.status}]`);
+    }
+    lines.push('');
+  }
+
+  lines.push(`Archive nodes: ${archives.running}/${archives.minimum} minimum (${archives.healthy ? 'healthy' : 'BELOW MINIMUM'})`);
+  lines.push('');
+  lines.push(`BFT Consensus: ${consensus.enabled ? 'ENABLED' : 'single-shard'} | ${consensus.committedTotal} committed | ${consensus.pendingProposals} pending`);
+  lines.push(`CRPC: ${crpc.enabled ? 'ENABLED' : 'disabled'} | ${crpc.completedTasks} rounds | avg confidence: ${crpc.avgConfidence}`);
+  lines.push(`Knowledge Chain: height ${kchain.height} | ${kchain.pendingChanges} pending changes`);
+  if (kchain.head) {
+    lines.push(`  Head: ${kchain.head.hash.slice(0, 12)}... | cumVD: ${kchain.head.cumulativeValueDensity.toFixed(3)}`);
+  }
+
+  ctx.reply(lines.join('\n'));
+});
+
 // ============ Health Check ============
 
 bot.command('health', async (ctx) => {
@@ -1123,6 +1232,10 @@ async function main() {
   console.log('[jarvis] Step 2: Initializing privacy engine...');
   await initPrivacy();
 
+  // Step 2.5: Initialize state store (abstracts file vs redis vs future backends)
+  console.log('[jarvis] Step 2.5: Initializing state store...');
+  await initStateStore();
+
   // Step 3: Load context, conversation history, moderation log, threads, comms
   console.log('[jarvis] Step 3: Loading memory, conversations, moderation, threads, comms...');
   await initClaude();
@@ -1133,7 +1246,18 @@ async function main() {
   await loadBehavior();
   await loadComms();
   await initLearning();
-  console.log('[jarvis] Behavior flags + comms + learning loaded.');
+  await initInnerDialogue();
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue loaded.');
+
+  // Step 3.5: Initialize shard identity (Decentralized Mind Network)
+  console.log('[jarvis] Step 3.5: Initializing shard identity...');
+  const shardResult = await initShard();
+  console.log(`[jarvis] Shard: ${shardResult.id} (${shardResult.totalShards} total, ${isMultiShard() ? 'MULTI' : 'SINGLE'}-shard mode)`);
+
+  // Step 3.6: Initialize consensus + CRPC
+  initConsensus();
+  initCRPC();
+  registerConsensusHandlers();
 
   // Step 4: Context diagnosis
   const report = await diagnoseContext();
@@ -1433,7 +1557,124 @@ async function main() {
             'POST /api/outbox/ack',
             'GET /api/comms/log?count=',
             'POST /api/tg/send',
+            'POST /router/register',
+            'POST /router/heartbeat',
+            'GET /router/route/:userId',
+            'GET /router/topology',
           ]}));
+        }
+
+      // ============ Router API (Shard Network) ============
+      } else if (req.url?.startsWith('/router/')) {
+        const routerUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const routerResult = handleRouterRequest(req, routerUrl);
+
+        if (!routerResult) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unknown router route' }));
+        } else if (routerResult.parse) {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body);
+              const data = processRouterBody(routerResult.handler, payload, routerResult.userId);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(routerResult.data));
+        }
+
+      // ============ Consensus API (BFT + CRPC) ============
+      } else if (req.url?.startsWith('/consensus/') || req.url?.startsWith('/crpc/')) {
+        const reqUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const path = reqUrl.pathname;
+
+        // Consensus endpoints
+        const consensusHandler = handleConsensusRequest(path, req.method);
+        if (consensusHandler) {
+          if (consensusHandler === 'state') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(getConsensusState()));
+          } else {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', async () => {
+              try {
+                const payload = JSON.parse(body);
+                const data = await processConsensusBody(consensusHandler, payload);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data || { ok: true }));
+              } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+              }
+            });
+          }
+          return;
+        }
+
+        // CRPC endpoints
+        const crpcHandler = handleCRPCRequest(path, req.method);
+        if (crpcHandler) {
+          if (crpcHandler === 'stats') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(getCRPCStats()));
+          } else {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const payload = JSON.parse(body);
+                const data = processCRPCBody(crpcHandler, payload);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+              } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+              }
+            });
+          }
+          return;
+        }
+
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unknown consensus/crpc route' }));
+
+      // ============ Knowledge Chain API ============
+      } else if (req.url?.startsWith('/knowledge-chain/')) {
+        const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const kcPath = kcUrl.pathname;
+        const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
+
+        if (!kcHandler) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unknown knowledge-chain route' }));
+        } else if (kcHandler === 'epoch') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body);
+              const data = processKnowledgeChainBody(kcHandler, payload);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+        } else {
+          const query = Object.fromEntries(kcUrl.searchParams);
+          const data = processKnowledgeChainBody(kcHandler, null, query);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
         }
       } else {
         res.writeHead(404);
@@ -1469,6 +1710,9 @@ async function main() {
       { command: 'knowledge', description: 'View learned knowledge (add "group" for group)' },
       { command: 'skills', description: 'View skills learned from corrections' },
       { command: 'privacy', description: 'Encryption status (owner only)' },
+      { command: 'inner', description: 'Inner dialogue / self-reflection (owner only)' },
+      { command: 'shard', description: 'Shard identity and status (owner only)' },
+      { command: 'network', description: 'Mind Network topology (owner only)' },
     ]);
   } catch {}
 
@@ -1486,12 +1730,13 @@ async function main() {
       lines.push(`Missing: ${report.missing.join(', ')}`);
     }
     lines.push(`Model: ${config.anthropic.model}`);
+    lines.push(`Shard: ${shardResult.id} (${isMultiShard() ? 'multi' : 'single'}-shard)`);
     await bot.telegram.sendMessage(config.ownerUserId, lines.join('\n'));
   } catch (err) {
     console.warn(`[jarvis] Could not notify owner: ${err.message}`);
   }
 
-  // Flush all data every 5 minutes (tracker + conversations + moderation + threads + comms + learning)
+  // Flush all data every 5 minutes (tracker + conversations + moderation + threads + comms + learning + inner dialogue)
   setInterval(async () => {
     await flushTracker();
     await saveConversations();
@@ -1499,8 +1744,19 @@ async function main() {
     await flushAntispam();
     await flushThreads();
     await flushLearning();
+    await flushInnerDialogue();
     pruneOldMessages();
     await saveComms();
+    // Check shard health (mark dead shards, trigger failover)
+    if (isMultiShard()) {
+      checkShardHealth();
+    }
+    // Knowledge chain: produce epoch + sync + broadcast
+    const epoch = produceEpoch();
+    if (epoch && isMultiShard()) {
+      await broadcastEpoch(epoch);
+      await syncWithPeers();
+    }
   }, 5 * 60 * 1000);
 
   // Scheduled daily digest — send at configured hour (default 18:00 UTC)
@@ -1543,12 +1799,14 @@ async function main() {
   // Graceful shutdown — save everything + mark clean shutdown
   async function gracefulShutdown(signal) {
     console.log(`[jarvis] Shutting down (${signal}) — saving all data...`);
+    await shutdownShard(); // Notify router before stopping
     await flushTracker();
     await saveConversations();
     await flushModeration();
     await flushAntispam();
     await flushThreads();
     await flushLearning();
+    await flushInnerDialogue();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

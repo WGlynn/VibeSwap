@@ -63,6 +63,15 @@ export const config = {
     masterKey: process.env.JARVIS_MASTER_KEY || null,
     encryptionEnabled: process.env.ENCRYPTION_ENABLED !== 'false', // ON by default
   },
+  // Shard / Network configuration (Decentralized Mind Network)
+  shard: {
+    id: process.env.SHARD_ID || 'shard-0',
+    totalShards: parseInt(process.env.TOTAL_SHARDS || '1'),
+    nodeType: process.env.NODE_TYPE || 'full', // 'light' | 'full' | 'archive'
+    stateBackend: process.env.STATE_BACKEND || 'file', // 'file' | 'redis'
+    redisUrl: process.env.REDIS_URL || null,
+    routerUrl: process.env.ROUTER_URL || null,
+  },
   // Runtime info
   isDocker,
 };

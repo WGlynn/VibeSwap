@@ -1,0 +1,316 @@
+// ============ Inner Dialogue — JARVIS Self-Reflection Primitive ============
+//
+// Inner Dialogue is a first-class CKB knowledge class representing JARVIS's
+// self-generated insights — reasoning traces, self-corrections, architectural
+// observations, and cross-CKB pattern synthesis.
+//
+// Knowledge class: INNER (between MUTUAL and COMMON in the hierarchy)
+// Source: "self-reflection" — NOT triggered by user correction
+// Triggers: reasoning about own behavior, noticing patterns across users,
+//           synthesizing cross-CKB insights, architectural observations
+//
+// Stored in: data/knowledge/inner-dialogue.json
+// Injected into system prompt as --- INNER DIALOGUE (Self-Reflection) ---
+//
+// Promotable to NETWORK if confirmed by consensus across shards (Phase 3).
+// ============
+
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { config } from './config.js';
+import { isEncryptionEnabled, encryptField, decryptField, deriveUserKey } from './privacy.js';
+
+// ============ Paths & Constants ============
+
+const KNOWLEDGE_DIR = join(config.dataDir, 'knowledge');
+const INNER_DIALOGUE_FILE = join(KNOWLEDGE_DIR, 'inner-dialogue.json');
+
+const INNER_DIALOGUE_BUDGET = 1500; // Max tokens for inner dialogue in system prompt
+const CHARS_PER_TOKEN = 4;
+const FACT_OVERHEAD = 12;
+const MAX_ENTRIES = 200;
+const DECAY_HALF_LIFE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days — inner dialogue decays slower
+
+// ============ Categories ============
+
+const CATEGORIES = {
+  PATTERN: 'pattern',           // Cross-CKB pattern noticed
+  SELF_CORRECTION: 'self_correction', // JARVIS noticed own mistake
+  ARCHITECTURAL: 'architectural', // System design observation
+  BEHAVIORAL: 'behavioral',     // Behavioral pattern across users
+  SYNTHESIS: 'synthesis',        // Cross-domain insight
+  META: 'meta',                 // Meta-cognitive observation
+};
+
+// ============ In-Memory State ============
+
+let dialogueEntries = [];
+let dirty = false;
+
+// ============ Init ============
+
+export async function initInnerDialogue() {
+  await mkdir(KNOWLEDGE_DIR, { recursive: true });
+
+  try {
+    const data = await readFile(INNER_DIALOGUE_FILE, 'utf-8');
+    dialogueEntries = JSON.parse(data);
+
+    // Decrypt if encryption enabled (inner dialogue uses a dedicated key scope)
+    if (isEncryptionEnabled()) {
+      const key = deriveInnerKey();
+      for (const entry of dialogueEntries) {
+        if (entry._encrypted) {
+          entry.thought = decryptField(entry.thought, key);
+          delete entry._encrypted;
+        }
+      }
+    }
+
+    // Backcompat: add missing fields
+    for (const entry of dialogueEntries) {
+      if (!entry.tokenCost) entry.tokenCost = estimateTokenCost(entry);
+      if (!entry.accessCount) entry.accessCount = 0;
+      if (!entry.promotedToNetwork) entry.promotedToNetwork = false;
+    }
+
+    console.log(`[inner-dialogue] Loaded ${dialogueEntries.length} entries`);
+  } catch {
+    dialogueEntries = [];
+    console.log('[inner-dialogue] No existing entries — starting fresh.');
+  }
+}
+
+// ============ Key Derivation ============
+
+function deriveInnerKey() {
+  // Use a dedicated scope for inner dialogue encryption
+  return deriveUserKey('inner-dialogue');
+}
+
+// ============ Token Economics ============
+
+function estimateTokenCost(entry) {
+  const contentTokens = Math.ceil((entry.thought || '').length / CHARS_PER_TOKEN);
+  return FACT_OVERHEAD + contentTokens;
+}
+
+function computeUtility(entry, now) {
+  let utility = 1.0;
+
+  // Category bonuses
+  const categoryBonus = {
+    [CATEGORIES.PATTERN]: 2.0,
+    [CATEGORIES.SELF_CORRECTION]: 1.8,
+    [CATEGORIES.SYNTHESIS]: 2.5,
+    [CATEGORIES.ARCHITECTURAL]: 1.5,
+    [CATEGORIES.BEHAVIORAL]: 1.5,
+    [CATEGORIES.META]: 1.0,
+  };
+  utility *= categoryBonus[entry.category] || 1.0;
+
+  // Access count boost
+  utility *= Math.max(1, entry.accessCount || 1);
+
+  // Confidence
+  utility *= entry.confidence || 0.8;
+
+  // Time decay (14-day half-life — slower than user facts)
+  const lastActive = entry.lastAccessed || entry.created;
+  const age = now - new Date(lastActive).getTime();
+  const decayFactor = Math.pow(0.5, age / DECAY_HALF_LIFE_MS);
+  utility *= decayFactor;
+
+  // Inner knowledge class bonus (2.0)
+  utility *= 2.0;
+
+  return utility;
+}
+
+function computeValueDensity(entry, now) {
+  return computeUtility(entry, now) / estimateTokenCost(entry);
+}
+
+// ============ Record Inner Dialogue ============
+
+export function recordInnerDialogue(thought, category, tags = []) {
+  if (!thought || thought.length < 10) return null;
+
+  // Validate category
+  const validCategory = Object.values(CATEGORIES).includes(category)
+    ? category
+    : CATEGORIES.META;
+
+  // Check for duplicate (fuzzy — same first 60 chars)
+  const prefix = thought.slice(0, 60).toLowerCase();
+  const existing = dialogueEntries.find(e =>
+    e.thought.slice(0, 60).toLowerCase() === prefix
+  );
+  if (existing) {
+    existing.accessCount++;
+    existing.lastAccessed = new Date().toISOString();
+    existing.confidence = Math.min(1.0, (existing.confidence || 0.8) + 0.05);
+    dirty = true;
+    return existing;
+  }
+
+  const entry = {
+    id: `inner-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    thought,
+    category: validCategory,
+    tags,
+    confidence: 0.7,
+    created: new Date().toISOString(),
+    lastAccessed: new Date().toISOString(),
+    accessCount: 0,
+    tokenCost: 0,
+    promotedToNetwork: false,
+    source: 'self-reflection',
+  };
+  entry.tokenCost = estimateTokenCost(entry);
+
+  // Enforce max entries — displace lowest value-density
+  if (dialogueEntries.length >= MAX_ENTRIES) {
+    const now = Date.now();
+    let lowestVD = Infinity;
+    let lowestIdx = -1;
+    for (let i = 0; i < dialogueEntries.length; i++) {
+      const vd = computeValueDensity(dialogueEntries[i], now);
+      if (vd < lowestVD) {
+        lowestVD = vd;
+        lowestIdx = i;
+      }
+    }
+    if (lowestIdx >= 0) {
+      dialogueEntries.splice(lowestIdx, 1);
+    }
+  }
+
+  dialogueEntries.push(entry);
+  dirty = true;
+
+  console.log(`[inner-dialogue] Recorded: [${validCategory}] "${thought.slice(0, 60)}..." (${entry.tokenCost} tokens)`);
+  return entry;
+}
+
+// ============ Get Inner Dialogue ============
+
+export function getInnerDialogue(limit = 20) {
+  const now = Date.now();
+  return [...dialogueEntries]
+    .map(e => ({ ...e, valueDensity: computeValueDensity(e, now) }))
+    .sort((a, b) => b.valueDensity - a.valueDensity)
+    .slice(0, limit);
+}
+
+// ============ Get Recent (for display) ============
+
+export function getRecentDialogue(limit = 10) {
+  return [...dialogueEntries]
+    .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+    .slice(0, limit);
+}
+
+// ============ Promote to Network ============
+
+export function promoteToNetwork(thoughtId) {
+  const entry = dialogueEntries.find(e => e.id === thoughtId);
+  if (!entry) return null;
+  entry.promotedToNetwork = true;
+  entry.promotedAt = new Date().toISOString();
+  dirty = true;
+  console.log(`[inner-dialogue] Promoted to network: "${entry.thought.slice(0, 60)}..."`);
+  return entry;
+}
+
+// ============ Build Context for System Prompt ============
+
+export function buildInnerDialogueContext() {
+  if (dialogueEntries.length === 0) return '';
+
+  const now = Date.now();
+  const parts = [];
+
+  // Sort by value density
+  const scored = dialogueEntries
+    .map(e => ({ entry: e, valueDensity: computeValueDensity(e, now) }))
+    .sort((a, b) => b.valueDensity - a.valueDensity);
+
+  let tokensUsed = 0;
+  const lines = [];
+
+  for (const { entry } of scored) {
+    const cost = estimateTokenCost(entry);
+    if (tokensUsed + cost > INNER_DIALOGUE_BUDGET) break;
+
+    const age = Math.floor((now - new Date(entry.created).getTime()) / (60 * 60 * 1000));
+    const ageLabel = age < 1 ? 'just now' : age < 24 ? `${age}h ago` : `${Math.floor(age / 24)}d ago`;
+    lines.push(`- [${entry.category}] ${entry.thought} (${ageLabel})`);
+
+    // Mark accessed
+    entry.lastAccessed = new Date().toISOString();
+    entry.accessCount++;
+    tokensUsed += cost;
+  }
+
+  if (lines.length > 0) {
+    const totalTokens = dialogueEntries.reduce((sum, e) => sum + estimateTokenCost(e), 0);
+    parts.push(`--- INNER DIALOGUE (Self-Reflection) (${totalTokens}/${INNER_DIALOGUE_BUDGET} tokens, ${dialogueEntries.length} entries) ---`);
+    parts.push(...lines);
+    parts.push('');
+    dirty = true;
+  }
+
+  return parts.join('\n');
+}
+
+// ============ Stats ============
+
+export function getDialogueStats() {
+  const now = Date.now();
+  const totalTokens = dialogueEntries.reduce((sum, e) => sum + estimateTokenCost(e), 0);
+  const promoted = dialogueEntries.filter(e => e.promotedToNetwork).length;
+
+  const categoryCounts = {};
+  for (const entry of dialogueEntries) {
+    categoryCounts[entry.category] = (categoryCounts[entry.category] || 0) + 1;
+  }
+
+  return {
+    totalEntries: dialogueEntries.length,
+    totalTokens,
+    budget: INNER_DIALOGUE_BUDGET,
+    utilization: `${Math.round(totalTokens / INNER_DIALOGUE_BUDGET * 100)}%`,
+    promotedToNetwork: promoted,
+    categoryCounts,
+    oldestEntry: dialogueEntries.length > 0
+      ? dialogueEntries.reduce((oldest, e) => new Date(e.created) < new Date(oldest.created) ? e : oldest).created
+      : null,
+    newestEntry: dialogueEntries.length > 0
+      ? dialogueEntries.reduce((newest, e) => new Date(e.created) > new Date(newest.created) ? e : newest).created
+      : null,
+  };
+}
+
+// ============ Flush ============
+
+export async function flushInnerDialogue() {
+  if (!dirty) return;
+
+  const toSave = dialogueEntries.map(entry => {
+    const clone = { ...entry };
+    if (isEncryptionEnabled()) {
+      const key = deriveInnerKey();
+      clone.thought = encryptField(clone.thought, key);
+      clone._encrypted = true;
+    }
+    return clone;
+  });
+
+  await writeFile(INNER_DIALOGUE_FILE, JSON.stringify(toSave, null, 2));
+  dirty = false;
+}
+
+// ============ Export Categories ============
+
+export { CATEGORIES as INNER_CATEGORIES };

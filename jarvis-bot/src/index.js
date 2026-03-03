@@ -45,6 +45,7 @@ try {
 }
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
+import { handleWebRequest } from './web-api.js';
 import { createServer } from 'http';
 import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
@@ -2550,6 +2551,17 @@ async function main() {
           }
         });
 
+      // ============ Web Portal API ============
+      // Public-facing endpoints for the VibeSwap frontend.
+      // Rate-limited per IP, CORS-restricted. No API secret needed.
+      } else if (req.url?.startsWith('/web/')) {
+        const webUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        const handled = await handleWebRequest(req, res, webUrl.pathname);
+        if (!handled) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Not found' }));
+        }
+
       // ============ Claude Code API Bridge ============
       // Direct HTTP communication — no human relay needed.
       // All /api/* routes require X-Api-Secret header.
@@ -2859,6 +2871,7 @@ async function main() {
       console.log(`[jarvis] Transcript webhook: http://0.0.0.0:${healthPort}/transcript`);
       console.log(`[jarvis] Fireflies webhook: http://0.0.0.0:${healthPort}/fireflies ${config.fireflies?.apiKey ? '(API key set)' : '(no API key)'}`);
       console.log(`[jarvis] Claude Code API: http://0.0.0.0:${healthPort}/api/* ${config.claudeCodeApiSecret ? '(secured)' : '(NO SECRET SET — disabled)'}`);
+      console.log(`[jarvis] Web Portal API: http://0.0.0.0:${healthPort}/web/* (public, rate-limited)`);
     });
   }
 

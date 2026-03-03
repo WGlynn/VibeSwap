@@ -120,12 +120,7 @@ contract TWAPOracleTest is Test {
 
     // ============ consult ============
 
-    /// @dev Known issue: getSurroundingObservations binary search has a boundary
-    ///      condition bug — when observation at position `i` has timestamp == target,
-    ///      setting r=i-1 can skip the valid "before" observation. This is a library
-    ///      bug (not a test bug) that needs fixing before mainnet.
-    ///      Skipping consult test for now — filed as go-live blocker.
-    function test_consult_stablePrice_KNOWN_ISSUE() public {
+    function test_consult_stablePrice() public {
         oracle.grow(100);
 
         // Write stable price over 10 minutes
@@ -135,10 +130,41 @@ contract TWAPOracleTest is Test {
         }
 
         assertTrue(oracle.canConsult(5 minutes));
-        // consult() reverts with "OLD" due to binary search boundary bug
-        // TODO: Fix getSurroundingObservations binary search
-        vm.expectRevert(bytes("OLD"));
-        oracle.consult(5 minutes);
+        uint256 twap = oracle.consult(5 minutes);
+        // TWAP of constant price should equal that price
+        assertEq(twap, INITIAL_PRICE);
+    }
+
+    function test_consult_risingPrice() public {
+        oracle.grow(100);
+
+        // Write rising price over 10 minutes
+        for (uint256 i = 1; i <= 20; i++) {
+            vm.warp(100_000 + i * 30);
+            oracle.write(INITIAL_PRICE + i * 10e18);
+        }
+
+        assertTrue(oracle.canConsult(5 minutes));
+        uint256 twap = oracle.consult(5 minutes);
+        // TWAP should be between start and end price
+        assertGt(twap, INITIAL_PRICE);
+        assertLt(twap, INITIAL_PRICE + 20 * 10e18);
+    }
+
+    function test_consult_exactTimestampMatch() public {
+        oracle.grow(100);
+
+        // Write at exact 30-second intervals
+        for (uint256 i = 1; i <= 20; i++) {
+            vm.warp(100_000 + i * 30);
+            oracle.write(INITIAL_PRICE);
+        }
+
+        // Query with period that lands exactly on an observation timestamp
+        // 10 minutes = 600s, current time = 100_600
+        assertTrue(oracle.canConsult(5 minutes));
+        uint256 twap = oracle.consult(5 minutes);
+        assertEq(twap, INITIAL_PRICE);
     }
 
     function test_consult_revertsIfPeriodTooShort() public {

@@ -20,7 +20,8 @@ import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, 
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
 import { initCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
 import { registerConsensusHandlers } from './learning.js';
-import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody } from './knowledge-chain.js';
+import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
+import { recoverRetryQueue } from './consensus.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
@@ -1526,6 +1527,8 @@ async function main() {
     console.log('[jarvis] Step 3: Loading learning + inner dialogue...');
     await initLearning();
     await initInnerDialogue();
+    await recoverWAL();
+    await recoverRetryQueue();
 
     console.log('[jarvis] Step 4: Initializing shard identity...');
     const shardResult = await initShard();
@@ -1694,14 +1697,15 @@ async function main() {
       console.log(`[jarvis] Worker shard listening on http://0.0.0.0:${healthPort}`);
     });
 
-    // Flush cycles for worker
-    setInterval(async () => {
+    // Flush cycles for worker — harmonic tick (all shards pulse at same wall-clock boundary)
+    scheduleHarmonicTick(async () => {
       await flushLearning();
       await flushInnerDialogue();
       if (isMultiShard()) checkShardHealth();
-      const epoch = produceEpoch();
+      const epoch = await produceEpoch();
       if (epoch && isMultiShard()) {
         await broadcastEpoch(epoch);
+        await retryMissedEpochs();
         await syncWithPeers();
       }
     }, 5 * 60 * 1000);
@@ -1757,6 +1761,8 @@ async function main() {
   await initLearning();
   await initInnerDialogue();
   await initStickers();
+  await recoverWAL();
+  await recoverRetryQueue();
   console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers loaded.');
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
@@ -2269,8 +2275,8 @@ async function main() {
     console.warn(`[jarvis] Could not notify owner: ${err.message}`);
   }
 
-  // Flush all data every 5 minutes (tracker + conversations + moderation + threads + comms + learning + inner dialogue)
-  setInterval(async () => {
+  // Flush all data every 5 minutes — harmonic tick (all shards pulse at same wall-clock boundary)
+  scheduleHarmonicTick(async () => {
     await flushTracker();
     await saveConversations();
     await flushModeration();
@@ -2292,10 +2298,11 @@ async function main() {
     if (isMultiShard()) {
       checkShardHealth();
     }
-    // Knowledge chain: produce epoch + sync + broadcast
-    const epoch = produceEpoch();
+    // Knowledge chain: produce epoch + sync + broadcast + retry missed
+    const epoch = await produceEpoch();
     if (epoch && isMultiShard()) {
       await broadcastEpoch(epoch);
+      await retryMissedEpochs();
       await syncWithPeers();
     }
   }, 5 * 60 * 1000);

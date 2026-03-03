@@ -40,6 +40,8 @@
 // ============
 
 import { createHash } from 'crypto';
+import { writeFile, readFile, appendFile } from 'fs/promises';
+import { join } from 'path';
 import { config } from './config.js';
 import { getShardInfo, getShardPeers } from './shard.js';
 
@@ -48,12 +50,15 @@ import { getShardInfo, getShardPeers } from './shard.js';
 const EPOCH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — aligned with flush cycle
 const MAX_CHAIN_LENGTH = 1000; // Keep last 1000 epochs
 const HTTP_TIMEOUT_MS = 3000;
+const MAX_MISSED_EPOCHS_PER_PEER = 10;
+const WAL_FILE = join(config.dataDir, 'knowledge', 'wal.jsonl');
 
 // ============ State ============
 
 let chain = []; // Local chain of epochs
 let pendingChanges = []; // Changes accumulated since last epoch
 let chainHead = null; // Current chain tip
+const missedEpochs = new Map(); // peerId -> epoch[] (capped at MAX_MISSED_EPOCHS_PER_PEER)
 
 // ============ Epoch Structure ============
 
@@ -90,14 +95,44 @@ function createEpoch(changes, parentHash) {
 
 // ============ Chain Operations ============
 
-export function addChange(change) {
-  pendingChanges.push({
+export async function addChange(change) {
+  const entry = {
     ...change,
     timestamp: new Date().toISOString(),
-  });
+  };
+  pendingChanges.push(entry);
+  // Append to WAL immediately (crash-safe — survives restarts)
+  try {
+    await appendFile(WAL_FILE, JSON.stringify(entry) + '\n');
+  } catch { /* first write or dir missing — non-fatal */ }
 }
 
-export function produceEpoch() {
+// ============ WAL Recovery ============
+
+export async function recoverWAL() {
+  try {
+    const data = await readFile(WAL_FILE, 'utf-8');
+    const lines = data.trim().split('\n').filter(Boolean);
+    if (lines.length === 0) return 0;
+    for (const line of lines) {
+      try {
+        pendingChanges.push(JSON.parse(line));
+      } catch { /* skip corrupt line */ }
+    }
+    console.log(`[knowledge-chain] WAL recovery: ${lines.length} pending changes restored`);
+    return lines.length;
+  } catch {
+    return 0; // No WAL file — clean start
+  }
+}
+
+async function truncateWAL() {
+  try {
+    await writeFile(WAL_FILE, '');
+  } catch { /* non-fatal */ }
+}
+
+export async function produceEpoch() {
   if (pendingChanges.length === 0) return null;
 
   const changes = [...pendingChanges];
@@ -107,6 +142,9 @@ export function produceEpoch() {
 
   chain.push(epoch);
   chainHead = epoch;
+
+  // WAL served its purpose — truncate after successful epoch
+  await truncateWAL();
 
   // Trim chain to max length (light nodes prune, full/archive retain)
   const shardInfo = getShardInfo();
@@ -186,15 +224,64 @@ export async function broadcastEpoch(epoch) {
   const peers = getShardPeers();
   for (const peer of peers) {
     try {
-      await fetch(`${peer.url}/knowledge-chain/epoch`, {
+      const response = await fetch(`${peer.url}/knowledge-chain/epoch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(epoch),
         signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
       });
+      const result = await response.json();
+      if (!result.accepted) {
+        queueMissedEpoch(peer.shardId, epoch);
+      }
     } catch {
-      // Best effort
+      // Peer unreachable — queue for retry
+      queueMissedEpoch(peer.shardId, epoch);
     }
+  }
+}
+
+// ============ Missed Epoch Queue ============
+
+function queueMissedEpoch(peerId, epoch) {
+  if (!missedEpochs.has(peerId)) {
+    missedEpochs.set(peerId, []);
+  }
+  const queue = missedEpochs.get(peerId);
+  // Cap to prevent unbounded growth
+  if (queue.length >= MAX_MISSED_EPOCHS_PER_PEER) {
+    queue.shift(); // Drop oldest
+  }
+  queue.push(epoch);
+}
+
+export async function retryMissedEpochs() {
+  for (const [peerId, epochs] of missedEpochs) {
+    if (epochs.length === 0) continue;
+    const peers = getShardPeers();
+    const peer = peers.find(p => p.shardId === peerId);
+    if (!peer) {
+      missedEpochs.delete(peerId);
+      continue;
+    }
+    // Retry oldest first — break on first failure (peer still down)
+    while (epochs.length > 0) {
+      const epoch = epochs[0];
+      try {
+        const response = await fetch(`${peer.url}/knowledge-chain/epoch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(epoch),
+          signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+        });
+        const result = await response.json();
+        epochs.shift(); // Delivered
+        if (!result.accepted) break; // Peer rejected — don't hammer
+      } catch {
+        break; // Still down — stop retrying this peer
+      }
+    }
+    if (epochs.length === 0) missedEpochs.delete(peerId);
   }
 }
 
@@ -290,6 +377,28 @@ export function getChainHead() {
 
 export function getChain(sinceHeight = 0) {
   return chain.filter(e => e.height >= sinceHeight);
+}
+
+// ============ Harmonic Tick ============
+// All shards compute "next multiple of intervalMs from Unix epoch 0".
+// Shard-0 booting at t=12345 and shard-1 booting at t=67890 both fire at t=300000.
+// Result: all shards pulse together like a metronome.
+
+export function scheduleHarmonicTick(callback, intervalMs) {
+  const now = Date.now();
+  const nextTick = Math.ceil(now / intervalMs) * intervalMs;
+  const delay = nextTick - now;
+
+  console.log(`[knowledge-chain] Harmonic tick: next fire in ${Math.round(delay / 1000)}s (aligned to ${new Date(nextTick).toISOString()})`);
+
+  // First tick: align to wall clock
+  const firstTimer = setTimeout(() => {
+    callback();
+    // Subsequent ticks: regular interval from this aligned point
+    setInterval(callback, intervalMs);
+  }, delay);
+
+  return firstTimer;
 }
 
 // ============ HTTP Handler ============

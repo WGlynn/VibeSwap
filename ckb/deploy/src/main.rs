@@ -33,6 +33,7 @@ const SCRIPTS: &[(&str, &str)] = &[
     ("compliance-type",     "Type script: compliance registry management"),
     ("config-type",         "Type script: protocol configuration singleton"),
     ("oracle-type",         "Type script: oracle price feed validation"),
+    ("knowledge-type",      "Type script: PoW-gated knowledge cell state transitions"),
 ];
 
 // ============ Deployment Config ============
@@ -223,6 +224,7 @@ fn print_rust_deployment_info(config: &DeploymentConfig) {
         ("compliance-type", "compliance_type_code_hash"),
         ("config-type", "config_type_code_hash"),
         ("oracle-type", "oracle_type_code_hash"),
+        ("knowledge-type", "knowledge_type_code_hash"),
     ];
 
     for (script_name, field_name) in &field_map {

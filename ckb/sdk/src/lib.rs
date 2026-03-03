@@ -2,6 +2,7 @@
 // Transaction builder for VibeSwap operations on Nervos CKB
 // Builds unsigned transactions that can be signed by any CKB wallet
 
+pub mod knowledge;
 pub mod miner;
 
 use vibeswap_types::*;
@@ -74,6 +75,7 @@ pub struct DeploymentInfo {
     pub compliance_type_code_hash: [u8; 32],
     pub config_type_code_hash: [u8; 32],
     pub oracle_type_code_hash: [u8; 32],
+    pub knowledge_type_code_hash: [u8; 32],
     pub script_dep_tx_hash: [u8; 32],
     pub script_dep_index: u32,
 }
@@ -907,6 +909,7 @@ mod tests {
             compliance_type_code_hash: [0x06; 32],
             config_type_code_hash: [0x07; 32],
             oracle_type_code_hash: [0x08; 32],
+            knowledge_type_code_hash: [0x09; 32],
             script_dep_tx_hash: [0x10; 32],
             script_dep_index: 0,
         }

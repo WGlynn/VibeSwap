@@ -310,6 +310,7 @@ mod tests {
             compliance_type_code_hash: [0x06; 32],
             config_type_code_hash: [0x07; 32],
             oracle_type_code_hash: [0x08; 32],
+            knowledge_type_code_hash: [0x09; 32],
             script_dep_tx_hash: [0x10; 32],
             script_dep_index: 0,
         };

@@ -16,7 +16,8 @@ OUT_DIR := build
 
 # All 8 CKB scripts
 SCRIPTS := pow-lock batch-auction-type commit-type amm-pool-type \
-           lp-position-type compliance-type config-type oracle-type
+           lp-position-type compliance-type config-type oracle-type \
+           knowledge-type
 
 # Binary names (Cargo replaces hyphens with underscores)
 BINARIES := $(patsubst %,$(OUT_DIR)/%, $(SCRIPTS))

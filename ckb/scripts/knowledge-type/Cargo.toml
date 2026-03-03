@@ -1,0 +1,16 @@
+[package]
+name = "knowledge-type"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = ["vibeswap-pow/std", "vibeswap-mmr/std", "vibeswap-types/std"]
+ckb = ["dep:ckb-std", "vibeswap-pow/no_std", "vibeswap-mmr/no_std", "vibeswap-types/no_std"]
+
+[dependencies]
+vibeswap-types = { path = "../../lib/types", default-features = false }
+vibeswap-pow = { path = "../../lib/pow", default-features = false }
+vibeswap-mmr = { path = "../../lib/mmr", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+ckb-std = { workspace = true, optional = true }

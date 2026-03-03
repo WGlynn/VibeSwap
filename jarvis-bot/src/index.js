@@ -41,6 +41,7 @@ try {
   console.warn('[jarvis] Run "npm install" to add the telegram (GramJS) package.');
   MONITORED_GROUPS = ['NervosNation'];
 }
+import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { createServer } from 'http';
 import { execFile } from 'child_process';
@@ -1241,6 +1242,134 @@ bot.command('idea', async (ctx) => {
   }
 });
 
+// ============ Sticker Generator ============
+
+bot.command('sticker', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+
+  const args = ctx.message.text.replace(/^\/sticker(@\w+)?/, '').trim();
+
+  // Check if replying to a photo — image-to-sticker mode
+  const replyPhoto = ctx.message.reply_to_message?.photo;
+  const replyText = args || ctx.message.reply_to_message?.text || ctx.message.reply_to_message?.caption;
+
+  if (!args && !replyPhoto && !replyText) {
+    const styles = getStyleList();
+    return ctx.reply(
+      `Usage:\n\n` +
+      `/sticker <text> — Generate text sticker (default style)\n` +
+      `/sticker <text> --style hype — Use a style template\n` +
+      `Reply to a photo with /sticker — Convert image to sticker\n` +
+      `Reply to a photo with /sticker <text> — Add text overlay\n\n` +
+      `Styles:\n${styles}\n\n` +
+      `Add --emoji <emoji> to set the sticker emoji\n` +
+      `Add --pack to also add to the VibeSwap sticker pack`
+    );
+  }
+
+  await ctx.sendChatAction('upload_photo');
+
+  try {
+    // Parse flags
+    const styleMatch = args.match(/--style\s+(\w+)/);
+    const emojiMatch = args.match(/--emoji\s+(\S+)/);
+    const addToPack = args.includes('--pack');
+    const style = styleMatch ? styleMatch[1] : 'default';
+    const emoji = emojiMatch ? emojiMatch[1] : '\u{1F680}';
+
+    // Strip flags from text
+    let stickerText = args
+      .replace(/--style\s+\w+/, '')
+      .replace(/--emoji\s+\S+/, '')
+      .replace(/--pack/, '')
+      .trim();
+
+    let pngBuffer;
+
+    if (replyPhoto) {
+      // Image mode — get the highest resolution photo
+      const photo = replyPhoto[replyPhoto.length - 1];
+      const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+      const response = await fetch(fileLink.href);
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
+
+      if (stickerText) {
+        // Image + text overlay
+        pngBuffer = await imageWithText(imageBuffer, stickerText);
+      } else {
+        // Pure image conversion
+        pngBuffer = await imageToSticker(imageBuffer);
+      }
+    } else {
+      // Text-only mode
+      if (!stickerText) stickerText = replyText || 'VIBE';
+      if (!AVAILABLE_STYLES.includes(style)) {
+        return ctx.reply(`Unknown style "${style}". Available: ${AVAILABLE_STYLES.join(', ')}`);
+      }
+      pngBuffer = await textToSticker(stickerText, style);
+    }
+
+    // Send as document (PNG) so Telegram doesn't compress it
+    await ctx.replyWithDocument(
+      { source: pngBuffer, filename: `vibe_sticker_${Date.now()}.png` },
+      { caption: `Sticker generated (${style} style)` }
+    );
+
+    // Optionally add to pack
+    if (addToPack) {
+      try {
+        const botUsername = ctx.botInfo.username;
+        const result = await addToStickerPack(ctx.telegram, ctx.from.id, botUsername, pngBuffer, emoji);
+        const action = result.created ? 'Created pack and added' : 'Added to';
+        await ctx.reply(`${action} sticker pack: t.me/addstickers/${result.packName}`);
+      } catch (packErr) {
+        await ctx.reply(`Sticker generated but pack error: ${packErr.message}\n\nYou can still use the PNG above as a sticker.`);
+      }
+    }
+
+  } catch (err) {
+    console.error('[sticker] Generation failed:', err.message);
+    await ctx.reply(`Sticker generation failed: ${err.message}`);
+  }
+});
+
+// Photo handler — offer sticker conversion when image is sent
+bot.on('photo', async (ctx) => {
+  // Only in private chats, and only if not a forwarded message
+  if (ctx.chat.type !== 'private') return;
+  if (ctx.message.forward_date) return;
+  if (!isAuthorized(ctx)) return;
+
+  // If the photo has a caption starting with /sticker, the command handler won't fire
+  // (Telegraf treats photo messages separately). Handle it here.
+  const caption = ctx.message.caption || '';
+  if (caption.startsWith('/sticker')) {
+    const args = caption.replace(/^\/sticker(@\w+)?/, '').trim();
+    const photo = ctx.message.photo[ctx.message.photo.length - 1];
+    const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+
+    await ctx.sendChatAction('upload_photo');
+    try {
+      const response = await fetch(fileLink.href);
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
+
+      let pngBuffer;
+      if (args) {
+        pngBuffer = await imageWithText(imageBuffer, args);
+      } else {
+        pngBuffer = await imageToSticker(imageBuffer);
+      }
+
+      await ctx.replyWithDocument(
+        { source: pngBuffer, filename: `vibe_sticker_${Date.now()}.png` },
+        { caption: 'Sticker generated from your image' }
+      );
+    } catch (err) {
+      await ctx.reply(`Sticker generation failed: ${err.message}`);
+    }
+  }
+});
+
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
@@ -1627,7 +1756,8 @@ async function main() {
   await loadComms();
   await initLearning();
   await initInnerDialogue();
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue loaded.');
+  await initStickers();
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers loaded.');
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
   console.log('[jarvis] Step 3.5: Initializing shard identity...');

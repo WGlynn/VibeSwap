@@ -4,7 +4,8 @@ import { join, resolve, relative } from 'path';
 import { config } from './config.js';
 import { loadSystemPrompt } from './memory.js';
 import { setFlag, getBehavior } from './behavior.js';
-import { learnFact, buildKnowledgeContext } from './learning.js';
+import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
+import { searchDeepStorageFull } from './deep-storage.js';
 import { llmChat, getProvider, getProviderName, getModelName } from './llm-provider.js';
 
 const REPO_PATH = config.repo.path;
@@ -471,10 +472,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   // In DMs, chatId IS the userId. In groups, userId must be passed explicitly.
   const effectiveUserId = userId || chatId;
 
-  // Build knowledge context for this user/chat
+  // Extract latest user message text for relevance scoring
+  const latestMessage = history.length > 0 ? history[history.length - 1] : null;
+  const messageText = latestMessage?.role === 'user' && typeof latestMessage.content === 'string'
+    ? latestMessage.content : '';
+
+  // Build knowledge context for this user/chat (with relevance scoring)
   let knowledgeContext = '';
   try {
-    knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType);
+    knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType, messageText);
   } catch {}
 
   const fullSystemPrompt = knowledgeContext
@@ -521,6 +527,51 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         required: ['fact', 'category'],
       },
     },
+    {
+      name: 'recall_knowledge',
+      description: 'Search your deep memory (L2 archive) for facts that were previously learned but pruned from active memory. Use this when you sense you should know something but cannot find it in your current knowledge context, or when a user asks about something you may have learned in a past conversation.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Natural language search query describing what you are looking for' },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional tags to filter by',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'web_search',
+      description: 'Search the web for current information, public archives, news, documentation, or any real-time data. Use this when the user asks a question you cannot answer from your knowledge base, or when they explicitly ask you to search/look something up.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The search query' },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'flag_deceiver',
+      description: 'Flag a user/entity as a deceiver in the Hell registry. Only use when there is highly credible + probabilistic evidence consistent with deceptive behavior. This is the system immune response — automated trust enforcement. Entry criteria: (1) credible evidence, (2) probabilistic consistency, (3) behavioral alignment with deception. Exit only via repentance process.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          identifier: { type: 'string', description: 'Username, wallet address, or other identifier of the deceiver' },
+          evidence: { type: 'string', description: 'Description of the credible evidence of deception' },
+          pattern: { type: 'string', description: 'The deceptive behavior pattern observed' },
+          severity: {
+            type: 'string',
+            enum: ['minor', 'moderate', 'severe', 'critical'],
+            description: 'Severity of the deception',
+          },
+        },
+        required: ['identifier', 'evidence', 'pattern', 'severity'],
+      },
+    },
   ];
 
   try {
@@ -564,6 +615,41 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           } catch (err) {
             result = `Failed to learn: ${err.message}`;
           }
+        } else if (tb.name === 'recall_knowledge') {
+          try {
+            const results = await searchDeepStorageFull(effectiveUserId, tb.input.query, tb.input.tags || [], 5);
+            if (results.length === 0) {
+              result = 'No matching facts found in deep memory (L2 archive).';
+            } else {
+              const formatted = results.map((r, i) => `${i + 1}. [${r.category || 'general'}] ${r.content} (archived: ${r.archivedAt || 'unknown'}, reason: ${r.archiveReason || 'unknown'})`);
+              result = `Found ${results.length} fact(s) in deep memory:\n${formatted.join('\n')}`;
+            }
+            console.log(`[claude] Tool: recall_knowledge("${tb.input.query.slice(0, 40)}...") → ${results.length} results`);
+          } catch (err) {
+            result = `Deep memory search failed: ${err.message}`;
+          }
+        } else if (tb.name === 'web_search') {
+          try {
+            result = await _webSearch(tb.input.query);
+            console.log(`[claude] Tool: web_search("${tb.input.query.slice(0, 40)}...")`);
+          } catch (err) {
+            result = `Web search failed: ${err.message}`;
+          }
+        } else if (tb.name === 'flag_deceiver') {
+          try {
+            const { flagDeceiver } = await import('./hell.js');
+            const entry = await flagDeceiver(
+              tb.input.identifier,
+              tb.input.evidence,
+              tb.input.pattern,
+              tb.input.severity,
+              { flaggedBy: userName, flaggedByUserId: effectiveUserId, chatId }
+            );
+            result = `Flagged "${tb.input.identifier}" in Hell registry. Entry ID: ${entry.id}. Severity: ${tb.input.severity}. Exit path: repentance process only.`;
+            console.log(`[claude] Tool: flag_deceiver("${tb.input.identifier}") — severity: ${tb.input.severity}`);
+          } catch (err) {
+            result = `Failed to flag: ${err.message}`;
+          }
         } else {
           result = 'Unknown tool.';
         }
@@ -604,6 +690,10 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       timestamp: Date.now(),
     });
 
+    // Cross-chat context symmetry: extract user-specific context from conversation
+    // and flow it into the CKB pipeline so knowledge persists across DM/group/shard
+    _extractConversationContext(effectiveUserId, userName, chatId, chatType, messageText, assistantMessage).catch(() => {});
+
     // Mark dirty for periodic save
     conversationsDirty = true;
 
@@ -617,5 +707,170 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   } catch (error) {
     console.error('[claude] API error:', error.message);
     throw error;
+  }
+}
+
+// ============ Cross-Chat Context Extraction ============
+// After each conversation turn, extract user-specific context and store as CKB facts.
+// This makes conversation-derived knowledge flow through the CKB pipeline (L1/L2),
+// ensuring the same user gets identical knowledge in DM, group, or different shard.
+
+const _contextExtractionThrottle = new Map(); // userId -> lastExtractTime
+const EXTRACTION_COOLDOWN = 60 * 1000; // 1 min between extractions per user
+
+async function _extractConversationContext(userId, userName, chatId, chatType, userMessage, assistantResponse) {
+  if (!userMessage || userMessage.length < 30) return;
+  if (!userId) return;
+
+  // Throttle: max 1 extraction per minute per user
+  const lastTime = _contextExtractionThrottle.get(String(userId)) || 0;
+  if (Date.now() - lastTime < EXTRACTION_COOLDOWN) return;
+  _contextExtractionThrottle.set(String(userId), Date.now());
+
+  try {
+    const response = await llmChat({
+      max_tokens: 200,
+      system: `You extract key user-specific facts from conversations. Only extract facts that are worth remembering long-term (preferences, personal info, decisions, project context). Return JSON:
+{ "facts": [{ "content": "fact text", "category": "preference|factual|technical|project", "tags": ["tag1"] }] }
+Return { "facts": [] } if nothing worth remembering. Be very selective — only persistent facts, not transient conversation topics.`,
+      messages: [{
+        role: 'user',
+        content: `User (${userName}): "${userMessage.slice(0, 300)}"\nAssistant response: "${assistantResponse.slice(0, 200)}"`,
+      }],
+    });
+
+    const raw = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return;
+
+    const result = JSON.parse(jsonMatch[0]);
+    if (!result.facts || result.facts.length === 0) return;
+
+    // Learn each extracted fact via the CKB pipeline
+    for (const fact of result.facts.slice(0, 3)) {
+      if (fact.content && fact.content.length > 5) {
+        await learnFact(userId, userName, chatId, chatType, fact.content, fact.category || 'factual', fact.tags || []);
+      }
+    }
+  } catch {
+    // Non-critical — silently fail
+  }
+}
+
+// ============ Web Search ============
+// Uses DuckDuckGo Instant Answer API (no API key needed) + fallback to scraping
+
+async function _webSearch(query) {
+  try {
+    // DuckDuckGo Instant Answer API — free, no key needed
+    const encoded = encodeURIComponent(query);
+    const ddgUrl = `https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&skip_disambig=1`;
+    const response = await fetch(ddgUrl, { signal: AbortSignal.timeout(10000) });
+    const data = await response.json();
+
+    const results = [];
+
+    // Abstract (main answer)
+    if (data.Abstract) {
+      results.push(`**${data.Heading || 'Answer'}**: ${data.Abstract}`);
+      if (data.AbstractURL) results.push(`Source: ${data.AbstractURL}`);
+    }
+
+    // Related topics
+    if (data.RelatedTopics?.length > 0) {
+      const topics = data.RelatedTopics
+        .filter(t => t.Text)
+        .slice(0, 5)
+        .map(t => `- ${t.Text}`);
+      if (topics.length > 0) {
+        results.push('\nRelated:');
+        results.push(...topics);
+      }
+    }
+
+    // Infobox
+    if (data.Infobox?.content?.length > 0) {
+      const info = data.Infobox.content
+        .slice(0, 5)
+        .map(i => `- ${i.label}: ${i.value}`)
+        .join('\n');
+      results.push('\nInfo:\n' + info);
+    }
+
+    if (results.length === 0) {
+      // Fallback: try DuckDuckGo HTML search
+      return await _webSearchFallback(query);
+    }
+
+    return results.join('\n');
+  } catch (err) {
+    console.warn(`[claude] DDG search failed: ${err.message}`);
+    return await _webSearchFallback(query);
+  }
+}
+
+async function _webSearchFallback(query) {
+  try {
+    const encoded = encodeURIComponent(query);
+    const url = `https://html.duckduckgo.com/html/?q=${encoded}`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; JarvisBot/1.0)' },
+      signal: AbortSignal.timeout(10000),
+    });
+    const html = await response.text();
+
+    // Extract result snippets from DDG HTML
+    const snippets = [];
+    const regex = /<a[^>]*class="result__a"[^>]*>(.*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>(.*?)<\/a>/g;
+    let match;
+    while ((match = regex.exec(html)) !== null && snippets.length < 5) {
+      const title = match[1].replace(/<[^>]+>/g, '').trim();
+      const snippet = match[2].replace(/<[^>]+>/g, '').trim();
+      if (title && snippet) {
+        snippets.push(`**${title}**: ${snippet}`);
+      }
+    }
+
+    if (snippets.length === 0) {
+      return `No results found for "${query}". Try a different search query.`;
+    }
+
+    return `Search results for "${query}":\n\n${snippets.join('\n\n')}`;
+  } catch (err) {
+    return `Web search unavailable: ${err.message}. Try again later.`;
+  }
+}
+
+// ============ Conversation Summarization ============
+// When history exceeds threshold, summarize oldest messages into a knowledge entry
+
+export async function summarizeConversationChunk(chatId, messages) {
+  if (!messages || messages.length < 10) return null;
+
+  try {
+    const textMessages = messages
+      .filter(m => typeof m.content === 'string')
+      .map(m => `${m.role}: ${m.content.slice(0, 200)}`)
+      .slice(0, 20);
+
+    if (textMessages.length < 5) return null;
+
+    const response = await llmChat({
+      max_tokens: 300,
+      system: 'Summarize this conversation into 2-3 key takeaways. Focus on: decisions made, preferences expressed, facts learned, topics discussed. Return a JSON object: { "summary": "...", "keyFacts": ["fact1", "fact2"], "topics": ["topic1"] }',
+      messages: [{
+        role: 'user',
+        content: textMessages.join('\n'),
+      }],
+    });
+
+    const raw = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.warn(`[claude] Conversation summarization failed: ${err.message}`);
+    return null;
   }
 }

@@ -4,8 +4,9 @@
 // Ports bit-counting logic from ckb/lib/pow/src/lib.rs for compatibility.
 //
 // JUL tokens are mined via SHA-256(challenge || nonce) with leading-zero-bit
-// difficulty. Mining JUL earns compute credits (1 JUL = 1000 API tokens)
-// and increases Shapley weight via creditFact() / markIdentified().
+// difficulty. JUL is a work-credit: ratio to API tokens floats with CPI and
+// API cost so 1 JUL always buys the same real purchasing power of compute.
+// Mining increases Shapley weight via creditFact() / markIdentified().
 //
 // State persists to data/mining-state.json, auto-saved every 60s.
 // ============
@@ -14,7 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
-import { creditFact, markIdentified } from './compute-economics.js';
+import { creditFact, markIdentified, getJulToPoolRatio } from './compute-economics.js';
 
 // ============ Constants ============
 
@@ -27,7 +28,13 @@ const BASE_REWARD = 1.0;          // JUL per proof at base difficulty
 const REWARD_SCALE_PER_BIT = 2.0; // doubles per bit above base
 const CHALLENGE_ROTATION = 300;   // new challenge every 5 min
 const MAX_PROOFS_PER_MINUTE = 5;  // rate limit per user
-const JUL_PER_API_TOKEN = 1000;   // 1 JUL = 1000 API tokens
+const JUL_PER_API_TOKEN_FALLBACK = 1000; // fallback before compute-economics loads
+
+// Dynamic ratio from pricing oracle (CPI-adjusted)
+function julToTokens() {
+  try { return getJulToPoolRatio(); }
+  catch { return JUL_PER_API_TOKEN_FALLBACK; }
+}
 const AUTO_SAVE_INTERVAL = 60_000; // 60s
 const MAX_ADJUSTMENT = 2;         // max ±2 bits per epoch
 
@@ -249,7 +256,7 @@ export function submitProof(userId, nonce, hash, challenge) {
     accepted: true,
     reward,
     julBalance: state.balances[userId],
-    apiTokensEarned: reward * JUL_PER_API_TOKEN,
+    apiTokensEarned: reward * julToTokens(),
     proofsSubmitted: state.proofCounts[userId],
     epoch: state.epoch,
     difficulty: state.difficulty,
@@ -264,7 +271,7 @@ export function getMiningStats(userId) {
   return {
     julBalance: state.balances[userId] || 0,
     proofsSubmitted: state.proofCounts[userId] || 0,
-    apiTokensEarned: (state.balances[userId] || 0) * JUL_PER_API_TOKEN,
+    apiTokensEarned: (state.balances[userId] || 0) * julToTokens(),
     difficulty: state.difficulty,
     epoch: state.epoch,
     epochProgress: `${state.epochProofs}/${EPOCH_LENGTH}`,
@@ -313,7 +320,7 @@ export function burnJUL(userId, amount, reason = 'burn') {
     success: true,
     burned: amount,
     newBalance: state.balances[userId],
-    poolExpansion: amount * JUL_PER_API_TOKEN,
+    poolExpansion: amount * julToTokens(),
     dailyBurned: state.treasury.dailyBurned,
     totalBurned: state.treasury.totalBurned,
   };
@@ -363,7 +370,7 @@ export function getTreasuryStats() {
   return {
     totalBurned: state.treasury.totalBurned,
     dailyBurned: state.treasury.dailyBurned,
-    dailyPoolExpansion: state.treasury.dailyBurned * JUL_PER_API_TOKEN,
+    dailyPoolExpansion: state.treasury.dailyBurned * julToTokens(),
     tipsToday: todayTips.length,
     tipsAllTime: state.treasury.tips.length,
     topTippers: Object.entries(
@@ -386,7 +393,7 @@ export function getLeaderboard(limit = 10) {
       userId,
       julBalance: balance,
       proofsSubmitted: state.proofCounts[userId] || 0,
-      apiTokensEarned: balance * JUL_PER_API_TOKEN,
+      apiTokensEarned: balance * julToTokens(),
     }))
     .sort((a, b) => b.julBalance - a.julBalance)
     .slice(0, limit);

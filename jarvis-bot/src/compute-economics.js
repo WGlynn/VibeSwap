@@ -36,7 +36,24 @@ const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
 const FREE_BUDGET_ANONYMOUS = 5_000;   // tokens/day for unidentified users
 const FREE_BUDGET_IDENTIFIED = 10_000; // tokens/day for identified users
 const BASE_POOL = 500_000;             // Will's baseline funding (floor)
-const JUL_TO_POOL_RATIO = 1_000;       // 1 JUL burned = 1000 extra pool tokens
+
+// ============ JUL Pricing Oracle ============
+//
+// JUL is a work-credit backed by fixed PoW (production theory of value).
+// The ratio floats so 1 JUL always buys the same CPI-adjusted REAL VALUE
+// of compute, not a fixed number of tokens.
+//
+// Phase 1 (now):  Manual — Will sets costPerMTok + cpiIndex via /reprice
+// Phase 2 (soon): CPI API auto-feed
+// Phase 3 (mainnet): AMM price discovery replaces the oracle entirely
+//
+// Formula:
+//   realCost = nominalCostPerMTok × (referenceCPI / currentCPI)
+//   ratio = baseRatio × (referenceRealCost / currentRealCost)
+//
+const BASE_RATIO = 1_000;                // tokens per JUL at calibration
+const REFERENCE_COST_PER_MTOK = 3.00;    // $/MTok when ratio was set (Sonnet 3.5 input)
+const REFERENCE_CPI = 100;               // CPI index at calibration (normalized base)
 
 const DEGRADED_MAX_TOKENS = 512;       // cap when budget > 80%
 const DEGRADE_THRESHOLD = 0.80;        // 80% = start degrading
@@ -54,15 +71,87 @@ const FREE_TELEGRAM_DMS = 3;          // free DMs/day for non-team users
 
 const SAVE_INTERVAL = 60_000; // 60s
 
-// ============ Dynamic Pool ============
+// ============ Dynamic Pool + Floating Ratio ============
 
 /**
- * Effective pool = BASE_POOL + (daily JUL burned × JUL_TO_POOL_RATIO).
+ * CPI-adjusted JUL→token ratio.
+ * JUL buys constant REAL purchasing power of compute, not a fixed token count.
+ *
+ * If API gets cheaper: ratio increases (JUL buys more tokens, same real value).
+ * If dollar inflates:  ratio increases (compensates for debasement).
+ * If API gets pricier: ratio decreases (fewer tokens, same real value).
+ *
+ * Phase 3: replaced by AMM oracle price — market discovers the ratio.
+ */
+export function getJulToPoolRatio() {
+  const p = state.pricing;
+  const currentCost = p.costPerMTok || REFERENCE_COST_PER_MTOK;
+  const currentCPI = p.cpiIndex || REFERENCE_CPI;
+
+  // Real cost = nominal cost adjusted for purchasing power
+  // realCost = nominalCost × (referenceCPI / currentCPI)
+  const currentRealCost = currentCost * (REFERENCE_CPI / currentCPI);
+
+  return Math.max(1, Math.round(BASE_RATIO * (REFERENCE_COST_PER_MTOK / currentRealCost)));
+}
+
+/**
+ * Effective pool = BASE_POOL + (daily JUL burned × floating ratio).
  * Work-credit loop: mining → burn → pool expansion → more budget for everyone.
  */
 export function getEffectivePool() {
   const julBurned = getDailyBurned();
-  return BASE_POOL + Math.round(julBurned * JUL_TO_POOL_RATIO);
+  return BASE_POOL + Math.round(julBurned * getJulToPoolRatio());
+}
+
+/**
+ * Update the pricing oracle. Owner-only via /reprice.
+ * Returns the new ratio for display.
+ */
+export function updatePricing({ costPerMTok, cpiIndex } = {}) {
+  if (!state.pricing) {
+    state.pricing = {
+      costPerMTok: REFERENCE_COST_PER_MTOK,
+      cpiIndex: REFERENCE_CPI,
+      lastUpdated: null,
+      source: 'manual',
+    };
+  }
+  if (typeof costPerMTok === 'number' && costPerMTok > 0) {
+    state.pricing.costPerMTok = costPerMTok;
+  }
+  if (typeof cpiIndex === 'number' && cpiIndex > 0) {
+    state.pricing.cpiIndex = cpiIndex;
+  }
+  state.pricing.lastUpdated = Date.now();
+  dirty = true;
+
+  // Recompute Shapley budgets with new ratio
+  computeShapleyWeights();
+
+  return {
+    costPerMTok: state.pricing.costPerMTok,
+    cpiIndex: state.pricing.cpiIndex,
+    ratio: getJulToPoolRatio(),
+    effectivePool: getEffectivePool(),
+  };
+}
+
+/**
+ * Get current pricing oracle state for display.
+ */
+export function getPricingInfo() {
+  const p = state.pricing || {};
+  return {
+    costPerMTok: p.costPerMTok || REFERENCE_COST_PER_MTOK,
+    cpiIndex: p.cpiIndex || REFERENCE_CPI,
+    referenceCostPerMTok: REFERENCE_COST_PER_MTOK,
+    referenceCPI: REFERENCE_CPI,
+    ratio: getJulToPoolRatio(),
+    baseRatio: BASE_RATIO,
+    source: p.source || 'manual',
+    lastUpdated: p.lastUpdated,
+  };
 }
 
 // ============ State ============
@@ -71,6 +160,12 @@ let state = {
   users: {},       // userId -> UserEconomics
   dayKey: '',      // YYYY-MM-DD — triggers rollover when it changes
   shapleySum: 0,   // Σ(S_j) — cached, recomputed on rollover
+  pricing: {
+    costPerMTok: REFERENCE_COST_PER_MTOK,  // current $/MTok (Will updates via /reprice)
+    cpiIndex: REFERENCE_CPI,                // current CPI index (Will updates via /reprice)
+    lastUpdated: null,                       // timestamp of last repricing
+    source: 'manual',                        // 'manual' | 'market' (phase 3)
+  },
 };
 
 let dirty = false;
@@ -336,11 +431,13 @@ export function getComputeStats(userId) {
 
   const effectivePool = getEffectivePool();
   const julBurnedToday = getDailyBurned();
-  const julBonus = Math.round(julBurnedToday * JUL_TO_POOL_RATIO);
+  const currentRatio = getJulToPoolRatio();
+  const julBonus = Math.round(julBurnedToday * currentRatio);
 
   const pool = {
     basePool: BASE_POOL,
     julBonus,
+    julToPoolRatio: currentRatio,
     dailyPool: effectivePool,
     julBurnedToday,
     poolUsed,

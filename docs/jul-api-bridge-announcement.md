@@ -36,11 +36,12 @@ That's the closed loop. No AMM pool. No crypto exchange. No converting to USD. *
 Every JUL burned doesn't just benefit the burner — it expands the compute pool for the entire community:
 
 ```
-Effective Pool = Base Pool + (Daily JUL Burned × 1000)
+Effective Pool = Base Pool + (Daily JUL Burned × Floating Ratio)
 ```
 
 - **Base Pool** (500,000 tokens/day) — Will's subsidy. The floor that exists no matter what. His contribution to the cooperative.
-- **JUL Bonus** — community-generated expansion. 1 JUL burned = 1,000 extra API tokens available to everyone.
+- **Floating Ratio** — CPI-adjusted so 1 JUL always buys the same real value of compute. Currently ~1,000 tokens per JUL at reference prices, but automatically adjusts when API costs or purchasing power change.
+- **JUL Bonus** — community-generated expansion. The more JUL burned, the bigger the pool for everyone.
 
 The expanded pool gets redistributed through [Shapley value allocation](https://en.wikipedia.org/wiki/Shapley_value) — a game theory mechanism that rewards each person proportionally to their marginal contribution. Quality contributors get more. But when the pie grows, everyone's slice grows too.
 
@@ -95,7 +96,7 @@ VibeSwap is built on **Cooperative Capitalism** — mutualized risk with free-ma
 Work-credits fix all three:
 
 - **Access is earned, not purchased.** You mine, you contribute, you get compute.
-- **No speculation.** JUL has no market price. It has a burn rate — 1 JUL = 1,000 API tokens, always.
+- **No speculation.** JUL has no market price. It has a burn rate pegged to real purchasing power — the token count floats so 1 JUL always buys the same CPI-adjusted value of compute, regardless of API price changes or dollar inflation.
 - **Value = work.** Every JUL in existence was created by a valid SHA-256 proof. The token IS the work.
 
 This is the same principle behind VibeSwap's on-chain mechanism: commit-reveal batch auctions where every participant's order is backed by a deposit, shuffled fairly, and settled at a uniform clearing price. No front-running. No information asymmetry. No extraction.
@@ -137,11 +138,22 @@ There's a free tier. You don't need JUL to talk to JARVIS. But if you want more 
 | Parameter | Value | Why |
 |-----------|-------|-----|
 | Base pool | 500,000 tokens/day | Will's baseline subsidy |
-| Burn ratio | 1 JUL = 1,000 API tokens | Matches mining reward ratio |
+| Base ratio | 1 JUL = 1,000 tokens | At reference API pricing ($3/MTok) and reference CPI |
+| Floating ratio | CPI and cost-adjusted | If API gets cheaper or dollar inflates, JUL buys more tokens |
 | Mining reward | 1 JUL base (doubles per difficulty bit) | Harder work = more tokens |
-| Auto-burn rate | 1 JUL = 1,000 tokens | Same ratio — no premium for generosity |
 
-The ratio is intentionally symmetric. Tipping (expanding the pool for everyone) and auto-burning (buying extra for yourself) use the same rate. There's no penalty for being generous.
+**The ratio floats.** JUL is backed by fixed PoW work (production theory of value), but API tokens change in value as models get cheaper or the dollar loses purchasing power. A fixed ratio would create arbitrage — hoard JUL when tokens are expensive, burn when they're cheap.
+
+Instead, the pricing oracle adjusts so 1 JUL always buys the same *real value* of compute:
+
+```
+ratio = baseRatio × (referenceCost / currentRealCost)
+where realCost = nominalCostPerMTok × (referenceCPI / currentCPI)
+```
+
+If Anthropic cuts prices 50%: ratio doubles. JUL buys more tokens, same dollar-value. If inflation runs 10%: ratio increases to compensate for dollar debasement. No arbitrage. Work in = value out, always.
+
+Tipping and auto-burning use the same floating rate. No penalty for generosity.
 
 ---
 
@@ -150,10 +162,11 @@ The ratio is intentionally symmetric. Tipping (expanding the pool for everyone) 
 | Command | What It Does |
 |---------|-------------|
 | `/mining` | Start mining JUL |
-| `/balance` | Your JUL balance + pool contribution stats + effective pool size |
+| `/balance` | Your JUL balance + current ratio + pool contribution stats |
 | `/tip <amount>` | Burn JUL to expand the compute pool for everyone |
 | `/tip` | View balance, tip history, and how the loop works |
-| `/economy` | Network-wide compute economics, JUL burn metrics, effective pool |
+| `/economy` | Pricing oracle, pool breakdown, treasury, burn metrics |
+| `/reprice` | (Owner) Update API cost or CPI index — ratio recalculates |
 
 ---
 

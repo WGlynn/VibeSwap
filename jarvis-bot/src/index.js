@@ -46,7 +46,7 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
-import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool } from './compute-economics.js';
+import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo } from './compute-economics.js';
 import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
@@ -904,6 +904,7 @@ bot.command('balance', async (ctx) => {
     `Mining difficulty: ${mining.difficulty}`,
     '',
     'JUL Bridge:',
+    `  Rate: 1 JUL = ${compute.pool.julToPoolRatio.toLocaleString()} tokens (CPI-adjusted)`,
     `  Burned today: ${treasury.dailyBurned.toFixed(2)} JUL`,
     `  Pool expansion: +${treasury.dailyPoolExpansion.toLocaleString()} tokens`,
     `  Effective pool: ${compute.pool.dailyPool.toLocaleString()} (${compute.pool.basePool.toLocaleString()} base + ${compute.pool.julBonus.toLocaleString()} JUL bonus)`,
@@ -932,13 +933,20 @@ bot.command('economy', async (ctx) => {
   const compute = getComputeStats(null);
   const mining = getLeaderboard(5);
   const treasury = getTreasuryStats();
+  const pricing = getPricingInfo();
 
   const lines = [
     'JOULE Economy',
     '',
+    'Pricing Oracle:',
+    `  1 JUL = ${pricing.ratio.toLocaleString()} tokens (CPI-adjusted)`,
+    `  API cost: $${pricing.costPerMTok.toFixed(2)}/MTok (ref: $${pricing.referenceCostPerMTok.toFixed(2)})`,
+    `  CPI index: ${pricing.cpiIndex} (ref: ${pricing.referenceCPI})`,
+    `  Source: ${pricing.source}${pricing.lastUpdated ? ' (updated ' + new Date(pricing.lastUpdated).toLocaleDateString() + ')' : ''}`,
+    '',
     'Compute Pool:',
     `  Base pool: ${compute.pool.basePool.toLocaleString()} tokens (Will subsidy)`,
-    `  JUL bonus: +${compute.pool.julBonus.toLocaleString()} tokens (${treasury.dailyBurned.toFixed(2)} JUL burned today)`,
+    `  JUL bonus: +${compute.pool.julBonus.toLocaleString()} tokens (${treasury.dailyBurned.toFixed(2)} JUL burned × ${pricing.ratio.toLocaleString()})`,
     `  Effective pool: ${compute.pool.dailyPool.toLocaleString()} tokens`,
     `  Pool used: ${compute.pool.poolUsed.toLocaleString()} (${compute.pool.poolUtilization}%)`,
     `  Pool remaining: ${compute.pool.poolRemaining.toLocaleString()}`,
@@ -1033,6 +1041,61 @@ bot.command('tip', async (ctx) => {
     'The entire network benefits. Work in, access out.',
   ];
   ctx.reply(lines.join('\n'));
+});
+
+// ============ Reprice — JUL Pricing Oracle ============
+
+bot.command('reprice', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const args = ctx.message.text.split(/\s+/).slice(1);
+
+  // /reprice (no args) — show current pricing
+  if (args.length === 0) {
+    const p = getPricingInfo();
+    return ctx.reply(
+      `JUL Pricing Oracle\n\n` +
+      `Current ratio: 1 JUL = ${p.ratio.toLocaleString()} tokens\n` +
+      `API cost: $${p.costPerMTok.toFixed(2)}/MTok (ref: $${p.referenceCostPerMTok.toFixed(2)})\n` +
+      `CPI index: ${p.cpiIndex} (ref: ${p.referenceCPI})\n` +
+      `Base ratio: ${p.baseRatio} (at reference prices)\n` +
+      `Source: ${p.source}\n\n` +
+      `Usage:\n` +
+      `  /reprice cost <$/MTok> — update API cost\n` +
+      `  /reprice cpi <index> — update CPI index\n` +
+      `  /reprice cost 1.50 cpi 103 — update both`
+    );
+  }
+
+  // Parse key-value pairs
+  let costPerMTok, cpiIndex;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === 'cost' && args[i + 1]) {
+      costPerMTok = parseFloat(args[++i]);
+    } else if (args[i] === 'cpi' && args[i + 1]) {
+      cpiIndex = parseFloat(args[++i]);
+    }
+  }
+
+  if ((costPerMTok !== undefined && (isNaN(costPerMTok) || costPerMTok <= 0)) ||
+      (cpiIndex !== undefined && (isNaN(cpiIndex) || cpiIndex <= 0))) {
+    return ctx.reply('Invalid values. Cost and CPI must be positive numbers.');
+  }
+
+  if (costPerMTok === undefined && cpiIndex === undefined) {
+    return ctx.reply('Usage: /reprice cost <$/MTok> | /reprice cpi <index> | /reprice cost <x> cpi <y>');
+  }
+
+  const result = updatePricing({ costPerMTok, cpiIndex });
+
+  ctx.reply(
+    `Pricing updated.\n\n` +
+    `API cost: $${result.costPerMTok.toFixed(2)}/MTok\n` +
+    `CPI index: ${result.cpiIndex}\n` +
+    `New ratio: 1 JUL = ${result.ratio.toLocaleString()} tokens\n` +
+    `Effective pool: ${result.effectivePool.toLocaleString()} tokens\n\n` +
+    `Shapley budgets recomputed.`
+  );
 });
 
 // ============ Spawn Shard (One-Click via Telegram) ============

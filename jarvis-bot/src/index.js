@@ -14,7 +14,7 @@ import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSumm
 import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
 import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue, generateInnerDialogue } from './inner-dialogue.js';
 import { initStateStore } from './state-store.js';
-import { initProvider, getProviderName, getModelName, getFallbackChain, getIntelligenceLevel } from './llm-provider.js';
+import { initProvider, getProviderName, getModelName, getFallbackChain, getIntelligenceLevel, checkDegradation, tryRestorePrimary } from './llm-provider.js';
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
@@ -1081,6 +1081,18 @@ bot.command('tip', async (ctx) => {
     '',
     'The entire network benefits. Work in, access out.',
   ];
+
+  // Wardenclyffe: attempt to restore premium provider after tip
+  const intel = getIntelligenceLevel();
+  if (intel.degraded) {
+    const restore = tryRestorePrimary();
+    if (restore.restored) {
+      lines.push('');
+      lines.push(`Wardenclyffe: Premium intelligence restored (${restore.provider}/${restore.model})`);
+      lines.push('Intelligence: 100% — tip jar refilled credits.');
+    }
+  }
+
   ctx.reply(lines.join('\n'));
 });
 
@@ -1848,6 +1860,25 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       for (let i = 0; i < reply.length; i += 4096) {
         await ctx.reply(reply.slice(i, i + 4096), { parse_mode: undefined });
       }
+    }
+
+    // Wardenclyffe: check for intelligence degradation and notify once
+    const degradation = checkDegradation();
+    if (degradation?.degraded) {
+      const notifyChat = config.communityGroupId || chatId;
+      try {
+        await bot.telegram.sendMessage(notifyChat,
+          `[Wardenclyffe] Intelligence at ${degradation.quality}% — running on ${degradation.provider}.\n` +
+          `Premium provider credits exhausted. Tip jar contributions (/tip) restore full quality.`
+        );
+      } catch {}
+    } else if (degradation?.recovered) {
+      const notifyChat = config.communityGroupId || chatId;
+      try {
+        await bot.telegram.sendMessage(notifyChat,
+          `[Wardenclyffe] Intelligence restored to 100% — back on ${degradation.provider}. Premium quality active.`
+        );
+      } catch {}
     }
   } catch (error) {
     clearInterval(typingInterval);

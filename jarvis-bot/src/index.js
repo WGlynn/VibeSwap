@@ -14,7 +14,7 @@ import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSumm
 import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
 import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue, generateInnerDialogue } from './inner-dialogue.js';
 import { initStateStore } from './state-store.js';
-import { initProvider, getProviderName, getModelName } from './llm-provider.js';
+import { initProvider, getProviderName, getModelName, getFallbackChain, getIntelligenceLevel } from './llm-provider.js';
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
@@ -23,6 +23,7 @@ import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
 import { recoverRetryQueue } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
+import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
 let monitorAvailable = false;
@@ -58,6 +59,23 @@ import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
 const execFileAsync = promisify(execFile);
 import googleTTS from 'google-tts-api';
+
+// ============ Safe Body Reader (prevents unbounded body accumulation) ============
+const MAX_BODY_SIZE = 64 * 1024; // 64 KB
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error('Body too large'));
+      }
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
 
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
 
@@ -109,7 +127,8 @@ const bot = IS_WORKER ? noopBot : new Telegraf(config.telegram.token, {
 
 // Auth middleware (only used in primary mode)
 function isAuthorized(ctx) {
-  if (config.authorizedUsers.length === 0) return true;
+  // Fail-closed: empty whitelist = NOBODY authorized except owner
+  if (config.authorizedUsers.length === 0) return isOwner(ctx);
   return config.authorizedUsers.includes(ctx.from.id);
 }
 
@@ -938,8 +957,18 @@ bot.command('economy', async (ctx) => {
   const L0 = pricing.layer0;
   const L1 = pricing.layer1;
 
+  const intel = getIntelligenceLevel();
+  const chain = getFallbackChain();
+
   const lines = [
     'JOULE Economy',
+    '',
+    `Wardenclyffe: ${intel.quality}% intelligence (${intel.tierLabel} — ${intel.provider}/${intel.model})`,
+    `  Cascade: ${chain.active?.name} → ${chain.remaining.map(p => p.name).join(' → ') || 'none'}`,
+    `  Providers: ${chain.totalProviders} total | ${chain.remaining.length} fallbacks remaining`,
+    intel.degraded
+      ? `  DEGRADED since ${new Date(intel.degradedSince).toLocaleTimeString()} — tip jar refills restore premium quality`
+      : '  Status: nominal (premium tier active)',
     '',
     `Pricing Oracle: 1 JUL = ${pricing.ratio.toLocaleString()} tokens`,
     `  Source: ${pricing.source}`,
@@ -2433,26 +2462,23 @@ async function main() {
 
       // Proxy processing — primary shard forwards a message for this shard to process
       if (req.url === '/shard/process' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', async () => {
-          try {
-            const payload = JSON.parse(body);
-            // Process the message with Claude (for CRPC multi-shard response generation)
-            const { chat: chatFn } = await import('./claude.js');
-            const response = await chatFn(
-              payload.chatId || 'proxy',
-              payload.userName || 'proxy',
-              payload.text,
-              payload.chatType || 'private'
-            );
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, text: response.text, shardId: shardResult.id }));
-          } catch (err) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: err.message }));
-          }
-        });
+        try {
+          const body = await readBody(req);
+          const payload = JSON.parse(body);
+          // Process the message with Claude (for CRPC multi-shard response generation)
+          const { chat: chatFn } = await import('./claude.js');
+          const response = await chatFn(
+            payload.chatId || 'proxy',
+            payload.userName || 'proxy',
+            payload.text,
+            payload.chatType || 'private'
+          );
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, text: response.text, shardId: shardResult.id }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        }
         return;
       }
 
@@ -2464,19 +2490,16 @@ async function main() {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unknown router route' }));
         } else if (routerResult.parse) {
-          let body = '';
-          req.on('data', chunk => { body += chunk; });
-          req.on('end', () => {
-            try {
-              const payload = JSON.parse(body);
-              const data = processRouterBody(routerResult.handler, payload, routerResult.userId);
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify(data));
-            } catch (err) {
-              res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          try {
+            const body = await readBody(req);
+            const payload = JSON.parse(body);
+            const data = processRouterBody(routerResult.handler, payload, routerResult.userId);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
         } else {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(routerResult.data));
@@ -2494,19 +2517,17 @@ async function main() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(getConsensusState()));
           } else {
-            let body = '';
-            req.on('data', chunk => { body += chunk; });
-            req.on('end', async () => {
-              try {
-                const payload = JSON.parse(body);
-                const data = await processConsensusBody(consensusHandler, payload);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data || { ok: true }));
-              } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-              }
-            });
+            try {
+              const body = await readBody(req);
+              const payload = JSON.parse(body);
+              const signature = req.headers['x-shard-signature'] || null;
+              const data = await processConsensusBody(consensusHandler, payload, signature);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data || { ok: true }));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
           }
           return;
         }
@@ -2516,19 +2537,16 @@ async function main() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(getCRPCStats()));
           } else {
-            let body = '';
-            req.on('data', chunk => { body += chunk; });
-            req.on('end', () => {
-              try {
-                const payload = JSON.parse(body);
-                const data = processCRPCBody(crpcHandler, payload);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data));
-              } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-              }
-            });
+            try {
+              const body = await readBody(req);
+              const payload = JSON.parse(body);
+              const data = processCRPCBody(crpcHandler, payload);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
           }
           return;
         }
@@ -2539,19 +2557,16 @@ async function main() {
         const kcPath = kcUrl.pathname;
         const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
         if (kcHandler === 'epoch') {
-          let body = '';
-          req.on('data', chunk => { body += chunk; });
-          req.on('end', () => {
-            try {
-              const payload = JSON.parse(body);
-              const data = processKnowledgeChainBody(kcHandler, payload);
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify(data));
-            } catch (err) {
-              res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          try {
+            const body = await readBody(req);
+            const payload = JSON.parse(body);
+            const data = processKnowledgeChainBody(kcHandler, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
           return;
         } else if (kcHandler) {
           const query = Object.fromEntries(kcUrl.searchParams);
@@ -2640,6 +2655,9 @@ async function main() {
   await initDeepStorage();
   await initHell();
   console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining + deep storage + hell loaded.');
+
+  // Security posture check (runs every startup)
+  await runSecurityChecks();
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
   console.log('[jarvis] Step 3.5: Initializing shard identity...');
@@ -3303,19 +3321,17 @@ async function main() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(getConsensusState()));
           } else {
-            let body = '';
-            req.on('data', chunk => { body += chunk; });
-            req.on('end', async () => {
-              try {
-                const payload = JSON.parse(body);
-                const data = await processConsensusBody(consensusHandler, payload);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data || { ok: true }));
-              } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-              }
-            });
+            try {
+              const body = await readBody(req);
+              const payload = JSON.parse(body);
+              const signature = req.headers['x-shard-signature'] || null;
+              const data = await processConsensusBody(consensusHandler, payload, signature);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data || { ok: true }));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
           }
           return;
         }

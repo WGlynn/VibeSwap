@@ -601,6 +601,123 @@ export function getFallbackChain() {
   };
 }
 
+// ============ Wardenclyffe — Elastic Intelligence Tiers ============
+//
+// Quality degrades visibly when paid providers exhaust.
+// This creates economic incentive: community tips refill premium credits.
+// Supply (Anthropic credits) and demand (output quality) find equilibrium.
+//
+// Tier 1: Claude          — quality 1.00 (reference)
+// Tier 1: DeepSeek        — quality 0.85
+// Tier 1: Gemini          — quality 0.75
+// Tier 1: OpenAI GPT-4o   — quality 0.90
+// Tier 2: Cerebras/Groq   — quality 0.60 (Llama 3.3 70B)
+// Tier 2: OpenRouter      — quality 0.55 (free DeepSeek R1)
+// Tier 2: Mistral Small   — quality 0.50
+// Tier 2: Together        — quality 0.60
+
+const PROVIDER_QUALITY = {
+  claude:     { quality: 1.00, tier: 1, label: 'Premium' },
+  deepseek:   { quality: 0.85, tier: 1, label: 'Premium' },
+  openai:     { quality: 0.90, tier: 1, label: 'Premium' },
+  gemini:     { quality: 0.75, tier: 1, label: 'Premium' },
+  cerebras:   { quality: 0.60, tier: 2, label: 'Free' },
+  groq:       { quality: 0.60, tier: 2, label: 'Free' },
+  openrouter: { quality: 0.55, tier: 2, label: 'Free' },
+  mistral:    { quality: 0.50, tier: 2, label: 'Free' },
+  together:   { quality: 0.60, tier: 2, label: 'Free' },
+  ollama:     { quality: 0.40, tier: 3, label: 'Local' },
+};
+
+// Track when we dropped from Tier 1 to Tier 2
+let degradedSince = null;
+let degradationNotified = false;
+
+/**
+ * Get current intelligence quality as a percentage.
+ * 100% = Claude (best). Drops as we cascade to cheaper providers.
+ */
+export function getIntelligenceLevel() {
+  const name = activeProvider?.name || 'none';
+  const info = PROVIDER_QUALITY[name] || { quality: 0.50, tier: 2, label: 'Unknown' };
+  return {
+    provider: name,
+    model: activeProvider?.model || 'unknown',
+    quality: Math.round(info.quality * 100),
+    tier: info.tier,
+    tierLabel: info.tierLabel || info.label,
+    degraded: info.tier > 1,
+    degradedSince,
+    primary: primaryProviderName,
+    fallbacksRemaining: fallbackProviders.length,
+  };
+}
+
+/**
+ * Check if intelligence just degraded (for one-time notification).
+ * Returns degradation info or null if no change.
+ */
+export function checkDegradation() {
+  const name = activeProvider?.name || 'none';
+  const info = PROVIDER_QUALITY[name] || { tier: 2 };
+
+  if (info.tier > 1 && !degradedSince) {
+    degradedSince = Date.now();
+    degradationNotified = false;
+  }
+
+  if (info.tier <= 1 && degradedSince) {
+    // Recovered to premium
+    degradedSince = null;
+    degradationNotified = false;
+    return { recovered: true, provider: name };
+  }
+
+  if (degradedSince && !degradationNotified) {
+    degradationNotified = true;
+    return {
+      degraded: true,
+      provider: name,
+      quality: Math.round((info.quality || 0.5) * 100),
+      since: degradedSince,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Attempt to restore the primary (premium) provider.
+ * Called when tip jar receives funds — try to reactivate Claude.
+ */
+export function tryRestorePrimary() {
+  if (activeProvider?.name === primaryProviderName) {
+    return { restored: false, reason: 'already on primary' };
+  }
+
+  const primaryConfig = getProviderConfig(primaryProviderName);
+  if (!primaryConfig.apiKey) {
+    return { restored: false, reason: 'no API key for primary' };
+  }
+
+  try {
+    const factory = providers.get(primaryProviderName);
+    if (!factory) return { restored: false, reason: 'unknown provider' };
+
+    const primary = factory(primaryConfig);
+    // Prepend current active + remaining fallbacks behind the restored primary
+    fallbackProviders.unshift(activeProvider, ...fallbackProviders);
+    activeProvider = primary;
+    degradedSince = null;
+    degradationNotified = false;
+
+    console.log(`[wardenclyffe] Primary provider restored: ${primaryProviderName} — tip jar refilled credits`);
+    return { restored: true, provider: primaryProviderName, model: primary.model };
+  } catch (err) {
+    return { restored: false, reason: err.message };
+  }
+}
+
 // ============ Credit/Billing Error Detection ============
 
 function isCreditError(error) {
@@ -628,9 +745,19 @@ function isCreditError(error) {
 
 function activateFallback() {
   if (fallbackProviders.length === 0) return false;
+  const previous = activeProvider?.name;
   const next = fallbackProviders.shift();
-  console.warn(`[llm] PRIMARY PROVIDER CREDIT EXHAUSTED — falling back to ${next.name} (${next.model})`);
+  const info = PROVIDER_QUALITY[next.name] || { tier: 2, quality: 0.5 };
+  console.warn(`[wardenclyffe] ${previous} credits exhausted — cascading to ${next.name} (${next.model}) [Tier ${info.tier}, ${Math.round(info.quality * 100)}% quality]`);
   activeProvider = next;
+
+  // Track degradation onset
+  if (info.tier > 1 && !degradedSince) {
+    degradedSince = Date.now();
+    degradationNotified = false;
+    console.warn(`[wardenclyffe] Intelligence degraded to free tier — tip jar contributions will restore premium quality`);
+  }
+
   return true;
 }
 

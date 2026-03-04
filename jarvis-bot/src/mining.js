@@ -46,6 +46,12 @@ let state = {
   balances: {},      // userId -> JUL balance
   proofCounts: {},   // userId -> total proofs
   replaySet: [],     // proof hashes for current epoch (serialized as array)
+  treasury: {
+    totalBurned: 0,       // all-time JUL burned (never resets)
+    dailyBurned: 0,       // JUL burned today (resets on day rollover)
+    dailyBurnDate: '',    // YYYY-MM-DD — triggers daily reset
+    tips: [],             // tip records [{ userId, amount, timestamp }]
+  },
 };
 
 let replaySet = new Set();       // in-memory Set for O(1) lookups
@@ -265,6 +271,110 @@ export function getMiningStats(userId) {
     activeMinerCount: Object.keys(state.proofCounts).length,
     totalNetworkProofs: state.totalProofs,
     reward: calculateReward(state.difficulty),
+  };
+}
+
+// ============ Treasury — JUL Burn + Tip ============
+
+function ensureTreasuryDayRollover() {
+  const today = new Date().toISOString().split('T')[0];
+  if (!state.treasury) {
+    state.treasury = { totalBurned: 0, dailyBurned: 0, dailyBurnDate: today, tips: [] };
+  }
+  if (state.treasury.dailyBurnDate !== today) {
+    state.treasury.dailyBurned = 0;
+    state.treasury.dailyBurnDate = today;
+    dirty = true;
+  }
+}
+
+/**
+ * Burn JUL from a user's balance into the treasury.
+ * Returns { success, burned, newBalance, poolExpansion } or { success: false, reason }.
+ */
+export function burnJUL(userId, amount, reason = 'burn') {
+  ensureTreasuryDayRollover();
+  if (!userId || typeof amount !== 'number' || amount <= 0) {
+    return { success: false, reason: 'invalid_amount' };
+  }
+  const balance = state.balances[userId] || 0;
+  if (balance < amount) {
+    return { success: false, reason: 'insufficient_balance', balance };
+  }
+
+  state.balances[userId] = balance - amount;
+  state.treasury.totalBurned += amount;
+  state.treasury.dailyBurned += amount;
+  dirty = true;
+
+  console.log(`[mining] Burn: ${userId} burned ${amount.toFixed(2)} JUL (${reason}) — daily total: ${state.treasury.dailyBurned.toFixed(2)}`);
+
+  return {
+    success: true,
+    burned: amount,
+    newBalance: state.balances[userId],
+    poolExpansion: amount * JUL_PER_API_TOKEN,
+    dailyBurned: state.treasury.dailyBurned,
+    totalBurned: state.treasury.totalBurned,
+  };
+}
+
+/**
+ * Tip JUL — burn from sender's balance, record in treasury.
+ * Returns receipt or { success: false, reason }.
+ */
+export function tipJUL(fromUserId, amount) {
+  const result = burnJUL(fromUserId, amount, 'tip');
+  if (!result.success) return result;
+
+  state.treasury.tips.push({
+    userId: fromUserId,
+    amount,
+    timestamp: Date.now(),
+  });
+
+  // Keep tips array bounded (last 1000)
+  if (state.treasury.tips.length > 1000) {
+    state.treasury.tips = state.treasury.tips.slice(-1000);
+  }
+
+  dirty = true;
+  return result;
+}
+
+/**
+ * Get daily JUL burned (for compute-economics pool expansion).
+ */
+export function getDailyBurned() {
+  ensureTreasuryDayRollover();
+  return state.treasury.dailyBurned;
+}
+
+/**
+ * Get treasury stats for display.
+ */
+export function getTreasuryStats() {
+  ensureTreasuryDayRollover();
+  const now = Date.now();
+  const todayTips = state.treasury.tips.filter(t =>
+    new Date(t.timestamp).toISOString().split('T')[0] === state.treasury.dailyBurnDate
+  );
+
+  return {
+    totalBurned: state.treasury.totalBurned,
+    dailyBurned: state.treasury.dailyBurned,
+    dailyPoolExpansion: state.treasury.dailyBurned * JUL_PER_API_TOKEN,
+    tipsToday: todayTips.length,
+    tipsAllTime: state.treasury.tips.length,
+    topTippers: Object.entries(
+      state.treasury.tips.reduce((acc, t) => {
+        acc[t.userId] = (acc[t.userId] || 0) + t.amount;
+        return acc;
+      }, {})
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([userId, total]) => ({ userId, totalTipped: total })),
   };
 }
 

@@ -46,8 +46,8 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
-import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats } from './compute-economics.js';
-import { initMining, flushMining, getMiningStats, getLeaderboard } from './mining.js';
+import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool } from './compute-economics.js';
+import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { createServer } from 'http';
@@ -893,15 +893,20 @@ bot.command('balance', async (ctx) => {
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
   const mining = getMiningStats(userId);
   const compute = getComputeStats(userId);
+  const treasury = getTreasuryStats();
   const learningStats = await getLearningStats(userId, ctx.chat.id);
 
   const lines = [
     `Balance: ${userName}`,
     '',
     `JUL: ${mining.julBalance.toFixed(2)}`,
-    `API tokens earned: ${mining.apiTokensEarned.toLocaleString()}`,
     `Proofs submitted: ${mining.proofsSubmitted}`,
     `Mining difficulty: ${mining.difficulty}`,
+    '',
+    'JUL Bridge:',
+    `  Burned today: ${treasury.dailyBurned.toFixed(2)} JUL`,
+    `  Pool expansion: +${treasury.dailyPoolExpansion.toLocaleString()} tokens`,
+    `  Effective pool: ${compute.pool.dailyPool.toLocaleString()} (${compute.pool.basePool.toLocaleString()} base + ${compute.pool.julBonus.toLocaleString()} JUL bonus)`,
     '',
   ];
 
@@ -926,21 +931,40 @@ bot.command('economy', async (ctx) => {
 
   const compute = getComputeStats(null);
   const mining = getLeaderboard(5);
+  const treasury = getTreasuryStats();
 
   const lines = [
     'JOULE Economy',
     '',
-    `Daily pool: ${compute.pool.dailyPool.toLocaleString()} tokens`,
-    `Pool used: ${compute.pool.poolUsed.toLocaleString()} (${compute.pool.poolUtilization}%)`,
-    `Pool remaining: ${compute.pool.poolRemaining.toLocaleString()}`,
-    `Active users today: ${compute.pool.activeUsers}`,
-    `Total users: ${compute.pool.totalUsers}`,
+    'Compute Pool:',
+    `  Base pool: ${compute.pool.basePool.toLocaleString()} tokens (Will subsidy)`,
+    `  JUL bonus: +${compute.pool.julBonus.toLocaleString()} tokens (${treasury.dailyBurned.toFixed(2)} JUL burned today)`,
+    `  Effective pool: ${compute.pool.dailyPool.toLocaleString()} tokens`,
+    `  Pool used: ${compute.pool.poolUsed.toLocaleString()} (${compute.pool.poolUtilization}%)`,
+    `  Pool remaining: ${compute.pool.poolRemaining.toLocaleString()}`,
+    '',
+    'Network:',
+    `  Active users today: ${compute.pool.activeUsers}`,
+    `  Total users: ${compute.pool.totalUsers}`,
+    '',
+    'Treasury:',
+    `  JUL burned today: ${treasury.dailyBurned.toFixed(2)}`,
+    `  JUL burned all-time: ${treasury.totalBurned.toFixed(2)}`,
+    `  Tips today: ${treasury.tipsToday} | All-time: ${treasury.tipsAllTime}`,
     '',
     `Mining: epoch ${mining.epoch}, difficulty ${mining.difficulty}`,
     `Total proofs: ${mining.totalProofs}`,
     `Active miners: ${mining.totalMiners}`,
     '',
   ];
+
+  if (treasury.topTippers.length > 0) {
+    lines.push('Top tippers (all-time):');
+    for (const t of treasury.topTippers) {
+      lines.push(`  ${t.userId} — ${t.totalTipped.toFixed(2)} JUL`);
+    }
+    lines.push('');
+  }
 
   if (mining.leaderboard.length > 0) {
     lines.push('Top miners:');
@@ -956,15 +980,59 @@ bot.command('economy', async (ctx) => {
 // ============ Tip — Tip Jar Address ============
 
 bot.command('tip', async (ctx) => {
-  const tipAddress = config.tipAddress || process.env.TIP_ADDRESS || null;
+  const userId = String(ctx.from.id);
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const amount = parseFloat(args[0]);
 
-  if (tipAddress) {
-    ctx.reply(
-      `Tip jar\n\nSend tips to support Jarvis development:\n${tipAddress}\n\nAll tips go to the VibeSwap treasury.`
-    );
-  } else {
-    ctx.reply('Tip jar not configured yet. Stay tuned!');
+  // /tip (no amount) — show info
+  if (!args[0] || isNaN(amount)) {
+    const mining = getMiningStats(userId);
+    const treasury = getTreasuryStats();
+    const compute = getComputeStats(userId);
+
+    const lines = [
+      'JUL Tip — Burn JUL to expand the compute pool',
+      '',
+      `Your JUL balance: ${mining.julBalance.toFixed(2)}`,
+      `Burned today (network): ${treasury.dailyBurned.toFixed(2)} JUL`,
+      `Pool expansion: +${treasury.dailyPoolExpansion.toLocaleString()} tokens`,
+      `Effective pool: ${compute.pool.dailyPool.toLocaleString()} tokens`,
+      '',
+      'How it works:',
+      '  /tip <amount> — burn JUL to expand the pool for everyone',
+      '  1 JUL burned = 1,000 extra API tokens in the daily pool',
+      '  Work in, access out. No money needed.',
+      '',
+      `All-time burned: ${treasury.totalBurned.toFixed(2)} JUL`,
+    ];
+    return ctx.reply(lines.join('\n'));
   }
+
+  // /tip <amount> — burn JUL
+  if (amount <= 0) {
+    return ctx.reply('Tip amount must be positive.');
+  }
+
+  const result = tipJUL(userId, amount);
+
+  if (!result.success) {
+    if (result.reason === 'insufficient_balance') {
+      return ctx.reply(`Not enough JUL. Balance: ${result.balance.toFixed(2)} JUL. Mine more with /mine.`);
+    }
+    return ctx.reply('Tip failed. Try again.');
+  }
+
+  const lines = [
+    `${userName} tipped ${amount.toFixed(2)} JUL`,
+    '',
+    `Pool expanded by ${result.poolExpansion.toLocaleString()} tokens`,
+    `Daily JUL burned: ${result.dailyBurned.toFixed(2)}`,
+    `Your remaining balance: ${result.newBalance.toFixed(2)} JUL`,
+    '',
+    'The entire network benefits. Work in, access out.',
+  ];
+  ctx.reply(lines.join('\n'));
 });
 
 // ============ Spawn Shard (One-Click via Telegram) ============

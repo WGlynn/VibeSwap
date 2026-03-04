@@ -177,10 +177,11 @@ export function updatePricing({ costPerMTok, cpiIndex } = {}) {
       source: 'manual',
     };
   }
-  if (typeof costPerMTok === 'number' && costPerMTok > 0) {
+  // Bounded pricing: $0.01–$100/MTok, CPI 50–500
+  if (typeof costPerMTok === 'number' && costPerMTok >= 0.01 && costPerMTok <= 100) {
     state.pricing.costPerMTok = costPerMTok;
   }
-  if (typeof cpiIndex === 'number' && cpiIndex > 0) {
+  if (typeof cpiIndex === 'number' && cpiIndex >= 50 && cpiIndex <= 500) {
     state.pricing.cpiIndex = cpiIndex;
   }
   state.pricing.lastUpdated = Date.now();
@@ -436,16 +437,19 @@ export function recordUsage(userId, usage, quality) {
   checkDayRollover();
   const user = ensureUser(userId);
 
-  const input = usage?.input || 0;
-  const output = usage?.output || 0;
+  // Cap per-call tokens to prevent a single malformed call from destroying accounting
+  const MAX_TOKENS_PER_CALL = 200_000;
+  const input = Math.max(0, Math.min(MAX_TOKENS_PER_CALL, usage?.input || 0));
+  const output = Math.max(0, Math.min(MAX_TOKENS_PER_CALL, usage?.output || 0));
 
   user.today.input += input;
   user.today.output += output;
   user.allTime.input += input;
   user.allTime.output += output;
 
-  if (typeof quality === 'number' && quality >= 0) {
-    user.quality.sum += quality;
+  // Clamp quality to [0, 5]
+  if (typeof quality === 'number') {
+    user.quality.sum += Math.max(0, Math.min(5, quality));
     user.quality.count += 1;
   }
 
@@ -565,10 +569,39 @@ export function getComputeStats(userId) {
 
 // ============ Persistence ============
 
+function validateState(parsed) {
+  if (!parsed || typeof parsed !== 'object') return false;
+  if (parsed.users && typeof parsed.users !== 'object') return false;
+  if (parsed.dayKey && typeof parsed.dayKey !== 'string') return false;
+  if (parsed.shapleySum !== undefined && typeof parsed.shapleySum !== 'number') return false;
+  // Validate user entries
+  if (parsed.users) {
+    for (const [userId, user] of Object.entries(parsed.users)) {
+      if (!user || typeof user !== 'object') return false;
+      if (user.today && (typeof user.today.input !== 'number' || typeof user.today.output !== 'number')) return false;
+      if (user.allTime && (typeof user.allTime.input !== 'number' || typeof user.allTime.output !== 'number')) return false;
+      // Check for corrupted negative values
+      if (user.today?.input < 0 || user.today?.output < 0) return false;
+      if (user.allTime?.input < 0 || user.allTime?.output < 0) return false;
+    }
+  }
+  // Validate pricing
+  if (parsed.pricing) {
+    const p = parsed.pricing;
+    if (p.costPerMTok !== undefined && (typeof p.costPerMTok !== 'number' || p.costPerMTok <= 0)) return false;
+    if (p.cpiIndex !== undefined && (typeof p.cpiIndex !== 'number' || p.cpiIndex <= 0)) return false;
+  }
+  return true;
+}
+
 async function loadState() {
   try {
     const data = await readFile(STATE_FILE, 'utf-8');
     const parsed = JSON.parse(data);
+    if (!validateState(parsed)) {
+      console.warn('[compute-econ] State file failed validation — using default state');
+      return;
+    }
     state = { ...state, ...parsed };
     console.log(`[compute-econ] Loaded state: ${Object.keys(state.users).length} users, day=${state.dayKey}`);
   } catch {

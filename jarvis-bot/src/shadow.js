@@ -16,7 +16,7 @@
 // Crypto: AES-256-GCM via Rosetta Stone Protocol (privacy.js)
 // ============
 
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, randomInt } from 'crypto';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
@@ -51,8 +51,8 @@ const NOUNS = [
 ];
 
 function generateCodename() {
-  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const adj = ADJECTIVES[randomInt(ADJECTIVES.length)];
+  const noun = NOUNS[randomInt(NOUNS.length)];
   const codename = `${adj} ${noun}`;
   // Ensure uniqueness
   if (shadows.has(codename)) return generateCodename();

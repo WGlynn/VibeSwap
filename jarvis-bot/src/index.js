@@ -935,14 +935,26 @@ bot.command('economy', async (ctx) => {
   const treasury = getTreasuryStats();
   const pricing = getPricingInfo();
 
+  const L0 = pricing.layer0;
+  const L1 = pricing.layer1;
+
   const lines = [
     'JOULE Economy',
     '',
-    'Pricing Oracle:',
-    `  1 JUL = ${pricing.ratio.toLocaleString()} tokens (CPI-adjusted)`,
-    `  API cost: $${pricing.costPerMTok.toFixed(2)}/MTok (ref: $${pricing.referenceCostPerMTok.toFixed(2)})`,
-    `  CPI index: ${pricing.cpiIndex} (ref: ${pricing.referenceCPI})`,
-    `  Source: ${pricing.source}${pricing.lastUpdated ? ' (updated ' + new Date(pricing.lastUpdated).toLocaleDateString() + ')' : ''}`,
+    `Pricing Oracle: 1 JUL = ${pricing.ratio.toLocaleString()} tokens`,
+    `  Source: ${pricing.source}`,
+    '',
+    '  Layer 0 (trustless floor):',
+    `    Ratio: ${L0.ratio.toLocaleString()} | Hash cost index: ${L0.hashCostIndex}`,
+    `    Confidence: ${(L0.confidence * 100).toFixed(0)}% (${L0.epochsUsed} epochs)`,
+    `    Difficulty: ${L0.difficulty} (ref: ${L0.referenceDifficulty}) | Trend: ${L0.trend}`,
+    '',
+    '  Layer 1 (CPI refinement):',
+    `    Ratio: ${L1.ratio.toLocaleString()}`,
+    `    API cost: $${L1.costPerMTok.toFixed(2)}/MTok (ref: $${L1.referenceCostPerMTok.toFixed(2)})`,
+    `    CPI: ${L1.cpiIndex} (ref: ${L1.referenceCPI})${L1.lastUpdated ? ' | Updated: ' + new Date(L1.lastUpdated).toLocaleDateString() : ''}`,
+    '',
+    `  Divergence: ${pricing.divergence}%${pricing.circuitBroken ? ' — CIRCUIT BREAKER ACTIVE (Layer 0 wins)' : ''}`,
     '',
     'Compute Pool:',
     `  Base pool: ${compute.pool.basePool.toLocaleString()} tokens (Will subsidy)`,
@@ -1054,16 +1066,21 @@ bot.command('reprice', async (ctx) => {
   if (args.length === 0) {
     const p = getPricingInfo();
     return ctx.reply(
-      `JUL Pricing Oracle\n\n` +
-      `Current ratio: 1 JUL = ${p.ratio.toLocaleString()} tokens\n` +
-      `API cost: $${p.costPerMTok.toFixed(2)}/MTok (ref: $${p.referenceCostPerMTok.toFixed(2)})\n` +
-      `CPI index: ${p.cpiIndex} (ref: ${p.referenceCPI})\n` +
-      `Base ratio: ${p.baseRatio} (at reference prices)\n` +
+      `JUL Pricing Oracle (Floor/Ceiling Convergence)\n\n` +
+      `Final ratio: 1 JUL = ${p.ratio.toLocaleString()} tokens\n` +
       `Source: ${p.source}\n\n` +
+      `Layer 0 (trustless floor):\n` +
+      `  Ratio: ${p.layer0.ratio.toLocaleString()} | Hash cost: ${p.layer0.hashCostIndex}\n` +
+      `  Confidence: ${(p.layer0.confidence * 100).toFixed(0)}% | Trend: ${p.layer0.trend}\n\n` +
+      `Layer 1 (CPI refinement):\n` +
+      `  Ratio: ${p.layer1.ratio.toLocaleString()}\n` +
+      `  API: $${p.layer1.costPerMTok.toFixed(2)}/MTok | CPI: ${p.layer1.cpiIndex}\n\n` +
+      `Divergence: ${p.divergence}%${p.circuitBroken ? ' — CIRCUIT BREAKER' : ''}\n\n` +
       `Usage:\n` +
-      `  /reprice cost <$/MTok> — update API cost\n` +
-      `  /reprice cpi <index> — update CPI index\n` +
-      `  /reprice cost 1.50 cpi 103 — update both`
+      `  /reprice cost <$/MTok> — update API cost (Layer 1)\n` +
+      `  /reprice cpi <index> — update CPI index (Layer 1)\n` +
+      `  /reprice cost 1.50 cpi 103 — update both\n\n` +
+      `Layer 0 adjusts automatically from mining data.`
     );
   }
 

@@ -839,19 +839,32 @@ bot.command('network', async (ctx) => {
 // ============ Mine — Launch Shard Miner Mini App ============
 
 bot.command('mine', async (ctx) => {
-  const healthPort = parseInt(process.env.HEALTH_PORT || '8080');
   const webAppUrl = process.env.WEBAPP_URL || `https://jarvis-vibeswap.fly.dev/app/`;
+  const isPrivate = ctx.chat.type === 'private';
 
-  await ctx.reply(
-    'Launch a Jarvis shard on your phone.\nMine JUL, join consensus, earn compute credits.',
-    {
-      reply_markup: {
-        inline_keyboard: [[
-          { text: 'Launch Shard', web_app: { url: webAppUrl } }
-        ]]
+  if (isPrivate) {
+    // DM: web_app button works in reply keyboard
+    await ctx.reply(
+      'Launch a Jarvis shard on your phone.\nMine JUL, join consensus, earn compute credits.',
+      {
+        reply_markup: {
+          keyboard: [[
+            { text: 'Launch Shard', web_app: { url: webAppUrl } }
+          ]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        }
       }
-    }
-  );
+    );
+  } else {
+    // Group: web_app buttons not allowed — send direct link + DM prompt
+    const botUsername = ctx.botInfo?.username || 'JarvisVibeSwapBot';
+    await ctx.reply(
+      'Launch a Jarvis shard on your phone.\nMine JUL, join consensus, earn compute credits.\n\n' +
+      `Tap to open: ${webAppUrl}\n\n` +
+      `Or DM me @${botUsername} and type /mine for the full Mini App experience.`
+    );
+  }
 });
 
 // Handle data sent back when Mini App closes

@@ -1,7 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { config } from './config.js';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+import { llmChat } from './llm-provider.js';
+import { recordUsage } from './compute-economics.js';
 
 // ============ Proactive Intelligence ============
 // Jarvis analyzes group messages and decides autonomously when to contribute.
@@ -66,7 +65,7 @@ export async function analyzeMessage(text, userName, recentContext) {
   }
 
   try {
-    const response = await client.messages.create({
+    const response = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       system: `You are a message triage system for JARVIS, the AI co-admin of VibeSwap (a cooperative capitalism DEX). Analyze the message and return EXACTLY one JSON object.
@@ -91,6 +90,11 @@ For MODERATE, also include "violation": type of violation and "severity": "low" 
         content: `[${userName}]: ${text}${recentContext ? '\n\nRecent context:\n' + recentContext : ''}`
       }],
     });
+
+    // Record budget usage for triage call
+    if (response.usage) {
+      recordUsage('jarvis-intelligence', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
 
     const raw = response.content
       .filter(block => block.type === 'text')
@@ -131,7 +135,7 @@ For MODERATE, also include "violation": type of violation and "severity": "low" 
 
 export async function generateProactiveResponse(text, userName, responseHint, systemPrompt) {
   try {
-    const response = await client.messages.create({
+    const response = await llmChat({
       model: config.anthropic.model,
       max_tokens: config.maxTokens,
       system: systemPrompt,
@@ -140,6 +144,11 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
         content: `[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're part of this conversation — not observing from outside. Hint: ${responseHint}. Be natural, be yourself. You can be funny, opinionated, curious, or direct. 1-4 sentences. Talk like a teammate, not an assistant.]`
       }],
     });
+
+    // Record budget usage for proactive response
+    if (response.usage) {
+      recordUsage('jarvis-intelligence', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
 
     const reply = response.content
       .filter(block => block.type === 'text')
@@ -184,7 +193,7 @@ export async function analyzeContributionQuality(text, category) {
   if (text.length < 30) return { quality: 1, tags: [] };
 
   try {
-    const response = await client.messages.create({
+    const response = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       system: `Rate a community message's contribution quality for a DeFi governance project. Return ONLY a JSON object.
@@ -193,6 +202,11 @@ Tags: pick 0-3 from [original_idea, technical, governance, helpful, constructive
 JSON: { "quality": N, "tags": [...] }`,
       messages: [{ role: 'user', content: `Category: ${category}\nMessage: ${text}` }],
     });
+
+    // Record budget usage for quality analysis
+    if (response.usage) {
+      recordUsage('jarvis-intelligence', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
 
     const raw = response.content
       .filter(block => block.type === 'text')

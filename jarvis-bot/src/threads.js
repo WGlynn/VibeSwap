@@ -1,10 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { createHash } from 'crypto';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+import { llmChat } from './llm-provider.js';
+import { recordUsage } from './compute-economics.js';
 const DATA_DIR = config.dataDir;
 const THREADS_FILE = join(DATA_DIR, 'threads.json');
 
@@ -131,7 +130,7 @@ export async function archiveThread(chatId, chatTitle, requestedBy) {
   let topics = [];
 
   try {
-    const response = await client.messages.create({
+    const response = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       system: `Summarize this community discussion thread in 2-3 sentences. Also extract 1-3 topic tags. Return JSON: { "summary": "...", "topics": ["topic1", "topic2"] }`,
@@ -142,6 +141,11 @@ export async function archiveThread(chatId, chatTitle, requestedBy) {
       .filter(block => block.type === 'text')
       .map(block => block.text)
       .join('');
+
+    // Record budget usage for thread archival
+    if (response.usage) {
+      recordUsage('jarvis-threads', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (jsonMatch) {

@@ -78,7 +78,7 @@ setInterval(() => {
 
 function validateTelegramInitData(initData) {
   const botToken = config.telegram?.token;
-  if (!botToken) return true; // Skip validation if no bot token configured
+  if (!botToken) return false; // Fail-closed: reject if bot token not configured
 
   try {
     const params = new URLSearchParams(initData);
@@ -118,10 +118,18 @@ function getClientIP(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
 }
 
+const MAX_BODY_SIZE = 64 * 1024; // 64 KB max request body
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error('Request body too large'));
+      }
+    });
     req.on('end', () => resolve(body));
     req.on('error', reject);
   });
@@ -353,18 +361,54 @@ export async function handleWebRequest(req, res, pathname) {
       const body = JSON.parse(await readBody(req));
       const { userId, nonce, hash, challenge, initData } = body;
 
-      if (!userId || !nonce || !hash || !challenge) {
-        jsonResponse(res, 400, { error: 'Missing required fields: userId, nonce, hash, challenge' });
+      if (!nonce || !hash || !challenge) {
+        jsonResponse(res, 400, { error: 'Missing required fields: nonce, hash, challenge' });
         return true;
       }
 
-      // Validate Telegram initData if provided (prevents non-Telegram clients)
-      if (initData && !validateTelegramInitData(initData)) {
+      // Require valid Telegram initData — binds proof to authenticated identity
+      if (!initData) {
+        jsonResponse(res, 403, { error: 'Telegram initData required' });
+        return true;
+      }
+      if (!validateTelegramInitData(initData)) {
         jsonResponse(res, 403, { error: 'Invalid Telegram initData' });
         return true;
       }
 
-      const result = submitProof(userId, nonce, hash, challenge);
+      // Extract authenticated userId from initData (not from request body)
+      let authenticatedUserId = userId;
+      try {
+        const params = new URLSearchParams(initData);
+        const userJson = params.get('user');
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          authenticatedUserId = String(user.id); // Telegram user ID — tamper-proof
+        }
+      } catch {
+        // Fall through with provided userId if parsing fails
+      }
+
+      if (!authenticatedUserId) {
+        jsonResponse(res, 400, { error: 'Could not determine userId' });
+        return true;
+      }
+
+      // Input validation — prevent oversized or malformed inputs
+      if (typeof nonce !== 'string' || nonce.length !== 64 || !/^[0-9a-f]{64}$/i.test(nonce)) {
+        jsonResponse(res, 400, { error: 'Invalid nonce format (expected 64 hex chars)' });
+        return true;
+      }
+      if (typeof hash !== 'string' || hash.length !== 64 || !/^[0-9a-f]{64}$/i.test(hash)) {
+        jsonResponse(res, 400, { error: 'Invalid hash format (expected 64 hex chars)' });
+        return true;
+      }
+      if (typeof challenge !== 'string' || challenge.length !== 64 || !/^[0-9a-f]{64}$/i.test(challenge)) {
+        jsonResponse(res, 400, { error: 'Invalid challenge format (expected 64 hex chars)' });
+        return true;
+      }
+
+      const result = submitProof(authenticatedUserId, nonce, hash, challenge);
       const status = result.accepted ? 200 : 400;
       jsonResponse(res, status, result);
     } catch (err) {

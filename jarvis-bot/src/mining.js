@@ -232,10 +232,10 @@ export function submitProof(userId, nonce, hash, challenge) {
     state.epoch++;
     state.epochProofs = 0;
     state.epochStartTime = Date.now();
-    // Clear replay set for new epoch
+    // Rotate challenge FIRST — old proofs become stale before replay set clears
+    rotateChallenge();
     replaySet.clear();
     state.replaySet = [];
-    rotateChallenge();
     console.log(`[mining] New epoch ${state.epoch} — difficulty: ${state.difficulty}`);
   }
 
@@ -287,6 +287,16 @@ export async function initMining() {
   saveTimer = setInterval(() => {
     if (dirty) flushMining();
   }, AUTO_SAVE_INTERVAL);
+
+  // Rate limit cleanup (every 5 min — mirrors web-api pattern)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [userId, bucket] of rateLimits) {
+      const recent = bucket.filter(t => now - t < 60_000);
+      if (recent.length === 0) rateLimits.delete(userId);
+      else rateLimits.set(userId, recent);
+    }
+  }, 5 * 60_000);
 
   ensureChallenge();
   console.log(`[mining] Mining engine initialized — difficulty ${state.difficulty}, challenge ${state.challenge.slice(0, 16)}...`);

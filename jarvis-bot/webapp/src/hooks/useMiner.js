@@ -23,9 +23,11 @@ export function useMiner(shardId) {
   const [log, setLog] = useState([]);
 
   const workersRef = useRef([]);
+  const workerRatesRef = useRef(new Map()); // workerId -> latest rate
   const challengeRef = useRef('');
   const challengeTimerRef = useRef(null);
   const miningRef = useRef(false);
+  const startingRef = useRef(false); // Guard against double-click race
 
   const addLog = useCallback((msg) => {
     setLog(prev => [...prev.slice(-49), { time: new Date().toLocaleTimeString(), msg }]);
@@ -76,10 +78,11 @@ export function useMiner(shardId) {
 
   // Start mining
   const startMining = useCallback(async () => {
-    if (miningRef.current || !shardId) return;
+    if (miningRef.current || startingRef.current || !shardId) return;
+    startingRef.current = true; // Guard against double-click during await
 
     const target = await refreshChallenge();
-    if (!target) return;
+    if (!target) { startingRef.current = false; return; }
 
     miningRef.current = true;
     setMining(true);
@@ -93,15 +96,16 @@ export function useMiner(shardId) {
         { type: 'module' }
       );
 
+      const workerId = i;
       worker.onmessage = (e) => {
         if (e.data.type === 'proof') {
           handleProof(e.data.nonce, e.data.hash);
         } else if (e.data.type === 'hashrate') {
-          // Sum hashrates from all workers
-          setHashrate(prev => {
-            // Simple averaging approach: report latest from this worker
-            return e.data.rate * threads;
-          });
+          // Track each worker's rate individually and sum
+          workerRatesRef.current.set(workerId, e.data.rate);
+          let total = 0;
+          for (const rate of workerRatesRef.current.values()) total += rate;
+          setHashrate(total);
         }
       };
 
@@ -119,6 +123,8 @@ export function useMiner(shardId) {
     }
 
     workersRef.current = workers;
+    workerRatesRef.current.clear();
+    startingRef.current = false;
 
     // Set up challenge refresh timer
     challengeTimerRef.current = setInterval(async () => {
@@ -141,8 +147,10 @@ export function useMiner(shardId) {
   // Stop mining
   const stopMining = useCallback(() => {
     miningRef.current = false;
+    startingRef.current = false;
     setMining(false);
     setHashrate(0);
+    workerRatesRef.current.clear();
 
     workersRef.current.forEach(w => {
       w.postMessage({ type: 'stop' });

@@ -16,6 +16,7 @@
 let mining = false;
 let challenge = null;
 let difficulty = 0;
+let generation = 0; // Prevents concurrent miningLoop() instances
 
 /**
  * Count leading zero bits in a Uint8Array hash buffer (0-255).
@@ -33,6 +34,9 @@ function countLeadingZeroBits(hashBytes) {
  * Convert hex string to Uint8Array
  */
 function hexToBytes(hex) {
+  if (!hex || typeof hex !== 'string' || hex.length % 2 !== 0) {
+    throw new Error(`Invalid hex string: length=${hex?.length}`);
+  }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
@@ -95,12 +99,13 @@ async function mineBatch(challengeBytes, batchSize) {
 async function miningLoop() {
   const BATCH_SIZE = 50; // Mobile-optimized: smaller batches for UI responsiveness
   const HASHRATE_INTERVAL = 1000; // Report hashrate every 1s
+  const myGeneration = generation; // Capture — if generation changes, this loop exits
 
   const challengeBytes = hexToBytes(challenge);
   let totalHashes = 0;
   let lastReport = performance.now();
 
-  while (mining) {
+  while (mining && generation === myGeneration) {
     const result = await mineBatch(challengeBytes, BATCH_SIZE);
     totalHashes += result.hashes;
 
@@ -130,8 +135,9 @@ self.onmessage = (e) => {
   const { type } = e.data;
 
   if (type === 'start') {
+    generation++; // Kill any existing miningLoop() before starting a new one
     challenge = e.data.challenge;
-    difficulty = e.data.difficulty;
+    difficulty = e.data.difficulty || 1; // Minimum 1 — prevents difficulty=0 flood
     mining = true;
     miningLoop();
   } else if (type === 'stop') {

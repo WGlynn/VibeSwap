@@ -36,6 +36,7 @@ import { config } from './config.js';
 // ============ Constants ============
 
 const HEARTBEAT_TIMEOUT_MS = 90000; // 90s — 3 missed heartbeats = DOWN
+const EVICT_AFTER_MISSED = 10; // Evict shard from registry after 10 missed (~50 min)
 const MIN_ARCHIVE_NODES = 3; // Minimum archive nodes for network survival
 const STORAGE_DISCOUNT_FULL = 0.7; // 30% discount for full nodes
 const STORAGE_DISCOUNT_ARCHIVE = 0.5; // 50% discount for archive nodes
@@ -118,15 +119,33 @@ export function checkShardHealth() {
   const now = Date.now();
   const downShards = [];
 
+  const evicted = [];
   for (const [shardId, entry] of shardRegistry) {
     if (now - entry.lastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
       entry.heartbeatsMissed++;
-      if (entry.heartbeatsMissed >= 3) {
+
+      // Evict after prolonged absence — stop log spam for dead shards
+      if (entry.heartbeatsMissed >= EVICT_AFTER_MISSED) {
+        evicted.push(shardId);
+        continue;
+      }
+
+      if (entry.heartbeatsMissed >= 3 && entry.status !== 'down') {
         entry.status = 'down';
         downShards.push(shardId);
         console.warn(`[router] Shard ${shardId} marked DOWN (${entry.heartbeatsMissed} missed heartbeats)`);
       }
     }
+  }
+
+  // Evict dead shards from registry (they can re-register via heartbeat)
+  for (const shardId of evicted) {
+    shardRegistry.delete(shardId);
+    // Clean up user assignments pointing to evicted shard
+    for (const [userId, assigned] of userAssignments) {
+      if (assigned === shardId) userAssignments.delete(userId);
+    }
+    console.log(`[router] Shard ${shardId} evicted (${EVICT_AFTER_MISSED}+ missed heartbeats — will re-register on reconnect)`);
   }
 
   // Auto-failover for down shards

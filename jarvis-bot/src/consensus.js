@@ -28,7 +28,7 @@
 // In single-shard mode: proposals auto-commit (no voting needed).
 // ============
 
-import { createHash, randomBytes } from 'crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
@@ -66,6 +66,55 @@ const VOTES = {
   ACCEPT: 'accept',
   REJECT: 'reject',
 };
+
+// ============ HMAC Authentication for Inter-Shard Communication ============
+
+function getShardSecret() {
+  return config.shard?.secret || null;
+}
+
+function signPayload(data) {
+  const secret = getShardSecret();
+  if (!secret) return null;
+  return createHmac('sha256', secret)
+    .update(JSON.stringify(data))
+    .digest('hex');
+}
+
+function verifyShardSignature(body, signature) {
+  const secret = getShardSecret();
+  if (!secret) return false; // Fail-closed: no secret = reject all
+  if (!signature || typeof signature !== 'string') return false;
+  const expected = createHmac('sha256', secret)
+    .update(JSON.stringify(body))
+    .digest('hex');
+  try {
+    return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+// ============ Replay Protection ============
+// Track seen proposal IDs to reject duplicates
+
+const seenProposals = new Set();
+const SEEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+let lastSeenCleanup = Date.now();
+
+function trackProposalId(id) {
+  seenProposals.add(id);
+  // Periodic cleanup
+  const now = Date.now();
+  if (now - lastSeenCleanup > SEEN_EXPIRY_MS) {
+    seenProposals.clear(); // Simple: clear all every hour
+    lastSeenCleanup = now;
+  }
+}
+
+function isReplayedProposal(id) {
+  return seenProposals.has(id);
+}
 
 // ============ State ============
 
@@ -311,11 +360,14 @@ export function onCommit(handler) {
 // ============ Broadcast ============
 
 async function broadcastToPeers(peers, path, data) {
+  const signature = signPayload(data);
   const promises = peers.map(async (peer) => {
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (signature) headers['X-Shard-Signature'] = signature;
       await fetch(`${peer.url}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
         signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
       });
@@ -446,7 +498,24 @@ export function handleConsensusRequest(path, method) {
   return null;
 }
 
-export async function processConsensusBody(handler, body) {
+export async function processConsensusBody(handler, body, signature) {
+  // Authenticate inter-shard messages (fail-closed if secret configured)
+  if (handler !== 'state' && getShardSecret()) {
+    if (!verifyShardSignature(body, signature)) {
+      console.warn(`[consensus] Rejected ${handler}: invalid or missing HMAC signature`);
+      return { error: 'Authentication failed' };
+    }
+  }
+
+  // Replay protection for proposals
+  if (handler === 'propose' && body?.id) {
+    if (isReplayedProposal(body.id)) {
+      console.warn(`[consensus] Rejected replayed proposal: ${body.id}`);
+      return { error: 'Duplicate proposal' };
+    }
+    trackProposalId(body.id);
+  }
+
   switch (handler) {
     case 'propose': return await handleProposal(body);
     case 'prevote': return await handlePrevote(body);

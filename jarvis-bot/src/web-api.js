@@ -385,8 +385,9 @@ export async function handleWebRequest(req, res, pathname) {
           const user = JSON.parse(userJson);
           authenticatedUserId = String(user.id); // Telegram user ID — tamper-proof
         }
-      } catch {
-        // Fall through with provided userId if parsing fails
+      } catch (parseErr) {
+        console.warn(`[web-api] initData user parse failed (IP: ${ip}): ${parseErr.message}`);
+        // Do NOT fall through to body userId — require authenticated identity
       }
 
       if (!authenticatedUserId) {

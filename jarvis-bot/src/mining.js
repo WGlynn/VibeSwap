@@ -522,14 +522,34 @@ export function getLeaderboard(limit = 10) {
 
 // ============ Persistence ============
 
+function validateMiningState(loaded) {
+  if (!loaded || typeof loaded !== 'object') return false;
+  if (loaded.epoch !== undefined && (typeof loaded.epoch !== 'number' || loaded.epoch < 0)) return false;
+  if (loaded.difficulty !== undefined && (typeof loaded.difficulty !== 'number' || loaded.difficulty < 1)) return false;
+  if (loaded.totalProofs !== undefined && (typeof loaded.totalProofs !== 'number' || loaded.totalProofs < 0)) return false;
+  if (loaded.balances && typeof loaded.balances !== 'object') return false;
+  // Check for corrupted negative balances
+  if (loaded.balances) {
+    for (const [userId, balance] of Object.entries(loaded.balances)) {
+      if (typeof balance !== 'number' || balance < 0) return false;
+    }
+  }
+  return true;
+}
+
 export async function initMining() {
   try {
     const raw = await readFile(STATE_FILE, 'utf-8');
     const loaded = JSON.parse(raw);
-    state = { ...state, ...loaded };
-    // Restore replay set from serialized array
-    replaySet = new Set(state.replaySet || []);
-    console.log(`[mining] State loaded — epoch ${state.epoch}, difficulty ${state.difficulty}, ${state.totalProofs} total proofs, ${Object.keys(state.balances).length} miners`);
+    if (!validateMiningState(loaded)) {
+      console.warn('[mining] State file failed validation — using default state');
+      rotateChallenge();
+    } else {
+      state = { ...state, ...loaded };
+      // Restore replay set from serialized array
+      replaySet = new Set(state.replaySet || []);
+      console.log(`[mining] State loaded — epoch ${state.epoch}, difficulty ${state.difficulty}, ${state.totalProofs} total proofs, ${Object.keys(state.balances).length} miners`);
+    }
   } catch {
     console.log('[mining] No existing state — starting fresh');
     rotateChallenge();

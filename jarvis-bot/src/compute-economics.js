@@ -26,6 +26,7 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
+import { getDailyBurned, burnJUL, getMiningStats } from './mining.js';
 
 const DATA_DIR = config.dataDir;
 const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
@@ -34,7 +35,8 @@ const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
 
 const FREE_BUDGET_ANONYMOUS = 5_000;   // tokens/day for unidentified users
 const FREE_BUDGET_IDENTIFIED = 10_000; // tokens/day for identified users
-const POOL_BUDGET = 500_000;           // total redistributable pool/day
+const BASE_POOL = 500_000;             // Will's baseline funding (floor)
+const JUL_TO_POOL_RATIO = 1_000;       // 1 JUL burned = 1000 extra pool tokens
 
 const DEGRADED_MAX_TOKENS = 512;       // cap when budget > 80%
 const DEGRADE_THRESHOLD = 0.80;        // 80% = start degrading
@@ -51,6 +53,17 @@ const TOTAL_CATEGORIES = 6; // IDEA, CODE, GOVERNANCE, COMMUNITY, DESIGN, REVIEW
 const FREE_TELEGRAM_DMS = 3;          // free DMs/day for non-team users
 
 const SAVE_INTERVAL = 60_000; // 60s
+
+// ============ Dynamic Pool ============
+
+/**
+ * Effective pool = BASE_POOL + (daily JUL burned × JUL_TO_POOL_RATIO).
+ * Work-credit loop: mining → burn → pool expansion → more budget for everyone.
+ */
+export function getEffectivePool() {
+  const julBurned = getDailyBurned();
+  return BASE_POOL + Math.round(julBurned * JUL_TO_POOL_RATIO);
+}
 
 // ============ State ============
 
@@ -143,7 +156,7 @@ export function computeShapleyWeights() {
     const user = state.users[userId];
     const freeBudget = user.identified ? FREE_BUDGET_IDENTIFIED : FREE_BUDGET_ANONYMOUS;
     const poolShare = sum > 0
-      ? POOL_BUDGET * user.shapleyWeight / sum
+      ? getEffectivePool() * user.shapleyWeight / sum
       : 0;
     user.budget = Math.round(freeBudget + poolShare);
   }
@@ -184,6 +197,32 @@ export function checkBudget(userId) {
   const exceeded = ratio >= 1.0;
 
   if (exceeded) {
+    // Auto-burn: if user has JUL balance, burn 1 JUL for extra budget
+    const mining = getMiningStats(userId);
+    if (mining.julBalance >= 1) {
+      const burn = burnJUL(userId, 1, 'auto-burn');
+      if (burn.success) {
+        // Grant extra budget from the burn
+        const extraTokens = burn.poolExpansion; // 1000 tokens
+        user.budget += extraTokens;
+        dirty = true;
+
+        // Recompute after burn expanded the pool
+        const newRemaining = Math.max(0, user.budget - used);
+        return {
+          allowed: true,
+          budget: user.budget,
+          used,
+          remaining: newRemaining,
+          degraded: false,
+          maxTokens: null,
+          autoBurned: true,
+          julBurned: 1,
+          message: `Auto-burned 1 JUL for ${extraTokens.toLocaleString()} extra tokens. Balance: ${burn.newBalance.toFixed(2)} JUL.`,
+        };
+      }
+    }
+
     return {
       allowed: false,
       budget,
@@ -191,7 +230,7 @@ export function checkBudget(userId) {
       remaining: 0,
       degraded: true,
       maxTokens: 0,
-      message: `Daily budget exceeded (${used.toLocaleString()}/${budget.toLocaleString()} tokens). Resets at midnight UTC. Contribute quality content to earn more compute.`,
+      message: `Daily budget exceeded (${used.toLocaleString()}/${budget.toLocaleString()} tokens). Resets at midnight UTC. Mine JUL for extra compute or contribute quality content.`,
     };
   }
 
@@ -247,7 +286,7 @@ export function markIdentified(userId) {
     // Recompute this user's budget immediately
     const freeBudget = FREE_BUDGET_IDENTIFIED;
     const poolShare = state.shapleySum > 0
-      ? POOL_BUDGET * user.shapleyWeight / state.shapleySum
+      ? getEffectivePool() * user.shapleyWeight / state.shapleySum
       : 0;
     user.budget = Math.round(freeBudget + poolShare);
     dirty = true;
@@ -295,11 +334,18 @@ export function getComputeStats(userId) {
   const poolUsed = allUsers.reduce((sum, [, u]) => sum + u.today.input + u.today.output, 0);
   const activeToday = allUsers.filter(([, u]) => u.today.input + u.today.output > 0).length;
 
+  const effectivePool = getEffectivePool();
+  const julBurnedToday = getDailyBurned();
+  const julBonus = Math.round(julBurnedToday * JUL_TO_POOL_RATIO);
+
   const pool = {
-    dailyPool: POOL_BUDGET,
+    basePool: BASE_POOL,
+    julBonus,
+    dailyPool: effectivePool,
+    julBurnedToday,
     poolUsed,
-    poolRemaining: Math.max(0, POOL_BUDGET - poolUsed),
-    poolUtilization: POOL_BUDGET > 0 ? Math.round((poolUsed / POOL_BUDGET) * 100) : 0,
+    poolRemaining: Math.max(0, effectivePool - poolUsed),
+    poolUtilization: effectivePool > 0 ? Math.round((poolUsed / effectivePool) * 100) : 0,
     activeUsers: activeToday,
     totalUsers: allUsers.length,
     shapleySum: Math.round(state.shapleySum * 1000) / 1000,
@@ -366,7 +412,7 @@ export async function initComputeEconomics() {
   saveTimer = setInterval(() => saveState(), SAVE_INTERVAL);
 
   const userCount = Object.keys(state.users).length;
-  console.log(`[compute-econ] Initialized — ${userCount} users, pool=${POOL_BUDGET.toLocaleString()} tokens/day`);
+  console.log(`[compute-econ] Initialized — ${userCount} users, pool=${getEffectivePool().toLocaleString()} tokens/day`);
 }
 
 export async function flushComputeEconomics() {

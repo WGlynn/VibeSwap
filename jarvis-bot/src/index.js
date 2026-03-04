@@ -10,7 +10,7 @@ import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
-import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName } from './learning.js';
+import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName, compressCKB } from './learning.js';
 import { initPrivacy, getPrivacyStatus, isEncryptionEnabled } from './privacy.js';
 import { initInnerDialogue, getRecentDialogue, getDialogueStats, recordInnerDialogue, flushInnerDialogue, generateInnerDialogue } from './inner-dialogue.js';
 import { initStateStore } from './state-store.js';
@@ -46,8 +46,10 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
-import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS } from './compute-economics.js';
-import { initMining, flushMining } from './mining.js';
+import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats } from './compute-economics.js';
+import { initMining, flushMining, getMiningStats, getLeaderboard } from './mining.js';
+import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
+import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { createServer } from 'http';
 import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
@@ -881,6 +883,87 @@ bot.on('web_app_data', async (ctx) => {
     }
   } catch {
     // Silently ignore malformed data
+  }
+});
+
+// ============ Balance — JUL + Compute Stats ============
+
+bot.command('balance', async (ctx) => {
+  const userId = String(ctx.from.id);
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const mining = getMiningStats(userId);
+  const compute = getComputeStats(userId);
+  const learningStats = await getLearningStats(userId, ctx.chat.id);
+
+  const lines = [
+    `Balance: ${userName}`,
+    '',
+    `JUL: ${mining.julBalance.toFixed(2)}`,
+    `API tokens earned: ${mining.apiTokensEarned.toLocaleString()}`,
+    `Proofs submitted: ${mining.proofsSubmitted}`,
+    `Mining difficulty: ${mining.difficulty}`,
+    '',
+  ];
+
+  if (compute.user) {
+    lines.push(`Shapley weight: ${compute.user.shapleyWeight}`);
+    lines.push(`Compute budget: ${compute.user.remaining.toLocaleString()}/${compute.user.budget.toLocaleString()} tokens`);
+    lines.push(`Compute used: ${compute.user.utilization}%`);
+  }
+
+  lines.push('');
+  lines.push(`CKB: ${learningStats.userTokens}/${learningStats.userBudget} tokens (${learningStats.userUtilization})`);
+  lines.push(`Facts: ${learningStats.userFacts} | Corrections: ${learningStats.userCorrections}`);
+  lines.push(`Knowledge class: ${learningStats.knowledgeClass}`);
+
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ Economy — Pool-Level Compute Stats ============
+
+bot.command('economy', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const compute = getComputeStats(null);
+  const mining = getLeaderboard(5);
+
+  const lines = [
+    'JOULE Economy',
+    '',
+    `Daily pool: ${compute.pool.dailyPool.toLocaleString()} tokens`,
+    `Pool used: ${compute.pool.poolUsed.toLocaleString()} (${compute.pool.poolUtilization}%)`,
+    `Pool remaining: ${compute.pool.poolRemaining.toLocaleString()}`,
+    `Active users today: ${compute.pool.activeUsers}`,
+    `Total users: ${compute.pool.totalUsers}`,
+    '',
+    `Mining: epoch ${mining.epoch}, difficulty ${mining.difficulty}`,
+    `Total proofs: ${mining.totalProofs}`,
+    `Active miners: ${mining.totalMiners}`,
+    '',
+  ];
+
+  if (mining.leaderboard.length > 0) {
+    lines.push('Top miners:');
+    for (let i = 0; i < mining.leaderboard.length; i++) {
+      const m = mining.leaderboard[i];
+      lines.push(`  ${i + 1}. ${m.userId} — ${m.julBalance.toFixed(2)} JUL (${m.proofsSubmitted} proofs)`);
+    }
+  }
+
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ Tip — Tip Jar Address ============
+
+bot.command('tip', async (ctx) => {
+  const tipAddress = config.tipAddress || process.env.TIP_ADDRESS || null;
+
+  if (tipAddress) {
+    ctx.reply(
+      `Tip jar\n\nSend tips to support Jarvis development:\n${tipAddress}\n\nAll tips go to the VibeSwap treasury.`
+    );
+  } else {
+    ctx.reply('Tip jar not configured yet. Stay tuned!');
   }
 });
 
@@ -1787,7 +1870,47 @@ bot.on('document', async (ctx) => {
   }
 });
 
-// ============ Video Handler (thumbnail analysis) ============
+// ============ Sticker Handler (visual analysis) ============
+
+bot.on('sticker', async (ctx) => {
+  if (!isAuthorized(ctx)) return;
+  if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
+  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+
+  const sticker = ctx.message.sticker;
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const emoji = sticker.emoji || '';
+  const setName = sticker.set_name || 'unknown';
+
+  // Try to get sticker thumbnail for visual analysis
+  const thumbFileId = sticker.thumbnail?.file_id || sticker.file_id;
+  if (thumbFileId && !sticker.is_animated && !sticker.is_video) {
+    try {
+      const { buffer, mimeType } = await downloadTelegramFile(ctx, thumbFileId);
+      console.log(`[multimodal] Sticker from ${userName}: ${emoji} (set: ${setName})`);
+
+      const media = [{
+        type: 'image',
+        mimeType,
+        data: buffer.toString('base64'),
+        filename: `sticker_${Date.now()}.webp`,
+      }];
+      const text = `[User sent a sticker. Emoji: ${emoji}. Sticker set: ${setName}. This is the sticker image. React to it naturally — describe what you see, match the vibe, respond with personality.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
+    } catch (err) {
+      console.error('[multimodal] Sticker processing failed:', err.message);
+      const text = `[User sent a sticker: ${emoji} from set "${setName}". Image processing failed. React to the emoji and context.]`;
+      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+    }
+  } else {
+    // Animated/video sticker — can't display, react to emoji
+    const stickerType = sticker.is_animated ? 'animated' : sticker.is_video ? 'video' : 'static';
+    const text = `[User sent a ${stickerType} sticker: ${emoji} from set "${setName}". React to the emoji and context naturally.]`;
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+  }
+});
+
+// ============ Video Handler (thumbnail + audio analysis) ============
 
 bot.on('video', async (ctx) => {
   console.log(`[multimodal] Video handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
@@ -1799,11 +1922,22 @@ bot.on('video', async (ctx) => {
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
   const caption = ctx.message.caption || '';
 
-  // Use Telegram-provided thumbnail for visual context
+  // Use Telegram-provided thumbnail for visual context + transcribe audio for small videos
   if (video.thumbnail) {
     try {
       const { buffer, mimeType } = await downloadTelegramFile(ctx, video.thumbnail.file_id);
-      console.log(`[multimodal] Video thumbnail from ${userName} (${video.duration}s video)`);
+      console.log(`[multimodal] Video thumbnail from ${userName} (${video.duration}s video, ${Math.round((video.file_size || 0) / 1024)}KB)`);
+
+      // Try audio transcription for videos <10MB
+      let transcript = null;
+      if (video.file_size && video.file_size < 10 * 1024 * 1024) {
+        try {
+          const { buffer: videoBuffer } = await downloadTelegramFile(ctx, video.file_id);
+          transcript = await transcribeAudio(videoBuffer, `video_${Date.now()}.mp4`);
+        } catch (err) {
+          console.warn(`[multimodal] Video audio transcription failed: ${err.message}`);
+        }
+      }
 
       const media = [{
         type: 'image',
@@ -1811,7 +1945,10 @@ bot.on('video', async (ctx) => {
         data: buffer.toString('base64'),
         filename: `video_thumb_${Date.now()}.jpg`,
       }];
-      const text = caption || `[User sent a ${video.duration}s video. This is the thumbnail/preview frame. Describe what you see and respond.]`;
+      let text = caption || `[User sent a ${video.duration}s video. This is the thumbnail/preview frame. Describe what you see and respond.]`;
+      if (transcript) {
+        text += `\n[Audio transcription]: "${transcript}"`;
+      }
       await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
     } catch (err) {
       console.error('[multimodal] Video thumbnail failed:', err.message);
@@ -1872,19 +2009,40 @@ bot.on('video_note', async (ctx) => {
   const videoNote = ctx.message.video_note;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
 
-  // Try to transcribe the audio track
+  // Transcribe audio + analyze thumbnail for full multimodal understanding
   try {
     const { buffer } = await downloadTelegramFile(ctx, videoNote.file_id);
     console.log(`[multimodal] Video note from ${userName} (${videoNote.duration}s, ${Math.round(buffer.length / 1024)}KB)`);
 
+    // Transcribe audio
     const transcript = await transcribeAudio(buffer, 'video_note.mp4');
-    if (transcript) {
-      const text = `[Video note (circular video) transcription]: "${transcript}"`;
-      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
-    } else {
-      const text = `[User sent a ${videoNote.duration}s video note (circular video). Transcription unavailable. Acknowledge it.]`;
-      await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type);
+
+    // Also try thumbnail analysis
+    let media = [];
+    if (videoNote.thumbnail) {
+      try {
+        const { buffer: thumbBuffer, mimeType } = await downloadTelegramFile(ctx, videoNote.thumbnail.file_id);
+        media = [{
+          type: 'image',
+          mimeType,
+          data: thumbBuffer.toString('base64'),
+          filename: `videonote_thumb_${Date.now()}.jpg`,
+        }];
+      } catch {}
     }
+
+    let text;
+    if (transcript && media.length > 0) {
+      text = `[Video note (circular video). Audio transcription]: "${transcript}"\n[This is the thumbnail. Describe what you see + respond to what they said.]`;
+    } else if (transcript) {
+      text = `[Video note (circular video) transcription]: "${transcript}"`;
+    } else if (media.length > 0) {
+      text = `[User sent a ${videoNote.duration}s video note (circular video). Audio transcription unavailable. This is the thumbnail — describe what you see.]`;
+    } else {
+      text = `[User sent a ${videoNote.duration}s video note (circular video). Transcription unavailable. Acknowledge it.]`;
+    }
+
+    await sendChatResponse(ctx, ctx.chat.id, userName, text, ctx.chat.type, media);
   } catch (err) {
     console.error('[multimodal] Video note processing failed:', err.message);
     const text = `[User sent a ${videoNote.duration}s video note. Processing failed. Acknowledge it.]`;
@@ -2087,9 +2245,11 @@ async function main() {
     console.log('[jarvis] Step 2.5: Initializing LLM provider...');
     initProvider();
 
-    console.log('[jarvis] Step 3: Loading learning + inner dialogue...');
+    console.log('[jarvis] Step 3: Loading learning + inner dialogue + deep storage + hell...');
     await initLearning();
     await initInnerDialogue();
+    await initDeepStorage();
+    await initHell();
     await recoverWAL();
     await recoverRetryQueue();
 
@@ -2329,7 +2489,9 @@ async function main() {
   await initShadow();
   await initComputeEconomics();
   await initMining();
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining loaded.');
+  await initDeepStorage();
+  await initHell();
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining + deep storage + hell loaded.');
 
   // Step 3.5: Initialize shard identity (Decentralized Mind Network)
   console.log('[jarvis] Step 3.5: Initializing shard identity...');
@@ -3107,6 +3269,9 @@ async function main() {
       { command: 'shard', description: 'Shard identity and status (owner only)' },
       { command: 'network', description: 'Mind Network topology (owner only)' },
       { command: 'mine', description: 'Launch shard miner (Mini App)' },
+      { command: 'balance', description: 'JUL balance, compute stats, CKB info' },
+      { command: 'economy', description: 'Pool-level compute economics (owner)' },
+      { command: 'tip', description: 'Tip jar address' },
     ]);
   } catch {}
 
@@ -3148,6 +3313,11 @@ async function main() {
     }
     await flushInnerDialogue();
     await flushShadow();
+    await flushHell();
+    // CKB compression: compress high-utilization CKBs periodically
+    try {
+      await compressCKB(config.ownerUserId);
+    } catch {}
     pruneOldMessages();
     await saveComms();
     // Check shard health (mark dead shards, trigger failover)

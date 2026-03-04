@@ -268,6 +268,28 @@ export function getMiningStats(userId) {
   };
 }
 
+// ============ Leaderboard ============
+
+export function getLeaderboard(limit = 10) {
+  const entries = Object.entries(state.balances)
+    .map(([userId, balance]) => ({
+      userId,
+      julBalance: balance,
+      proofsSubmitted: state.proofCounts[userId] || 0,
+      apiTokensEarned: balance * JUL_PER_API_TOKEN,
+    }))
+    .sort((a, b) => b.julBalance - a.julBalance)
+    .slice(0, limit);
+
+  return {
+    leaderboard: entries,
+    totalMiners: Object.keys(state.balances).length,
+    totalProofs: state.totalProofs,
+    difficulty: state.difficulty,
+    epoch: state.epoch,
+  };
+}
+
 // ============ Persistence ============
 
 export async function initMining() {

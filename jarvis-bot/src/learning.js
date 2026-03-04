@@ -35,6 +35,8 @@ import { getStateStore } from './state-store.js';
 import { buildInnerDialogueContext } from './inner-dialogue.js';
 import { propose, PROPOSAL_TYPES, onCommit } from './consensus.js';
 import { isMultiShard } from './shard.js';
+import { archiveFact, archiveBatch, searchDeepStorageFull, getDeepStorageStats } from './deep-storage.js';
+import { addChange } from './knowledge-chain.js';
 
 // LLM calls use llmChat from llm-provider.js (supports fallback chain)
 
@@ -148,7 +150,7 @@ function computeCKBOccupation(facts) {
 // Remove facts whose value density has fallen below threshold.
 // This is the immune system — it prevents knowledge cancer.
 
-function apoptosis(facts, budget) {
+async function apoptosis(facts, budget, userId = null) {
   const now = Date.now();
   const scored = facts.map(f => ({
     fact: f,
@@ -156,25 +158,36 @@ function apoptosis(facts, budget) {
     tokenCost: estimateTokenCost(f),
   }));
 
-  // Remove facts below prune threshold
+  // Separate alive from pruned
   const alive = scored.filter(s => s.valueDensity >= ECONOMICS.PRUNE_THRESHOLD);
-  const pruned = scored.length - alive.length;
+  const decayed = scored.filter(s => s.valueDensity < ECONOMICS.PRUNE_THRESHOLD);
 
   // If still over budget, remove lowest value-density facts until under budget
   alive.sort((a, b) => b.valueDensity - a.valueDensity);
   let totalTokens = 0;
   const survivors = [];
+  const budgetDisplaced = [];
   for (const entry of alive) {
     if (totalTokens + entry.tokenCost <= budget) {
       totalTokens += entry.tokenCost;
       survivors.push(entry.fact);
+    } else {
+      budgetDisplaced.push(entry.fact);
     }
-    // else: this fact gets pruned due to budget pressure
   }
 
-  const budgetPruned = alive.length - survivors.length;
-  if (pruned > 0 || budgetPruned > 0) {
-    console.log(`[learning] Apoptosis: ${pruned} decayed, ${budgetPruned} displaced by budget. ${survivors.length} survive (${totalTokens}/${budget} tokens).`);
+  // Archive pruned facts to L2 deep storage (never permanently lost)
+  const allPruned = [...decayed.map(s => s.fact), ...budgetDisplaced];
+  if (allPruned.length > 0 && userId) {
+    try {
+      await archiveBatch(userId, allPruned, decayed.length > 0 ? 'apoptosis' : 'budget_pressure');
+    } catch (err) {
+      console.warn(`[learning] L2 archive failed: ${err.message}`);
+    }
+  }
+
+  if (decayed.length > 0 || budgetDisplaced.length > 0) {
+    console.log(`[learning] Apoptosis: ${decayed.length} decayed, ${budgetDisplaced.length} displaced by budget → L2. ${survivors.length} survive (${totalTokens}/${budget} tokens).`);
   }
 
   return survivors;
@@ -544,6 +557,18 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
   console.log(`[learning] Correction processed: ${correction.category} — "${correction.what_is_right?.slice(0, 60)}"`);
   dirty = true;
 
+  // Emit to knowledge chain for cross-shard sync
+  if (isMultiShard()) {
+    addChange({
+      type: 'correction_processed',
+      userId: String(userId),
+      correctionId,
+      category: correction.category,
+      lesson: lesson?.lesson,
+      valueDensity: 1.0,
+    }).catch(() => {});
+  }
+
   return {
     correctionId,
     category: correction.category,
@@ -604,6 +629,10 @@ function addFactWithEconomics(ckb, factData) {
     if (idx !== null) {
       const displaced = ckb.facts[idx];
       console.log(`[learning] Displacement: "${displaced.content.slice(0, 40)}..." (vd=${computeValueDensity(displaced, Date.now()).toFixed(3)}) → "${content.slice(0, 40)}..."`);
+      // Archive to L2 before removing
+      if (ckb.userId) {
+        archiveFact(ckb.userId, displaced, 'displacement').catch(() => {});
+      }
       ckb.facts.splice(idx, 1);
     }
   }
@@ -613,6 +642,10 @@ function addFactWithEconomics(ckb, factData) {
   if (displacementIdx !== null) {
     const displaced = ckb.facts[displacementIdx];
     console.log(`[learning] Budget displacement: "${displaced.content.slice(0, 40)}..." freed ${displaced.tokenCost} tokens`);
+    // Archive to L2 before removing
+    if (ckb.userId) {
+      archiveFact(ckb.userId, displaced, 'budget_displacement').catch(() => {});
+    }
     ckb.facts.splice(displacementIdx, 1);
   }
 
@@ -804,6 +837,16 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
   const classLabel = newFact?.knowledgeClass || KNOWLEDGE_CLASSES.SHARED;
   console.log(`[learning] Fact learned: "${fact.slice(0, 50)}" [${classLabel}] (${occupation}/${userCKB.tokenBudget} tokens)`);
 
+  // Emit to knowledge chain for cross-shard sync
+  if (isMultiShard()) {
+    addChange({
+      type: 'fact_learned',
+      userId: String(userId),
+      fact: { content: fact, category: category || 'general', tags: tags || [] },
+      valueDensity: newFact ? computeValueDensity(newFact, Date.now()) : 0,
+    }).catch(() => {});
+  }
+
   return true;
 }
 
@@ -824,20 +867,56 @@ export async function forgetFact(userId, factId) {
   return false;
 }
 
+// ============ Relevance Scoring ============
+// Score how relevant a fact is to the current message.
+// Used to surface the most contextually useful facts.
+
+function scoreRelevance(fact, messageText) {
+  if (!messageText || !fact.content) return 0;
+
+  const msgLower = messageText.toLowerCase();
+  const factLower = fact.content.toLowerCase();
+
+  // Extract significant words (>2 chars, no stopwords)
+  const stopwords = new Set(['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'has', 'have', 'that', 'this', 'with', 'from', 'they', 'been', 'said', 'each', 'she', 'which', 'their', 'will', 'way', 'about', 'many', 'then', 'them', 'would', 'like', 'what', 'when', 'how', 'your']);
+  const msgWords = msgLower.split(/\s+/)
+    .filter(w => w.length > 2 && !stopwords.has(w))
+    .map(w => w.replace(/[^a-z0-9]/g, ''))
+    .filter(w => w.length > 2);
+
+  if (msgWords.length === 0) return 0;
+
+  let score = 0;
+
+  // Word overlap
+  for (const word of msgWords) {
+    if (factLower.includes(word)) score += 1;
+  }
+
+  // Tag match
+  const factTags = (fact.tags || []).map(t => t.toLowerCase());
+  for (const word of msgWords) {
+    if (factTags.includes(word)) score += 2;
+  }
+
+  // Normalize by message length
+  return score / Math.max(1, msgWords.length);
+}
+
 // ============ Knowledge Context Builder ============
 // Builds a string to inject into the system prompt.
 // Marks facts as "accessed" (increases their utility, resets decay timer).
 // This is the "state rent payment" — being useful keeps you alive.
 
-export async function buildKnowledgeContext(userId, chatId, chatType) {
+export async function buildKnowledgeContext(userId, chatId, chatType, messageText = '') {
   const parts = [];
   const now = Date.now();
 
   // ---- Per-user CKB (dyadic) ----
   const userCKB = await loadUserCKB(userId);
   if (userCKB.facts.length > 0) {
-    // Run apoptosis before building context
-    userCKB.facts = apoptosis(userCKB.facts, userCKB.tokenBudget);
+    // Run apoptosis before building context (archives pruned facts to L2)
+    userCKB.facts = await apoptosis(userCKB.facts, userCKB.tokenBudget, userId);
 
     const ckbLabel = userCKB.username
       ? `Jarvisx${userCKB.username}`
@@ -846,12 +925,18 @@ export async function buildKnowledgeContext(userId, chatId, chatType) {
 
     parts.push(`--- CKB: ${ckbLabel} [${userCKB.knowledgeClass}] (${occupation}/${userCKB.tokenBudget} tokens, ${userCKB.facts.length} facts) ---`);
 
-    // Sort by value density (highest first) — best knowledge surfaces first
-    const scored = userCKB.facts.map(f => ({
-      fact: f,
-      valueDensity: computeValueDensity(f, now),
-    }));
-    scored.sort((a, b) => b.valueDensity - a.valueDensity);
+    // Sort by composite score: value density + relevance to current message
+    const scored = userCKB.facts.map(f => {
+      const vd = computeValueDensity(f, now);
+      const rel = messageText ? scoreRelevance(f, messageText) : 0;
+      return {
+        fact: f,
+        valueDensity: vd,
+        relevance: rel,
+        compositeScore: messageText ? (0.6 * vd + 0.4 * rel * 10) : vd,
+      };
+    });
+    scored.sort((a, b) => b.compositeScore - a.compositeScore);
 
     // Build context string within budget
     let tokensUsed = 0;
@@ -878,7 +963,7 @@ export async function buildKnowledgeContext(userId, chatId, chatType) {
   if (chatType !== 'private') {
     const groupCKB = await loadGroupCKB(chatId);
     if (groupCKB.facts.length > 0) {
-      groupCKB.facts = apoptosis(groupCKB.facts, groupCKB.tokenBudget);
+      groupCKB.facts = await apoptosis(groupCKB.facts, groupCKB.tokenBudget);
 
       const groupLabel = groupCKB.groupName || `Group${chatId}`;
       const occupation = computeCKBOccupation(groupCKB.facts);
@@ -1049,6 +1134,139 @@ export async function setGroupName(chatId, name) {
   const groupCKB = await loadGroupCKB(chatId);
   groupCKB.groupName = name;
   await saveGroupCKB(chatId);
+}
+
+// ============ CKB Compression ============
+// When L1 utilization >80%, ask LLM to merge related facts into denser ones.
+// Originals go to L2 deep storage.
+
+export async function compressCKB(userId) {
+  const userCKB = await loadUserCKB(userId);
+  const occupation = computeCKBOccupation(userCKB.facts);
+  const utilization = occupation / userCKB.tokenBudget;
+
+  if (utilization < 0.8 || userCKB.facts.length < 5) return null;
+
+  try {
+    const factsText = userCKB.facts.map((f, i) =>
+      `${i}: [${f.category}] ${f.content} (tags: ${(f.tags || []).join(', ')})`
+    ).join('\n');
+
+    const response = await llmChat({
+      max_tokens: 600,
+      system: `You compress knowledge by merging related facts into denser statements. Given a numbered list of facts, identify groups that can be merged. Return JSON:
+{
+  "merges": [
+    { "indices": [0, 3, 7], "merged": "Combined fact statement" }
+  ]
+}
+Rules:
+- Only merge truly related facts (same topic/category)
+- Merged statement must preserve all key information
+- Aim for 30-50% reduction in total characters
+- Don't merge facts with different categories unless strongly related`,
+      messages: [{
+        role: 'user',
+        content: `Compress these ${userCKB.facts.length} facts (${occupation}/${userCKB.tokenBudget} tokens, ${Math.round(utilization * 100)}% full):\n\n${factsText}`,
+      }],
+    });
+
+    const raw = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const result = JSON.parse(jsonMatch[0]);
+    if (!result.merges || result.merges.length === 0) return null;
+
+    let mergeCount = 0;
+    const indicesToRemove = new Set();
+
+    for (const merge of result.merges) {
+      if (!merge.indices || !merge.merged || merge.indices.length < 2) continue;
+
+      // Archive originals to L2
+      const originals = merge.indices
+        .filter(i => i >= 0 && i < userCKB.facts.length)
+        .map(i => userCKB.facts[i]);
+
+      if (originals.length < 2) continue;
+
+      await archiveBatch(userId, originals, 'compression');
+
+      // Mark for removal
+      for (const i of merge.indices) {
+        if (i >= 0 && i < userCKB.facts.length) indicesToRemove.add(i);
+      }
+
+      // Add merged fact
+      addFactWithEconomics(userCKB, {
+        content: merge.merged,
+        source: 'compression',
+        category: originals[0].category,
+        confidence: Math.max(...originals.map(f => f.confidence || 0.8)),
+        tags: [...new Set(originals.flatMap(f => f.tags || []))],
+      });
+
+      mergeCount++;
+    }
+
+    // Remove originals (iterate in reverse to preserve indices)
+    const sortedIndices = [...indicesToRemove].sort((a, b) => b - a);
+    for (const i of sortedIndices) {
+      userCKB.facts.splice(i, 1);
+    }
+
+    if (mergeCount > 0) {
+      await saveUserCKB(userId);
+      dirty = true;
+      const newOccupation = computeCKBOccupation(userCKB.facts);
+      console.log(`[learning] CKB compression: ${mergeCount} merges, ${indicesToRemove.size} facts → L2. Occupation: ${occupation} → ${newOccupation} tokens`);
+    }
+
+    return { merges: mergeCount, archived: indicesToRemove.size };
+  } catch (err) {
+    console.warn(`[learning] CKB compression failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ============ Cross-Chat Sync ============
+// Merge incoming facts from peer shards
+
+export async function syncUserCKB(userId, incomingFacts) {
+  const userCKB = await loadUserCKB(userId);
+  let added = 0;
+
+  for (const fact of incomingFacts) {
+    // Check for duplicate by content
+    const existing = userCKB.facts.find(f => f.content === fact.content);
+    if (existing) {
+      // Merge: take higher confirmation count and more recent timestamps
+      existing.confirmed = Math.max(existing.confirmed, fact.confirmed || 1);
+      if (fact.lastConfirmed > existing.lastConfirmed) {
+        existing.lastConfirmed = fact.lastConfirmed;
+      }
+      continue;
+    }
+
+    // Add new fact with economics
+    addFactWithEconomics(userCKB, {
+      content: fact.content,
+      source: fact.source || 'cross_shard_sync',
+      category: fact.category,
+      confidence: fact.confidence,
+      tags: fact.tags || [],
+    });
+    added++;
+  }
+
+  if (added > 0) {
+    await saveUserCKB(userId);
+    dirty = true;
+    console.log(`[learning] Cross-shard sync: ${added} new facts for user ${userId}`);
+  }
+
+  return added;
 }
 
 // ============ Flush ============

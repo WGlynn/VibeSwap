@@ -75,6 +75,12 @@ class FileStateStore extends StateStore {
     if (parts[0] === 'corrections') {
       return join(this.baseDir, 'knowledge', 'corrections.jsonl');
     }
+    if (parts[0] === 'deep') {
+      return join(this.baseDir, 'knowledge', 'deep', `${parts[1]}.jsonl`);
+    }
+    if (parts[0] === 'hell') {
+      return join(this.baseDir, 'knowledge', 'hell', `${parts[1] || 'registry'}.json`);
+    }
 
     // Generic fallback
     return join(this.baseDir, `${key.replace(/:/g, '_')}.json`);
@@ -246,6 +252,8 @@ export async function initStateStore() {
   if (store instanceof FileStateStore) {
     await mkdir(join(config.dataDir, 'knowledge', 'users'), { recursive: true });
     await mkdir(join(config.dataDir, 'knowledge', 'groups'), { recursive: true });
+    await mkdir(join(config.dataDir, 'knowledge', 'deep'), { recursive: true });
+    await mkdir(join(config.dataDir, 'knowledge', 'hell'), { recursive: true });
   }
 
   // If Redis, connect

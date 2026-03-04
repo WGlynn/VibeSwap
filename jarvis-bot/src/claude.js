@@ -555,6 +555,57 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       },
     },
     {
+      name: 'read_file',
+      description: 'Read the contents of a file from the VibeSwap repository or any accessible path. Use this when you need to look up code, configs, docs, or any file content. Returns the file contents as text. Path can be relative to the repo root (e.g., "jarvis-bot/src/config.js") or absolute.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path (relative to repo root or absolute)' },
+        },
+        required: ['path'],
+      },
+    },
+    {
+      name: 'write_file',
+      description: 'Write content to a file in the VibeSwap repository. Creates the file if it does not exist. Use this to update code, configs, docs, or create new files. Only writes within the repo directory for safety.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path relative to repo root (e.g., "docs/new-doc.md")' },
+          content: { type: 'string', description: 'The full content to write to the file' },
+        },
+        required: ['path', 'content'],
+      },
+    },
+    {
+      name: 'run_command',
+      description: 'Execute a shell command in the VibeSwap repository directory. Use for git operations (commit, push, pull, status, diff, log), running tests, building, or any CLI operation. Commands run with a 60-second timeout. For safety, destructive commands (rm -rf, drop, etc.) are blocked.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The shell command to execute' },
+          cwd: { type: 'string', description: 'Working directory (defaults to repo root)' },
+        },
+        required: ['command'],
+      },
+    },
+    {
+      name: 'fetch_repo',
+      description: 'Fetch and read files from a GitHub repository URL. Clones/pulls the repo to a temp directory and reads specified files. Use when someone shares a GitHub URL and you need to read its contents.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'GitHub repository URL (e.g., https://github.com/user/repo)' },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'List of file paths to read from the repo (e.g., ["README.md", "src/index.ts"]). If empty, reads README.md.',
+          },
+        },
+        required: ['url'],
+      },
+    },
+    {
       name: 'flag_deceiver',
       description: 'Flag a user/entity as a deceiver in the Hell registry. Only use when there is highly credible + probabilistic evidence consistent with deceptive behavior. This is the system immune response — automated trust enforcement. Entry criteria: (1) credible evidence, (2) probabilistic consistency, (3) behavioral alignment with deception. Exit only via repentance process.',
       input_schema: {
@@ -634,6 +685,96 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             console.log(`[claude] Tool: web_search("${tb.input.query.slice(0, 40)}...")`);
           } catch (err) {
             result = `Web search failed: ${err.message}`;
+          }
+        } else if (tb.name === 'read_file') {
+          try {
+            const filePath = tb.input.path.startsWith('/') || tb.input.path.match(/^[A-Z]:/)
+              ? tb.input.path
+              : join(REPO_PATH, tb.input.path);
+            const content = await readFile(filePath, 'utf-8');
+            // Cap at 8000 chars to avoid context explosion
+            result = content.length > 8000
+              ? content.slice(0, 8000) + `\n\n[... truncated, ${content.length} chars total]`
+              : content;
+            console.log(`[claude] Tool: read_file("${tb.input.path}") → ${content.length} chars`);
+          } catch (err) {
+            result = `Failed to read file: ${err.message}`;
+          }
+        } else if (tb.name === 'write_file') {
+          try {
+            const filePath = join(REPO_PATH, tb.input.path);
+            // Safety: ensure path is within repo
+            const resolved = resolve(filePath);
+            const repoResolved = resolve(REPO_PATH);
+            if (!resolved.startsWith(repoResolved)) {
+              result = 'Blocked: write_file path must be within the repository.';
+            } else {
+              // Ensure parent directory exists
+              const parentDir = resolve(filePath, '..');
+              await mkdir(parentDir, { recursive: true });
+              await writeFile(filePath, tb.input.content, 'utf-8');
+              result = `Written ${tb.input.content.length} chars to ${tb.input.path}`;
+              console.log(`[claude] Tool: write_file("${tb.input.path}") → ${tb.input.content.length} chars`);
+            }
+          } catch (err) {
+            result = `Failed to write file: ${err.message}`;
+          }
+        } else if (tb.name === 'run_command') {
+          try {
+            const cmd = tb.input.command;
+            // Safety: block destructive commands
+            const blocked = ['rm -rf /', 'rm -rf ~', 'DROP TABLE', 'DROP DATABASE', 'format c:', 'mkfs', ':(){:|:&};:'];
+            const isBlocked = blocked.some(b => cmd.toLowerCase().includes(b.toLowerCase()));
+            if (isBlocked) {
+              result = 'Blocked: destructive command detected.';
+            } else {
+              const cwd = tb.input.cwd
+                ? (tb.input.cwd.startsWith('/') || tb.input.cwd.match(/^[A-Z]:/) ? tb.input.cwd : join(REPO_PATH, tb.input.cwd))
+                : REPO_PATH;
+              const { execSync } = await import('child_process');
+              const output = execSync(cmd, {
+                cwd,
+                timeout: 60000,
+                encoding: 'utf-8',
+                maxBuffer: 1024 * 1024,
+                env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+              });
+              // Cap output
+              result = output.length > 4000
+                ? output.slice(0, 4000) + `\n\n[... truncated, ${output.length} chars total]`
+                : output || '(no output)';
+              console.log(`[claude] Tool: run_command("${cmd.slice(0, 60)}") → ${output.length} chars output`);
+            }
+          } catch (err) {
+            result = `Command failed: ${err.stderr || err.message || String(err)}`.slice(0, 2000);
+          }
+        } else if (tb.name === 'fetch_repo') {
+          try {
+            const url = tb.input.url.replace(/\.git$/, '');
+            const repoName = url.split('/').pop();
+            const tempDir = join(REPO_PATH, '.claude', 'repo-cache', repoName);
+            const { execSync } = await import('child_process');
+            if (existsSync(tempDir)) {
+              execSync('git pull --ff-only', { cwd: tempDir, timeout: 30000, encoding: 'utf-8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+            } else {
+              await mkdir(join(REPO_PATH, '.claude', 'repo-cache'), { recursive: true });
+              execSync(`git clone --depth 1 ${url}.git ${tempDir}`, { timeout: 60000, encoding: 'utf-8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+            }
+            const files = tb.input.files?.length ? tb.input.files : ['README.md'];
+            const results = [];
+            for (const f of files.slice(0, 5)) { // Max 5 files
+              try {
+                const content = await readFile(join(tempDir, f), 'utf-8');
+                const truncated = content.length > 4000 ? content.slice(0, 4000) + '\n[truncated]' : content;
+                results.push(`--- ${f} ---\n${truncated}`);
+              } catch {
+                results.push(`--- ${f} --- (not found)`);
+              }
+            }
+            result = results.join('\n\n');
+            console.log(`[claude] Tool: fetch_repo("${repoName}") → ${files.length} files read`);
+          } catch (err) {
+            result = `Failed to fetch repo: ${err.message}`;
           }
         } else if (tb.name === 'flag_deceiver') {
           try {

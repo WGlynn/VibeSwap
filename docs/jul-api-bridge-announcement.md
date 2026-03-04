@@ -133,27 +133,69 @@ There's a free tier. You don't need JUL to talk to JARVIS. But if you want more 
 
 ---
 
+## Floor/Ceiling Convergence: How JUL Stays Stable
+
+JUL is backed by fixed PoW work (production theory of value), but API tokens change in value as models get cheaper or the dollar loses purchasing power. A fixed ratio would create arbitrage — hoard JUL when tokens are expensive, burn when they're cheap.
+
+The solution is a three-layer pricing oracle inspired by the [Trinomial Stability Theorem](https://github.com/WGlynn/VibeSwap/blob/master/docs/TRINOMIAL_STABILITY_THEOREM.md):
+
+> *The production theory of value (energy-backed) gives you the floor. The time adjustments (CPI) keep that floor honest across history. The market gives you the ceiling — what people actually think it's worth in practice. Floor and ceiling converge → price stability.*
+
+### Layer 0: The Trustless Floor (No Oracle Needed)
+
+The mining network measures its own production cost. No external data feed. No trusted third party. The network IS the oracle.
+
+Every mining epoch (100 proofs, target: 1 hour), the system records how long it actually took. This is a direct measurement of real-world mining economics:
+
+- **Epoch runs fast**: miners spending more compute → energy is cheap, hardware plentiful → deflationary signal
+- **Epoch runs slow**: miners pulled back → energy expensive, hardware scarce → inflationary signal
+
+The hash cost index — an exponential moving average of epoch efficiency weighted by difficulty trend — captures the real-world cost of computational work without trusting anyone. From the Trinomial theorem: *"price converges to ε₀ — the cost of a single hash in electricity."* Layer 0 measures ε₀ directly.
+
+This is why hash cost is a *better* economic indicator than CPI for compute pricing. CPI tracks milk and housing. Hash cost tracks exactly what we care about: **what does it cost, in real-world resources, to produce one unit of computational work?**
+
+### Layer 1: CPI Refinement (Semi-Trusted, Optional)
+
+The hash cost floor is trustless but coarse. Layer 1 adds precision: API pricing from Anthropic and CPI data for dollar-inflation adjustment. Will updates these via `/reprice` when pricing changes.
+
+But Layer 1 is constrained by Layer 0. The dual-oracle architecture from the Trinomial theorem: *"each oracle constrains the other. If one feed were compromised or manipulated, the other provides an independent physical-reality anchor."*
+
+If Layer 1 diverges more than 25% from Layer 0, the **circuit breaker** fires and Layer 0 wins. You can manipulate a CPI number. You can't manipulate the mining network's own epoch behavior.
+
+### Layer 2: The Market Ceiling (Future)
+
+When JUL goes on-chain with VibeSwap mainnet, AMM price discovery replaces both layers. The JUL/USDC pool price IS the purchasing power signal. The market discovers what people actually think JUL is worth — and that price converges toward the production floor over time (miners won't sell below cost, buyers won't pay unbounded premiums for a commodity).
+
+Floor and ceiling converge. Volatility bound: the variance of global electricity costs (~2-5% annually, per the Trinomial theorem). That's the lowest achievable bound for proof-of-work money.
+
+### The Formula
+
+```
+Layer 0 ratio = baseRatio × hashCostIndex       (trustless)
+Layer 1 ratio = baseRatio × (refCost / realCost) (CPI-adjusted)
+
+Final ratio = geometric_mean(Layer0, Layer1)
+              unless divergence > 25% → Layer 0 wins
+
+hashCostIndex = EMA(epochDuration / target) × (difficulty / refDifficulty)
+realCost = nominalCost × (referenceCPI / currentCPI)
+```
+
+If API gets cheaper: both layers increase the ratio. If dollar inflates: Layer 1 compensates. If mining gets harder: Layer 0 increases the ratio. If someone feeds bad CPI data: circuit breaker fires, hash cost wins.
+
+**No arbitrage. Work in = value out. Always.**
+
 ## The Numbers
 
 | Parameter | Value | Why |
 |-----------|-------|-----|
 | Base pool | 500,000 tokens/day | Will's baseline subsidy |
-| Base ratio | 1 JUL = 1,000 tokens | At reference API pricing ($3/MTok) and reference CPI |
-| Floating ratio | CPI and cost-adjusted | If API gets cheaper or dollar inflates, JUL buys more tokens |
-| Mining reward | 1 JUL base (doubles per difficulty bit) | Harder work = more tokens |
-
-**The ratio floats.** JUL is backed by fixed PoW work (production theory of value), but API tokens change in value as models get cheaper or the dollar loses purchasing power. A fixed ratio would create arbitrage — hoard JUL when tokens are expensive, burn when they're cheap.
-
-Instead, the pricing oracle adjusts so 1 JUL always buys the same *real value* of compute:
-
-```
-ratio = baseRatio × (referenceCost / currentRealCost)
-where realCost = nominalCostPerMTok × (referenceCPI / currentCPI)
-```
-
-If Anthropic cuts prices 50%: ratio doubles. JUL buys more tokens, same dollar-value. If inflation runs 10%: ratio increases to compensate for dollar debasement. No arbitrage. Work in = value out, always.
-
-Tipping and auto-burning use the same floating rate. No penalty for generosity.
+| Base ratio | 1,000 tokens/JUL | At reference prices (calibration point) |
+| Layer 0 | Hash cost from epoch behavior | Trustless, oracle-free, always-on |
+| Layer 1 | CPI + API cost | Fine-tuning, circuit-breakered |
+| Layer 2 | AMM price (future) | Market replaces all oracles |
+| Circuit breaker | 25% divergence | Layer 0 overrides Layer 1 |
+| Mining reward | 1 JUL base (2× per difficulty bit) | 256 expected hashes per JUL, always |
 
 ---
 

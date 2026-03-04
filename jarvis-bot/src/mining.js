@@ -59,6 +59,10 @@ let state = {
     dailyBurnDate: '',    // YYYY-MM-DD — triggers daily reset
     tips: [],             // tip records [{ userId, amount, timestamp }]
   },
+  // Layer 0 oracle: epoch history for trustless hash cost index
+  // Tracks how long each epoch took vs target — the network's own
+  // measurement of real-world mining economics (electricity + hardware).
+  epochHistory: [],       // [{ epoch, difficulty, duration, proofs, timestamp }]
 };
 
 let replaySet = new Set();       // in-memory Set for O(1) lookups
@@ -241,6 +245,21 @@ export function submitProof(userId, nonce, hash, challenge) {
 
   // Epoch transition
   if (state.epochProofs >= EPOCH_LENGTH) {
+    // Record epoch history BEFORE adjustment (raw signal for Layer 0 oracle)
+    const epochDuration = (Date.now() - state.epochStartTime) / 1000;
+    if (!state.epochHistory) state.epochHistory = [];
+    state.epochHistory.push({
+      epoch: state.epoch,
+      difficulty: state.difficulty,
+      duration: epochDuration,
+      proofs: state.epochProofs,
+      timestamp: Date.now(),
+    });
+    // Keep last 100 epochs (bounded memory)
+    if (state.epochHistory.length > 100) {
+      state.epochHistory = state.epochHistory.slice(-100);
+    }
+
     adjustDifficulty();
     state.epoch++;
     state.epochProofs = 0;
@@ -382,6 +401,100 @@ export function getTreasuryStats() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([userId, total]) => ({ userId, totalTipped: total })),
+  };
+}
+
+// ============ Layer 0: Trustless Hash Cost Oracle ============
+//
+// From the Trinomial Stability Theorem (§3.3):
+//   Price converges to ε₀ — the cost of a single hash in electricity.
+//   h'(t) = α(N'(t)×p(t) - h(t)×ε)
+//
+// The mining network's own epoch behavior measures ε₀ trustlessly:
+//   - Epoch runs FAST (< target): miners spending more compute than expected
+//     → energy is cheap / hardware plentiful → deflationary signal
+//   - Epoch runs SLOW (> target): miners spending less compute
+//     → energy is expensive / hardware scarce → inflationary signal
+//
+// Layer 0 = trustless, always-on, oracle-free (the network IS the oracle)
+// Layer 1 = CPI/API cost fine-tuning via /reprice (semi-trusted, optional)
+// Layer 2 = AMM price discovery (future — market replaces all oracles)
+//
+// The hash cost index is an EMA of epoch efficiency ratios. It captures
+// the real-world production cost of computational work without any
+// external data feed. Dual-oracle architecture (§5.2) cross-validates:
+// if Layer 1 CPI diverges >25% from Layer 0 hash cost, Layer 0 wins.
+
+const HASH_COST_EMA_ALPHA = 0.3;         // EMA smoothing (higher = more reactive)
+const HASH_COST_REFERENCE_DIFFICULTY = INITIAL_DIFFICULTY; // difficulty at calibration
+
+/**
+ * Compute the trustless hash cost index from epoch history.
+ *
+ * hashCostIndex = EMA of (epochDuration / TARGET_EPOCH_DURATION)
+ *   × (currentDifficulty / referenceDifficulty)
+ *
+ * The first factor captures temporal efficiency: are miners spending
+ * more or less real-world compute than expected?
+ *
+ * The second factor captures difficulty trend: has the network attracted
+ * more or less hash power over time? Rising difficulty = economic
+ * expansion (more miners willing to spend energy on JUL).
+ *
+ * Index > 1.0: mining is getting more expensive (inflationary pressure)
+ * Index < 1.0: mining is getting cheaper (deflationary pressure)
+ * Index = 1.0: equilibrium (production cost unchanged from reference)
+ *
+ * Returns { index, epochsUsed, confidence, currentDifficulty, trend }
+ */
+export function getHashCostIndex() {
+  const history = state.epochHistory || [];
+
+  // Not enough data yet — return neutral
+  if (history.length < 2) {
+    return {
+      index: 1.0,
+      epochsUsed: history.length,
+      confidence: 0,
+      currentDifficulty: state.difficulty,
+      referenceDifficulty: HASH_COST_REFERENCE_DIFFICULTY,
+      trend: 'insufficient_data',
+    };
+  }
+
+  // Compute EMA of epoch duration ratios
+  let ema = history[0].duration / TARGET_EPOCH_DURATION;
+  for (let i = 1; i < history.length; i++) {
+    const ratio = history[i].duration / TARGET_EPOCH_DURATION;
+    ema = HASH_COST_EMA_ALPHA * ratio + (1 - HASH_COST_EMA_ALPHA) * ema;
+  }
+
+  // Difficulty trend factor: how has difficulty moved from reference?
+  // Higher difficulty = more hash power being spent = economic expansion
+  const difficultyFactor = state.difficulty / HASH_COST_REFERENCE_DIFFICULTY;
+
+  // Combined index: epoch efficiency × difficulty trend
+  // If epochs run slow AND difficulty is rising: strong inflationary signal
+  // If epochs run fast AND difficulty is falling: strong deflationary signal
+  const index = ema * difficultyFactor;
+
+  // Confidence: increases with more epochs of data (0..1)
+  const confidence = Math.min(1, history.length / 20);
+
+  // Trend classification
+  const recentEpochs = history.slice(-5);
+  const recentAvgDuration = recentEpochs.reduce((s, e) => s + e.duration, 0) / recentEpochs.length;
+  const trend = recentAvgDuration < TARGET_EPOCH_DURATION * 0.8 ? 'deflationary'
+    : recentAvgDuration > TARGET_EPOCH_DURATION * 1.2 ? 'inflationary'
+    : 'equilibrium';
+
+  return {
+    index: Math.round(index * 1000) / 1000,
+    epochsUsed: history.length,
+    confidence: Math.round(confidence * 100) / 100,
+    currentDifficulty: state.difficulty,
+    referenceDifficulty: HASH_COST_REFERENCE_DIFFICULTY,
+    trend,
   };
 }
 

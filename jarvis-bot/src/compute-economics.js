@@ -26,7 +26,7 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
-import { getDailyBurned, burnJUL, getMiningStats } from './mining.js';
+import { getDailyBurned, burnJUL, getMiningStats, getHashCostIndex } from './mining.js';
 
 const DATA_DIR = config.dataDir;
 const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
@@ -37,23 +37,37 @@ const FREE_BUDGET_ANONYMOUS = 5_000;   // tokens/day for unidentified users
 const FREE_BUDGET_IDENTIFIED = 10_000; // tokens/day for identified users
 const BASE_POOL = 500_000;             // Will's baseline funding (floor)
 
-// ============ JUL Pricing Oracle ============
+// ============ JUL Pricing Oracle — Floor/Ceiling Convergence ============
 //
-// JUL is a work-credit backed by fixed PoW (production theory of value).
-// The ratio floats so 1 JUL always buys the same CPI-adjusted REAL VALUE
-// of compute, not a fixed number of tokens.
+// From the Trinomial Stability Theorem:
+//   "The production theory of value (energy-backed) gives you the floor.
+//    The time adjustments (CPI, Shapley T) keep that floor honest across
+//    history. The market (Phase 3) gives you the ceiling — what people
+//    actually think it's worth in practice."
 //
-// Phase 1 (now):  Manual — Will sets costPerMTok + cpiIndex via /reprice
-// Phase 2 (soon): CPI API auto-feed
-// Phase 3 (mainnet): AMM price discovery replaces the oracle entirely
+// Three-layer oracle architecture (§5.2 dual oracle, extended):
 //
-// Formula:
-//   realCost = nominalCostPerMTok × (referenceCPI / currentCPI)
-//   ratio = baseRatio × (referenceRealCost / currentRealCost)
+// Layer 0 — FLOOR (trustless, always-on, oracle-free):
+//   Hash cost index from mining epoch behavior. The network measures
+//   its own production cost: ε₀ = cost of a hash in electricity.
+//   No external data. The network IS the oracle.
+//
+// Layer 1 — REFINEMENT (semi-trusted, optional fine-tuning):
+//   CPI + API cost via /reprice. Cross-validates against Layer 0.
+//   If Layer 1 diverges >25% from Layer 0: Layer 0 wins (circuit breaker).
+//   "Each oracle constrains the other" — Trinomial §5.2
+//
+// Layer 2 — CEILING (market, future):
+//   AMM price discovery. The market IS the oracle.
+//   Replaces both layers. JUL/USDC LP price = purchasing power.
+//
+// Floor and ceiling converge over time → price stability.
+// Volatility bound: σ²_elec ≈ 2-5% annually (Trinomial §11.4)
 //
 const BASE_RATIO = 1_000;                // tokens per JUL at calibration
 const REFERENCE_COST_PER_MTOK = 3.00;    // $/MTok when ratio was set (Sonnet 3.5 input)
 const REFERENCE_CPI = 100;               // CPI index at calibration (normalized base)
+const LAYER_DIVERGENCE_LIMIT = 0.25;     // 25% max divergence before circuit breaker
 
 const DEGRADED_MAX_TOKENS = 512;       // cap when budget > 80%
 const DEGRADE_THRESHOLD = 0.80;        // 80% = start degrading
@@ -71,28 +85,74 @@ const FREE_TELEGRAM_DMS = 3;          // free DMs/day for non-team users
 
 const SAVE_INTERVAL = 60_000; // 60s
 
-// ============ Dynamic Pool + Floating Ratio ============
+// ============ Dynamic Pool + Three-Layer Floating Ratio ============
 
 /**
- * CPI-adjusted JUL→token ratio.
- * JUL buys constant REAL purchasing power of compute, not a fixed token count.
+ * Layer 0: Trustless hash cost ratio (floor).
+ * Derived entirely from the mining network's own epoch behavior.
+ * No external oracle. The network IS the measurement.
  *
- * If API gets cheaper: ratio increases (JUL buys more tokens, same real value).
- * If dollar inflates:  ratio increases (compensates for debasement).
- * If API gets pricier: ratio decreases (fewer tokens, same real value).
- *
- * Phase 3: replaced by AMM oracle price — market discovers the ratio.
+ * From Trinomial §3.3: price converges to ε₀ (cost of a hash in electricity).
+ * If hash cost index rises (mining more expensive): ratio increases
+ * (JUL costs more to produce, so it should buy more tokens).
+ * If hash cost index falls: ratio decreases.
  */
-export function getJulToPoolRatio() {
+function getLayer0Ratio() {
+  const hci = getHashCostIndex();
+  if (hci.confidence < 0.1) return BASE_RATIO; // not enough data yet
+  return Math.max(1, Math.round(BASE_RATIO * hci.index));
+}
+
+/**
+ * Layer 1: CPI-adjusted ratio (refinement).
+ * Semi-trusted: Will sets costPerMTok + cpiIndex via /reprice.
+ * Adjusts for dollar inflation and API pricing changes.
+ */
+function getLayer1Ratio() {
   const p = state.pricing;
   const currentCost = p.costPerMTok || REFERENCE_COST_PER_MTOK;
   const currentCPI = p.cpiIndex || REFERENCE_CPI;
 
   // Real cost = nominal cost adjusted for purchasing power
-  // realCost = nominalCost × (referenceCPI / currentCPI)
   const currentRealCost = currentCost * (REFERENCE_CPI / currentCPI);
 
   return Math.max(1, Math.round(BASE_RATIO * (REFERENCE_COST_PER_MTOK / currentRealCost)));
+}
+
+/**
+ * Three-layer JUL→token ratio with circuit breaker.
+ *
+ * Layer 0 (hash cost) is the trustless floor — always computed.
+ * Layer 1 (CPI/API cost) fine-tunes — but if it diverges >25% from
+ * Layer 0, the circuit breaker fires and Layer 0 wins.
+ *
+ * "Each oracle constrains the other. If one feed were compromised or
+ *  manipulated, the other provides an independent physical-reality
+ *  anchor." — Trinomial Stability Theorem §5.2
+ *
+ * Layer 2 (AMM market price) will replace both when JUL is on-chain.
+ */
+export function getJulToPoolRatio() {
+  const layer0 = getLayer0Ratio();
+  const layer1 = getLayer1Ratio();
+  const hci = getHashCostIndex();
+
+  // If Layer 0 doesn't have enough data, use Layer 1 alone
+  if (hci.confidence < 0.1) {
+    return layer1;
+  }
+
+  // Circuit breaker: if Layer 1 diverges >25% from Layer 0, Layer 0 wins
+  const divergence = Math.abs(layer1 - layer0) / layer0;
+  if (divergence > LAYER_DIVERGENCE_LIMIT) {
+    console.log(`[compute-econ] Circuit breaker: Layer 1 (${layer1}) diverges ${(divergence * 100).toFixed(1)}% from Layer 0 (${layer0}) — using Layer 0`);
+    return layer0;
+  }
+
+  // Normal operation: geometric mean of both layers
+  // Geometric mean respects proportional changes and prevents either
+  // layer from dominating. It's the "conservative composite" from §5.2.
+  return Math.max(1, Math.round(Math.sqrt(layer0 * layer1)));
 }
 
 /**
@@ -139,18 +199,46 @@ export function updatePricing({ costPerMTok, cpiIndex } = {}) {
 
 /**
  * Get current pricing oracle state for display.
+ * Exposes all three layers for transparency.
  */
 export function getPricingInfo() {
   const p = state.pricing || {};
+  const hci = getHashCostIndex();
+  const layer0 = getLayer0Ratio();
+  const layer1 = getLayer1Ratio();
+  const finalRatio = getJulToPoolRatio();
+  const divergence = layer0 > 0 ? Math.abs(layer1 - layer0) / layer0 : 0;
+  const circuitBroken = hci.confidence >= 0.1 && divergence > LAYER_DIVERGENCE_LIMIT;
+
   return {
-    costPerMTok: p.costPerMTok || REFERENCE_COST_PER_MTOK,
-    cpiIndex: p.cpiIndex || REFERENCE_CPI,
-    referenceCostPerMTok: REFERENCE_COST_PER_MTOK,
-    referenceCPI: REFERENCE_CPI,
-    ratio: getJulToPoolRatio(),
+    // Final ratio (what's actually used)
+    ratio: finalRatio,
     baseRatio: BASE_RATIO,
-    source: p.source || 'manual',
-    lastUpdated: p.lastUpdated,
+    // Layer 0: trustless hash cost (floor)
+    layer0: {
+      ratio: layer0,
+      hashCostIndex: hci.index,
+      confidence: hci.confidence,
+      epochsUsed: hci.epochsUsed,
+      trend: hci.trend,
+      difficulty: hci.currentDifficulty,
+      referenceDifficulty: hci.referenceDifficulty,
+    },
+    // Layer 1: CPI fine-tuning (refinement)
+    layer1: {
+      ratio: layer1,
+      costPerMTok: p.costPerMTok || REFERENCE_COST_PER_MTOK,
+      cpiIndex: p.cpiIndex || REFERENCE_CPI,
+      referenceCostPerMTok: REFERENCE_COST_PER_MTOK,
+      referenceCPI: REFERENCE_CPI,
+      lastUpdated: p.lastUpdated,
+    },
+    // Cross-validation
+    divergence: Math.round(divergence * 1000) / 10,  // percentage
+    circuitBroken,
+    source: circuitBroken ? 'layer0 (circuit breaker)' :
+            hci.confidence < 0.1 ? 'layer1 (layer0 bootstrapping)' :
+            'geometric mean (layer0 × layer1)',
   };
 }
 

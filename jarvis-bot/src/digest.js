@@ -1,10 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { config } from './config.js';
+import { llmChat } from './llm-provider.js';
 import { getGroupStats, getAllUsers, getUnsubmittedContributions } from './tracker.js';
 import { getModerationLog } from './moderation.js';
 import { getSpamLog } from './antispam.js';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+import { recordUsage } from './compute-economics.js';
 
 // ============ Daily Digest ============
 // Jarvis compiles a daily summary of community activity and sends it to the group.
@@ -91,7 +90,7 @@ export async function generateDigest(chatId) {
 
   // Use Haiku for cheap/fast digest generation
   try {
-    const response = await client.messages.create({
+    const response = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 600,
       system: `You are JARVIS, the AI co-admin of VibeSwap. Write a brief daily digest for the Telegram community. Keep it under 200 words. Be conversational, not corporate. No emojis. Use plain text formatting (no markdown — this is Telegram). Include the key numbers but make it feel human. End with something motivating or a call to action. The real VibeSwap is not a DEX, it's a movement — wherever the Minds converge.`,
@@ -100,6 +99,11 @@ export async function generateDigest(chatId) {
         content: `Generate a daily community digest from this data:\n${JSON.stringify(digestData, null, 2)}`
       }],
     });
+
+    // Record budget usage for daily digest
+    if (response.usage) {
+      recordUsage('jarvis-digest', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
 
     const summary = response.content
       .filter(block => block.type === 'text')
@@ -188,7 +192,7 @@ export async function generateWeeklyDigest(chatId) {
   };
 
   try {
-    const response = await client.messages.create({
+    const response = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 800,
       system: `You are JARVIS, AI co-admin of VibeSwap. Write a weekly community digest. Under 300 words. Conversational, not corporate. No emojis. Plain text (Telegram). Highlight trends, top categories, community health. End with a forward-looking statement.`,
@@ -197,6 +201,11 @@ export async function generateWeeklyDigest(chatId) {
         content: `Generate a weekly digest from this data:\n${JSON.stringify(data, null, 2)}`
       }],
     });
+
+    // Record budget usage for weekly digest
+    if (response.usage) {
+      recordUsage('jarvis-digest', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
 
     return response.content
       .filter(block => block.type === 'text')

@@ -74,6 +74,8 @@ export const config = {
     // Worker mode: shard runs without Telegram bot, participates in consensus/CRPC only
     // Auto-detected when TELEGRAM_BOT_TOKEN is missing and SHARD_MODE=worker
     mode: process.env.SHARD_MODE || (process.env.TELEGRAM_BOT_TOKEN ? 'primary' : 'worker'),
+    // Shared secret for inter-shard HMAC authentication (required for multi-shard)
+    secret: process.env.SHARD_SECRET || null,
   },
   // LLM Provider (Multi-Model Mind Network)
   llm: {
@@ -85,6 +87,12 @@ export const config = {
     deepseekApiKey: process.env.DEEPSEEK_API_KEY || null,
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     whisperModel: process.env.WHISPER_MODEL || 'whisper-1',
+    // Tier 2 — Free/Low-Cost providers (Infinite Compute fallback chain)
+    cerebrasApiKey: process.env.CEREBRAS_API_KEY || null,
+    groqApiKey: process.env.GROQ_API_KEY || null,
+    openrouterApiKey: process.env.OPENROUTER_API_KEY || null,
+    mistralApiKey: process.env.MISTRAL_API_KEY || null,
+    togetherApiKey: process.env.TOGETHER_API_KEY || null,
   },
   // Web Portal — public-facing API for frontend
   web: {

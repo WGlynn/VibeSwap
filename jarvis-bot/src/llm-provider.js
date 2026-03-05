@@ -372,36 +372,82 @@ function createGeminiProvider(providerConfig) {
   function convertMessages(messages, system) {
     const contents = [];
 
+    // Build tool_use_id → function_name lookup across all messages
+    const toolIdToName = new Map();
+    for (const msg of messages) {
+      if (Array.isArray(msg.content)) {
+        for (const block of msg.content) {
+          if (block.type === 'tool_use' && block.id && block.name) {
+            toolIdToName.set(block.id, block.name);
+          }
+        }
+      }
+    }
+
     for (const msg of messages) {
       const role = msg.role === 'assistant' ? 'model' : 'user';
 
       if (Array.isArray(msg.content)) {
-        const parts = [];
+        // Gemini requires: functionCall in model turn, functionResponse in user turn
+        // immediately after. Separate them from text/image parts.
+        const functionCallParts = [];
+        const functionResponseParts = [];
+        const otherParts = [];
+
         for (const block of msg.content) {
           if (block.type === 'text') {
-            parts.push({ text: block.text });
+            otherParts.push({ text: block.text });
           } else if (block.type === 'image' && block.source?.type === 'base64') {
-            parts.push({
+            otherParts.push({
               inlineData: { mimeType: block.source.media_type, data: block.source.data },
             });
           } else if (block.type === 'tool_use') {
-            parts.push({
-              functionCall: { name: block.name, args: block.input },
+            functionCallParts.push({
+              functionCall: { name: block.name, args: block.input || {} },
             });
           } else if (block.type === 'tool_result') {
-            parts.push({
+            const funcName = toolIdToName.get(block.tool_use_id) || block.tool_use_id;
+            functionResponseParts.push({
               functionResponse: {
-                name: block.tool_use_id,
-                response: { result: block.content },
+                name: funcName,
+                response: { result: typeof block.content === 'string' ? block.content : JSON.stringify(block.content) },
               },
             });
           }
         }
-        if (parts.length > 0) {
-          contents.push({ role, parts });
+
+        // Emit parts in Gemini-required order:
+        // Gemini allows text + functionCall in same model turn, but functionResponse
+        // must be in a dedicated user turn immediately after the functionCall turn.
+        if (functionCallParts.length > 0) {
+          // Model turn: text (if any) + functionCall parts together
+          const modelParts = [...otherParts, ...functionCallParts];
+          contents.push({ role: 'model', parts: modelParts });
+        } else if (functionResponseParts.length > 0) {
+          // User turn: functionResponse parts (+ any text, though rare)
+          const userParts = [...otherParts, ...functionResponseParts];
+          contents.push({ role: 'user', parts: userParts });
+        } else if (otherParts.length > 0) {
+          // No function parts — just text/image in natural role
+          contents.push({ role, parts: otherParts });
         }
       } else if (typeof msg.content === 'string') {
         contents.push({ role, parts: [{ text: msg.content }] });
+      }
+    }
+
+    // Gemini doesn't allow consecutive same-role turns (except model→model for
+    // function call chains). Merge consecutive same-role non-function turns.
+    for (let i = 1; i < contents.length; i++) {
+      if (contents[i].role === contents[i - 1].role) {
+        // Check if merging is safe (don't merge functionCall with text, etc.)
+        const prevHasFunc = contents[i - 1].parts.some(p => p.functionCall || p.functionResponse);
+        const currHasFunc = contents[i].parts.some(p => p.functionCall || p.functionResponse);
+        if (!prevHasFunc && !currHasFunc) {
+          contents[i - 1].parts.push(...contents[i].parts);
+          contents.splice(i, 1);
+          i--;
+        }
       }
     }
 

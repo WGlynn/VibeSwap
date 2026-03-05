@@ -3,17 +3,26 @@
 // Zero-cost tools that make Jarvis useful in group chats.
 // All APIs are free with no API key required.
 //
-// Commands:
+// Crypto Commands:
 //   /price <token>     — Crypto price + 24h change (CoinGecko)
 //   /trending          — Top trending tokens (CoinGecko)
 //   /chart <token> [days] — Price chart as image (CoinGecko + QuickChart)
 //   /fear              — Crypto Fear & Greed Index (alternative.me)
 //   /gas               — ETH gas prices (Etherscan public)
+//   /convert <amt> <from> <to> — Crypto conversion (CoinGecko)
+//   /tvl [protocol]    — DeFi TVL data (DeFi Llama)
+//   /ath <token>       — All-time high + distance (CoinGecko)
+//   /dominance         — BTC dominance + market overview (CoinGecko)
+//   /yields [chain]    — Top DeFi yields by APY (DeFi Llama)
+//   /chains            — Chain TVL rankings (DeFi Llama)
+//   /stables           — Stablecoin market data (DeFi Llama)
+//   /dex               — DEX volume rankings (DeFi Llama)
+//   /wallet <address>  — ETH wallet balance (Etherscan)
+//
+// Utility Commands:
 //   /remind <time> <msg> — Set a reminder (in-memory)
 //   /qr <text>         — Generate QR code image
 //   /image <prompt>    — AI image generation (Pollinations.ai)
-//   /convert <amt> <from> <to> — Crypto conversion (CoinGecko)
-//   /tvl [protocol]    — DeFi TVL data (DeFi Llama)
 // ============
 
 const HTTP_TIMEOUT = 10000;
@@ -337,6 +346,213 @@ export async function convertCrypto(amount, from, to) {
     return `${amount} ${from.toUpperCase()} = ${result.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${to.toUpperCase()}`;
   } catch (err) {
     return `Conversion failed: ${err.message}`;
+  }
+}
+
+// ============ All-Time High (CoinGecko) ============
+
+export async function getATH(token) {
+  const id = resolveCoinId(token);
+  try {
+    const data = await fetchCoinGecko(`/coins/${id}?localization=false&tickers=false&community_data=false&developer_data=false`);
+    const md = data.market_data;
+    if (!md) return `No data found for "${token}".`;
+
+    const ath = md.ath?.usd;
+    const athDate = md.ath_date?.usd;
+    const athChange = md.ath_change_percentage?.usd;
+    const current = md.current_price?.usd;
+
+    if (!ath) return `No ATH data for "${token}".`;
+
+    const priceStr = current >= 1 ? `$${current.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : `$${current.toFixed(6)}`;
+    const athStr = ath >= 1 ? `$${ath.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : `$${ath.toFixed(6)}`;
+    const dateStr = athDate ? new Date(athDate).toLocaleDateString() : '?';
+
+    return `${data.name} (${data.symbol?.toUpperCase()})\n\n  Current: ${priceStr}\n  ATH: ${athStr} (${dateStr})\n  From ATH: ${athChange?.toFixed(1)}%\n  Rank: #${data.market_cap_rank || '?'}`;
+  } catch (err) {
+    return `ATH lookup failed: ${err.message}`;
+  }
+}
+
+// ============ Market Dominance + Overview (CoinGecko) ============
+
+export async function getDominance() {
+  try {
+    const data = await fetchCoinGecko('/global');
+    const g = data.data;
+    if (!g) return 'Market data unavailable.';
+
+    const btcDom = g.market_cap_percentage?.btc?.toFixed(1);
+    const ethDom = g.market_cap_percentage?.eth?.toFixed(1);
+    const totalMcap = g.total_market_cap?.usd;
+    const totalVol = g.total_volume?.usd;
+    const change = g.market_cap_change_percentage_24h_usd;
+
+    const lines = ['Crypto Market Overview\n'];
+    if (totalMcap) lines.push(`  Total MCap: $${formatLargeNum(totalMcap)}`);
+    if (change != null) lines.push(`  24h Change: ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`);
+    if (totalVol) lines.push(`  24h Volume: $${formatLargeNum(totalVol)}`);
+    if (btcDom) lines.push(`  BTC Dominance: ${btcDom}%`);
+    if (ethDom) lines.push(`  ETH Dominance: ${ethDom}%`);
+    lines.push(`  Active Cryptos: ${g.active_cryptocurrencies?.toLocaleString() || '?'}`);
+    return lines.join('\n');
+  } catch (err) {
+    return `Market overview failed: ${err.message}`;
+  }
+}
+
+// ============ Top DeFi Yields (DeFi Llama) ============
+
+export async function getYields(chain) {
+  try {
+    const resp = await fetch('https://yields.llama.fi/pools', {
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) throw new Error(`DeFi Llama ${resp.status}`);
+    const data = await resp.json();
+    let pools = data.data || [];
+
+    // Filter by chain if specified
+    if (chain) {
+      const chainLower = chain.toLowerCase();
+      pools = pools.filter(p => p.chain?.toLowerCase() === chainLower);
+    }
+
+    // Sort by APY, filter out tiny/dead pools
+    pools = pools
+      .filter(p => p.tvlUsd > 100000 && p.apy > 0 && p.apy < 10000)
+      .sort((a, b) => b.apy - a.apy)
+      .slice(0, 10);
+
+    if (pools.length === 0) return chain ? `No significant yields found on ${chain}.` : 'No yield data available.';
+
+    const title = chain ? `Top Yields on ${chain}\n` : 'Top DeFi Yields\n';
+    const lines = [title];
+    for (let i = 0; i < pools.length; i++) {
+      const p = pools[i];
+      lines.push(`  ${i + 1}. ${p.project} — ${p.symbol}`);
+      lines.push(`     APY: ${p.apy.toFixed(2)}% | TVL: $${formatLargeNum(p.tvlUsd)} | ${p.chain}`);
+    }
+    return lines.join('\n');
+  } catch (err) {
+    return `Yields lookup failed: ${err.message}`;
+  }
+}
+
+// ============ Chain Rankings (DeFi Llama) ============
+
+export async function getChains() {
+  try {
+    const resp = await fetch('https://api.llama.fi/v2/chains', {
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
+    });
+    if (!resp.ok) throw new Error(`DeFi Llama ${resp.status}`);
+    const data = await resp.json();
+
+    const chains = data
+      .filter(c => c.tvl > 0)
+      .sort((a, b) => b.tvl - a.tvl)
+      .slice(0, 15);
+
+    const lines = ['Top Chains by TVL\n'];
+    for (let i = 0; i < chains.length; i++) {
+      const c = chains[i];
+      lines.push(`  ${String(i + 1).padStart(2)}. ${c.name.padEnd(14)} $${formatLargeNum(c.tvl)}`);
+    }
+    return lines.join('\n');
+  } catch (err) {
+    return `Chain rankings failed: ${err.message}`;
+  }
+}
+
+// ============ Stablecoin Market (DeFi Llama) ============
+
+export async function getStables() {
+  try {
+    const resp = await fetch('https://stablecoins.llama.fi/stablecoins?includePrices=true', {
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
+    });
+    if (!resp.ok) throw new Error(`DeFi Llama ${resp.status}`);
+    const data = await resp.json();
+    const stables = (data.peggedAssets || [])
+      .filter(s => s.circulating?.peggedUSD > 100000000)
+      .sort((a, b) => (b.circulating?.peggedUSD || 0) - (a.circulating?.peggedUSD || 0))
+      .slice(0, 10);
+
+    if (stables.length === 0) return 'No stablecoin data available.';
+
+    let totalMcap = 0;
+    const lines = ['Stablecoin Market\n'];
+    for (let i = 0; i < stables.length; i++) {
+      const s = stables[i];
+      const mcap = s.circulating?.peggedUSD || 0;
+      totalMcap += mcap;
+      lines.push(`  ${String(i + 1).padStart(2)}. ${s.name.padEnd(10)} $${formatLargeNum(mcap)}`);
+    }
+    lines.unshift(`Stablecoin Market — Total: $${formatLargeNum(totalMcap)}\n`);
+    lines.shift(); // remove duplicate header
+    return lines.join('\n');
+  } catch (err) {
+    return `Stablecoins lookup failed: ${err.message}`;
+  }
+}
+
+// ============ DEX Volume Rankings (DeFi Llama) ============
+
+export async function getDexVolume() {
+  try {
+    const resp = await fetch('https://api.llama.fi/overview/dexs?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true', {
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
+    });
+    if (!resp.ok) throw new Error(`DeFi Llama ${resp.status}`);
+    const data = await resp.json();
+    const dexes = (data.protocols || [])
+      .filter(d => d.total24h > 0)
+      .sort((a, b) => b.total24h - a.total24h)
+      .slice(0, 10);
+
+    if (dexes.length === 0) return 'No DEX volume data available.';
+
+    const totalVol = data.total24h || dexes.reduce((s, d) => s + d.total24h, 0);
+    const lines = [`DEX Volume Rankings — 24h Total: $${formatLargeNum(totalVol)}\n`];
+    for (let i = 0; i < dexes.length; i++) {
+      const d = dexes[i];
+      const change = d.change_1d;
+      const changeStr = change != null ? ` (${change >= 0 ? '+' : ''}${change.toFixed(1)}%)` : '';
+      lines.push(`  ${String(i + 1).padStart(2)}. ${d.name.padEnd(14)} $${formatLargeNum(d.total24h)}${changeStr}`);
+    }
+    return lines.join('\n');
+  } catch (err) {
+    return `DEX volume lookup failed: ${err.message}`;
+  }
+}
+
+// ============ Wallet Balance (Etherscan, free) ============
+
+export async function getWalletBalance(address) {
+  if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    return 'Invalid Ethereum address. Format: 0x...';
+  }
+  try {
+    const resp = await fetch(`https://api.etherscan.io/api?module=account&action=balance&address=${address}&tag=latest`, {
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
+    });
+    const data = await resp.json();
+    if (data.status !== '1') return 'Could not fetch wallet balance.';
+
+    const balanceWei = BigInt(data.result);
+    const balanceEth = Number(balanceWei) / 1e18;
+
+    // Get ETH price
+    const priceData = await fetchCoinGecko('/simple/price?ids=ethereum&vs_currencies=usd');
+    const ethPrice = priceData.ethereum?.usd || 0;
+    const usdValue = balanceEth * ethPrice;
+
+    const short = `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return `Wallet ${short}\n\n  ETH: ${balanceEth.toFixed(4)}\n  USD: $${usdValue.toLocaleString('en-US', { maximumFractionDigits: 2 })}\n  ETH Price: $${ethPrice.toLocaleString()}`;
+  } catch (err) {
+    return `Wallet lookup failed: ${err.message}`;
   }
 }
 

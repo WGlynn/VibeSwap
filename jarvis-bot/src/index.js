@@ -24,7 +24,9 @@ import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, 
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
-import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL } from './tools.js';
+import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL, getATH, getDominance, getYields, getChains, getStables, getDexVolume, getWalletBalance } from './tools.js';
+import { getWeather, getWiki, getDefinition, translateText, calculate, getWorldTime, shortenUrl } from './tools-utility.js';
+import { parsePollArgs, coinFlip, diceRoll, magicEightBall, getTrivia, recordGM, getGMLeaderboard } from './tools-fun.js';
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats } from './group-context.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -679,6 +681,179 @@ bot.command('tvl', async (ctx) => {
   const protocol = ctx.message.text.replace(/^\/tvl(@\w+)?/i, '').trim();
   const result = await getTVL(protocol || null);
   ctx.reply(result);
+});
+
+// ============ Advanced Crypto Tools ============
+
+// /ath <token> — All-time high + distance
+bot.command('ath', async (ctx) => {
+  const token = ctx.message.text.replace(/^\/ath(@\w+)?/i, '').trim();
+  if (!token) return ctx.reply('Usage: /ath ETH\n\nShows all-time high price and how far from it.');
+  const result = await getATH(token);
+  ctx.reply(result);
+});
+
+// /dominance — Market overview + BTC dominance
+bot.command('dominance', async (ctx) => {
+  const result = await getDominance();
+  ctx.reply(result);
+});
+bot.command('market', async (ctx) => {
+  const result = await getDominance();
+  ctx.reply(result);
+});
+
+// /yields [chain] — Top DeFi yields
+bot.command('yields', async (ctx) => {
+  const chain = ctx.message.text.replace(/^\/yields(@\w+)?/i, '').trim();
+  const result = await getYields(chain || null);
+  ctx.reply(result);
+});
+
+// /chains — Chain TVL rankings
+bot.command('chains', async (ctx) => {
+  const result = await getChains();
+  ctx.reply(result);
+});
+
+// /stables — Stablecoin market
+bot.command('stables', async (ctx) => {
+  const result = await getStables();
+  ctx.reply(result);
+});
+
+// /dex — DEX volume rankings
+bot.command('dex', async (ctx) => {
+  const result = await getDexVolume();
+  ctx.reply(result);
+});
+
+// /wallet <address> — ETH wallet balance
+bot.command('wallet', async (ctx) => {
+  const address = ctx.message.text.replace(/^\/wallet(@\w+)?/i, '').trim();
+  if (!address) return ctx.reply('Usage: /wallet 0x...\n\nCheck ETH balance for any Ethereum address.');
+  const result = await getWalletBalance(address);
+  ctx.reply(result);
+});
+
+// ============ Utility Tools ============
+
+// /weather <city> — Weather forecast
+bot.command('weather', async (ctx) => {
+  const city = ctx.message.text.replace(/^\/weather(@\w+)?/i, '').trim();
+  if (!city) return ctx.reply('Usage: /weather London\n\n3-day forecast for any city.');
+  const result = await getWeather(city);
+  ctx.reply(result);
+});
+
+// /wiki <topic> — Wikipedia summary
+bot.command('wiki', async (ctx) => {
+  const topic = ctx.message.text.replace(/^\/wiki(@\w+)?/i, '').trim();
+  if (!topic) return ctx.reply('Usage: /wiki Ethereum\n\nLook up any topic on Wikipedia.');
+  const result = await getWiki(topic);
+  ctx.reply(result, { disable_web_page_preview: true });
+});
+
+// /define <word> — Dictionary
+bot.command('define', async (ctx) => {
+  const word = ctx.message.text.replace(/^\/define(@\w+)?/i, '').trim();
+  if (!word) return ctx.reply('Usage: /define consensus\n\nGet the definition of any English word.');
+  const result = await getDefinition(word);
+  ctx.reply(result);
+});
+
+// /translate <lang> <text> — Translation
+bot.command('translate', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/translate(@\w+)?/i, '').trim();
+  const parts = args.split(/\s+/);
+  const lang = parts[0];
+  const text = parts.slice(1).join(' ');
+  if (!lang || !text) return ctx.reply('Usage: /translate es Hello world\n\nLanguages: en, es, fr, de, it, pt, ru, zh, ja, ko, ar, hi, tr, nl, pl, uk, sv');
+  const result = await translateText(lang, text);
+  ctx.reply(result);
+});
+
+// /calc <expression> — Calculator
+bot.command('calc', (ctx) => {
+  const expr = ctx.message.text.replace(/^\/calc(@\w+)?/i, '').trim();
+  if (!expr) return ctx.reply('Usage: /calc 2^10 + sqrt(144)\n\nSupports: +, -, *, /, ^, sqrt, sin, cos, tan, log, ln, pi, e');
+  const result = calculate(expr);
+  ctx.reply(result);
+});
+bot.command('math', (ctx) => {
+  const expr = ctx.message.text.replace(/^\/math(@\w+)?/i, '').trim();
+  if (!expr) return ctx.reply('Usage: /math 2^10 + sqrt(144)');
+  ctx.reply(calculate(expr));
+});
+
+// /time <city/timezone> — World clock
+bot.command('time', (ctx) => {
+  const query = ctx.message.text.replace(/^\/time(@\w+)?/i, '').trim();
+  if (!query) return ctx.reply('Usage: /time Tokyo\n\nCities: nyc, london, tokyo, sydney, dubai, singapore, etc.\nTimezones: UTC, EST, PST, CET, JST, etc.');
+  const result = getWorldTime(query);
+  ctx.reply(result);
+});
+
+// /shorten <url> — URL shortener
+bot.command('shorten', async (ctx) => {
+  const url = ctx.message.text.replace(/^\/shorten(@\w+)?/i, '').trim();
+  if (!url) return ctx.reply('Usage: /shorten https://example.com');
+  const result = await shortenUrl(url);
+  ctx.reply(result, { disable_web_page_preview: true });
+});
+
+// ============ Fun & Community Tools ============
+
+// /poll Question | Option 1 | Option 2 — Native Telegram poll
+bot.command('poll', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/poll(@\w+)?/i, '').trim();
+  const parsed = parsePollArgs(args);
+  if (parsed.error) return ctx.reply(parsed.error);
+  try {
+    await ctx.replyWithPoll(parsed.question, parsed.options, { is_anonymous: false });
+  } catch (err) {
+    ctx.reply(`Poll creation failed: ${err.message?.slice(0, 100)}`);
+  }
+});
+
+// /flip — Coin flip
+bot.command('flip', (ctx) => {
+  ctx.reply(coinFlip());
+});
+
+// /roll [NdN] — Dice roll
+bot.command('roll', (ctx) => {
+  const notation = ctx.message.text.replace(/^\/roll(@\w+)?/i, '').trim() || '1d6';
+  ctx.reply(diceRoll(notation));
+});
+bot.command('dice', (ctx) => {
+  const notation = ctx.message.text.replace(/^\/dice(@\w+)?/i, '').trim() || '1d6';
+  ctx.reply(diceRoll(notation));
+});
+
+// /8ball <question> — Magic 8-ball
+bot.command('8ball', (ctx) => {
+  const question = ctx.message.text.replace(/^\/8ball(@\w+)?/i, '').trim();
+  if (!question) return ctx.reply('Usage: /8ball Will ETH hit 10k?');
+  ctx.reply(magicEightBall(question));
+});
+
+// /trivia — Random crypto trivia
+bot.command('trivia', (ctx) => {
+  const item = getTrivia();
+  ctx.reply(`${item.question}\n\nAnswer: ${item.answer}`);
+});
+
+// /gm — GM streak tracker
+bot.command('gm', (ctx) => {
+  const username = ctx.from.username || ctx.from.first_name || 'anon';
+  const result = recordGM(ctx.from.id, username);
+  ctx.reply(result);
+});
+
+// /gmboard — GM streak leaderboard
+bot.command('gmboard', (ctx) => {
+  ctx.reply(getGMLeaderboard());
 });
 
 // Helper: resolve target user from reply or args

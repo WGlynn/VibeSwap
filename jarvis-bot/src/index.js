@@ -2324,7 +2324,7 @@ function isBotAddressed(ctx) {
   const caption = (ctx.message.caption || '').toLowerCase();
   const isMentioned = botUsername && caption.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
-  const isCalledByName = caption.includes('jarvis');
+  const isCalledByName = caption.includes('jarvis') || caption.includes('jar ') || caption.startsWith('jar') || caption.includes(' j ') || caption.startsWith('j ');
   // Voice/video_note can't have captions — if user replies to bot with media, honor it
   // Also: if media has NO caption at all, treat reply-to as the only addressing check
   const isMediaWithoutCaption = !ctx.message.caption && (ctx.message.voice || ctx.message.video_note || ctx.message.audio);
@@ -2783,7 +2783,7 @@ bot.on('text', async (ctx) => {
   const textLower = ctx.message.text.toLowerCase();
   const isMentioned = botUsername && textLower.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
-  const isCalledByName = textLower.includes('jarvis');
+  const isCalledByName = textLower.includes('jarvis') || textLower.includes('jar ') || textLower.startsWith('jar') || textLower.includes(' j ') || textLower.startsWith('j ');
 
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
     // In groups: buffer into conversation history for situational awareness

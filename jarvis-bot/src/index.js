@@ -51,6 +51,7 @@ import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEc
 import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
+import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
 import { initLimni, flushLimni, getLimniStats, registerTerminal, registerVPS, checkTerminalHealth, checkAllVPS, listStrategies, getStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, onAlert, strategyPipeline, deployStrategy, listBacktests, getBacktestResult, fetchTrades } from './limni.js';
 import { registerKataraktiStrategies, formatPerformanceSummary } from './katarakti.js';
 import { createServer } from 'http';
@@ -1317,6 +1318,29 @@ bot.command('health', async (ctx) => {
     lines.push(`Missing: ${report.missing.join(', ')}`);
   }
   lines.push(`Model: ${config.anthropic.model}`);
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ Continuous Context ============
+
+bot.command('context', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const stats = getContextMemoryStats();
+  const lines = [
+    'Continuous Context Memory',
+    '',
+    `Chats with memory: ${stats.totalChats}`,
+    `Total messages summarized: ${stats.totalMessages}`,
+    `Total summary size: ${stats.totalSummaryChars} chars`,
+  ];
+  for (const s of stats.summaries) {
+    lines.push(`\nChat ${s.chatId}:`);
+    lines.push(`  Messages: ${s.messageCount} | Summary: ${s.summaryLength} chars | v${s.version}`);
+    lines.push(`  Last updated: ${s.lastUpdated}`);
+  }
+  if (stats.totalChats === 0) {
+    lines.push('\nNo summaries yet — context will build as conversations grow beyond 40 messages.');
+  }
   ctx.reply(lines.join('\n'));
 });
 
@@ -2750,6 +2774,10 @@ async function main() {
   console.log('[jarvis] Step 2.7: Initializing LLM provider...');
   initProvider();
 
+  // Step 2.9: Initialize continuous context memory (rolling summaries)
+  console.log('[jarvis] Step 2.9: Initializing continuous context memory...');
+  await initContextMemory();
+
   // Step 3: Load context, conversation history, moderation log, threads, comms
   console.log('[jarvis] Step 3: Loading memory, conversations, moderation, threads, comms...');
   await initClaude();
@@ -3613,6 +3641,7 @@ async function main() {
     await flushShadow();
     await flushHell();
     await flushLimni();
+    await flushContextMemory();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);

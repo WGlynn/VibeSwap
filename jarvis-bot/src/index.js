@@ -358,43 +358,60 @@ bot.command('whoami', (ctx) => {
 
 // /authorize — Owner adds a user (direct authority)
 bot.command('authorize', async (ctx) => {
-  if (!isOwner(ctx)) return ownerOnly(ctx);
-  const { targetId, targetName } = resolveTarget(ctx);
-  if (!targetId) return ctx.reply('Reply to someone\'s message with /authorize, or: /authorize <userId>');
-  if (targetId === config.ownerUserId) return ctx.reply('Owner is always authorized.');
-  authorizeUser(targetId, 'owner', targetName, 0);
-  ctx.reply(`Authorized ${targetName} (${targetId}). They can now interact with JARVIS and /bless others.`);
-  console.log(`[auth] Will authorized user ${targetId} (${targetName})`);
+  console.log(`[authorize] Command from ${ctx.from.id}, reply_to: ${ctx.message.reply_to_message?.from?.id || 'none'}`);
+  try {
+    if (!isOwner(ctx)) return ownerOnly(ctx);
+    const { targetId, targetName } = resolveTarget(ctx);
+    console.log(`[authorize] Target: ${targetId} (${targetName})`);
+    if (!targetId) return ctx.reply('Reply to someone\'s message with /authorize, or: /authorize <userId>');
+    if (targetId === config.ownerUserId) return ctx.reply('Owner is always authorized.');
+    authorizeUser(targetId, 'owner', targetName, 0);
+    await ctx.reply(`Authorized ${targetName} (${targetId}). They can now interact with JARVIS and /bless others.`);
+    console.log(`[auth] Will authorized user ${targetId} (${targetName})`);
+  } catch (err) {
+    console.error(`[authorize] Error: ${err.message}`);
+    ctx.reply(`Authorization failed: ${err.message}`).catch(() => {});
+  }
 });
 
 // /bless — Authorized users can bless others (cascading authority)
 // "And when he had called unto him his twelve disciples, he gave them power..."
 bot.command('bless', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  console.log(`[bless] Command received from ${ctx.from.id} (${ctx.from.username || ctx.from.first_name}), reply_to: ${ctx.message.reply_to_message?.from?.id || 'none'}`);
+  try {
+    if (!isAuthorized(ctx)) return unauthorized(ctx);
 
-  const blesserDepth = isOwner(ctx) ? -1 : getBlessingDepth(ctx.from.id);
-  const newDepth = blesserDepth + 1;
+    const blesserDepth = isOwner(ctx) ? -1 : getBlessingDepth(ctx.from.id);
+    const newDepth = blesserDepth + 1;
 
-  if (newDepth > MAX_BLESSING_DEPTH) {
-    return ctx.reply(`Your blessing depth (${blesserDepth}) is at the limit. Only those closer to Will can bless others.`);
+    if (newDepth > MAX_BLESSING_DEPTH) {
+      return ctx.reply(`Your blessing depth (${blesserDepth}) is at the limit. Only those closer to Will can bless others.`);
+    }
+
+    const { targetId, targetName } = resolveTarget(ctx);
+    console.log(`[bless] Target resolved: ${targetId} (${targetName})`);
+    if (!targetId) return ctx.reply('Reply to someone\'s message with /bless, or: /bless <userId>');
+    if (targetId === config.ownerUserId) return ctx.reply('The owner needs no blessing.');
+
+    // Check if already authorized (without creating mock ctx)
+    const alreadyAuthorized = config.authorizedUsers.includes(targetId) || runtimeAuthorized.has(targetId);
+    if (alreadyAuthorized) return ctx.reply(`${targetName} is already blessed.`);
+
+    const blesserName = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
+    authorizeUser(targetId, ctx.from.id, targetName, newDepth);
+
+    const chain = getBlessingChain(targetId);
+    await ctx.reply(
+      `${blesserName} has blessed ${targetName}.\n\n` +
+      `Trust chain: ${chain.join(' → ')}\n` +
+      `Depth: ${newDepth}/${MAX_BLESSING_DEPTH}\n\n` +
+      `${targetName} can now interact with JARVIS` + (newDepth < MAX_BLESSING_DEPTH ? ' and /bless others.' : '.')
+    );
+    console.log(`[auth] ${blesserName} (${ctx.from.id}) blessed ${targetName} (${targetId}), depth ${newDepth}`);
+  } catch (err) {
+    console.error(`[bless] Error: ${err.message}`);
+    ctx.reply(`Blessing failed: ${err.message}`).catch(() => {});
   }
-
-  const { targetId, targetName } = resolveTarget(ctx);
-  if (!targetId) return ctx.reply('Reply to someone\'s message with /bless, or: /bless <userId>');
-  if (targetId === config.ownerUserId) return ctx.reply('The owner needs no blessing.');
-  if (isAuthorized({ from: { id: targetId } })) return ctx.reply(`${targetName} is already blessed.`);
-
-  const blesserName = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
-  authorizeUser(targetId, ctx.from.id, targetName, newDepth);
-
-  const chain = getBlessingChain(targetId);
-  ctx.reply(
-    `${blesserName} has blessed ${targetName}.\n\n` +
-    `Trust chain: ${chain.join(' → ')}\n` +
-    `Depth: ${newDepth}/${MAX_BLESSING_DEPTH}\n\n` +
-    `${targetName} can now interact with JARVIS` + (newDepth < MAX_BLESSING_DEPTH ? ' and /bless others.' : '.')
-  );
-  console.log(`[auth] ${blesserName} (${ctx.from.id}) blessed ${targetName} (${targetId}), depth ${newDepth}`);
 });
 
 // /deauthorize — Owner removes a user (cascading revocation)

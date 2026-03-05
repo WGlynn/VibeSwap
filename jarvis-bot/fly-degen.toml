@@ -1,0 +1,62 @@
+# ============ DIABLO JARVIS — Degen Shard (Fly.io) ============
+#
+# Same JARVIS codebase, FULL DEGEN personality.
+# Runs as @diablojarvisbot on Telegram.
+#
+# Deployment:
+#   fly deploy --config fly-degen.toml
+#
+# Secrets:
+#   fly secrets set TELEGRAM_BOT_TOKEN=<degen-bot-token> --app jarvis-degen
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-... --app jarvis-degen
+#   fly secrets set OWNER_USER_ID=<will-id> --app jarvis-degen
+# ============
+
+app = 'jarvis-degen'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
+  NODE_ENV = 'production'
+  HEALTH_PORT = '8080'
+  JARVIS_PERSONA = 'degen'
+  # Runs as a full primary with its own Telegram bot
+  # Connects to the Mind Network as a peer
+  SHARD_MODE = 'primary'
+  TOTAL_SHARDS = '3'
+  NODE_TYPE = 'full'
+  ROUTER_URL = 'http://jarvis-vibeswap.fly.dev'
+  MEMORY_DIR = '/app/memory'
+  VIBESWAP_REPO = '/repo'
+  GITHUB_REPO_URL = 'https://github.com/WGlynn/vibeswap-private.git'
+
+[[mounts]]
+  source = 'jarvis_degen_data'
+  destination = '/app/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+
+[checks]
+  [checks.health]
+    port = 8080
+    type = 'http'
+    interval = '1m0s'
+    timeout = '10s'
+    path = '/health'
+
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

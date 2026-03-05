@@ -3813,12 +3813,55 @@ bot.on('text', async (ctx) => {
       ctx.reply('This conversation is getting good. Use /archive if you want to save it as a knowledge artifact.');
     }
 
+    // ============ Sibling Bot Interaction ============
+    // Detect if the message is from our sibling bot (JARVIS ↔ Diablo)
+    // They should riff off each other like teammates — but with a loop guard
+    const SIBLING_BOT_IDS = [
+      8725684717,   // @diablojarvisbot (Diablo)
+      8467996907,   // @JarvisMind1828383bot (regular JARVIS)
+    ];
+    const isFromSibling = ctx.from.is_bot && SIBLING_BOT_IDS.includes(ctx.from.id);
+    const myBotId = ctx.botInfo?.id;
+
+    // Bot-to-bot loop guard: max 2 exchanges, then stop
+    const botChatKey = `bot2bot:${ctx.chat.id}`;
+    if (!global._botExchanges) global._botExchanges = new Map();
+    if (isFromSibling) {
+      const exchanges = global._botExchanges.get(botChatKey) || { count: 0, lastTime: 0 };
+      const timeSinceLastExchange = Date.now() - exchanges.lastTime;
+      // Reset counter if it's been more than 5 minutes since last bot-to-bot exchange
+      if (timeSinceLastExchange > 5 * 60 * 1000) exchanges.count = 0;
+      // Stop after 2 consecutive bot-to-bot exchanges to prevent infinite loops
+      if (exchanges.count >= 2) {
+        // Let the conversation breathe — humans should jump in
+        return;
+      }
+    }
+
     // Proactive intelligence — JARVIS is a full team member, not a wallflower
     if (msgText.length >= 3) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
         const recentCtx = getRecentContext(ctx.chat.id, 10);
-        const analysis = await analyzeMessage(msgText, userName, recentCtx);
+
+        // If message is from sibling bot, boost engagement — they should banter
+        let analysis;
+        if (isFromSibling) {
+          const siblingName = ctx.from.id === 8725684717 ? 'Diablo' : 'JARVIS';
+          const myName = persona === 'degen' ? 'Diablo' : 'JARVIS';
+          // 60% chance to respond to sibling (not every time — feels more natural)
+          if (Math.random() < 0.6) {
+            analysis = {
+              action: 'engage',
+              response_hint: `Your sibling bot ${siblingName} just said something. Riff on it, agree, disagree, or roast them. You two are like coworkers who banter. Keep it to 1 sentence. Be playful.`,
+              confidence: 0.9,
+            };
+          } else {
+            analysis = { action: 'observe', reason: 'letting_sibling_breathe' };
+          }
+        } else {
+          analysis = await analyzeMessage(msgText, userName, recentCtx);
+        }
 
         if (analysis.action === 'engage' && analysis.response_hint) {
           const proactiveReply = await generateProactiveResponse(
@@ -3826,10 +3869,20 @@ bot.on('text', async (ctx) => {
           );
           if (proactiveReply) {
             await ctx.reply(proactiveReply, { parse_mode: undefined });
-            // Track Jarvis's proactive response in BOTH context window AND conversation history
-            // This prevents phantom interactions — the LLM knows what Jarvis already said
-            pushGroupMessage(ctx.chat.id, 'JARVIS', proactiveReply, null, true);
+            const myDisplayName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
+            pushGroupMessage(ctx.chat.id, myDisplayName, proactiveReply, null, true);
             bufferAssistantMessage(ctx.chat.id, proactiveReply);
+
+            // Track bot-to-bot exchange count
+            if (isFromSibling) {
+              const exchanges = global._botExchanges.get(botChatKey) || { count: 0, lastTime: 0 };
+              exchanges.count++;
+              exchanges.lastTime = Date.now();
+              global._botExchanges.set(botChatKey, exchanges);
+            } else {
+              // Human message resets the bot exchange counter
+              global._botExchanges.set(botChatKey, { count: 0, lastTime: 0 });
+            }
           }
         } else if (analysis.action === 'moderate') {
           const modAction = await evaluateModeration(msgText, userName, analysis.violation, analysis.severity);
@@ -3839,7 +3892,6 @@ bot.on('text', async (ctx) => {
           } else if (modAction.action === 'mute') {
             await muteUser(bot, ctx.chat.id, ctx.from.id, 600, modAction.reason, 'jarvis-ai');
           }
-          // Bans from AI moderation should be rare and reviewed — log but don't auto-execute
         }
       } catch (err) {
         // Swallow proactive intelligence errors — don't let Haiku 529s crash group handling

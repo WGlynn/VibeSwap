@@ -52,6 +52,8 @@ const MAX_CHAIN_LENGTH = 1000; // Keep last 1000 epochs
 const HTTP_TIMEOUT_MS = 3000;
 const MAX_MISSED_EPOCHS_PER_PEER = 10;
 const WAL_FILE = join(config.dataDir, 'knowledge', 'wal.jsonl');
+const MISSED_EPOCHS_FILE = join(config.dataDir, 'knowledge', 'missed-epochs.json');
+const CHAIN_FILE = join(config.dataDir, 'knowledge', 'chain.json');
 
 // ============ State ============
 
@@ -287,7 +289,7 @@ export async function retryMissedEpochs() {
 
 // ============ Receive Remote Epoch ============
 
-export function receiveEpoch(epoch) {
+export async function receiveEpoch(epoch) {
   // Validate epoch hash
   const expectedHash = hashEpoch({ ...epoch, hash: '' });
   if (expectedHash !== epoch.hash) {
@@ -302,9 +304,31 @@ export function receiveEpoch(epoch) {
     return true;
   }
 
-  // Fork detected — resolve
-  // For now, just track it. Full fork resolution requires fetching the remote chain.
+  // Fork detected — attempt resolution by fetching remote chain
   console.log(`[knowledge-chain] Fork detected: epoch ${epoch.height} from ${epoch.shardId} (parent ${epoch.parentHash.slice(0, 8)} !== our head ${chainHead?.hash.slice(0, 8)})`);
+
+  // Find the peer that sent this epoch and fetch their full chain
+  const peers = getShardPeers();
+  const sourcePeer = peers.find(p => p.shardId === epoch.shardId);
+  if (sourcePeer) {
+    try {
+      const chainResponse = await fetch(`${sourcePeer.url}/knowledge-chain/chain?since=0`, {
+        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS * 2), // Give extra time for full chain
+      });
+      const remoteData = await chainResponse.json();
+      const remoteChain = remoteData.epochs || [];
+      if (remoteChain.length > 0) {
+        const accepted = acceptRemoteChain(remoteChain);
+        if (accepted) {
+          console.log(`[knowledge-chain] Fork resolved: accepted remote chain from ${epoch.shardId} (${remoteChain.length} epochs)`);
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn(`[knowledge-chain] Fork resolution failed for ${epoch.shardId}: ${err.message}`);
+    }
+  }
+
   return false;
 }
 
@@ -343,6 +367,49 @@ function computeMerkleRoot(changes) {
   }
 
   return hashes[0];
+}
+
+// ============ Chain & Missed Epoch Persistence ============
+
+export async function persistChain() {
+  try {
+    await writeFile(CHAIN_FILE, JSON.stringify({
+      chain: chain.slice(-MAX_CHAIN_LENGTH),
+      head: chainHead,
+    }));
+  } catch {}
+  // Persist missed epochs
+  try {
+    const obj = {};
+    for (const [k, v] of missedEpochs) obj[k] = v;
+    if (Object.keys(obj).length > 0) {
+      await writeFile(MISSED_EPOCHS_FILE, JSON.stringify(obj));
+    }
+  } catch {}
+}
+
+export async function recoverChain() {
+  // Recover chain state
+  try {
+    const data = await readFile(CHAIN_FILE, 'utf-8');
+    const saved = JSON.parse(data);
+    if (saved.chain?.length > 0) {
+      chain = saved.chain;
+      chainHead = saved.head || chain[chain.length - 1];
+      console.log(`[knowledge-chain] Recovered chain: ${chain.length} epochs, head at height ${chainHead.height}`);
+    }
+  } catch { /* clean start */ }
+  // Recover missed epochs
+  try {
+    const data = await readFile(MISSED_EPOCHS_FILE, 'utf-8');
+    const obj = JSON.parse(data);
+    for (const [k, v] of Object.entries(obj)) {
+      missedEpochs.set(k, v);
+    }
+    if (Object.keys(obj).length > 0) {
+      console.log(`[knowledge-chain] Recovered ${Object.keys(obj).length} peers with missed epochs`);
+    }
+  } catch { /* clean start */ }
 }
 
 // ============ Stats ============
@@ -411,11 +478,11 @@ export function handleKnowledgeChainRequest(path, method) {
   return null;
 }
 
-export function processKnowledgeChainBody(handler, body, query) {
+export async function processKnowledgeChainBody(handler, body, query) {
   switch (handler) {
     case 'head': return getChainHead() || { height: 0, cumulativeValueDensity: 0 };
     case 'stats': return getChainStats();
-    case 'epoch': return { accepted: receiveEpoch(body) };
+    case 'epoch': return { accepted: await receiveEpoch(body) };
     case 'chain': return { epochs: getChain(parseInt(query?.since || '0')) };
     default: return { error: 'Unknown handler' };
   }

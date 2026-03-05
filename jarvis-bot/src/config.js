@@ -76,6 +76,9 @@ export const config = {
     mode: process.env.SHARD_MODE || (process.env.TELEGRAM_BOT_TOKEN ? 'primary' : 'worker'),
     // Shared secret for inter-shard HMAC authentication (required for multi-shard)
     secret: process.env.SHARD_SECRET || null,
+    // Static peer seeds — known shard URLs for router-independent discovery (comma-separated)
+    // These are public URLs that work even if the router is down
+    peerSeeds: process.env.PEER_SEEDS ? process.env.PEER_SEEDS.split(',').map(s => s.trim()) : [],
   },
   // LLM Provider (Multi-Model Mind Network)
   llm: {
@@ -93,6 +96,9 @@ export const config = {
     openrouterApiKey: process.env.OPENROUTER_API_KEY || null,
     mistralApiKey: process.env.MISTRAL_API_KEY || null,
     togetherApiKey: process.env.TOGETHER_API_KEY || null,
+    sambanovaApiKey: process.env.SAMBANOVA_API_KEY || null,
+    fireworksApiKey: process.env.FIREWORKS_API_KEY || null,
+    novitaApiKey: process.env.NOVITA_API_KEY || null,
   },
   // Web Portal — public-facing API for frontend
   web: {

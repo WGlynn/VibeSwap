@@ -21,7 +21,7 @@
 // ============
 
 import { config } from './config.js';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 
 // ============ Provider Interface ============
 
@@ -875,28 +875,72 @@ export async function llmChat(request) {
   const MAX_RETRIES = 3;
   let lastError;
 
+  const cascadeTrail = [];
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const attemptStart = Date.now();
     try {
       const result = await activeProvider.chat(request);
+      // Cascade trail — record successful attempt
+      cascadeTrail.push({
+        provider: activeProvider.name,
+        model: activeProvider.model,
+        status: 'success',
+        latencyMs: Date.now() - attemptStart,
+      });
       // Attach provider metadata for usage tracking
       result._provider = activeProvider.name;
       result._model = activeProvider.model;
+      // Wardenclyffe protocol metadata
+      result._cascadeTrail = cascadeTrail;
+      result._intelligenceLevel = getIntelligenceLevel();
+      const contentStr = JSON.stringify(result.content);
+      result._responseHash = createHash('sha256')
+        .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
+        .digest('hex');
       return result;
     } catch (error) {
       lastError = error;
 
       // Credit exhaustion — try fallback provider immediately
       if (isCreditError(error) && activateFallback()) {
+        cascadeTrail.push({
+          provider: cascadeTrail.length > 0 ? cascadeTrail[cascadeTrail.length - 1].provider : 'unknown',
+          model: cascadeTrail.length > 0 ? cascadeTrail[cascadeTrail.length - 1].model : 'unknown',
+          status: 'credit_error',
+          latencyMs: Date.now() - attemptStart,
+          error: error.message?.slice(0, 120),
+        });
         console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
+        const fallbackStart = Date.now();
         const { model, ...rest } = request;
         const result = await activeProvider.chat(rest);
+        cascadeTrail.push({
+          provider: activeProvider.name,
+          model: activeProvider.model,
+          status: 'success',
+          latencyMs: Date.now() - fallbackStart,
+        });
         result._provider = activeProvider.name;
         result._model = activeProvider.model;
+        result._cascadeTrail = cascadeTrail;
+        result._intelligenceLevel = getIntelligenceLevel();
+        const contentStr = JSON.stringify(result.content);
+        result._responseHash = createHash('sha256')
+          .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
+          .digest('hex');
         return result;
       }
 
       // Transient errors — retry with exponential backoff + jitter
       if (isTransientError(error) && attempt < MAX_RETRIES) {
+        cascadeTrail.push({
+          provider: activeProvider.name,
+          model: activeProvider.model,
+          status: 'transient_error',
+          latencyMs: Date.now() - attemptStart,
+          error: error.message?.slice(0, 120),
+        });
         const baseDelay = Math.min(1000 * Math.pow(2, attempt), 8000);
         const jitter = Math.random() * 1000;
         const delay = baseDelay + jitter;
@@ -905,7 +949,15 @@ export async function llmChat(request) {
         continue;
       }
 
-      throw error; // Non-transient, non-credit error — give up
+      // Fatal error — record and throw
+      cascadeTrail.push({
+        provider: activeProvider.name,
+        model: activeProvider.model,
+        status: 'fatal_error',
+        latencyMs: Date.now() - attemptStart,
+        error: error.message?.slice(0, 120),
+      });
+      throw error;
     }
   }
 

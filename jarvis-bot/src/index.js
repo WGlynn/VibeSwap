@@ -24,7 +24,7 @@ import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, 
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
-import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, getImageUrl, convertCrypto, getTVL } from './tools.js';
+import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL } from './tools.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -593,7 +593,14 @@ bot.command('chart', async (ctx) => {
   const result = await getChart(token, Math.min(days, 365));
   if (result.error) return ctx.reply(result.error);
   try {
-    await ctx.replyWithPhoto(result.url, { caption: result.caption });
+    // Fetch chart image as buffer (Telegram may reject external URLs)
+    const resp = await fetch(result.url, { signal: AbortSignal.timeout(15000) });
+    if (resp.ok) {
+      const buffer = Buffer.from(await resp.arrayBuffer());
+      await ctx.replyWithPhoto({ source: buffer }, { caption: result.caption });
+    } else {
+      ctx.reply(`${result.caption}\n\nChart: ${result.url}`);
+    }
   } catch {
     ctx.reply(`${result.caption}\n\nChart: ${result.url}`);
   }
@@ -641,11 +648,18 @@ bot.command('qr', async (ctx) => {
 bot.command('image', async (ctx) => {
   const prompt = ctx.message.text.replace(/^\/image(@\w+)?/i, '').trim();
   if (!prompt) return ctx.reply('Usage: /image a futuristic city with neon lights\n\nGenerates an AI image from your description.');
-  await ctx.reply('Generating image...');
+  const statusMsg = await ctx.reply('Generating image...');
   try {
-    await ctx.replyWithPhoto(getImageUrl(prompt), { caption: prompt.slice(0, 200) });
-  } catch {
-    ctx.reply(`Image generation failed. Try a simpler prompt.`);
+    const result = await generateImage(prompt);
+    if (result) {
+      await ctx.replyWithPhoto({ source: result.buffer }, { caption: prompt.slice(0, 200) });
+    } else {
+      await ctx.reply('Image generation service is currently unavailable. Try again later.');
+    }
+    // Clean up status message
+    try { await ctx.deleteMessage(statusMsg.message_id); } catch {}
+  } catch (err) {
+    ctx.reply(`Image generation failed: ${err.message?.slice(0, 100)}`);
   }
 });
 

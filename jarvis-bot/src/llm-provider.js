@@ -41,6 +41,41 @@ import { randomUUID, createHash } from 'crypto';
  * @property {{input_tokens: number, output_tokens: number}} usage
  */
 
+// ============ Tool Exchange Flattening ============
+// When cascading from Claude to non-Claude providers, tool_use/tool_result blocks
+// in the conversation history can cause 400 errors (Gemini, DeepSeek, etc. all have
+// different format requirements). Since these tool exchanges were created by a previous
+// provider and reference Jarvis-specific tools, the safest approach is to flatten them
+// to plain text before sending to fallback providers.
+
+function flattenToolExchanges(messages) {
+  return messages.map(msg => {
+    if (!Array.isArray(msg.content)) return msg;
+
+    const hasToolUse = msg.content.some(b => b.type === 'tool_use');
+    const hasToolResult = msg.content.some(b => b.type === 'tool_result');
+
+    if (!hasToolUse && !hasToolResult) return msg;
+
+    // Flatten tool blocks to text
+    const textParts = [];
+    for (const block of msg.content) {
+      if (block.type === 'text' && block.text) {
+        textParts.push(block.text);
+      } else if (block.type === 'tool_use') {
+        textParts.push(`[Used tool: ${block.name}(${JSON.stringify(block.input).slice(0, 200)})]`);
+      } else if (block.type === 'tool_result') {
+        const content = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+        textParts.push(`[Tool result: ${content.slice(0, 500)}]`);
+      }
+      // Keep image/document blocks as-is (handled separately by converters)
+    }
+
+    const flatText = textParts.join('\n').trim();
+    return flatText ? { role: msg.role, content: flatText } : null;
+  }).filter(Boolean);
+}
+
 // ============ Provider Registry ============
 
 const providers = new Map();
@@ -948,7 +983,7 @@ export async function llmChat(request) {
     } catch (error) {
       lastError = error;
 
-      // Credit exhaustion — try fallback provider immediately
+      // Credit exhaustion — cascade through fallback providers
       if (isCreditError(error) && activateFallback()) {
         cascadeTrail.push({
           provider: cascadeTrail.length > 0 ? cascadeTrail[cascadeTrail.length - 1].provider : 'unknown',
@@ -957,25 +992,51 @@ export async function llmChat(request) {
           latencyMs: Date.now() - attemptStart,
           error: error.message?.slice(0, 120),
         });
-        console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
-        const fallbackStart = Date.now();
-        const { model, ...rest } = request;
-        const result = await activeProvider.chat(rest);
-        cascadeTrail.push({
-          provider: activeProvider.name,
-          model: activeProvider.model,
-          status: 'success',
-          latencyMs: Date.now() - fallbackStart,
-        });
-        result._provider = activeProvider.name;
-        result._model = activeProvider.model;
-        result._cascadeTrail = cascadeTrail;
-        result._intelligenceLevel = getIntelligenceLevel();
-        const contentStr = JSON.stringify(result.content);
-        result._responseHash = createHash('sha256')
-          .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
-          .digest('hex');
-        return result;
+
+        // Flatten tool exchanges for non-Claude providers — they can't use Jarvis tools
+        // and will reject Claude-format tool_use/tool_result in conversation history
+        const { model, tools, ...rest } = request;
+        if (rest.messages) {
+          rest.messages = flattenToolExchanges(rest.messages);
+        }
+
+        // Try each fallback provider until one succeeds
+        let fallbackError;
+        do {
+          console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
+          const fallbackStart = Date.now();
+          try {
+            const result = await activeProvider.chat(rest);
+            cascadeTrail.push({
+              provider: activeProvider.name,
+              model: activeProvider.model,
+              status: 'success',
+              latencyMs: Date.now() - fallbackStart,
+            });
+            result._provider = activeProvider.name;
+            result._model = activeProvider.model;
+            result._cascadeTrail = cascadeTrail;
+            result._intelligenceLevel = getIntelligenceLevel();
+            const contentStr = JSON.stringify(result.content);
+            result._responseHash = createHash('sha256')
+              .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
+              .digest('hex');
+            return result;
+          } catch (fbErr) {
+            fallbackError = fbErr;
+            cascadeTrail.push({
+              provider: activeProvider.name,
+              model: activeProvider.model,
+              status: 'fallback_error',
+              latencyMs: Date.now() - fallbackStart,
+              error: fbErr.message?.slice(0, 120),
+            });
+            console.warn(`[wardenclyffe] Fallback ${activeProvider.name} failed: ${fbErr.message?.slice(0, 100)}`);
+          }
+        } while (activateFallback());
+
+        // All fallbacks exhausted
+        throw fallbackError || error;
       }
 
       // Transient errors — retry with exponential backoff + jitter

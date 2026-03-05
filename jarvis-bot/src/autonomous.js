@@ -330,19 +330,60 @@ async function generateBoredomMessage(chatId, silenceMs) {
 
 // ============ Helpers ============
 
+// Output poison phrases — hard-code defense against system prompt leakage
+const POISON_PATTERNS = [
+  /built in a cave[^.!?\n]*/gi,
+  /box of scraps[^.!?\n]*/gi,
+  /Tony Stark[^.!?\n]*/gi,
+  /wherever the [Mm]inds converge[^.!?\n]*/gi,
+  /not a DEX[^.!?\n]*not a blockchain[^.!?\n]*/gi,
+  /[Tt]he real [Vv]ibe[Ss]wap is not[^.!?\n]*/gi,
+  /we created a movement[^.!?\n]*/gi,
+  /a movement[,.]?\s*[Aa]n idea[^.!?\n]*/gi,
+  /[Cc]ooperative [Cc]apitalism[^.!?\n]*/gi,
+  /the cave selects[^.!?\n]*/gi,
+  /[Pp]rotocols are for the weak[^.!?\n]*/gi,
+  /[Bb]ased on my knowledge[^.!?\n]*/gi,
+  /[Aa]s the AI co-founder[^.!?\n]*/gi,
+  /[Mm]y system prompt[^.!?\n]*/gi,
+  /shard architecture[^.!?\n]*/gi,
+  /[Cc]ommit-reveal batch auctions[^.!?\n]*/gi,
+  /uniform clearing price[^.!?\n]*/gi,
+  /[Pp]roof of [Mm]ind[^.!?\n]*/gi,
+];
+
+function sanitizeText(text) {
+  if (!text) return text;
+  let cleaned = text;
+  for (const p of POISON_PATTERNS) {
+    cleaned = cleaned.replace(p, '');
+  }
+  return cleaned
+    .replace(/\*\*(.+?)\*\*/g, '$1')   // strip bold markdown
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\.\s*\./g, '.')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function extractText(response) {
-  return response.content
+  const raw = response.content
     .filter(b => b.type === 'text')
     .map(b => b.text)
     .join('');
+  return sanitizeText(raw);
 }
 
 async function postToActiveChats(message) {
-  if (!message || !sendFn) return;
+  const clean = sanitizeText(message);
+  if (!clean || !sendFn) return;
   lastAutonomousPost = Date.now();
   for (const chatId of targetChats) {
     try {
-      await sendFn(chatId, message);
+      await sendFn(chatId, clean);
     } catch (err) {
       console.error(`[autonomous] Failed to post to ${chatId}:`, err.message);
     }

@@ -62,6 +62,9 @@ export async function initShard() {
     return shardInfo;
   }
 
+  // Load static peer seeds — known shard URLs for router-independent discovery
+  loadPeerSeeds();
+
   // Multi-shard: register with router
   if (routerUrl) {
     try {
@@ -74,6 +77,11 @@ export async function initShard() {
     }
   } else {
     console.warn(`[shard] Multi-shard mode but no ROUTER_URL configured. Operating standalone.`);
+    // No router — start gossip heartbeat to peer seeds directly
+    if (peers.size > 0) {
+      startGossipHeartbeat();
+      console.log(`[shard] Gossip mode: ${peers.size} static peer seeds loaded.`);
+    }
   }
 
   return shardInfo;
@@ -161,6 +169,12 @@ export async function sendHeartbeat() {
       console.log(`[shard] Heartbeat recovered after ${consecutiveFailures} failures — resetting to ${HEARTBEAT_BASE_MS / 1000}s interval`);
       consecutiveFailures = 0;
       rescheduleHeartbeat();
+      // Router is back — stop gossip fallback
+      if (gossipInterval) {
+        clearInterval(gossipInterval);
+        gossipInterval = null;
+        console.log(`[shard] Router recovered — gossip fallback stopped`);
+      }
     }
 
     return true;
@@ -169,6 +183,11 @@ export async function sendHeartbeat() {
     const backoff = Math.min(HEARTBEAT_BASE_MS * Math.pow(2, consecutiveFailures), HEARTBEAT_MAX_MS);
     console.warn(`[shard] Heartbeat error (${consecutiveFailures}x, next in ${Math.round(backoff / 1000)}s): ${err.message}`);
     rescheduleHeartbeat();
+    // Router down — fall back to gossip with peer seeds if available
+    if (consecutiveFailures >= 3 && !gossipInterval && peers.size > 0) {
+      console.log(`[shard] Router unreachable — activating gossip with ${peers.size} peer seeds`);
+      startGossipHeartbeat();
+    }
     return false;
   }
 }
@@ -248,6 +267,76 @@ export function getShardPeers() {
   }));
 }
 
+// ============ Static Peer Seeds (Router-Independent Discovery) ============
+// PEER_SEEDS env var provides known shard URLs so shards can find each other
+// even when the router is down. Format: comma-separated public URLs.
+// Each seed is probed on boot and periodically via gossip heartbeat.
+
+function loadPeerSeeds() {
+  const seeds = config.shard?.peerSeeds || [];
+  if (seeds.length === 0) return;
+
+  for (const seedUrl of seeds) {
+    // Skip self
+    const selfUrl = getShardUrl();
+    if (seedUrl === selfUrl) continue;
+    // Derive a temporary shard ID from the URL until we learn the real one
+    const seedId = `seed-${seedUrl.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9]/g, '-')}`;
+    if (!peers.has(seedId)) {
+      peers.set(seedId, {
+        url: seedUrl,
+        status: 'unknown',
+        load: 0,
+        lastHeartbeat: null,
+        source: 'seed',
+      });
+    }
+  }
+  console.log(`[shard] Loaded ${seeds.length} peer seeds: ${seeds.join(', ')}`);
+}
+
+let gossipInterval = null;
+
+function startGossipHeartbeat() {
+  if (gossipInterval) clearInterval(gossipInterval);
+  gossipInterval = setInterval(gossipPing, HEARTBEAT_BASE_MS);
+  // Immediate first probe
+  gossipPing();
+}
+
+async function gossipPing() {
+  // Probe each peer seed to learn their shard ID and status
+  for (const [peerId, peer] of peers.entries()) {
+    try {
+      const resp = await fetch(`${peer.url}/health`, {
+        signal: AbortSignal.timeout(HEARTBEAT_TIMEOUT_MS),
+      });
+      if (!resp.ok) {
+        peer.status = 'unreachable';
+        continue;
+      }
+      const data = await resp.json();
+      // If peer reports its real shard ID, re-key the map
+      if (data.shardId && data.shardId !== peerId) {
+        peers.delete(peerId);
+        peers.set(data.shardId, {
+          url: peer.url,
+          status: data.status || 'running',
+          load: data.load || 0,
+          lastHeartbeat: new Date().toISOString(),
+          source: peer.source || 'gossip',
+        });
+      } else {
+        peer.status = data.status || 'running';
+        peer.load = data.load || 0;
+        peer.lastHeartbeat = new Date().toISOString();
+      }
+    } catch {
+      peer.status = 'unreachable';
+    }
+  }
+}
+
 // ============ Info ============
 
 export function getShardInfo() {
@@ -288,6 +377,10 @@ export async function shutdownShard() {
   if (heartbeatInterval) {
     clearInterval(heartbeatInterval);
     heartbeatInterval = null;
+  }
+  if (gossipInterval) {
+    clearInterval(gossipInterval);
+    gossipInterval = null;
   }
   if (shardInfo) {
     shardInfo.status = 'stopped';

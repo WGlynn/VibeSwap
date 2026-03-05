@@ -3,16 +3,15 @@
 // Tesla's Wardenclyffe Tower was designed to transmit energy without wires,
 // without meters, without bills. The tower was demolished. The idea was not.
 //
-// Wardenclyffe is a 9-provider LLM cascade that harvests free inference
+// Wardenclyffe is a 12-provider LLM cascade that harvests free inference
 // from the ambient compute surplus of the modern API economy.
 // When paid providers exhaust, free-tier providers sustain the signal.
 //
 // Tier 1 (paid):  Claude → DeepSeek → Gemini → OpenAI
-// Tier 2 (free):  Cerebras → Groq → OpenRouter → Mistral → Together
+// Tier 2 (free):  Cerebras → Groq → OpenRouter → Mistral → Together → SambaNova → Fireworks → Novita
 //
-// Availability: 1 - (1-a)^9 ≈ 1.0 (twelve nines)
-// Capacity: 5.8M tok/day vs 925K required (6.3x headroom)
-// Single-provider dependency: 100% → 11%
+// Availability: 1 - (1-a)^12 ≈ 1.0 (fifteen nines)
+// Single-provider dependency: 100% → 8.3%
 //
 // All providers return normalized Anthropic-format responses:
 //   { content, stop_reason, usage, _provider, _model }
@@ -646,6 +645,45 @@ function createTogetherProvider(providerConfig) {
 
 registerProvider('together', createTogetherProvider);
 
+// ============ SambaNova Provider (Free Tier — Llama 3.3 70B, fast inference) ============
+
+function createSambaNovaProvider(providerConfig) {
+  return createOpenAIProvider({
+    ...providerConfig,
+    providerName: 'sambanova',
+    baseUrl: providerConfig.baseUrl || 'https://api.sambanova.ai/v1',
+    model: providerConfig.model || 'Meta-Llama-3.3-70B-Instruct',
+  });
+}
+
+registerProvider('sambanova', createSambaNovaProvider);
+
+// ============ Fireworks Provider (Free Credits — Llama 3.3 70B, blazing fast) ============
+
+function createFireworksProvider(providerConfig) {
+  return createOpenAIProvider({
+    ...providerConfig,
+    providerName: 'fireworks',
+    baseUrl: providerConfig.baseUrl || 'https://api.fireworks.ai/inference/v1',
+    model: providerConfig.model || 'accounts/fireworks/models/llama-v3p3-70b-instruct',
+  });
+}
+
+registerProvider('fireworks', createFireworksProvider);
+
+// ============ Novita Provider (Free Tier — Llama 3.3 70B, generous limits) ============
+
+function createNovitaProvider(providerConfig) {
+  return createOpenAIProvider({
+    ...providerConfig,
+    providerName: 'novita',
+    baseUrl: providerConfig.baseUrl || 'https://api.novita.ai/v3/openai',
+    model: providerConfig.model || 'meta-llama/llama-3.3-70b-instruct',
+  });
+}
+
+registerProvider('novita', createNovitaProvider);
+
 // ============ Factory ============
 
 let activeProvider = null;
@@ -696,6 +734,9 @@ export function getFallbackChain() {
 // Tier 2: OpenRouter      — quality 0.55 (free DeepSeek R1)
 // Tier 2: Mistral Small   — quality 0.50
 // Tier 2: Together        — quality 0.60
+// Tier 2: SambaNova       — quality 0.60 (Llama 3.3 70B, free)
+// Tier 2: Fireworks       — quality 0.60 (Llama 3.3 70B, fast)
+// Tier 2: Novita          — quality 0.55 (Llama 3.3 70B, free)
 
 const PROVIDER_QUALITY = {
   claude:     { quality: 1.00, tier: 1, label: 'Premium' },
@@ -707,6 +748,9 @@ const PROVIDER_QUALITY = {
   openrouter: { quality: 0.55, tier: 2, label: 'Free' },
   mistral:    { quality: 0.50, tier: 2, label: 'Free' },
   together:   { quality: 0.60, tier: 2, label: 'Free' },
+  sambanova:  { quality: 0.60, tier: 2, label: 'Free' },
+  fireworks:  { quality: 0.60, tier: 2, label: 'Free' },
+  novita:     { quality: 0.55, tier: 2, label: 'Free' },
   ollama:     { quality: 0.40, tier: 3, label: 'Local' },
 };
 
@@ -858,6 +902,9 @@ function getProviderConfig(providerName) {
         case 'openrouter': return 'deepseek/deepseek-r1:free';
         case 'mistral': return 'mistral-small-latest';
         case 'together': return 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+        case 'sambanova': return 'Meta-Llama-3.3-70B-Instruct';
+        case 'fireworks': return 'accounts/fireworks/models/llama-v3p3-70b-instruct';
+        case 'novita': return 'meta-llama/llama-3.3-70b-instruct';
         default: return config.llm?.model;
       }
     })(),
@@ -873,6 +920,9 @@ function getProviderConfig(providerName) {
         case 'openrouter': return config.llm?.openrouterApiKey || process.env.OPENROUTER_API_KEY;
         case 'mistral': return config.llm?.mistralApiKey || process.env.MISTRAL_API_KEY;
         case 'together': return config.llm?.togetherApiKey || process.env.TOGETHER_API_KEY;
+        case 'sambanova': return config.llm?.sambanovaApiKey || process.env.SAMBANOVA_API_KEY;
+        case 'fireworks': return config.llm?.fireworksApiKey || process.env.FIREWORKS_API_KEY;
+        case 'novita': return config.llm?.novitaApiKey || process.env.NOVITA_API_KEY;
         default: return config.anthropic?.apiKey;
       }
     })(),
@@ -885,6 +935,9 @@ function getProviderConfig(providerName) {
         case 'openrouter': return 'https://openrouter.ai/api/v1';
         case 'mistral': return 'https://api.mistral.ai/v1';
         case 'together': return 'https://api.together.xyz/v1';
+        case 'sambanova': return 'https://api.sambanova.ai/v1';
+        case 'fireworks': return 'https://api.fireworks.ai/inference/v1';
+        case 'novita': return 'https://api.novita.ai/v3/openai';
         default: return config.llm?.baseUrl || process.env.LLM_BASE_URL || undefined;
       }
     })(),
@@ -901,7 +954,7 @@ export function initProvider() {
 
   // Init fallbacks — any provider with a configured API key that isn't the primary
   // Tier 1 (paid) → Tier 2 (free/low-cost) — Infinite Compute cascade
-  const fallbackOrder = ['claude', 'deepseek', 'gemini', 'openai', 'cerebras', 'groq', 'openrouter', 'mistral', 'together'];
+  const fallbackOrder = ['claude', 'deepseek', 'gemini', 'openai', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
   fallbackProviders = [];
 
   for (const name of fallbackOrder) {

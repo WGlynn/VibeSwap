@@ -3130,6 +3130,68 @@ async function main() {
       }
     }, 5 * 60 * 1000);
 
+    // ============ Primary Watchdog ============
+    // Workers monitor the primary shard. If it dies, restart it via Fly.io API.
+    // This makes the network self-healing — if the Telegram bot crashes, workers revive it.
+    let primaryFailCount = 0;
+    const PRIMARY_HEALTH_URL = (config.shard?.routerUrl || 'https://jarvis-vibeswap.fly.dev') + '/health';
+    const PRIMARY_MAX_FAILURES = 3; // 3 consecutive failures = 90s down
+    const FLY_API_TOKEN = process.env.FLY_API_TOKEN || config.fly?.apiToken;
+    const PRIMARY_APP = config.fly?.primaryApp || 'jarvis-vibeswap';
+
+    setInterval(async () => {
+      try {
+        const resp = await fetch(PRIMARY_HEALTH_URL, { signal: AbortSignal.timeout(10000) });
+        if (resp.ok) {
+          if (primaryFailCount > 0) {
+            console.log(`[watchdog] Primary recovered after ${primaryFailCount} failures`);
+            primaryFailCount = 0;
+          }
+          return;
+        }
+        primaryFailCount++;
+      } catch {
+        primaryFailCount++;
+      }
+
+      console.warn(`[watchdog] Primary unreachable (${primaryFailCount}/${PRIMARY_MAX_FAILURES})`);
+
+      if (primaryFailCount >= PRIMARY_MAX_FAILURES && FLY_API_TOKEN) {
+        console.warn('[watchdog] Primary down — attempting restart via Fly.io API...');
+        try {
+          // List machines in the primary app
+          const listResp = await fetch(`https://api.machines.dev/v1/apps/${PRIMARY_APP}/machines`, {
+            headers: { 'Authorization': `Bearer ${FLY_API_TOKEN}` },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (listResp.ok) {
+            const machines = await listResp.json();
+            for (const machine of machines) {
+              if (machine.state !== 'started') {
+                console.warn(`[watchdog] Restarting machine ${machine.id} (state: ${machine.state})`);
+                await fetch(`https://api.machines.dev/v1/apps/${PRIMARY_APP}/machines/${machine.id}/start`, {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${FLY_API_TOKEN}` },
+                  signal: AbortSignal.timeout(15000),
+                });
+              } else {
+                // Machine thinks it's started but unresponsive — force restart
+                console.warn(`[watchdog] Force-restarting machine ${machine.id}`);
+                await fetch(`https://api.machines.dev/v1/apps/${PRIMARY_APP}/machines/${machine.id}/restart`, {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${FLY_API_TOKEN}` },
+                  signal: AbortSignal.timeout(15000),
+                });
+              }
+            }
+          }
+          primaryFailCount = 0; // Reset — give it time to boot
+        } catch (err) {
+          console.error(`[watchdog] Failed to restart primary: ${err.message}`);
+        }
+      }
+    }, 30000); // Check every 30s
+
     // Graceful shutdown for worker
     async function workerShutdown(signal) {
       console.log(`[jarvis] Worker shutting down (${signal})...`);

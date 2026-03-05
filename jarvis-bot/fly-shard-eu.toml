@@ -1,0 +1,48 @@
+# JARVIS Mind Network — Worker Shard: shard-eu
+# European node (London) — geographic redundancy, Gemini free tier
+# 5th node in the network — full BFT+CRPC capability
+
+app = 'jarvis-shard-eu'
+primary_region = 'lhr'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
+  NODE_ENV = 'production'
+  HEALTH_PORT = '8080'
+  SHARD_MODE = 'worker'
+  TOTAL_SHARDS = '5'
+  NODE_TYPE = 'full'
+  ROUTER_URL = 'https://jarvis-vibeswap.fly.dev'
+  LLM_PROVIDER = 'gemini'
+  LLM_MODEL = 'gemini-2.0-flash'
+
+[[mounts]]
+  source = 'jarvis_data'
+  destination = '/app/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+
+[checks]
+  [checks.health]
+    port = 8080
+    type = 'http'
+    interval = '1m0s'
+    timeout = '10s'
+    path = '/health'
+
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'

@@ -151,7 +151,7 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
 
     const response = await llmChat({
       model: config.anthropic.model,
-      max_tokens: config.maxTokens,
+      max_tokens: 300, // Keep proactive responses SHORT — 1-2 sentences
       system: systemPrompt,
       messages: [{
         role: 'user',

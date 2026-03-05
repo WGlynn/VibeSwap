@@ -105,6 +105,13 @@ export const config = {
     apiKey: process.env.FIREFLIES_API_KEY || null,
     webhookSecret: process.env.FIREFLIES_WEBHOOK_SECRET || null, // HMAC verification
   },
+  // Fly.io Machines API — for deploying operator shards
+  fly: {
+    apiToken: process.env.FLY_API_TOKEN || null,
+    org: process.env.FLY_ORG || 'personal',
+    primaryApp: process.env.FLY_APP_NAME || 'jarvis-vibeswap',
+    defaultRegion: process.env.FLY_DEFAULT_REGION || 'iad',
+  },
   // Tip jar — ETH address for voluntary contributions
   tipJarAddress: process.env.TIP_JAR_ADDRESS || '0xa-EOFc55d6f6478918076B5Bb85E8Cf3738549a2',
   // Runtime info

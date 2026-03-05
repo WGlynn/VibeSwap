@@ -23,6 +23,7 @@ import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
 import { recoverRetryQueue } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
+import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -438,6 +439,132 @@ bot.command('authorized', (ctx) => {
     return ctx.reply('No blessed users yet. Use /authorize or /bless to add people.');
   }
   ctx.reply(`Blessed users (${entries.length}):\n${entries.join('\n')}\n\nOwner: Will (${config.ownerUserId})`);
+});
+
+// ============ Shard Operator Commands ============
+
+// /shard — Start shard onboarding wizard (blessed users, DM only)
+bot.command('shard', async (ctx) => {
+  if (!isAuthorized(ctx)) return ctx.reply('You need to be blessed first. Ask Will to /authorize you.');
+  if (ctx.chat.type !== 'private') return ctx.reply('DM me to set up your shard (security: API keys must stay private).');
+
+  // Already has a shard?
+  const existing = getOperator(ctx.from.id);
+  if (existing) {
+    const health = await checkOperatorHealth(ctx.from.id);
+    return ctx.reply(
+      `You already have a shard!\n\n` +
+      `Shard: ${existing.shardId}\n` +
+      `Provider: ${existing.provider} (${existing.model})\n` +
+      `Status: ${existing.status}\n` +
+      `Health: ${health?.status || 'unknown'}\n` +
+      `URL: https://${existing.flyAppName}.fly.dev\n\n` +
+      `Commands:\n/shard-status — detailed health\n/shard-stop — pause shard\n/shard-destroy — remove shard`
+    );
+  }
+
+  // Start wizard
+  setWizardState(ctx.from.id, { step: 'choose_provider' });
+  ctx.reply(
+    `Welcome to the JARVIS Mind Network, ${ctx.from.first_name}.\n\n` +
+    `Your shard will participate in:\n` +
+    `  - BFT consensus (voting on decisions)\n` +
+    `  - CRPC pairwise comparison (evaluating responses)\n` +
+    `  - Knowledge chain (shared memory)\n\n` +
+    `Which LLM provider will your shard use?\n\n` +
+    `1. Claude (Anthropic) — highest quality\n` +
+    `2. DeepSeek — cheapest cloud option\n` +
+    `3. Gemini (Google) — free tier available\n` +
+    `4. OpenAI — GPT-4o\n\n` +
+    `Reply with a number (1-4).`
+  );
+});
+
+// /shard-status — Check shard health
+bot.command('shard_status', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const op = getOperator(ctx.from.id);
+  if (!op) return ctx.reply('You don\'t have a shard. Use /shard to create one.');
+  const health = await checkOperatorHealth(ctx.from.id);
+  await flushOperators();
+  ctx.reply(
+    `Shard: ${op.shardId}\n` +
+    `Provider: ${op.provider} (${op.model})\n` +
+    `Status: ${op.status}\n` +
+    `Health: ${JSON.stringify(health, null, 2)}\n` +
+    `URL: https://${op.flyAppName}.fly.dev\n` +
+    `Region: ${op.region}\n` +
+    `Deployed: ${op.deployedAt ? new Date(op.deployedAt).toISOString() : 'never'}`
+  );
+});
+
+// /shard-stop — Stop your shard
+bot.command('shard_stop', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const op = getOperator(ctx.from.id);
+  if (!op) return ctx.reply('You don\'t have a shard.');
+  try {
+    await stopOperatorShard(ctx.from.id);
+    await flushOperators();
+    ctx.reply(`Shard ${op.shardId} stopped. Use /shard_start to restart.`);
+  } catch (err) {
+    ctx.reply(`Failed to stop shard: ${err.message}`);
+  }
+});
+
+// /shard-start — Restart your shard
+bot.command('shard_start', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const op = getOperator(ctx.from.id);
+  if (!op) return ctx.reply('You don\'t have a shard.');
+  try {
+    await startOperatorShard(ctx.from.id);
+    await flushOperators();
+    ctx.reply(`Shard ${op.shardId} starting up...`);
+  } catch (err) {
+    ctx.reply(`Failed to start shard: ${err.message}`);
+  }
+});
+
+// /shard-destroy — Remove your shard entirely
+bot.command('shard_destroy', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const op = getOperator(ctx.from.id);
+  if (!op && !isOwner(ctx)) return ctx.reply('You don\'t have a shard.');
+  // Owner can destroy anyone's shard
+  const targetId = isOwner(ctx) ? (resolveTarget(ctx).targetId || ctx.from.id) : ctx.from.id;
+  const target = getOperator(targetId);
+  if (!target) return ctx.reply('No shard found for that user.');
+  try {
+    await destroyOperatorShard(targetId);
+    await flushOperators();
+    ctx.reply(`Shard ${target.shardId} destroyed. All resources cleaned up.`);
+  } catch (err) {
+    ctx.reply(`Failed to destroy shard: ${err.message}`);
+  }
+});
+
+// /shards — Owner: list all operator shards
+bot.command('shards', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const stats = getOperatorStats();
+  if (stats.total === 0) return ctx.reply('No operator shards yet. Blessed users can run /shard to create one.');
+  const lines = stats.operators.map(op =>
+    `${op.status === 'running' ? 'ON' : 'OFF'} ${op.shardId} — ${op.name} (${op.provider}/${op.model}) [${op.region}]`
+  );
+  ctx.reply(
+    `Shard Network: ${stats.running} running, ${stats.stopped} stopped, ${stats.failed} failed\n\n` +
+    lines.join('\n')
+  );
+});
+
+// /cancel — Cancel shard wizard
+bot.command('cancel', (ctx) => {
+  if (getWizardState(ctx.from.id)) {
+    clearWizardState(ctx.from.id);
+    return ctx.reply('Shard setup cancelled.');
+  }
+  ctx.reply('Nothing to cancel.');
 });
 
 // Helper: resolve target user from reply or args
@@ -2573,6 +2700,83 @@ bot.on('text', async (ctx) => {
   // Skip commands (already handled above)
   if (ctx.message.text.startsWith('/')) return;
 
+  // ============ Shard Wizard Intercept ============
+  // If user is in a /shard wizard flow (DM only), handle their input here
+  if (ctx.chat.type === 'private') {
+    const wizard = getWizardState(ctx.from.id);
+    if (wizard) {
+      const text = ctx.message.text.trim();
+
+      if (wizard.step === 'choose_provider') {
+        const provider = PROVIDERS[text];
+        if (!provider) {
+          return ctx.reply('Please reply with a number 1-4:\n1. Claude\n2. DeepSeek\n3. Gemini\n4. OpenAI');
+        }
+        setWizardState(ctx.from.id, { step: 'send_api_key', provider: provider.id, model: provider.model, providerName: provider.name });
+        const help = PROVIDER_HELP[provider.id] || '';
+        return ctx.reply(
+          `${provider.name} selected (${provider.model}).\n\n` +
+          `Now send me your API key.\n${help}\n\n` +
+          `I'll encrypt it and delete your message immediately.`
+        );
+      }
+
+      if (wizard.step === 'send_api_key') {
+        // Delete the user's message containing the API key
+        try {
+          await ctx.deleteMessage();
+        } catch (err) {
+          console.warn(`[operator] Could not delete API key message: ${err.message}`);
+        }
+
+        await ctx.reply('Validating your API key...');
+
+        const validation = await validateApiKey(wizard.provider, text);
+        if (!validation.valid) {
+          return ctx.reply(
+            `API key validation failed: ${validation.error}\n\n` +
+            `Please send a valid ${wizard.providerName} API key, or /cancel to abort.`
+          );
+        }
+
+        // Register the operator
+        const name = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
+        const record = registerOperator(ctx.from.id, name, wizard.provider, wizard.model, text);
+        clearWizardState(ctx.from.id);
+        await flushOperators();
+
+        await ctx.reply(
+          `API key validated (${wizard.model} responded in ${validation.latencyMs}ms).\n` +
+          `Deploying shard-${record.shardName}...`
+        );
+
+        // Deploy asynchronously
+        try {
+          const result = await deployOperatorShard(ctx.from.id);
+          await flushOperators();
+          await ctx.reply(
+            `Your shard is LIVE!\n\n` +
+            `  App: ${result.appUrl}\n` +
+            `  Health: ${result.healthUrl}\n` +
+            `  Shard ID: ${result.shardId}\n` +
+            `  Region: ${record.region}\n\n` +
+            `Commands:\n` +
+            `/shard_status — check health\n` +
+            `/shard_stop — pause shard\n` +
+            `/shard_start — restart shard`
+          );
+        } catch (err) {
+          await flushOperators();
+          await ctx.reply(`Deployment failed: ${err.message}\n\nYour API key is saved. Try again with /shard or ask Will for help.`);
+        }
+        return;
+      }
+
+      // Unknown wizard state — clear it
+      clearWizardState(ctx.from.id);
+    }
+  }
+
   // In group chats, respond if mentioned, replied to, or called by name
   const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
   const botUsername = ctx.botInfo?.username?.toLowerCase();
@@ -2987,6 +3191,7 @@ async function main() {
   await recoverWAL();
   await recoverRetryQueue();
   await initShadow();
+  await initOperators();
   await initComputeEconomics();
   await initMining();
   await initDeepStorage();
@@ -3833,6 +4038,7 @@ async function main() {
     }
     await flushInnerDialogue();
     await flushShadow();
+    await flushOperators();
     await flushHell();
     await flushLimni();
     await flushContextMemory();
@@ -3904,6 +4110,7 @@ async function main() {
     await flushLearning();
     await flushInnerDialogue();
     await flushShadow();
+    await flushOperators();
     await flushComputeEconomics();
     await flushMining();
     await saveComms();

@@ -133,15 +133,20 @@ For MODERATE, also include "violation": type of violation and "severity": "low" 
 // ============ Generate Proactive Response ============
 // When triage says ENGAGE, generate a full response using the main model.
 
-export async function generateProactiveResponse(text, userName, responseHint, systemPrompt) {
+export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext) {
   try {
+    // Build conversational context so JARVIS knows what's been discussed
+    const contextBlock = recentContext
+      ? `<recent_conversation>\n${recentContext}\n</recent_conversation>\n\n`
+      : '';
+
     const response = await llmChat({
       model: config.anthropic.model,
       max_tokens: config.maxTokens,
       system: systemPrompt,
       messages: [{
         role: 'user',
-        content: `[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're part of this conversation — not observing from outside. Hint: ${responseHint}. Be natural, be yourself. You can be funny, opinionated, curious, or direct. 1-4 sentences. Talk like a teammate, not an assistant.]`
+        content: `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're part of this conversation — not observing from outside. The recent conversation above is what's been discussed. Hint: ${responseHint}. Be natural, be yourself. You can be funny, opinionated, curious, or direct. 1-4 sentences. Talk like a teammate, not an assistant. Reference what others have said if relevant — show you've been listening.]`
       }],
     });
 

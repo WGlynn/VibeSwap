@@ -3673,13 +3673,16 @@ bot.on('text', async (ctx) => {
   recordActivity(ctx.from.id);
   const xpAction = ctx.message.text.length > 50 ? 'quality_message' : 'message';
   const xpResult = awardXP(ctx.from.id, msgUserName, xpAction);
-  // Announce level-ups and achievements in-line
-  if (xpResult.leveledUp) {
-    ctx.reply(`${msgUserName} leveled up to Level ${xpResult.newLevel}!`).catch(() => {});
+  // Only announce significant level-ups (every 5 levels) and non-trivial achievements
+  const SILENT_ACHIEVEMENTS = new Set(['first_message', 'xp_1000']); // Too easy / spammy
+  if (xpResult.leveledUp && xpResult.newLevel % 5 === 0) {
+    ctx.reply(`${msgUserName} hit Level ${xpResult.newLevel}!`).catch(() => {});
   }
   if (xpResult.newAchievements?.length > 0) {
     for (const ach of xpResult.newAchievements) {
-      ctx.reply(`${msgUserName} unlocked: ${ach.name} — ${ach.desc}`).catch(() => {});
+      if (!SILENT_ACHIEVEMENTS.has(ach.id)) {
+        ctx.reply(`${msgUserName} unlocked: ${ach.name} — ${ach.desc}`).catch(() => {});
+      }
     }
   }
 
@@ -3769,7 +3772,9 @@ bot.on('text', async (ctx) => {
   const textLower = ctx.message.text.toLowerCase();
   const isMentioned = botUsername && textLower.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
-  const isCalledByName = textLower.includes('jarvis') || textLower.includes('jar ') || textLower.startsWith('jar') || textLower.includes(' j ') || textLower.startsWith('j ');
+  // Called by name — but exclude mentions of OTHER bots (e.g. @diablojarvisbot)
+  const textWithoutMentions = textLower.replace(/@\w+/g, ''); // Strip all @mentions before checking
+  const isCalledByName = textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ') || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
 
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
     // In groups: buffer into conversation history for situational awareness

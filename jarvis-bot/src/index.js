@@ -51,6 +51,8 @@ import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEc
 import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
+import { initLimni, flushLimni, getLimniStats, registerTerminal, registerVPS, checkTerminalHealth, checkAllVPS, listStrategies, getStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, onAlert, strategyPipeline, deployStrategy, listBacktests, getBacktestResult, fetchTrades } from './limni.js';
+import { registerKataraktiStrategies, formatPerformanceSummary } from './katarakti.js';
 import { createServer } from 'http';
 import { createHmac } from 'crypto';
 import { execFile } from 'child_process';
@@ -1315,6 +1317,88 @@ bot.command('health', async (ctx) => {
     lines.push(`Missing: ${report.missing.join(', ')}`);
   }
   lines.push(`Model: ${config.anthropic.model}`);
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ Limni — Trading Terminal Monitoring ============
+
+bot.command('trades', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const stats = getLimniStats();
+  const lines = [
+    'Limni Trading Monitor',
+    '',
+    `Terminals: ${stats.terminals.length} registered`,
+  ];
+  for (const t of stats.terminals) {
+    lines.push(`  ${t.id}: ${t.status} (${t.operator}) — ${t.strategies.length} strategies`);
+  }
+  lines.push('');
+  lines.push(`Trades: ${stats.totalTrades} total (${stats.validTrades} valid, ${stats.invalidTrades} invalid)`);
+  lines.push(`Alerts: ${stats.alertsSent} sent (${stats.pendingAlerts} pending)`);
+  lines.push(`Strategies: ${stats.strategies.length} registered`);
+  for (const s of stats.strategies) {
+    lines.push(`  ${s.id}: ${s.name} (${s.operator})`);
+  }
+  lines.push('');
+  lines.push(`VPS: ${stats.vps.length} monitored`);
+  for (const v of stats.vps) {
+    lines.push(`  ${v.id}: ${v.status} (${v.host})`);
+  }
+  lines.push(`Backtests: ${stats.backtestCount}`);
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('strategy', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const args = ctx.message.text.split(' ').slice(1);
+  const strategyId = args[0];
+  if (!strategyId) {
+    const strats = listStrategies();
+    if (strats.length === 0) return ctx.reply('No strategies registered.');
+    const lines = ['Registered Strategies:', ''];
+    for (const s of strats) {
+      lines.push(`${s.id} (${s.version}) — ${s.name} [${s.operator}]`);
+    }
+    lines.push('\nUse /strategy <id> for details.');
+    return ctx.reply(lines.join('\n'));
+  }
+  const s = getStrategy(strategyId);
+  if (!s) return ctx.reply(`Strategy '${strategyId}' not found.`);
+  ctx.reply(JSON.stringify(s, null, 2).slice(0, 4000));
+});
+
+bot.command('vps', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const results = await checkAllVPS();
+  const lines = ['VPS Health Check:', ''];
+  for (const [id, r] of Object.entries(results)) {
+    lines.push(`${id}: ${r.status}${r.error ? ` — ${r.error}` : ''}${r.failures ? ` (${r.failures} consecutive failures)` : ''}`);
+  }
+  if (Object.keys(results).length === 0) lines.push('No VPS registered. Use Jarvis tools to add one.');
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('backtests', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const bts = listBacktests();
+  if (bts.length === 0) return ctx.reply('No backtests yet. Use the strategy pipeline to create one.');
+  const lines = ['Backtest Results:', ''];
+  for (const b of bts.slice(-10)) {
+    lines.push(`${b.backtestId.slice(0, 25)}: ${b.strategyName || b.strategyId} → ${b.returnPct >= 0 ? '+' : ''}${b.returnPct}% (${b.winRate}% win, ${b.maxDD}% DD, ${b.trades} trades)`);
+  }
+  ctx.reply(lines.join('\n'));
+});
+
+bot.command('alerts', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const alerts = getAlerts(10);
+  if (alerts.length === 0) return ctx.reply('No recent alerts.');
+  const lines = ['Recent Alerts:', ''];
+  for (const a of alerts) {
+    const time = new Date(a.timestamp).toISOString().slice(11, 19);
+    lines.push(`[${time}] ${a.type}: ${a.message}`);
+  }
   ctx.reply(lines.join('\n'));
 });
 
@@ -2685,7 +2769,15 @@ async function main() {
   await initMining();
   await initDeepStorage();
   await initHell();
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining + deep storage + hell loaded.');
+  await initLimni();
+  registerKataraktiStrategies();
+  // Wire Limni alerts to owner's Telegram DM
+  onAlert((alert) => {
+    try {
+      bot.telegram.sendMessage(config.ownerUserId, `⚠ LIMNI ALERT [${alert.type}]\n${alert.message}`);
+    } catch {}
+  });
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining + deep storage + hell + limni loaded.');
 
   // Security posture check (runs every startup)
   await runSecurityChecks();
@@ -3509,6 +3601,7 @@ async function main() {
     await flushInnerDialogue();
     await flushShadow();
     await flushHell();
+    await flushLimni();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);

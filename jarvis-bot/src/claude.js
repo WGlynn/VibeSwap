@@ -7,6 +7,8 @@ import { setFlag, getBehavior } from './behavior.js';
 import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
 import { llmChat, getProvider, getProviderName, getModelName } from './llm-provider.js';
+import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
+import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -623,6 +625,73 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         required: ['identifier', 'evidence', 'pattern', 'severity'],
       },
     },
+    // ============ Limni — Trading Terminal Integration ============
+    {
+      name: 'limni_status',
+      description: 'Get the current status of all connected Limni trading terminals, registered strategies, VPS health, and trade statistics. Use when asked about trading status, bot health, or strategy performance.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'limni_register_terminal',
+      description: 'Register a Limni trading terminal for monitoring. Use when setting up a new connection to Freedom\'s Limni instance.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          terminalId: { type: 'string', description: 'Unique terminal identifier (e.g., "katarakti", "universal")' },
+          url: { type: 'string', description: 'Terminal API base URL' },
+          apiKey: { type: 'string', description: 'API key for authentication (optional)' },
+          operator: { type: 'string', description: 'Who monitors this terminal (e.g., "will", "freedom")' },
+        },
+        required: ['terminalId', 'url', 'operator'],
+      },
+    },
+    {
+      name: 'limni_register_vps',
+      description: 'Register a VPS for health monitoring. Use when adding a new VPS that hosts Limni or trading bots.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          vpsId: { type: 'string', description: 'Unique VPS identifier' },
+          host: { type: 'string', description: 'VPS hostname or IP' },
+          healthUrl: { type: 'string', description: 'Health check URL (e.g., http://host:port/health)' },
+          operator: { type: 'string', description: 'Who manages this VPS' },
+        },
+        required: ['vpsId', 'host', 'healthUrl', 'operator'],
+      },
+    },
+    {
+      name: 'limni_check_health',
+      description: 'Check health of a specific terminal or all VPS instances. Returns current status and any connectivity issues.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          target: { type: 'string', description: '"vps" to check all VPS, or a terminal ID to check a specific terminal' },
+        },
+        required: ['target'],
+      },
+    },
+    {
+      name: 'limni_monitor',
+      description: 'Start or stop the autonomous trade monitoring loop. The loop checks all terminals at regular intervals and verifies trades.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['start', 'stop'], description: 'Start or stop the monitor loop' },
+          intervalMs: { type: 'number', description: 'Check interval in milliseconds (default: 30000 = 30s). Only used with "start".' },
+        },
+        required: ['action'],
+      },
+    },
+    {
+      name: 'limni_alerts',
+      description: 'Get recent trading alerts (invalid trades, terminal failures, VPS issues).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'Number of alerts to return (default: 20)' },
+        },
+      },
+    },
   ];
 
   try {
@@ -791,6 +860,67 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           } catch (err) {
             result = `Failed to flag: ${err.message}`;
           }
+        // ============ Limni Tools ============
+        } else if (tb.name === 'limni_status') {
+          result = JSON.stringify(getLimniStats(), null, 2);
+          console.log('[claude] Tool: limni_status');
+        } else if (tb.name === 'limni_register_terminal') {
+          try {
+            const terminal = registerTerminal(tb.input.terminalId, {
+              url: tb.input.url,
+              apiKey: tb.input.apiKey,
+              operator: tb.input.operator,
+              strategies: [],
+            });
+            result = `Terminal '${tb.input.terminalId}' registered at ${tb.input.url} (operator: ${tb.input.operator})`;
+            console.log(`[claude] Tool: limni_register_terminal("${tb.input.terminalId}")`);
+          } catch (err) {
+            result = `Failed to register terminal: ${err.message}`;
+          }
+        } else if (tb.name === 'limni_register_vps') {
+          try {
+            registerVPS(tb.input.vpsId, {
+              host: tb.input.host,
+              healthUrl: tb.input.healthUrl,
+              operator: tb.input.operator,
+            });
+            result = `VPS '${tb.input.vpsId}' registered (${tb.input.host}) — operator: ${tb.input.operator}`;
+            console.log(`[claude] Tool: limni_register_vps("${tb.input.vpsId}")`);
+          } catch (err) {
+            result = `Failed to register VPS: ${err.message}`;
+          }
+        } else if (tb.name === 'limni_check_health') {
+          try {
+            if (tb.input.target === 'vps') {
+              const vpsResults = await checkAllVPS();
+              result = JSON.stringify(vpsResults, null, 2);
+            } else {
+              const termResult = await checkTerminalHealth(tb.input.target);
+              result = JSON.stringify(termResult, null, 2);
+            }
+            console.log(`[claude] Tool: limni_check_health("${tb.input.target}")`);
+          } catch (err) {
+            result = `Health check failed: ${err.message}`;
+          }
+        } else if (tb.name === 'limni_monitor') {
+          try {
+            if (tb.input.action === 'start') {
+              startMonitorLoop(tb.input.intervalMs || 30000);
+              result = `Monitor loop started (interval: ${(tb.input.intervalMs || 30000) / 1000}s)`;
+            } else {
+              stopMonitorLoop();
+              result = 'Monitor loop stopped.';
+            }
+            console.log(`[claude] Tool: limni_monitor("${tb.input.action}")`);
+          } catch (err) {
+            result = `Monitor control failed: ${err.message}`;
+          }
+        } else if (tb.name === 'limni_alerts') {
+          const alerts = getAlerts(tb.input?.limit || 20);
+          result = alerts.length === 0
+            ? 'No recent alerts.'
+            : alerts.map(a => `[${new Date(a.timestamp).toISOString()}] ${a.type}: ${a.message}`).join('\n');
+          console.log(`[claude] Tool: limni_alerts → ${alerts.length} alerts`);
         } else {
           result = 'Unknown tool.';
         }

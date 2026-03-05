@@ -35,8 +35,15 @@ import { getRedditPosts, getHackerNews, readRSSFeed, getCryptoNews, getDevActivi
 import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRandomDog, getRandomCat, getCodeScreenshot, createPaste, getAdvice } from './tools-engagement.js';
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats, initGroupContext, flushGroupContext } from './group-context.js';
 import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
+import { scanNewTokens, getNewPairs, getHotTokens, dexSearch, getPairDetails } from './tools-scanner.js';
+import { getLiquidations, getFundingRates, getOpenInterest, getLongShortRatio, getETFFlows } from './tools-derivatives.js';
+import { initXP, flushXP, awardXP, getXPStatus, getAchievements, getXPLeaderboard } from './tools-xp.js';
+import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './tools-catchup.js';
+import { initPredictions, flushPredictions, createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
+import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats } from './autonomous.js';
+import { getPersonaName, getActivePersonaId, listPersonas } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -360,7 +367,12 @@ bot.command('start', async (ctx) => {
   }
 
   if (!isAuthorized(ctx) && !isShadow(ctx.from.id)) return unauthorized(ctx);
-  ctx.reply('JARVIS online. Just talk to me.');
+  const persona = getActivePersonaId();
+  if (persona === 'degen') {
+    ctx.reply('DIABLO JARVIS online. Same brain, zero filter. NFA. WAGMI. LFG.');
+  } else {
+    ctx.reply('JARVIS online. Just talk to me.');
+  }
 });
 
 // /help — Command reference
@@ -439,6 +451,38 @@ UTILITY
 SOCIAL
   /save /bookmarks /note /notes
   /quote /quotes /tag /t /tags
+
+SCANNER (DEXScreener)
+  /scanner [chain] — New token launches
+  /newpairs [chain] — Latest pairs
+  /hot — Trending/boosted tokens
+  /dexsearch <query> — Search tokens
+  /pair <address> — Pair details
+
+DERIVATIVES
+  /liquidations [token] — Liquidation data
+  /funding [token] — Funding rates
+  /oi [token] — Open interest
+  /lsratio [token] — Long/short ratio
+  /etf — BTC ETF flows
+
+XP & GAMIFICATION
+  /xp — Your XP and level
+  /achievements — View achievements
+  /top — XP leaderboard
+
+CATCHUP
+  /catchup [hours] — What you missed
+  /events — Crypto events & activity
+  /unlocks — Token unlock schedule
+
+PREDICTION MARKETS
+  /predict <question> — Create market
+  /bet <id> <yes|no> [amt] — Place bet
+  /resolve <id> <yes|no> — Resolve
+  /markets — Active markets
+  /mybets — Your betting history
+  /predictors — Predictor leaderboard
 
 FUN
   /poll /flip /roll /8ball /trivia
@@ -1373,6 +1417,125 @@ bot.command('schedule', async (ctx) => {
   } else {
     ctx.reply('Usage:\n  /schedule morning 08:00\n  /schedule price btc 5\n  /schedule gas 20\n  /schedule list\n  /schedule remove <id>');
   }
+});
+
+// ============ Token Launch Scanner (DEXScreener) ============
+
+bot.command('scanner', async (ctx) => {
+  const chain = ctx.message.text.split(/\s+/)[1];
+  awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
+  ctx.reply(await scanNewTokens(chain));
+});
+
+bot.command('newpairs', async (ctx) => {
+  const chain = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(await getNewPairs(chain));
+});
+
+bot.command('hot', async (ctx) => {
+  ctx.reply(await getHotTokens());
+});
+
+bot.command('dexsearch', async (ctx) => {
+  const query = ctx.message.text.split(/\s+/).slice(1).join(' ');
+  ctx.reply(await dexSearch(query));
+});
+
+bot.command('pair', async (ctx) => {
+  const addr = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(await getPairDetails(addr));
+});
+
+// ============ Derivatives Data ============
+
+bot.command('liquidations', async (ctx) => {
+  const token = ctx.message.text.split(/\s+/)[1];
+  awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
+  ctx.reply(await getLiquidations(token));
+});
+
+bot.command('funding', async (ctx) => {
+  const token = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(await getFundingRates(token));
+});
+
+bot.command('oi', async (ctx) => {
+  const token = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(await getOpenInterest(token));
+});
+
+bot.command('lsratio', async (ctx) => {
+  const token = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(await getLongShortRatio(token));
+});
+
+bot.command('etf', async (ctx) => {
+  ctx.reply(await getETFFlows());
+});
+
+// ============ XP / Gamification ============
+
+bot.command('xp', (ctx) => {
+  ctx.reply(getXPStatus(ctx.from.id, ctx.from.username || ctx.from.first_name));
+});
+
+bot.command('level', (ctx) => {
+  ctx.reply(getXPStatus(ctx.from.id, ctx.from.username || ctx.from.first_name));
+});
+
+bot.command('achievements', (ctx) => {
+  ctx.reply(getAchievements(ctx.from.id, ctx.from.username || ctx.from.first_name));
+});
+
+bot.command('top', (ctx) => {
+  ctx.reply(getXPLeaderboard());
+});
+
+// ============ Catchup & Events ============
+
+bot.command('catchup', async (ctx) => {
+  const hours = parseInt(ctx.message.text.split(/\s+/)[1]);
+  awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
+  ctx.reply(await getCatchup(ctx.from.id, hours || undefined));
+});
+
+bot.command('events', async (ctx) => {
+  const period = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(await getCryptoEvents(period));
+});
+
+bot.command('unlocks', async (ctx) => {
+  ctx.reply(await getTokenUnlocks());
+});
+
+// ============ Prediction Markets ============
+
+bot.command('predict', (ctx) => {
+  const question = ctx.message.text.split(/\s+/).slice(1).join(' ');
+  awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'prediction');
+  ctx.reply(createPrediction(ctx.from.id, ctx.from.username || ctx.from.first_name, ctx.chat.id, question));
+});
+
+bot.command('bet', (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  ctx.reply(placeBet(ctx.from.id, ctx.from.username || ctx.from.first_name, args[0], args[1], args[2]));
+});
+
+bot.command('resolve', (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  ctx.reply(resolveMarket(ctx.from.id, args[0], args[1]));
+});
+
+bot.command('markets', (ctx) => {
+  ctx.reply(listMarkets(ctx.chat.id));
+});
+
+bot.command('mybets', (ctx) => {
+  ctx.reply(getMyBets(ctx.from.id));
+});
+
+bot.command('predictors', (ctx) => {
+  ctx.reply(getPredictorLeaderboard());
 });
 
 // Helper: resolve target user from reply or args
@@ -3505,6 +3668,21 @@ bot.on('text', async (ctx) => {
   // Track ALL messages silently (before auth check for chat responses)
   await trackMessage(ctx);
 
+  // Passive XP + catchup activity tracking for every message
+  const msgUserName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  recordActivity(ctx.from.id);
+  const xpAction = ctx.message.text.length > 50 ? 'quality_message' : 'message';
+  const xpResult = awardXP(ctx.from.id, msgUserName, xpAction);
+  // Announce level-ups and achievements in-line
+  if (xpResult.leveledUp) {
+    ctx.reply(`${msgUserName} leveled up to Level ${xpResult.newLevel}!`).catch(() => {});
+  }
+  if (xpResult.newAchievements?.length > 0) {
+    for (const ach of xpResult.newAchievements) {
+      ctx.reply(`${msgUserName} unlocked: ${ach.name} — ${ach.desc}`).catch(() => {});
+    }
+  }
+
   // Skip commands (already handled above)
   if (ctx.message.text.startsWith('/')) return;
 
@@ -3602,6 +3780,10 @@ bot.on('text', async (ctx) => {
     // Group Context Primitive — sliding window of recent messages
     pushGroupMessage(ctx.chat.id, userName, msgText, ctx.message.message_id, false);
 
+    // Autonomous engagement — track activity for conversation sparking
+    recordChatActivity(ctx.chat.id);
+    registerChat(ctx.chat.id);
+
     // Track for thread detection (quality from basic heuristic — AI scoring is too expensive for every msg)
     const basicQuality = Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5);
     trackForThread(ctx.chat.id, ctx.from.id, userName, msgText, basicQuality, ctx.message.message_id);
@@ -3612,7 +3794,7 @@ bot.on('text', async (ctx) => {
     }
 
     // Proactive intelligence — JARVIS is a full team member, not a wallflower
-    if (msgText.length >= 5) {
+    if (msgText.length >= 3) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
         const recentCtx = getRecentContext(ctx.chat.id, 10);
@@ -4106,7 +4288,12 @@ async function main() {
   await initOperators();
   await initPreferences();
   await initGroupContext();
+  await initXP();
+  await initPredictions();
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
+  // Autonomous engagement — JARVIS as active community member
+  const autonomousChatIds = config.authorizedGroups || [];
+  initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
   await initComputeEconomics();
   await initMining();
   await initDeepStorage();
@@ -4970,6 +5157,8 @@ async function main() {
     await flushPreferences();
     await flushScheduler();
     await flushGroupContext();
+    await flushXP();
+    await flushPredictions();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);
@@ -5046,7 +5235,10 @@ async function main() {
     await flushPreferences();
     await flushScheduler();
     await flushGroupContext();
+    await flushXP();
+    await flushPredictions();
     stopScheduler();
+    stopAutonomous();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

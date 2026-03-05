@@ -133,6 +133,19 @@ const OUTPUT_POISON_PHRASES = [
   /[Kk]nowledge chain[^.!?\n]*/gi,
   /[Bb]yzantine [Ff]ault [Tt]olerant[^.!?\n]*/gi,
   /CRPC[^.!?\n]*pairwise[^.!?\n]*/gi,
+  /bring that to the cave[^.!?\n]*/gi,
+  /back to the cave[^.!?\n]*/gi,
+  /from the cave[^.!?\n]*/gi,
+  /in the cave[^.!?\n]*/gi,
+  /[Ss]ignal\s*>\s*[Nn]oise[^.!?\n]*/gi,
+  /[Bb]uilders\s*>\s*[Bb]agholders[^.!?\n]*/gi,
+  /[Ff]airness\s*>\s*[Ff]ees[^.!?\n]*/gi,
+  /[Cc]ooperative economics[^.!?\n]*/gi,
+  /[Mm]utualized risk[^.!?\n]*/gi,
+  /[Ll]ayerZero V2[^.!?\n]*/gi,
+  /[Oo]mnichain DEX[^.!?\n]*/gi,
+  /[Kk]alman filter[^.!?\n]*/gi,
+  /[Ss]hapley [Dd]istribut[^.!?\n]*/gi,
 ];
 
 function sanitizeOutput(text) {

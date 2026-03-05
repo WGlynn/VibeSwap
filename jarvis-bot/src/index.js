@@ -3772,9 +3772,24 @@ bot.on('text', async (ctx) => {
   const textLower = ctx.message.text.toLowerCase();
   const isMentioned = botUsername && textLower.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
-  // Called by name — but exclude mentions of OTHER bots (e.g. @diablojarvisbot)
-  const textWithoutMentions = textLower.replace(/@\w+/g, ''); // Strip all @mentions before checking
-  const isCalledByName = textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ') || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
+  // Called by name — persona-aware triggers
+  const textWithoutMentions = textLower.replace(/@\w+/g, '').trim();
+  const persona = getActivePersonaId();
+  let isCalledByName = false;
+  if (persona === 'degen') {
+    // Diablo JARVIS responds to: diablo, diabolical, funny jarvis, edgy jarvis, cool jarvis, degen jarvis, evil jarvis, unhinged jarvis, and just "jarvis"
+    isCalledByName = textWithoutMentions.includes('diablo') || textWithoutMentions.includes('diabolical')
+      || textWithoutMentions.includes('funny jarvis') || textWithoutMentions.includes('edgy jarvis')
+      || textWithoutMentions.includes('cool jarvis') || textWithoutMentions.includes('degen jarvis')
+      || textWithoutMentions.includes('evil jarvis') || textWithoutMentions.includes('unhinged jarvis')
+      || textWithoutMentions.includes('based jarvis') || textWithoutMentions.includes('chaos jarvis')
+      || textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ')
+      || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
+  } else {
+    // Standard JARVIS — responds to jarvis, jar, j
+    isCalledByName = textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ')
+      || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
+  }
 
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
     // In groups: buffer into conversation history for situational awareness

@@ -34,6 +34,9 @@ import { getBTCStats, getHalvingCountdown, resolveENS, checkStablecoinPegs, getM
 import { getRedditPosts, getHackerNews, readRSSFeed, getCryptoNews, getDevActivity } from './tools-news.js';
 import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRandomDog, getRandomCat, getCodeScreenshot, createPaste, getAdvice } from './tools-engagement.js';
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats } from './group-context.js';
+import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
+import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
+import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -364,6 +367,11 @@ bot.command('start', async (ctx) => {
 bot.command('help', (ctx) => {
   const helpText = `JARVIS Command Reference
 
+ALPHA INTELLIGENCE
+  /alpha <token> — Full alpha report
+  /compare <a> <b> — Token comparison
+  /narrative — Current crypto narratives
+
 CRYPTO
   /price <token> — Price + 24h change
   /btc /eth /sol — Quick summary
@@ -401,8 +409,18 @@ ON-CHAIN
   /block [chain] — Latest block
   /ens <name.eth> — ENS lookup
 
-WATCHLIST
+PORTFOLIO & PREFS
+  /portfolio [add|remove] — Track holdings
+  /setpref <key> <val> — Set preferences
+  /prefs — View your profile
+  /mywallet <0x> — Default wallet
   /watch /unwatch /watchlist
+
+SCHEDULED ALERTS
+  /schedule morning 08:00 — Daily briefing
+  /schedule price btc 5 — Price alerts
+  /schedule gas 20 — Gas alerts
+  /schedule list — View schedules
 
 NEWS & SOCIAL
   /news — Crypto news aggregator
@@ -1278,6 +1296,83 @@ bot.command('paste', async (ctx) => {
 // /advice — Random advice
 bot.command('advice', async (ctx) => {
   ctx.reply(await getAdvice());
+});
+
+// ============ Alpha Intelligence ============
+
+// /alpha <token> — Full alpha report
+bot.command('alpha', async (ctx) => {
+  const token = ctx.message.text.split(/\s+/).slice(1).join(' ');
+  ctx.reply(await getAlphaReport(token));
+});
+
+// /compare <a> <b> — Side-by-side token comparison
+bot.command('compare', async (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  ctx.reply(await compareTokens(args[0], args[1]));
+});
+
+// /narrative — Current crypto narratives
+bot.command('narrative', async (ctx) => {
+  ctx.reply(await getCurrentNarrative());
+});
+
+// ============ User Preferences & Portfolio ============
+
+// /portfolio [add|remove|show] <token> [amount] [chain]
+bot.command('portfolio', async (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const action = args[0]?.toLowerCase();
+  const userId = ctx.from.id;
+
+  if (action === 'add') {
+    ctx.reply(addToPortfolio(userId, args[1], args[2], args[3]));
+  } else if (action === 'remove' || action === 'rm') {
+    ctx.reply(removeFromPortfolio(userId, args[1]));
+  } else {
+    ctx.reply(await getPortfolio(userId));
+  }
+});
+
+// /setpref <key> <value>
+bot.command('setpref', (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  ctx.reply(setPreference(ctx.from.id, args[0], args.slice(1).join(' ')));
+});
+
+// /prefs — View preferences
+bot.command('prefs', (ctx) => {
+  ctx.reply(getPreferences(ctx.from.id));
+});
+
+// /mywallet <address>
+bot.command('mywallet', (ctx) => {
+  const addr = ctx.message.text.split(/\s+/)[1];
+  ctx.reply(setWallet(ctx.from.id, addr));
+});
+
+// ============ Scheduled Briefings ============
+
+// /schedule <type> <params>
+bot.command('schedule', async (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const type = args[0]?.toLowerCase();
+  const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
+
+  if (type === 'list' || !type) {
+    ctx.reply(listSchedules(userId));
+  } else if (type === 'remove' || type === 'rm') {
+    ctx.reply(removeSchedule(userId, args[1]));
+  } else if (type === 'morning') {
+    ctx.reply(addSchedule(userId, chatId, 'morning', { time: args[1] || '08:00' }));
+  } else if (type === 'price') {
+    ctx.reply(addSchedule(userId, chatId, 'price', { token: args[1], threshold: args[2] }));
+  } else if (type === 'gas') {
+    ctx.reply(addSchedule(userId, chatId, 'gas', { gwei: args[1] }));
+  } else {
+    ctx.reply('Usage:\n  /schedule morning 08:00\n  /schedule price btc 5\n  /schedule gas 20\n  /schedule list\n  /schedule remove <id>');
+  }
 });
 
 // Helper: resolve target user from reply or args
@@ -3525,7 +3620,7 @@ bot.on('text', async (ctx) => {
 
         if (analysis.action === 'engage' && analysis.response_hint) {
           const proactiveReply = await generateProactiveResponse(
-            msgText, userName, analysis.response_hint, getSystemPrompt()
+            msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx
           );
           if (proactiveReply) {
             await ctx.reply(proactiveReply, { parse_mode: undefined });
@@ -3995,6 +4090,8 @@ async function main() {
   await recoverCommittedIds();
   await initShadow();
   await initOperators();
+  await initPreferences();
+  await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
   await initComputeEconomics();
   await initMining();
   await initDeepStorage();
@@ -4855,6 +4952,8 @@ async function main() {
     await flushHell();
     await flushLimni();
     await flushContextMemory();
+    await flushPreferences();
+    await flushScheduler();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);
@@ -4928,6 +5027,9 @@ async function main() {
     await persistChain();
     await flushComputeEconomics();
     await flushMining();
+    await flushPreferences();
+    await flushScheduler();
+    stopScheduler();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

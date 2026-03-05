@@ -27,6 +27,8 @@ import { initOperators, flushOperators, getWizardState, setWizardState, clearWiz
 import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL, getATH, getDominance, getYields, getChains, getStables, getDexVolume, getWalletBalance } from './tools.js';
 import { getWeather, getWiki, getDefinition, translateText, calculate, getWorldTime, shortenUrl } from './tools-utility.js';
 import { parsePollArgs, coinFlip, diceRoll, magicEightBall, getTrivia, recordGM, getGMLeaderboard } from './tools-fun.js';
+import { getGainers, getLosers, getTopVolume, getQuickSummary, addToWatchlist, removeFromWatchlist, getWatchlist, getNFTStats } from './tools-alerts.js';
+import { saveBookmark, getBookmarks, deleteBookmark, addNote, getNotes, deleteNote, saveQuote, getQuotes, setTag, getTag, listTags, deleteTag } from './tools-social.js';
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats } from './group-context.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -352,6 +354,74 @@ bot.command('start', async (ctx) => {
 
   if (!isAuthorized(ctx) && !isShadow(ctx.from.id)) return unauthorized(ctx);
   ctx.reply('JARVIS online. Just talk to me.');
+});
+
+// /help — Command reference
+bot.command('help', (ctx) => {
+  const helpText = `JARVIS Command Reference
+
+CRYPTO
+  /price <token> — Price + 24h change
+  /btc /eth /sol — Quick summary
+  /chart <token> [days] — Price chart
+  /ath <token> — All-time high
+  /trending — Trending tokens
+  /dominance — Market overview
+  /gainers — Top 24h gainers
+  /losers — Top 24h losers
+  /volume — Top volume
+  /convert <N> <from> <to> — Convert
+  /fear — Fear & Greed Index
+  /gas — ETH gas prices
+
+DEFI
+  /tvl [protocol] — Total Value Locked
+  /yields [chain] — Top DeFi yields
+  /chains — Chain TVL rankings
+  /stables — Stablecoin market
+  /dex — DEX volume rankings
+  /wallet <0x...> — ETH balance
+  /nft <collection> — NFT stats
+
+WATCHLIST
+  /watch <token> — Add to watchlist
+  /unwatch <token> — Remove
+  /watchlist — View prices
+
+UTILITY
+  /weather <city> — 3-day forecast
+  /wiki <topic> — Wikipedia
+  /define <word> — Dictionary
+  /translate <lang> <text> — Translate
+  /calc <expr> — Calculator
+  /time <city> — World clock
+  /shorten <url> — URL shortener
+  /remind <time> <msg> — Reminder
+  /qr <text> — QR code
+  /image <prompt> — AI image
+
+SOCIAL
+  /save — Bookmark (reply to msg)
+  /bookmarks — Your bookmarks
+  /note <text> — Save a note
+  /notes — Your notes
+  /quote — Save quote (reply)
+  /quotes — Group quotes
+  /tag <name> <text> — Create snippet
+  /t <name> — Recall snippet
+  /tags — Your snippets
+
+FUN
+  /poll Q | Opt1 | Opt2 — Poll
+  /flip — Coin flip
+  /roll [2d6+3] — Dice
+  /8ball <question> — 8-ball
+  /trivia — Crypto trivia
+  /gm — GM streak
+  /gmboard — Streak leaderboard
+
+Or just talk to me — I'm always listening.`;
+  ctx.reply(helpText);
 });
 
 bot.command('whoami', (ctx) => {
@@ -854,6 +924,177 @@ bot.command('gm', (ctx) => {
 // /gmboard — GM streak leaderboard
 bot.command('gmboard', (ctx) => {
   ctx.reply(getGMLeaderboard());
+});
+
+// ============ Market Movers & Alerts ============
+
+// /gainers — Top 24h gainers
+bot.command('gainers', async (ctx) => {
+  const result = await getGainers();
+  ctx.reply(result);
+});
+
+// /losers — Top 24h losers
+bot.command('losers', async (ctx) => {
+  const result = await getLosers();
+  ctx.reply(result);
+});
+
+// /volume — Top volume
+bot.command('volume', async (ctx) => {
+  const result = await getTopVolume();
+  ctx.reply(result);
+});
+
+// /btc — Quick BTC summary
+bot.command('btc', async (ctx) => {
+  const result = await getQuickSummary('bitcoin');
+  ctx.reply(result);
+});
+
+// /eth — Quick ETH summary
+bot.command('eth', async (ctx) => {
+  const result = await getQuickSummary('ethereum');
+  ctx.reply(result);
+});
+
+// /sol — Quick SOL summary
+bot.command('sol', async (ctx) => {
+  const result = await getQuickSummary('solana');
+  ctx.reply(result);
+});
+
+// /nft <collection> — NFT stats
+bot.command('nft', async (ctx) => {
+  const collection = ctx.message.text.replace(/^\/nft(@\w+)?/i, '').trim();
+  if (!collection) return ctx.reply('Usage: /nft bored-ape-yacht-club\n\nCheck NFT collection floor price, volume, and owners.');
+  const result = await getNFTStats(collection);
+  ctx.reply(result);
+});
+
+// /watch <token> — Add to watchlist
+bot.command('watch', (ctx) => {
+  const token = ctx.message.text.replace(/^\/watch(@\w+)?/i, '').trim();
+  if (!token) return ctx.reply('Usage: /watch ETH\n\nAdd a token to your personal price watchlist.');
+  const result = addToWatchlist(ctx.from.id, token);
+  ctx.reply(result);
+});
+
+// /unwatch <token> — Remove from watchlist
+bot.command('unwatch', (ctx) => {
+  const token = ctx.message.text.replace(/^\/unwatch(@\w+)?/i, '').trim();
+  if (!token) return ctx.reply('Usage: /unwatch ETH');
+  const result = removeFromWatchlist(ctx.from.id, token);
+  ctx.reply(result);
+});
+
+// /watchlist — Show your watchlist
+bot.command('watchlist', async (ctx) => {
+  const result = await getWatchlist(ctx.from.id);
+  ctx.reply(result);
+});
+bot.command('wl', async (ctx) => {
+  const result = await getWatchlist(ctx.from.id);
+  ctx.reply(result);
+});
+
+// ============ Social & Productivity Tools ============
+
+// /save — Bookmark a message (reply to save)
+bot.command('save', (ctx) => {
+  const replyMsg = ctx.message.reply_to_message;
+  if (!replyMsg) return ctx.reply('Reply to a message and use /save to bookmark it.');
+  const text = replyMsg.text || replyMsg.caption || '[media]';
+  const author = replyMsg.from?.username || replyMsg.from?.first_name || 'Unknown';
+  const chatTitle = ctx.chat.title || 'DM';
+  const result = saveBookmark(ctx.from.id, text, author, chatTitle);
+  ctx.reply(result);
+});
+
+// /bookmarks — List saved messages
+bot.command('bookmarks', (ctx) => {
+  const page = parseInt(ctx.message.text.replace(/^\/bookmarks(@\w+)?/i, '').trim()) || 1;
+  const result = getBookmarks(ctx.from.id, page);
+  ctx.reply(result);
+});
+
+// /delbookmark <number> — Delete a bookmark
+bot.command('delbookmark', (ctx) => {
+  const num = parseInt(ctx.message.text.replace(/^\/delbookmark(@\w+)?/i, '').trim());
+  if (!num) return ctx.reply('Usage: /delbookmark 3');
+  const result = deleteBookmark(ctx.from.id, num);
+  ctx.reply(result);
+});
+
+// /note <text> — Save a note
+bot.command('note', (ctx) => {
+  const text = ctx.message.text.replace(/^\/note(@\w+)?/i, '').trim();
+  const result = addNote(ctx.from.id, text);
+  ctx.reply(result);
+});
+
+// /notes — List your notes
+bot.command('notes', (ctx) => {
+  const result = getNotes(ctx.from.id);
+  ctx.reply(result);
+});
+
+// /delnote <number> — Delete a note
+bot.command('delnote', (ctx) => {
+  const num = parseInt(ctx.message.text.replace(/^\/delnote(@\w+)?/i, '').trim());
+  if (!num) return ctx.reply('Usage: /delnote 3');
+  const result = deleteNote(ctx.from.id, num);
+  ctx.reply(result);
+});
+
+// /quote — Save a quote (reply to message)
+bot.command('quote', (ctx) => {
+  const replyMsg = ctx.message.reply_to_message;
+  if (!replyMsg) return ctx.reply('Reply to a message and use /quote to save it as a memorable quote.');
+  const text = replyMsg.text || replyMsg.caption || '[media]';
+  const author = replyMsg.from?.username || replyMsg.from?.first_name || 'Unknown';
+  const savedBy = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const result = saveQuote(ctx.chat.id, text, author, savedBy);
+  ctx.reply(result);
+});
+
+// /quotes — Show saved quotes
+bot.command('quotes', (ctx) => {
+  const result = getQuotes(ctx.chat.id);
+  ctx.reply(result);
+});
+
+// /tag <name> <text> — Create a reusable snippet
+bot.command('tag', (ctx) => {
+  const args = ctx.message.text.replace(/^\/tag(@\w+)?/i, '').trim();
+  const spaceIdx = args.indexOf(' ');
+  if (spaceIdx < 1) return ctx.reply('Usage: /tag links Check vibeswap.xyz and our TG group\n\nCreate reusable text snippets. Recall with /t <name>');
+  const name = args.slice(0, spaceIdx);
+  const text = args.slice(spaceIdx + 1);
+  const result = setTag(ctx.from.id, name, text);
+  ctx.reply(result);
+});
+
+// /tags — List your tags
+bot.command('tags', (ctx) => {
+  const result = listTags(ctx.from.id);
+  ctx.reply(result);
+});
+
+// /t <name> — Recall a tag
+bot.command('t', (ctx) => {
+  const name = ctx.message.text.replace(/^\/t(@\w+)?/i, '').trim();
+  if (!name) return ctx.reply('Usage: /t links\n\nRecall a saved tag. List tags with /tags');
+  const result = getTag(ctx.from.id, name);
+  ctx.reply(result);
+});
+
+// /deltag <name> — Delete a tag
+bot.command('deltag', (ctx) => {
+  const name = ctx.message.text.replace(/^\/deltag(@\w+)?/i, '').trim();
+  if (!name) return ctx.reply('Usage: /deltag links');
+  const result = deleteTag(ctx.from.id, name);
+  ctx.reply(result);
 });
 
 // Helper: resolve target user from reply or args

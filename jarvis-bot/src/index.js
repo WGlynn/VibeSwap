@@ -222,6 +222,8 @@ function isAuthorized(ctx) {
 }
 
 function unauthorized(ctx) {
+  // In groups, silently ignore unauthorized commands (don't spam the chat)
+  if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') return;
   return ctx.reply('Not authorized. Ask Will to add your Telegram user ID.');
 }
 
@@ -2643,7 +2645,9 @@ bot.on('text', async (ctx) => {
       }
       recordTelegramMessage(String(ctx.from.id));
     } else {
-      return unauthorized(ctx);
+      // In groups: silently ignore unauthorized users (don't spam "Not authorized")
+      // Their messages are already buffered for context above
+      return;
     }
   }
 

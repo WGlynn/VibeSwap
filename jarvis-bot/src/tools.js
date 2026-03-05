@@ -275,10 +275,41 @@ export function getQRUrl(text) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;
 }
 
-// ============ AI Image Generation (Pollinations.ai — free, no key) ============
+// ============ AI Image Generation ============
+// Try multiple free providers. Fetch image as buffer (Telegram rejects
+// some external URLs) and return it for upload.
 
+const IMAGE_PROVIDERS = [
+  // Pollinations.ai — free, no key
+  (prompt) => `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true`,
+  // Pollinations v2 endpoint
+  (prompt) => `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`,
+];
+
+export async function generateImage(prompt) {
+  for (const urlFn of IMAGE_PROVIDERS) {
+    const url = urlFn(prompt);
+    try {
+      const resp = await fetch(url, {
+        signal: AbortSignal.timeout(30000),
+        redirect: 'follow',
+      });
+      if (!resp.ok) continue;
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) continue;
+      const buffer = Buffer.from(await resp.arrayBuffer());
+      if (buffer.length < 1000) continue; // Too small = error page
+      return { buffer, contentType };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+// Legacy URL function (kept for fallback)
 export function getImageUrl(prompt) {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512`;
 }
 
 // ============ Crypto Conversion ============

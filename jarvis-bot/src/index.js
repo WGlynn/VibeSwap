@@ -128,11 +128,54 @@ const bot = IS_WORKER ? noopBot : new Telegraf(config.telegram.token, {
   telegram: { allowedUpdates: ['message', 'callback_query'] },
 });
 
+// ============ Runtime Authorization ============
+// Owner can authorize/deauthorize users at runtime via /authorize command.
+// Persisted to disk so authorized users survive restarts.
+
+const AUTHORIZED_FILE = join(config.dataDir, 'authorized-users.json');
+const runtimeAuthorized = new Set(); // userId numbers added at runtime
+
+async function loadRuntimeAuthorized() {
+  try {
+    const data = await readFile(AUTHORIZED_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    for (const id of parsed) runtimeAuthorized.add(id);
+    if (runtimeAuthorized.size > 0) {
+      console.log(`[auth] Loaded ${runtimeAuthorized.size} runtime-authorized user(s)`);
+    }
+  } catch {
+    // No file yet — that's fine
+  }
+}
+
+async function saveRuntimeAuthorized() {
+  try {
+    await writeFile(AUTHORIZED_FILE, JSON.stringify([...runtimeAuthorized], null, 2));
+  } catch (err) {
+    console.warn(`[auth] Failed to save authorized users: ${err.message}`);
+  }
+}
+
+function authorizeUser(userId) {
+  runtimeAuthorized.add(userId);
+  saveRuntimeAuthorized();
+}
+
+function deauthorizeUser(userId) {
+  runtimeAuthorized.delete(userId);
+  saveRuntimeAuthorized();
+}
+
+function getAuthorizedList() {
+  return [...new Set([...config.authorizedUsers, ...runtimeAuthorized])];
+}
+
 // Auth middleware (only used in primary mode)
 function isAuthorized(ctx) {
-  // Fail-closed: empty whitelist = NOBODY authorized except owner
-  if (config.authorizedUsers.length === 0) return isOwner(ctx);
-  return config.authorizedUsers.includes(ctx.from.id);
+  if (isOwner(ctx)) return true;
+  if (config.authorizedUsers.includes(ctx.from.id)) return true;
+  if (runtimeAuthorized.has(ctx.from.id)) return true;
+  return false;
 }
 
 function unauthorized(ctx) {
@@ -262,7 +305,75 @@ bot.command('start', async (ctx) => {
 });
 
 bot.command('whoami', (ctx) => {
-  ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}`);
+  const authorized = isAuthorized(ctx) ? 'Yes' : 'No';
+  ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}`);
+});
+
+// /authorize — Owner adds a user to the authorized list at runtime
+bot.command('authorize', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  // Accept: /authorize <userId>, /authorize @username (via reply), or reply to a message
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  let targetId = null;
+  let targetName = 'unknown';
+
+  // If replying to someone's message, authorize that user
+  if (ctx.message.reply_to_message?.from) {
+    targetId = ctx.message.reply_to_message.from.id;
+    targetName = ctx.message.reply_to_message.from.username || ctx.message.reply_to_message.from.first_name || String(targetId);
+  } else if (args.length > 0) {
+    // Try parsing as numeric user ID
+    const parsed = parseInt(args[0]);
+    if (!isNaN(parsed)) {
+      targetId = parsed;
+      targetName = args[1] || String(parsed);
+    } else {
+      return ctx.reply('Usage: /authorize <userId> or reply to someone\'s message with /authorize');
+    }
+  } else {
+    return ctx.reply('Usage: /authorize <userId> or reply to someone\'s message with /authorize');
+  }
+
+  if (targetId === config.ownerUserId) {
+    return ctx.reply('Owner is always authorized.');
+  }
+
+  authorizeUser(targetId);
+  ctx.reply(`Authorized ${targetName} (${targetId}). They can now interact with JARVIS.`);
+  console.log(`[auth] Will authorized user ${targetId} (${targetName})`);
+});
+
+// /deauthorize — Owner removes a user from the authorized list
+bot.command('deauthorize', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  let targetId = null;
+
+  if (ctx.message.reply_to_message?.from) {
+    targetId = ctx.message.reply_to_message.from.id;
+  } else if (args.length > 0) {
+    targetId = parseInt(args[0]);
+  }
+
+  if (!targetId || isNaN(targetId)) {
+    return ctx.reply('Usage: /deauthorize <userId> or reply to someone\'s message with /deauthorize');
+  }
+
+  deauthorizeUser(targetId);
+  ctx.reply(`Deauthorized user ${targetId}.`);
+  console.log(`[auth] Will deauthorized user ${targetId}`);
+});
+
+// /authorized — List all authorized users
+bot.command('authorized', (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const list = getAuthorizedList();
+  if (list.length === 0) {
+    return ctx.reply('No authorized users (owner-only mode).');
+  }
+  ctx.reply(`Authorized users (${list.length}):\n${list.map(id => `- ${id}`).join('\n')}\n\nOwner: ${config.ownerUserId}`);
 });
 
 bot.command('status', async (ctx) => {
@@ -2777,6 +2888,9 @@ async function main() {
   // Step 2.9: Initialize continuous context memory (rolling summaries)
   console.log('[jarvis] Step 2.9: Initializing continuous context memory...');
   await initContextMemory();
+
+  // Step 2.95: Load runtime-authorized users
+  await loadRuntimeAuthorized();
 
   // Step 3: Load context, conversation history, moderation log, threads, comms
   console.log('[jarvis] Step 3: Loading memory, conversations, moderation, threads, comms...');

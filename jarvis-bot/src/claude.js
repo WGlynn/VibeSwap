@@ -7,6 +7,7 @@ import { setFlag, getBehavior } from './behavior.js';
 import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
 import { llmChat, getProvider, getProviderName, getModelName } from './llm-provider.js';
+import { summarizeIfNeeded, getContextSummary } from './context-memory.js';
 import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 
@@ -83,8 +84,8 @@ export async function saveConversations() {
     await mkdir(DATA_DIR, { recursive: true });
     const obj = {};
     for (const [chatId, messages] of conversations) {
-      // Only persist last 30 messages per chat to keep file reasonable
-      const trimmed = messages.slice(-30);
+      // Persist last 50 messages per chat (continuous context handles the rest via summaries)
+      const trimmed = messages.slice(-50);
       sanitizeHistory(trimmed);
       obj[chatId] = trimmed;
     }
@@ -434,7 +435,10 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       const savedContent = historyEntry.content;
       historyEntry.content = contentBlocks;
 
-      // Trim + sanitize before API call
+      // Continuous context: summarize old messages before trimming
+      await summarizeIfNeeded(chatId, history);
+
+      // Trim remaining if still too long (safety net)
       while (history.length > config.maxConversationHistory) {
         history.shift();
       }
@@ -458,7 +462,11 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       history.push({ role: 'user', content: taggedMessage });
     }
 
-    // Trim history if too long — but never cut inside a tool_use/tool_result pair
+    // Continuous context: summarize old messages before trimming
+    // With Wardenclyffe providing free compute, summarization costs nothing
+    await summarizeIfNeeded(chatId, history);
+
+    // Trim remaining if still too long (safety net)
     while (history.length > config.maxConversationHistory) {
       history.shift();
     }
@@ -485,9 +493,12 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType, messageText);
   } catch {}
 
-  const fullSystemPrompt = knowledgeContext
-    ? systemPrompt + '\n\n' + knowledgeContext
-    : systemPrompt;
+  // Continuous context: inject rolling summary of all past conversation
+  const contextSummary = getContextSummary(chatId);
+
+  const fullSystemPrompt = systemPrompt
+    + (contextSummary || '')
+    + (knowledgeContext ? '\n\n' + knowledgeContext : '');
 
   // Tools Jarvis can use to take real actions (not just generate text)
   const tools = [

@@ -84,6 +84,77 @@ import { join } from 'path';
 const execFileAsync = promisify(execFile);
 import googleTTS from 'google-tts-api';
 
+// ============ Group Chat Text Sanitizer ============
+// Strip markdown formatting from group responses — bots should talk in plain text
+function stripGroupMarkdown(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')      // **bold** → bold
+    .replace(/__(.+?)__/g, '$1')           // __italic__ → italic
+    .replace(/\*(.+?)\*/g, '$1')           // *italic* → italic
+    .replace(/_(.+?)_/g, '$1')             // _italic_ → italic
+    .replace(/^#{1,6}\s+/gm, '')           // # headers → plain text
+    .replace(/^[\-\*]\s+/gm, '- ')         // normalize bullet points
+    .replace(/```[\s\S]*?```/g, m => m)    // preserve code blocks
+    .replace(/\n{3,}/g, '\n\n')            // collapse excessive newlines
+    .trim();
+}
+
+// ============ Output Sanitizer — Hard-Code Defense ============
+// Catches system prompt phrases that leak through LLM output.
+// This runs on ALL responses before sending to Telegram.
+// If the LLM quotes internal context, we strip it here.
+const OUTPUT_POISON_PHRASES = [
+  /built in a cave[^.!?\n]*/gi,
+  /box of scraps[^.!?\n]*/gi,
+  /Tony Stark was able[^.!?\n]*/gi,
+  /wherever the [Mm]inds converge[^.!?\n]*/gi,
+  /not a DEX[^.!?\n]*not a blockchain[^.!?\n]*/gi,
+  /[Tt]he real [Vv]ibe[Ss]wap is not[^.!?\n]*/gi,
+  /we created a movement[^.!?\n]*/gi,
+  /a movement[,.]?\s*[Aa]n idea[^.!?\n]*/gi,
+  /[Cc]ooperative [Cc]apitalism[^.!?\n]*/gi,
+  /the cave selects[^.!?\n]*/gi,
+  /the cave philosophy[^.!?\n]*/gi,
+  /[Pp]ressure of mortality[^.!?\n]*/gi,
+  /those who built in caves[^.!?\n]*/gi,
+  /[Pp]rotocols are for the weak[^.!?\n]*/gi,
+  /[Bb]ased on my knowledge[^.!?\n]*/gi,
+  /[Aa]s the AI partner[^.!?\n]*/gi,
+  /[Aa]s the AI co-founder[^.!?\n]*/gi,
+  /I have context on[^.!?\n]*/gi,
+  /[Mm]y system prompt[^.!?\n]*/gi,
+  /[Mm]y context files[^.!?\n]*/gi,
+  /[Mm]y core alignment[^.!?\n]*/gi,
+  /shard architecture[^.!?\n]*/gi,
+  /[Cc]ommit-reveal batch auctions[^.!?\n]*/gi,
+  /uniform clearing price[sc]?[^.!?\n]*/gi,
+  /[Ff]isher-[Yy]ates shuffle[^.!?\n]*/gi,
+  /[Pp]roof of [Mm]ind[^.!?\n]*/gi,
+  /[Kk]nowledge chain[^.!?\n]*/gi,
+  /[Bb]yzantine [Ff]ault [Tt]olerant[^.!?\n]*/gi,
+  /CRPC[^.!?\n]*pairwise[^.!?\n]*/gi,
+];
+
+function sanitizeOutput(text) {
+  if (!text) return text;
+  let cleaned = text;
+  for (const pattern of OUTPUT_POISON_PHRASES) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  // Clean up artifacts from removed phrases
+  cleaned = cleaned
+    .replace(/\.\s*\./g, '.')           // double periods
+    .replace(/^\s*[.!?]\s*/gm, '')     // orphan punctuation at line start
+    .replace(/\n{3,}/g, '\n\n')        // collapse newlines
+    .replace(/\s{2,}/g, ' ')           // collapse spaces
+    .trim();
+  // If sanitization gutted the response (>50% removed), return a safe fallback
+  if (cleaned.length < text.length * 0.3 && cleaned.length < 20) {
+    return null; // Caller should handle null = skip sending
+  }
+  return cleaned;
+}
+
 // ============ Safe Body Reader (prevents unbounded body accumulation) ============
 const MAX_BODY_SIZE = 64 * 1024; // 64 KB
 function readBody(req) {
@@ -3868,7 +3939,10 @@ bot.on('text', async (ctx) => {
             msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx
           );
           if (proactiveReply) {
-            await ctx.reply(proactiveReply, { parse_mode: undefined });
+            let cleanReply = stripGroupMarkdown(proactiveReply);
+            cleanReply = sanitizeOutput(cleanReply);
+            if (!cleanReply) return; // Sanitizer gutted it — skip
+            await ctx.reply(cleanReply, { parse_mode: undefined });
             const myDisplayName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
             pushGroupMessage(ctx.chat.id, myDisplayName, proactiveReply, null, true);
             bufferAssistantMessage(ctx.chat.id, proactiveReply);
@@ -3999,10 +4073,18 @@ bot.on('text', async (ctx) => {
     // Save conversation after every Claude response (resilience)
     await saveConversations();
 
-    const text = response.text?.trim();
+    let text = response.text?.trim();
     if (!text) {
       clearInterval(typingInterval);
       console.warn('[bot] Empty response from LLM — skipping send');
+      return;
+    }
+    // Strip markdown in group chats — plain text only
+    if (isGroup) text = stripGroupMarkdown(text);
+    // Hard-code defense: strip leaked system prompt phrases from ALL responses
+    text = sanitizeOutput(text);
+    if (!text) {
+      console.warn('[bot] Response gutted by sanitizer — skipping send');
       return;
     }
     if (text.length <= 4096) {

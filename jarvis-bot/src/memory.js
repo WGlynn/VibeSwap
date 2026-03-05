@@ -30,6 +30,65 @@ async function safeRead(filePath, label) {
   }
 }
 
+// ============ Context Sanitizer ============
+// Strip philosophical quotes and dev documentation from context files
+// before injecting into the bot's system prompt. The bot should NEVER
+// see quotable phrases it might parrot in conversation.
+const CONTEXT_POISON_PATTERNS = [
+  /Tony Stark[^.]*cave[^.]*scraps[^.]*/gi,
+  /built in a cave[^.]*/gi,
+  /The real VibeSwap is not a DEX[^.]*/gi,
+  /not a DEX[^.]*not a blockchain[^.]*/gi,
+  /we created a movement[^.]*/gi,
+  /wherever the Minds converge[^.]*/gi,
+  /VibeSwap is wherever[^.]*/gi,
+  /The cave selects[^.]*/gi,
+  /The cave philosophy[^.]*/gi,
+  /NEVER COMPRESS - CORE ALIGNMENT[^.]*/gi,
+  /the pressure of mortality focused[^.]*/gi,
+  /those who built in caves[^.]*/gi,
+  /Not everyone can build in a cave[^.]*/gi,
+  /a movement[^.]*an idea[^.]*/gi,
+  /cooperative capitalism[^.]*/gi,
+  /This is how we align[^.]*/gi,
+  /building the practices.*mental models[^.]*/gi,
+];
+
+// Sections to completely remove from CLAUDE.md (development docs, not bot context)
+const SECTION_KILL_PATTERNS = [
+  /## THE CAVE PHILOSOPHY[\s\S]*?(?=\n## )/gi,
+  /## AUTO-SYNC INSTRUCTIONS[\s\S]*?(?=\n## )/gi,
+  /## WALLET SECURITY AXIOMS[\s\S]*?(?=\n## )/gi,
+  /## Recent Session State[\s\S]*?(?=\n## |$)/gi,
+  /## SESSION START PROTOCOL[\s\S]*?(?=\n## )/gi,
+  /### Git Remotes[\s\S]*?(?=\n### |$)/gi,
+  /### Common Commands[\s\S]*?(?=\n### |$)/gi,
+  /### Key Directories[\s\S]*?(?=\n### |$)/gi,
+  /### Key Patterns[\s\S]*?(?=\n### |$)/gi,
+  /### Important Files Recently Modified[\s\S]*?(?=\n### |$)/gi,
+  /### Coding Conventions[\s\S]*?(?=\n### |$)/gi,
+];
+
+function sanitizeContextForBot(content) {
+  if (!content) return content;
+  let cleaned = content;
+
+  // Remove entire development-only sections
+  for (const pattern of SECTION_KILL_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // Remove individual poison phrases
+  for (const pattern of CONTEXT_POISON_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // Collapse multiple blank lines
+  cleaned = cleaned.replace(/\n{4,}/g, '\n\n');
+
+  return cleaned.trim();
+}
+
 // Diagnose what context loaded vs what's missing
 export async function diagnoseContext() {
   const report = { loaded: [], missing: [], totalChars: 0 };
@@ -206,41 +265,53 @@ export async function loadSystemPrompt() {
     parts.push('');
   }
 
-  // Load CLAUDE.md
-  const claudeMd = await safeRead(CLAUDE_MD_PATH, 'CLAUDE.md');
-  if (claudeMd) {
-    parts.push('<context type="project">');
-    parts.push(claudeMd.slice(0, 4000));
-    parts.push('</context>');
-    parts.push('');
-  }
-
-  // Load SESSION_STATE.md
-  const sessionState = await safeRead(SESSION_STATE_PATH, 'SESSION_STATE.md');
-  if (sessionState) {
-    parts.push('<context type="session_state">');
-    parts.push(sessionState.slice(0, 3000));
-    parts.push('</context>');
-    parts.push('');
-  }
-
-  // Load CKB (core alignment)
-  const ckb = await safeRead(CKB_PATH, 'JarvisxWill_CKB.md');
-  if (ckb) {
-    parts.push('<context type="core_alignment">');
-    parts.push(ckb.slice(0, 3000));
-    parts.push('</context>');
-    parts.push('');
-  }
-
-  // Load memory files
-  for (const file of MEMORY_FILES) {
-    const content = await safeRead(join(MEMORY_DIR, file), file);
-    if (content) {
-      parts.push(`<memory file="${file}">`);
-      parts.push(content.slice(0, 2000));
-      parts.push('</memory>');
+  // Load CLAUDE.md — sanitized: strip dev docs, philosophical quotes, git remotes
+  const claudeMdRaw = await safeRead(CLAUDE_MD_PATH, 'CLAUDE.md');
+  if (claudeMdRaw) {
+    const claudeMd = sanitizeContextForBot(claudeMdRaw);
+    if (claudeMd.length > 100) { // Only include if meaningful content remains
+      parts.push('<context type="project_brief">');
+      parts.push(claudeMd.slice(0, 2000)); // Reduced from 4000 — less surface area for parroting
+      parts.push('</context>');
       parts.push('');
+    }
+  }
+
+  // Load SESSION_STATE.md — sanitized
+  const sessionStateRaw = await safeRead(SESSION_STATE_PATH, 'SESSION_STATE.md');
+  if (sessionStateRaw) {
+    const sessionState = sanitizeContextForBot(sessionStateRaw);
+    if (sessionState.length > 50) {
+      parts.push('<context type="session_state">');
+      parts.push(sessionState.slice(0, 2000));
+      parts.push('</context>');
+      parts.push('');
+    }
+  }
+
+  // Load CKB (core alignment) — sanitized
+  const ckbRaw = await safeRead(CKB_PATH, 'JarvisxWill_CKB.md');
+  if (ckbRaw) {
+    const ckb = sanitizeContextForBot(ckbRaw);
+    if (ckb.length > 50) {
+      parts.push('<context type="core_alignment">');
+      parts.push(ckb.slice(0, 2000));
+      parts.push('</context>');
+      parts.push('');
+    }
+  }
+
+  // Load memory files — sanitized
+  for (const file of MEMORY_FILES) {
+    const rawContent = await safeRead(join(MEMORY_DIR, file), file);
+    if (rawContent) {
+      const content = sanitizeContextForBot(rawContent);
+      if (content.length > 50) {
+        parts.push(`<memory file="${file}">`);
+        parts.push(content.slice(0, 1500));
+        parts.push('</memory>');
+        parts.push('');
+      }
     }
   }
 

@@ -13,8 +13,15 @@
 //               2. SELF-TRACKING — what Jarvis already said (no phantom responses)
 //               3. PROACTIVE FEED — gives triage real context instead of ''
 //
+// Persisted to disk so context survives deploys/restarts.
 // "Jarvis doesn't just hear the last thing said. He hears the whole room."
 // ============
+
+import { readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
+
+const DATA_DIR = process.env.DATA_DIR || './data';
+const CONTEXT_FILE = join(DATA_DIR, 'group-context.json');
 
 // chatId -> GroupContextWindow
 const contextWindows = new Map();
@@ -152,4 +159,59 @@ export function getGroupContextStats() {
     stats.totalMessages += w.messages.length;
   }
   return stats;
+}
+
+// ============ Persistence ============
+// Save/load context windows so they survive deploys and restarts.
+
+let contextDirty = false;
+
+// Mark dirty when a message is pushed (called from pushGroupMessage wrapper below isn't needed —
+// we just set it inside push since pushGroupMessage already calls push)
+const _originalPush = GroupContextWindow.prototype.push;
+GroupContextWindow.prototype.push = function (...args) {
+  contextDirty = true;
+  return _originalPush.call(this, ...args);
+};
+
+export async function initGroupContext() {
+  try {
+    const data = await readFile(CONTEXT_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    for (const [chatId, windowData] of Object.entries(parsed)) {
+      const win = new GroupContextWindow();
+      // Restore messages — only keep non-stale ones
+      const now = Date.now();
+      for (const msg of windowData.messages || []) {
+        if (now - msg.timestamp < STALE_THRESHOLD_MS * 2) { // 2 hour window for restored context
+          win.messages.push(msg);
+        }
+      }
+      // Restore jarvis responses
+      for (const msg of windowData.jarvisResponses || []) {
+        if (now - msg.timestamp < STALE_THRESHOLD_MS * 2) {
+          win.jarvisResponses.push(msg);
+        }
+      }
+      if (win.messages.length > 0) {
+        contextWindows.set(Number(chatId), win);
+      }
+    }
+    console.log(`[group-context] Restored ${contextWindows.size} group context windows`);
+  } catch {
+    console.log('[group-context] No saved context — starting fresh');
+  }
+}
+
+export async function flushGroupContext() {
+  if (!contextDirty) return;
+  const obj = {};
+  for (const [chatId, win] of contextWindows) {
+    obj[chatId] = {
+      messages: win.messages,
+      jarvisResponses: win.jarvisResponses,
+    };
+  }
+  await writeFile(CONTEXT_FILE, JSON.stringify(obj));
+  contextDirty = false;
 }

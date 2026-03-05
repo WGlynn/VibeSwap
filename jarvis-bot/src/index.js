@@ -3366,7 +3366,15 @@ function isBotAddressed(ctx) {
   const caption = (ctx.message.caption || '').toLowerCase();
   const isMentioned = botUsername && caption.includes(`@${botUsername}`);
   const isReplyToBot = ctx.message.reply_to_message?.from?.id === ctx.botInfo?.id;
-  const isCalledByName = caption.includes('jarvis') || caption.includes('jar ') || caption.startsWith('jar') || caption.includes(' j ') || caption.startsWith('j ');
+  // Standard JARVIS: don't respond to captions addressing Diablo
+  const captionWithoutMentions = caption.replace(/@\w+/g, '').trim();
+  const isDiabloCaption = captionWithoutMentions.includes('diablo') || captionWithoutMentions.includes('diabolical')
+    || captionWithoutMentions.includes('funny jarvis') || captionWithoutMentions.includes('edgy jarvis')
+    || captionWithoutMentions.includes('cool jarvis') || captionWithoutMentions.includes('degen jarvis');
+  const persona = getActivePersonaId();
+  const isCalledByName = isDiabloCaption
+    ? (persona === 'degen') // Only Diablo responds to Diablo addresses
+    : (caption.includes('jarvis') || caption.includes('jar ') || caption.startsWith('jar') || caption.includes(' j ') || caption.startsWith('j '));
   // Voice/video_note can't have captions — if user replies to bot with media, honor it
   // Also: if media has NO caption at all, treat reply-to as the only addressing check
   const isMediaWithoutCaption = !ctx.message.caption && (ctx.message.voice || ctx.message.video_note || ctx.message.audio);
@@ -3858,8 +3866,18 @@ bot.on('text', async (ctx) => {
       || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
   } else {
     // Standard JARVIS — responds to jarvis, jar, j
-    isCalledByName = textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ')
-      || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
+    // BUT NOT when Diablo is being addressed (diablo jarvis, funny jarvis, edgy jarvis, etc.)
+    const isDiabloAddress = textWithoutMentions.includes('diablo') || textWithoutMentions.includes('diabolical')
+      || textWithoutMentions.includes('funny jarvis') || textWithoutMentions.includes('edgy jarvis')
+      || textWithoutMentions.includes('cool jarvis') || textWithoutMentions.includes('degen jarvis')
+      || textWithoutMentions.includes('evil jarvis') || textWithoutMentions.includes('unhinged jarvis')
+      || textWithoutMentions.includes('based jarvis') || textWithoutMentions.includes('chaos jarvis');
+    if (isDiabloAddress) {
+      isCalledByName = false; // Let Diablo handle it
+    } else {
+      isCalledByName = textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ')
+        || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
+    }
   }
 
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
@@ -3910,7 +3928,19 @@ bot.on('text', async (ctx) => {
     }
 
     // Proactive intelligence — JARVIS is a full team member, not a wallflower
-    if (msgText.length >= 3) {
+    // But if the message is specifically addressing the OTHER bot, stay quiet
+    const msgTextLowerForCheck = msgText.toLowerCase().replace(/@\w+/g, '').trim();
+    const msgAddressesDiablo = msgTextLowerForCheck.includes('diablo') || msgTextLowerForCheck.includes('diabolical')
+      || msgTextLowerForCheck.includes('funny jarvis') || msgTextLowerForCheck.includes('edgy jarvis')
+      || msgTextLowerForCheck.includes('cool jarvis') || msgTextLowerForCheck.includes('degen jarvis')
+      || msgTextLowerForCheck.includes('evil jarvis') || msgTextLowerForCheck.includes('unhinged jarvis');
+    const msgAddressesJarvis = (msgTextLowerForCheck.includes('jarvis') || msgTextLowerForCheck.includes('jar '))
+      && !msgAddressesDiablo;
+    // Standard JARVIS skips when Diablo is addressed; Diablo skips when only standard JARVIS is addressed
+    const shouldSkipProactive = (persona !== 'degen' && msgAddressesDiablo)
+      || (persona === 'degen' && msgAddressesJarvis && !msgAddressesDiablo);
+
+    if (msgText.length >= 3 && !shouldSkipProactive) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
         const recentCtx = getRecentContext(ctx.chat.id, 10);

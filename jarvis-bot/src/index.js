@@ -132,16 +132,33 @@ const bot = IS_WORKER ? noopBot : new Telegraf(config.telegram.token, {
 // Owner can authorize/deauthorize users at runtime via /authorize command.
 // Persisted to disk so authorized users survive restarts.
 
+// ============ The Blessing System ============
+// "And when he had called unto him his twelve disciples, he gave them power..."
+// - Matthew 10:1
+//
+// Will (the founder) can /authorize anyone. Authorized users can /bless others.
+// Blessings cascade: the blessed can bless others, up to a depth limit.
+// Each blessing records who blessed whom — a trust chain.
+// Will can /deauthorize anyone, which also revokes all their downstream blessings.
+
 const AUTHORIZED_FILE = join(config.dataDir, 'authorized-users.json');
-const runtimeAuthorized = new Set(); // userId numbers added at runtime
+const MAX_BLESSING_DEPTH = 3; // Will → disciple → disciple's disciple → max
+
+// userId -> { blessedBy: userId|'owner', depth: number, name: string, blessedAt: timestamp }
+const runtimeAuthorized = new Map();
 
 async function loadRuntimeAuthorized() {
   try {
     const data = await readFile(AUTHORIZED_FILE, 'utf-8');
     const parsed = JSON.parse(data);
-    for (const id of parsed) runtimeAuthorized.add(id);
+    // Support both old format (array of IDs) and new format (object of entries)
+    if (Array.isArray(parsed)) {
+      for (const id of parsed) runtimeAuthorized.set(id, { blessedBy: 'owner', depth: 0, name: String(id), blessedAt: Date.now() });
+    } else {
+      for (const [id, entry] of Object.entries(parsed)) runtimeAuthorized.set(Number(id), entry);
+    }
     if (runtimeAuthorized.size > 0) {
-      console.log(`[auth] Loaded ${runtimeAuthorized.size} runtime-authorized user(s)`);
+      console.log(`[auth] Loaded ${runtimeAuthorized.size} blessed user(s)`);
     }
   } catch {
     // No file yet — that's fine
@@ -150,24 +167,50 @@ async function loadRuntimeAuthorized() {
 
 async function saveRuntimeAuthorized() {
   try {
-    await writeFile(AUTHORIZED_FILE, JSON.stringify([...runtimeAuthorized], null, 2));
+    const obj = {};
+    for (const [id, entry] of runtimeAuthorized) obj[id] = entry;
+    await writeFile(AUTHORIZED_FILE, JSON.stringify(obj, null, 2));
   } catch (err) {
     console.warn(`[auth] Failed to save authorized users: ${err.message}`);
   }
 }
 
-function authorizeUser(userId) {
-  runtimeAuthorized.add(userId);
+function authorizeUser(userId, blessedBy = 'owner', name = 'unknown', depth = 0) {
+  runtimeAuthorized.set(userId, { blessedBy, depth, name, blessedAt: Date.now() });
   saveRuntimeAuthorized();
 }
 
 function deauthorizeUser(userId) {
   runtimeAuthorized.delete(userId);
+  // Revoke all downstream blessings (anyone blessed by this user, recursively)
+  const toRevoke = [];
+  for (const [id, entry] of runtimeAuthorized) {
+    if (entry.blessedBy === userId) toRevoke.push(id);
+  }
+  for (const id of toRevoke) deauthorizeUser(id); // Recursive — cascading revocation
   saveRuntimeAuthorized();
 }
 
+function getBlessingDepth(userId) {
+  const entry = runtimeAuthorized.get(userId);
+  return entry?.depth ?? -1;
+}
+
+function getBlessingChain(userId) {
+  const chain = [];
+  let current = userId;
+  while (current && current !== 'owner') {
+    const entry = runtimeAuthorized.get(current);
+    if (!entry) break;
+    chain.unshift(`${entry.name} (${current})`);
+    current = entry.blessedBy;
+  }
+  chain.unshift('Will (owner)');
+  return chain;
+}
+
 function getAuthorizedList() {
-  return [...new Set([...config.authorizedUsers, ...runtimeAuthorized])];
+  return [...new Set([...config.authorizedUsers, ...runtimeAuthorized.keys()])];
 }
 
 // Auth middleware (only used in primary mode)
@@ -306,75 +349,91 @@ bot.command('start', async (ctx) => {
 
 bot.command('whoami', (ctx) => {
   const authorized = isAuthorized(ctx) ? 'Yes' : 'No';
-  ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}`);
+  const entry = runtimeAuthorized.get(ctx.from.id);
+  const blessingInfo = entry
+    ? `\nBlessed by: ${entry.blessedBy === 'owner' ? 'Will (owner)' : entry.blessedBy}\nBlessing depth: ${entry.depth}`
+    : '';
+  ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}${blessingInfo}`);
 });
 
-// /authorize — Owner adds a user to the authorized list at runtime
+// /authorize — Owner adds a user (direct authority)
 bot.command('authorize', async (ctx) => {
   if (!isOwner(ctx)) return ownerOnly(ctx);
-
-  // Accept: /authorize <userId>, /authorize @username (via reply), or reply to a message
-  const args = ctx.message.text.split(/\s+/).slice(1);
-  let targetId = null;
-  let targetName = 'unknown';
-
-  // If replying to someone's message, authorize that user
-  if (ctx.message.reply_to_message?.from) {
-    targetId = ctx.message.reply_to_message.from.id;
-    targetName = ctx.message.reply_to_message.from.username || ctx.message.reply_to_message.from.first_name || String(targetId);
-  } else if (args.length > 0) {
-    // Try parsing as numeric user ID
-    const parsed = parseInt(args[0]);
-    if (!isNaN(parsed)) {
-      targetId = parsed;
-      targetName = args[1] || String(parsed);
-    } else {
-      return ctx.reply('Usage: /authorize <userId> or reply to someone\'s message with /authorize');
-    }
-  } else {
-    return ctx.reply('Usage: /authorize <userId> or reply to someone\'s message with /authorize');
-  }
-
-  if (targetId === config.ownerUserId) {
-    return ctx.reply('Owner is always authorized.');
-  }
-
-  authorizeUser(targetId);
-  ctx.reply(`Authorized ${targetName} (${targetId}). They can now interact with JARVIS.`);
+  const { targetId, targetName } = resolveTarget(ctx);
+  if (!targetId) return ctx.reply('Reply to someone\'s message with /authorize, or: /authorize <userId>');
+  if (targetId === config.ownerUserId) return ctx.reply('Owner is always authorized.');
+  authorizeUser(targetId, 'owner', targetName, 0);
+  ctx.reply(`Authorized ${targetName} (${targetId}). They can now interact with JARVIS and /bless others.`);
   console.log(`[auth] Will authorized user ${targetId} (${targetName})`);
 });
 
-// /deauthorize — Owner removes a user from the authorized list
+// /bless — Authorized users can bless others (cascading authority)
+// "And when he had called unto him his twelve disciples, he gave them power..."
+bot.command('bless', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+
+  const blesserDepth = isOwner(ctx) ? -1 : getBlessingDepth(ctx.from.id);
+  const newDepth = blesserDepth + 1;
+
+  if (newDepth > MAX_BLESSING_DEPTH) {
+    return ctx.reply(`Your blessing depth (${blesserDepth}) is at the limit. Only those closer to Will can bless others.`);
+  }
+
+  const { targetId, targetName } = resolveTarget(ctx);
+  if (!targetId) return ctx.reply('Reply to someone\'s message with /bless, or: /bless <userId>');
+  if (targetId === config.ownerUserId) return ctx.reply('The owner needs no blessing.');
+  if (isAuthorized({ from: { id: targetId } })) return ctx.reply(`${targetName} is already blessed.`);
+
+  const blesserName = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
+  authorizeUser(targetId, ctx.from.id, targetName, newDepth);
+
+  const chain = getBlessingChain(targetId);
+  ctx.reply(
+    `${blesserName} has blessed ${targetName}.\n\n` +
+    `Trust chain: ${chain.join(' → ')}\n` +
+    `Depth: ${newDepth}/${MAX_BLESSING_DEPTH}\n\n` +
+    `${targetName} can now interact with JARVIS` + (newDepth < MAX_BLESSING_DEPTH ? ' and /bless others.' : '.')
+  );
+  console.log(`[auth] ${blesserName} (${ctx.from.id}) blessed ${targetName} (${targetId}), depth ${newDepth}`);
+});
+
+// /deauthorize — Owner removes a user (cascading revocation)
 bot.command('deauthorize', async (ctx) => {
   if (!isOwner(ctx)) return ownerOnly(ctx);
-
-  const args = ctx.message.text.split(/\s+/).slice(1);
-  let targetId = null;
-
-  if (ctx.message.reply_to_message?.from) {
-    targetId = ctx.message.reply_to_message.from.id;
-  } else if (args.length > 0) {
-    targetId = parseInt(args[0]);
-  }
-
-  if (!targetId || isNaN(targetId)) {
-    return ctx.reply('Usage: /deauthorize <userId> or reply to someone\'s message with /deauthorize');
-  }
-
+  const { targetId } = resolveTarget(ctx);
+  if (!targetId) return ctx.reply('Reply to someone\'s message with /deauthorize, or: /deauthorize <userId>');
   deauthorizeUser(targetId);
-  ctx.reply(`Deauthorized user ${targetId}.`);
-  console.log(`[auth] Will deauthorized user ${targetId}`);
+  ctx.reply(`Deauthorized user ${targetId} and all their downstream blessings.`);
+  console.log(`[auth] Will deauthorized user ${targetId} (cascade)`);
 });
 
-// /authorized — List all authorized users
+// /authorized — List all authorized users with blessing chains
 bot.command('authorized', (ctx) => {
-  if (!isOwner(ctx)) return ownerOnly(ctx);
-  const list = getAuthorizedList();
-  if (list.length === 0) {
-    return ctx.reply('No authorized users (owner-only mode).');
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const entries = [];
+  for (const [id, entry] of runtimeAuthorized) {
+    const chain = getBlessingChain(id);
+    entries.push(`- ${entry.name} (${id}) [depth ${entry.depth}] via ${chain.join(' → ')}`);
   }
-  ctx.reply(`Authorized users (${list.length}):\n${list.map(id => `- ${id}`).join('\n')}\n\nOwner: ${config.ownerUserId}`);
+  if (entries.length === 0) {
+    return ctx.reply('No blessed users yet. Use /authorize or /bless to add people.');
+  }
+  ctx.reply(`Blessed users (${entries.length}):\n${entries.join('\n')}\n\nOwner: Will (${config.ownerUserId})`);
 });
+
+// Helper: resolve target user from reply or args
+function resolveTarget(ctx) {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  if (ctx.message.reply_to_message?.from) {
+    const from = ctx.message.reply_to_message.from;
+    return { targetId: from.id, targetName: from.username || from.first_name || String(from.id) };
+  }
+  if (args.length > 0) {
+    const parsed = parseInt(args[0]);
+    if (!isNaN(parsed)) return { targetId: parsed, targetName: args[1] || String(parsed) };
+  }
+  return { targetId: null, targetName: null };
+}
 
 bot.command('status', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);

@@ -33,7 +33,7 @@ import { rugCheck, honeypotCheck, contractAudit, getTopHolders, checkApprovals }
 import { getBTCStats, getHalvingCountdown, resolveENS, checkStablecoinPegs, getMultiChainBalance, getLatestBlock } from './tools-onchain.js';
 import { getRedditPosts, getHackerNews, readRSSFeed, getCryptoNews, getDevActivity } from './tools-news.js';
 import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRandomDog, getRandomCat, getCodeScreenshot, createPaste, getAdvice } from './tools-engagement.js';
-import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats } from './group-context.js';
+import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats, initGroupContext, flushGroupContext } from './group-context.js';
 import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
@@ -3178,7 +3178,7 @@ bot.on('photo', async (ctx) => {
 
   // Multimodal vision path — send image to LLM for analysis
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Largest size
   try {
@@ -3205,7 +3205,7 @@ bot.on('voice', async (ctx) => {
   console.log(`[multimodal] Voice handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}, authorized: ${isAuthorized(ctx)}, addressed: ${isBotAddressed(ctx)}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const voice = ctx.message.voice;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3236,7 +3236,7 @@ bot.on('audio', async (ctx) => {
   console.log(`[multimodal] Audio handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const audio = ctx.message.audio;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3266,7 +3266,7 @@ bot.on('document', async (ctx) => {
   console.log(`[multimodal] Document handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}, mime: ${ctx.message.document?.mime_type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const doc = ctx.message.document;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3315,7 +3315,7 @@ bot.on('document', async (ctx) => {
 bot.on('sticker', async (ctx) => {
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const sticker = ctx.message.sticker;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3356,7 +3356,7 @@ bot.on('video', async (ctx) => {
   console.log(`[multimodal] Video handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const video = ctx.message.video;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3407,7 +3407,7 @@ bot.on('animation', async (ctx) => {
   console.log(`[multimodal] Animation/GIF handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const animation = ctx.message.animation;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3444,7 +3444,7 @@ bot.on('video_note', async (ctx) => {
   console.log(`[multimodal] VideoNote handler triggered — from: ${ctx.from?.id} (${ctx.from?.username || 'anon'}), chat: ${ctx.chat?.type}`);
   if (!isAuthorized(ctx)) return;
   if (!isBotAddressed(ctx) && ctx.chat.type !== 'private') return;
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) return;
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) return;
 
   const videoNote = ctx.message.video_note;
   const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -3672,7 +3672,7 @@ bot.on('text', async (ctx) => {
   }
 
   // Rate limit Claude API calls (owner exempt, shadows get standard limit)
-  if (!isOwner(ctx) && isRateLimited(ctx.from.id)) {
+  if (!isAuthorized(ctx) && isRateLimited(ctx.from.id)) {
     return ctx.reply('Slow down — too many requests. Try again in a minute.');
   }
 
@@ -3719,7 +3719,21 @@ bot.on('text', async (ctx) => {
       pushGroupMessage(chatId, userName, ctx.message.text, ctx.message.message_id, false);
     }
 
-    const response = await chat(chatId, userName, ctx.message.text, ctx.chat.type, [], { userId: ctx.from.id });
+    // Bare invocation detection: if someone just says "jarvis" or "j" without a real question,
+    // inject the recent group context as an explicit hint so the LLM responds to what was actually discussed
+    let messageForLLM = ctx.message.text;
+    if (isGroup) {
+      const stripped = ctx.message.text.toLowerCase().replace(/[^a-z]/g, '');
+      const isBareInvocation = ['jarvis', 'jar', 'j', 'hey jarvis', 'heyjarvis', 'yo jarvis', 'yojarvis'].includes(stripped);
+      if (isBareInvocation) {
+        const recentCtx = getRecentContext(chatId, 8);
+        if (recentCtx) {
+          messageForLLM = `${ctx.message.text}\n\n[SYSTEM: ${userName} just called your name. Here's what was just discussed in the group — respond to the conversation flow, not with a generic "Yes?":\n${recentCtx}]`;
+        }
+      }
+    }
+
+    const response = await chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id });
 
     clearInterval(typingInterval);
 
@@ -4091,6 +4105,7 @@ async function main() {
   await initShadow();
   await initOperators();
   await initPreferences();
+  await initGroupContext();
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
   await initComputeEconomics();
   await initMining();
@@ -4954,6 +4969,7 @@ async function main() {
     await flushContextMemory();
     await flushPreferences();
     await flushScheduler();
+    await flushGroupContext();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);
@@ -5029,6 +5045,7 @@ async function main() {
     await flushMining();
     await flushPreferences();
     await flushScheduler();
+    await flushGroupContext();
     stopScheduler();
     await saveComms();
     await writeHeartbeat('stopped');

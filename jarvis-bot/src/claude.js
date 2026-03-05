@@ -8,6 +8,7 @@ import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
 import { llmChat, getProvider, getProviderName, getModelName } from './llm-provider.js';
 import { summarizeIfNeeded, getContextSummary } from './context-memory.js';
+import { getGroupContext } from './group-context.js';
 import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 
@@ -394,6 +395,32 @@ export function bufferMessage(chatId, userName, message) {
   conversationsDirty = true;
 }
 
+// Buffer a JARVIS response into conversation history.
+// Used when proactive intelligence sends a response outside the normal chat() flow.
+// Prevents phantom interactions — the LLM knows what Jarvis already said.
+export function bufferAssistantMessage(chatId, message) {
+  if (!conversations.has(chatId)) {
+    conversations.set(chatId, []);
+  }
+
+  const history = conversations.get(chatId);
+
+  // Assistant messages: append to last assistant block or create new one
+  const last = history[history.length - 1];
+  if (last && last.role === 'assistant' && typeof last.content === 'string') {
+    last.content += '\n' + message;
+  } else {
+    history.push({ role: 'assistant', content: message });
+  }
+
+  while (history.length > config.maxConversationHistory) {
+    history.shift();
+  }
+  sanitizeHistory(history);
+
+  conversationsDirty = true;
+}
+
 export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId } = {}) {
   return withChatLock(chatId, async () => {
     if (!conversations.has(chatId)) {
@@ -496,8 +523,13 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   // Continuous context: inject rolling summary of all past conversation
   const contextSummary = getContextSummary(chatId);
 
+  // Group Context Primitive: inject recent group messages as explicit context
+  // This ensures Jarvis always knows what was just discussed — no more fumbled context
+  const groupContext = chatType !== 'private' ? getGroupContext(chatId) : '';
+
   const fullSystemPrompt = systemPrompt
     + (contextSummary || '')
+    + (groupContext || '')
     + (knowledgeContext ? '\n\n' + knowledgeContext : '');
 
   // Tools Jarvis can use to take real actions (not just generate text)

@@ -2745,10 +2745,10 @@ bot.on('text', async (ctx) => {
         clearWizardState(ctx.from.id);
         await flushOperators();
 
-        await ctx.reply(
-          `API key validated (${wizard.model} responded in ${validation.latencyMs}ms).\n` +
-          `Deploying shard-${record.shardName}...`
-        );
+        const statusMsg = validation.warning
+          ? `Key accepted. ${validation.warning}\nDeploying shard-${record.shardName}...`
+          : `API key validated (${wizard.model} responded in ${validation.latencyMs}ms).\nDeploying shard-${record.shardName}...`;
+        await ctx.reply(statusMsg);
 
         // Deploy asynchronously
         try {

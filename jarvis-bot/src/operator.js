@@ -427,6 +427,24 @@ export async function validateApiKey(provider, apiKey) {
       return { valid: true, latencyMs, model: PROVIDERS[Object.keys(PROVIDERS).find(k => PROVIDERS[k].id === provider)]?.model };
     }
     const errText = await response.text();
+    const errLower = errText.toLowerCase();
+
+    // 401 = bad key. 403 = forbidden. These mean the key itself is wrong.
+    if (response.status === 401 || response.status === 403) {
+      return { valid: false, error: 'Invalid API key — check for typos and try again.', latencyMs };
+    }
+
+    // Credit/billing errors = key is valid but account has no credits.
+    // The shard has Wardenclyffe cascade, so it'll still work via fallback providers.
+    if (errLower.includes('credit balance') || errLower.includes('billing') || errLower.includes('quota') || errLower.includes('rate limit')) {
+      return { valid: true, warning: 'Key is valid but your account has low/no credits. The shard will use Wardenclyffe cascade (fallback providers) until credits are added.', latencyMs, model: PROVIDERS[Object.keys(PROVIDERS).find(k => PROVIDERS[k].id === provider)]?.model };
+    }
+
+    // Other errors (429 rate limit, 500 server error, etc.) — key is probably valid
+    if (response.status === 429 || response.status >= 500) {
+      return { valid: true, warning: `Provider returned ${response.status} — key accepted (temporary issue).`, latencyMs, model: PROVIDERS[Object.keys(PROVIDERS).find(k => PROVIDERS[k].id === provider)]?.model };
+    }
+
     return { valid: false, error: `API returned ${response.status}: ${errText.slice(0, 100)}`, latencyMs };
   } catch (err) {
     return { valid: false, error: err.message, latencyMs: Date.now() - start };

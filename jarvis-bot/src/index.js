@@ -3209,6 +3209,17 @@ async function main() {
       // ============ Web Portal API ============
       // Public-facing endpoints for the VibeSwap frontend.
       // Rate-limited per IP, CORS-restricted. No API secret needed.
+      // ============ Voice Bridge ============
+      } else if (req.url === '/voice') {
+        try {
+          const voiceHtml = await readFile(join(import.meta.dirname || '.', 'voice.html'), 'utf8');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(voiceHtml);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Voice bridge unavailable: ' + err.message);
+        }
+
       } else if (req.url?.startsWith('/web/')) {
         const webUrl = new URL(req.url, `http://localhost:${healthPort}`);
         const handled = await handleWebRequest(req, res, webUrl.pathname);

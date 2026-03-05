@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS Voice Bridge</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #1a3a1a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0d0d0d;
+  }
+  .header h1 {
+    font-size: 18px;
+    color: #4ade80;
+    font-weight: normal;
+  }
+  .header .status {
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid #333;
+  }
+  .status.listening { color: #4ade80; border-color: #4ade80; }
+  .status.idle { color: #666; border-color: #333; }
+  .status.error { color: #f87171; border-color: #f87171; }
+  .status.sending { color: #60a5fa; border-color: #60a5fa; }
+
+  .controls {
+    padding: 12px 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #1a1a1a;
+    background: #0d0d0d;
+    align-items: center;
+  }
+  button {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 8px 16px;
+    border: 1px solid #333;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:hover { background: #252525; border-color: #4ade80; }
+  button:active { transform: scale(0.97); }
+  button.primary { border-color: #4ade80; color: #4ade80; }
+  button.primary:hover { background: #1a2e1a; }
+  button.danger { border-color: #f87171; color: #f87171; }
+  button.danger:hover { background: #2e1a1a; }
+  button.active { background: #1a2e1a; border-color: #4ade80; color: #4ade80; }
+  button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .config {
+    padding: 8px 24px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 12px;
+    color: #666;
+    border-bottom: 1px solid #111;
+  }
+  .config label { display: flex; align-items: center; gap: 6px; }
+  .config input[type="text"] {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    border-radius: 4px;
+    width: 280px;
+  }
+  .config select {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    border-radius: 4px;
+  }
+
+  .transcript-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px;
+  }
+  .segment {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: #111;
+    border-radius: 8px;
+    border-left: 3px solid #333;
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  .segment.final { border-left-color: #4ade80; }
+  .segment.interim { border-left-color: #60a5fa; color: #888; font-style: italic; }
+  .segment.sent { border-left-color: #a78bfa; opacity: 0.6; }
+  .segment .meta {
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 4px;
+  }
+
+  .compose {
+    padding: 12px 24px;
+    border-top: 1px solid #1a1a1a;
+    background: #0d0d0d;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .compose textarea {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 10px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    border-radius: 6px;
+    resize: vertical;
+    min-height: 44px;
+    max-height: 200px;
+  }
+  .compose textarea:focus { outline: none; border-color: #4ade80; }
+
+  .response-area {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 12px 24px;
+    border-top: 1px solid #1a3a1a;
+    background: #0a140a;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #4ade80;
+    display: none;
+  }
+  .response-area.visible { display: block; }
+
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 20px;
+    background: #1a2e1a;
+    color: #4ade80;
+    border: 1px solid #4ade80;
+    border-radius: 6px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 600px) {
+    .config { flex-direction: column; gap: 8px; }
+    .config input[type="text"] { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>JARVIS Voice Bridge</h1>
+  <span class="status idle" id="status">IDLE</span>
+</div>
+
+<div class="controls">
+  <button class="primary" id="btnListen" onclick="toggleListening()">Start Listening</button>
+  <button id="btnSend" onclick="sendTranscript()" disabled>Send to Jarvis</button>
+  <button id="btnCopy" onclick="copyTranscript()">Copy to Clipboard</button>
+  <button class="danger" id="btnClear" onclick="clearTranscript()">Clear</button>
+  <label style="margin-left: auto; font-size: 12px; color: #666;">
+    <input type="checkbox" id="chkContinuous" checked> Continuous
+  </label>
+  <label style="font-size: 12px; color: #666;">
+    <input type="checkbox" id="chkAutoSend"> Auto-send
+  </label>
+</div>
+
+<div class="config">
+  <label>
+    Jarvis URL:
+    <input type="text" id="jarvisUrl" value="http://localhost:8080" placeholder="http://host:port">
+  </label>
+  <label>
+    Language:
+    <select id="langSelect">
+      <option value="en-US" selected>English (US)</option>
+      <option value="en-GB">English (UK)</option>
+      <option value="es-ES">Spanish</option>
+      <option value="fr-FR">French</option>
+      <option value="de-DE">German</option>
+      <option value="ja-JP">Japanese</option>
+      <option value="zh-CN">Chinese</option>
+    </select>
+  </label>
+  <label>
+    Mode:
+    <select id="modeSelect">
+      <option value="jarvis" selected>Send to Jarvis</option>
+      <option value="clipboard">Clipboard only</option>
+      <option value="both">Both</option>
+    </select>
+  </label>
+</div>
+
+<div class="transcript-area" id="transcriptArea">
+  <div style="color: #555; text-align: center; padding: 60px 20px;">
+    Click "Start Listening" and speak.<br>
+    Your words will appear here in real-time.<br><br>
+    <span style="font-size: 12px;">
+      Uses your browser's built-in speech recognition.<br>
+      No data leaves your machine until you send to Jarvis.
+    </span>
+  </div>
+</div>
+
+<div class="response-area" id="responseArea"></div>
+
+<div class="compose">
+  <textarea id="composeBox" placeholder="Edit transcript or type manually..." rows="2"></textarea>
+  <button class="primary" id="btnComposeSend" onclick="sendCompose()">Send</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ State ============
+let recognition = null;
+let isListening = false;
+let segments = [];        // { text, final, timestamp, sent }
+let interimText = '';
+
+const statusEl = document.getElementById('status');
+const transcriptArea = document.getElementById('transcriptArea');
+const composeBox = document.getElementById('composeBox');
+const responseArea = document.getElementById('responseArea');
+
+// ============ Speech Recognition Setup ============
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SpeechRecognition) {
+  statusEl.textContent = 'NOT SUPPORTED';
+  statusEl.className = 'status error';
+  document.getElementById('btnListen').disabled = true;
+  showToast('Speech recognition not supported in this browser. Use Chrome or Edge.');
+}
+
+function createRecognition() {
+  const rec = new SpeechRecognition();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  rec.lang = document.getElementById('langSelect').value;
+
+  rec.onstart = () => {
+    isListening = true;
+    statusEl.textContent = 'LISTENING';
+    statusEl.className = 'status listening';
+    document.getElementById('btnListen').textContent = 'Stop Listening';
+    document.getElementById('btnListen').classList.add('active');
+  };
+
+  rec.onend = () => {
+    // Auto-restart if continuous mode is on and we didn't manually stop
+    if (isListening && document.getElementById('chkContinuous').checked) {
+      try { recognition.start(); } catch {}
+      return;
+    }
+    isListening = false;
+    statusEl.textContent = 'IDLE';
+    statusEl.className = 'status idle';
+    document.getElementById('btnListen').textContent = 'Start Listening';
+    document.getElementById('btnListen').classList.remove('active');
+  };
+
+  rec.onerror = (event) => {
+    if (event.error === 'no-speech') return; // Normal — just silence
+    if (event.error === 'aborted') return;   // We stopped it
+    console.warn('[voice] Recognition error:', event.error);
+    statusEl.textContent = `ERROR: ${event.error}`;
+    statusEl.className = 'status error';
+
+    // Auto-restart on network errors
+    if (event.error === 'network' && isListening) {
+      setTimeout(() => { try { recognition.start(); } catch {} }, 1000);
+    }
+  };
+
+  rec.onresult = (event) => {
+    let interim = '';
+    let finalText = '';
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      const text = result[0].transcript;
+
+      if (result.isFinal) {
+        finalText += text;
+      } else {
+        interim += text;
+      }
+    }
+
+    // Add final segment
+    if (finalText) {
+      const segment = {
+        text: finalText.trim(),
+        final: true,
+        timestamp: Date.now(),
+        sent: false,
+      };
+      segments.push(segment);
+
+      // Update compose box
+      updateComposeBox();
+
+      // Auto-send if enabled
+      if (document.getElementById('chkAutoSend').checked) {
+        sendTranscript();
+      }
+    }
+
+    // Update interim display
+    interimText = interim;
+    renderTranscript();
+  };
+
+  return rec;
+}
+
+// ============ UI ============
+
+function renderTranscript() {
+  if (segments.length === 0 && !interimText) {
+    transcriptArea.innerHTML = `<div style="color: #555; text-align: center; padding: 60px 20px;">
+      ${isListening ? 'Listening... speak now.' : 'Click "Start Listening" and speak.'}
+    </div>`;
+    return;
+  }
+
+  let html = '';
+  for (const seg of segments) {
+    const time = new Date(seg.timestamp).toLocaleTimeString();
+    const cls = seg.sent ? 'segment sent' : 'segment final';
+    html += `<div class="${cls}">
+      <div class="meta">${time}${seg.sent ? ' — sent' : ''}</div>
+      ${escapeHtml(seg.text)}
+    </div>`;
+  }
+
+  if (interimText) {
+    html += `<div class="segment interim">${escapeHtml(interimText)}</div>`;
+  }
+
+  transcriptArea.innerHTML = html;
+  transcriptArea.scrollTop = transcriptArea.scrollHeight;
+}
+
+function updateComposeBox() {
+  const unsent = segments.filter(s => !s.sent).map(s => s.text).join('\n\n');
+  composeBox.value = unsent;
+  document.getElementById('btnSend').disabled = unsent.length === 0;
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ============ Actions ============
+
+function toggleListening() {
+  if (!SpeechRecognition) return;
+
+  if (isListening) {
+    isListening = false;
+    recognition.stop();
+  } else {
+    recognition = createRecognition();
+    try {
+      recognition.start();
+    } catch (err) {
+      showToast('Failed to start: ' + err.message);
+    }
+  }
+}
+
+async function sendTranscript() {
+  const text = composeBox.value.trim();
+  if (!text) return;
+
+  const mode = document.getElementById('modeSelect').value;
+  const jarvisUrl = document.getElementById('jarvisUrl').value.trim();
+
+  // Mark segments as sent
+  for (const seg of segments) {
+    if (!seg.sent) seg.sent = true;
+  }
+  renderTranscript();
+
+  if (mode === 'clipboard' || mode === 'both') {
+    await copyToClipboard(text);
+  }
+
+  if (mode === 'jarvis' || mode === 'both') {
+    await sendToJarvis(text, jarvisUrl);
+  }
+
+  composeBox.value = '';
+  document.getElementById('btnSend').disabled = true;
+}
+
+async function sendCompose() {
+  const text = composeBox.value.trim();
+  if (!text) return;
+
+  const mode = document.getElementById('modeSelect').value;
+  const jarvisUrl = document.getElementById('jarvisUrl').value.trim();
+
+  if (mode === 'clipboard' || mode === 'both') {
+    await copyToClipboard(text);
+  }
+
+  if (mode === 'jarvis' || mode === 'both') {
+    await sendToJarvis(text, jarvisUrl);
+  }
+
+  // Add to segments as sent
+  segments.push({ text, final: true, timestamp: Date.now(), sent: true });
+  composeBox.value = '';
+  document.getElementById('btnSend').disabled = true;
+  renderTranscript();
+}
+
+async function sendToJarvis(text, jarvisUrl) {
+  statusEl.textContent = 'SENDING';
+  statusEl.className = 'status sending';
+
+  try {
+    const response = await fetch(`${jarvisUrl}/web/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    showResponse(data.reply || data.response || JSON.stringify(data));
+    showToast('Sent to Jarvis');
+  } catch (err) {
+    showToast('Send failed: ' + err.message);
+    console.error('[voice] Send error:', err);
+  }
+
+  statusEl.textContent = isListening ? 'LISTENING' : 'IDLE';
+  statusEl.className = isListening ? 'status listening' : 'status idle';
+}
+
+function showResponse(text) {
+  responseArea.textContent = text;
+  responseArea.classList.add('visible');
+  setTimeout(() => responseArea.classList.remove('visible'), 30000);
+}
+
+async function copyTranscript() {
+  const text = composeBox.value.trim() ||
+    segments.filter(s => !s.sent).map(s => s.text).join('\n\n');
+  if (!text) return showToast('Nothing to copy');
+  await copyToClipboard(text);
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard');
+  } catch {
+    // Fallback for non-HTTPS
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Copied to clipboard');
+  }
+}
+
+function clearTranscript() {
+  segments = [];
+  interimText = '';
+  composeBox.value = '';
+  document.getElementById('btnSend').disabled = true;
+  responseArea.classList.remove('visible');
+  renderTranscript();
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ============ Keyboard Shortcuts ============
+
+document.addEventListener('keydown', (e) => {
+  // Ctrl+Space = toggle listening
+  if (e.ctrlKey && e.code === 'Space') {
+    e.preventDefault();
+    toggleListening();
+  }
+  // Ctrl+Enter = send
+  if (e.ctrlKey && e.code === 'Enter') {
+    e.preventDefault();
+    sendCompose();
+  }
+  // Ctrl+Shift+C = copy transcript
+  if (e.ctrlKey && e.shiftKey && e.code === 'KeyC') {
+    e.preventDefault();
+    copyTranscript();
+  }
+});
+
+// ============ Persist Settings ============
+
+function saveSettings() {
+  const settings = {
+    jarvisUrl: document.getElementById('jarvisUrl').value,
+    lang: document.getElementById('langSelect').value,
+    mode: document.getElementById('modeSelect').value,
+    continuous: document.getElementById('chkContinuous').checked,
+    autoSend: document.getElementById('chkAutoSend').checked,
+  };
+  localStorage.setItem('jarvis-voice-settings', JSON.stringify(settings));
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem('jarvis-voice-settings');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.jarvisUrl) document.getElementById('jarvisUrl').value = s.jarvisUrl;
+    if (s.lang) document.getElementById('langSelect').value = s.lang;
+    if (s.mode) document.getElementById('modeSelect').value = s.mode;
+    if (s.continuous !== undefined) document.getElementById('chkContinuous').checked = s.continuous;
+    if (s.autoSend !== undefined) document.getElementById('chkAutoSend').checked = s.autoSend;
+  } catch {}
+}
+
+// Save on change
+document.getElementById('jarvisUrl').addEventListener('change', saveSettings);
+document.getElementById('langSelect').addEventListener('change', saveSettings);
+document.getElementById('modeSelect').addEventListener('change', saveSettings);
+document.getElementById('chkContinuous').addEventListener('change', saveSettings);
+document.getElementById('chkAutoSend').addEventListener('change', saveSettings);
+
+loadSettings();
+</script>
+</body>
+</html>

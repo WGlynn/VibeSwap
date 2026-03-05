@@ -24,6 +24,7 @@ import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, 
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
+import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, getImageUrl, convertCrypto, getTVL } from './tools.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -565,6 +566,104 @@ bot.command('cancel', (ctx) => {
     return ctx.reply('Shard setup cancelled.');
   }
   ctx.reply('Nothing to cancel.');
+});
+
+// ============ Community Tools (Free APIs) ============
+
+// /price <token> — Crypto prices from CoinGecko
+bot.command('price', async (ctx) => {
+  const token = ctx.message.text.replace(/^\/price(@\w+)?/i, '').trim();
+  if (!token) return ctx.reply('Usage: /price ETH\n\nExamples: /price btc, /price solana, /price pepe');
+  const result = await getPrice(token);
+  ctx.reply(result);
+});
+
+// /trending — Top trending tokens
+bot.command('trending', async (ctx) => {
+  const result = await getTrending();
+  ctx.reply(result);
+});
+
+// /chart <token> [days] — Price chart as image
+bot.command('chart', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/chart(@\w+)?/i, '').trim().split(/\s+/);
+  const token = args[0];
+  const days = parseInt(args[1]) || 7;
+  if (!token) return ctx.reply('Usage: /chart ETH [days]\n\nExamples: /chart btc 30, /chart sol 1');
+  const result = await getChart(token, Math.min(days, 365));
+  if (result.error) return ctx.reply(result.error);
+  try {
+    await ctx.replyWithPhoto(result.url, { caption: result.caption });
+  } catch {
+    ctx.reply(`${result.caption}\n\nChart: ${result.url}`);
+  }
+});
+
+// /fear — Crypto Fear & Greed Index
+bot.command('fear', async (ctx) => {
+  const result = await getFearGreed();
+  ctx.reply(result);
+});
+
+// /gas — ETH gas prices
+bot.command('gas', async (ctx) => {
+  const result = await getGasPrices();
+  ctx.reply(result);
+});
+
+// /remind <time> <message> — Set a reminder
+bot.command('remind', (ctx) => {
+  const args = ctx.message.text.replace(/^\/remind(@\w+)?/i, '').trim().split(/\s+/);
+  const timeStr = args[0];
+  const message = args.slice(1).join(' ');
+  if (!timeStr || !message) return ctx.reply('Usage: /remind 30m Check governance vote\n\nTime formats: 30s, 5m, 2h, 1d');
+  const username = ctx.from.username || ctx.from.first_name;
+  const result = setReminder(ctx.chat.id, ctx.from.id, username, timeStr, message, (msg) => {
+    ctx.reply(msg, { reply_to_message_id: ctx.message.message_id }).catch(() => {
+      ctx.reply(msg);
+    });
+  });
+  ctx.reply(result);
+});
+
+// /qr <text or URL> — Generate QR code
+bot.command('qr', async (ctx) => {
+  const text = ctx.message.text.replace(/^\/qr(@\w+)?/i, '').trim();
+  if (!text) return ctx.reply('Usage: /qr https://vibeswap.xyz\n\nGenerates a QR code for any text or URL.');
+  try {
+    await ctx.replyWithPhoto(getQRUrl(text), { caption: `QR: ${text.slice(0, 100)}` });
+  } catch {
+    ctx.reply(`QR code: ${getQRUrl(text)}`);
+  }
+});
+
+// /image <prompt> — AI image generation
+bot.command('image', async (ctx) => {
+  const prompt = ctx.message.text.replace(/^\/image(@\w+)?/i, '').trim();
+  if (!prompt) return ctx.reply('Usage: /image a futuristic city with neon lights\n\nGenerates an AI image from your description.');
+  await ctx.reply('Generating image...');
+  try {
+    await ctx.replyWithPhoto(getImageUrl(prompt), { caption: prompt.slice(0, 200) });
+  } catch {
+    ctx.reply(`Image generation failed. Try a simpler prompt.`);
+  }
+});
+
+// /convert <amount> <from> <to> — Crypto conversion
+bot.command('convert', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/convert(@\w+)?/i, '').trim().split(/\s+/);
+  if (args.length < 3) return ctx.reply('Usage: /convert 1 ETH USD\n\nExamples: /convert 100 USDT ETH, /convert 0.5 BTC SOL');
+  const amount = parseFloat(args[0]);
+  if (isNaN(amount)) return ctx.reply('First argument must be a number.');
+  const result = await convertCrypto(amount, args[1], args[2]);
+  ctx.reply(result);
+});
+
+// /tvl [protocol] — DeFi TVL data
+bot.command('tvl', async (ctx) => {
+  const protocol = ctx.message.text.replace(/^\/tvl(@\w+)?/i, '').trim();
+  const result = await getTVL(protocol || null);
+  ctx.reply(result);
 });
 
 // Helper: resolve target user from reply or args

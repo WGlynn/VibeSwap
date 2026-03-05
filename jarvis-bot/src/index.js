@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, codeGenChat, bufferMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse } from './claude.js';
+import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
@@ -25,6 +25,7 @@ import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
 import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL } from './tools.js';
+import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats } from './group-context.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -2904,6 +2905,9 @@ bot.on('text', async (ctx) => {
     const msgText = ctx.message.text;
     bufferMessage(ctx.chat.id, userName, msgText);
 
+    // Group Context Primitive — sliding window of recent messages
+    pushGroupMessage(ctx.chat.id, userName, msgText, ctx.message.message_id, false);
+
     // Track for thread detection (quality from basic heuristic — AI scoring is too expensive for every msg)
     const basicQuality = Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5);
     trackForThread(ctx.chat.id, ctx.from.id, userName, msgText, basicQuality, ctx.message.message_id);
@@ -2916,8 +2920,9 @@ bot.on('text', async (ctx) => {
     // Proactive intelligence — JARVIS is a full team member, not a wallflower
     if (msgText.length >= 5) {
       try {
-        const recentContext = ''; // Could build from buffered messages
-        const analysis = await analyzeMessage(msgText, userName, recentContext);
+        // Feed real recent context instead of '' — the group context primitive provides this
+        const recentCtx = getRecentContext(ctx.chat.id, 10);
+        const analysis = await analyzeMessage(msgText, userName, recentCtx);
 
         if (analysis.action === 'engage' && analysis.response_hint) {
           const proactiveReply = await generateProactiveResponse(
@@ -2925,6 +2930,10 @@ bot.on('text', async (ctx) => {
           );
           if (proactiveReply) {
             await ctx.reply(proactiveReply, { parse_mode: undefined });
+            // Track Jarvis's proactive response in BOTH context window AND conversation history
+            // This prevents phantom interactions — the LLM knows what Jarvis already said
+            pushGroupMessage(ctx.chat.id, 'JARVIS', proactiveReply, null, true);
+            bufferAssistantMessage(ctx.chat.id, proactiveReply);
           }
         } else if (analysis.action === 'moderate') {
           const modAction = await evaluateModeration(msgText, userName, analysis.violation, analysis.severity);
@@ -3011,6 +3020,11 @@ bot.on('text', async (ctx) => {
       }
     }
 
+    // Group Context Primitive — record the addressed message in the sliding window
+    if (isGroup) {
+      pushGroupMessage(chatId, userName, ctx.message.text, ctx.message.message_id, false);
+    }
+
     const response = await chat(chatId, userName, ctx.message.text, ctx.chat.type, [], { userId: ctx.from.id });
 
     clearInterval(typingInterval);
@@ -3039,6 +3053,11 @@ bot.on('text', async (ctx) => {
       for (const chunk of chunks) {
         await ctx.reply(chunk, { parse_mode: undefined });
       }
+    }
+
+    // Track Jarvis's response in group context window (prevents phantom interactions)
+    if (isGroup && text) {
+      pushGroupMessage(chatId, 'JARVIS', text.slice(0, 500), null, true);
     }
   } catch (error) {
     clearInterval(typingInterval);

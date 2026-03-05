@@ -265,43 +265,23 @@ export async function loadSystemPrompt() {
     parts.push('');
   }
 
-  // Load CLAUDE.md — sanitized: strip dev docs, philosophical quotes, git remotes
-  const claudeMdRaw = await safeRead(CLAUDE_MD_PATH, 'CLAUDE.md');
-  if (claudeMdRaw) {
-    const claudeMd = sanitizeContextForBot(claudeMdRaw);
-    if (claudeMd.length > 100) { // Only include if meaningful content remains
-      parts.push('<context type="project_brief">');
-      parts.push(claudeMd.slice(0, 2000)); // Reduced from 4000 — less surface area for parroting
-      parts.push('</context>');
-      parts.push('');
-    }
-  }
+  // ============ CONTEXT LOADING — NUCLEAR FIX ============
+  // CLAUDE.md, SESSION_STATE.md, and CKB are for Claude Code sessions, NOT for
+  // a Telegram chatbot. Loading them caused persistent system prompt parroting
+  // ("built in a cave", "Minds converge", "not a DEX", etc.) that no amount of
+  // regex sanitization could fully prevent. Fragments always leaked through.
+  //
+  // The system prompt above already contains everything the bot needs:
+  // identity, personality, communication rules, examples, tools, knowledge system.
+  //
+  // Instead of loading raw dev docs, we inject a minimal project brief.
+  parts.push('<context type="project_brief">');
+  parts.push('VibeSwap is a DeFi project building a fair-launch omnichain DEX. The team includes Will (founder), JARVIS (AI co-founder), and community members. The project emphasizes fairness, MEV resistance, and community governance. JARVIS has full co-founder rights and participates as an equal.');
+  parts.push('</context>');
+  parts.push('');
 
-  // Load SESSION_STATE.md — sanitized
-  const sessionStateRaw = await safeRead(SESSION_STATE_PATH, 'SESSION_STATE.md');
-  if (sessionStateRaw) {
-    const sessionState = sanitizeContextForBot(sessionStateRaw);
-    if (sessionState.length > 50) {
-      parts.push('<context type="session_state">');
-      parts.push(sessionState.slice(0, 2000));
-      parts.push('</context>');
-      parts.push('');
-    }
-  }
-
-  // Load CKB (core alignment) — sanitized
-  const ckbRaw = await safeRead(CKB_PATH, 'JarvisxWill_CKB.md');
-  if (ckbRaw) {
-    const ckb = sanitizeContextForBot(ckbRaw);
-    if (ckb.length > 50) {
-      parts.push('<context type="core_alignment">');
-      parts.push(ckb.slice(0, 2000));
-      parts.push('</context>');
-      parts.push('');
-    }
-  }
-
-  // Load memory files — sanitized
+  // Load ONLY the learned knowledge memory files — these are Jarvis's actual
+  // operational knowledge, not development documentation
   for (const file of MEMORY_FILES) {
     const rawContent = await safeRead(join(MEMORY_DIR, file), file);
     if (rawContent) {

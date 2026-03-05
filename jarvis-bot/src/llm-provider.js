@@ -1011,6 +1011,12 @@ export async function llmChat(request) {
 
   const cascadeTrail = [];
 
+  // Non-Claude providers can't handle tool_use/tool_result in conversation history.
+  // Flatten them to plain text BEFORE sending — not just during cascade.
+  if (activeProvider.name !== 'claude' && request.messages) {
+    request = { ...request, messages: flattenToolExchanges(request.messages) };
+  }
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const attemptStart = Date.now();
     try {

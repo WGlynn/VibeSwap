@@ -3102,7 +3102,7 @@ async function main() {
           try {
             const body = await readBody(req);
             const payload = JSON.parse(body);
-            const data = processKnowledgeChainBody(kcHandler, payload);
+            const data = await processKnowledgeChainBody(kcHandler, payload);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(data));
           } catch (err) {
@@ -3112,7 +3112,7 @@ async function main() {
           return;
         } else if (kcHandler) {
           const query = Object.fromEntries(kcUrl.searchParams);
-          const data = processKnowledgeChainBody(kcHandler, null, query);
+          const data = await processKnowledgeChainBody(kcHandler, null, query);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
           return;
@@ -4016,10 +4016,10 @@ async function main() {
         } else if (kcHandler === 'epoch') {
           let body = '';
           req.on('data', chunk => { body += chunk; });
-          req.on('end', () => {
+          req.on('end', async () => {
             try {
               const payload = JSON.parse(body);
-              const data = processKnowledgeChainBody(kcHandler, payload);
+              const data = await processKnowledgeChainBody(kcHandler, payload);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(data));
             } catch (err) {
@@ -4029,7 +4029,7 @@ async function main() {
           });
         } else {
           const query = Object.fromEntries(kcUrl.searchParams);
-          const data = processKnowledgeChainBody(kcHandler, null, query);
+          const data = await processKnowledgeChainBody(kcHandler, null, query);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
         }

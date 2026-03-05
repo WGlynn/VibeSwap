@@ -29,6 +29,10 @@ import { getWeather, getWiki, getDefinition, translateText, calculate, getWorldT
 import { parsePollArgs, coinFlip, diceRoll, magicEightBall, getTrivia, recordGM, getGMLeaderboard } from './tools-fun.js';
 import { getGainers, getLosers, getTopVolume, getQuickSummary, addToWatchlist, removeFromWatchlist, getWatchlist, getNFTStats } from './tools-alerts.js';
 import { saveBookmark, getBookmarks, deleteBookmark, addNote, getNotes, deleteNote, saveQuote, getQuotes, setTag, getTag, listTags, deleteTag } from './tools-social.js';
+import { rugCheck, honeypotCheck, contractAudit, getTopHolders, checkApprovals } from './tools-security.js';
+import { getBTCStats, getHalvingCountdown, resolveENS, checkStablecoinPegs, getMultiChainBalance, getLatestBlock } from './tools-onchain.js';
+import { getRedditPosts, getHackerNews, readRSSFeed, getCryptoNews, getDevActivity } from './tools-news.js';
+import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRandomDog, getRandomCat, getCodeScreenshot, createPaste, getAdvice } from './tools-engagement.js';
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats } from './group-context.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -367,12 +371,13 @@ CRYPTO
   /ath <token> — All-time high
   /trending — Trending tokens
   /dominance — Market overview
-  /gainers — Top 24h gainers
-  /losers — Top 24h losers
+  /gainers /losers — 24h movers
   /volume — Top volume
   /convert <N> <from> <to> — Convert
   /fear — Fear & Greed Index
   /gas — ETH gas prices
+  /btcstats — BTC network stats
+  /halving — BTC halving countdown
 
 DEFI
   /tvl [protocol] — Total Value Locked
@@ -382,43 +387,45 @@ DEFI
   /dex — DEX volume rankings
   /wallet <0x...> — ETH balance
   /nft <collection> — NFT stats
+  /depeg — Stablecoin peg monitor
+
+SECURITY
+  /rugcheck <0x> [chain] — Token security
+  /honeypot <0x> — Quick honeypot check
+  /audit <0x> — Contract audit
+  /holders <0x> — Top token holders
+  /approvals <0x> — Approval security
+
+ON-CHAIN
+  /balance <chain> <0x> — Multi-chain
+  /block [chain] — Latest block
+  /ens <name.eth> — ENS lookup
 
 WATCHLIST
-  /watch <token> — Add to watchlist
-  /unwatch <token> — Remove
-  /watchlist — View prices
+  /watch /unwatch /watchlist
+
+NEWS & SOCIAL
+  /news — Crypto news aggregator
+  /reddit [sub] — Reddit hot posts
+  /hn — Hacker News crypto
+  /rss <url> — RSS reader
+  /dev <project> — GitHub activity
+  /morning — Daily briefing
+  /markets — Market hours
 
 UTILITY
-  /weather <city> — 3-day forecast
-  /wiki <topic> — Wikipedia
-  /define <word> — Dictionary
-  /translate <lang> <text> — Translate
-  /calc <expr> — Calculator
-  /time <city> — World clock
-  /shorten <url> — URL shortener
-  /remind <time> <msg> — Reminder
-  /qr <text> — QR code
-  /image <prompt> — AI image
+  /weather /wiki /define /translate
+  /calc /time /shorten /remind
+  /qr /image /carbon /paste
 
 SOCIAL
-  /save — Bookmark (reply to msg)
-  /bookmarks — Your bookmarks
-  /note <text> — Save a note
-  /notes — Your notes
-  /quote — Save quote (reply)
-  /quotes — Group quotes
-  /tag <name> <text> — Create snippet
-  /t <name> — Recall snippet
-  /tags — Your snippets
+  /save /bookmarks /note /notes
+  /quote /quotes /tag /t /tags
 
 FUN
-  /poll Q | Opt1 | Opt2 — Poll
-  /flip — Coin flip
-  /roll [2d6+3] — Dice
-  /8ball <question> — 8-ball
-  /trivia — Crypto trivia
-  /gm — GM streak
-  /gmboard — Streak leaderboard
+  /poll /flip /roll /8ball /trivia
+  /gm /gmboard /fact /today
+  /dog /cat /advice
 
 Or just talk to me — I'm always listening.`;
   ctx.reply(helpText);
@@ -1095,6 +1102,182 @@ bot.command('deltag', (ctx) => {
   if (!name) return ctx.reply('Usage: /deltag links');
   const result = deleteTag(ctx.from.id, name);
   ctx.reply(result);
+});
+
+// ============ Security Tools ============
+
+// /rugcheck <address> [chain] — Full token security scan
+bot.command('rugcheck', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/rugcheck(@\w+)?/i, '').trim().split(/\s+/);
+  const result = await rugCheck(args[0], args[1]);
+  ctx.reply(result);
+});
+bot.command('rug', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/rug(@\w+)?/i, '').trim().split(/\s+/);
+  ctx.reply(await rugCheck(args[0], args[1]));
+});
+
+// /honeypot <address> [chain] — Quick honeypot check
+bot.command('honeypot', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/honeypot(@\w+)?/i, '').trim().split(/\s+/);
+  ctx.reply(await honeypotCheck(args[0], args[1]));
+});
+
+// /audit <address> [chain] — Contract audit
+bot.command('audit', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/audit(@\w+)?/i, '').trim().split(/\s+/);
+  ctx.reply(await contractAudit(args[0], args[1]));
+});
+
+// /holders <address> — Top token holders
+bot.command('holders', async (ctx) => {
+  const address = ctx.message.text.replace(/^\/holders(@\w+)?/i, '').trim();
+  ctx.reply(await getTopHolders(address));
+});
+
+// /approvals <address> [chain] — Token approval security
+bot.command('approvals', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/approvals(@\w+)?/i, '').trim().split(/\s+/);
+  ctx.reply(await checkApprovals(args[0], args[1]));
+});
+
+// ============ On-Chain Tools ============
+
+// /btcstats — Bitcoin network stats
+bot.command('btcstats', async (ctx) => {
+  ctx.reply(await getBTCStats());
+});
+
+// /halving — Bitcoin halving countdown
+bot.command('halving', async (ctx) => {
+  ctx.reply(await getHalvingCountdown());
+});
+
+// /ens <name> — ENS name resolution
+bot.command('ens', async (ctx) => {
+  const name = ctx.message.text.replace(/^\/ens(@\w+)?/i, '').trim();
+  ctx.reply(await resolveENS(name));
+});
+
+// /depeg — Stablecoin peg monitor
+bot.command('depeg', async (ctx) => {
+  ctx.reply(await checkStablecoinPegs());
+});
+
+// /balance <chain> <address> — Multi-chain balance
+bot.command('balance', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/balance(@\w+)?/i, '').trim().split(/\s+/);
+  if (args.length < 2) return ctx.reply('Usage: /balance eth 0x...\n\nChains: eth, bsc, polygon, arbitrum, optimism, avalanche, base, fantom');
+  ctx.reply(await getMultiChainBalance(args[0], args[1]));
+});
+
+// /block [chain] — Latest block info
+bot.command('block', async (ctx) => {
+  const chain = ctx.message.text.replace(/^\/block(@\w+)?/i, '').trim() || 'eth';
+  ctx.reply(await getLatestBlock(chain));
+});
+
+// ============ News & Social ============
+
+// /news [topic] — Crypto news aggregator
+bot.command('news', async (ctx) => {
+  const topic = ctx.message.text.replace(/^\/news(@\w+)?/i, '').trim();
+  ctx.reply(await getCryptoNews(topic || null), { disable_web_page_preview: true });
+});
+
+// /reddit [subreddit] — Reddit posts
+bot.command('reddit', async (ctx) => {
+  const sub = ctx.message.text.replace(/^\/reddit(@\w+)?/i, '').trim() || 'cryptocurrency';
+  ctx.reply(await getRedditPosts(sub), { disable_web_page_preview: true });
+});
+
+// /hackernews [filter] — Hacker News
+bot.command('hackernews', async (ctx) => {
+  const filter = ctx.message.text.replace(/^\/hackernews(@\w+)?/i, '').trim() || 'crypto';
+  ctx.reply(await getHackerNews(filter), { disable_web_page_preview: true });
+});
+bot.command('hn', async (ctx) => {
+  const filter = ctx.message.text.replace(/^\/hn(@\w+)?/i, '').trim() || 'crypto';
+  ctx.reply(await getHackerNews(filter), { disable_web_page_preview: true });
+});
+
+// /rss <url> — RSS feed reader
+bot.command('rss', async (ctx) => {
+  const url = ctx.message.text.replace(/^\/rss(@\w+)?/i, '').trim();
+  ctx.reply(await readRSSFeed(url), { disable_web_page_preview: true });
+});
+
+// /devactivity <project> — GitHub dev activity
+bot.command('devactivity', async (ctx) => {
+  const project = ctx.message.text.replace(/^\/devactivity(@\w+)?/i, '').trim();
+  ctx.reply(await getDevActivity(project), { disable_web_page_preview: true });
+});
+bot.command('dev', async (ctx) => {
+  const project = ctx.message.text.replace(/^\/dev(@\w+)?/i, '').trim();
+  ctx.reply(await getDevActivity(project), { disable_web_page_preview: true });
+});
+
+// ============ Engagement & Combo Commands ============
+
+// /morning — Daily crypto briefing
+bot.command('morning', async (ctx) => {
+  ctx.reply(await getMorningBriefing());
+});
+
+// /markets — Traditional market hours
+bot.command('markets', (ctx) => {
+  ctx.reply(getMarketHours());
+});
+
+// /fact — Random fact
+bot.command('fact', async (ctx) => {
+  ctx.reply(await getRandomFact());
+});
+
+// /today — On this day in history
+bot.command('today', async (ctx) => {
+  ctx.reply(await getOnThisDay());
+});
+
+// /dog — Random dog pic
+bot.command('dog', async (ctx) => {
+  const result = await getRandomDog();
+  if (result.error) return ctx.reply(result.error);
+  try { await ctx.replyWithPhoto(result.url); } catch { ctx.reply(result.url); }
+});
+
+// /cat — Random cat pic
+bot.command('cat', async (ctx) => {
+  const result = await getRandomCat();
+  if (result.error) return ctx.reply(result.error);
+  try { await ctx.replyWithPhoto(result.url); } catch { ctx.reply(result.url); }
+});
+
+// /carbon <code> — Code screenshot
+bot.command('carbon', async (ctx) => {
+  const code = ctx.message.text.replace(/^\/carbon(@\w+)?/i, '').trim();
+  if (!code) return ctx.reply('Usage: /carbon function swap() { return true; }\n\nGenerates a beautiful code screenshot.');
+  const statusMsg = await ctx.reply('Generating code screenshot...');
+  const result = await getCodeScreenshot(code);
+  try { await ctx.deleteMessage(statusMsg.message_id); } catch {}
+  if (result.error) return ctx.reply(result.error);
+  await ctx.replyWithPhoto({ source: result.buffer }, { caption: 'Code screenshot via Carbonara' });
+});
+
+// /paste <text> — Create a paste
+bot.command('paste', async (ctx) => {
+  let content = ctx.message.text.replace(/^\/paste(@\w+)?/i, '').trim();
+  // Also support reply-to-paste
+  if (!content && ctx.message.reply_to_message?.text) {
+    content = ctx.message.reply_to_message.text;
+  }
+  if (!content) return ctx.reply('Usage: /paste <text>\n\nOr reply to a message with /paste');
+  ctx.reply(await createPaste(content), { disable_web_page_preview: true });
+});
+
+// /advice — Random advice
+bot.command('advice', async (ctx) => {
+  ctx.reply(await getAdvice());
 });
 
 // Helper: resolve target user from reply or args

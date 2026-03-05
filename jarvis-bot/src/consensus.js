@@ -121,9 +121,11 @@ function isReplayedProposal(id) {
 let consensusEnabled = false;
 const pendingProposals = new Map(); // proposalId -> ProposalState
 const committedProposals = []; // History of committed proposals
+const committedIds = new Set(); // Dedup: track committed proposal hashes to prevent double-commit
 const commitHandlers = []; // Callbacks for committed state changes
 const proposalHandlers = []; // Callbacks for incoming proposals (validation)
 const retryQueue = []; // { proposal, retryCount, nextRetryAt }
+const COMMITTED_IDS_FILE = join(config.dataDir, 'knowledge', 'committed-ids.json');
 
 let roundCounter = 0;
 
@@ -175,9 +177,15 @@ export async function propose(type, data) {
     hash: hashProposal(type, data),
   };
 
-  // Single-shard mode: auto-commit
+  // Single-shard mode: auto-commit (with dedup)
   if (!consensusEnabled) {
+    const dedupKey = hashProposal(type, data);
+    if (committedIds.has(dedupKey)) {
+      console.warn(`[consensus] Duplicate auto-commit blocked: ${type}`);
+      return { proposal, committed: false, duplicate: true };
+    }
     console.log(`[consensus] Auto-commit (single shard): ${type}`);
+    committedIds.add(dedupKey);
     const result = { proposal, committed: true, phase: PHASES.COMMIT };
     for (const handler of commitHandlers) {
       try { await handler(type, data, proposal); } catch (err) {
@@ -185,6 +193,7 @@ export async function propose(type, data) {
       }
     }
     committedProposals.push({ ...proposal, committedAt: new Date().toISOString() });
+    persistCommittedIds();
     return result;
   }
 
@@ -320,8 +329,17 @@ export async function handlePrecommit(precommit) {
   const acceptCount = Array.from(state.precommits.values()).filter(v => v === VOTES.ACCEPT).length;
 
   if (acceptCount >= requiredVotes && !state.committed) {
+    // Dedup check — prevent double-commit of same proposal content
+    const dedupKey = hashProposal(state.type, state.data);
+    if (committedIds.has(dedupKey)) {
+      console.warn(`[consensus] Duplicate commit blocked: ${state.type} (${state.id}) — content already committed`);
+      pendingProposals.delete(state.id);
+      return;
+    }
+
     state.committed = true;
     state.phase = PHASES.COMMIT;
+    committedIds.add(dedupKey);
 
     // Execute commit handlers
     for (const handler of commitHandlers) {
@@ -343,6 +361,7 @@ export async function handlePrecommit(precommit) {
     });
 
     pendingProposals.delete(state.id);
+    persistCommittedIds(); // Best-effort persist
     console.log(`[consensus] COMMITTED: ${state.type} (${state.id}) — ${acceptCount}/${totalShards} precommits`);
   }
 }
@@ -456,6 +475,27 @@ export async function recoverRetryQueue() {
       console.log(`[consensus] Recovered ${entries.length} proposals from journal`);
     }
   } catch { /* no journal — clean start */ }
+}
+
+// ============ Committed IDs Persistence (Dedup) ============
+
+async function persistCommittedIds() {
+  try {
+    // Keep last 1000 committed IDs to prevent unbounded growth
+    const ids = [...committedIds].slice(-1000);
+    await writeFile(COMMITTED_IDS_FILE, JSON.stringify(ids));
+  } catch { /* non-fatal */ }
+}
+
+export async function recoverCommittedIds() {
+  try {
+    const data = await readFile(COMMITTED_IDS_FILE, 'utf-8');
+    const ids = JSON.parse(data);
+    for (const id of ids) committedIds.add(id);
+    if (ids.length > 0) {
+      console.log(`[consensus] Recovered ${ids.length} committed IDs for dedup`);
+    }
+  } catch { /* clean start */ }
 }
 
 // ============ Hashing ============

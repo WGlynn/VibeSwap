@@ -18,10 +18,10 @@ import { initProvider, getProviderName, getModelName, getFallbackChain, getIntel
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
-import { initCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
+import { initCRPC, flushCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
 import { registerConsensusHandlers } from './learning.js';
-import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
-import { recoverRetryQueue } from './consensus.js';
+import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
+import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
 import { runSecurityChecks } from './security-checks.js';
@@ -2962,7 +2962,9 @@ async function main() {
     await initDeepStorage();
     await initHell();
     await recoverWAL();
+    await recoverChain();
     await recoverRetryQueue();
+    await recoverCommittedIds();
 
     console.log('[jarvis] Step 4: Initializing shard identity...');
     const shardResult = await initShard();
@@ -2970,7 +2972,7 @@ async function main() {
 
     console.log('[jarvis] Step 5: Initializing consensus + CRPC...');
     initConsensus();
-    initCRPC();
+    await initCRPC();
     registerConsensusHandlers();
 
     // Worker HTTP server — consensus, CRPC, knowledge chain, health, proxy processing
@@ -2979,6 +2981,9 @@ async function main() {
       // Health check
       if (req.url === '/health') {
         const info = getShardInfo();
+        const chainStats = getChainStats();
+        const consensusState = getConsensusState();
+        const crpcStats = getCRPCStats();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status: 'ok',
@@ -2990,6 +2995,9 @@ async function main() {
           uptime: process.uptime(),
           memory: info.memory,
           peers: info.peers,
+          chain: { height: chainStats.height, pending: chainStats.pendingChanges, head: chainStats.head?.hash?.slice(0, 12) },
+          consensus: { enabled: consensusState.enabled, committed: consensusState.committedTotal, pending: consensusState.pendingProposals },
+          crpc: { enabled: crpcStats.enabled, active: crpcStats.activeTasks, completed: crpcStats.completedTasks },
         }));
         return;
       }
@@ -3251,7 +3259,9 @@ async function main() {
   await initInnerDialogue();
   await initStickers();
   await recoverWAL();
+  await recoverChain();
   await recoverRetryQueue();
+  await recoverCommittedIds();
   await initShadow();
   await initOperators();
   await initComputeEconomics();
@@ -3278,7 +3288,7 @@ async function main() {
 
   // Step 3.6: Initialize consensus + CRPC
   initConsensus();
-  initCRPC();
+  await initCRPC();
   registerConsensusHandlers();
 
   // Step 4: Context diagnosis
@@ -3319,6 +3329,10 @@ async function main() {
       if (req.url === '/health') {
         try {
           const report = await diagnoseContext();
+          const chainStats = getChainStats();
+          const consensusState = getConsensusState();
+          const crpcStats = getCRPCStats();
+          const info = getShardInfo();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             status: 'ok',
@@ -3326,6 +3340,10 @@ async function main() {
             provider: getProviderName(),
             model: getModelName(),
             context: { loaded: report.loaded.length, total: report.loaded.length + report.missing.length, chars: report.totalChars },
+            chain: { height: chainStats.height, pending: chainStats.pendingChanges, head: chainStats.head?.hash?.slice(0, 12) },
+            consensus: { enabled: consensusState.enabled, committed: consensusState.committedTotal, pending: consensusState.pendingProposals },
+            crpc: { enabled: crpcStats.enabled, active: crpcStats.activeTasks, completed: crpcStats.completedTasks },
+            peers: info?.peers || 0,
           }));
         } catch {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4101,6 +4119,8 @@ async function main() {
     await flushInnerDialogue();
     await flushShadow();
     await flushOperators();
+    await flushCRPC();
+    await persistChain();
     await flushHell();
     await flushLimni();
     await flushContextMemory();
@@ -4173,6 +4193,8 @@ async function main() {
     await flushInnerDialogue();
     await flushShadow();
     await flushOperators();
+    await flushCRPC();
+    await persistChain();
     await flushComputeEconomics();
     await flushMining();
     await saveComms();

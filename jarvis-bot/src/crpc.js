@@ -40,8 +40,15 @@
 // ============
 
 import { createHash, randomBytes } from 'crypto';
+import { writeFile, readFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 import { config } from './config.js';
 import { getShardInfo, getShardPeers } from './shard.js';
+
+const CRPC_DATA_DIR = join(config.dataDir, 'crpc');
+const REPUTATION_FILE = join(CRPC_DATA_DIR, 'reputation.json');
+const COMPLETED_FILE = join(CRPC_DATA_DIR, 'completed.json');
+const STALE_TASK_MS = 60000; // Auto-settle tasks stuck for >60s
 
 // ============ Constants ============
 
@@ -109,14 +116,61 @@ function createCRPCTask(taskId, prompt, context, opts) {
 
 // ============ Init ============
 
-export function initCRPC() {
+export async function initCRPC() {
   const shardInfo = getShardInfo();
   crpcEnabled = shardInfo && shardInfo.totalShards >= MIN_PARTICIPANTS;
 
+  // Ensure data directory exists
+  try { await mkdir(CRPC_DATA_DIR, { recursive: true }); } catch {}
+
+  // Restore persisted reputation
+  try {
+    const data = await readFile(REPUTATION_FILE, 'utf-8');
+    const entries = JSON.parse(data);
+    for (const [k, v] of Object.entries(entries)) {
+      reputationScores.set(k, v);
+    }
+    if (Object.keys(entries).length > 0) {
+      console.log(`[crpc] Restored ${Object.keys(entries).length} reputation scores`);
+    }
+  } catch { /* clean start */ }
+
+  // Restore completed task history
+  try {
+    const data = await readFile(COMPLETED_FILE, 'utf-8');
+    const tasks = JSON.parse(data);
+    completedTasks.push(...tasks.slice(-MAX_HISTORY));
+  } catch { /* clean start */ }
+
   if (crpcEnabled) {
     console.log(`[crpc] CRPC ENABLED (${shardInfo.totalShards} shards, min ${MIN_PARTICIPANTS} for pairwise comparison)`);
+    // Auto-settle stale tasks every 30s
+    setInterval(autoSettleStaleTasks, 30000);
   } else {
     console.log('[crpc] CRPC disabled — fewer than 3 shards. Single-response mode.');
+  }
+}
+
+// ============ Persistence ============
+
+export async function flushCRPC() {
+  try {
+    await writeFile(REPUTATION_FILE, JSON.stringify(Object.fromEntries(reputationScores)));
+  } catch {}
+  try {
+    await writeFile(COMPLETED_FILE, JSON.stringify(completedTasks.slice(-MAX_HISTORY)));
+  } catch {}
+}
+
+// ============ Auto-Settle Stale Tasks ============
+
+function autoSettleStaleTasks() {
+  const now = Date.now();
+  for (const [taskId, task] of activeTasks) {
+    if (now - task.createdAt > STALE_TASK_MS && !task.settled) {
+      console.warn(`[crpc] Auto-settling stale task ${taskId} (age: ${Math.round((now - task.createdAt) / 1000)}s)`);
+      settleTask(taskId);
+    }
   }
 }
 

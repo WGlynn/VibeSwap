@@ -129,6 +129,51 @@ const COMMITTED_IDS_FILE = join(config.dataDir, 'knowledge', 'committed-ids.json
 
 let roundCounter = 0;
 
+// ============ Circuit Breaker ============
+// Prevents consensus from flooding the event loop when all peers are unreachable.
+// Opens after consecutive failures, backs off exponentially, auto-recovers.
+
+const circuitBreaker = {
+  failures: 0,
+  state: 'closed', // closed (normal) | open (blocking) | half-open (testing)
+  openedAt: 0,
+  backoffMs: 30000, // Start at 30s, doubles each trip, max 5 min
+  maxBackoffMs: 300000,
+  failureThreshold: 3, // Open after 3 consecutive all-peer failures
+};
+
+function cbTrip() {
+  circuitBreaker.failures++;
+  if (circuitBreaker.failures >= circuitBreaker.failureThreshold) {
+    if (circuitBreaker.state !== 'open') {
+      circuitBreaker.state = 'open';
+      circuitBreaker.openedAt = Date.now();
+      console.warn(`[consensus] Circuit breaker OPEN — all peers unreachable, backing off ${circuitBreaker.backoffMs / 1000}s`);
+    }
+  }
+}
+
+function cbSuccess() {
+  if (circuitBreaker.state !== 'closed') {
+    console.log(`[consensus] Circuit breaker CLOSED — peer reachable`);
+  }
+  circuitBreaker.failures = 0;
+  circuitBreaker.state = 'closed';
+  circuitBreaker.backoffMs = 30000;
+}
+
+function cbAllowRequest() {
+  if (circuitBreaker.state === 'closed') return true;
+  const elapsed = Date.now() - circuitBreaker.openedAt;
+  if (elapsed >= circuitBreaker.backoffMs) {
+    circuitBreaker.state = 'half-open';
+    // Double backoff for next trip
+    circuitBreaker.backoffMs = Math.min(circuitBreaker.backoffMs * 2, circuitBreaker.maxBackoffMs);
+    return true;
+  }
+  return false;
+}
+
 // ============ Proposal State ============
 
 function createProposalState(proposal) {
@@ -379,23 +424,38 @@ export function onCommit(handler) {
 // ============ Broadcast ============
 
 async function broadcastToPeers(peers, path, data) {
+  // Circuit breaker: don't flood when all peers are down
+  if (!cbAllowRequest()) return;
+
   const signature = signPayload(data);
+  let successes = 0;
   const promises = peers.map(async (peer) => {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (signature) headers['X-Shard-Signature'] = signature;
-      await fetch(`${peer.url}${path}`, {
+      const res = await fetch(`${peer.url}${path}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
         signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
       });
+      if (res.ok) successes++;
     } catch (err) {
-      console.warn(`[consensus] Broadcast to ${peer.shardId} failed: ${err.message}`);
+      // Suppress repeated warnings when circuit breaker is half-open
+      if (circuitBreaker.state !== 'half-open') {
+        console.warn(`[consensus] Broadcast to ${peer.shardId} failed: ${err.message}`);
+      }
     }
   });
 
   await Promise.allSettled(promises);
+
+  // Track circuit breaker state
+  if (successes > 0) {
+    cbSuccess();
+  } else {
+    cbTrip();
+  }
 }
 
 // ============ Timeout Checker ============
@@ -408,7 +468,7 @@ function checkProposalTimeouts() {
       pendingProposals.delete(id);
       // Push to retry queue instead of silent discard
       const existing = retryQueue.find(r => r.proposal.id === id);
-      if (!existing) {
+      if (!existing && retryQueue.length < 10) { // Cap retry queue — prevent unbounded growth
         const retryCount = 0;
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount);
         retryQueue.push({
@@ -426,6 +486,9 @@ function checkProposalTimeouts() {
 }
 
 async function processRetryQueue() {
+  // Don't retry when circuit breaker is open — peers are down
+  if (!cbAllowRequest()) return;
+
   const now = Date.now();
   let i = 0;
   while (i < retryQueue.length) {

@@ -498,6 +498,68 @@ export function getHashCostIndex() {
   };
 }
 
+// ============ Account Linking — Mobile Miner → Telegram ============
+
+/**
+ * Link a mobile mining identity to a Telegram user ID.
+ * Transfers JUL balance and proof count from minerId to telegramId.
+ * The minerId balance is zeroed — all future lookups use telegramId.
+ *
+ * Security: knowing the minerId (device-generated hash) = proof of device possession.
+ * Future mining from the Mini App with valid initData will use telegramId directly.
+ */
+export function linkMiner(telegramId, minerId) {
+  if (!telegramId || !minerId) {
+    return { success: false, reason: 'missing_ids' };
+  }
+  telegramId = String(telegramId);
+  minerId = String(minerId);
+
+  if (telegramId === minerId) {
+    return { success: false, reason: 'same_id' };
+  }
+
+  const minerBalance = state.balances[minerId] || 0;
+  const minerProofs = state.proofCounts[minerId] || 0;
+
+  if (minerBalance === 0 && minerProofs === 0) {
+    return { success: false, reason: 'miner_not_found', minerId };
+  }
+
+  // Transfer balance and proofs
+  state.balances[telegramId] = (state.balances[telegramId] || 0) + minerBalance;
+  state.proofCounts[telegramId] = (state.proofCounts[telegramId] || 0) + minerProofs;
+
+  // Zero out the old miner (don't delete — keeps history visible)
+  state.balances[minerId] = 0;
+  state.proofCounts[minerId] = 0;
+
+  // Track the link for future reference
+  if (!state.linkedMiners) state.linkedMiners = {};
+  state.linkedMiners[telegramId] = minerId;
+
+  dirty = true;
+
+  console.log(`[mining] Linked miner ${minerId} → ${telegramId} — transferred ${minerBalance.toFixed(2)} JUL, ${minerProofs} proofs`);
+
+  return {
+    success: true,
+    telegramId,
+    minerId,
+    transferred: minerBalance,
+    proofsTransferred: minerProofs,
+    newBalance: state.balances[telegramId],
+    totalProofs: state.proofCounts[telegramId],
+  };
+}
+
+/**
+ * Get the linked miner ID for a Telegram user (if any).
+ */
+export function getLinkedMiner(telegramId) {
+  return state.linkedMiners?.[String(telegramId)] || null;
+}
+
 // ============ Leaderboard ============
 
 export function getLeaderboard(limit = 10) {

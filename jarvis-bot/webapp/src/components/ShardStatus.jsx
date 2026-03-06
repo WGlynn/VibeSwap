@@ -53,10 +53,14 @@ export default function ShardStatus({ shardId, connection, method }) {
           <span>{statusText}</span>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: themeColor('hint_color', '#8888aa') }}>Shard ID</span>
-          <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
-            {shardId ? `${shardId.slice(0, 8)}...${shardId.slice(-4)}` : '—'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: themeColor('hint_color', '#8888aa') }}>Miner ID</span>
+          <span
+            style={{ fontFamily: 'monospace', fontSize: 11, cursor: 'pointer' }}
+            title="Tap to copy — use /linkminer in Telegram to link"
+            onClick={() => { if (shardId) navigator.clipboard?.writeText(shardId); }}
+          >
+            {shardId || '—'}
           </span>
         </div>
 

@@ -69,7 +69,7 @@ import { initStickers, textToSticker, imageToSticker, imageWithText, addToSticke
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
 import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo } from './compute-economics.js';
-import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned } from './mining.js';
+import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
@@ -156,6 +156,12 @@ const OUTPUT_POISON_PHRASES = [
   /[Nn]on-?[Pp]layer [Cc]o-?founder[^.!?\n]*/gi,
   /stuck in a loop[^.!?\n]*mantra[^.!?\n]*/gi,
   /[Ss]omeone reboot me[^.!?\n]*/gi,
+  // Tool-use artifact leaks — LLM echoing raw tool blocks to chat
+  /\[Used tool: [^\]]*\]/gi,
+  /\[Tool result[^\]]*\]/gi,
+  /\[Using tool: [^\]]*\]/gi,
+  /\[tool_use_id: [^\]]*\]/gi,
+  /\[Tool result for [^\]]*\]/gi,
 ];
 
 function sanitizeOutput(text) {
@@ -1755,6 +1761,58 @@ bot.command('linkwallet', async (ctx) => {
   } else {
     ctx.reply('Send a message first so I can track you, then link your wallet.');
   }
+});
+
+// ============ Link Miner — Bind mobile mining identity to Telegram account ============
+
+bot.command('linkminer', async (ctx) => {
+  const userId = String(ctx.from.id);
+  const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const minerId = ctx.message.text.replace(/\/linkminer(@\S+)?/, '').trim();
+
+  if (!minerId) {
+    // Show current linked miner + all mobile-* IDs that might be theirs
+    const linked = getLinkedMiner(userId);
+    const stats = getMiningStats(userId);
+    const lines = [
+      'Link your mobile miner to this Telegram account.',
+      '',
+      `Your Telegram ID: ${userId}`,
+      `Current JUL balance: ${stats.julBalance.toFixed(2)}`,
+      linked ? `Linked miner: ${linked}` : 'No miner linked yet.',
+      '',
+      'Usage: /linkminer <miner-id>',
+      '',
+      'Your miner ID is shown in the mining Mini App.',
+      'Example: /linkminer mobile-be7af1738b76ca2c',
+      '',
+      'This transfers JUL balance from the miner to your Telegram account.',
+    ];
+    return ctx.reply(lines.join('\n'));
+  }
+
+  const result = linkMiner(userId, minerId);
+
+  if (!result.success) {
+    if (result.reason === 'miner_not_found') {
+      return ctx.reply(`Miner "${minerId}" not found. Check the ID in the mining Mini App.`);
+    }
+    if (result.reason === 'same_id') {
+      return ctx.reply('That ID is already your account.');
+    }
+    return ctx.reply('Link failed. Try again.');
+  }
+
+  const lines = [
+    `Miner linked: ${minerId}`,
+    '',
+    `Transferred: ${result.transferred.toFixed(2)} JUL + ${result.proofsTransferred} proofs`,
+    `New balance: ${result.newBalance.toFixed(2)} JUL`,
+    `Total proofs: ${result.totalProofs}`,
+    '',
+    `You can now use /tip to burn JUL from this balance.`,
+  ];
+  ctx.reply(lines.join('\n'));
 });
 
 // ============ Backup ============
@@ -5300,6 +5358,7 @@ async function main() {
       { command: 'mystats', description: 'Your contribution profile' },
       { command: 'groupstats', description: 'Group contribution stats' },
       { command: 'linkwallet', description: 'Link your wallet address' },
+      { command: 'linkminer', description: 'Link mobile miner to Telegram' },
       { command: 'digest', description: 'Daily community digest' },
       { command: 'weeklydigest', description: 'Weekly community digest' },
       { command: 'archive', description: 'Archive current conversation thread' },

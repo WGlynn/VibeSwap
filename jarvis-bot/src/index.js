@@ -152,14 +152,17 @@ function sanitizeOutput(text) {
   if (!text) return text;
   // Only strip raw tool-use artifact leaks (LLM echoing internal blocks)
   // Everything else passes through — no more aggressive content filtering
-  return text
+  const cleaned = text
     .replace(/\[Used tool: [^\]]*\]/gi, '')
     .replace(/\[Tool result[^\]]*\]/gi, '')
     .replace(/\[Using tool: [^\]]*\]/gi, '')
     .replace(/\[tool_use_id: [^\]]*\]/gi, '')
     .replace(/\[Tool result for [^\]]*\]/gi, '')
     .replace(/\n{3,}/g, '\n\n')
-    .trim() || text.trim(); // If stripping artifacts leaves empty, return original
+    .trim();
+  // If stripping tool artifacts left nothing, the entire response was just tool echoes
+  // Return null — caller will handle (NOT the original text, which is just artifacts)
+  return cleaned || null;
 }
 
 // ============ Safe Body Reader (prevents unbounded body accumulation) ============
@@ -4247,8 +4250,15 @@ bot.on('text', async (ctx) => {
     }
     // Strip markdown in group chats — plain text only
     if (isGroup) text = stripGroupMarkdown(text);
-    // Strip only raw tool-use artifacts (LLM echoing internal blocks)
+    // Strip raw tool-use artifacts (LLM echoing internal blocks as text)
     text = sanitizeOutput(text);
+    if (!text) {
+      // Entire response was tool artifacts (deepseek echoing tool calls as text)
+      // Skip silently — don't send garbage to chat
+      clearInterval(typingInterval);
+      console.warn('[bot] Response was only tool artifacts — skipped');
+      return;
+    }
     if (text.length <= 4096) {
       await ctx.reply(text, { parse_mode: undefined });
     } else {

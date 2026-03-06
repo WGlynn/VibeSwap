@@ -45,7 +45,7 @@ const summaries = new Map();
 const SUMMARIZE_THRESHOLD = 40;     // Start summarizing when history hits this
 const KEEP_RECENT = 25;             // Keep this many recent messages verbatim
 const SUMMARIZE_BATCH = 15;         // Summarize this many oldest messages at a time
-const MAX_SUMMARY_LENGTH = 3000;    // Max chars for the rolling summary (prevent bloat)
+const MAX_SUMMARY_LENGTH = 6000;    // Max chars — richer context for technical discussions
 
 let dirty = false;
 
@@ -157,12 +157,14 @@ ${existingSummary ? 'Update the existing summary by incorporating the new messag
 
 Rules:
 - Focus on: decisions made, facts learned, preferences expressed, ongoing tasks, action items, relationships between people mentioned
-- Preserve important details: names, numbers, dates, technical decisions, code changes
+- PRESERVE with exact detail: names (people, tokens, contracts), numbers, dates, code references, file paths, technical decisions, architectural choices, error messages, URLs
+- Preserve WHO said WHAT — attribute opinions and decisions to specific people
 - Remove chit-chat and greetings — keep only substantive content
 - Write in present tense as ongoing context ("User prefers X", "Currently working on Y")
-- Keep under 600 words — be dense and information-rich
+- Keep under 1000 words — be dense and information-rich, but never lose technical specifics
 - Do NOT use JSON — write natural flowing prose with bullet points for key facts
-- This summary will be prepended to future conversations so the AI has continuous memory`;
+- This summary will be prepended to future conversations so the AI has continuous memory
+- When in doubt about whether to keep a detail, KEEP IT — information loss is worse than verbosity`;
 
     const response = await llmChat({
       max_tokens: 800,

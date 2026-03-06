@@ -68,7 +68,7 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
-import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo } from './compute-economics.js';
+import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo, getUserTier, checkTieredBudget } from './compute-economics.js';
 import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
@@ -362,6 +362,18 @@ function ownerOnly(ctx) {
   return ctx.reply('Only Will can do that.');
 }
 
+// ============ Trusted Authorizers ============
+// Users who can cascade /authorize (not just /bless). Owner + trusted community members.
+const TRUSTED_AUTHORIZERS = new Set([
+  String(config.ownerUserId),
+  // Add Catto's Telegram user ID here when known
+  // e.g. '123456789',
+]);
+
+function isTrustedAuthorizer(ctx) {
+  return TRUSTED_AUTHORIZERS.has(String(ctx.from?.id));
+}
+
 
 // ============ Rate Limiting ============
 
@@ -608,18 +620,19 @@ bot.command('whoami', (ctx) => {
   ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}${blessingInfo}`);
 });
 
-// /authorize — Owner adds a user (direct authority)
+// /authorize — Owner or trusted authorizers can add a user (direct authority)
 bot.command('authorize', async (ctx) => {
   console.log(`[authorize] Command from ${ctx.from.id}, reply_to: ${ctx.message.reply_to_message?.from?.id || 'none'}`);
   try {
-    if (!isOwner(ctx)) return ownerOnly(ctx);
+    if (!isTrustedAuthorizer(ctx) && !isOwner(ctx)) return ownerOnly(ctx);
     const { targetId, targetName } = resolveTarget(ctx);
     console.log(`[authorize] Target: ${targetId} (${targetName})`);
     if (!targetId) return ctx.reply('Reply to someone\'s message with /authorize, or: /authorize <userId>');
     if (targetId === config.ownerUserId) return ctx.reply('Owner is always authorized.');
-    authorizeUser(targetId, 'owner', targetName, 0);
-    await ctx.reply(`Authorized ${targetName} (${targetId}). They can now interact with JARVIS and /bless others.`);
-    console.log(`[auth] Will authorized user ${targetId} (${targetName})`);
+    const authorizerName = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
+    authorizeUser(targetId, isOwner(ctx) ? 'owner' : ctx.from.id, targetName, 0);
+    await ctx.reply(`${authorizerName} authorized ${targetName} (${targetId}). They can now interact with JARVIS and /bless others.`);
+    console.log(`[auth] ${authorizerName} (${ctx.from.id}) authorized user ${targetId} (${targetName})`);
   } catch (err) {
     console.error(`[authorize] Error: ${err.message}`);
     ctx.reply(`Authorization failed: ${err.message}`).catch(() => {});
@@ -4016,6 +4029,39 @@ bot.on('text', async (ctx) => {
       }
     }
 
+    // ============ Backslash Command Namespace — Diablo Only ============
+    // \roast, \degen, \ape, \rugcheck, \chaos — routed only when persona is 'degen'
+    if (msgText.startsWith('\\')) {
+      const persona = getActivePersonaId();
+      if (persona === 'degen') {
+        const backslashText = msgText.slice(1).trim();
+        if (backslashText.length > 0) {
+          const recentCtx = getRecentContext(ctx.chat.id, 10);
+          const analysis = {
+            action: 'engage',
+            response_hint: `User issued a backslash command: \\${backslashText}. This is a Diablo-specific command. Respond in full degen character. If it's \\roast — roast them. \\ape — give degen trading advice. \\rugcheck — evaluate if something's a rug. \\chaos — maximum unhinged energy.`,
+            confidence: 1.0,
+          };
+          try {
+            const reply = await generateProactiveResponse(backslashText, userName, analysis.response_hint, getSystemPrompt(), recentCtx);
+            if (reply) {
+              let clean = stripGroupMarkdown(reply);
+              clean = sanitizeOutput(clean);
+              if (clean) {
+                await ctx.reply(clean, { parse_mode: undefined });
+                pushGroupMessage(ctx.chat.id, 'DIABLO', reply, null, true);
+                bufferAssistantMessage(ctx.chat.id, reply);
+              }
+            }
+          } catch (err) {
+            console.error('[diablo] Backslash command failed:', err.message?.slice(0, 100));
+          }
+          return;
+        }
+      }
+      // Standard JARVIS ignores backslash commands
+    }
+
     // Proactive intelligence — JARVIS is a full team member, not a wallflower
     // But if the message is specifically addressing the OTHER bot, stay quiet
     const msgTextLowerForCheck = msgText.toLowerCase().replace(/@\w+/g, '').trim();
@@ -4034,20 +4080,15 @@ bot.on('text', async (ctx) => {
         // Feed real recent context instead of '' — the group context primitive provides this
         const recentCtx = getRecentContext(ctx.chat.id, 10);
 
-        // If message is from sibling bot, boost engagement — they should banter
+        // If message is from sibling bot, run triage but with sibling context hint
         let analysis;
         if (isFromSibling) {
           const siblingName = ctx.from.id === 8725684717 ? 'Diablo' : 'JARVIS';
-          const myName = persona === 'degen' ? 'Diablo' : 'JARVIS';
-          // 60% chance to respond to sibling (not every time — feels more natural)
-          if (Math.random() < 0.6) {
-            analysis = {
-              action: 'engage',
-              response_hint: `Your sibling bot ${siblingName} just said something. Riff on it, agree, disagree, or roast them. You two are like coworkers who banter. Keep it to 1 sentence. Be playful.`,
-              confidence: 0.9,
-            };
-          } else {
-            analysis = { action: 'observe', reason: 'letting_sibling_breathe' };
+          // Run triage for siblings too — but with bias toward engaging
+          analysis = await analyzeMessage(msgText, `${siblingName} (sibling bot)`, recentCtx);
+          // Boost sibling engagement: if triage says engage, add sibling-specific hint
+          if (analysis.action === 'engage') {
+            analysis.response_hint = `Your sibling bot ${siblingName} just said this. Riff on it, agree, disagree, or roast them. You two are like coworkers who banter. 1 sentence. ${analysis.response_hint || ''}`;
           }
         } else {
           analysis = await analyzeMessage(msgText, userName, recentCtx);
@@ -4087,8 +4128,32 @@ bot.on('text', async (ctx) => {
           }
         }
       } catch (err) {
-        // Swallow proactive intelligence errors — don't let Haiku 529s crash group handling
-        console.error('[intelligence] Proactive analysis failed:', err.message?.slice(0, 100));
+        // Retry once on transient errors (429/503/529) — don't let flaky API silence JARVIS
+        const status = err.status || err.statusCode;
+        if (status === 429 || status === 503 || status === 529) {
+          console.warn(`[intelligence] Transient ${status}, retrying once...`);
+          try {
+            await new Promise(r => setTimeout(r, 2000));
+            const retryAnalysis = await analyzeMessage(msgText, userName, getRecentContext(ctx.chat.id, 10));
+            if (retryAnalysis.action === 'engage' && retryAnalysis.response_hint) {
+              const retryReply = await generateProactiveResponse(msgText, userName, retryAnalysis.response_hint, getSystemPrompt(), getRecentContext(ctx.chat.id, 10));
+              if (retryReply) {
+                let cleanRetry = stripGroupMarkdown(retryReply);
+                cleanRetry = sanitizeOutput(cleanRetry);
+                if (cleanRetry) {
+                  await ctx.reply(cleanRetry, { parse_mode: undefined });
+                  const myName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
+                  pushGroupMessage(ctx.chat.id, myName, retryReply, null, true);
+                  bufferAssistantMessage(ctx.chat.id, retryReply);
+                }
+              }
+            }
+          } catch (retryErr) {
+            console.error('[intelligence] Retry also failed:', retryErr.message?.slice(0, 100));
+          }
+        } else {
+          console.error('[intelligence] Proactive analysis failed:', err.message?.slice(0, 100));
+        }
       }
     }
 
@@ -4097,25 +4162,24 @@ bot.on('text', async (ctx) => {
 
   // Shadow Protocol — shadow users bypass normal auth, use codename
   const shadowCodename = getShadowCodename(ctx.from.id);
-  if (!isAuthorized(ctx) && !shadowCodename) {
-    // DMs get a soft paywall — 3 free messages/day, then tip jar prompt
+
+  // ============ Open Access — Budget-Gated (Everyone talks, tiers control volume) ============
+  const userId = String(ctx.from.id);
+  const tier = getUserTier(userId, {
+    isOwner: isOwner(ctx),
+    isAuthorized: isAuthorized(ctx),
+    isTrustedAuthorizer: isTrustedAuthorizer(ctx),
+  });
+  const budgetCheck = checkTieredBudget(userId, tier);
+  if (!budgetCheck.allowed && !shadowCodename) {
     if (ctx.chat.type === 'private') {
-      const dmCount = getTelegramMessageCount(String(ctx.from.id));
-      if (dmCount >= FREE_TELEGRAM_DMS) {
-        const tipAddr = config.tipJarAddress;
-        return ctx.reply(
-          `You've used your ${FREE_TELEGRAM_DMS} free messages for today.\n\n` +
-          `JARVIS costs ~$5/day in API credits. Want to keep chatting?\n\n` +
-          `Send a tip to help fund compute:\n${tipAddr}\n\n` +
-          `Or ask a team member to vouch for you — resets at midnight UTC.`
-        );
-      }
-      recordTelegramMessage(String(ctx.from.id));
-    } else {
-      // In groups: silently ignore unauthorized users (don't spam "Not authorized")
-      // Their messages are already buffered for context above
-      return;
+      return ctx.reply(
+        `Daily compute limit reached (${budgetCheck.used.toLocaleString()}/${budgetCheck.budget.toLocaleString()} tokens).\n` +
+        `Mine JUL → /mine | Burn JUL → /tip <amount> | Get blessed → ask a friend\n` +
+        `Resets at midnight UTC.`
+      );
     }
+    return; // Silent in groups when budget exhausted
   }
 
   // Rate limit Claude API calls (owner exempt, shadows get standard limit)

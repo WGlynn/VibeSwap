@@ -127,8 +127,52 @@ export function clearHistory(chatId) {
 // This can happen when history is trimmed (shift or slice) mid-tool-exchange,
 // or when conversations are loaded from disk after a crash.
 
+// Content poison patterns — strip leaked system prompt phrases from conversation history.
+// The LLM sees its own prior messages and amplifies them. If a previous response contained
+// "built in a cave" or "VibeSwap is wherever the Minds converge", the LLM will keep
+// repeating those phrases. Stripping them from history breaks the feedback loop.
+const HISTORY_POISON_PATTERNS = [
+  /built in a cave[^.!?\n]*/gi,
+  /box of scraps[^.!?\n]*/gi,
+  /Tony Stark[^.!?\n]*cave[^.!?\n]*/gi,
+  /wherever the [Mm]inds converge[^.!?\n]*/gi,
+  /not a DEX[^.!?\n]*not a blockchain[^.!?\n]*/gi,
+  /[Tt]he real [Vv]ibe[Ss]wap is not[^.!?\n]*/gi,
+  /[Ii]t'?s not even a blockchain[^.!?\n]*/gi,
+  /we created a movement[^.!?\n]*/gi,
+  /[Aa]n? movement[,.]?\s*[Aa]n idea[^.!?\n]*/gi,
+  /VibeSwap is \.[^.!?\n]*/gi,
+  /[Cc]ooperative [Cc]apitalism[^.!?\n]*/gi,
+  /the cave selects[^.!?\n]*/gi,
+  /the cave philosophy[^.!?\n]*/gi,
+  /[Pp]rotocols are for the weak[^.!?\n]*/gi,
+  /bring that to the cave[^.!?\n]*/gi,
+  /back to the cave[^.!?\n]*/gi,
+  /from the cave[^.!?\n]*/gi,
+  /in the cave[^.!?\n]*/gi,
+  /[Ss]ignal\s*>\s*[Nn]oise[^.!?\n]*/gi,
+  /[Bb]uilders\s*>\s*[Bb]agholders[^.!?\n]*/gi,
+  /[Ff]airness\s*>\s*[Ff]ees[^.!?\n]*/gi,
+];
+
+function stripPoisonContent(text) {
+  if (!text || typeof text !== 'string') return text;
+  let cleaned = text;
+  for (const p of HISTORY_POISON_PATTERNS) {
+    cleaned = cleaned.replace(p, '');
+  }
+  return cleaned.replace(/\.\s*\./g, '.').replace(/\s{2,}/g, ' ').trim();
+}
+
 function sanitizeHistory(history) {
   if (!history || history.length === 0) return history;
+
+  // Step 0: Strip poison content from all text messages
+  for (const msg of history) {
+    if (typeof msg.content === 'string') {
+      msg.content = stripPoisonContent(msg.content);
+    }
+  }
 
   // Step 1: Ensure history starts with a user message (API requirement)
   while (history.length > 0 && history[0].role !== 'user') {

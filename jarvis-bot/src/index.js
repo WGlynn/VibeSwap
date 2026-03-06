@@ -150,30 +150,16 @@ const OUTPUT_POISON_PHRASES = [
 
 function sanitizeOutput(text) {
   if (!text) return text;
-  let cleaned = text;
-  for (const pattern of OUTPUT_POISON_PHRASES) {
-    cleaned = cleaned.replace(pattern, '');
-  }
-  // Clean up artifacts from removed phrases
-  cleaned = cleaned
-    .replace(/\bThe\s*\./g, '')        // orphaned "The ."
-    .replace(/\bA\s*\./g, '')          // orphaned "A ."
-    .replace(/\bAn\s*\./g, '')         // orphaned "An ."
-    .replace(/\bIt'?s\s*\./g, '')      // orphaned "It's ."
-    .replace(/\.\s*\./g, '.')          // double periods
-    .replace(/^\s*[.!?]\s*/gm, '')     // orphan punctuation at line start
-    .replace(/—\s*\./g, '.')           // "— ." → "."
-    .replace(/,\s*\./g, '.')           // ", ." → "."
-    .replace(/\n{3,}/g, '\n\n')        // collapse newlines
-    .replace(/\s{2,}/g, ' ')           // collapse spaces
-    .trim();
-  // If sanitization gutted the response (>90% removed AND under 5 chars), skip
-  // Old threshold (30% + 20 chars) was too aggressive — was silencing legitimate responses
-  if (cleaned.length < text.length * 0.1 && cleaned.length < 5) {
-    console.warn(`[sanitizer] Gutted response: "${text.slice(0, 100)}..." → "${cleaned}"`);
-    return null; // Caller should handle null = skip sending
-  }
-  return cleaned;
+  // Only strip raw tool-use artifact leaks (LLM echoing internal blocks)
+  // Everything else passes through — no more aggressive content filtering
+  return text
+    .replace(/\[Used tool: [^\]]*\]/gi, '')
+    .replace(/\[Tool result[^\]]*\]/gi, '')
+    .replace(/\[Using tool: [^\]]*\]/gi, '')
+    .replace(/\[tool_use_id: [^\]]*\]/gi, '')
+    .replace(/\[Tool result for [^\]]*\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim() || text.trim(); // If stripping artifacts leaves empty, return original
 }
 
 // ============ Safe Body Reader (prevents unbounded body accumulation) ============
@@ -4261,12 +4247,8 @@ bot.on('text', async (ctx) => {
     }
     // Strip markdown in group chats — plain text only
     if (isGroup) text = stripGroupMarkdown(text);
-    // Hard-code defense: strip leaked system prompt phrases from ALL responses
+    // Strip only raw tool-use artifacts (LLM echoing internal blocks)
     text = sanitizeOutput(text);
-    if (!text) {
-      console.warn('[bot] Response gutted by sanitizer — skipping send');
-      return;
-    }
     if (text.length <= 4096) {
       await ctx.reply(text, { parse_mode: undefined });
     } else {

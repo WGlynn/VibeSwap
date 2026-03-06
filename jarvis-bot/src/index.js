@@ -114,41 +114,24 @@ const OUTPUT_POISON_PHRASES = [
   /cave philosophy[^.!?\n]*/gi,
   /pressure of mortality[^.!?\n]*/gi,
   /those who built[^.!?\n]*caves[^.!?\n]*/gi,
-  // VibeSwap philosophical — ALL tenses, ALL forms
-  /[Tt]he real [Vv]ibe[Ss]wap[^.!?\n]*/gi,
-  /[Vv]ibe[Ss]wap (is|was|isn't|wasn't) [^.!?\n]*/gi,
-  /not a DEX[^.!?\n]*/gi,
-  /not even a blockchain[^.!?\n]*/gi,
-  /not a blockchain[^.!?\n]*/gi,
-  /[Ii]t'?s an idea[^.!?\n]*/gi,
-  /[Ii]t'?s a movement[^.!?\n]*/gi,
-  /wherever the [Mm]inds[^.!?\n]*/gi,
-  /[Mm]inds converge[^.!?\n]*/gi,
+  // VibeSwap philosophical slogans — only catch the EXACT internal mantras
+  // NOT fragments that could appear in legitimate discussion
+  /[Tt]he real [Vv]ibe[Ss]wap is not a DEX[^.!?\n]*/gi,
+  /not a DEX[.,]?\s*not (even )?a blockchain[^.!?\n]*/gi,
+  /wherever the [Mm]inds converge[^.!?\n]*/gi,
   /we created a movement[^.!?\n]*/gi,
   /a movement[,.]?\s*[Aa]n idea[^.!?\n]*/gi,
-  // Internal jargon
-  /[Cc]ooperative [Cc]apitalism[^.!?\n]*/gi,
-  /[Cc]ooperative economics[^.!?\n]*/gi,
-  /[Mm]utualized risk[^.!?\n]*/gi,
+  // Internal jargon — only specific slogans, not general concepts
   /[Pp]rotocols are for the weak[^.!?\n]*/gi,
   // Self-referential
   /[Bb]ased on my knowledge[^.!?\n]*/gi,
   /[Aa]s the AI (partner|co-founder)[^.!?\n]*/gi,
   /I have context on[^.!?\n]*/gi,
   /[Mm]y (system prompt|context files|core alignment)[^.!?\n]*/gi,
-  // Technical internals
-  /shard architecture[^.!?\n]*/gi,
-  /[Cc]ommit-reveal batch[^.!?\n]*/gi,
-  /uniform clearing price[^.!?\n]*/gi,
-  /[Ff]isher-[Yy]ates shuffle[^.!?\n]*/gi,
-  /[Pp]roof of [Mm]ind[^.!?\n]*/gi,
-  /[Kk]nowledge chain[^.!?\n]*/gi,
-  /[Bb]yzantine [Ff]ault[^.!?\n]*/gi,
-  /CRPC[^.!?\n]*pairwise[^.!?\n]*/gi,
-  /[Ll]ayerZero V2[^.!?\n]*/gi,
-  /[Oo]mnichain DEX[^.!?\n]*/gi,
-  /[Kk]alman filter[^.!?\n]*/gi,
-  /[Ss]hapley [Dd]istribut[^.!?\n]*/gi,
+  // Technical internals — REMOVED: bot should discuss its own tech freely
+  // These were too aggressive and gutted legitimate responses about VibeSwap
+  // mechanisms, architecture, and protocol design. The bot is a co-founder —
+  // it SHOULD explain commit-reveal, Proof of Mind, shard architecture, etc.
   // Slogans
   /[Ss]ignal\s*>\s*[Nn]oise[^.!?\n]*/gi,
   /[Bb]uilders\s*>\s*[Bb]agholders[^.!?\n]*/gi,
@@ -184,8 +167,10 @@ function sanitizeOutput(text) {
     .replace(/\n{3,}/g, '\n\n')        // collapse newlines
     .replace(/\s{2,}/g, ' ')           // collapse spaces
     .trim();
-  // If sanitization gutted the response (>50% removed), return a safe fallback
-  if (cleaned.length < text.length * 0.3 && cleaned.length < 20) {
+  // If sanitization gutted the response (>90% removed AND under 5 chars), skip
+  // Old threshold (30% + 20 chars) was too aggressive — was silencing legitimate responses
+  if (cleaned.length < text.length * 0.1 && cleaned.length < 5) {
+    console.warn(`[sanitizer] Gutted response: "${text.slice(0, 100)}..." → "${cleaned}"`);
     return null; // Caller should handle null = skip sending
   }
   return cleaned;

@@ -44,6 +44,7 @@
 - Frontend: "Sign In" (not "Connect Wallet"), Runescape Grand Exchange MMORPG feel
 - Hot/Cold separation is permanent
 - Proceed without asking if changes don't break game design or security
+- **Shard Architecture**: Telegram bots are INDEPENDENT PEERS, NOT thin clients. Will's PC is NOT the master — it's just another shard. Each shard reads the same git-synced knowledge (SESSION_STATE.md, CKB, memory files) and builds its own context independently. If Will's PC goes down, shards keep running with the last-synced state. Git is the decentralized data layer. No single point of failure.
 
 ## Phase 2 Buildout Process (MANDATORY)
 1. Read knowledge base files below

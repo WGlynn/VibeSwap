@@ -41,7 +41,9 @@
 
 import { createHash } from 'crypto';
 import { writeFile, readFile, appendFile } from 'fs/promises';
-import { join } from 'path';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { mkdir } from 'fs/promises';
 import { config } from './config.js';
 import { getShardInfo, getShardPeers } from './shard.js';
 
@@ -76,6 +78,11 @@ function createEpoch(changes, parentHash) {
   // Merkle root of all changes
   const merkleRoot = computeMerkleRoot(changes);
 
+  // Extract file_sync changes to carry inline (peers need the content)
+  const fileSyncData = changes
+    .filter(c => c.type === 'file_sync' && c.content)
+    .map(c => ({ type: c.type, path: c.path, contentHash: c.contentHash, content: c.content, size: c.size }));
+
   const epoch = {
     height: chain.length,
     parentHash: parentHash || (chainHead ? chainHead.hash : '0'.repeat(32)),
@@ -86,6 +93,7 @@ function createEpoch(changes, parentHash) {
     changes: changes.length,
     aggregateValueDensity: aggregateVD,
     cumulativeValueDensity: (chainHead?.cumulativeValueDensity || 0) + aggregateVD,
+    fileSyncData: fileSyncData.length > 0 ? fileSyncData : undefined,
     hash: '', // Computed below
   };
 
@@ -107,6 +115,144 @@ export async function addChange(change) {
   try {
     await appendFile(WAL_FILE, JSON.stringify(entry) + '\n');
   } catch { /* first write or dir missing — non-fatal */ }
+}
+
+// ============ File Sync — Shard-to-Shard File Relay ============
+// When a memory file or SESSION_STATE changes, propagate via knowledge chain.
+// This makes shards independent of GitHub — peer-to-peer file relay.
+
+const FILE_SYNC_MAX_INLINE = 4096; // Only inline content under 4KB
+const syncedFileHashes = new Map(); // path -> contentHash (dedup)
+const syncedFileInventory = new Map(); // path -> { hash, size, lastUpdated }
+
+function hashContent(content) {
+  return createHash('sha256').update(content).digest('hex').slice(0, 32);
+}
+
+/**
+ * Sync a file change across the shard network via knowledge chain epochs.
+ * Call this when a memory file, CKB, or SESSION_STATE changes.
+ */
+export async function syncFileChange(filePath, content) {
+  const contentHash = hashContent(content);
+
+  // Dedup: don't re-sync if hash hasn't changed
+  if (syncedFileHashes.get(filePath) === contentHash) return false;
+  syncedFileHashes.set(filePath, contentHash);
+
+  // Update inventory
+  syncedFileInventory.set(filePath, {
+    hash: contentHash,
+    size: content.length,
+    lastUpdated: Date.now(),
+  });
+
+  await addChange({
+    type: 'file_sync',
+    path: filePath,
+    contentHash,
+    // Only inline content under threshold; larger files served on demand
+    content: content.length <= FILE_SYNC_MAX_INLINE ? content : null,
+    size: content.length,
+  });
+
+  console.log(`[knowledge-chain] File sync queued: ${filePath} (${content.length} chars, hash: ${contentHash.slice(0, 12)})`);
+  return true;
+}
+
+/**
+ * Apply file_sync changes from a received epoch.
+ * Writes synced files to local disk.
+ */
+async function applyFileSyncChanges(epochChanges) {
+  if (!Array.isArray(epochChanges)) return;
+  for (const change of epochChanges) {
+    if (change.type !== 'file_sync' || !change.content || !change.path) continue;
+
+    // Don't overwrite if we already have the same hash
+    if (syncedFileHashes.get(change.path) === change.contentHash) continue;
+
+    try {
+      // Ensure directory exists
+      const dir = dirname(change.path);
+      await mkdir(dir, { recursive: true });
+
+      await writeFile(change.path, change.content, 'utf-8');
+      syncedFileHashes.set(change.path, change.contentHash);
+      syncedFileInventory.set(change.path, {
+        hash: change.contentHash,
+        size: change.size || change.content.length,
+        lastUpdated: Date.now(),
+      });
+      console.log(`[knowledge-chain] File synced from peer: ${change.path} (${change.content.length} chars)`);
+    } catch (err) {
+      console.warn(`[knowledge-chain] File sync write failed for ${change.path}: ${err.message}`);
+    }
+  }
+}
+
+/**
+ * Get inventory of all synced files (for peer bootstrap).
+ */
+export function getFileInventory() {
+  const inventory = [];
+  for (const [path, info] of syncedFileInventory) {
+    inventory.push({ path, hash: info.hash, size: info.size, lastUpdated: info.lastUpdated });
+  }
+  return inventory;
+}
+
+/**
+ * Get content of a synced file by path (for peer bootstrap).
+ */
+export async function getFileContent(filePath) {
+  try {
+    return await readFile(filePath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Bootstrap files from a peer (when booting without git).
+ */
+export async function bootstrapFilesFromPeer(peerUrl) {
+  try {
+    const response = await fetch(`${peerUrl}/knowledge/files`, {
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS * 3),
+    });
+    const inventory = await response.json();
+
+    let synced = 0;
+    for (const file of inventory) {
+      // Skip if we already have this version
+      if (syncedFileHashes.get(file.path) === file.hash) continue;
+
+      try {
+        const contentResponse = await fetch(
+          `${peerUrl}/knowledge/file?path=${encodeURIComponent(file.path)}`,
+          { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS * 2) }
+        );
+        if (contentResponse.ok) {
+          const content = await contentResponse.text();
+          const dir = dirname(file.path);
+          await mkdir(dir, { recursive: true });
+          await writeFile(file.path, content, 'utf-8');
+          syncedFileHashes.set(file.path, file.hash);
+          syncedFileInventory.set(file.path, { hash: file.hash, size: file.size, lastUpdated: Date.now() });
+          synced++;
+        }
+      } catch { /* individual file failure is non-fatal */ }
+    }
+
+    if (synced > 0) {
+      console.log(`[knowledge-chain] Bootstrapped ${synced} files from peer ${peerUrl}`);
+    }
+    return synced;
+  } catch (err) {
+    console.warn(`[knowledge-chain] Bootstrap from ${peerUrl} failed: ${err.message}`);
+    return 0;
+  }
 }
 
 // ============ WAL Recovery ============
@@ -299,6 +445,10 @@ export async function receiveEpoch(epoch) {
 
   // If this extends our chain
   if (epoch.parentHash === chainHead?.hash) {
+    // Apply any file_sync changes from this epoch
+    if (epoch.fileSyncData) {
+      await applyFileSyncChanges(epoch.fileSyncData);
+    }
     chain.push(epoch);
     chainHead = epoch;
     return true;
@@ -348,7 +498,7 @@ function hashEpoch(epoch) {
   return createHash('sha256').update(data).digest('hex').slice(0, 32);
 }
 
-function computeMerkleRoot(changes) {
+export function computeMerkleRoot(changes) {
   if (changes.length === 0) return '0'.repeat(32);
 
   let hashes = changes.map(c =>
@@ -475,6 +625,9 @@ export function handleKnowledgeChainRequest(path, method) {
   if (path === '/knowledge-chain/stats' && method === 'GET') return 'stats';
   if (path === '/knowledge-chain/epoch' && method === 'POST') return 'epoch';
   if (path.startsWith('/knowledge-chain/chain') && method === 'GET') return 'chain';
+  // File sync endpoints — peer bootstrap (GitHub-free recovery)
+  if (path === '/knowledge/files' && method === 'GET') return 'files';
+  if (path === '/knowledge/file' && method === 'GET') return 'file';
   return null;
 }
 
@@ -484,6 +637,13 @@ export async function processKnowledgeChainBody(handler, body, query) {
     case 'stats': return getChainStats();
     case 'epoch': return { accepted: await receiveEpoch(body) };
     case 'chain': return { epochs: getChain(parseInt(query?.since || '0')) };
+    case 'files': return getFileInventory();
+    case 'file': {
+      const filePath = query?.path;
+      if (!filePath) return { error: 'Missing path parameter' };
+      const content = await getFileContent(filePath);
+      return content !== null ? { content } : { error: 'File not found' };
+    }
     default: return { error: 'Unknown handler' };
   }
 }

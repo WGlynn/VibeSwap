@@ -1,7 +1,9 @@
 import { readFile } from 'fs/promises';
+import { createHash } from 'crypto';
 import { join } from 'path';
 import { config } from './config.js';
 import { getPersonaOverlay, getActivePersonaId } from './persona.js';
+import { syncFileChange } from './knowledge-chain.js';
 
 const MEMORY_FILES = [
   'MEMORY.md',
@@ -21,6 +23,28 @@ const MEMORY_DIR = config.memory.dir;
 const SESSION_STATE_PATH = join(REPO_PATH, '.claude', 'SESSION_STATE.md');
 const CLAUDE_MD_PATH = join(REPO_PATH, 'CLAUDE.md');
 const CKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_CKB.md');
+
+// ============ File Change Detection for Shard Sync ============
+// Track content hashes across reloads. When a file changes, emit
+// a file_sync change to the knowledge chain for peer-to-peer propagation.
+const fileHashes = new Map(); // path -> sha256 hash
+
+async function detectAndSyncChanges(filePath, content) {
+  if (!content || !filePath) return;
+  const hash = createHash('sha256').update(content).digest('hex').slice(0, 32);
+  const prevHash = fileHashes.get(filePath);
+  fileHashes.set(filePath, hash);
+
+  // First load or no change — skip
+  if (!prevHash || prevHash === hash) return;
+
+  // File changed — propagate via knowledge chain
+  try {
+    await syncFileChange(filePath, content);
+  } catch (err) {
+    console.warn(`[memory] File sync failed for ${filePath}: ${err.message}`);
+  }
+}
 
 async function safeRead(filePath, label) {
   try {
@@ -313,6 +337,7 @@ export async function loadSystemPrompt() {
   // Load the TAIL (most recent state) — bottom of file = latest session.
   const sessionState = await safeRead(SESSION_STATE_PATH, 'SESSION_STATE.md');
   if (sessionState) {
+    await detectAndSyncChanges(SESSION_STATE_PATH, sessionState);
     const sanitized = sanitizeContextForBot(sessionState);
     // Take the LAST 4000 chars (most recent 1-2 sessions of decisions/tasks)
     const tail = sanitized.length > 4000
@@ -329,6 +354,7 @@ export async function loadSystemPrompt() {
   // tiers that make JARVIS reason consistently across sessions.
   const ckb = await safeRead(CKB_PATH, 'JarvisxWill_CKB.md');
   if (ckb) {
+    await detectAndSyncChanges(CKB_PATH, ckb);
     const sanitized = sanitizeContextForBot(ckb);
     // Cap at 5000 chars — key operational tiers, skip philosophy (already sanitized out)
     const capped = sanitized.slice(0, 5000);
@@ -343,8 +369,10 @@ export async function loadSystemPrompt() {
   // losing 90%+ of each file — MEMORY.md alone is 243 lines.
   const PER_FILE_BUDGET = 3000;
   for (const file of MEMORY_FILES) {
-    const rawContent = await safeRead(join(MEMORY_DIR, file), file);
+    const filePath = join(MEMORY_DIR, file);
+    const rawContent = await safeRead(filePath, file);
     if (rawContent) {
+      await detectAndSyncChanges(filePath, rawContent);
       const content = sanitizeContextForBot(rawContent);
       if (content.length > 50) {
         dynamicParts.push(`<memory file="${file}">`);

@@ -27,6 +27,7 @@ import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
 import { getDailyBurned, burnJUL, getMiningStats, getHashCostIndex } from './mining.js';
+import { getProviderCostPerMTok } from './llm-provider.js';
 
 const DATA_DIR = config.dataDir;
 const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
@@ -110,8 +111,11 @@ function getLayer0Ratio() {
  */
 function getLayer1Ratio() {
   const p = state.pricing;
-  const currentCost = p.costPerMTok || REFERENCE_COST_PER_MTOK;
   const currentCPI = p.cpiIndex || REFERENCE_CPI;
+
+  // Auto-detect active provider cost, fall back to manual /reprice value
+  const providerCost = getProviderCostPerMTok();
+  const currentCost = providerCost || p.costPerMTok || REFERENCE_COST_PER_MTOK;
 
   // Real cost = nominal cost adjusted for purchasing power
   const currentRealCost = currentCost * (REFERENCE_CPI / currentCPI);
@@ -228,11 +232,12 @@ export function getPricingInfo() {
     // Layer 1: CPI fine-tuning (refinement)
     layer1: {
       ratio: layer1,
-      costPerMTok: p.costPerMTok || REFERENCE_COST_PER_MTOK,
+      costPerMTok: getProviderCostPerMTok() || p.costPerMTok || REFERENCE_COST_PER_MTOK,
       cpiIndex: p.cpiIndex || REFERENCE_CPI,
       referenceCostPerMTok: REFERENCE_COST_PER_MTOK,
       referenceCPI: REFERENCE_CPI,
       lastUpdated: p.lastUpdated,
+      autoDetected: true,
     },
     // Cross-validation
     divergence: Math.round(divergence * 1000) / 10,  // percentage

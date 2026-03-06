@@ -754,6 +754,35 @@ const PROVIDER_QUALITY = {
   ollama:     { quality: 0.40, tier: 3, label: 'Local' },
 };
 
+// ============ Provider Cost Map ($/MTok, blended input+output avg) ============
+// Used by compute-economics.js to auto-adjust JUL pricing oracle (Layer 1)
+// When the active provider changes, the JUL-to-token ratio auto-adjusts so
+// 1 JUL always buys the same DOLLAR VALUE of compute regardless of provider.
+const PROVIDER_COST_PER_MTOK = {
+  claude:     9.00,   // $3 input + $15 output, blended ~$9/MTok
+  deepseek:   0.69,   // $0.27 input + $1.10 output, blended
+  openai:     6.25,   // $2.50 input + $10 output, blended
+  gemini:     0.375,  // $0.15 input + $0.60 output, blended
+  cerebras:   0.001,  // Free tier
+  groq:       0.001,  // Free tier
+  openrouter: 0.001,  // Free tier
+  mistral:    0.001,  // Free tier
+  together:   0.001,  // Free tier (credits)
+  sambanova:  0.001,  // Free tier
+  fireworks:  0.001,  // Free tier
+  novita:     0.001,  // Free tier
+  ollama:     0.001,  // Local (electricity only)
+};
+
+/**
+ * Get the active provider's cost per MTok.
+ * Used by the JUL pricing oracle to auto-adjust the token ratio.
+ */
+export function getProviderCostPerMTok() {
+  const name = activeProvider?.name || 'none';
+  return PROVIDER_COST_PER_MTOK[name] || 3.00; // default to reference
+}
+
 // Track when we dropped from Tier 1 to Tier 2
 let degradedSince = null;
 let degradationNotified = false;

@@ -21,7 +21,7 @@ import { getShadowStats, consumeInvite, registerShadow } from './shadow.js';
 import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
-import { getCurrentTarget, submitProof, getMiningStats } from './mining.js';
+import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner } from './mining.js';
 import { createHmac } from 'crypto';
 
 // ============ Rate Limiter ============
@@ -377,7 +377,7 @@ export async function handleWebRequest(req, res, pathname) {
       }
 
       // Extract authenticated userId from initData (not from request body)
-      let authenticatedUserId = userId;
+      let authenticatedUserId = null;
       try {
         const params = new URLSearchParams(initData);
         const userJson = params.get('user');
@@ -387,12 +387,26 @@ export async function handleWebRequest(req, res, pathname) {
         }
       } catch (parseErr) {
         console.warn(`[web-api] initData user parse failed (IP: ${ip}): ${parseErr.message}`);
-        // Do NOT fall through to body userId — require authenticated identity
       }
+      // Fallback to body userId ONLY if initData didn't yield an ID
+      if (!authenticatedUserId) authenticatedUserId = userId;
 
       if (!authenticatedUserId) {
         jsonResponse(res, 400, { error: 'Could not determine userId' });
         return true;
+      }
+
+      // SPV auto-link: if initData yielded a Telegram ID different from body userId,
+      // cryptographically link the mobile miner to the Telegram account.
+      // The initData HMAC IS the proof — signed by Telegram's servers.
+      if (userId && authenticatedUserId !== userId && userId.startsWith('mobile-')) {
+        const existing = getLinkedMiner(authenticatedUserId);
+        if (!existing) {
+          const link = linkMiner(authenticatedUserId, userId);
+          if (link.success) {
+            console.log(`[web-api] SPV auto-link: ${userId} → Telegram ${authenticatedUserId} (${link.transferred.toFixed(2)} JUL transferred)`);
+          }
+        }
       }
 
       // Input validation — prevent oversized or malformed inputs

@@ -166,8 +166,14 @@ function sanitizeOutput(text) {
   }
   // Clean up artifacts from removed phrases
   cleaned = cleaned
-    .replace(/\.\s*\./g, '.')           // double periods
+    .replace(/\bThe\s*\./g, '')        // orphaned "The ."
+    .replace(/\bA\s*\./g, '')          // orphaned "A ."
+    .replace(/\bAn\s*\./g, '')         // orphaned "An ."
+    .replace(/\bIt'?s\s*\./g, '')      // orphaned "It's ."
+    .replace(/\.\s*\./g, '.')          // double periods
     .replace(/^\s*[.!?]\s*/gm, '')     // orphan punctuation at line start
+    .replace(/—\s*\./g, '.')           // "— ." → "."
+    .replace(/,\s*\./g, '.')           // ", ." → "."
     .replace(/\n{3,}/g, '\n\n')        // collapse newlines
     .replace(/\s{2,}/g, ' ')           // collapse spaces
     .trim();
@@ -3398,11 +3404,14 @@ function isBotAddressed(ctx) {
   const isCalledByName = isDiabloCaption
     ? (persona === 'degen') // Only Diablo responds to Diablo addresses
     : (caption.includes('jarvis') || caption.includes('jar ') || caption.startsWith('jar') || caption.includes(' j ') || caption.startsWith('j '));
-  // Voice/video_note can't have captions — if user replies to bot with media, honor it
-  // Also: if media has NO caption at all, treat reply-to as the only addressing check
-  const isMediaWithoutCaption = !ctx.message.caption && (ctx.message.voice || ctx.message.video_note || ctx.message.audio);
-  if (isMediaWithoutCaption) return isReplyToBot;
-  return isMentioned || isReplyToBot || isCalledByName;
+  // Media without captions — check reply-to and @mention entities only
+  // Photos, voice, video_note, audio can all lack text captions
+  const isMediaWithoutCaption = !ctx.message.caption && (ctx.message.voice || ctx.message.video_note || ctx.message.audio || ctx.message.photo || ctx.message.video || ctx.message.animation || ctx.message.document || ctx.message.sticker);
+  // Check @mention entities (Telegram sends mentions as entities, not always in caption text)
+  const entities = ctx.message.caption_entities || ctx.message.entities || [];
+  const isMentionedInEntities = entities.some(e => e.type === 'mention' && botUsername && (ctx.message.caption || ctx.message.text || '').slice(e.offset, e.offset + e.length).toLowerCase() === `@${botUsername}`);
+  if (isMediaWithoutCaption) return isReplyToBot || isMentionedInEntities;
+  return isMentioned || isMentionedInEntities || isReplyToBot || isCalledByName;
 }
 
 // ============ Photo Handler (multimodal + sticker) ============
@@ -3879,14 +3888,13 @@ bot.on('text', async (ctx) => {
   const persona = getActivePersonaId();
   let isCalledByName = false;
   if (persona === 'degen') {
-    // Diablo JARVIS responds to: diablo, diabolical, funny jarvis, edgy jarvis, cool jarvis, degen jarvis, evil jarvis, unhinged jarvis, and just "jarvis"
+    // Diablo JARVIS responds ONLY to Diablo-specific triggers — NOT bare "jarvis"
+    // Bare "jarvis" is for regular JARVIS. Diablo has his own identity.
     isCalledByName = textWithoutMentions.includes('diablo') || textWithoutMentions.includes('diabolical')
       || textWithoutMentions.includes('funny jarvis') || textWithoutMentions.includes('edgy jarvis')
       || textWithoutMentions.includes('cool jarvis') || textWithoutMentions.includes('degen jarvis')
       || textWithoutMentions.includes('evil jarvis') || textWithoutMentions.includes('unhinged jarvis')
-      || textWithoutMentions.includes('based jarvis') || textWithoutMentions.includes('chaos jarvis')
-      || textWithoutMentions.includes('jarvis') || textWithoutMentions.includes('jar ')
-      || textWithoutMentions.startsWith('jar') || textWithoutMentions.includes(' j ') || textWithoutMentions.startsWith('j ');
+      || textWithoutMentions.includes('based jarvis') || textWithoutMentions.includes('chaos jarvis');
   } else {
     // Standard JARVIS — responds to jarvis, jar, j
     // BUT NOT when Diablo is being addressed (diablo jarvis, funny jarvis, edgy jarvis, etc.)

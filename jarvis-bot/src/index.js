@@ -20,7 +20,8 @@ import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, 
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
 import { initCRPC, flushCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
 import { registerConsensusHandlers } from './learning.js';
-import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick } from './knowledge-chain.js';
+import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
+import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
@@ -370,8 +371,19 @@ const TRUSTED_AUTHORIZERS = new Set([
   // e.g. '123456789',
 ]);
 
+// ============ Unlimited Users (by username) ============
+// Co-founders and core partners — no token limits. Matched by Telegram @username.
+const UNLIMITED_USERNAMES = new Set([
+  'txbxhxnest',   // tbhxnest — GenTu substrate co-founder
+]);
+
 function isTrustedAuthorizer(ctx) {
   return TRUSTED_AUTHORIZERS.has(String(ctx.from?.id));
+}
+
+function isUnlimitedUser(ctx) {
+  const username = ctx.from?.username?.toLowerCase();
+  return username && UNLIMITED_USERNAMES.has(username);
 }
 
 
@@ -4166,7 +4178,7 @@ bot.on('text', async (ctx) => {
   // ============ Open Access — Budget-Gated (Everyone talks, tiers control volume) ============
   const userId = String(ctx.from.id);
   const tier = getUserTier(userId, {
-    isOwner: isOwner(ctx),
+    isOwner: isOwner(ctx) || isUnlimitedUser(ctx),
     isAuthorized: isAuthorized(ctx),
     isTrustedAuthorizer: isTrustedAuthorizer(ctx),
   });
@@ -4322,6 +4334,7 @@ async function main() {
     await initHell();
     await recoverWAL();
     await recoverChain();
+    await initAnchor();
     await recoverRetryQueue();
     await recoverCommittedIds();
 
@@ -4453,7 +4466,7 @@ async function main() {
         }
       }
 
-      if (req.url?.startsWith('/knowledge-chain/')) {
+      if (req.url?.startsWith('/knowledge-chain/') || req.url?.startsWith('/knowledge/')) {
         const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
         const kcPath = kcUrl.pathname;
         const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
@@ -4495,6 +4508,8 @@ async function main() {
         await retryMissedEpochs();
         await syncWithPeers();
       }
+      // Anchor: periodically commit Merkle super-roots to local proof chain
+      await maybeAnchor();
     }, 5 * 60 * 1000);
 
     // ============ Primary Watchdog ============
@@ -4619,6 +4634,7 @@ async function main() {
   await initStickers();
   await recoverWAL();
   await recoverChain();
+  await initAnchor();
   await recoverRetryQueue();
   await recoverCommittedIds();
   await initShadow();
@@ -5372,7 +5388,7 @@ async function main() {
         res.end(JSON.stringify({ error: 'Unknown consensus/crpc route' }));
 
       // ============ Knowledge Chain API ============
-      } else if (req.url?.startsWith('/knowledge-chain/')) {
+      } else if (req.url?.startsWith('/knowledge-chain/') || req.url?.startsWith('/knowledge/')) {
         const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
         const kcPath = kcUrl.pathname;
         const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
@@ -5514,6 +5530,8 @@ async function main() {
       await retryMissedEpochs();
       await syncWithPeers();
     }
+    // Anchor: periodically commit Merkle super-roots to local proof chain
+    await maybeAnchor();
   }, 5 * 60 * 1000);
 
   // Scheduled daily digest — send at configured hour (default 18:00 UTC)

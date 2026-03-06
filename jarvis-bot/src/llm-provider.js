@@ -48,6 +48,9 @@ import { randomUUID, createHash } from 'crypto';
 // to plain text before sending to fallback providers.
 
 function flattenToolExchanges(messages) {
+  // Strip tool_use/tool_result blocks entirely — fallback models don't need them
+  // and will echo ANY visible format (brackets, parens, natural language) as text.
+  // Only preserve the text content from messages that had tool exchanges.
   return messages.map(msg => {
     if (!Array.isArray(msg.content)) return msg;
 
@@ -56,20 +59,10 @@ function flattenToolExchanges(messages) {
 
     if (!hasToolUse && !hasToolResult) return msg;
 
-    // Flatten tool blocks to natural text (NOT bracketed format — models mimic brackets)
-    const textParts = [];
-    for (const block of msg.content) {
-      if (block.type === 'text' && block.text) {
-        textParts.push(block.text);
-      } else if (block.type === 'tool_use') {
-        // Use natural language instead of [brackets] — prevents model from echoing format
-        textParts.push(`(I looked up: ${block.name})`);
-      } else if (block.type === 'tool_result') {
-        const content = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-        textParts.push(`(Result: ${content.slice(0, 500)})`);
-      }
-      // Keep image/document blocks as-is (handled separately by converters)
-    }
+    // Keep ONLY text blocks — drop all tool_use and tool_result blocks silently
+    const textParts = msg.content
+      .filter(b => b.type === 'text' && b.text)
+      .map(b => b.text);
 
     const flatText = textParts.join('\n').trim();
     return flatText ? { role: msg.role, content: flatText } : null;
@@ -896,6 +889,23 @@ function isCreditError(error) {
     (msg.includes('400') && msg.includes('credit'));
 }
 
+// ============ Transient/Glitch Error Detection (Retryable) ============
+
+function isTransientOrGlitch(error) {
+  const msg = (error?.message || '').toLowerCase();
+  const status = error?.status || error?.statusCode || error?.response?.status;
+  return msg.includes('model not exist') ||   // DeepSeek transient glitch
+    msg.includes('temporarily unavailable') ||
+    msg.includes('service unavailable') ||
+    msg.includes('internal server error') ||
+    msg.includes('bad gateway') ||
+    msg.includes('gateway timeout') ||
+    msg.includes('econnreset') ||
+    msg.includes('etimedout') ||
+    msg.includes('socket hang up') ||
+    status === 500 || status === 502 || status === 503 || status === 504;
+}
+
 // ============ Fallback: Activate Next Provider ============
 
 function activateFallback() {
@@ -974,6 +984,90 @@ function getProviderConfig(providerName) {
   };
 }
 
+// ============ Smart Router — Route by Complexity ============
+// Instead of always calling Claude and cascading on failure,
+// classify query complexity and route to the right model.
+// "Don't call Anthropic if all I asked was 'what's your name'" — Scottie
+//
+// Complexity levels:
+//   simple   → free tier (Groq/Cerebras) — greetings, one-liners, short factual
+//   moderate → mid tier (DeepSeek/Gemini) — conversation, explanations, summaries
+//   complex  → premium (Claude) — reasoning, code, tools, long-form analysis
+
+const SIMPLE_PATTERNS = /^(hey|hi|hello|yo|sup|gm|gn|gg|lol|lmao|ok|okay|sure|thanks|ty|thx|bet|word|facts|based|fr|w |l |nice|cool|dope|sick|fire|mid|nah|yep|yea|yeah|yes|no|nope|what'?s? ?(up|good|poppin)|how are you|who are you|what'?s? your name|good (morning|night|evening)|wagmi|ngmi|wen |gm fam|send it)\b/i;
+
+const COMPLEX_SIGNALS = /```|contract |function |error |bug |debug|implement|refactor|analyze|compare|explain .{80,}|write a |build |create a |design |architect|security|audit|vulnerabil|exploit|smart contract|solidity|rust |python |javascript/i;
+
+function classifyComplexity(request) {
+  // If tools are requested, always use Claude (tool use requires it)
+  if (request.tools?.length > 0) return 'complex';
+
+  // If caller explicitly set a model, respect it
+  if (request.model) return 'explicit';
+
+  // Analyze the last user message
+  const lastMsg = [...(request.messages || [])].reverse().find(m => m.role === 'user');
+  if (!lastMsg) return 'moderate';
+
+  const text = typeof lastMsg.content === 'string'
+    ? lastMsg.content
+    : Array.isArray(lastMsg.content)
+      ? lastMsg.content.filter(b => b.type === 'text').map(b => b.text).join(' ')
+      : '';
+
+  const len = text.length;
+
+  // Short + matches simple patterns → free tier
+  if (len < 80 && SIMPLE_PATTERNS.test(text)) return 'simple';
+
+  // Very short messages without complex signals → simple
+  if (len < 30 && !COMPLEX_SIGNALS.test(text)) return 'simple';
+
+  // Complex signals or long messages → Claude
+  if (COMPLEX_SIGNALS.test(text)) return 'complex';
+  if (len > 500) return 'complex';
+
+  // Has images/documents → Gemini
+  if (Array.isArray(lastMsg.content) && lastMsg.content.some(b => b.type === 'image' || b.type === 'document')) {
+    return 'multimodal';
+  }
+
+  // Everything else → moderate
+  return 'moderate';
+}
+
+// Provider pool — all initialized providers keyed by name
+const providerPool = new Map();
+
+function getProviderForComplexity(complexity) {
+  // Priority order for each complexity level
+  const routes = {
+    simple:     ['groq', 'cerebras', 'sambanova', 'deepseek', 'gemini'],
+    moderate:   ['deepseek', 'gemini', 'groq', 'cerebras'],
+    complex:    ['claude', 'deepseek', 'openai', 'gemini'],
+    multimodal: ['gemini', 'claude', 'openai'],
+    explicit:   [], // Caller specified model — use activeProvider
+  };
+
+  const candidates = routes[complexity] || routes.moderate;
+  for (const name of candidates) {
+    const provider = providerPool.get(name);
+    if (provider) return provider;
+  }
+
+  // Fallback to active provider if no candidates available
+  return activeProvider;
+}
+
+// Export for testing/debugging
+export function getRouterStats() {
+  return {
+    poolSize: providerPool.size,
+    providers: [...providerPool.keys()],
+    classify: (text) => classifyComplexity({ messages: [{ role: 'user', content: text }] }),
+  };
+}
+
 export function initProvider() {
   const providerName = config.llm?.provider || 'claude';
   primaryProviderName = providerName;
@@ -981,9 +1075,9 @@ export function initProvider() {
   // Init primary
   const providerConfig = getProviderConfig(providerName);
   createProvider(providerName, providerConfig);
+  providerPool.set(providerName, activeProvider);
 
-  // Init fallbacks — any provider with a configured API key that isn't the primary
-  // Tier 1 (paid) → Tier 2 (free/low-cost) — Infinite Compute cascade
+  // Init ALL available providers into the pool + fallback chain
   const fallbackOrder = ['claude', 'deepseek', 'gemini', 'openai', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
   fallbackProviders = [];
 
@@ -996,15 +1090,19 @@ export function initProvider() {
         if (factory) {
           const fb = factory(fbConfig);
           fallbackProviders.push(fb);
-          console.log(`[llm] Fallback registered: ${name} (${fb.model})`);
+          providerPool.set(name, fb); // Also add to router pool
+          console.log(`[llm] Provider registered: ${name} (${fb.model})`);
         }
-      } catch { /* skip broken fallbacks */ }
+      } catch { /* skip broken providers */ }
     }
   }
 
-  if (fallbackProviders.length > 0) {
-    console.log(`[wardenclyffe] ${fallbackProviders.length} fallback provider(s) in cascade — auto-switch on credit exhaustion`);
-    console.log(`[wardenclyffe] Chain: ${providerName} → ${fallbackProviders.map(p => p.name).join(' → ')}`);
+  if (providerPool.size > 1) {
+    console.log(`[wardenclyffe] Smart router: ${providerPool.size} providers in pool — routing by complexity`);
+    console.log(`[wardenclyffe]   simple → ${['groq', 'cerebras', 'sambanova'].filter(n => providerPool.has(n))[0] || 'fallback'}`);
+    console.log(`[wardenclyffe]   moderate → ${['deepseek', 'gemini'].filter(n => providerPool.has(n))[0] || 'fallback'}`);
+    console.log(`[wardenclyffe]   complex → ${['claude', 'deepseek', 'openai'].filter(n => providerPool.has(n))[0] || 'fallback'}`);
+    console.log(`[wardenclyffe] Cascade fallback: ${providerName} → ${fallbackProviders.map(p => p.name).join(' → ')}`);
   } else {
     console.warn('[wardenclyffe] No fallback providers configured. Set CEREBRAS_API_KEY, GROQ_API_KEY, etc. for infinite compute.');
   }
@@ -1041,42 +1139,76 @@ export async function llmChat(request) {
 
   const cascadeTrail = [];
 
+  // ============ Smart Router ============
+  // Route to the best provider based on query complexity.
+  // Only routes if: (1) multiple providers available, (2) caller didn't specify a model
+  const complexity = classifyComplexity(request);
+  let routedProvider = activeProvider;
+
+  if (complexity !== 'explicit' && providerPool.size > 1) {
+    routedProvider = getProviderForComplexity(complexity);
+    if (routedProvider !== activeProvider) {
+      console.log(`[router] ${complexity} → ${routedProvider.name} (saved ${activeProvider.name} for complex)`);
+    }
+  }
+
   // Non-Claude providers can't handle tool_use/tool_result in conversation history.
-  // Flatten them to plain text BEFORE sending — not just during cascade.
-  if (activeProvider.name !== 'claude' && request.messages) {
+  // Flatten them BEFORE sending — not just during cascade.
+  if (routedProvider.name !== 'claude' && request.messages) {
     request = { ...request, messages: flattenToolExchanges(request.messages) };
   }
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const attemptStart = Date.now();
     try {
-      const result = await activeProvider.chat(request);
+      const result = await routedProvider.chat(request);
       // Cascade trail — record successful attempt
       cascadeTrail.push({
-        provider: activeProvider.name,
-        model: activeProvider.model,
+        provider: routedProvider.name,
+        model: routedProvider.model,
         status: 'success',
         latencyMs: Date.now() - attemptStart,
+        complexity,
       });
       // Attach provider metadata for usage tracking
-      result._provider = activeProvider.name;
-      result._model = activeProvider.model;
+      result._provider = routedProvider.name;
+      result._model = routedProvider.model;
       // Wardenclyffe protocol metadata
       result._cascadeTrail = cascadeTrail;
       result._intelligenceLevel = getIntelligenceLevel();
+      result._complexity = complexity;
       const contentStr = JSON.stringify(result.content);
       result._responseHash = createHash('sha256')
-        .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
+        .update(contentStr + routedProvider.name + routedProvider.model + Date.now())
         .digest('hex');
       return result;
     } catch (error) {
       lastError = error;
 
-      // Credit exhaustion — cascade through fallback providers
+      // Routed provider failed (non-transient) — fall back to primary before cascading
+      if (routedProvider !== activeProvider && !isTransientError(error)) {
+        cascadeTrail.push({
+          provider: routedProvider.name,
+          model: routedProvider.model,
+          status: 'route_error',
+          latencyMs: Date.now() - attemptStart,
+          error: error.message?.slice(0, 120),
+        });
+        console.warn(`[router] ${routedProvider.name} failed for ${complexity} query — falling back to ${activeProvider.name}`);
+        routedProvider = activeProvider; // Switch to primary
+        // Re-send with original request (tools + model intact for Claude)
+        if (routedProvider.name === 'claude') {
+          // Undo flattening — Claude can handle tools
+          request = { ...request };
+        }
+        continue; // Retry with primary
+      }
+
+      // Credit exhaustion on primary — cascade through fallback providers
       if (isCreditError(error) && activateFallback()) {
         cascadeTrail.push({
-          provider: cascadeTrail.length > 0 ? cascadeTrail[cascadeTrail.length - 1].provider : 'unknown',
-          model: cascadeTrail.length > 0 ? cascadeTrail[cascadeTrail.length - 1].model : 'unknown',
+          provider: routedProvider.name,
+          model: routedProvider.model,
           status: 'credit_error',
           latencyMs: Date.now() - attemptStart,
           error: error.message?.slice(0, 120),
@@ -1090,37 +1222,48 @@ export async function llmChat(request) {
         }
 
         // Try each fallback provider until one succeeds
+        // Each provider gets up to 2 attempts (1 retry) for transient errors
         let fallbackError;
         do {
           console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
-          const fallbackStart = Date.now();
-          try {
-            const result = await activeProvider.chat(rest);
-            cascadeTrail.push({
-              provider: activeProvider.name,
-              model: activeProvider.model,
-              status: 'success',
-              latencyMs: Date.now() - fallbackStart,
-            });
-            result._provider = activeProvider.name;
-            result._model = activeProvider.model;
-            result._cascadeTrail = cascadeTrail;
-            result._intelligenceLevel = getIntelligenceLevel();
-            const contentStr = JSON.stringify(result.content);
-            result._responseHash = createHash('sha256')
-              .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
-              .digest('hex');
-            return result;
-          } catch (fbErr) {
-            fallbackError = fbErr;
-            cascadeTrail.push({
-              provider: activeProvider.name,
-              model: activeProvider.model,
-              status: 'fallback_error',
-              latencyMs: Date.now() - fallbackStart,
-              error: fbErr.message?.slice(0, 120),
-            });
-            console.warn(`[wardenclyffe] Fallback ${activeProvider.name} failed: ${fbErr.message?.slice(0, 100)}`);
+
+          for (let fbAttempt = 0; fbAttempt < 2; fbAttempt++) {
+            const fallbackStart = Date.now();
+            try {
+              const result = await activeProvider.chat(rest);
+              cascadeTrail.push({
+                provider: activeProvider.name,
+                model: activeProvider.model,
+                status: 'success',
+                latencyMs: Date.now() - fallbackStart,
+              });
+              result._provider = activeProvider.name;
+              result._model = activeProvider.model;
+              result._cascadeTrail = cascadeTrail;
+              result._intelligenceLevel = getIntelligenceLevel();
+              const contentStr = JSON.stringify(result.content);
+              result._responseHash = createHash('sha256')
+                .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
+                .digest('hex');
+              return result;
+            } catch (fbErr) {
+              fallbackError = fbErr;
+              cascadeTrail.push({
+                provider: activeProvider.name,
+                model: activeProvider.model,
+                status: fbAttempt === 0 ? 'fallback_error_retry' : 'fallback_error',
+                latencyMs: Date.now() - fallbackStart,
+                error: fbErr.message?.slice(0, 120),
+              });
+              // Retry once for transient errors (e.g. DeepSeek "Model Not Exist" glitches)
+              if (fbAttempt === 0 && isTransientOrGlitch(fbErr)) {
+                console.warn(`[wardenclyffe] Fallback ${activeProvider.name} transient error — retrying in 1s: ${fbErr.message?.slice(0, 80)}`);
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
+              }
+              console.warn(`[wardenclyffe] Fallback ${activeProvider.name} failed: ${fbErr.message?.slice(0, 100)}`);
+              break;
+            }
           }
         } while (activateFallback());
 
@@ -1131,8 +1274,8 @@ export async function llmChat(request) {
       // Transient errors — retry with exponential backoff + jitter
       if (isTransientError(error) && attempt < MAX_RETRIES) {
         cascadeTrail.push({
-          provider: activeProvider.name,
-          model: activeProvider.model,
+          provider: routedProvider.name,
+          model: routedProvider.model,
           status: 'transient_error',
           latencyMs: Date.now() - attemptStart,
           error: error.message?.slice(0, 120),
@@ -1147,8 +1290,8 @@ export async function llmChat(request) {
 
       // Fatal error — record and throw
       cascadeTrail.push({
-        provider: activeProvider.name,
-        model: activeProvider.model,
+        provider: routedProvider.name,
+        model: routedProvider.model,
         status: 'fatal_error',
         latencyMs: Date.now() - attemptStart,
         error: error.message?.slice(0, 120),

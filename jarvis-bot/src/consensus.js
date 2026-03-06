@@ -139,7 +139,7 @@ const circuitBreaker = {
   openedAt: 0,
   backoffMs: 30000, // Start at 30s, doubles each trip, max 5 min
   maxBackoffMs: 300000,
-  failureThreshold: 3, // Open after 3 consecutive all-peer failures
+  failureThreshold: 1, // Open immediately on first all-peer failure
 };
 
 function cbTrip() {
@@ -240,6 +240,12 @@ export async function propose(type, data) {
     committedProposals.push({ ...proposal, committedAt: new Date().toISOString() });
     persistCommittedIds();
     return result;
+  }
+
+  // Circuit breaker: don't create proposals when peers are unreachable
+  // (prevents timeout → retry → new proposal → timeout cycle)
+  if (!cbAllowRequest()) {
+    return { proposal, committed: false, circuitOpen: true };
   }
 
   // Multi-shard: start BFT round
@@ -485,9 +491,14 @@ function checkProposalTimeouts() {
   processRetryQueue();
 }
 
+let retryQueueRunning = false;
+
 async function processRetryQueue() {
   // Don't retry when circuit breaker is open — peers are down
   if (!cbAllowRequest()) return;
+  // Prevent concurrent processRetryQueue calls (checkProposalTimeouts doesn't await)
+  if (retryQueueRunning) return;
+  retryQueueRunning = true;
 
   const now = Date.now();
   let i = 0;
@@ -510,6 +521,10 @@ async function processRetryQueue() {
         retryQueue.splice(i, 1);
         continue;
       }
+      if (result.circuitOpen) {
+        // Circuit breaker is open — stop processing retries entirely
+        break;
+      }
     } catch (err) {
       console.warn(`[consensus] Retry failed: ${err.message}`);
     }
@@ -518,6 +533,7 @@ async function processRetryQueue() {
     entry.nextRetryAt = now + RETRY_BASE_DELAY_MS * Math.pow(2, entry.retryCount);
     i++;
   }
+  retryQueueRunning = false;
   // Persist retry queue for crash recovery
   persistRetryQueue();
 }

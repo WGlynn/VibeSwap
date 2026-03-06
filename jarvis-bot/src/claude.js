@@ -103,7 +103,20 @@ export async function saveConversations() {
 // ============ Init ============
 
 export async function initClaude() {
-  await loadConversations();
+  // One-time conversation wipe: set WIPE_CONVERSATIONS=1 to purge poisoned history
+  if (process.env.WIPE_CONVERSATIONS) {
+    console.log('[claude] WIPE_CONVERSATIONS set — purging all conversation history');
+    conversations.clear();
+    try {
+      const { writeFile: wf } = await import('fs/promises');
+      await wf(CONVERSATIONS_FILE, '{}');
+      console.log('[claude] Conversations file wiped to {}');
+    } catch (e) {
+      console.warn('[claude] Could not wipe conversations file:', e.message);
+    }
+  } else {
+    await loadConversations();
+  }
   systemPrompt = await loadSystemPrompt();
   console.log(`[claude] System prompt loaded (${systemPrompt.length} chars)`);
 }

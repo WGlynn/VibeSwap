@@ -56,16 +56,17 @@ function flattenToolExchanges(messages) {
 
     if (!hasToolUse && !hasToolResult) return msg;
 
-    // Flatten tool blocks to text
+    // Flatten tool blocks to natural text (NOT bracketed format — models mimic brackets)
     const textParts = [];
     for (const block of msg.content) {
       if (block.type === 'text' && block.text) {
         textParts.push(block.text);
       } else if (block.type === 'tool_use') {
-        textParts.push(`[Used tool: ${block.name}(${JSON.stringify(block.input).slice(0, 200)})]`);
+        // Use natural language instead of [brackets] — prevents model from echoing format
+        textParts.push(`(I looked up: ${block.name})`);
       } else if (block.type === 'tool_result') {
         const content = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-        textParts.push(`[Tool result: ${content.slice(0, 500)}]`);
+        textParts.push(`(Result: ${content.slice(0, 500)})`);
       }
       // Keep image/document blocks as-is (handled separately by converters)
     }

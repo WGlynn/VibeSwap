@@ -36,6 +36,7 @@ import { buildInnerDialogueContext } from './inner-dialogue.js';
 import { propose, PROPOSAL_TYPES, onCommit } from './consensus.js';
 import { isMultiShard } from './shard.js';
 import { archiveFact, archiveBatch, searchDeepStorageFull, getDeepStorageStats } from './deep-storage.js';
+import { creditKnowledgeValue } from './compute-economics.js';
 import { addChange } from './knowledge-chain.js';
 
 // LLM calls use llmChat from llm-provider.js (supports fallback chain)
@@ -557,6 +558,9 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
   console.log(`[learning] Correction processed: ${correction.category} — "${correction.what_is_right?.slice(0, 60)}"`);
   dirty = true;
 
+  // Credit knowledge value → Shapley weight increase
+  creditKnowledgeValue(String(userId), 1.0, 'correction');
+
   // Emit to knowledge chain for cross-shard sync
   if (isMultiShard()) {
     addChange({
@@ -705,6 +709,11 @@ async function maybePromoteToSkill(correction, lesson) {
 
   // Single-shard: apply directly
   applySkillPromotion(newSkill);
+
+  // Credit knowledge value for skill promotion (highest weight)
+  if (correction.userId) {
+    creditKnowledgeValue(String(correction.userId), 1.0, 'skill_promoted');
+  }
 }
 
 // Apply a skill promotion (called directly in single-shard, or via consensus commit handler)
@@ -835,7 +844,11 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
 
   const occupation = computeCKBOccupation(userCKB.facts);
   const classLabel = newFact?.knowledgeClass || KNOWLEDGE_CLASSES.SHARED;
+  const factVD = newFact ? computeValueDensity(newFact, Date.now()) : 0;
   console.log(`[learning] Fact learned: "${fact.slice(0, 50)}" [${classLabel}] (${occupation}/${userCKB.tokenBudget} tokens)`);
+
+  // Credit knowledge value → Shapley weight increase
+  creditKnowledgeValue(String(userId), factVD, 'fact');
 
   // Emit to knowledge chain for cross-shard sync
   if (isMultiShard()) {
@@ -843,7 +856,7 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
       type: 'fact_learned',
       userId: String(userId),
       fact: { content: fact, category: category || 'general', tags: tags || [] },
-      valueDensity: newFact ? computeValueDensity(newFact, Date.now()) : 0,
+      valueDensity: factVD,
     }).catch(() => {});
   }
 

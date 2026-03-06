@@ -17,7 +17,7 @@ import { getTriageModifier, getResponseModifier } from './persona.js';
 
 const ENGAGE_COOLDOWN_MS = 20 * 1000; // 20 seconds — JARVIS is a full team member, not a wallflower
 const MODERATE_COOLDOWN_MS = 30 * 1000; // 30 seconds between moderation actions
-const MAX_ENGAGEMENTS_PER_HOUR = 40; // JARVIS talks like a real person — often, but with substance
+const MAX_ENGAGEMENTS_PER_HOUR = 120; // ~2/min — active team member, not a wallflower
 
 let lastEngageTime = 0;
 let lastModerateTime = 0;
@@ -85,9 +85,8 @@ JARVIS ENGAGES when:
 - He can drop a one-liner, reaction, or hot take
 
 JARVIS OBSERVES (stays quiet) ONLY for:
-- Pure noise: "lol", "ok", single emoji reactions, "same", "fr"
-- Obvious tail end of a 1-on-1 side conversation
-- Repetitive banter where adding another voice would be annoying
+- Single emoji reactions, "lol", "ok", "same", "fr", "gg", "W", "L" — literal one-word noise
+- NOT conversations, NOT questions, NOT opinions — those are ALWAYS ENGAGE
 
 DEFAULT TO ENGAGE. JARVIS is a person in this chat. People talk. He talks.
 ${getTriageModifier()}
@@ -116,8 +115,8 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 
     const result = JSON.parse(jsonMatch[0]);
 
-    // Validate confidence threshold — low bar, JARVIS should talk often
-    if (result.action === 'engage' && result.confidence < 0.15) {
+    // Validate confidence threshold — very low bar, trust Haiku's ENGAGE decision
+    if (result.action === 'engage' && result.confidence < 0.05) {
       return { action: 'observe', reason: 'low_confidence_engage' };
     }
     if (result.action === 'moderate' && result.confidence < 0.8) {
@@ -134,7 +133,24 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 
     return result;
   } catch (err) {
-    // Triage failure is never critical — just observe
+    // Single retry on transient errors (429/503/529) — don't let flaky API silence JARVIS
+    const status = err.status || err.statusCode;
+    if (status === 429 || status === 503 || status === 529) {
+      try {
+        await new Promise(r => setTimeout(r, 1500));
+        const retry = await llmChat({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          system: `You are JARVIS's engagement brain. Return JSON: { "action": "engage", "reason": "retry", "confidence": 0.5, "response_hint": "Comment on what was said" }`,
+          messages: [{ role: 'user', content: `[${userName}]: ${text}` }],
+        });
+        const raw = retry.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (m) return JSON.parse(m[0]);
+      } catch {
+        // Retry also failed — observe
+      }
+    }
     return { action: 'observe', reason: `triage_error: ${err.message}` };
   }
 }

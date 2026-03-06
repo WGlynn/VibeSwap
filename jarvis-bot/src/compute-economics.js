@@ -36,6 +36,7 @@ const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
 
 const FREE_BUDGET_ANONYMOUS = 5_000;   // tokens/day for unidentified users
 const FREE_BUDGET_IDENTIFIED = 10_000; // tokens/day for identified users
+const FREE_BUDGET_AUTHORIZED = 25_000; // tokens/day for authorized/blessed users
 const BASE_POOL = 500_000;             // Will's baseline funding (floor)
 
 // ============ JUL Pricing Oracle — Floor/Ceiling Convergence ============
@@ -483,6 +484,71 @@ export function markIdentified(userId) {
     user.budget = Math.round(freeBudget + poolShare);
     dirty = true;
   }
+}
+
+// ============ Tiered Budget — Open Access with Caps ============
+// Everyone can talk. Budget tiers control volume.
+// anonymous: 5k tokens/day | authorized/blessed: 25k | owner/trusted: uncapped
+
+/**
+ * Get a user's authorization tier for budget purposes.
+ * @param {string} userId - Telegram user ID as string
+ * @param {object} opts - { isOwner, isAuthorized, isTrustedAuthorizer }
+ * @returns {'owner' | 'authorized' | 'anonymous'}
+ */
+export function getUserTier(userId, opts = {}) {
+  if (opts.isOwner || opts.isTrustedAuthorizer) return 'owner';
+  if (opts.isAuthorized) return 'authorized';
+  return 'anonymous';
+}
+
+/**
+ * Check budget with tier awareness.
+ * Owner tier gets Infinity budget. Authorized gets 25k base. Anonymous gets 5k.
+ * @param {string} userId
+ * @param {'owner'|'authorized'|'anonymous'} tier
+ */
+export function checkTieredBudget(userId, tier) {
+  if (tier === 'owner') {
+    // Owner/trusted: uncapped
+    checkDayRollover();
+    const user = ensureUser(userId);
+    const used = user.today.input + user.today.output;
+    return { allowed: true, budget: Infinity, used, remaining: Infinity, degraded: false, maxTokens: null };
+  }
+  // For authorized tier, temporarily boost the user's free budget
+  if (tier === 'authorized') {
+    checkDayRollover();
+    const user = ensureUser(userId);
+    // Ensure authorized users get at least 25k base (poolShare adds on top)
+    if (user.budget < FREE_BUDGET_AUTHORIZED) {
+      const poolShare = state.shapleySum > 0
+        ? getEffectivePool() * user.shapleyWeight / state.shapleySum
+        : 0;
+      user.budget = Math.round(FREE_BUDGET_AUTHORIZED + poolShare);
+    }
+  }
+  // Fall through to standard checkBudget
+  return checkBudget(userId);
+}
+
+// ============ Knowledge Value Credits — Knowledge → JUL Reward Bridge ============
+// valueDensity is computed but never rewarded. This bridges knowledge to economics.
+
+/**
+ * Credit a user's Shapley quality signal when they contribute valuable knowledge.
+ * @param {string} userId
+ * @param {number} valueDensity - computed value density of the knowledge
+ * @param {'correction'|'fact'|'skill_promoted'} type - type of knowledge contribution
+ */
+export function creditKnowledgeValue(userId, valueDensity, type) {
+  const user = ensureUser(userId);
+  const weight = type === 'correction' ? 2.0 : type === 'skill_promoted' ? 5.0 : 1.0;
+  const signal = Math.min(5, (valueDensity || 0) * weight);
+  user.quality.sum += signal;
+  user.quality.count += 1;
+  user.facts += 1;
+  dirty = true;
 }
 
 // ============ Knowledge Access Credits ============

@@ -9,6 +9,9 @@ const MEMORY_FILES = [
   'gentu-substrate.md',
   'freedom-micro-interfaces.md',
   'matt-pow-mmr.md',
+  'psinet-protocol.md',
+  'nervos-intel.md',
+  'limni-systems.md',
 ];
 
 // Path resolution uses config (supports both local and Docker/cloud)
@@ -304,15 +307,48 @@ export async function loadSystemPrompt() {
   dynamicParts.push('</context>');
   dynamicParts.push('');
 
-  // Load ONLY the learned knowledge memory files — these are Jarvis's actual
-  // operational knowledge, not development documentation
+  // ============ SESSION STATE — Recent Work & Decisions ============
+  // This is what makes the Claude Code session feel "sentient" — it knows what
+  // was just worked on, what decisions were made, what's in progress.
+  // Load the TAIL (most recent state) — bottom of file = latest session.
+  const sessionState = await safeRead(SESSION_STATE_PATH, 'SESSION_STATE.md');
+  if (sessionState) {
+    const sanitized = sanitizeContextForBot(sessionState);
+    // Take the LAST 4000 chars (most recent 1-2 sessions of decisions/tasks)
+    const tail = sanitized.length > 4000
+      ? '...\n' + sanitized.slice(-4000)
+      : sanitized;
+    dynamicParts.push('<context type="session_state" description="Recent work, decisions, and current focus">');
+    dynamicParts.push(tail);
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  // ============ CORE KNOWLEDGE BASE — Alignment & Protocols ============
+  // The CKB contains identity primitives, operational protocols, and alignment
+  // tiers that make JARVIS reason consistently across sessions.
+  const ckb = await safeRead(CKB_PATH, 'JarvisxWill_CKB.md');
+  if (ckb) {
+    const sanitized = sanitizeContextForBot(ckb);
+    // Cap at 5000 chars — key operational tiers, skip philosophy (already sanitized out)
+    const capped = sanitized.slice(0, 5000);
+    dynamicParts.push('<context type="core_knowledge_base" description="Core alignment, identity protocols, and operational principles">');
+    dynamicParts.push(capped);
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  // ============ Memory Files — Operational Knowledge ============
+  // Each file gets 3000 chars (2x the old 1500 cap). The old truncation was
+  // losing 90%+ of each file — MEMORY.md alone is 243 lines.
+  const PER_FILE_BUDGET = 3000;
   for (const file of MEMORY_FILES) {
     const rawContent = await safeRead(join(MEMORY_DIR, file), file);
     if (rawContent) {
       const content = sanitizeContextForBot(rawContent);
       if (content.length > 50) {
         dynamicParts.push(`<memory file="${file}">`);
-        dynamicParts.push(content.slice(0, 1500));
+        dynamicParts.push(content.slice(0, PER_FILE_BUDGET));
         dynamicParts.push('</memory>');
         dynamicParts.push('');
       }

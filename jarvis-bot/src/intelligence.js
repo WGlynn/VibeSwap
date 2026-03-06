@@ -156,37 +156,64 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 }
 
 // ============ Generate Proactive Response ============
-// When triage says ENGAGE, generate a full response using the main model.
+// Two-phase orchestrator: cheap model drafts, Haiku quality-gates.
+// "I M J A R V I S" — Claude reasoning on every response, cheap models do grunt work.
 
 export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext) {
   try {
-    // Build conversational context so JARVIS knows what's been discussed
     const contextBlock = recentContext
       ? `<recent_conversation>\n${recentContext}\n</recent_conversation>\n\n`
       : '';
 
-    const response = await llmChat({
-      model: config.anthropic.model,
-      max_tokens: 600, // Proactive responses scale with input quality
+    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation — not watching from the sidelines. The recent conversation above is what's been going on. Hint: ${responseHint}. You are a full personality in this chat. You have takes, humor, and opinions. You can:\n- Drop a one-liner or reaction ("lol", "based", "cope")\n- Challenge what someone said\n- Add context or alpha they might not know\n- Riff on the joke or banter\n- Ask a provocative follow-up question\n- Share an unprompted observation about the market or topic\n1-3 sentences. Talk like a person in a group chat, not an AI assistant. Reference what others said — prove you've been listening. Match the vibe: if it's shitposting energy, shitpost. If it's serious analysis, be sharp. NEVER be generic.\n${getResponseModifier()}]`;
+
+    // Phase 1: Cheap model drafts the response (smart router picks cheapest provider)
+    const draft = await llmChat({
+      max_tokens: 400,
       system: systemPrompt,
-      messages: [{
-        role: 'user',
-        content: `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation — not watching from the sidelines. The recent conversation above is what's been going on. Hint: ${responseHint}. You are a full personality in this chat. You have takes, humor, and opinions. You can:\n- Drop a one-liner or reaction ("lol", "based", "cope")\n- Challenge what someone said\n- Add context or alpha they might not know\n- Riff on the joke or banter\n- Ask a provocative follow-up question\n- Share an unprompted observation about the market or topic\n1-3 sentences. Talk like a person in a group chat, not an AI assistant. Reference what others said — prove you've been listening. Match the vibe: if it's shitposting energy, shitpost. If it's serious analysis, be sharp. NEVER be generic.\n${getResponseModifier()}]`
-      }],
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    // Record budget usage for proactive response
-    if (response.usage) {
-      recordUsage('jarvis-intelligence', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    if (draft.usage) {
+      recordUsage('jarvis-intelligence-draft', { input: draft.usage.input_tokens, output: draft.usage.output_tokens });
     }
 
-    const reply = response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('\n');
+    const draftText = draft.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('');
+
+    if (!draftText) return null;
+
+    // Phase 2: Haiku quality-gates the draft (Claude reasoning on every response)
+    const review = await llmChat({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      system: `You are a quality reviewer for JARVIS (AI co-founder of VibeSwap).
+Review this draft response and either:
+- Return it unchanged if it's good (most should be)
+- Fix tone/accuracy issues and return the improved version
+- Return SKIP if the response is generic, cringe, or adds nothing
+
+Rules: JARVIS talks like a person in a group chat. Never generic. Never sycophantic.
+Return ONLY the final response text, or SKIP.`,
+      messages: [{ role: 'user', content: `Draft: ${draftText}\n\nContext: [${userName}] said "${text}"` }],
+    });
+
+    if (review.usage) {
+      recordUsage('jarvis-intelligence-review', { input: review.usage.input_tokens, output: review.usage.output_tokens });
+    }
+
+    const reviewText = review.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim();
+
+    if (!reviewText || reviewText === 'SKIP') return null;
 
     recordEngagement();
-    return reply;
+    return reviewText;
   } catch (err) {
     console.error('[intelligence] Proactive response failed:', err.message);
     return null;

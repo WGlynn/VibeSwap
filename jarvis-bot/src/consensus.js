@@ -433,9 +433,21 @@ async function broadcastToPeers(peers, path, data) {
   // Circuit breaker: don't flood when all peers are down
   if (!cbAllowRequest()) return;
 
+  // Filter self from peer list — self-success doesn't prove peers are reachable
+  const flyAppName = process.env.FLY_APP_NAME || '';
+  const shardInfo = getShardInfo();
+  const remotePeers = peers.filter(p => {
+    if (p.shardId === shardInfo?.id) return false;
+    // Seed URLs use public hostnames — match by app name
+    if (flyAppName && p.url?.includes(flyAppName)) return false;
+    return true;
+  });
+
+  if (remotePeers.length === 0) return;
+
   const signature = signPayload(data);
   let successes = 0;
-  const promises = peers.map(async (peer) => {
+  const promises = remotePeers.map(async (peer) => {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (signature) headers['X-Shard-Signature'] = signature;

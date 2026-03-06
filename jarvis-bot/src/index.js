@@ -150,14 +150,19 @@ const OUTPUT_POISON_PHRASES = [
 
 function sanitizeOutput(text) {
   if (!text) return text;
-  // Only strip raw tool-use artifact leaks (LLM echoing internal blocks)
-  // Everything else passes through — no more aggressive content filtering
+  // Strip raw tool-use artifact leaks — both bracket AND parenthetical formats
+  // Bracket: [Used tool: name(input)] — old flatten style
+  // Paren: (I looked up: name) / (Result: ...) — new flatten style
   const cleaned = text
     .replace(/\[Used tool: [^\]]*\]/gi, '')
     .replace(/\[Tool result[^\]]*\]/gi, '')
     .replace(/\[Using tool: [^\]]*\]/gi, '')
     .replace(/\[tool_use_id: [^\]]*\]/gi, '')
     .replace(/\[Tool result for [^\]]*\]/gi, '')
+    .replace(/\(I looked up: [^)]*\)/gi, '')
+    .replace(/\(Result: [^)]{0,600}\)/gi, '')
+    .replace(/\(I searched: [^)]*\)/gi, '')
+    .replace(/\(I recalled: [^)]*\)/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   // If stripping tool artifacts left nothing, the entire response was just tool echoes

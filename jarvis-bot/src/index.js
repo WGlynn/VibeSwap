@@ -163,6 +163,12 @@ function sanitizeOutput(text) {
     .replace(/\(Result: [^)]{0,600}\)/gi, '')
     .replace(/\(I searched: [^)]*\)/gi, '')
     .replace(/\(I recalled: [^)]*\)/gi, '')
+    // Raw tool result content leaks — line-by-line matching only (no [\s\S]* to avoid ReDoS)
+    .replace(/^Found \d+ fact\(s\) in deep memory:[^\n]*/gim, '')
+    .replace(/^in deep memory:[^\n]*/gim, '')
+    .replace(/^No matching facts found in deep memory[^\n]*/gim, '')
+    .replace(/^Deep memory search failed:[^\n]*/gim, '')
+    .replace(/^\d+\.\s*\[(?:tonal|factual|preference|general|identity)\]\s[^\n]*/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   // If stripping tool artifacts left nothing, the entire response was just tool echoes

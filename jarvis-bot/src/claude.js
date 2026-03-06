@@ -173,6 +173,12 @@ const HISTORY_POISON_PATTERNS = [
   /\[Used tool: [^\]]*\]/gi,
   /\[Tool result[^\]]*\]/gi,
   /\[Using tool: [^\]]*\]/gi,
+  /\(I looked up: [^)]*\)/gi,
+  /\(Result: [^)]*\)/gi,
+  // Raw recall_knowledge result format — never let this accumulate in history
+  /Found \d+ fact\(s\) in deep memory:[^\n]*/gi,
+  /in deep memory:\s*\n\d+\.\s*\[[^\]]*\][^\n]*/gi,
+  /No matching facts found in deep memory[^.]*/gi,
 ];
 
 function stripPoisonContent(text) {
@@ -736,8 +742,51 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       + (cappedKnowledge ? '\n\n' + cappedKnowledge : '');
   }
 
+  // ============ Selective Tool Loading ============
+  // Only send relevant tools per message — saves ~1400 tokens/call.
+  // "I M J A R V I S" orchestrator: Claude reasoning stays, token waste goes.
+
+  const TOOL_GROUPS = {
+    knowledge: ['learn_fact', 'recall_knowledge'],
+    code: ['read_file', 'write_file', 'run_command', 'list_files', 'fetch_repo'],
+    web: ['web_search'],
+    behavior: ['set_behavior', 'get_behavior'],
+    moderation: ['flag_deceiver'],
+    limni: ['limni_status', 'limni_register_terminal', 'limni_register_vps',
+            'limni_check_health', 'limni_monitor', 'limni_alerts'],
+  };
+
+  function selectTools(msg, allTools) {
+    const lc = msg.toLowerCase();
+    const selected = new Set(['knowledge']); // Always include — recall is fundamental
+
+    if (/code|file|script|deploy|build|error|bug|read |write |commit|git|repo/.test(lc)) {
+      selected.add('code');
+    }
+    if (/search|look up|find|what is|who is|price|news|latest/.test(lc)) {
+      selected.add('web');
+    }
+    if (/behavior|personality|flag|tone|mode|welcome|digest|proactive/.test(lc)) {
+      selected.add('behavior');
+    }
+    if (/limni|terminal|monitor|health|vps|alert|trading|strategy|bot/.test(lc)) {
+      selected.add('limni');
+    }
+    if (/flag|deceiv|scam|fraud|report/.test(lc)) {
+      selected.add('moderation');
+    }
+
+    const selectedNames = new Set();
+    for (const group of selected) {
+      for (const name of TOOL_GROUPS[group] || []) {
+        selectedNames.add(name);
+      }
+    }
+    return allTools.filter(t => selectedNames.has(t.name));
+  }
+
   // Tools Jarvis can use to take real actions (not just generate text)
-  const tools = [
+  const allTools = [
     {
       name: 'set_behavior',
       description: 'Update a runtime behavior flag. Use this when the user asks you to change your behavior (e.g. stop welcoming new members, disable digest, etc). Available flags: welcomeNewMembers, proactiveEngagement, dailyDigest, autoModeration, arkDmOnJoin, trackContributions, respondInGroups, respondInDms. You can also set welcomeMessage (string).',
@@ -940,6 +989,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       },
     },
   ];
+
+  // Select only relevant tools based on message content
+  const tools = selectTools(messageText, allTools);
 
   try {
     const effectiveMaxTokens = maxTokensOverride || config.maxTokens;

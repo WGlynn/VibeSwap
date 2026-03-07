@@ -1368,6 +1368,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
 const _contextExtractionThrottle = new Map(); // userId -> lastExtractTime
 const EXTRACTION_COOLDOWN = 60 * 1000; // 1 min between extractions per user
+const MAX_EXTRACTION_THROTTLE = 10000;
 
 async function _extractConversationContext(userId, userName, chatId, chatType, userMessage, assistantResponse) {
   if (!userMessage || userMessage.length < 30) return;
@@ -1376,6 +1377,10 @@ async function _extractConversationContext(userId, userName, chatId, chatType, u
   // Throttle: max 1 extraction per minute per user
   const lastTime = _contextExtractionThrottle.get(String(userId)) || 0;
   if (Date.now() - lastTime < EXTRACTION_COOLDOWN) return;
+  if (_contextExtractionThrottle.size >= MAX_EXTRACTION_THROTTLE) {
+    const firstKey = _contextExtractionThrottle.keys().next().value;
+    _contextExtractionThrottle.delete(firstKey);
+  }
   _contextExtractionThrottle.set(String(userId), Date.now());
 
   try {

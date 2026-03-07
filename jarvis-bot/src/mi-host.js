@@ -110,6 +110,13 @@ class CellInstance {
 
     // Capability handlers (capability name → handler fn)
     this.handlers = new Map();
+
+    // Energy budget tracking
+    this.energyBudget = manifest.runtime?.energy_budget || 100;
+    this.energyUsed = 0;
+    this.cpuBudgetMs = manifest.runtime?.cpu_budget_ms || 5000;
+    this.cpuUsedMs = 0;
+    this.budgetResetAt = Date.now() + 60000; // Reset every 60s
   }
 
   /**
@@ -259,6 +266,19 @@ class CellInstance {
     this.lastActivity = Date.now();
     telemetry.invocations++;
 
+    // Reset budget window
+    if (Date.now() > this.budgetResetAt) {
+      this.energyUsed = 0;
+      this.cpuUsedMs = 0;
+      this.budgetResetAt = Date.now() + 60000;
+    }
+
+    // Energy budget check
+    if (this.energyUsed >= this.energyBudget) {
+      this.metrics.budgetExceeded = (this.metrics.budgetExceeded || 0) + 1;
+      return { error: `Energy budget exceeded (${this.energyUsed}/${this.energyBudget})` };
+    }
+
     const handler = this.handlers.get(capabilityName);
     if (!handler) {
       this.errors++;
@@ -277,6 +297,11 @@ class CellInstance {
       const reward = result?.error ? 0.2 : (0.5 + 0.5 * latencyReward);
       this.learn(reward, 'invoke_success');
 
+      // Charge energy: 1 unit base + latency penalty
+      const energyCost = 1 + Math.floor(latencyMs / 1000);
+      this.energyUsed += energyCost;
+      this.cpuUsedMs += latencyMs;
+
       // Track latency metric
       this.metrics.avgLatencyMs = this.metrics.avgLatencyMs
         ? this.metrics.avgLatencyMs * 0.9 + latencyMs * 0.1
@@ -286,6 +311,7 @@ class CellInstance {
     } catch (err) {
       this.errors++;
       telemetry.errors++;
+      this.energyUsed += 2; // Errors cost extra
       this.learn(0.0, 'invoke_error');
       return { error: err.message };
     }
@@ -714,6 +740,13 @@ function reloadCell(filePath) {
       existingCell.act();
 
       console.log(`[mi-host] Hot-reload: updated ${manifest.id} → identity: ${existingCell.identity}`);
+      emitSignalInternal('cell.hot_reload', {
+        cellId: manifest.id,
+        action: 'updated',
+        identity: existingCell.identity,
+        capabilities: (manifest.capabilities || []).map(c => c.name),
+        version: manifest.version
+      });
     } else {
       // New cell
       registerCell(manifest);
@@ -723,10 +756,20 @@ function reloadCell(filePath) {
       instance.act();
       cells.set(manifest.id, instance);
       console.log(`[mi-host] Hot-reload: added ${manifest.id} → identity: ${instance.identity}`);
+      emitSignalInternal('cell.hot_reload', {
+        cellId: manifest.id,
+        action: 'added',
+        identity: instance.identity,
+        capabilities: (manifest.capabilities || []).map(c => c.name),
+        version: manifest.version
+      });
     }
 
     emitSignalInternal('cell.identity.announce', {
       cellId: manifest.id,
+      identity: cells.get(manifest.id)?.identity,
+      confidence: cells.get(manifest.id)?.confidence,
+      capabilities: (manifest.capabilities || []).map(c => c.name),
       reason: 'hot_reload'
     });
   } catch (err) {

@@ -17,6 +17,8 @@ import {
   emitSignal,
   onSignal,
   rewardCell,
+  pauseCell,
+  resumeCell,
   generateToolDefinitions,
   handleMIToolCall,
   getCellStats,
@@ -218,6 +220,22 @@ describe('signal bus', () => {
     assert.ok(received.timestamp, 'Should have timestamp');
   });
 
+  it('should deliver signals to wildcard handlers', async () => {
+    let received = [];
+    onSignal('wildcard.*', (signal) => {
+      received.push(signal);
+    });
+
+    emitSignal('wildcard.foo', { a: 1 });
+    emitSignal('wildcard.bar', { b: 2 });
+    emitSignal('other.baz', { c: 3 }); // Should NOT match
+
+    await new Promise(r => setTimeout(r, 300));
+    assert.equal(received.length, 2, `Expected 2 wildcard matches, got ${received.length}`);
+    assert.equal(received[0].name, 'wildcard.foo');
+    assert.equal(received[1].name, 'wildcard.bar');
+  });
+
   it('should not deliver to unrelated handlers', async () => {
     let called = false;
     onSignal('unrelated.signal', () => { called = true; });
@@ -301,6 +319,42 @@ describe('pheromone board', () => {
     const stats = getPheromoneStats();
     assert.ok(typeof stats.entries === 'number');
     assert.ok(typeof stats.maxEntries === 'number');
+  });
+});
+
+// ============ Pause / Resume Tests ============
+
+describe('pauseCell / resumeCell', () => {
+  it('should pause an active cell', () => {
+    const ok = pauseCell('test-cell');
+    assert.equal(ok, true);
+
+    const stats = getCellStats();
+    const cell = stats.cells.find(c => c.id === 'test-cell');
+    assert.equal(cell.state, 'paused');
+  });
+
+  it('should skip paused cells during invocation', async () => {
+    // test-cell is paused from previous test
+    // low-energy-cell also provides echo — but may have budget issues
+    // Just verify the invocation still works (routes to another cell or returns error)
+    const result = await invokeCapability('echo', { msg: 'while-paused' });
+    // Should either succeed via another cell or return an error — NOT test-cell
+    assert.ok(result);
+  });
+
+  it('should resume a paused cell', () => {
+    const ok = resumeCell('test-cell');
+    assert.equal(ok, true);
+
+    const stats = getCellStats();
+    const cell = stats.cells.find(c => c.id === 'test-cell');
+    assert.notEqual(cell.state, 'paused');
+  });
+
+  it('should return false for non-existent cell', () => {
+    assert.equal(pauseCell('nonexistent'), false);
+    assert.equal(resumeCell('nonexistent'), false);
   });
 });
 

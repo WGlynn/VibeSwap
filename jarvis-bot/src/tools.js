@@ -483,7 +483,7 @@ export async function getStables() {
     if (stables.length === 0) return 'No stablecoin data available.';
 
     let totalMcap = 0;
-    const lines = ['Stablecoin Market\n'];
+    const lines = [];
     for (let i = 0; i < stables.length; i++) {
       const s = stables[i];
       const mcap = s.circulating?.peggedUSD || 0;
@@ -491,7 +491,6 @@ export async function getStables() {
       lines.push(`  ${String(i + 1).padStart(2)}. ${s.name.padEnd(10)} $${formatLargeNum(mcap)}`);
     }
     lines.unshift(`Stablecoin Market — Total: $${formatLargeNum(totalMcap)}\n`);
-    lines.shift(); // remove duplicate header
     return lines.join('\n');
   } catch (err) {
     return `Stablecoins lookup failed: ${err.message}`;

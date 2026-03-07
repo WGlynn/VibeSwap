@@ -102,7 +102,7 @@ export async function getPortfolio(userId) {
       `https://api.coingecko.com/api/v3/simple/price?ids=${tokenIds.join(',')}&vs_currencies=usd&include_24hr_change=true`,
       { signal: AbortSignal.timeout(10000) }
     );
-    prices = await resp.json();
+    if (resp.ok) prices = await resp.json();
   } catch {}
 
   const lines = ['Your Portfolio\n'];

@@ -129,6 +129,7 @@ export function getTrivia() {
 
 // userId -> { streak, lastGM, totalGMs, longestStreak }
 const gmStreaks = new Map();
+const MAX_GM_USERS = 10000;
 
 export function recordGM(userId, username) {
   const now = Date.now();
@@ -155,6 +156,15 @@ export function recordGM(userId, username) {
   if (entry.streak > entry.longestStreak) entry.longestStreak = entry.streak;
 
   gmStreaks.set(userId, entry);
+
+  // Evict oldest entries if over cap
+  if (gmStreaks.size > MAX_GM_USERS) {
+    let oldestId = null, oldestTime = Infinity;
+    for (const [id, e] of gmStreaks) {
+      if (e.lastGM < oldestTime) { oldestTime = e.lastGM; oldestId = id; }
+    }
+    if (oldestId !== null) gmStreaks.delete(oldestId);
+  }
 
   const fire = entry.streak >= 7 ? ' 🔥' : entry.streak >= 3 ? ' ✨' : '';
   return `GM ${username}! Streak: ${entry.streak} day${entry.streak > 1 ? 's' : ''}${fire} | Total GMs: ${entry.totalGMs}`;

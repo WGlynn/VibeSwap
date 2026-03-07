@@ -122,6 +122,12 @@ export function getOperator(userId) {
 }
 
 export function registerOperator(userId, name, provider, model, apiKey) {
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error('Operator name is required');
+  }
+  if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) {
+    throw new Error('Valid API key is required');
+  }
   const shardName = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || `op${userId}`;
   const flyAppName = `jarvis-shard-${shardName}`;
   const shardId = `shard-${shardName}`;

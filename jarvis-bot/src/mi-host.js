@@ -67,6 +67,7 @@ const telemetry = {
   signalsDropped: 0,
   cellsActive: 0,
   identityChanges: 0,
+  invocations: 0,
   errors: 0,
   pheromonesDeposited: 0,
   pheromonesQueried: 0,
@@ -158,16 +159,17 @@ class CellInstance {
       this.identity = fallback.identity;
       this.confidence = 0.3;
     } else {
-      // Weighted selection using strategy weights
+      // Strategy-based selection
       const strategy = this.manifest.lifecycle?.learn?.strategy || 'fixed';
-      if (strategy === 'contextual_bandit') {
-        this.identity = banditSelect(eligible, this.strategyWeights);
-        this.confidence = this.strategyWeights[this.identity] || 0.5;
-      } else {
+      if (strategy === 'fixed') {
         // Fixed: pick highest priority (lowest number)
         const best = eligible.sort((a, b) => a.priority - b.priority)[0];
         this.identity = best.identity;
         this.confidence = 1.0;
+      } else {
+        // Bandit strategies: thompson, epsilon_greedy, ucb1, contextual_bandit
+        this.identity = banditSelect(eligible, this.strategyWeights);
+        this.confidence = this.strategyWeights[this.identity] || 0.5;
       }
     }
 
@@ -204,10 +206,10 @@ class CellInstance {
   learn(reward, rewardSignal) {
     if (!this.identity) return;
     const strategy = this.manifest.lifecycle?.learn?.strategy || 'fixed';
-    if (strategy !== 'contextual_bandit') return;
+    if (strategy === 'fixed') return; // Fixed cells don't learn
 
-    // Simple exponential moving average update
-    const lr = 0.1; // Learning rate
+    // EMA update for all bandit strategies (thompson, epsilon_greedy, ucb1, contextual_bandit)
+    const lr = 0.1;
     const currentWeight = this.strategyWeights[this.identity] || 0.5;
     this.strategyWeights[this.identity] = currentWeight + lr * (reward - currentWeight);
 
@@ -219,6 +221,12 @@ class CellInstance {
       }
     }
 
+    // Track reward signal for telemetry
+    this.metrics[`reward_${rewardSignal}`] = (this.metrics[`reward_${rewardSignal}`] || 0) + 1;
+    this.metrics.totalRewards = (this.metrics.totalRewards || 0) + 1;
+    this.metrics.avgReward = this.metrics.avgReward
+      ? this.metrics.avgReward * 0.9 + reward * 0.1
+      : reward;
     this.lastActivity = Date.now();
   }
 
@@ -247,19 +255,36 @@ class CellInstance {
   async invoke(capabilityName, input) {
     this.invocations++;
     this.lastActivity = Date.now();
+    telemetry.invocations++;
 
     const handler = this.handlers.get(capabilityName);
     if (!handler) {
       this.errors++;
+      this.learn(0.0, 'missing_handler');
       return { error: `No handler registered for capability: ${capabilityName}` };
     }
 
+    const startMs = Date.now();
     try {
       const result = await handler(input);
+      const latencyMs = Date.now() - startMs;
+
+      // Auto-reward: success = 1.0, scaled by latency (faster = better reward)
+      // Latency reward: 1.0 at 0ms, 0.5 at 5000ms, approaches 0 at infinity
+      const latencyReward = 1.0 / (1 + latencyMs / 5000);
+      const reward = result?.error ? 0.2 : (0.5 + 0.5 * latencyReward);
+      this.learn(reward, 'invoke_success');
+
+      // Track latency metric
+      this.metrics.avgLatencyMs = this.metrics.avgLatencyMs
+        ? this.metrics.avgLatencyMs * 0.9 + latencyMs * 0.1
+        : latencyMs;
+
       return result;
     } catch (err) {
       this.errors++;
       telemetry.errors++;
+      this.learn(0.0, 'invoke_error');
       return { error: err.message };
     }
   }

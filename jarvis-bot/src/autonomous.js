@@ -20,8 +20,15 @@ import { llmChat } from './llm-provider.js';
 import { getRecentContext } from './group-context.js';
 import { recordUsage } from './compute-economics.js';
 import { getActivePersonaId, getResponseModifier } from './persona.js';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const HTTP_TIMEOUT = 10000;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = join(__dirname, '..', 'data');
+const ACTIVITY_FILE = join(DATA_DIR, 'chat-activity.json');
 
 // ============ State ============
 
@@ -412,4 +419,59 @@ export function getAutonomousStats() {
       }])
     ),
   };
+}
+
+// ============ Persistence ============
+
+/**
+ * Load chat activity from disk. Call at startup before initAutonomous.
+ */
+export async function loadChatActivity() {
+  try {
+    if (!existsSync(ACTIVITY_FILE)) return;
+    const raw = await readFile(ACTIVITY_FILE, 'utf-8');
+    const data = JSON.parse(raw);
+    if (data.chatActivity) {
+      for (const [id, a] of Object.entries(data.chatActivity)) {
+        chatActivity.set(id, {
+          lastMessage: a.lastMessage || 0,
+          messageCount: a.messageCount || 0,
+          hourStart: a.hourStart || Date.now(),
+        });
+      }
+    }
+    if (data.targetChats) {
+      for (const id of data.targetChats) targetChats.add(id);
+    }
+    if (data.lastAutonomousPost) lastAutonomousPost = data.lastAutonomousPost;
+    console.log(`[autonomous] Loaded ${chatActivity.size} chat activity records`);
+  } catch (err) {
+    console.warn(`[autonomous] Failed to load activity: ${err.message}`);
+  }
+}
+
+/**
+ * Save chat activity to disk. Call during flush cycles and shutdown.
+ */
+export async function flushAutonomous() {
+  try {
+    if (!existsSync(DATA_DIR)) {
+      await mkdir(DATA_DIR, { recursive: true });
+    }
+    const data = {
+      savedAt: new Date().toISOString(),
+      lastAutonomousPost,
+      targetChats: [...targetChats],
+      chatActivity: Object.fromEntries(
+        [...chatActivity.entries()].map(([id, a]) => [id, {
+          lastMessage: a.lastMessage,
+          messageCount: a.messageCount,
+          hourStart: a.hourStart,
+        }])
+      ),
+    };
+    await writeFile(ACTIVITY_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn(`[autonomous] Failed to save activity: ${err.message}`);
+  }
 }

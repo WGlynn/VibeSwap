@@ -57,12 +57,15 @@ try {
   getCellStats = () => ({ host: {}, registry: {}, cells: [] });
   getMIStatusString = () => 'MI Host SDK not loaded.';
 }
-// Provider health (circuit breakers)
+// Provider health (circuit breakers + performance ranking)
+let getProviderPerformanceStats_MI;
 try {
   const lp = await import('./llm-provider.js');
   getProviderHealthString_MI = lp.getProviderHealthString;
+  getProviderPerformanceStats_MI = lp.getProviderPerformanceStats;
 } catch {
   getProviderHealthString_MI = () => 'Provider health not available.';
+  getProviderPerformanceStats_MI = () => ({});
 }
 // MI Bridge — wires cell capabilities to tool functions
 let registerMIBridge = async () => ({ registered: 0 });
@@ -92,7 +95,7 @@ import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './
 import { initPredictions, flushPredictions, createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
-import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats } from './autonomous.js';
+import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { getPersonaName, getActivePersonaId, listPersonas } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -914,6 +917,42 @@ bot.command('provider_health', async (ctx) => {
     ctx.reply(health);
   } catch (err) {
     ctx.reply(`Provider health error: ${err.message}`);
+  }
+});
+
+// /telemetry — Combined system telemetry: MI cells + providers + performance
+bot.command('telemetry', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  try {
+    const parts = [];
+
+    // MI Cell stats
+    const cellStats = getCellStats();
+    parts.push(`=== MI Cells ===`);
+    parts.push(`Active: ${cellStats.cells?.length || 0} | Signals processed: ${cellStats.host?.signalsProcessed || 0} | Errors: ${cellStats.host?.errors || 0}`);
+    if (cellStats.cells?.length > 0) {
+      for (const c of cellStats.cells) {
+        parts.push(`  ${c.id}: ${c.state} [${c.identity}] invocations=${c.invocations} errors=${c.errors}`);
+      }
+    }
+
+    // Provider health
+    parts.push('');
+    parts.push(getProviderHealthString_MI());
+
+    // Performance ranking
+    const perf = getProviderPerformanceStats_MI();
+    if (Object.keys(perf).length > 0) {
+      parts.push('');
+      parts.push('=== Provider Performance ===');
+      for (const [name, stats] of Object.entries(perf)) {
+        parts.push(`  ${name}: ~${stats.avgLatencyMs}ms, ${stats.successRate} success, score=${stats.score} (${stats.samples} samples)`);
+      }
+    }
+
+    ctx.reply(parts.join('\n'));
+  } catch (err) {
+    ctx.reply(`Telemetry error: ${err.message}`);
   }
 });
 
@@ -4685,6 +4724,7 @@ async function main() {
       await shutdownShard();
       await flushLearning();
       await flushInnerDialogue();
+      await flushAutonomous();
       process.exit(0);
     }
     process.once('SIGINT', () => workerShutdown('SIGINT'));
@@ -4757,6 +4797,7 @@ async function main() {
   await initPredictions();
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
   // Autonomous engagement — JARVIS as active community member
+  await loadChatActivity(); // Restore activity state before init
   const autonomousChatIds = config.authorizedGroups || [];
   initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
   await initComputeEconomics();
@@ -5626,6 +5667,7 @@ async function main() {
     await flushGroupContext();
     await flushXP();
     await flushPredictions();
+    await flushAutonomous();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);
@@ -5709,6 +5751,7 @@ async function main() {
     await flushXP();
     await flushPredictions();
     stopScheduler();
+    await flushAutonomous();
     stopAutonomous();
     await saveComms();
     await writeHeartbeat('stopped');

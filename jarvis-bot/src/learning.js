@@ -33,6 +33,18 @@ import { config } from './config.js';
 import { encryptUserCKB, decryptUserCKB, encryptGroupCKB, decryptGroupCKB, encryptSkills, verifySkills, signCorrection, isEncryptionEnabled } from './privacy.js';
 import { getStateStore } from './state-store.js';
 import { buildInnerDialogueContext } from './inner-dialogue.js';
+// Shard learnings — graceful fallback
+let broadcastLearning = async () => false;
+let buildShardLearningsContext = () => '';
+let maybeRefresh = async () => false;
+try {
+  const sl = await import('./shard-learnings.js');
+  broadcastLearning = sl.broadcastLearning;
+  buildShardLearningsContext = sl.buildShardLearningsContext;
+  maybeRefresh = sl.maybeRefresh;
+} catch (err) {
+  console.warn(`[learning] Shard learnings unavailable: ${err.message}`);
+}
 import { propose, PROPOSAL_TYPES, onCommit } from './consensus.js';
 import { isMultiShard } from './shard.js';
 import { archiveFact, archiveBatch, searchDeepStorageFull, getDeepStorageStats } from './deep-storage.js';
@@ -860,6 +872,9 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
     }).catch(() => {});
   }
 
+  // Cross-shard learning bus — git-synced JSONL (shouldBroadcast handles threshold)
+  broadcastLearning(fact, category, tags, 'high').catch(() => {});
+
   return true;
 }
 
@@ -1017,6 +1032,13 @@ export async function buildKnowledgeContext(userId, chatId, chatType, messageTex
   if (innerContext) {
     parts.push(innerContext);
   }
+
+  // ---- Cross-Shard Learnings (Git-Synced JSONL) ----
+  try {
+    await maybeRefresh();
+    const shardContext = buildShardLearningsContext();
+    if (shardContext) parts.push(shardContext);
+  } catch {}
 
   // ---- Network Knowledge: Skills ----
   if (skills.length > 0) {

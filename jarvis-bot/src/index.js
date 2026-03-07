@@ -22,6 +22,25 @@ import { initCRPC, flushCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody }
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
+// Shard learnings — graceful fallback if module fails to load
+let initShardLearnings, readLearnings, archiveExpired, queryLearnings, getRecentLearnings, getShardSyncStatus;
+try {
+  const sl = await import('./shard-learnings.js');
+  initShardLearnings = sl.initShardLearnings;
+  readLearnings = sl.readLearnings;
+  archiveExpired = sl.archiveExpired;
+  queryLearnings = sl.queryLearnings;
+  getRecentLearnings = sl.getRecentLearnings;
+  getShardSyncStatus = sl.getShardSyncStatus;
+} catch (err) {
+  console.warn(`[jarvis] Shard learnings unavailable: ${err.message}`);
+  initShardLearnings = async () => {};
+  readLearnings = async () => [];
+  archiveExpired = async () => 0;
+  queryLearnings = () => [];
+  getRecentLearnings = () => [];
+  getShardSyncStatus = () => ({ total: 0, own: 0, other: 0, last24h: 0, last7d: 0, shardCounts: {}, staleSec: -1 });
+}
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
@@ -801,6 +820,49 @@ bot.command('shard_destroy', async (ctx) => {
   } catch (err) {
     ctx.reply(`Failed to destroy shard: ${err.message}`);
   }
+});
+
+// /shard_sync — Cross-shard learning bus status + queries
+bot.command('shard_sync', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const args = (ctx.message.text || '').split(/\s+/).slice(1);
+  const sub = args[0] || 'status';
+
+  if (sub === 'status') {
+    const s = getShardSyncStatus();
+    const shardLines = Object.entries(s.shardCounts)
+      .map(([id, count]) => `  ${id}: ${count}`)
+      .join('\n');
+    return ctx.reply(
+      `Cross-Shard Learning Bus\n` +
+      `Total: ${s.total} | Own: ${s.own} | Other: ${s.other}\n` +
+      `Last 24h: ${s.last24h} | Last 7d: ${s.last7d}\n` +
+      `Cache age: ${s.staleSec}s\n\n` +
+      `By shard:\n${shardLines || '  (none)'}`
+    );
+  }
+
+  if (sub === 'query') {
+    const topic = args.slice(1).join(' ') || null;
+    const results = queryLearnings(topic, null);
+    if (results.length === 0) return ctx.reply(`No learnings found${topic ? ` for "${topic}"` : ''}.`);
+    const lines = results.slice(0, 15).map(e =>
+      `[${e.shardId}] ${e.topic}: ${e.fact.slice(0, 80)}`
+    );
+    return ctx.reply(lines.join('\n'));
+  }
+
+  if (sub === 'recent') {
+    const hours = parseInt(args[1]) || 24;
+    const results = getRecentLearnings(hours * 60 * 60 * 1000);
+    if (results.length === 0) return ctx.reply(`No learnings in the last ${hours}h.`);
+    const lines = results.slice(0, 15).map(e =>
+      `[${e.shardId}] ${e.topic}: ${e.fact.slice(0, 80)}`
+    );
+    return ctx.reply(`Last ${hours}h (${results.length} total):\n${lines.join('\n')}`);
+  }
+
+  ctx.reply('Usage: /shard_sync [status|query <topic>|recent <hours>]');
 });
 
 // /shards — Owner: list all operator shards
@@ -4317,6 +4379,7 @@ async function main() {
 
     console.log('[jarvis] Step 3: Loading learning + inner dialogue + deep storage + hell...');
     await initLearning();
+    try { await initShardLearnings(); } catch (err) { console.warn(`[jarvis] Shard learnings init failed: ${err.message}`); }
     await initInnerDialogue();
     await initDeepStorage();
     await initHell();
@@ -4488,6 +4551,7 @@ async function main() {
     // Flush cycles for worker — harmonic tick (all shards pulse at same wall-clock boundary)
     scheduleHarmonicTick(async () => {
       await flushLearning();
+      try { await readLearnings(); await archiveExpired(); } catch {}
       await flushInnerDialogue();
       if (isMultiShard()) checkShardHealth();
       const epoch = await produceEpoch();
@@ -4618,6 +4682,7 @@ async function main() {
   await loadBehavior();
   await loadComms();
   await initLearning();
+  try { await initShardLearnings(); } catch (err) { console.warn(`[jarvis] Shard learnings init failed: ${err.message}`); }
   await initInnerDialogue();
   await initStickers();
   await recoverWAL();
@@ -5480,6 +5545,7 @@ async function main() {
     await flushAntispam();
     await flushThreads();
     await flushLearning();
+    try { await readLearnings(); await archiveExpired(); } catch {}
     // Inner dialogue: generate self-reflections (rate-limited to 1x/hour internally)
     try {
       const stats = await getLearningStats(config.ownerUserId, null);
@@ -5545,6 +5611,8 @@ async function main() {
         const pullResult = await gitPull();
         if (!pullResult.includes('0 changes, 0 insertions, 0 deletions')) {
           await reloadSystemPrompt();
+          // Re-read shard learnings after git pull brings new entries
+          await readLearnings();
         }
       } catch {}
     }, config.autoSyncInterval);

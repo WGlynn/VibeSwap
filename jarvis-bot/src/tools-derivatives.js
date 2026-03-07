@@ -57,6 +57,7 @@ async function getLiquidationsFallback(symbol) {
       `https://api.coingecko.com/api/v3/simple/price?ids=${symbolToId(symbol)}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`,
       { signal: AbortSignal.timeout(HTTP_TIMEOUT) }
     );
+    if (!resp.ok) return `Liquidations data unavailable (HTTP ${resp.status}).`;
     const data = await resp.json();
     const id = symbolToId(symbol);
     const info = data[id];
@@ -129,6 +130,7 @@ async function getFundingFallback(symbol) {
       `https://api.coingecko.com/api/v3/simple/price?ids=${symbolToId(symbol)}&vs_currencies=usd&include_24hr_change=true`,
       { signal: AbortSignal.timeout(HTTP_TIMEOUT) }
     );
+    if (!resp.ok) return `Funding rate data unavailable (HTTP ${resp.status}).`;
     const data = await resp.json();
     const info = data[symbolToId(symbol)];
     if (!info) return `No data for ${symbol}.`;

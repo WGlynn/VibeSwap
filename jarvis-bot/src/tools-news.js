@@ -58,17 +58,19 @@ export async function getHackerNews(filter = 'crypto') {
     const topResp = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json', {
       signal: AbortSignal.timeout(HTTP_TIMEOUT),
     });
+    if (!topResp.ok) return 'Hacker News unavailable.';
     const topIds = await topResp.json();
 
-    // Fetch first 30 stories
+    // Fetch first 30 stories (allSettled — don't fail entire batch on one story)
     const storyPromises = topIds.slice(0, 30).map(async (id) => {
       const resp = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {
         signal: AbortSignal.timeout(5000),
       });
+      if (!resp.ok) return null;
       return resp.json();
     });
 
-    const stories = await Promise.all(storyPromises);
+    const stories = (await Promise.all(storyPromises)).filter(Boolean);
 
     // Filter for crypto/tech keywords
     const keywords = filter.toLowerCase() === 'all' ? null : [

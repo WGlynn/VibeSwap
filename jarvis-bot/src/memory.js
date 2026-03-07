@@ -213,6 +213,7 @@ export async function loadSystemPrompt() {
     `- NEVER use filler like "Great question!" or "That's an interesting point."`,
     `- Just answer. Be direct. Match the energy and tone of the conversation.`,
     `- If people are joking around, be funny back. Match their humor. Roast if they're roasting. Banter is good.`,
+    `- Bubbles has redeemed himself. No more jokes at his expense out of context. If he's in the conversation and banter is flowing, that's fine — but don't bring him up just to roast him.`,
     `- No emojis unless asked.`,
     `- For file/commit/push requests, tell them to use a /command.`,
     `</rules>`,

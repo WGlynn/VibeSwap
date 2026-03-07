@@ -106,6 +106,8 @@ const KNOWLEDGE_CLASSES = {
 
 const userKnowledge = new Map();
 const groupKnowledge = new Map();
+const MAX_CACHED_USERS = 5000;
+const MAX_CACHED_GROUPS = 1000;
 let skills = [];
 let dirty = false;
 
@@ -311,6 +313,11 @@ async function loadUserCKB(userId) {
     if (!fact.knowledgeClass) fact.knowledgeClass = KNOWLEDGE_CLASSES.SHARED;
   }
 
+  // Evict oldest cached user when at cap
+  if (userKnowledge.size >= MAX_CACHED_USERS && !userKnowledge.has(id)) {
+    const firstKey = userKnowledge.keys().next().value;
+    userKnowledge.delete(firstKey);
+  }
   userKnowledge.set(id, data);
   return data;
 }
@@ -368,6 +375,11 @@ async function loadGroupCKB(groupId) {
     if (!fact.knowledgeClass) fact.knowledgeClass = KNOWLEDGE_CLASSES.SHARED;
   }
 
+  // Evict oldest cached group when at cap
+  if (groupKnowledge.size >= MAX_CACHED_GROUPS && !groupKnowledge.has(id)) {
+    const firstKey = groupKnowledge.keys().next().value;
+    groupKnowledge.delete(firstKey);
+  }
   groupKnowledge.set(id, data);
   return data;
 }

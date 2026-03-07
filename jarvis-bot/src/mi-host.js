@@ -17,6 +17,7 @@
 
 import {
   loadManifestDir,
+  loadManifest,
   registerCell,
   unregisterCell,
   matchSignal,
@@ -26,12 +27,17 @@ import {
   getCell,
   listCells
 } from './mi-manifest.js';
+import { watch, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, basename, dirname } from 'path';
 
 // ============ Constants ============
 const DEFAULT_CELLS_DIR = './cells';
+const MI_STATE_FILE = './data/mi-state.json';
 const MAX_SIGNAL_QUEUE = 1000;
 const SIGNAL_PROCESS_INTERVAL_MS = 100;
 const TELEMETRY_FLUSH_INTERVAL_MS = 30000;
+const STATE_PERSIST_INTERVAL_MS = 300000; // Persist every 5 minutes
+const HOT_RELOAD_DEBOUNCE_MS = 2000;
 const LIFECYCLE_CHECK_INTERVAL_MS = 60000;
 
 // ============ State ============
@@ -413,6 +419,75 @@ function lifecycleCheck() {
   telemetry.cellsActive = [...cells.values()].filter(c => c.state === 'active').length;
 }
 
+// ============ State Persistence ============
+
+let persistInterval = null;
+
+/**
+ * Save cell strategy weights and telemetry to disk.
+ */
+export function persistMIState() {
+  try {
+    const state = {
+      version: 1,
+      timestamp: Date.now(),
+      cells: {}
+    };
+
+    for (const [id, cell] of cells) {
+      state.cells[id] = {
+        identity: cell.identity,
+        confidence: cell.confidence,
+        strategyWeights: { ...cell.strategyWeights },
+        invocations: cell.invocations,
+        errors: cell.errors,
+        metrics: { ...cell.metrics }
+      };
+    }
+
+    // Ensure directory exists
+    const dir = dirname(MI_STATE_FILE);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+    writeFileSync(MI_STATE_FILE, JSON.stringify(state, null, 2));
+    return true;
+  } catch (err) {
+    console.warn(`[mi-host] Failed to persist state: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Load saved cell state from disk. Restores strategy weights.
+ */
+function loadMIState() {
+  try {
+    if (!existsSync(MI_STATE_FILE)) return null;
+    const raw = readFileSync(MI_STATE_FILE, 'utf-8');
+    const state = JSON.parse(raw);
+    if (state.version !== 1) return null;
+    console.log(`[mi-host] Loaded persisted state (${Object.keys(state.cells).length} cells, saved ${new Date(state.timestamp).toISOString()})`);
+    return state;
+  } catch (err) {
+    console.warn(`[mi-host] Failed to load persisted state: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Apply persisted state to a cell instance.
+ */
+function applyPersistedState(cell, savedState) {
+  if (!savedState) return;
+  // Restore strategy weights (learned from past runs)
+  if (savedState.strategyWeights) {
+    cell.strategyWeights = { ...savedState.strategyWeights };
+  }
+  // Restore counters (cumulative across runs)
+  if (savedState.invocations) cell.invocations = savedState.invocations;
+  if (savedState.errors) cell.errors = savedState.errors;
+}
+
 // ============ Initialization ============
 
 /**
@@ -420,6 +495,9 @@ function lifecycleCheck() {
  */
 export async function initMIHost(cellsDir = DEFAULT_CELLS_DIR) {
   console.log('[mi-host] Initializing MI Host SDK...');
+
+  // Load persisted state (strategy weights from previous runs)
+  const savedState = loadMIState();
 
   // Load manifests
   const manifests = loadManifestDir(cellsDir);
@@ -429,6 +507,11 @@ export async function initMIHost(cellsDir = DEFAULT_CELLS_DIR) {
   for (const manifest of manifests) {
     registerCell(manifest);
     const instance = new CellInstance(manifest);
+
+    // Apply persisted state (learned weights, counters)
+    if (savedState?.cells?.[manifest.id]) {
+      applyPersistedState(instance, savedState.cells[manifest.id]);
+    }
 
     // Run initial lifecycle: sense → choose → act
     const features = instance.sense({});
@@ -451,17 +534,112 @@ export async function initMIHost(cellsDir = DEFAULT_CELLS_DIR) {
     telemetry.cellsActive = [...cells.values()].filter(c => c.state === 'active').length;
   }, TELEMETRY_FLUSH_INTERVAL_MS);
 
+  // Start state persistence loop (save learned weights every 5 min)
+  persistInterval = setInterval(persistMIState, STATE_PERSIST_INTERVAL_MS);
+
+  // Start hot-reload file watcher
+  startHotReload(cellsDir);
+
   console.log(`[mi-host] Host SDK initialized. ${cells.size} cells active.`);
   return { cellCount: cells.size, manifests: manifests.length };
+}
+
+// ============ Hot Reload ============
+
+let fileWatcher = null;
+let hotReloadDebounce = null;
+
+/**
+ * Watch cells directory for manifest changes. Debounced reload.
+ */
+function startHotReload(cellsDir) {
+  if (!existsSync(cellsDir)) return;
+
+  try {
+    fileWatcher = watch(cellsDir, { persistent: false }, (eventType, filename) => {
+      if (!filename || !filename.endsWith('.mi.json')) return;
+
+      // Debounce: wait for writes to finish
+      if (hotReloadDebounce) clearTimeout(hotReloadDebounce);
+      hotReloadDebounce = setTimeout(() => {
+        reloadCell(join(cellsDir, filename));
+      }, HOT_RELOAD_DEBOUNCE_MS);
+    });
+    console.log(`[mi-host] Hot-reload watching: ${cellsDir}`);
+  } catch (err) {
+    console.warn(`[mi-host] Hot-reload watcher failed: ${err.message}`);
+  }
+}
+
+/**
+ * Reload a single cell manifest from disk.
+ */
+function reloadCell(filePath) {
+  try {
+    if (!existsSync(filePath)) {
+      // File deleted — unregister cell
+      const fileName = basename(filePath, '.mi.json');
+      for (const [id, cell] of cells) {
+        if (cell.manifest._source === filePath) {
+          console.log(`[mi-host] Hot-reload: removing ${id} (file deleted)`);
+          emitSignalInternal('cell.death', { cellId: id, identity: cell.identity });
+          unregisterCell(id);
+          cells.delete(id);
+          break;
+        }
+      }
+      return;
+    }
+
+    const manifest = loadManifest(filePath);
+    const existingCell = cells.get(manifest.id);
+
+    if (existingCell) {
+      // Re-register manifest (updates registry indexes)
+      unregisterCell(manifest.id);
+      registerCell(manifest);
+
+      // Preserve learned weights but update manifest
+      existingCell.manifest = manifest;
+
+      // Re-run lifecycle with new manifest
+      const features = existingCell.sense({});
+      existingCell.choose(features);
+      existingCell.act();
+
+      console.log(`[mi-host] Hot-reload: updated ${manifest.id} → identity: ${existingCell.identity}`);
+    } else {
+      // New cell
+      registerCell(manifest);
+      const instance = new CellInstance(manifest);
+      const features = instance.sense({});
+      instance.choose(features);
+      instance.act();
+      cells.set(manifest.id, instance);
+      console.log(`[mi-host] Hot-reload: added ${manifest.id} → identity: ${instance.identity}`);
+    }
+
+    emitSignalInternal('cell.identity.announce', {
+      cellId: manifest.id,
+      reason: 'hot_reload'
+    });
+  } catch (err) {
+    console.warn(`[mi-host] Hot-reload failed for ${filePath}: ${err.message}`);
+  }
 }
 
 /**
  * Shutdown the MI Host SDK.
  */
 export function shutdownMIHost() {
+  // Persist state before shutdown
+  persistMIState();
+
   if (signalInterval) clearInterval(signalInterval);
   if (lifecycleInterval) clearInterval(lifecycleInterval);
   if (telemetryInterval) clearInterval(telemetryInterval);
+  if (persistInterval) clearInterval(persistInterval);
+  if (fileWatcher) { fileWatcher.close(); fileWatcher = null; }
 
   // Emit death signals
   for (const [id, cell] of cells) {

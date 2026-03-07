@@ -146,6 +146,7 @@ export async function backupData() {
       'jarvis-bot/data/spam-log.json',
       'jarvis-bot/data/threads.json',
       '.claude/shard_learnings.jsonl',
+      'jarvis-bot/data/mi-state.json',
     ];
 
     // Check if any data files have changes

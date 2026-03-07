@@ -42,6 +42,28 @@ try {
   getShardSyncStatus = () => ({ total: 0, own: 0, other: 0, last24h: 0, last7d: 0, shardCounts: {}, staleSec: -1 });
 }
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
+// MI Host SDK — graceful fallback if module fails to load
+let initMIHost, shutdownMIHost, getCellStats, getMIStatusString, getProviderHealthString_MI;
+try {
+  const mi = await import('./mi-host.js');
+  initMIHost = mi.initMIHost;
+  shutdownMIHost = mi.shutdownMIHost;
+  getCellStats = mi.getCellStats;
+  getMIStatusString = mi.getMIStatusString;
+} catch (err) {
+  console.warn(`[jarvis] MI Host SDK unavailable: ${err.message}`);
+  initMIHost = async () => ({ cellCount: 0, manifests: 0 });
+  shutdownMIHost = () => {};
+  getCellStats = () => ({ host: {}, registry: {}, cells: [] });
+  getMIStatusString = () => 'MI Host SDK not loaded.';
+}
+// Provider health (circuit breakers)
+try {
+  const lp = await import('./llm-provider.js');
+  getProviderHealthString_MI = lp.getProviderHealthString;
+} catch {
+  getProviderHealthString_MI = () => 'Provider health not available.';
+}
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
 import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL, getATH, getDominance, getYields, getChains, getStables, getDexVolume, getWalletBalance } from './tools.js';
@@ -863,6 +885,28 @@ bot.command('shard_sync', async (ctx) => {
   }
 
   ctx.reply('Usage: /shard_sync [status|query <topic>|recent <hours>]');
+});
+
+// /mi_status — Micro-Interface cell status
+bot.command('mi_status', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  try {
+    const status = getMIStatusString();
+    ctx.reply(status);
+  } catch (err) {
+    ctx.reply(`MI Status error: ${err.message}`);
+  }
+});
+
+// /provider_health — Wardenclyffe circuit breaker stats
+bot.command('provider_health', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  try {
+    const health = getProviderHealthString_MI();
+    ctx.reply(health);
+  } catch (err) {
+    ctx.reply(`Provider health error: ${err.message}`);
+  }
 });
 
 // /shards — Owner: list all operator shards
@@ -4380,6 +4424,7 @@ async function main() {
     console.log('[jarvis] Step 3: Loading learning + inner dialogue + deep storage + hell...');
     await initLearning();
     try { await initShardLearnings(); } catch (err) { console.warn(`[jarvis] Shard learnings init failed: ${err.message}`); }
+    try { await initMIHost('./cells'); } catch (err) { console.warn(`[jarvis] MI Host init failed: ${err.message}`); }
     await initInnerDialogue();
     await initDeepStorage();
     await initHell();
@@ -4683,6 +4728,10 @@ async function main() {
   await loadComms();
   await initLearning();
   try { await initShardLearnings(); } catch (err) { console.warn(`[jarvis] Shard learnings init failed: ${err.message}`); }
+  try {
+    const miResult = await initMIHost('./cells');
+    console.log(`[jarvis] MI Host: ${miResult.cellCount} cells active (${miResult.manifests} manifests loaded)`);
+  } catch (err) { console.warn(`[jarvis] MI Host init failed: ${err.message}`); }
   await initInnerDialogue();
   await initStickers();
   await recoverWAL();

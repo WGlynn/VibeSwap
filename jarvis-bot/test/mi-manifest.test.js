@@ -112,7 +112,7 @@ describe('validateManifest', () => {
   });
 
   it('should accept all valid strategies', () => {
-    for (const strategy of ['contextual_bandit', 'nca', 'evolutionary', 'fixed']) {
+    for (const strategy of ['contextual_bandit', 'epsilon_greedy', 'thompson', 'ucb1', 'nca', 'evolutionary', 'fixed']) {
       const result = validateManifest(makeManifest({
         lifecycle: { learn: { strategy } },
       }));

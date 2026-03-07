@@ -15,7 +15,7 @@ import { createHash } from 'crypto';
 const MI_VERSION = '0.1';
 const REQUIRED_FIELDS = ['mi', 'id', 'name', 'kind', 'capabilities'];
 const VALID_KINDS = ['ui', 'service', 'orchestrator', 'proxy', 'sensor'];
-const VALID_STRATEGIES = ['contextual_bandit', 'nca', 'evolutionary', 'fixed'];
+const VALID_STRATEGIES = ['contextual_bandit', 'epsilon_greedy', 'thompson', 'ucb1', 'nca', 'evolutionary', 'fixed'];
 const VALID_SURFACES = ['telegram', 'web', 'api', 'cli', 'ar', 'mobile'];
 const VALID_SANDBOXES = ['worker', 'iframe', 'process', 'wasm'];
 

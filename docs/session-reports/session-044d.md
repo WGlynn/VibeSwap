@@ -38,6 +38,18 @@ Fourth continuation of the autonomous hardening sweep. Completed social tools pe
 - **moderation.js**: Capped moderationLog at 5K entries
 - **antispam.js**: Fixed spamLog pruning to also trim in-memory array during flush
 
+### Survey Round 4 — Full codebase audit completion
+- **tools.js**: Fixed stablecoins header bug — `unshift` then `shift` deleted the new header instead of the old placeholder
+- **tools-alpha.js**: Fixed asymmetric sentiment scoring — added bearish Reddit penalty (-5) to match bullish bonus (+5)
+- **tools-preferences.js**: Added `resp.ok` check before parsing CoinGecko response in getPortfolio
+- **tracker.js**: Wrapped `saveAll()` in try-catch to prevent unhandled throws
+- **moderation.js**: Same pattern for `saveModLog()`
+
+### Full Codebase Audit Status
+- 41/44 source files fully audited (93%)
+- Remaining 3 partially audited: consensus.js (architecture issue), crpc.js (clean), tools-onchain.js (documented limitation)
+- shard-learnings.js already implemented from prior session (plan was already complete)
+
 ## Commits
 
 | Hash | Description | Files | Delta |
@@ -45,12 +57,14 @@ Fourth continuation of the autonomous hardening sweep. Completed social tools pe
 | `d088dab` | Social persistence, peer eviction, codename safety, data integrity | 9 | +121/-11 |
 | `d2e3e04` | Antispam null guard, router failover accounting | 2 | +5/-1 |
 | `7373c2d` | Cap unbounded arrays in tracker, moderation, antispam | 3 | +19/-2 |
+| `ca5d80c` | Stablecoins header bug, sentiment asymmetry, portfolio API check | 3 | +8/-5 |
+| `991cde1` | Wrap tracker and moderation save in try-catch | 2 | +14/-6 |
 
 ## Test Results
 
-114/114 passing (verified 3 times during session)
+114/114 passing (verified 6 times during session)
 
-## Files Modified
+## Files Modified (18 total)
 
 - `jarvis-bot/src/tools-social.js` — persistence init/flush
 - `jarvis-bot/src/index.js` — flushSocial in flush cycle + shutdown
@@ -63,8 +77,11 @@ Fourth continuation of the autonomous hardening sweep. Completed social tools pe
 - `jarvis-bot/src/comms.js` — saveComms error handling
 - `jarvis-bot/src/antispam.js` — null guard + in-memory pruning fix
 - `jarvis-bot/src/router.js` — failover user count fix
-- `jarvis-bot/src/tracker.js` — contribution/interaction caps
-- `jarvis-bot/src/moderation.js` — log cap
+- `jarvis-bot/src/tracker.js` — contribution/interaction caps + save error handling
+- `jarvis-bot/src/moderation.js` — log cap + save error handling
+- `jarvis-bot/src/tools.js` — stablecoins header fix
+- `jarvis-bot/src/tools-alpha.js` — symmetric sentiment scoring
+- `jarvis-bot/src/tools-preferences.js` — API response validation
 
 ## Logic Primitives Extracted
 
@@ -74,10 +91,11 @@ Fourth continuation of the autonomous hardening sweep. Completed social tools pe
 
 ## Metrics
 
-- False positive rate on survey findings: ~40% (8/20)
-- Real fixes applied: 12 across 13 files
+- False positive rate on survey findings: ~40% (12/30 across all rounds)
+- Real fixes applied: 17 across 18 files
 - Zero regressions introduced
-- Cumulative hardening across sessions 044a-044d: ~50 fixes, 0 test failures
+- Cumulative hardening across sessions 044a-044d: ~55 fixes, 0 test failures
+- Full codebase audit: 41/44 files (93% coverage)
 
 ## Remaining Survey Findings (Not Yet Fixed — Lower Priority)
 

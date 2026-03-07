@@ -149,8 +149,8 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
         const raw = retry.content.filter(b => b.type === 'text').map(b => b.text).join('');
         const m = raw.match(/\{[\s\S]*\}/);
         if (m) return JSON.parse(m[0]);
-      } catch {
-        // Retry also failed — observe
+      } catch (retryErr) {
+        console.warn(`[intelligence] Triage retry also failed (${status}): ${retryErr.message}`);
       }
     }
     return { action: 'observe', reason: `triage_error: ${err.message}` };

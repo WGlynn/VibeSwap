@@ -356,10 +356,14 @@ export function computeShapleyWeights() {
 
 // ============ Day Rollover ============
 
+let rollingOverToday = null; // Guard against concurrent rollover
+
 function checkDayRollover() {
   const today = todayKey();
   if (state.dayKey === today) return;
+  if (rollingOverToday === today) return; // Already in progress
 
+  rollingOverToday = today;
   console.log(`[compute-econ] Day rollover: ${state.dayKey || '(first run)'} → ${today}`);
   state.dayKey = today;
 
@@ -371,6 +375,7 @@ function checkDayRollover() {
   // Recompute Shapley weights for the new day
   computeShapleyWeights();
   dirty = true;
+  rollingOverToday = null;
 }
 
 // ============ Budget Check ============

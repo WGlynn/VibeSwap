@@ -2,12 +2,17 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-03-03 (Desktop - Claude Code Opus 4.6, Session 37 — Mining Security Hardening)
+**Last Updated**: 2026-03-07 (Desktop - Claude Code Opus 4.6, Session 38 — Cross-Shard Bus, NC-Max, VPS, MI Manifests)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
+- **CROSS-SHARD LEARNING BUS LIVE** — Git-synced JSONL transport for knowledge chain (Session 38)
+- **NC-Max SYMBIOSIS** — Propose/commit pipelining, compact epochs, freshness penalty in knowledge chain
+- **VPS MIGRATION READY** — Docker Compose + Nginx + Ollama stack for Hetzner (Sunday deploy w/ Freedom)
+- **MI MANIFEST FORMAT v0.1** — Spec, loader, validator, sample cells (price-feed, rug-check)
+- **DeepSeek TRUNCATION FIX** — TruncatedResponseError class + retry classification
 - **SHARD MINER LIVE** — One-Tap Jarvis Shard Launcher deployed, 13 security fixes applied (Session 37)
 - **BASE MAINNET PHASE 2: LIVE** — Pools + Tokenomics deployed 2026-03-03
 - **Phase 1 Core**: 5 UUPS proxy contracts deployed 2026-02-21

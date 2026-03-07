@@ -1,0 +1,110 @@
+{
+  "mi": "0.1",
+  "id": "rug-check-cell",
+  "name": "Rug Checker",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "service",
+  "domain": "security",
+  "tags": ["defi", "security", "audit", "scam"],
+  "capabilities": [
+    {
+      "name": "checkRug",
+      "description": "Analyze a token contract for rug pull indicators",
+      "input": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string", "example": "0x..." },
+          "chain": { "type": "string", "example": "ethereum" }
+        },
+        "required": ["address"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "score": { "type": "number", "description": "0-100 safety score" },
+          "flags": { "type": "array", "description": "List of red flags" },
+          "holders": { "type": "number" },
+          "liquidity_locked": { "type": "boolean" },
+          "ownership_renounced": { "type": "boolean" }
+        }
+      }
+    },
+    {
+      "name": "checkHoneypot",
+      "description": "Simulate buy/sell to detect honeypot contracts",
+      "input": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" }
+        },
+        "required": ["address"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "is_honeypot": { "type": "boolean" },
+          "buy_tax": { "type": "number" },
+          "sell_tax": { "type": "number" }
+        }
+      }
+    }
+  ],
+  "signals": {
+    "subscribe": [
+      "security.check.request",
+      "token.new.detected",
+      "user.portfolio.token.added"
+    ],
+    "emit": [
+      "security.check.result",
+      "security.alert.high",
+      "cell.identity.announce"
+    ]
+  },
+  "requires": {
+    "capabilities": ["http.fetch"],
+    "permissions": ["network.outbound"],
+    "neighbors": []
+  },
+  "lifecycle": {
+    "sense": {
+      "signals": ["community.needs.security", "token.new.detected"],
+      "context": ["host.domain"]
+    },
+    "candidates": [
+      {
+        "identity": "full-audit",
+        "condition": "network.outbound",
+        "priority": 1
+      },
+      {
+        "identity": "heuristic-only",
+        "condition": "true",
+        "priority": 2
+      }
+    ],
+    "commit": {
+      "min_dwell_ms": 60000,
+      "reconsider_on": ["api.unavailable", "error_rate > 0.5"]
+    },
+    "learn": {
+      "strategy": "contextual_bandit",
+      "reward_signals": ["detection_accuracy", "false_positive_rate"],
+      "update_interval_ms": 900000
+    }
+  },
+  "runtime": {
+    "sandbox": "worker",
+    "memory_limit_mb": 32,
+    "cpu_budget_ms": 5000,
+    "ttl_ms": 0,
+    "energy_budget": 80
+  },
+  "telemetry": {
+    "emit_interval_ms": 60000,
+    "metrics": ["invocations", "latency_p50", "error_rate", "flags_detected"]
+  },
+  "surfaces": ["telegram", "web", "api"],
+  "host_sdk_min": "0.1"
+}

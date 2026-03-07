@@ -23,6 +23,7 @@ let toolsUtility = {};
 let toolsFun = {};
 let toolsAlerts = {};
 let limni = {};
+let learning = {};
 
 async function ensureToolsLoaded() {
   if (toolsLoaded) return;
@@ -32,6 +33,7 @@ async function ensureToolsLoaded() {
     toolsFun = await import('./tools-fun.js');
     toolsAlerts = await import('./tools-alerts.js');
     limni = await import('./limni.js');
+    learning = await import('./learning.js');
     toolsLoaded = true;
   } catch (err) {
     console.warn(`[mi-bridge] Failed to load tools: ${err.message}`);
@@ -214,6 +216,32 @@ export async function registerMIBridge() {
 
   count += registerIfExists('limni-trading-cell', 'checkAllVPS', async () => {
     return await limni.checkAllVPS();
+  });
+
+  // ============ Knowledge Learner Cell ============
+  count += registerIfExists('knowledge-learner-cell', 'learnFact', async (input) => {
+    // learnFact requires userId/userName/chatId/chatType — use system defaults for MI invocation
+    const result = await learning.learnFact(
+      input.userId || 'mi-system',
+      input.userName || 'MI Cell',
+      input.chatId || 'mi-internal',
+      'private',
+      input.fact,
+      input.category || 'general',
+      input.tags || []
+    );
+    return { stored: result, broadcast: true };
+  });
+
+  count += registerIfExists('knowledge-learner-cell', 'recallKnowledge', async (input) => {
+    // Use getUserKnowledgeSummary for recall — returns structured knowledge
+    if (input.userId) {
+      const summary = await learning.getUserKnowledgeSummary(input.userId);
+      return { facts: summary ? [summary] : [], count: summary ? 1 : 0 };
+    }
+    // Without userId, return learning stats as general recall
+    const stats = await learning.getLearningStats(input.userId || 'mi-system', input.chatId);
+    return { facts: stats ? [stats] : [], count: stats ? 1 : 0 };
   });
 
   console.log(`[mi-bridge] Registered ${count} capability handlers`);

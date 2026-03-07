@@ -44,6 +44,9 @@ let contributions = [];
 let users = {};
 let interactions = [];
 
+const MAX_CONTRIBUTIONS = 50000;
+const MAX_INTERACTIONS = 20000;
+
 // ============ Init ============
 
 export async function initTracker() {
@@ -68,6 +71,14 @@ async function loadJson(path, fallback) {
 }
 
 async function saveAll() {
+  // Prune old entries to prevent unbounded growth
+  if (contributions.length > MAX_CONTRIBUTIONS) {
+    contributions = contributions.slice(-MAX_CONTRIBUTIONS);
+  }
+  if (interactions.length > MAX_INTERACTIONS) {
+    interactions = interactions.slice(-MAX_INTERACTIONS);
+  }
+
   await Promise.all([
     writeFile(CONTRIBUTIONS_FILE, JSON.stringify(contributions, null, 2)),
     writeFile(USERS_FILE, JSON.stringify(users, null, 2)),

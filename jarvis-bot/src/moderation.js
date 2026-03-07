@@ -34,7 +34,13 @@ async function loadJson(path, fallback) {
   }
 }
 
+const MAX_MOD_LOG = 5000;
+
 async function saveModLog() {
+  // Prune old entries to prevent unbounded growth
+  if (moderationLog.length > MAX_MOD_LOG) {
+    moderationLog = moderationLog.slice(-MAX_MOD_LOG);
+  }
   await writeFile(MOD_LOG_FILE, JSON.stringify(moderationLog, null, 2));
 }
 

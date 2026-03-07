@@ -1,0 +1,127 @@
+{
+  "mi": "0.1",
+  "id": "price-feed-cell",
+  "name": "Crypto Price Feed",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "service",
+  "domain": "defi",
+  "tags": ["price", "oracle", "market", "crypto"],
+  "capabilities": [
+    {
+      "name": "getPrice",
+      "description": "Fetch current price for a cryptocurrency",
+      "input": {
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string", "example": "ETH" },
+          "currency": { "type": "string", "example": "USD" }
+        },
+        "required": ["symbol"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "price": { "type": "number" },
+          "change24h": { "type": "number" },
+          "volume24h": { "type": "number" },
+          "source": { "type": "string" },
+          "timestamp": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "getMarketOverview",
+      "description": "Top coins by market cap with key metrics",
+      "input": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "number", "example": 10 }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "coins": { "type": "array" },
+          "totalMarketCap": { "type": "number" }
+        }
+      }
+    }
+  ],
+  "signals": {
+    "subscribe": [
+      "price.request",
+      "market.overview.request",
+      "system.heartbeat"
+    ],
+    "emit": [
+      "price.update",
+      "price.alert.threshold",
+      "market.sentiment.shift",
+      "cell.identity.announce"
+    ]
+  },
+  "requires": {
+    "capabilities": ["http.fetch"],
+    "permissions": ["network.outbound"],
+    "neighbors": [
+      {
+        "capability": "cache.store",
+        "optional": true
+      }
+    ]
+  },
+  "lifecycle": {
+    "sense": {
+      "signals": ["market.needs.price", "user.asks.price"],
+      "context": ["host.domain", "neighbor.capabilities"]
+    },
+    "candidates": [
+      {
+        "identity": "live-api",
+        "condition": "network.outbound",
+        "priority": 1
+      },
+      {
+        "identity": "cached-fallback",
+        "condition": "neighbor.has(cache.store)",
+        "priority": 2
+      }
+    ],
+    "commit": {
+      "min_dwell_ms": 300000,
+      "reconsider_on": [
+        "api.rate_limited",
+        "error_rate > 0.3"
+      ]
+    },
+    "learn": {
+      "strategy": "contextual_bandit",
+      "reward_signals": [
+        "response_latency_ms",
+        "data_freshness_ms",
+        "user_satisfaction"
+      ],
+      "update_interval_ms": 600000
+    }
+  },
+  "runtime": {
+    "sandbox": "worker",
+    "memory_limit_mb": 32,
+    "cpu_budget_ms": 2000,
+    "ttl_ms": 0,
+    "energy_budget": 50
+  },
+  "telemetry": {
+    "emit_interval_ms": 60000,
+    "metrics": [
+      "invocations",
+      "latency_p50",
+      "latency_p99",
+      "error_rate",
+      "cache_hit_rate"
+    ]
+  },
+  "surfaces": ["telegram", "web", "api"],
+  "host_sdk_min": "0.1"
+}

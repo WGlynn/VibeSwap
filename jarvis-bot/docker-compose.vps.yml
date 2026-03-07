@@ -1,0 +1,237 @@
+# ============ JARVIS Mind Network — Hetzner VPS Production Stack ============
+#
+# Full production deployment for self-managed VPS (Hetzner CX31 or similar).
+# Includes: primary shard, worker shard, Ollama local LLM, Nginx reverse proxy.
+#
+# Prerequisites:
+#   1. Run scripts/vps-deploy.sh on fresh VPS (installs Docker, firewall, SSL)
+#   2. Copy .env.vps.example to .env and fill in secrets
+#   3. Place SSL certs in ./nginx/certs/ (or use certbot via deploy script)
+#
+# Usage:
+#   docker compose -f docker-compose.vps.yml up -d --build
+#   docker compose -f docker-compose.vps.yml logs -f
+#   docker compose -f docker-compose.vps.yml down
+#
+# Architecture:
+#   ┌─────────────────────────────────────────────────────┐
+#   │                    Nginx (443/80)                    │
+#   │              SSL termination + proxy                │
+#   └───────────┬────────────────────┬────────────────────┘
+#               │                    │
+#   ┌───────────▼──────────┐  ┌─────▼────────────────────┐
+#   │   shard-0 (primary)  │  │   shard-1 (worker)       │
+#   │   Telegram bot       │  │   Consensus + CRPC       │
+#   │   Router + BFT       │  │   No Telegram            │
+#   │   Port 8080          │  │   Port 8080              │
+#   └───────────┬──────────┘  └─────┬────────────────────┘
+#               │                    │
+#   ┌───────────▼────────────────────▼────────────────────┐
+#   │              Ollama (11434)                          │
+#   │         Local LLM — zero API cost                   │
+#   └─────────────────────────────────────────────────────┘
+# ============
+
+services:
+  # ============ Nginx Reverse Proxy ============
+  # SSL termination, rate limiting, health endpoint forwarding
+  nginx:
+    image: nginx:alpine
+    container_name: jarvis-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - nginx-cache:/var/cache/nginx
+    networks:
+      - mind-network
+    depends_on:
+      - shard-0
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ============ Ollama — Local LLM Server ============
+  # Runs independently so shards can share it. Persists models on volume.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: jarvis-ollama
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    volumes:
+      - ollama-models:/root/.ollama
+    networks:
+      - mind-network
+    # No ports exposed externally — only accessible within Docker network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============ Model Bootstrapper ============
+  # Pulls the default model on first boot, then exits. Runs once.
+  ollama-bootstrap:
+    image: curlimages/curl:latest
+    container_name: jarvis-ollama-bootstrap
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c '
+        MODEL="${LLM_MODEL:-qwen2.5:7b}"
+        echo "Checking model: $$MODEL"
+        if curl -sf http://ollama:11434/api/tags | grep -q "$$MODEL"; then
+          echo "Model $$MODEL already available."
+        else
+          echo "Pulling $$MODEL (first boot — will be cached on volume)..."
+          curl -sf http://ollama:11434/api/pull -d "{\"name\": \"$$MODEL\"}"
+          echo "Model $$MODEL pulled."
+        fi
+      '
+    environment:
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5:7b}
+    networks:
+      - mind-network
+    restart: "no"
+
+  # ============ Primary Shard (shard-0) ============
+  shard-0:
+    build: .
+    container_name: jarvis-shard-0
+    restart: unless-stopped
+    environment:
+      # Telegram
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BOT_USERNAME=${BOT_USERNAME:-JarvisMind1828383bot}
+      - OWNER_USER_ID=${OWNER_USER_ID:-8366932263}
+      - COMMUNITY_GROUP_ID=${COMMUNITY_GROUP_ID:-}
+      - ARK_GROUP_ID=${ARK_GROUP_ID:-}
+      - AUTHORIZED_USERS=${AUTHORIZED_USERS:-}
+      # LLM — Groq primary, Ollama fallback, DeepSeek/Cerebras cascade
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      # Ollama (shared container on Docker network)
+      - OLLAMA_URL=http://ollama:11434
+      # Git
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_URL=${GITHUB_REPO_URL:-https://github.com/WGlynn/vibeswap-private.git}
+      - GITHUB_STEALTH_URL=${GITHUB_STEALTH_URL:-}
+      # Paths
+      - DOCKER=1
+      - NODE_ENV=production
+      - VIBESWAP_REPO=/repo
+      - MEMORY_DIR=/repo/.claude/projects/C--Users-Will/memory
+      - DATA_DIR=/app/data
+      # Encryption
+      - JARVIS_MASTER_KEY=${JARVIS_MASTER_KEY:-}
+      - ENCRYPTION_ENABLED=true
+      # Network
+      - HEALTH_PORT=8080
+      - SHARD_ID=shard-0
+      - SHARD_MODE=primary
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-2}
+      - NODE_TYPE=full
+      - ROUTER_URL=http://shard-0:8080
+      - SHARD_SECRET=${SHARD_SECRET:-}
+      # Web
+      - WEB_CORS_ORIGINS=${WEB_CORS_ORIGINS:-https://frontend-jade-five-87.vercel.app,http://localhost:3000}
+      - CLAUDE_CODE_API_SECRET=${CLAUDE_CODE_API_SECRET:-}
+      # Monitoring
+      - MONITORED_GROUPS=${MONITORED_GROUPS:-}
+      - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
+      - FIREFLIES_WEBHOOK_SECRET=${FIREFLIES_WEBHOOK_SECRET:-}
+    volumes:
+      - shard0-data:/app/data
+      - shard0-repo:/repo
+    networks:
+      - mind-network
+    depends_on:
+      ollama:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ============ Worker Shard (shard-1) ============
+  shard-1:
+    build: .
+    container_name: jarvis-shard-1
+    restart: unless-stopped
+    environment:
+      # LLM — Ollama primary (zero cost), API fallback
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5:7b}
+      - OLLAMA_URL=http://ollama:11434
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      # Paths
+      - DOCKER=1
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - ENCRYPTION_ENABLED=true
+      - HEALTH_PORT=8080
+      # Network — NO TELEGRAM = auto worker mode
+      - SHARD_ID=shard-1
+      - SHARD_MODE=worker
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-2}
+      - NODE_TYPE=full
+      - ROUTER_URL=http://shard-0:8080
+      - SHARD_SECRET=${SHARD_SECRET:-}
+    volumes:
+      - shard1-data:/app/data
+    networks:
+      - mind-network
+    depends_on:
+      - shard-0
+      - ollama
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  shard0-data:
+    name: jarvis-vps-shard0-data
+  shard0-repo:
+    name: jarvis-vps-shard0-repo
+  shard1-data:
+    name: jarvis-vps-shard1-data
+  ollama-models:
+    name: jarvis-vps-ollama-models
+  nginx-cache:
+    name: jarvis-vps-nginx-cache
+
+networks:
+  mind-network:
+    name: jarvis-vps-network
+    driver: bridge

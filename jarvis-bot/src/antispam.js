@@ -208,7 +208,9 @@ export async function flushAntispam() {
     // Keep last 1000 entries to prevent unbounded growth
     const toSave = spamLog.slice(-1000);
     await writeFile(SPAM_LOG_FILE, JSON.stringify(toSave, null, 2));
-  } catch {}
+  } catch (err) {
+    console.warn(`[antispam] Flush failed: ${err.message}`);
+  }
 }
 
 export function getSpamLog(chatId, limit = 10) {

@@ -194,7 +194,9 @@ async function checkPriceSchedule(schedule) {
       schedule.lastRun = Date.now();
       dirty = true;
     }
-  } catch {}
+  } catch (err) {
+    console.warn(`[scheduler] Price check failed: ${err.message}`);
+  }
 }
 
 async function checkGasSchedule(schedule) {
@@ -218,7 +220,9 @@ async function checkGasSchedule(schedule) {
       schedule.lastRun = Date.now();
       dirty = true;
     }
-  } catch {}
+  } catch (err) {
+    console.warn(`[scheduler] Gas check failed: ${err.message}`);
+  }
 }
 
 export function getSchedulerStats() {

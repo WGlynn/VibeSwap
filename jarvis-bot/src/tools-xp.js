@@ -21,6 +21,25 @@ const XP_FILE = join(DATA_DIR, 'xp.json');
 const players = new Map();
 let dirty = false;
 
+// Action cooldown tracking — prevents XP farming via rapid repeated actions
+// userId -> { action -> lastAwardedAt }
+const actionCooldowns = new Map();
+
+// Cooldowns per action (milliseconds). Actions not listed have no cooldown.
+const ACTION_COOLDOWN_MS = {
+  gm: 86400000,        // Once per day
+  message: 5000,        // 5s between message XP
+  command: 3000,        // 3s between command XP
+  quality_message: 10000, // 10s
+};
+
+// XP penalties — subtracted from profile
+const XP_PENALTIES = {
+  wrong_prediction: 15,
+  misinformation: 10,
+  spam_warning: 5,
+};
+
 // ============ XP Curve ============
 
 // Level thresholds — exponential curve
@@ -115,6 +134,18 @@ function getOrCreate(userId, userName) {
 // ============ Core XP Functions ============
 
 export function awardXP(userId, userName, action, multiplier = 1) {
+  // Cooldown check — prevent rapid-fire XP farming
+  const cooldownMs = ACTION_COOLDOWN_MS[action];
+  if (cooldownMs) {
+    if (!actionCooldowns.has(userId)) actionCooldowns.set(userId, {});
+    const userCooldowns = actionCooldowns.get(userId);
+    const lastAwarded = userCooldowns[action] || 0;
+    if (Date.now() - lastAwarded < cooldownMs) {
+      return { amount: 0, leveledUp: false, newLevel: getOrCreate(userId, userName).level, newAchievements: [], cooledDown: true };
+    }
+    userCooldowns[action] = Date.now();
+  }
+
   const amount = (XP_ACTIONS[action] || 1) * multiplier;
   const profile = getOrCreate(userId, userName);
 
@@ -161,6 +192,26 @@ export function awardXP(userId, userName, action, multiplier = 1) {
   dirty = true;
 
   return { amount, leveledUp, newLevel: profile.level, newAchievements };
+}
+
+/**
+ * Penalize XP for negative actions (wrong predictions, spam, misinformation).
+ * XP floor is 0 — can't go negative.
+ */
+export function penalizeXP(userId, action) {
+  const amount = XP_PENALTIES[action] || 5;
+  const profile = getOrCreate(userId);
+  const before = profile.xp;
+  profile.xp = Math.max(0, profile.xp - amount);
+  const actual = before - profile.xp;
+
+  // Recalculate level (can delevel)
+  const levelInfo = calculateLevel(profile.xp);
+  const deleveled = levelInfo.level < profile.level;
+  profile.level = levelInfo.level;
+
+  dirty = true;
+  return { penalized: actual, deleveled, newLevel: profile.level, newXP: profile.xp };
 }
 
 // ============ Achievements ============

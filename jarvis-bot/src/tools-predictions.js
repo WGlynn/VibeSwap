@@ -177,17 +177,46 @@ export function resolveMarket(userId, marketId, result) {
   const lines = [`Market #${id} RESOLVED: ${result.toUpperCase()}\n`];
   lines.push(`"${market.question}"\n`);
 
-  if (winners.length === 0) {
+  if (totalPool === 0) {
+    // Zero-bet market — nothing to distribute
+    lines.push('  No bets placed. Market closed.');
+  } else if (winners.length === 0) {
     // No winners — return bets to losers
     for (const b of losers) {
       const pts = getPoints(b.userId);
       userPoints.set(b.userId, pts + b.amount);
     }
     lines.push('  No winners. All bets returned.');
+  } else if (winnerPool === 0) {
+    // Winners exist but all bet 0 (edge case) — return loser bets
+    for (const b of losers) {
+      const pts = getPoints(b.userId);
+      userPoints.set(b.userId, pts + b.amount);
+    }
+    lines.push('  Winners bet nothing. Loser bets returned.');
   } else {
     // Distribute pool proportionally to winners
+    // Use floor to avoid over-distributing, give remainder to largest winner
+    let distributed = 0;
+    const shares = [];
     for (const w of winners) {
-      const share = Math.round((w.amount / winnerPool) * totalPool);
+      const share = Math.floor((w.amount / winnerPool) * totalPool);
+      shares.push(share);
+      distributed += share;
+    }
+    // Rounding remainder goes to the largest bettor
+    const remainder = totalPool - distributed;
+    if (remainder > 0) {
+      let maxIdx = 0;
+      for (let i = 1; i < winners.length; i++) {
+        if (winners[i].amount > winners[maxIdx].amount) maxIdx = i;
+      }
+      shares[maxIdx] += remainder;
+    }
+
+    for (let i = 0; i < winners.length; i++) {
+      const w = winners[i];
+      const share = shares[i];
       const pts = getPoints(w.userId);
       userPoints.set(w.userId, pts + share);
       const profit = share - w.amount;

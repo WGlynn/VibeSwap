@@ -156,10 +156,14 @@ export async function initCRPC() {
 export async function flushCRPC() {
   try {
     await writeFile(REPUTATION_FILE, JSON.stringify(Object.fromEntries(reputationScores)));
-  } catch {}
+  } catch (err) {
+    console.warn(`[crpc] Failed to flush reputation: ${err.message}`);
+  }
   try {
     await writeFile(COMPLETED_FILE, JSON.stringify(completedTasks.slice(-MAX_HISTORY)));
-  } catch {}
+  } catch (err) {
+    console.warn(`[crpc] Failed to flush completed tasks: ${err.message}`);
+  }
 }
 
 // ============ Auto-Settle Stale Tasks ============

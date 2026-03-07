@@ -166,6 +166,30 @@ export function getGroupContextStats() {
 
 let contextDirty = false;
 
+// ============ Periodic Cleanup ============
+// Remove stale context windows — groups with no recent activity
+
+const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // Every 6 hours
+const WINDOW_EXPIRY_MS = 24 * 60 * 60 * 1000;   // 24 hours no activity → evict
+
+setInterval(() => {
+  const now = Date.now();
+  let evicted = 0;
+  for (const [chatId, win] of contextWindows) {
+    const newest = win.messages.length > 0
+      ? win.messages[win.messages.length - 1].timestamp
+      : 0;
+    if (now - newest > WINDOW_EXPIRY_MS) {
+      contextWindows.delete(chatId);
+      evicted++;
+    }
+  }
+  if (evicted > 0) {
+    console.log(`[group-context] Cleanup: evicted ${evicted} stale context windows (${contextWindows.size} remaining)`);
+    contextDirty = true;
+  }
+}, CLEANUP_INTERVAL_MS);
+
 // Mark dirty when a message is pushed (called from pushGroupMessage wrapper below isn't needed —
 // we just set it inside push since pushGroupMessage already calls push)
 const _originalPush = GroupContextWindow.prototype.push;

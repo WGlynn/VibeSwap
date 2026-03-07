@@ -401,7 +401,9 @@ async function _auditLog(event, data) {
   };
   try {
     await appendFile(AUDIT_LOG, JSON.stringify(entry) + '\n');
-  } catch {}
+  } catch (err) {
+    console.warn(`[hell] Audit log write failed: ${err.message}`);
+  }
 }
 
 export async function flushHell() {

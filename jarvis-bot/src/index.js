@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse } from './claude.js';
+import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
@@ -105,7 +105,7 @@ import { initPredictions, flushPredictions, createPrediction, placeBet, resolveM
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
-import { getPersonaName, getActivePersonaId, listPersonas } from './persona.js';
+import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
 let initMonitor, interactiveAuth, interceptAuthMessage, formatIntelReport, getMonitorStatus, getMessagesForAnalysis, startPolling, stopPolling, MONITORED_GROUPS;
@@ -467,6 +467,40 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+// ============ Command-Level Rate Limiting ============
+// Per-command cooldowns to prevent API-intensive commands from being spammed.
+// userId:command -> lastUsedAt
+
+const commandRateLimits = new Map();
+
+const COMMAND_COOLDOWNS = {
+  scanner: 10000,        // 10s — external API
+  liquidations: 30000,   // 30s — external API
+  alpha: 15000,          // 15s — LLM call
+  digest: 60000,         // 60s — heavy computation
+  weekly: 120000,        // 2min — very heavy
+  codegen: 30000,        // 30s — LLM call
+  briefing: 30000,       // 30s — LLM call
+};
+
+function isCommandRateLimited(userId, command) {
+  const cooldownMs = COMMAND_COOLDOWNS[command];
+  if (!cooldownMs) return false; // No cooldown configured
+  const key = `${userId}:${command}`;
+  const lastUsed = commandRateLimits.get(key) || 0;
+  if (Date.now() - lastUsed < cooldownMs) return true;
+  commandRateLimits.set(key, Date.now());
+  return false;
+}
+
+// Cleanup stale command rate limit entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of commandRateLimits) {
+    if (now - ts > 300000) commandRateLimits.delete(key); // 5min stale
+  }
+}, 10 * 60 * 1000);
+
 // ============ Heartbeat + Crash Detection ============
 
 async function writeHeartbeat(status) {
@@ -671,6 +705,7 @@ SYSTEM
   /mi_metrics — Prometheus metrics
   /mi_pause <cell> — Pause a cell
   /mi_resume <cell> — Resume a cell
+  /persona [id] — View or swap persona
   /telemetry — Provider health & performance
   /shard_sync — Cross-shard learning bus
   /whoami — Your user info
@@ -968,6 +1003,26 @@ bot.command('mi_resume', async (ctx) => {
   ctx.reply(ok ? `Cell ${cellId} resumed.` : `Cell ${cellId} not found.`);
 });
 
+// /persona [id] — View or hot-swap persona at runtime
+bot.command('persona', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const args = ctx.message.text.split(' ').slice(1);
+  if (args.length === 0) {
+    // Show current persona + list
+    const personas = listPersonas();
+    const lines = ['Persona System\n'];
+    for (const p of personas) {
+      lines.push(`  ${p.active ? '>' : ' '} ${p.id} — ${p.name}${p.active ? ' (active)' : ''}`);
+    }
+    lines.push('\nSwap: /persona <id>');
+    return ctx.reply(lines.join('\n'));
+  }
+  const result = setPersona(args[0]);
+  if (!result.ok) return ctx.reply(result.error);
+  reloadSystemPrompt();
+  ctx.reply(`Persona swapped: ${result.previous} → ${result.current} (${result.name})\n\nPersonality change takes effect on next message.`);
+});
+
 // /provider_health — Wardenclyffe circuit breaker stats
 bot.command('provider_health', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
@@ -1006,6 +1061,18 @@ bot.command('telemetry', async (ctx) => {
       parts.push('=== Provider Performance ===');
       for (const [name, stats] of Object.entries(perf)) {
         parts.push(`  ${name}: ~${stats.avgLatencyMs}ms, ${stats.successRate} success, score=${stats.score} (${stats.samples} samples)`);
+      }
+    }
+
+    // Tool circuit breakers
+    const breakers = getToolBreakerStats();
+    const breakerKeys = Object.keys(breakers);
+    if (breakerKeys.length > 0) {
+      parts.push('');
+      parts.push('=== Tool Circuit Breakers ===');
+      for (const [name, state] of Object.entries(breakers)) {
+        const status = state.disabled ? `DISABLED (${state.cooldownRemainingSec}s remaining)` : `${state.failures} failures`;
+        parts.push(`  ${name}: ${status}`);
       }
     }
 
@@ -1674,6 +1741,7 @@ bot.command('advice', async (ctx) => {
 
 // /alpha <token> — Full alpha report
 bot.command('alpha', async (ctx) => {
+  if (isCommandRateLimited(ctx.from.id, 'alpha')) return ctx.reply('Alpha on cooldown. Try again shortly.');
   const token = ctx.message.text.split(/\s+/).slice(1).join(' ');
   ctx.reply(await getAlphaReport(token));
 });
@@ -1750,6 +1818,7 @@ bot.command('schedule', async (ctx) => {
 // ============ Token Launch Scanner (DEXScreener) ============
 
 bot.command('scanner', async (ctx) => {
+  if (isCommandRateLimited(ctx.from.id, 'scanner')) return ctx.reply('Scanner on cooldown. Try again in a few seconds.');
   const chain = ctx.message.text.split(/\s+/)[1];
   awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
   ctx.reply(await scanNewTokens(chain));
@@ -1777,6 +1846,7 @@ bot.command('pair', async (ctx) => {
 // ============ Derivatives Data ============
 
 bot.command('liquidations', async (ctx) => {
+  if (isCommandRateLimited(ctx.from.id, 'liquidations')) return ctx.reply('Liquidations on cooldown. Try again shortly.');
   const token = ctx.message.text.split(/\s+/)[1];
   awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
   ctx.reply(await getLiquidations(token));
@@ -2246,6 +2316,7 @@ bot.command('ark', async (ctx) => {
 
 bot.command('digest', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
+  if (isCommandRateLimited(ctx.from.id, 'digest')) return ctx.reply('Digest on cooldown. Try again in a minute.');
   ctx.reply('Generating daily digest...');
   const digest = await generateDigest(ctx.chat.id);
   if (digest) {

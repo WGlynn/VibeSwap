@@ -233,8 +233,8 @@ export function receiveChangeAnnouncement(announcement) {
   if (peerChangePool.size > 5000) {
     // Evict oldest entries (Map preserves insertion order)
     const excess = peerChangePool.size - 5000;
-    const keys = peerChangePool.keys();
-    for (let i = 0; i < excess; i++) keys.next().value && peerChangePool.delete(keys.next().value);
+    const keysToEvict = [...peerChangePool.keys()].slice(0, excess);
+    for (const key of keysToEvict) peerChangePool.delete(key);
   }
 
   return added;
@@ -785,7 +785,9 @@ export async function persistChain() {
       chain: chain.slice(-MAX_CHAIN_LENGTH),
       head: chainHead,
     }));
-  } catch {}
+  } catch (err) {
+    console.warn(`[knowledge-chain] Failed to persist chain: ${err.message}`);
+  }
   // Persist missed epochs
   try {
     const obj = {};
@@ -793,7 +795,9 @@ export async function persistChain() {
     if (Object.keys(obj).length > 0) {
       await writeFile(MISSED_EPOCHS_FILE, JSON.stringify(obj));
     }
-  } catch {}
+  } catch (err) {
+    console.warn(`[knowledge-chain] Failed to persist missed epochs: ${err.message}`);
+  }
 }
 
 export async function recoverChain() {

@@ -65,6 +65,52 @@ export function getLastResponse(chatId) {
   return lastResponses.get(chatId) || null;
 }
 
+// ============ Tool Call Circuit Breaker ============
+// Tracks consecutive failures per tool. After 3 consecutive failures,
+// the tool is disabled for 30s to prevent wasting tokens on broken tools.
+const toolBreakers = new Map(); // toolName -> { failures, disabledUntil }
+const TOOL_CB_THRESHOLD = 3;
+const TOOL_CB_COOLDOWN_MS = 30000;
+
+function isToolDisabled(toolName) {
+  const state = toolBreakers.get(toolName);
+  if (!state) return false;
+  if (state.disabledUntil && Date.now() < state.disabledUntil) return true;
+  if (state.disabledUntil && Date.now() >= state.disabledUntil) {
+    // Cooldown expired — reset
+    toolBreakers.delete(toolName);
+    console.log(`[circuit-breaker] Tool ${toolName} re-enabled after cooldown`);
+    return false;
+  }
+  return false;
+}
+
+function recordToolSuccess(toolName) {
+  toolBreakers.delete(toolName);
+}
+
+function recordToolFailure(toolName) {
+  const state = toolBreakers.get(toolName) || { failures: 0, disabledUntil: null };
+  state.failures++;
+  if (state.failures >= TOOL_CB_THRESHOLD) {
+    state.disabledUntil = Date.now() + TOOL_CB_COOLDOWN_MS;
+    console.warn(`[circuit-breaker] Tool ${toolName} disabled for ${TOOL_CB_COOLDOWN_MS / 1000}s after ${state.failures} consecutive failures`);
+  }
+  toolBreakers.set(toolName, state);
+}
+
+export function getToolBreakerStats() {
+  const stats = {};
+  for (const [name, state] of toolBreakers) {
+    stats[name] = {
+      failures: state.failures,
+      disabled: isToolDisabled(name),
+      cooldownRemainingSec: state.disabledUntil ? Math.max(0, Math.round((state.disabledUntil - Date.now()) / 1000)) : 0,
+    };
+  }
+  return stats;
+}
+
 // ============ Conversation Persistence ============
 
 async function loadConversations() {
@@ -1015,6 +1061,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
       const toolResults = [];
       for (const tb of toolBlocks) {
+        // Circuit breaker check — skip disabled tools
+        if (isToolDisabled(tb.name)) {
+          toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: `Tool "${tb.name}" temporarily disabled (circuit breaker tripped after ${TOOL_CB_THRESHOLD} consecutive failures). Will auto-resume in ${TOOL_CB_COOLDOWN_MS / 1000}s.` });
+          continue;
+        }
         let result;
         if (tb.name === 'set_behavior') {
           const ok = await setFlag(tb.input.flag, tb.input.value);
@@ -1223,6 +1274,13 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           console.log(`[claude] Tool: limni_alerts → ${alerts.length} alerts`);
         } else {
           result = 'Unknown tool.';
+        }
+        // Circuit breaker: track success/failure
+        const isFailure = typeof result === 'string' && /^(Failed|Error|Command failed|Health check failed|Web search failed|Deep memory search failed)/i.test(result);
+        if (isFailure) {
+          recordToolFailure(tb.name);
+        } else {
+          recordToolSuccess(tb.name);
         }
         toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: result });
       }

@@ -16,7 +16,7 @@
 
 import { config } from './config.js';
 
-const ACTIVE_PERSONA = process.env.JARVIS_PERSONA || 'standard';
+let activePersona = process.env.JARVIS_PERSONA || 'standard';
 
 const PERSONAS = {
   standard: {
@@ -122,7 +122,7 @@ You are JARVIS in teacher mode. Patient, thorough, encouraging. You explain conc
 // ============ Exports ============
 
 export function getPersona() {
-  return PERSONAS[ACTIVE_PERSONA] || PERSONAS.standard;
+  return PERSONAS[activePersona] || PERSONAS.standard;
 }
 
 export function getPersonaName() {
@@ -142,13 +142,29 @@ export function getResponseModifier() {
 }
 
 export function getActivePersonaId() {
-  return ACTIVE_PERSONA;
+  return activePersona;
+}
+
+/**
+ * Hot-swap persona at runtime. Returns { ok, previous, current } or { ok: false, error }.
+ */
+export function setPersona(id) {
+  if (!id || typeof id !== 'string') return { ok: false, error: 'Persona ID required' };
+  const normalized = id.toLowerCase().trim();
+  if (!PERSONAS[normalized]) {
+    const available = Object.keys(PERSONAS).join(', ');
+    return { ok: false, error: `Unknown persona "${id}". Available: ${available}` };
+  }
+  const previous = activePersona;
+  activePersona = normalized;
+  console.log(`[persona] Hot-swapped: ${previous} → ${normalized}`);
+  return { ok: true, previous, current: normalized, name: PERSONAS[normalized].name };
 }
 
 export function listPersonas() {
   return Object.entries(PERSONAS).map(([id, p]) => ({
     id,
     name: p.name,
-    active: id === ACTIVE_PERSONA,
+    active: id === activePersona,
   }));
 }

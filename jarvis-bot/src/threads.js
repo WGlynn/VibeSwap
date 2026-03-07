@@ -45,7 +45,9 @@ async function saveThreads() {
   try {
     await writeFile(THREADS_FILE, JSON.stringify(threads, null, 2));
     threadsDirty = false;
-  } catch {}
+  } catch (err) {
+    console.warn(`[threads] Flush failed: ${err.message}`);
+  }
 }
 
 // ============ Track Messages for Thread Detection ============

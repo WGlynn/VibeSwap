@@ -298,6 +298,7 @@ export async function propose(type, data) {
 // ============ Handle Incoming Proposal ============
 
 export async function handleProposal(proposal) {
+  if (!consensusEnabled) return; // Single-shard mode — reject incoming proposals
   const shardInfo = getShardInfo();
   if (!shardInfo) return;
 
@@ -337,6 +338,7 @@ export async function handleProposal(proposal) {
 // ============ Handle Prevote ============
 
 export async function handlePrevote(prevote) {
+  if (!consensusEnabled) return;
   const state = pendingProposals.get(prevote.proposalId);
   if (!state || state.committed) return;
 
@@ -369,6 +371,7 @@ export async function handlePrevote(prevote) {
 // ============ Handle Precommit ============
 
 export async function handlePrecommit(precommit) {
+  if (!consensusEnabled) return;
   const state = pendingProposals.get(precommit.proposalId);
   if (!state || state.committed) return;
 
@@ -484,8 +487,9 @@ function checkProposalTimeouts() {
     if (now - state.createdAt > PROPOSAL_TIMEOUT_MS && !state.committed) {
       state.timedOut = true;
       pendingProposals.delete(id);
-      // Push to retry queue instead of silent discard
-      const existing = retryQueue.find(r => r.proposal.id === id);
+      // Push to retry queue instead of silent discard (dedup by content hash)
+      const contentHash = hashProposal(state.type, state.data);
+      const existing = retryQueue.find(r => hashProposal(r.proposal.type, r.proposal.data) === contentHash);
       if (!existing && retryQueue.length < 10) { // Cap retry queue — prevent unbounded growth
         const retryCount = 0;
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount);
@@ -551,7 +555,6 @@ async function processRetryQueue() {
 }
 
 async function persistRetryQueue() {
-  if (retryQueue.length === 0) return;
   try {
     await writeFile(PROPOSAL_JOURNAL_FILE, JSON.stringify(retryQueue));
   } catch { /* non-fatal */ }
@@ -561,9 +564,18 @@ export async function recoverRetryQueue() {
   try {
     const data = await readFile(PROPOSAL_JOURNAL_FILE, 'utf-8');
     const entries = JSON.parse(data);
-    retryQueue.push(...entries);
-    if (entries.length > 0) {
-      console.log(`[consensus] Recovered ${entries.length} proposals from journal`);
+    // Dedup recovered entries by content hash
+    const seen = new Set();
+    let dedupCount = 0;
+    for (const entry of entries) {
+      if (!entry.proposal) continue;
+      const hash = hashProposal(entry.proposal.type, entry.proposal.data);
+      if (seen.has(hash)) { dedupCount++; continue; }
+      seen.add(hash);
+      retryQueue.push(entry);
+    }
+    if (retryQueue.length > 0 || dedupCount > 0) {
+      console.log(`[consensus] Recovered ${retryQueue.length} proposals from journal (${dedupCount} duplicates removed)`);
     }
   } catch { /* no journal — clean start */ }
 }

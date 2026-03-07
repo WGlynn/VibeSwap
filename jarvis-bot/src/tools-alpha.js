@@ -314,8 +314,12 @@ function calculateSentiment(coinData, redditResult) {
   else if (dev?.commit_count_4_weeks === 0) { score -= 10; factors.push('No recent dev activity'); }
 
   // Reddit sentiment
-  if (redditResult?.status === 'fulfilled' && redditResult.value?.sentiment === 'Bullish') {
-    score += 5; factors.push('Bullish Reddit sentiment');
+  if (redditResult?.status === 'fulfilled' && redditResult.value?.sentiment) {
+    if (redditResult.value.sentiment === 'Bullish') {
+      score += 5; factors.push('Bullish Reddit sentiment');
+    } else if (redditResult.value.sentiment === 'Bearish') {
+      score -= 5; factors.push('Bearish Reddit sentiment');
+    }
   }
 
   // Clamp

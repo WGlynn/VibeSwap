@@ -51,12 +51,17 @@ const NOUNS = [
 ];
 
 function generateCodename() {
+  const maxAttempts = 100;
+  for (let i = 0; i < maxAttempts; i++) {
+    const adj = ADJECTIVES[randomInt(ADJECTIVES.length)];
+    const noun = NOUNS[randomInt(NOUNS.length)];
+    const codename = `${adj} ${noun}`;
+    if (!shadows.has(codename)) return codename;
+  }
+  // Fallback: append number to guarantee uniqueness
   const adj = ADJECTIVES[randomInt(ADJECTIVES.length)];
   const noun = NOUNS[randomInt(NOUNS.length)];
-  const codename = `${adj} ${noun}`;
-  // Ensure uniqueness
-  if (shadows.has(codename)) return generateCodename();
-  return codename;
+  return `${adj} ${noun}-${Date.now() % 10000}`;
 }
 
 // ============ Token Generation ============

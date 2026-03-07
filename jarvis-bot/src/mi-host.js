@@ -413,6 +413,10 @@ export function emitSignal(name, payload = {}) {
 function emitSignalInternal(name, payload) {
   if (signalQueue.length >= MAX_SIGNAL_QUEUE) {
     telemetry.signalsDropped++;
+    // Log every 100th drop to avoid spam
+    if (telemetry.signalsDropped % 100 === 1) {
+      console.warn(`[mi-host] Signal queue full (${MAX_SIGNAL_QUEUE}) — ${telemetry.signalsDropped} signals dropped total`);
+    }
     return false;
   }
 

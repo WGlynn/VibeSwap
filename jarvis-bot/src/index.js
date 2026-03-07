@@ -90,7 +90,7 @@ import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminde
 import { getWeather, getWiki, getDefinition, translateText, calculate, getWorldTime, shortenUrl } from './tools-utility.js';
 import { parsePollArgs, coinFlip, diceRoll, magicEightBall, getTrivia, recordGM, getGMLeaderboard } from './tools-fun.js';
 import { getGainers, getLosers, getTopVolume, getQuickSummary, addToWatchlist, removeFromWatchlist, getWatchlist, getNFTStats } from './tools-alerts.js';
-import { saveBookmark, getBookmarks, deleteBookmark, addNote, getNotes, deleteNote, saveQuote, getQuotes, setTag, getTag, listTags, deleteTag } from './tools-social.js';
+import { saveBookmark, getBookmarks, deleteBookmark, addNote, getNotes, deleteNote, saveQuote, getQuotes, setTag, getTag, listTags, deleteTag, initSocial, flushSocial } from './tools-social.js';
 import { rugCheck, honeypotCheck, contractAudit, getTopHolders, checkApprovals } from './tools-security.js';
 import { getBTCStats, getHalvingCountdown, resolveENS, checkStablecoinPegs, getMultiChainBalance, getLatestBlock } from './tools-onchain.js';
 import { getRedditPosts, getHackerNews, readRSSFeed, getCryptoNews, getDevActivity } from './tools-news.js';
@@ -4925,6 +4925,7 @@ async function main() {
   await initGroupContext();
   await initXP();
   await initPredictions();
+  await initSocial();
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
   // Autonomous engagement — JARVIS as active community member
   await loadChatActivity(); // Restore activity state before init
@@ -5797,6 +5798,7 @@ async function main() {
     await flushGroupContext();
     await flushXP();
     await flushPredictions();
+    await flushSocial();
     await flushAutonomous();
     // CKB compression: compress high-utilization CKBs periodically
     try {
@@ -5880,6 +5882,7 @@ async function main() {
     await flushGroupContext();
     await flushXP();
     await flushPredictions();
+    await flushSocial();
     stopScheduler();
     await flushAutonomous();
     stopAutonomous();

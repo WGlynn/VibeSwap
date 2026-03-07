@@ -29,6 +29,7 @@ let heartbeatInterval = null;
 let consecutiveFailures = 0;
 const HEARTBEAT_BASE_MS = 30000; // 30 seconds
 const HEARTBEAT_MAX_MS = 5 * 60 * 1000; // 5 minute cap
+const PEER_STALE_MS = 60 * 60 * 1000; // Evict peers not seen for 1 hour
 const HEARTBEAT_TIMEOUT_MS = 5000;
 
 // ============ Init ============
@@ -333,6 +334,15 @@ async function gossipPing() {
       }
     } catch {
       peer.status = 'unreachable';
+    }
+  }
+
+  // Evict peers not seen for PEER_STALE_MS
+  const now = Date.now();
+  for (const [peerId, peer] of peers.entries()) {
+    if (peer.lastHeartbeat && now - new Date(peer.lastHeartbeat).getTime() > PEER_STALE_MS) {
+      peers.delete(peerId);
+      console.log(`[shard] Evicted stale peer ${peerId} (last seen ${peer.lastHeartbeat})`);
     }
   }
 }

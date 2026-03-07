@@ -22,7 +22,10 @@ export async function loadBehavior() {
   try {
     const raw = await readFile(BEHAVIOR_PATH, 'utf-8');
     behaviorCache = { ...DEFAULTS, ...JSON.parse(raw) };
-  } catch {
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn(`[behavior] Failed to load behavior.json: ${err.message}`);
+    }
     behaviorCache = { ...DEFAULTS };
   }
   return behaviorCache;

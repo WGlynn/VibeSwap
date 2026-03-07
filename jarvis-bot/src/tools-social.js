@@ -13,7 +13,14 @@
 //   /t <name>           — Recall a tag
 // ============
 
-// ============ State (in-memory) ============
+import { readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
+
+const DATA_DIR = process.env.DATA_DIR || './data';
+const SOCIAL_FILE = join(DATA_DIR, 'social.json');
+let dirty = false;
+
+// ============ State ============
 
 // userId -> [{ text, from, chatId, timestamp }]
 const bookmarks = new Map();
@@ -51,6 +58,7 @@ export function saveBookmark(userId, messageText, authorName, chatTitle) {
     timestamp: Date.now(),
   });
 
+  dirty = true;
   return `Bookmarked! You now have ${list.length} saved messages. View with /bookmarks`;
 }
 
@@ -81,6 +89,7 @@ export function deleteBookmark(userId, index) {
   const list = bookmarks.get(userId);
   if (!list || index < 1 || index > list.length) return 'Invalid bookmark number.';
   list.splice(index - 1, 1);
+  dirty = true;
   return `Bookmark #${index} deleted. ${list.length} remaining.`;
 }
 
@@ -97,6 +106,7 @@ export function addNote(userId, text) {
   }
 
   list.push({ text: text.slice(0, 500), timestamp: Date.now() });
+  dirty = true;
   return `Note saved (#${list.length}). View with /notes`;
 }
 
@@ -117,6 +127,7 @@ export function deleteNote(userId, index) {
   const list = notes.get(userId);
   if (!list || index < 1 || index > list.length) return 'Invalid note number.';
   list.splice(index - 1, 1);
+  dirty = true;
   return `Note #${index} deleted. ${list.length} remaining.`;
 }
 
@@ -139,6 +150,7 @@ export function saveQuote(chatId, messageText, authorName, savedByName) {
     timestamp: Date.now(),
   });
 
+  dirty = true;
   return `Quote saved! "${messageText.slice(0, 60)}${messageText.length > 60 ? '...' : ''}" — ${authorName}`;
 }
 
@@ -169,6 +181,7 @@ export function setTag(userId, name, text) {
   }
 
   userTags.set(name.toLowerCase(), text.slice(0, 1000));
+  dirty = true;
   return `Tag "${name}" saved. Recall with /t ${name}`;
 }
 
@@ -195,7 +208,60 @@ export function deleteTag(userId, name) {
   const userTags = tags.get(userId);
   if (!userTags || !userTags.has(name.toLowerCase())) return `Tag "${name}" not found.`;
   userTags.delete(name.toLowerCase());
+  dirty = true;
   return `Tag "${name}" deleted.`;
+}
+
+// ============ Persistence ============
+
+export async function initSocial() {
+  try {
+    const data = await readFile(SOCIAL_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    if (parsed.bookmarks) {
+      for (const [id, list] of Object.entries(parsed.bookmarks)) {
+        bookmarks.set(Number(id), list);
+      }
+    }
+    if (parsed.notes) {
+      for (const [id, list] of Object.entries(parsed.notes)) {
+        notes.set(Number(id), list);
+      }
+    }
+    if (parsed.quotes) {
+      for (const [id, list] of Object.entries(parsed.quotes)) {
+        quotes.set(Number(id), list);
+      }
+    }
+    if (parsed.tags) {
+      for (const [id, tagObj] of Object.entries(parsed.tags)) {
+        tags.set(Number(id), new Map(Object.entries(tagObj)));
+      }
+    }
+    console.log(`[social] Loaded ${bookmarks.size} bookmark users, ${notes.size} note users, ${quotes.size} quote chats, ${tags.size} tag users`);
+  } catch {
+    console.log('[social] No saved social data — starting fresh');
+  }
+}
+
+export async function flushSocial() {
+  if (!dirty) return;
+  try {
+    const obj = {
+      bookmarks: Object.fromEntries(bookmarks),
+      notes: Object.fromEntries(notes),
+      quotes: Object.fromEntries(quotes),
+      tags: {},
+    };
+    // Convert tag Maps to plain objects
+    for (const [id, tagMap] of tags) {
+      obj.tags[id] = Object.fromEntries(tagMap);
+    }
+    await writeFile(SOCIAL_FILE, JSON.stringify(obj, null, 2));
+    dirty = false;
+  } catch (err) {
+    console.warn(`[social] Flush failed: ${err.message}`);
+  }
 }
 
 // ============ Helpers ============

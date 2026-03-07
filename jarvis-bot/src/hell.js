@@ -180,7 +180,7 @@ export function findEntry(identifier) {
   // Direct match
   let entry = registry.entries.find(e =>
     e.primaryIdentifier.toLowerCase() === idLower ||
-    e.knownAliases.some(a => a.toLowerCase() === idLower)
+    (Array.isArray(e.knownAliases) && e.knownAliases.some(a => a.toLowerCase() === idLower))
   );
   if (entry) return entry;
 
@@ -190,7 +190,7 @@ export function findEntry(identifier) {
     for (const link of linked) {
       entry = registry.entries.find(e =>
         e.primaryIdentifier.toLowerCase() === link.toLowerCase() ||
-        e.knownAliases.some(a => a.toLowerCase() === link.toLowerCase())
+        (Array.isArray(e.knownAliases) && e.knownAliases.some(a => a.toLowerCase() === link.toLowerCase()))
       );
       if (entry) return entry;
     }
@@ -224,6 +224,7 @@ export async function linkAlias(existingIdentifier, newAlias) {
   const entry = findEntry(existingIdentifier);
   if (!entry) return false;
 
+  if (!Array.isArray(entry.knownAliases)) entry.knownAliases = [];
   if (!entry.knownAliases.includes(newAlias)) {
     entry.knownAliases.push(newAlias);
     entry.lastUpdated = new Date().toISOString();

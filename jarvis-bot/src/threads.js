@@ -26,6 +26,7 @@ const CONVERSATION_WINDOW_MS = 30 * 60 * 1000; // 30 minutes — messages within
 const MIN_MESSAGES_FOR_AUTO_DETECT = 5;
 const MIN_PARTICIPANTS_FOR_AUTO_DETECT = 3;
 const MIN_AVG_QUALITY_FOR_AUTO_DETECT = 3;
+const CONVERSATION_EVICT_MS = 2 * 60 * 60 * 1000; // Evict inactive conversations after 2 hours
 
 // ============ Init ============
 
@@ -38,6 +39,19 @@ export async function initThreads() {
     threads = [];
   }
   console.log(`[threads] Loaded ${threads.length} archived threads`);
+
+  // Periodic cleanup of stale conversation tracking entries
+  setInterval(() => {
+    const now = Date.now();
+    for (const [chatId, conv] of activeConversations.entries()) {
+      const newest = conv.messages.length > 0
+        ? conv.messages[conv.messages.length - 1].timestamp
+        : conv.startTime;
+      if (now - newest > CONVERSATION_EVICT_MS) {
+        activeConversations.delete(chatId);
+      }
+    }
+  }, 30 * 60 * 1000); // Check every 30 minutes
 }
 
 async function saveThreads() {

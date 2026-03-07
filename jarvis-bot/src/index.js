@@ -5000,6 +5000,7 @@ async function main() {
           const consensusState = getConsensusState();
           const crpcStats = getCRPCStats();
           const info = getShardInfo();
+          const mem = process.memoryUsage();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             status: 'ok',
@@ -5011,6 +5012,7 @@ async function main() {
             consensus: { enabled: consensusState.enabled, committed: consensusState.committedTotal, pending: consensusState.pendingProposals },
             crpc: { enabled: crpcStats.enabled, active: crpcStats.activeTasks, completed: crpcStats.completedTasks },
             peers: info?.peers || 0,
+            memory: { heapMB: Math.round(mem.heapUsed / 1048576), rssMB: Math.round(mem.rss / 1048576) },
           }));
         } catch {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -5861,34 +5863,52 @@ async function main() {
   setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
 
   // Graceful shutdown — save everything + mark clean shutdown
+  // Hard timeout: 20s max to prevent Fly.io forced kill (30s default)
   async function gracefulShutdown(signal) {
     console.log(`[jarvis] Shutting down (${signal}) — saving all data...`);
-    await shutdownShard(); // Notify router before stopping
-    await flushTracker();
-    await saveConversations();
-    await flushModeration();
-    await flushAntispam();
-    await flushThreads();
-    await flushLearning();
-    await flushInnerDialogue();
-    await flushShadow();
-    await flushOperators();
-    await flushCRPC();
-    await persistChain();
-    await flushComputeEconomics();
-    await flushMining();
-    await flushPreferences();
-    await flushScheduler();
-    await flushGroupContext();
-    await flushXP();
-    await flushPredictions();
-    await flushSocial();
+    const shutdownTimer = setTimeout(() => {
+      console.error('[jarvis] SHUTDOWN TIMEOUT (20s) — forcing exit');
+      process.exit(1);
+    }, 20000);
+
+    const flushOps = [
+      ['shard', shutdownShard],
+      ['tracker', flushTracker],
+      ['conversations', saveConversations],
+      ['moderation', flushModeration],
+      ['antispam', flushAntispam],
+      ['threads', flushThreads],
+      ['learning', flushLearning],
+      ['inner-dialogue', flushInnerDialogue],
+      ['shadow', flushShadow],
+      ['operators', flushOperators],
+      ['crpc', flushCRPC],
+      ['chain', persistChain],
+      ['compute', flushComputeEconomics],
+      ['mining', flushMining],
+      ['preferences', flushPreferences],
+      ['scheduler', flushScheduler],
+      ['group-context', flushGroupContext],
+      ['xp', flushXP],
+      ['predictions', flushPredictions],
+      ['social', flushSocial],
+      ['autonomous', flushAutonomous],
+      ['comms', saveComms],
+    ];
+
+    let flushed = 0;
+    for (const [name, fn] of flushOps) {
+      try { await fn(); flushed++; } catch (err) {
+        console.error(`[shutdown] ${name} flush failed: ${err.message}`);
+      }
+    }
+    console.log(`[jarvis] Flushed ${flushed}/${flushOps.length} modules`);
+
     stopScheduler();
-    await flushAutonomous();
     stopAutonomous();
     stopGroupContext();
-    await saveComms();
     await writeHeartbeat('stopped');
+    clearTimeout(shutdownTimer);
     bot.stop(signal);
   }
   process.once('SIGINT', () => gracefulShutdown('SIGINT'));

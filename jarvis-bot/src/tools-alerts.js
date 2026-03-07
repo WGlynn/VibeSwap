@@ -246,6 +246,84 @@ export async function getNFTStats(collection) {
   }
 }
 
+// ============ Rug Check (GoPlusLabs free API) ============
+
+const GOPLUS_CHAINS = {
+  eth: '1', ethereum: '1',
+  bsc: '56', bnb: '56',
+  polygon: '137', matic: '137',
+  arbitrum: '42161', arb: '42161',
+  base: '8453',
+  avalanche: '43114', avax: '43114',
+  optimism: '10', op: '10',
+  fantom: '250', ftm: '250',
+  solana: 'solana', sol: 'solana',
+};
+
+export async function checkRug(address, chain = 'eth') {
+  try {
+    const chainId = GOPLUS_CHAINS[chain.toLowerCase()] || '1';
+    const resp = await fetch(
+      `https://api.gopluslabs.io/api/v1/token_security/${chainId}?contract_addresses=${address}`,
+      { signal: AbortSignal.timeout(HTTP_TIMEOUT) }
+    );
+    if (!resp.ok) throw new Error(`GoPlusLabs ${resp.status}`);
+    const data = await resp.json();
+
+    const token = data.result?.[address.toLowerCase()];
+    if (!token) return { error: 'Token not found or not supported on this chain' };
+
+    const flags = [];
+    if (token.is_honeypot === '1') flags.push('HONEYPOT');
+    if (token.is_blacklisted === '1') flags.push('BLACKLISTED');
+    if (token.is_proxy === '1') flags.push('PROXY CONTRACT');
+    if (token.is_mintable === '1') flags.push('MINTABLE');
+    if (token.can_take_back_ownership === '1') flags.push('OWNERSHIP TAKEBACK');
+    if (token.owner_change_balance === '1') flags.push('OWNER CAN CHANGE BALANCE');
+    if (token.hidden_owner === '1') flags.push('HIDDEN OWNER');
+    if (token.selfdestruct === '1') flags.push('SELF-DESTRUCT');
+    if (token.external_call === '1') flags.push('EXTERNAL CALL');
+    if (parseInt(token.holder_count || '0') < 50) flags.push('LOW HOLDERS');
+
+    const riskLevel = flags.length >= 3 ? 'high' : flags.length >= 1 ? 'medium' : 'low';
+
+    const lines = [`Rug Check: ${token.token_name || address}\n`];
+    lines.push(`  Risk: ${riskLevel.toUpperCase()}`);
+    lines.push(`  Holders: ${token.holder_count || '?'}`);
+    lines.push(`  LP Holders: ${token.lp_holder_count || '?'}`);
+    if (token.buy_tax) lines.push(`  Buy Tax: ${(parseFloat(token.buy_tax) * 100).toFixed(1)}%`);
+    if (token.sell_tax) lines.push(`  Sell Tax: ${(parseFloat(token.sell_tax) * 100).toFixed(1)}%`);
+    if (flags.length > 0) lines.push(`  Flags: ${flags.join(', ')}`);
+    else lines.push('  No red flags detected');
+
+    return { text: lines.join('\n'), riskLevel, flags, raw: token };
+  } catch (err) {
+    return { error: `Rug check failed: ${err.message}` };
+  }
+}
+
+export async function checkHoneypot(address, chain = 'eth') {
+  try {
+    const result = await checkRug(address, chain);
+    if (result.error) return result;
+
+    const isHoneypot = result.flags.includes('HONEYPOT');
+    const buyTax = result.raw?.buy_tax ? parseFloat(result.raw.buy_tax) * 100 : 0;
+    const sellTax = result.raw?.sell_tax ? parseFloat(result.raw.sell_tax) * 100 : 0;
+
+    const lines = [`Honeypot Check: ${result.raw?.token_name || address}\n`];
+    lines.push(`  Honeypot: ${isHoneypot ? 'YES — DO NOT BUY' : 'No'}`);
+    lines.push(`  Buy Tax: ${buyTax.toFixed(1)}%`);
+    lines.push(`  Sell Tax: ${sellTax.toFixed(1)}%`);
+    if (sellTax > 10) lines.push('  WARNING: High sell tax — may not be able to sell');
+    if (!isHoneypot && sellTax <= 5 && buyTax <= 5) lines.push('  Appears safe to trade');
+
+    return lines.join('\n');
+  } catch (err) {
+    return `Honeypot check failed: ${err.message}`;
+  }
+}
+
 function formatNFT(data) {
   const floor = data.floor_price?.usd;
   const mcap = data.market_cap?.usd;

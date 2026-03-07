@@ -656,6 +656,12 @@ FUN
   /gm /gmboard /fact /today
   /dog /cat /advice
 
+SYSTEM
+  /mi_status — MI cell status & telemetry
+  /telemetry — Provider health & performance
+  /shard_sync — Cross-shard learning bus
+  /whoami — Your user info
+
 Or just talk to me — I'm always listening.`;
   ctx.reply(helpText);
 });

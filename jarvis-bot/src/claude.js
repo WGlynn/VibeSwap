@@ -54,10 +54,21 @@ async function withChatLock(chatId, fn) {
 
 // ============ Periodic Cleanup ============
 // Evict stale entries from lastResponses and chatLocks every 30 minutes
+const MAX_LAST_RESPONSES = 5000;
 setInterval(() => {
   const cutoff = Date.now() - 30 * 60 * 1000;
   for (const [chatId, entry] of lastResponses) {
     if (entry.timestamp < cutoff) lastResponses.delete(chatId);
+  }
+  // Hard cap: drop oldest if still too many
+  if (lastResponses.size > MAX_LAST_RESPONSES) {
+    const excess = lastResponses.size - MAX_LAST_RESPONSES;
+    let removed = 0;
+    for (const key of lastResponses.keys()) {
+      if (removed >= excess) break;
+      lastResponses.delete(key);
+      removed++;
+    }
   }
 }, 30 * 60 * 1000);
 

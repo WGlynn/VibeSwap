@@ -323,7 +323,7 @@ function drawVibeLogo(ctx, x, y, size, color) {
   ctx.stroke();
 }
 
-function wrapText(ctx, text, maxWidth, fontSize, fontWeight) {
+function wrapText(ctx, text, maxWidth, fontSize, fontWeight, depth = 0) {
   ctx.font = `${fontWeight} ${fontSize}px ${FONT_FAMILY}`;
   const words = text.split(' ');
   const lines = [];
@@ -345,11 +345,13 @@ function wrapText(ctx, text, maxWidth, fontSize, fontWeight) {
     lines.push(currentLine);
   }
 
-  // If text is too long, reduce font size and re-wrap
-  if (lines.length > 5) {
+  // If text is too long, reduce font size and re-wrap (max 5 recursions)
+  if (lines.length > 5 && depth < 5) {
     const smallerSize = Math.max(24, fontSize - 8);
-    ctx.font = `${fontWeight} ${smallerSize}px ${FONT_FAMILY}`;
-    return wrapText(ctx, text, maxWidth, smallerSize, fontWeight);
+    if (smallerSize < fontSize) {
+      ctx.font = `${fontWeight} ${smallerSize}px ${FONT_FAMILY}`;
+      return wrapText(ctx, text, maxWidth, smallerSize, fontWeight, depth + 1);
+    }
   }
 
   return lines;

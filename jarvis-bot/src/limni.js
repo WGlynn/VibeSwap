@@ -304,14 +304,21 @@ export function startMonitorLoop(intervalMs = 30000) {
 
   console.log(`[limni] Monitor loop started (every ${intervalMs / 1000}s)`);
 
+  let monitorCheckCount = 0;
+
   monitorInterval = setInterval(async () => {
     state.stats.lastCheck = Date.now();
+    monitorCheckCount++;
+
+    let terminalsChecked = 0, healthy = 0, tradesVerified = 0;
 
     for (const [terminalId, terminal] of Object.entries(state.connectedTerminals)) {
+      terminalsChecked++;
       // Health check
       await checkTerminalHealth(terminalId);
 
       if (terminal.status !== 'healthy') continue;
+      healthy++;
 
       // Fetch and verify trades
       const result = await fetchTrades(terminalId);
@@ -326,8 +333,14 @@ export function startMonitorLoop(intervalMs = 30000) {
           const strategyId = trade.strategyId || terminal.strategies[0];
           const strategy = state.activeStrategies[strategyId];
           verifyTrade(trade, strategy);
+          tradesVerified++;
         }
       }
+    }
+
+    // Log summary every 10 checks so operator knows loop is alive
+    if (monitorCheckCount % 10 === 0) {
+      console.log(`[limni] Monitor check #${monitorCheckCount}: ${healthy}/${terminalsChecked} terminals healthy, ${tradesVerified} trades verified, ${state.alerts.length} total alerts`);
     }
   }, intervalMs);
 }

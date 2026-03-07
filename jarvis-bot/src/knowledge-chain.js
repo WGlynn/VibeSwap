@@ -57,12 +57,24 @@ const WAL_FILE = join(config.dataDir, 'knowledge', 'wal.jsonl');
 const MISSED_EPOCHS_FILE = join(config.dataDir, 'knowledge', 'missed-epochs.json');
 const CHAIN_FILE = join(config.dataDir, 'knowledge', 'chain.json');
 
+// NC-Max constants — propose/commit pipelining
+const PROPOSAL_WINDOW_EPOCHS = 2; // Changes must be proposed N epochs before commitment
+const COMPACT_SHORTID_BYTES = 6; // 48-bit shortids for compact epochs
+const FRESHNESS_PENALTY = 0.5; // VD multiplier for epochs containing fresh changes
+const PRE_PROPAGATION_DEBOUNCE_MS = 2000; // Batch pre-propagation announcements
+
 // ============ State ============
 
 let chain = []; // Local chain of epochs
 let pendingChanges = []; // Changes accumulated since last epoch
 let chainHead = null; // Current chain tip
 const missedEpochs = new Map(); // peerId -> epoch[] (capped at MAX_MISSED_EPOCHS_PER_PEER)
+
+// NC-Max state — propose/commit pipeline
+const proposedChanges = new Map(); // changeHash -> { change, proposedAt, epoch }
+const peerChangePool = new Map(); // changeHash -> change (changes announced by peers, not yet in epoch)
+let prePropagationQueue = []; // Changes waiting to be announced to peers
+let prePropagationTimer = null;
 
 // ============ Epoch Structure ============
 
@@ -115,6 +127,213 @@ export async function addChange(change) {
   try {
     await appendFile(WAL_FILE, JSON.stringify(entry) + '\n');
   } catch { /* first write or dir missing — non-fatal */ }
+
+  // NC-Max: pre-propagate immediately (peers cache for compact epoch reconstruction)
+  try {
+    const changeHash = hashChange(entry);
+    queuePrePropagation(entry, changeHash);
+  } catch { /* non-fatal — epoch still works without pre-propagation */ }
+}
+
+// ============ NC-Max: Change Pre-Propagation (Two-Step Mechanism) ============
+//
+// NC-Max insight: "fresh transactions" (changes peers haven't seen) are the bottleneck.
+// Solution: propagate change hashes IMMEDIATELY when added, before the epoch.
+// When the epoch arrives, peers already have the changes in their pool.
+// Epoch propagation becomes size-independent (like compact blocks).
+//
+// Step 1: PROPOSE — change hash announced to all peers immediately
+// Step 2: COMMIT — epoch confirms only pre-propagated changes
+//
+// Fresh changes (not pre-propagated) still get included but receive a VD penalty,
+// disincentivizing information asymmetry (transaction withholding defense).
+
+function hashChange(change) {
+  return createHash('sha256').update(JSON.stringify(change)).digest('hex').slice(0, 32);
+}
+
+function computeShortId(changeHash, epochSalt) {
+  // Compact block-style shortid: siphash-like truncation
+  return createHash('sha256')
+    .update(changeHash + (epochSalt || ''))
+    .digest('hex')
+    .slice(0, COMPACT_SHORTID_BYTES * 2); // hex chars = 2x bytes
+}
+
+/**
+ * Pre-propagate a change to peers immediately (NC-Max Step 1: PROPOSE).
+ * Called automatically by addChange(). Peers store in their peerChangePool.
+ * When the epoch arrives, they can reconstruct from shortids.
+ */
+function queuePrePropagation(change, changeHash) {
+  // Track locally as proposed
+  proposedChanges.set(changeHash, {
+    change,
+    proposedAt: Date.now(),
+    epoch: chainHead?.height || 0,
+  });
+
+  prePropagationQueue.push({ hash: changeHash, change });
+
+  // Debounce: batch announcements every 2s to avoid per-change HTTP spam
+  if (!prePropagationTimer) {
+    prePropagationTimer = setTimeout(() => flushPrePropagation(), PRE_PROPAGATION_DEBOUNCE_MS);
+  }
+}
+
+async function flushPrePropagation() {
+  prePropagationTimer = null;
+  if (prePropagationQueue.length === 0) return;
+
+  const batch = prePropagationQueue.splice(0);
+  const peers = getShardPeers();
+  if (peers.length === 0) return;
+
+  const shardInfo = getShardInfo();
+  const announcement = {
+    type: 'change_announcement',
+    shardId: shardInfo?.id || 'shard-0',
+    changes: batch.map(b => ({
+      hash: b.hash,
+      // Include full change content (small — typically <500 bytes)
+      // This is the "pre-propagation" — peers cache it for epoch reconstruction
+      content: b.change,
+    })),
+    timestamp: new Date().toISOString(),
+  };
+
+  // Best-effort broadcast — failures are non-fatal (epoch still works, just slower)
+  for (const peer of peers) {
+    try {
+      await fetch(`${peer.url}/knowledge-chain/announce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(announcement),
+        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+      });
+    } catch { /* non-fatal — epoch will carry full content as fallback */ }
+  }
+}
+
+/**
+ * Receive pre-propagated changes from a peer (NC-Max Step 1 receiver).
+ * Stores changes in peerChangePool for later epoch reconstruction.
+ */
+export function receiveChangeAnnouncement(announcement) {
+  if (!announcement?.changes || !Array.isArray(announcement.changes)) return 0;
+
+  let added = 0;
+  for (const item of announcement.changes) {
+    if (!item.hash || peerChangePool.has(item.hash)) continue;
+    peerChangePool.set(item.hash, item.content);
+    added++;
+  }
+
+  // Cap pool size to prevent memory bloat
+  if (peerChangePool.size > 5000) {
+    // Evict oldest entries (Map preserves insertion order)
+    const excess = peerChangePool.size - 5000;
+    const keys = peerChangePool.keys();
+    for (let i = 0; i < excess; i++) keys.next().value && peerChangePool.delete(keys.next().value);
+  }
+
+  return added;
+}
+
+// ============ NC-Max: Compact Epochs ============
+//
+// Instead of full changes, epochs carry shortids.
+// Receiver reconstructs from peerChangePool + requests missing.
+// Epoch propagation latency becomes independent of change count.
+
+function buildCompactEpoch(epoch, changes) {
+  const salt = epoch.hash.slice(0, 16);
+  const shortids = changes.map(c => computeShortId(hashChange(c), salt));
+
+  // Track freshness: how many changes were NOT pre-propagated
+  const freshCount = changes.filter(c => {
+    const h = hashChange(c);
+    return !proposedChanges.has(h);
+  }).length;
+
+  return {
+    height: epoch.height,
+    hash: epoch.hash,
+    parentHash: epoch.parentHash,
+    salt,
+    shortids,
+    // Pre-filled: changes that are likely fresh (peer probably doesn't have them)
+    // Analogous to compact block "prefilled transactions"
+    prefilled: changes.filter(c => !proposedChanges.has(hashChange(c))),
+    freshCount,
+    totalCount: changes.length,
+    // Full epoch fields for fallback
+    merkleRoot: epoch.merkleRoot,
+    shardId: epoch.shardId,
+    timestamp: epoch.timestamp,
+    aggregateValueDensity: epoch.aggregateValueDensity,
+    cumulativeValueDensity: epoch.cumulativeValueDensity,
+    fileSyncData: epoch.fileSyncData,
+  };
+}
+
+/**
+ * Reconstruct full changes from a compact epoch using local change pool.
+ * Returns { changes, missing } — missing shortids need explicit request.
+ */
+export function reconstructFromCompact(compactEpoch) {
+  if (!compactEpoch.shortids) return { changes: [], missing: [] };
+
+  const salt = compactEpoch.salt;
+  const changes = [];
+  const missing = [];
+
+  // Build reverse lookup: shortid -> change from our pools
+  const localPool = new Map();
+  for (const [hash, change] of peerChangePool) {
+    const sid = computeShortId(hash, salt);
+    localPool.set(sid, change);
+  }
+  for (const [hash, info] of proposedChanges) {
+    const sid = computeShortId(hash, salt);
+    if (!localPool.has(sid)) localPool.set(sid, info.change);
+  }
+
+  // Add prefilled changes first (these are "fresh" — guaranteed available)
+  const prefilledSids = new Set();
+  if (compactEpoch.prefilled) {
+    for (const c of compactEpoch.prefilled) {
+      const sid = computeShortId(hashChange(c), salt);
+      prefilledSids.add(sid);
+      localPool.set(sid, c);
+    }
+  }
+
+  // Reconstruct
+  for (const sid of compactEpoch.shortids) {
+    if (localPool.has(sid)) {
+      changes.push(localPool.get(sid));
+    } else {
+      missing.push(sid);
+    }
+  }
+
+  return { changes, missing };
+}
+
+// ============ NC-Max: Freshness Penalty (Anti-Withholding) ============
+//
+// Epochs containing high % of fresh (not pre-propagated) changes get
+// a VD penalty in fork resolution. This disincentivizes shards from
+// deliberately withholding changes to gain propagation advantage.
+//
+// Analogous to NC-Max's defense against transaction withholding attacks.
+
+export function computeFreshnessPenalty(compactEpoch) {
+  if (!compactEpoch || compactEpoch.totalCount === 0) return 1.0;
+  const freshRatio = (compactEpoch.freshCount || 0) / compactEpoch.totalCount;
+  // Linear penalty: 0% fresh = 1.0x VD, 100% fresh = FRESHNESS_PENALTY x VD
+  return 1.0 - (freshRatio * (1.0 - FRESHNESS_PENALTY));
 }
 
 // ============ File Sync — Shard-to-Shard File Relay ============
@@ -288,6 +507,21 @@ export async function produceEpoch() {
 
   const epoch = createEpoch(changes, chainHead?.hash);
 
+  // NC-Max: compute freshness metrics for this epoch
+  let freshCount = 0;
+  for (const c of changes) {
+    const ch = hashChange(c);
+    if (!proposedChanges.has(ch)) freshCount++;
+  }
+  epoch.freshCount = freshCount;
+  epoch.totalCount = changes.length;
+  // Re-hash with freshness metadata included
+  epoch.hash = hashEpoch(epoch);
+
+  // Store compact epoch data for peers requesting shortids
+  epoch._compactData = buildCompactEpoch(epoch, changes);
+  epoch._fullChanges = changes; // Keep for broadcastEpoch fallback
+
   chain.push(epoch);
   chainHead = epoch;
 
@@ -300,12 +534,19 @@ export async function produceEpoch() {
     chain = chain.slice(-MAX_CHAIN_LENGTH);
   }
 
-  console.log(`[knowledge-chain] Epoch ${epoch.height}: ${changes.length} changes, VD=${epoch.aggregateValueDensity.toFixed(3)}, cumVD=${epoch.cumulativeValueDensity.toFixed(3)}`);
+  // NC-Max: prune old proposed changes (older than 2 epochs)
+  const pruneThreshold = (chainHead?.height || 0) - PROPOSAL_WINDOW_EPOCHS;
+  for (const [hash, info] of proposedChanges) {
+    if (info.epoch < pruneThreshold) proposedChanges.delete(hash);
+  }
+
+  const freshPct = changes.length > 0 ? Math.round(freshCount / changes.length * 100) : 0;
+  console.log(`[knowledge-chain] Epoch ${epoch.height}: ${changes.length} changes (${freshCount} fresh/${freshPct}%), VD=${epoch.aggregateValueDensity.toFixed(3)}, cumVD=${epoch.cumulativeValueDensity.toFixed(3)}`);
 
   return epoch;
 }
 
-// ============ Fork Resolution (Proof of Mind) ============
+// ============ Fork Resolution (Proof of Mind + NC-Max Freshness) ============
 
 export function resolveFork(localChain, remoteChain) {
   if (!remoteChain || remoteChain.length === 0) return 'local';
@@ -314,11 +555,17 @@ export function resolveFork(localChain, remoteChain) {
   const localHead = localChain[localChain.length - 1];
   const remoteHead = remoteChain[remoteChain.length - 1];
 
-  // Proof of Mind: highest cumulative value density wins
-  if (remoteHead.cumulativeValueDensity > localHead.cumulativeValueDensity) {
+  // NC-Max freshness penalty: apply to cumulative VD if epoch has fresh change metadata
+  const localPenalty = computeFreshnessPenalty(localHead);
+  const remotePenalty = computeFreshnessPenalty(remoteHead);
+  const localEffectiveVD = (localHead.cumulativeValueDensity || 0) * localPenalty;
+  const remoteEffectiveVD = (remoteHead.cumulativeValueDensity || 0) * remotePenalty;
+
+  // Proof of Mind: highest effective cumulative value density wins
+  if (remoteEffectiveVD > localEffectiveVD) {
     return 'remote';
   }
-  if (localHead.cumulativeValueDensity > remoteHead.cumulativeValueDensity) {
+  if (localEffectiveVD > remoteEffectiveVD) {
     return 'local';
   }
 
@@ -443,6 +690,14 @@ export async function receiveEpoch(epoch) {
     return false;
   }
 
+  // NC-Max: log freshness of received epoch
+  if (epoch.totalCount > 0) {
+    const freshPct = Math.round((epoch.freshCount || 0) / epoch.totalCount * 100);
+    if (freshPct > 50) {
+      console.warn(`[knowledge-chain] High freshness epoch from ${epoch.shardId}: ${freshPct}% fresh (possible withholding)`);
+    }
+  }
+
   // If this extends our chain
   if (epoch.parentHash === chainHead?.hash) {
     // Apply any file_sync changes from this epoch
@@ -494,6 +749,9 @@ function hashEpoch(epoch) {
     changes: epoch.changes,
     aggregateValueDensity: epoch.aggregateValueDensity,
     cumulativeValueDensity: epoch.cumulativeValueDensity,
+    // NC-Max: freshness metadata included in hash commitment
+    freshCount: epoch.freshCount || 0,
+    totalCount: epoch.totalCount || epoch.changes,
   });
   return createHash('sha256').update(data).digest('hex').slice(0, 32);
 }
@@ -577,6 +835,14 @@ export function getChainStats() {
     pendingChanges: pendingChanges.length,
     epochInterval: `${EPOCH_INTERVAL_MS / 1000}s`,
     maxChainLength: MAX_CHAIN_LENGTH,
+    // NC-Max pipeline stats
+    ncmax: {
+      proposedChanges: proposedChanges.size,
+      peerChangePool: peerChangePool.size,
+      prePropagationQueue: prePropagationQueue.length,
+      proposalWindowEpochs: PROPOSAL_WINDOW_EPOCHS,
+      freshnessPenalty: FRESHNESS_PENALTY,
+    },
     recentEpochs: chain.slice(-5).map(e => ({
       height: e.height,
       hash: e.hash.slice(0, 12),
@@ -584,6 +850,7 @@ export function getChainStats() {
       changes: e.changes,
       vd: e.aggregateValueDensity.toFixed(3),
       cumVd: e.cumulativeValueDensity.toFixed(3),
+      freshCount: e.freshCount || 0,
     })),
   };
 }
@@ -624,6 +891,7 @@ export function handleKnowledgeChainRequest(path, method) {
   if (path === '/knowledge-chain/head' && method === 'GET') return 'head';
   if (path === '/knowledge-chain/stats' && method === 'GET') return 'stats';
   if (path === '/knowledge-chain/epoch' && method === 'POST') return 'epoch';
+  if (path === '/knowledge-chain/announce' && method === 'POST') return 'announce';
   if (path.startsWith('/knowledge-chain/chain') && method === 'GET') return 'chain';
   // File sync endpoints — peer bootstrap (GitHub-free recovery)
   if (path === '/knowledge/files' && method === 'GET') return 'files';
@@ -636,6 +904,7 @@ export async function processKnowledgeChainBody(handler, body, query) {
     case 'head': return getChainHead() || { height: 0, cumulativeValueDensity: 0 };
     case 'stats': return getChainStats();
     case 'epoch': return { accepted: await receiveEpoch(body) };
+    case 'announce': return { added: receiveChangeAnnouncement(body) };
     case 'chain': return { epochs: getChain(parseInt(query?.since || '0')) };
     case 'files': return getFileInventory();
     case 'file': {

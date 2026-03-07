@@ -26,7 +26,7 @@
 // Fork path: Freedom copies this into Poseidon, connects to his Limni instance.
 // ============
 
-import { writeFile, readFile, mkdir } from 'fs/promises';
+import { writeFile, readFile, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { config } from './config.js';
@@ -102,7 +102,6 @@ export async function flushLimni() {
     // Append new trades to JSONL
     if (tradeLog.length > 0) {
       const lines = tradeLog.map(t => JSON.stringify(t)).join('\n') + '\n';
-      const { appendFile } = await import('fs/promises');
       await appendFile(TRADES_FILE, lines);
       state.tradeLog = []; // Clear after flush
     }
@@ -110,7 +109,6 @@ export async function flushLimni() {
     // Append new alerts to JSONL
     if (alerts.length > 0) {
       const lines = alerts.map(a => JSON.stringify(a)).join('\n') + '\n';
-      const { appendFile } = await import('fs/promises');
       await appendFile(ALERTS_FILE, lines);
       state.alerts = []; // Clear after flush
     }

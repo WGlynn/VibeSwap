@@ -2,13 +2,15 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-03-07 (Desktop - Claude Code Opus 4.6, Session 044d — Autonomous Hardening Pass)
+**Last Updated**: 2026-03-07 (Desktop - Claude Code Opus 4.6, Session 045 — The Two Loops: Hyperbolic Knowledge Extraction)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
-- **AUTONOMOUS HARDENING SWEEP** — Sessions 044a-044d: ~50 fixes across 20+ files, 0 test failures, 114/114 tests passing
+- **THE TWO LOOPS** — Session 045: TIER 13 codified, 71 knowledge primitives + 3 meta-primitives extracted, 16 new research papers written, primitives cheatsheet + master index created. 27 total papers (1.2 MB). LIVE_SESSION.md crash protection introduced.
+- **VERCEL LIGHT NODE** — Concept: Vercel frontend as light node on JARVIS Mind Network (stateless = natural light node). Saved as P-046, not yet implemented.
+- **AUTONOMOUS HARDENING SWEEP** — Sessions 044a-044f: ~50 fixes across 20+ files, 0 test failures, 114/114 tests passing
 - **MI FULLY INTEGRATED** — Host SDK wired into bot startup, /mi_status + /provider_health commands, hot-reload, state persistence (Session 040)
 - **MI RUNTIME LIVE** — Host SDK + contextual bandit proto-AI + 7 cell manifests (28 capabilities) (Session 39)
 - **WARDENCLYFFE CIRCUIT BREAKERS** — Per-provider health tracking, auto-disable, exponential backoff (Session 39)
@@ -54,7 +56,32 @@ This file maintains continuity between Claude Code sessions across devices.
 - **IPFS pinning** service for contribution evidence hashes
 - ~~**GenesisContributions.s.sol** — founder addresses are placeholders~~ FIXED (Session 29: now uses vm.envAddress)
 
-## Recently Completed (Feb 22, 2026 — Session 34: Protocol Hardening + Infrastructure)
+## Recently Completed (Mar 7, 2026 — Session 045: The Two Loops)
+110. **TIER 13: The Two Loops** — Codified in CKB as permanent workflow primitives
+    - Loop 1: Knowledge Primitive Extraction (BUILD → EXTRACT → TEST alignment → CODIFY → COMPOUND)
+    - Loop 2: Ideas → Papers → GitHub (IDENTIFY → WRITE → CONNECT → PUSH → INDEX)
+
+111. **71 Knowledge Primitives Extracted** — `docs/papers/knowledge-primitives-index.md`
+    - 15 Core + 20 Extended + 5 Mechanism + 8 Systemic + 23 Frontier
+    - 3 Meta-Primitives: Separation, Composition, Alignment
+    - Every primitive generalizes beyond VibeSwap
+
+112. **16 New Research Papers Written** (492 KB)
+    - Commit-Reveal Batch Auctions, Cooperative Capitalism, VSOS Architecture
+    - Cave Methodology, Five-Layer MEV Defense, Idea-Execution Separation
+    - Hot/Cold Trust Boundaries, The Two Loops, Near-Zero Token Scaling
+    - Convergent Architecture, AI Agents as DeFi Citizens, Autonomous Circuit Breakers
+    - Wardenclyffe Inference Cascade, Proof of Mind Mechanism
+    - Testing as Proof of Correctness, Verify Destination Before Route
+
+113. **Papers Infrastructure**
+    - `docs/papers/README.md` — Master index with reading order
+    - `docs/papers/primitives-cheatsheet.md` — Single-page quick reference
+    - `docs/papers/knowledge-primitives-index.md` — Full index (805 lines)
+
+114. **LIVE_SESSION.md Introduced** — Mid-session crash protection, continuously updated
+
+## Previously Completed (Feb 22, 2026 — Session 34: Protocol Hardening + Infrastructure)
 105. **VibeSynth Price Jump Validation**
     - `updatePrice()` now bounded by `maxPriceJumpBps` (default 20%) for price setters
     - Owner bypasses for emergencies; configurable via `setMaxPriceJump()`

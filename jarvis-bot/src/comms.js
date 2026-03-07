@@ -39,8 +39,12 @@ async function loadComms() {
 }
 
 async function saveComms() {
-  await mkdir(config.dataDir, { recursive: true });
-  await writeFile(COMMS_FILE, JSON.stringify(comms, null, 2));
+  try {
+    await mkdir(config.dataDir, { recursive: true });
+    await writeFile(COMMS_FILE, JSON.stringify(comms, null, 2));
+  } catch (err) {
+    console.error(`[comms] Failed to save: ${err.message}`);
+  }
 }
 
 // ============ Inbox (Claude Code → JARVIS) ============

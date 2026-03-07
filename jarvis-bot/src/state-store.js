@@ -91,15 +91,26 @@ class FileStateStore extends StateStore {
     try {
       const data = await readFile(path, 'utf-8');
       return JSON.parse(data);
-    } catch {
+    } catch (err) {
+      if (err.code === 'ENOENT') return null; // File doesn't exist — expected
+      if (err instanceof SyntaxError) {
+        console.error(`[state-store] JSON corruption in ${key}: ${err.message}`);
+      } else {
+        console.warn(`[state-store] Failed to read ${key}: ${err.message}`);
+      }
       return null;
     }
   }
 
   async set(key, value) {
     const path = this._keyToPath(key);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, JSON.stringify(value, null, 2));
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, JSON.stringify(value, null, 2));
+    } catch (err) {
+      console.error(`[state-store] Write failed for ${key}: ${err.message}`);
+      return;
+    }
 
     // Notify watchers
     const callbacks = this.watchers.get(key);

@@ -60,6 +60,11 @@ export async function initContextMemory() {
       const parsed = JSON.parse(raw);
       let count = 0;
       for (const [chatId, data] of Object.entries(parsed)) {
+        // Validate loaded summary bounds — truncate oversized summaries
+        if (data.summary && data.summary.length > MAX_SUMMARY_LENGTH * 2) {
+          console.warn(`[context-memory] Chat ${chatId}: summary oversized (${data.summary.length} chars), truncating`);
+          data.summary = data.summary.slice(0, MAX_SUMMARY_LENGTH) + '\n[truncated on load]';
+        }
         summaries.set(Number(chatId), data);
         count++;
       }
@@ -218,7 +223,12 @@ Rules:
  */
 export function getContextSummary(chatId) {
   const data = summaries.get(chatId);
-  if (!data?.summary) return '';
+  if (!data?.summary || data.summary.length === 0) return '';
+
+  // Safety bound — truncate if somehow oversized
+  const summary = data.summary.length > MAX_SUMMARY_LENGTH
+    ? data.summary.slice(0, MAX_SUMMARY_LENGTH) + '\n[context truncated]'
+    : data.summary;
 
   const age = Date.now() - data.lastUpdated;
   const ageStr = age < 3600000
@@ -227,7 +237,7 @@ export function getContextSummary(chatId) {
       ? `${Math.round(age / 3600000)}h ago`
       : `${Math.round(age / 86400000)}d ago`;
 
-  return `\n\n// ============ CONTINUOUS CONTEXT (${data.messageCount} messages summarized, updated ${ageStr}) ============\n${data.summary}\n// ============ END CONTINUOUS CONTEXT ============`;
+  return `\n\n// ============ CONTINUOUS CONTEXT (${data.messageCount} messages summarized, updated ${ageStr}) ============\n${summary}\n// ============ END CONTINUOUS CONTEXT ============`;
 }
 
 // ============ Manual Operations ============

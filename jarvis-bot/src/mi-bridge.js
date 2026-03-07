@@ -183,20 +183,20 @@ export async function registerMIBridge() {
 
   // ============ Rug Check Cell ============
   count += registerIfExists('rug-check-cell', 'checkRug', async (input) => {
-    if (toolsAlerts.checkRug) {
-      const result = await toolsAlerts.checkRug(input.address, input.chain);
-      // Emit security alert for high-risk findings
-      if (result && typeof result === 'object' && result.riskLevel === 'high') {
-        emitSignal('security.alert.high', {
-          address: input.address,
-          chain: input.chain,
-          riskLevel: result.riskLevel,
-          flags: result.flags,
-        });
-      }
-      return result;
+    const result = await toolsAlerts.checkRug(input.address, input.chain);
+    if (result && typeof result === 'object' && result.riskLevel === 'high') {
+      emitSignal('security.alert.high', {
+        address: input.address,
+        chain: input.chain,
+        riskLevel: result.riskLevel,
+        flags: result.flags,
+      });
     }
-    return { error: 'Rug check API not configured' };
+    return result;
+  });
+
+  count += registerIfExists('rug-check-cell', 'checkHoneypot', async (input) => {
+    return await toolsAlerts.checkHoneypot(input.address, input.chain);
   });
 
   // ============ Limni Trading Cell ============

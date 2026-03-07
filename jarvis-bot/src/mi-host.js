@@ -681,9 +681,17 @@ export async function initMIHost(cellsDir = DEFAULT_CELLS_DIR) {
 
   // Start telemetry flush loop
   telemetryInterval = setInterval(() => {
-    const stats = getRegistryStats();
     telemetry.cellsActive = [...cells.values()].filter(c => c.state === 'active').length;
+    telemetry.cellsTotal = cells.size;
+    telemetry.pheromoneEntries = pheromoneBoard.stats().entries;
+    telemetry.uptimeMs = Date.now() - (telemetry._startedAt || Date.now());
+
+    // Log summary if any activity occurred since last flush
+    if (telemetry.invocations > 0 && telemetry.invocations % 10 === 0) {
+      console.log(`[mi-host] Telemetry: ${telemetry.invocations} invocations, ${telemetry.errors} errors, ${telemetry.cellsActive}/${telemetry.cellsTotal} cells active`);
+    }
   }, TELEMETRY_FLUSH_INTERVAL_MS);
+  telemetry._startedAt = Date.now();
 
   // Start state persistence loop (save learned weights every 5 min)
   persistInterval = setInterval(persistMIState, STATE_PERSIST_INTERVAL_MS);

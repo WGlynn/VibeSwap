@@ -111,7 +111,7 @@ export async function checkMessage(bot, ctx) {
   if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') return { action: 'allow' };
 
   const user = ctx.from;
-  if (user.is_bot) return { action: 'allow' };
+  if (!user || user.is_bot) return { action: 'allow' };
 
   const text = ctx.message.text;
   const userId = user.id;

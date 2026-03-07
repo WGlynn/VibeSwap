@@ -259,6 +259,10 @@ export function failoverShard(shardId) {
     reassigned++;
   }
 
+  // Zero out failed shard's user count
+  entry.userCount = Math.max(0, entry.userCount - reassigned);
+  entry.status = 'failed';
+
   console.log(`[router] Failover: ${reassigned} users from ${shardId} → ${candidates.map(c => c.shardId).join(', ')}`);
 
   return { reassigned, from: shardId, to: candidates.map(c => c.shardId) };

@@ -44,18 +44,27 @@ try {
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
 // MI Host SDK — graceful fallback if module fails to load
 let initMIHost, shutdownMIHost, getCellStats, getMIStatusString, getProviderHealthString_MI;
+let getMetricsText_MI, getSignalHistoryString_MI, pauseCell_MI, resumeCell_MI;
 try {
   const mi = await import('./mi-host.js');
   initMIHost = mi.initMIHost;
   shutdownMIHost = mi.shutdownMIHost;
   getCellStats = mi.getCellStats;
   getMIStatusString = mi.getMIStatusString;
+  getMetricsText_MI = mi.getMetricsText;
+  getSignalHistoryString_MI = mi.getSignalHistoryString;
+  pauseCell_MI = mi.pauseCell;
+  resumeCell_MI = mi.resumeCell;
 } catch (err) {
   console.warn(`[jarvis] MI Host SDK unavailable: ${err.message}`);
   initMIHost = async () => ({ cellCount: 0, manifests: 0 });
   shutdownMIHost = () => {};
   getCellStats = () => ({ host: {}, registry: {}, cells: [] });
   getMIStatusString = () => 'MI Host SDK not loaded.';
+  getMetricsText_MI = () => 'MI Host SDK not loaded.';
+  getSignalHistoryString_MI = () => 'MI Host SDK not loaded.';
+  pauseCell_MI = () => false;
+  resumeCell_MI = () => false;
 }
 // Provider health (circuit breakers + performance ranking)
 let getProviderPerformanceStats_MI;
@@ -658,6 +667,10 @@ FUN
 
 SYSTEM
   /mi_status — MI cell status & telemetry
+  /mi_signals [N] — Recent signal history
+  /mi_metrics — Prometheus metrics
+  /mi_pause <cell> — Pause a cell
+  /mi_resume <cell> — Resume a cell
   /telemetry — Provider health & performance
   /shard_sync — Cross-shard learning bus
   /whoami — Your user info
@@ -913,6 +926,46 @@ bot.command('mi_status', async (ctx) => {
   } catch (err) {
     ctx.reply(`MI Status error: ${err.message}`);
   }
+});
+
+// /mi_signals — Signal history debug view
+bot.command('mi_signals', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  try {
+    const limit = parseInt(ctx.message.text.split(' ')[1]) || 20;
+    ctx.reply(getSignalHistoryString_MI(limit));
+  } catch (err) {
+    ctx.reply(`Signal history error: ${err.message}`);
+  }
+});
+
+// /mi_metrics — Prometheus-format metrics
+bot.command('mi_metrics', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  try {
+    const text = getMetricsText_MI();
+    ctx.reply(`\`\`\`\n${text}\n\`\`\``, { parse_mode: 'Markdown' });
+  } catch (err) {
+    ctx.reply(`Metrics error: ${err.message}`);
+  }
+});
+
+// /mi_pause <cellId> — Pause a cell
+bot.command('mi_pause', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const cellId = ctx.message.text.split(' ')[1];
+  if (!cellId) return ctx.reply('Usage: /mi_pause <cellId>');
+  const ok = pauseCell_MI(cellId);
+  ctx.reply(ok ? `Cell ${cellId} paused.` : `Cell ${cellId} not found.`);
+});
+
+// /mi_resume <cellId> — Resume a paused cell
+bot.command('mi_resume', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const cellId = ctx.message.text.split(' ')[1];
+  if (!cellId) return ctx.reply('Usage: /mi_resume <cellId>');
+  const ok = resumeCell_MI(cellId);
+  ctx.reply(ok ? `Cell ${cellId} resumed.` : `Cell ${cellId} not found.`);
 });
 
 // /provider_health — Wardenclyffe circuit breaker stats

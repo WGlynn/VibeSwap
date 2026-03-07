@@ -190,7 +190,7 @@ export async function getTokenUnlocks() {
       { name: 'APT', note: 'Monthly core contributor unlocks' },
       { name: 'SUI', note: 'Monthly ecosystem unlocks' },
       { name: 'SEI', note: 'Monthly team vesting' },
-      { name: 'TIA', note: 'Oct 2025 cliff unlock was massive' },
+      { name: 'TIA', note: 'Post-cliff ongoing unlocks (cliff was Oct 2025)' },
       { name: 'STRK', note: 'Ongoing contributor vesting' },
       { name: 'JUP', note: 'Community airdrop tranches' },
     ];
@@ -213,11 +213,12 @@ function getUpcomingMajorEvents() {
   const now = new Date();
   const month = now.getMonth() + 1;
 
-  // Add known recurring events
-  if (month === 3 || month === 9) events.push('Ethereum Devcon season');
-  if (month === 4) events.push('Bitcoin halving anniversary (Apr 2024)');
-  events.push('Fed rate decision — check calendar');
-  events.push('CPI data release — check calendar');
+  // Recurring crypto/macro events by month
+  if (month >= 3 && month <= 5) events.push('ETH conference season (EthDenver, Devconnect)');
+  if (month >= 9 && month <= 11) events.push('Devcon / TOKEN2049 season');
+  if (month === 4) events.push('Bitcoin halving anniversary month');
+  events.push('Fed rate decision — check FOMC calendar');
+  events.push('CPI data release — check BLS calendar');
 
   return events;
 }

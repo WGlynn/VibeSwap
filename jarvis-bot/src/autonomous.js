@@ -251,7 +251,10 @@ async function generateMarketComment(event) {
     });
     if (response.usage) recordUsage('jarvis-autonomous', { input: response.usage.input_tokens, output: response.usage.output_tokens });
     return extractText(response);
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`[autonomous] generateMarketComment failed: ${err.message}`);
+    return null;
+  }
 }
 
 async function generateImpulse(chatId) {
@@ -298,7 +301,10 @@ async function generateImpulse(chatId) {
     });
     if (response.usage) recordUsage('jarvis-autonomous', { input: response.usage.input_tokens, output: response.usage.output_tokens });
     return extractText(response);
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`[autonomous] generateImpulse failed: ${err.message}`);
+    return null;
+  }
 }
 
 async function generateBoredomMessage(chatId, silenceMs) {
@@ -332,7 +338,10 @@ async function generateBoredomMessage(chatId, silenceMs) {
     });
     if (response.usage) recordUsage('jarvis-autonomous', { input: response.usage.input_tokens, output: response.usage.output_tokens });
     return extractText(response);
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`[autonomous] generateBoredomMessage failed: ${err.message}`);
+    return null;
+  }
 }
 
 // ============ Helpers ============

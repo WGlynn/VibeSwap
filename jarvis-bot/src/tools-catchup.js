@@ -11,11 +11,22 @@
 
 const HTTP_TIMEOUT = 12000;
 
-// Track last seen time per user
+// Track last seen time per user (cap at 10K to prevent unbounded growth)
 const lastSeen = new Map(); // userId -> timestamp
+const MAX_LAST_SEEN = 10000;
 
 export function recordActivity(userId) {
   lastSeen.set(userId, Date.now());
+  if (lastSeen.size > MAX_LAST_SEEN) {
+    // Drop oldest entries
+    const excess = lastSeen.size - MAX_LAST_SEEN;
+    let removed = 0;
+    for (const key of lastSeen.keys()) {
+      if (removed >= excess) break;
+      lastSeen.delete(key);
+      removed++;
+    }
+  }
 }
 
 // ============ /catchup — Smart Digest ============
@@ -216,5 +227,6 @@ async function fetchJSON(url) {
     signal: AbortSignal.timeout(HTTP_TIMEOUT),
     headers: { 'Accept': 'application/json' },
   });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }

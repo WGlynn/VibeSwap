@@ -24,6 +24,7 @@ let dirty = false;
 // Action cooldown tracking — prevents XP farming via rapid repeated actions
 // userId -> { action -> lastAwardedAt }
 const actionCooldowns = new Map();
+const MAX_COOLDOWN_ENTRIES = 10000;
 
 // Cooldowns per action (milliseconds). Actions not listed have no cooldown.
 const ACTION_COOLDOWN_MS = {
@@ -137,7 +138,14 @@ export function awardXP(userId, userName, action, multiplier = 1) {
   // Cooldown check — prevent rapid-fire XP farming
   const cooldownMs = ACTION_COOLDOWN_MS[action];
   if (cooldownMs) {
-    if (!actionCooldowns.has(userId)) actionCooldowns.set(userId, {});
+    if (!actionCooldowns.has(userId)) {
+      // Cap cooldown map to prevent unbounded growth
+      if (actionCooldowns.size >= MAX_COOLDOWN_ENTRIES) {
+        const firstKey = actionCooldowns.keys().next().value;
+        actionCooldowns.delete(firstKey);
+      }
+      actionCooldowns.set(userId, {});
+    }
     const userCooldowns = actionCooldowns.get(userId);
     const lastAwarded = userCooldowns[action] || 0;
     if (Date.now() - lastAwarded < cooldownMs) {

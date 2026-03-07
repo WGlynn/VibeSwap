@@ -67,6 +67,7 @@ const PRE_PROPAGATION_DEBOUNCE_MS = 2000; // Batch pre-propagation announcements
 
 let chain = []; // Local chain of epochs
 let pendingChanges = []; // Changes accumulated since last epoch
+const MAX_PENDING_CHANGES = 5000;
 let chainHead = null; // Current chain tip
 const missedEpochs = new Map(); // peerId -> epoch[] (capped at MAX_MISSED_EPOCHS_PER_PEER)
 
@@ -122,6 +123,10 @@ export async function addChange(change) {
     ...change,
     timestamp: new Date().toISOString(),
   };
+  if (pendingChanges.length >= MAX_PENDING_CHANGES) {
+    console.warn(`[knowledge-chain] Pending changes at cap (${MAX_PENDING_CHANGES}) — dropping oldest`);
+    pendingChanges = pendingChanges.slice(-Math.floor(MAX_PENDING_CHANGES * 0.8));
+  }
   pendingChanges.push(entry);
   // Append to WAL immediately (crash-safe — survives restarts)
   try {

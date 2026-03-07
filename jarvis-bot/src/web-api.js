@@ -31,6 +31,19 @@ const miningRateBuckets = new Map(); // IP -> [timestamps]
 const RATE_LIMIT = config.web?.rateLimitPerMinute || 5;
 const MINING_RATE_LIMIT = 10; // mining submissions per minute per IP
 const RATE_WINDOW = 60_000; // 1 minute
+const MAX_TRACKED_IPS = 10000;
+
+function pruneOldestBuckets(map) {
+  if (map.size <= MAX_TRACKED_IPS) return;
+  // Drop oldest entries (Map preserves insertion order)
+  const excess = map.size - MAX_TRACKED_IPS;
+  let removed = 0;
+  for (const key of map.keys()) {
+    if (removed >= excess) break;
+    map.delete(key);
+    removed++;
+  }
+}
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -43,6 +56,7 @@ function checkRateLimit(ip) {
   }
   recent.push(now);
   rateBuckets.set(ip, recent);
+  pruneOldestBuckets(rateBuckets);
   return true;
 }
 
@@ -56,6 +70,7 @@ function checkMiningRateLimit(ip) {
   }
   recent.push(now);
   miningRateBuckets.set(ip, recent);
+  pruneOldestBuckets(miningRateBuckets);
   return true;
 }
 

@@ -172,7 +172,7 @@ let contextDirty = false;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // Every 6 hours
 const WINDOW_EXPIRY_MS = 24 * 60 * 60 * 1000;   // 24 hours no activity → evict
 
-setInterval(() => {
+let cleanupInterval = setInterval(() => {
   const now = Date.now();
   let evicted = 0;
   for (const [chatId, win] of contextWindows) {
@@ -189,6 +189,13 @@ setInterval(() => {
     contextDirty = true;
   }
 }, CLEANUP_INTERVAL_MS);
+
+export function stopGroupContext() {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
 
 // Mark dirty when a message is pushed (called from pushGroupMessage wrapper below isn't needed —
 // we just set it inside push since pushGroupMessage already calls push)

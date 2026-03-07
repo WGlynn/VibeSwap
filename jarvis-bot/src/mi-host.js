@@ -42,6 +42,7 @@ const TELEMETRY_FLUSH_INTERVAL_MS = 30000;
 const STATE_PERSIST_INTERVAL_MS = miConfig.persistIntervalMs || 300000;
 const HOT_RELOAD_DEBOUNCE_MS = miConfig.hotReloadDebounceMs || 2000;
 const LIFECYCLE_CHECK_INTERVAL_MS = miConfig.lifecycleCheckIntervalMs || 60000;
+const HANDLER_TIMEOUT_MS = parseInt(process.env.MI_HANDLER_TIMEOUT || '10000');
 
 // ============ State ============
 
@@ -288,7 +289,12 @@ class CellInstance {
 
     const startMs = Date.now();
     try {
-      const result = await handler(input);
+      const result = await Promise.race([
+        handler(input),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Handler timeout (${HANDLER_TIMEOUT_MS}ms)`)), HANDLER_TIMEOUT_MS)
+        ),
+      ]);
       const latencyMs = Date.now() - startMs;
 
       // Auto-reward: success = 1.0, scaled by latency (faster = better reward)
@@ -835,28 +841,35 @@ export async function invokeCapability(capabilityName, input = {}) {
     return { error: `No cell provides capability: ${capabilityName}` };
   }
 
-  // Pick the best cell (active, lowest error rate, highest confidence)
-  let bestCell = null;
-  let bestScore = -1;
-
+  // Rank cells by score (active, lowest error rate, highest confidence)
+  const ranked = [];
   for (const manifest of matches) {
     const cell = cells.get(manifest.id);
     if (!cell || cell.state !== 'active') continue;
 
     const errorPenalty = cell.invocations > 0 ? cell.errors / cell.invocations : 0;
     const score = cell.confidence * (1 - errorPenalty);
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestCell = cell;
-    }
+    ranked.push({ cell, score });
   }
 
-  if (!bestCell) {
+  ranked.sort((a, b) => b.score - a.score);
+
+  if (ranked.length === 0) {
     return { error: `No active cell provides capability: ${capabilityName}` };
   }
 
-  return bestCell.invoke(capabilityName, input);
+  // Try cells in ranked order — fallback on timeout/error
+  for (const { cell } of ranked) {
+    const result = await cell.invoke(capabilityName, input);
+    // If primary cell returned a timeout or handler error, try next cell
+    if (result?.error && ranked.length > 1 && /timeout|budget/i.test(result.error)) {
+      console.warn(`[mi-host] Cell ${cell.id} failed for ${capabilityName}: ${result.error} — trying fallback`);
+      continue;
+    }
+    return result;
+  }
+
+  return { error: `All cells failed for capability: ${capabilityName}` };
 }
 
 /**

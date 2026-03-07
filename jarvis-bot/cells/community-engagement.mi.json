@@ -1,0 +1,63 @@
+{
+  "mi": "0.1",
+  "id": "community-engagement-cell",
+  "name": "Community Engagement",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "sensor",
+  "domain": "social",
+  "tags": ["community", "engagement", "polls", "trivia", "gm", "fun"],
+  "capabilities": [
+    {
+      "name": "coinFlip",
+      "description": "Flip a coin",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "result": { "type": "string" } } }
+    },
+    {
+      "name": "diceRoll",
+      "description": "Roll dice with D&D notation",
+      "input": { "type": "object", "properties": { "notation": { "type": "string", "example": "2d6" } } },
+      "output": { "type": "object", "properties": { "rolls": { "type": "array" }, "total": { "type": "number" } } }
+    },
+    {
+      "name": "getTrivia",
+      "description": "Get a random crypto trivia question",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "question": { "type": "string" }, "answer": { "type": "string" } } }
+    },
+    {
+      "name": "recordGM",
+      "description": "Record a user's daily GM greeting",
+      "input": { "type": "object", "properties": { "userId": { "type": "string" }, "username": { "type": "string" } }, "required": ["userId"] },
+      "output": { "type": "object", "properties": { "streak": { "type": "number" }, "total": { "type": "number" } } }
+    },
+    {
+      "name": "getGMLeaderboard",
+      "description": "Get the GM streak leaderboard",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "leaders": { "type": "array" } } }
+    }
+  ],
+  "signals": {
+    "subscribe": ["community.engagement.request", "user.greeting", "system.heartbeat"],
+    "emit": ["community.engagement.response", "community.streak.milestone", "cell.identity.announce"]
+  },
+  "requires": {
+    "capabilities": [],
+    "permissions": ["storage.read", "storage.write"],
+    "neighbors": []
+  },
+  "lifecycle": {
+    "sense": { "signals": ["community.active", "user.greeting"], "context": ["host.domain"] },
+    "candidates": [
+      { "identity": "full-engagement", "condition": "true", "priority": 1 }
+    ],
+    "commit": { "min_dwell_ms": 0, "reconsider_on": [] },
+    "learn": { "strategy": "contextual_bandit", "reward_signals": ["user_engagement", "response_quality"], "update_interval_ms": 900000 }
+  },
+  "runtime": { "sandbox": "worker", "memory_limit_mb": 16, "cpu_budget_ms": 500, "ttl_ms": 0, "energy_budget": 10 },
+  "telemetry": { "emit_interval_ms": 60000, "metrics": ["invocations", "unique_users", "streak_count"] },
+  "surfaces": ["telegram", "web"],
+  "host_sdk_min": "0.1"
+}

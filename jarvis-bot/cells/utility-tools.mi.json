@@ -1,0 +1,64 @@
+{
+  "mi": "0.1",
+  "id": "utility-tools-cell",
+  "name": "Utility Tools",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "service",
+  "domain": "utility",
+  "tags": ["weather", "wiki", "translate", "calculate", "time", "qr"],
+  "capabilities": [
+    {
+      "name": "getWeather",
+      "description": "Get current weather for a city",
+      "input": { "type": "object", "properties": { "city": { "type": "string" } }, "required": ["city"] },
+      "output": { "type": "object", "properties": { "temp": { "type": "number" }, "conditions": { "type": "string" }, "humidity": { "type": "number" } } }
+    },
+    {
+      "name": "getWiki",
+      "description": "Get Wikipedia summary for a topic",
+      "input": { "type": "object", "properties": { "topic": { "type": "string" } }, "required": ["topic"] },
+      "output": { "type": "object", "properties": { "summary": { "type": "string" }, "url": { "type": "string" } } }
+    },
+    {
+      "name": "translateText",
+      "description": "Translate text to a target language",
+      "input": { "type": "object", "properties": { "targetLang": { "type": "string" }, "text": { "type": "string" } }, "required": ["targetLang", "text"] },
+      "output": { "type": "object", "properties": { "translation": { "type": "string" } } }
+    },
+    {
+      "name": "calculate",
+      "description": "Evaluate a mathematical expression",
+      "input": { "type": "object", "properties": { "expression": { "type": "string" } }, "required": ["expression"] },
+      "output": { "type": "object", "properties": { "result": { "type": "number" } } }
+    },
+    {
+      "name": "getWorldTime",
+      "description": "Get current time in a timezone",
+      "input": { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] },
+      "output": { "type": "object", "properties": { "time": { "type": "string" }, "timezone": { "type": "string" } } }
+    }
+  ],
+  "signals": {
+    "subscribe": ["utility.request", "system.heartbeat"],
+    "emit": ["utility.response", "cell.identity.announce"]
+  },
+  "requires": {
+    "capabilities": ["http.fetch"],
+    "permissions": ["network.outbound"],
+    "neighbors": []
+  },
+  "lifecycle": {
+    "sense": { "signals": ["user.needs.utility"], "context": ["host.domain"] },
+    "candidates": [
+      { "identity": "full-utility", "condition": "network.outbound", "priority": 1 },
+      { "identity": "offline-utility", "condition": "true", "priority": 2 }
+    ],
+    "commit": { "min_dwell_ms": 600000, "reconsider_on": ["error_rate > 0.5"] },
+    "learn": { "strategy": "fixed", "reward_signals": [], "update_interval_ms": 0 }
+  },
+  "runtime": { "sandbox": "worker", "memory_limit_mb": 16, "cpu_budget_ms": 2000, "ttl_ms": 0, "energy_budget": 20 },
+  "telemetry": { "emit_interval_ms": 60000, "metrics": ["invocations", "latency_p50", "error_rate"] },
+  "surfaces": ["telegram", "web", "api"],
+  "host_sdk_min": "0.1"
+}

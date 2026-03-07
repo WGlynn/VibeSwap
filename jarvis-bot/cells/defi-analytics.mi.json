@@ -1,0 +1,70 @@
+{
+  "mi": "0.1",
+  "id": "defi-analytics-cell",
+  "name": "DeFi Analytics",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "service",
+  "domain": "defi",
+  "tags": ["defi", "tvl", "yields", "dex", "chains", "stablecoins"],
+  "capabilities": [
+    {
+      "name": "getTVL",
+      "description": "Get total value locked for a protocol",
+      "input": { "type": "object", "properties": { "protocol": { "type": "string" } }, "required": ["protocol"] },
+      "output": { "type": "object", "properties": { "tvl": { "type": "number" }, "change24h": { "type": "number" } } }
+    },
+    {
+      "name": "getYields",
+      "description": "Get top yield farming opportunities on a chain",
+      "input": { "type": "object", "properties": { "chain": { "type": "string" } } },
+      "output": { "type": "object", "properties": { "pools": { "type": "array" } } }
+    },
+    {
+      "name": "getDexVolume",
+      "description": "Get DEX trading volumes across chains",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "volumes": { "type": "array" }, "total24h": { "type": "number" } } }
+    },
+    {
+      "name": "getChains",
+      "description": "Get TVL rankings across all chains",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "chains": { "type": "array" } } }
+    },
+    {
+      "name": "getStables",
+      "description": "Get stablecoin market data and peg status",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "stablecoins": { "type": "array" }, "totalMcap": { "type": "number" } } }
+    },
+    {
+      "name": "getWalletBalance",
+      "description": "Get token balances for a wallet address",
+      "input": { "type": "object", "properties": { "address": { "type": "string" } }, "required": ["address"] },
+      "output": { "type": "object", "properties": { "balances": { "type": "array" }, "totalUsd": { "type": "number" } } }
+    }
+  ],
+  "signals": {
+    "subscribe": ["defi.analytics.request", "wallet.balance.request", "system.heartbeat"],
+    "emit": ["defi.tvl.update", "defi.yield.alert", "wallet.balance.update", "cell.identity.announce"]
+  },
+  "requires": {
+    "capabilities": ["http.fetch"],
+    "permissions": ["network.outbound"],
+    "neighbors": [{ "capability": "getPrice", "optional": true }]
+  },
+  "lifecycle": {
+    "sense": { "signals": ["defi.needs.analytics"], "context": ["host.domain"] },
+    "candidates": [
+      { "identity": "full-analytics", "condition": "network.outbound", "priority": 1 },
+      { "identity": "cached-analytics", "condition": "true", "priority": 2 }
+    ],
+    "commit": { "min_dwell_ms": 300000, "reconsider_on": ["error_rate > 0.4"] },
+    "learn": { "strategy": "contextual_bandit", "reward_signals": ["data_freshness_ms", "user_engagement"], "update_interval_ms": 600000 }
+  },
+  "runtime": { "sandbox": "worker", "memory_limit_mb": 32, "cpu_budget_ms": 3000, "ttl_ms": 0, "energy_budget": 50 },
+  "telemetry": { "emit_interval_ms": 60000, "metrics": ["invocations", "latency_p50", "error_rate"] },
+  "surfaces": ["telegram", "web", "api"],
+  "host_sdk_min": "0.1"
+}

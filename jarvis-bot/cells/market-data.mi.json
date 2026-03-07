@@ -1,0 +1,82 @@
+{
+  "mi": "0.1",
+  "id": "market-data-cell",
+  "name": "Market Data Hub",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "service",
+  "domain": "defi",
+  "tags": ["market", "price", "trending", "chart", "sentiment", "gas"],
+  "capabilities": [
+    {
+      "name": "getPrice",
+      "description": "Get current price, 24h change, volume for a token",
+      "input": { "type": "object", "properties": { "token": { "type": "string" } }, "required": ["token"] },
+      "output": { "type": "object", "properties": { "price": { "type": "number" }, "change24h": { "type": "number" }, "volume": { "type": "number" } } }
+    },
+    {
+      "name": "getTrending",
+      "description": "Get trending cryptocurrencies",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "coins": { "type": "array" } } }
+    },
+    {
+      "name": "getChart",
+      "description": "Get price chart data over time",
+      "input": { "type": "object", "properties": { "token": { "type": "string" }, "days": { "type": "number" } }, "required": ["token"] },
+      "output": { "type": "object", "properties": { "chart": { "type": "string" } } }
+    },
+    {
+      "name": "getFearGreed",
+      "description": "Get crypto Fear & Greed index",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "value": { "type": "number" }, "label": { "type": "string" } } }
+    },
+    {
+      "name": "getGasPrices",
+      "description": "Get current Ethereum gas prices",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "slow": { "type": "number" }, "standard": { "type": "number" }, "fast": { "type": "number" } } }
+    },
+    {
+      "name": "getATH",
+      "description": "Get all-time high price for a token",
+      "input": { "type": "object", "properties": { "token": { "type": "string" } }, "required": ["token"] },
+      "output": { "type": "object", "properties": { "ath": { "type": "number" }, "date": { "type": "string" } } }
+    },
+    {
+      "name": "getDominance",
+      "description": "Get BTC/ETH market dominance percentages",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "btc": { "type": "number" }, "eth": { "type": "number" } } }
+    },
+    {
+      "name": "convertCrypto",
+      "description": "Convert between crypto amounts",
+      "input": { "type": "object", "properties": { "amount": { "type": "number" }, "from": { "type": "string" }, "to": { "type": "string" } }, "required": ["amount", "from", "to"] },
+      "output": { "type": "object", "properties": { "result": { "type": "number" }, "rate": { "type": "number" } } }
+    }
+  ],
+  "signals": {
+    "subscribe": ["price.request", "market.overview.request", "system.heartbeat"],
+    "emit": ["price.update", "market.sentiment.shift", "market.alert", "cell.identity.announce"]
+  },
+  "requires": {
+    "capabilities": ["http.fetch"],
+    "permissions": ["network.outbound"],
+    "neighbors": []
+  },
+  "lifecycle": {
+    "sense": { "signals": ["market.needs.data", "user.asks.price"], "context": ["host.domain"] },
+    "candidates": [
+      { "identity": "full-api", "condition": "network.outbound", "priority": 1 },
+      { "identity": "cached-only", "condition": "neighbor.has(cache.store)", "priority": 2 }
+    ],
+    "commit": { "min_dwell_ms": 300000, "reconsider_on": ["api.rate_limited", "error_rate > 0.3"] },
+    "learn": { "strategy": "contextual_bandit", "reward_signals": ["response_latency_ms", "data_freshness_ms"], "update_interval_ms": 600000 }
+  },
+  "runtime": { "sandbox": "worker", "memory_limit_mb": 32, "cpu_budget_ms": 2000, "ttl_ms": 0, "energy_budget": 40 },
+  "telemetry": { "emit_interval_ms": 60000, "metrics": ["invocations", "latency_p50", "error_rate", "cache_hit_rate"] },
+  "surfaces": ["telegram", "web", "api"],
+  "host_sdk_min": "0.1"
+}

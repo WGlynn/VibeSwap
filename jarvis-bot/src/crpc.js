@@ -75,7 +75,9 @@ const TASK_TYPES = {
 // ============ State ============
 
 let crpcEnabled = false;
+let staleTaskInterval = null;
 const activeTasks = new Map(); // taskId -> CRPCTask
+const MAX_ACTIVE_TASKS = 100;
 const completedTasks = []; // History
 const MAX_HISTORY = 100;
 
@@ -145,7 +147,7 @@ export async function initCRPC() {
   if (crpcEnabled) {
     console.log(`[crpc] CRPC ENABLED (${shardInfo.totalShards} shards, min ${MIN_PARTICIPANTS} for pairwise comparison)`);
     // Auto-settle stale tasks every 30s
-    setInterval(autoSettleStaleTasks, 30000);
+    staleTaskInterval = setInterval(autoSettleStaleTasks, 30000);
   } else {
     console.log('[crpc] CRPC disabled — fewer than 3 shards. Single-response mode.');
   }
@@ -192,6 +194,13 @@ export async function requestConsensusResponse(prompt, context, opts = {}) {
       singleShard: true,
       confidence: 1.0,
     };
+  }
+
+  // Cap active tasks to prevent unbounded growth from stuck tasks
+  if (activeTasks.size >= MAX_ACTIVE_TASKS) {
+    console.warn(`[crpc] Active tasks at cap (${MAX_ACTIVE_TASKS}) — settling oldest`);
+    const oldest = activeTasks.keys().next().value;
+    settleTask(oldest);
   }
 
   const task = createCRPCTask(taskId, prompt, context, opts);
@@ -487,12 +496,15 @@ function archiveTask(task) {
 async function broadcastCRPC(peers, path, data) {
   const promises = peers.map(async (peer) => {
     try {
-      await fetch(`${peer.url}${path}`, {
+      const resp = await fetch(`${peer.url}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
         signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
       });
+      if (!resp.ok) {
+        console.warn(`[crpc] Broadcast to ${peer.shardId} HTTP ${resp.status}`);
+      }
     } catch (err) {
       console.warn(`[crpc] Broadcast to ${peer.shardId} failed: ${err.message}`);
     }
@@ -545,6 +557,13 @@ export function processCRPCBody(handler, body) {
       return getCRPCStats();
     default:
       return { error: 'Unknown CRPC handler' };
+  }
+}
+
+export function stopCRPC() {
+  if (staleTaskInterval) {
+    clearInterval(staleTaskInterval);
+    staleTaskInterval = null;
   }
 }
 

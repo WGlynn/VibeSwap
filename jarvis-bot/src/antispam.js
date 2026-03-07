@@ -10,6 +10,7 @@ const SPAM_LOG_FILE = join(DATA_DIR, 'spam-log.json');
 
 // Per-user message tracking for flood detection
 const recentMessages = new Map(); // userId -> [{ text, timestamp }]
+const MAX_TRACKED_USERS = 10000;
 let spamLog = [];
 
 // ============ Scam Patterns ============
@@ -54,6 +55,11 @@ function isScamMessage(text) {
 
 function isFlood(userId, text, now) {
   if (!recentMessages.has(userId)) {
+    // Evict stale users when at cap
+    if (recentMessages.size >= MAX_TRACKED_USERS) {
+      const firstKey = recentMessages.keys().next().value;
+      recentMessages.delete(firstKey);
+    }
     recentMessages.set(userId, []);
   }
 

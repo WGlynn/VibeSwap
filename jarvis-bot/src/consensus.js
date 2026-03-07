@@ -120,8 +120,10 @@ function isReplayedProposal(id) {
 
 let consensusEnabled = false;
 const pendingProposals = new Map(); // proposalId -> ProposalState
+const PROPOSAL_TTL_MS = 120000; // Auto-expire stuck proposals after 2 minutes
 const committedProposals = []; // History of committed proposals
 const committedIds = new Set(); // Dedup: track committed proposal hashes to prevent double-commit
+const MAX_COMMITTED_IDS = 5000;
 const commitHandlers = []; // Callbacks for committed state changes
 const proposalHandlers = []; // Callbacks for incoming proposals (validation)
 const retryQueue = []; // { proposal, retryCount, nextRetryAt }
@@ -584,7 +586,13 @@ export async function recoverRetryQueue() {
 
 async function persistCommittedIds() {
   try {
-    // Keep last 1000 committed IDs to prevent unbounded growth
+    // Cap in-memory Set to prevent unbounded growth
+    if (committedIds.size > MAX_COMMITTED_IDS) {
+      const keep = [...committedIds].slice(-Math.floor(MAX_COMMITTED_IDS * 0.8));
+      committedIds.clear();
+      for (const id of keep) committedIds.add(id);
+    }
+    // Keep last 1000 committed IDs on disk
     const ids = [...committedIds].slice(-1000);
     await writeFile(COMMITTED_IDS_FILE, JSON.stringify(ids));
   } catch { /* non-fatal */ }

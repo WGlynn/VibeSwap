@@ -18,7 +18,7 @@ import { initProvider, getProviderName, getModelName, getFallbackChain, getIntel
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
-import { initCRPC, flushCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
+import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
@@ -432,6 +432,30 @@ function isUnlimitedUser(ctx) {
   return username && UNLIMITED_USERNAMES.has(username);
 }
 
+
+// ============ Friendly Error Messages ============
+
+function friendlyError(error) {
+  const msg = error.message || '';
+  // Cascade exhausted — all LLM providers down
+  if (/all.*exhaust|cascade.*fail|fallback.*fail/i.test(msg) || (msg.includes('HTTP') && /5\d\d/.test(msg))) {
+    return 'All AI providers are temporarily unavailable. I\'ll be back shortly — try again in a minute.';
+  }
+  // Timeout
+  if (/timeout|timed? ?out|ETIMEDOUT|ECONNABORTED/i.test(msg)) {
+    return 'Request timed out — the AI provider is slow right now. Try again in a moment.';
+  }
+  // Rate limited by upstream
+  if (/429|rate.?limit|too many requests/i.test(msg)) {
+    return 'AI provider rate limit hit. Try again in a few seconds.';
+  }
+  // Content filter / safety
+  if (/content.?filter|safety|blocked|refused/i.test(msg)) {
+    return 'That request was filtered by the AI provider\'s safety system. Try rephrasing.';
+  }
+  // Generic — still truncate but frame better
+  return `Something went wrong: ${msg.slice(0, 150) || 'Unknown error'}`;
+}
 
 // ============ Rate Limiting ============
 
@@ -3730,7 +3754,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
     clearInterval(typingInterval);
     console.error('[bot] Media response error:', error.message);
     try {
-      await ctx.reply(`Error: ${error.message?.slice(0, 200) || 'Unknown error'}`, { parse_mode: undefined });
+      await ctx.reply(friendlyError(error), { parse_mode: undefined });
     } catch {
       console.error('[bot] Failed to send error reply to chat', ctx.chat?.id);
     }
@@ -4573,7 +4597,7 @@ bot.on('text', async (ctx) => {
     clearInterval(typingInterval);
     console.error('[bot] Error:', error.message);
     try {
-      await ctx.reply(`Error: ${error.message?.slice(0, 200) || 'Unknown error'}`, { parse_mode: undefined });
+      await ctx.reply(friendlyError(error), { parse_mode: undefined });
     } catch {
       // If even the error reply fails (user blocked bot, chat deleted, TG down), just log
       console.error('[bot] Failed to send error reply to chat', ctx.chat?.id);
@@ -5907,6 +5931,7 @@ async function main() {
     stopScheduler();
     stopAutonomous();
     stopGroupContext();
+    stopCRPC();
     await writeHeartbeat('stopped');
     clearTimeout(shutdownTimer);
     bot.stop(signal);

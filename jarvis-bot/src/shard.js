@@ -25,6 +25,7 @@ import { config } from './config.js';
 let shardInfo = null;
 let peers = new Map(); // shardId -> { url, status, load, lastHeartbeat }
 let userAssignments = new Map(); // userId -> shardId (local cache)
+const MAX_USER_ASSIGNMENTS = 50000;
 let heartbeatInterval = null;
 let consecutiveFailures = 0;
 const HEARTBEAT_BASE_MS = 30000; // 30 seconds
@@ -211,6 +212,11 @@ function startHeartbeat() {
 
 export function assignUser(userId) {
   const id = String(userId);
+  // Evict oldest entry when at cap
+  if (userAssignments.size >= MAX_USER_ASSIGNMENTS && !userAssignments.has(id)) {
+    const firstKey = userAssignments.keys().next().value;
+    userAssignments.delete(firstKey);
+  }
   userAssignments.set(id, shardInfo.id);
   shardInfo.userCount++;
   return shardInfo.id;

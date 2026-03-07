@@ -221,7 +221,7 @@ Return ONLY the final response text, or SKIP.`,
       .then(scores => {
         if (scores) appendScoreLog(null, scores);
       })
-      .catch(() => {});
+      .catch(err => console.warn(`[intelligence] Score log error: ${err.message}`));
 
     return reviewText;
   } catch (err) {

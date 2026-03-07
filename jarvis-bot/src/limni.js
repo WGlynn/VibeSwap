@@ -268,7 +268,7 @@ export function verifyTrade(trade, strategy) {
     }
   }
 
-  // Record in trade log
+  // Record in trade log (cap at 5K entries)
   state.tradeLog.push({
     ...trade,
     strategyId: strategy.id,
@@ -276,6 +276,7 @@ export function verifyTrade(trade, strategy) {
     reasons: result.reasons,
     verifiedAt: Date.now(),
   });
+  if (state.tradeLog.length > 5000) state.tradeLog = state.tradeLog.slice(-4000);
   state.stats.totalTrades++;
   if (result.valid) {
     state.stats.validTrades++;
@@ -305,8 +306,11 @@ export function startMonitorLoop(intervalMs = 30000) {
   console.log(`[limni] Monitor loop started (every ${intervalMs / 1000}s)`);
 
   let monitorCheckCount = 0;
+  let monitorRunning = false;
 
   monitorInterval = setInterval(async () => {
+    if (monitorRunning) return; // Prevent overlapping monitor ticks
+    monitorRunning = true;
     state.stats.lastCheck = Date.now();
     monitorCheckCount++;
 
@@ -342,6 +346,7 @@ export function startMonitorLoop(intervalMs = 30000) {
     if (monitorCheckCount % 10 === 0) {
       console.log(`[limni] Monitor check #${monitorCheckCount}: ${healthy}/${terminalsChecked} terminals healthy, ${tradesVerified} trades verified, ${state.alerts.length} total alerts`);
     }
+    monitorRunning = false;
   }, intervalMs);
 }
 
@@ -762,6 +767,7 @@ function emitAlert(type, message, data = {}) {
     acknowledged: false,
   };
   state.alerts.push(alert);
+  if (state.alerts.length > 2000) state.alerts = state.alerts.slice(-1500);
   state.stats.alertsSent++;
 
   console.warn(`[limni] ALERT [${type}]: ${message}`);

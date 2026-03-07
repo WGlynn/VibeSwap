@@ -41,7 +41,11 @@ async function saveModLog() {
   if (moderationLog.length > MAX_MOD_LOG) {
     moderationLog = moderationLog.slice(-MAX_MOD_LOG);
   }
-  await writeFile(MOD_LOG_FILE, JSON.stringify(moderationLog, null, 2));
+  try {
+    await writeFile(MOD_LOG_FILE, JSON.stringify(moderationLog, null, 2));
+  } catch (err) {
+    console.warn(`[moderation] Save failed: ${err.message}`);
+  }
 }
 
 // ============ Default Policy ============

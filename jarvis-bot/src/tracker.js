@@ -79,11 +79,15 @@ async function saveAll() {
     interactions = interactions.slice(-MAX_INTERACTIONS);
   }
 
-  await Promise.all([
-    writeFile(CONTRIBUTIONS_FILE, JSON.stringify(contributions, null, 2)),
-    writeFile(USERS_FILE, JSON.stringify(users, null, 2)),
-    writeFile(INTERACTIONS_FILE, JSON.stringify(interactions, null, 2)),
-  ]);
+  try {
+    await Promise.all([
+      writeFile(CONTRIBUTIONS_FILE, JSON.stringify(contributions, null, 2)),
+      writeFile(USERS_FILE, JSON.stringify(users, null, 2)),
+      writeFile(INTERACTIONS_FILE, JSON.stringify(interactions, null, 2)),
+    ]);
+  } catch (err) {
+    console.warn(`[tracker] Save failed: ${err.message}`);
+  }
 }
 
 // ============ User Registry ============

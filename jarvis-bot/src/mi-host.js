@@ -92,7 +92,7 @@ class CellInstance {
     this.manifest = manifest;
     this.id = manifest.id;
     this.identity = null; // Chosen identity (from candidates)
-    this.state = 'undifferentiated'; // undifferentiated → sensing → choosing → active → reconsidering
+    this.state = 'undifferentiated'; // undifferentiated → sensing → choosing → active → reconsidering | paused
     this.confidence = 0;
     this.createdAt = Date.now();
     this.lastActivity = Date.now();
@@ -429,12 +429,37 @@ function emitSignalInternal(name, payload) {
 
 /**
  * Register a custom signal handler (for host-level integration).
+ * Supports wildcard patterns: 'market.*' matches 'market.BTC', 'market.ETH', etc.
  */
 export function onSignal(name, handler) {
   if (!signalHandlers.has(name)) {
     signalHandlers.set(name, new Set());
   }
   signalHandlers.get(name).add(handler);
+}
+
+/**
+ * Collect handlers for a signal name, including wildcard pattern matches.
+ * E.g., signal 'market.BTC' matches handlers for 'market.BTC' (exact) and 'market.*' (wildcard).
+ */
+function collectSignalHandlers(signalName) {
+  const collected = new Set();
+
+  // Exact match
+  const exact = signalHandlers.get(signalName);
+  if (exact) for (const h of exact) collected.add(h);
+
+  // Wildcard matches: check all registered patterns ending with '*'
+  for (const [pattern, handlers] of signalHandlers) {
+    if (pattern.endsWith('.*')) {
+      const prefix = pattern.slice(0, -1); // 'market.*' → 'market.'
+      if (signalName.startsWith(prefix)) {
+        for (const h of handlers) collected.add(h);
+      }
+    }
+  }
+
+  return collected.size > 0 ? collected : null;
 }
 
 /**
@@ -474,7 +499,7 @@ function processSignals() {
       continue;
     }
 
-    // Deliver to subscribed cells
+    // Deliver to subscribed cells (exact match)
     const subscribers = matchSignal(signal.name);
     for (const manifest of subscribers) {
       const cell = cells.get(manifest.id);
@@ -484,8 +509,8 @@ function processSignals() {
       }
     }
 
-    // Deliver to host handlers (with error budget)
-    const handlers = signalHandlers.get(signal.name);
+    // Deliver to host handlers (exact match + wildcard pattern match)
+    const handlers = collectSignalHandlers(signal.name);
     if (handlers) {
       for (const handler of handlers) {
         // Check handler health
@@ -887,6 +912,32 @@ export function rewardCell(cellId, reward, rewardSignal = 'generic') {
   const cell = cells.get(cellId);
   if (!cell) return false;
   cell.learn(reward, rewardSignal);
+  return true;
+}
+
+/**
+ * Pause a cell. Paused cells skip signal delivery and invocations.
+ */
+export function pauseCell(cellId) {
+  const cell = cells.get(cellId);
+  if (!cell) return false;
+  if (cell.state === 'paused') return true; // Already paused
+  cell._stateBeforePause = cell.state;
+  cell.state = 'paused';
+  emitSignalInternal('cell.paused', { cellId, previousState: cell._stateBeforePause });
+  return true;
+}
+
+/**
+ * Resume a paused cell. Restores previous state.
+ */
+export function resumeCell(cellId) {
+  const cell = cells.get(cellId);
+  if (!cell) return false;
+  if (cell.state !== 'paused') return true; // Not paused
+  cell.state = cell._stateBeforePause || 'active';
+  delete cell._stateBeforePause;
+  emitSignalInternal('cell.resumed', { cellId, state: cell.state });
   return true;
 }
 

@@ -8,8 +8,9 @@ import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
 import { llmChat, getProvider, getProviderName, getModelName, getIntelligenceLevel } from './llm-provider.js';
 import { summarizeIfNeeded, getContextSummary } from './context-memory.js';
-import { checkBudget } from './compute-economics.js';
+import { checkBudget, recordUsage } from './compute-economics.js';
 import { getGroupContext } from './group-context.js';
+import { evaluateOwnResponse, appendScoreLog } from './intelligence.js';
 import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 
@@ -1263,6 +1264,17 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     // Cross-chat context symmetry: extract user-specific context from conversation
     // and flow it into the CKB pipeline so knowledge persists across DM/group/shard
     _extractConversationContext(effectiveUserId, userName, chatId, chatType, messageText, assistantMessage).catch(() => {});
+
+    // Self-correcting feedback loop: score every response (fire-and-forget)
+    evaluateOwnResponse(assistantMessage, messageText, chatType)
+      .then(scores => {
+        if (scores) {
+          // Feed composite score (0-10) into Shapley quality accumulator (expects 0-5)
+          recordUsage('jarvis-response', {}, scores.composite / 2);
+          appendScoreLog(chatId, scores);
+        }
+      })
+      .catch(() => {});
 
     // Mark dirty for periodic save
     conversationsDirty = true;

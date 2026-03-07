@@ -1,3 +1,5 @@
+import { appendFile, readFile } from 'fs/promises';
+import { join } from 'path';
 import { config } from './config.js';
 import { llmChat } from './llm-provider.js';
 import { recordUsage } from './compute-economics.js';
@@ -213,6 +215,14 @@ Return ONLY the final response text, or SKIP.`,
     if (!reviewText || reviewText === 'SKIP') return null;
 
     recordEngagement();
+
+    // Self-correcting feedback loop: score proactive response (fire-and-forget)
+    evaluateOwnResponse(reviewText, text, 'group')
+      .then(scores => {
+        if (scores) appendScoreLog(null, scores);
+      })
+      .catch(() => {});
+
     return reviewText;
   } catch (err) {
     console.error('[intelligence] Proactive response failed:', err.message);
@@ -291,6 +301,71 @@ function computeBasicQuality(text) {
   if (text.includes('?')) score++;
   if (text.includes('http') || text.includes('```')) score++;
   return Math.min(score, 5);
+}
+
+// ============ Self-Correcting Feedback Loop ============
+// Mario AI approach: score every response, track trends, feed back into economics.
+// Positive signal → reinforces behavior. Negative signal → inner dialogue flags it.
+
+const SCORE_LOG_FILE = join(config.dataDir, 'knowledge', 'self-scores.jsonl');
+
+export async function evaluateOwnResponse(responseText, userMessage, chatType) {
+  if (!responseText || responseText.length < 10) return null;
+
+  try {
+    // No explicit model — let Wardenclyffe route to cheapest available provider.
+    // This is a simple classification task, so smart router will pick free/cheap tier.
+    const response = await llmChat({
+      max_tokens: 150,
+      system: `Score this AI response on 4 criteria (0-10 each). Be harsh — 7 is good, 10 is rare.
+Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness": N }`,
+      messages: [{ role: 'user', content: `User said: "${userMessage.slice(0, 300)}"\n\nAI responded: "${responseText.slice(0, 500)}"` }],
+    });
+
+    if (response.usage) {
+      recordUsage('jarvis-self-eval', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+    }
+
+    const raw = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    const scores = JSON.parse(match[0]);
+    const composite = (scores.accuracy + scores.relevance + scores.conciseness + scores.usefulness) / 4;
+
+    return { ...scores, composite, chatType, timestamp: Date.now() };
+  } catch {
+    return null;
+  }
+}
+
+export async function appendScoreLog(chatId, scores) {
+  const entry = JSON.stringify({ ...scores, chatId, ts: Date.now() }) + '\n';
+  try {
+    await appendFile(SCORE_LOG_FILE, entry);
+  } catch { /* non-fatal */ }
+}
+
+export async function getScoreTrends(days = 7) {
+  try {
+    const data = await readFile(SCORE_LOG_FILE, 'utf-8');
+    const cutoff = Date.now() - days * 86400000;
+    const entries = data.trim().split('\n')
+      .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(e => e && e.ts > cutoff);
+
+    if (entries.length === 0) return null;
+
+    const avg = (key) => entries.reduce((s, e) => s + (e[key] || 0), 0) / entries.length;
+    return {
+      count: entries.length,
+      accuracy: avg('accuracy').toFixed(1),
+      relevance: avg('relevance').toFixed(1),
+      conciseness: avg('conciseness').toFixed(1),
+      usefulness: avg('usefulness').toFixed(1),
+      composite: avg('composite').toFixed(1),
+    };
+  } catch { return null; }
 }
 
 // ============ Stats ============

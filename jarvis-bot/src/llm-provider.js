@@ -22,6 +22,16 @@
 import { config } from './config.js';
 import { randomUUID, createHash } from 'crypto';
 
+// ============ Truncated Response Error ============
+// Thrown when a provider returns incomplete/truncated JSON.
+// Classified as transient so the retry + cascade logic catches it.
+class TruncatedResponseError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'TruncatedResponseError';
+  }
+}
+
 // ============ Provider Interface ============
 
 /**
@@ -205,7 +215,10 @@ function createOpenAIProvider(providerConfig) {
 
   // Convert OpenAI response → Anthropic format
   function convertResponse(response) {
-    const choice = response.choices[0];
+    const choice = response.choices?.[0];
+    if (!choice?.message) {
+      throw new TruncatedResponseError('Missing choices[0].message in API response');
+    }
     const content = [];
 
     if (choice.message.content) {
@@ -214,11 +227,19 @@ function createOpenAIProvider(providerConfig) {
 
     if (choice.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
+        let parsedArgs = {};
+        try {
+          parsedArgs = JSON.parse(tc.function.arguments || '{}');
+        } catch (parseErr) {
+          // Truncated tool call arguments — treat as transient (provider cut off mid-stream)
+          console.warn(`[openai-compat] Truncated tool_call arguments for ${tc.function.name}: ${parseErr.message}`);
+          throw new TruncatedResponseError(`Truncated tool_call arguments: ${parseErr.message}`);
+        }
         content.push({
           type: 'tool_use',
           id: tc.id,
           name: tc.function.name,
-          input: JSON.parse(tc.function.arguments || '{}'),
+          input: parsedArgs,
         });
       }
     }
@@ -259,7 +280,15 @@ function createOpenAIProvider(providerConfig) {
         throw new Error(`${this.name} API error ${response.status}: ${error}`);
       }
 
-      return convertResponse(await response.json());
+      // Parse response body — catch truncated JSON from providers that cut off mid-stream
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseErr) {
+        throw new TruncatedResponseError(`${providerConfig.providerName || 'openai'} returned truncated JSON: ${parseErr.message}`);
+      }
+
+      return convertResponse(responseData);
     },
   };
 }
@@ -892,6 +921,7 @@ function isCreditError(error) {
 // ============ Transient/Glitch Error Detection (Retryable) ============
 
 function isTransientOrGlitch(error) {
+  if (error instanceof TruncatedResponseError) return true;
   const msg = (error?.message || '').toLowerCase();
   const status = error?.status || error?.statusCode || error?.response?.status;
   return msg.includes('model not exist') ||   // DeepSeek transient glitch
@@ -903,6 +933,8 @@ function isTransientOrGlitch(error) {
     msg.includes('econnreset') ||
     msg.includes('etimedout') ||
     msg.includes('socket hang up') ||
+    msg.includes('truncated') ||              // Truncated JSON response
+    msg.includes('unterminated string') ||    // Specific JSON parse error
     status === 500 || status === 502 || status === 503 || status === 504;
 }
 
@@ -1113,11 +1145,13 @@ export function initProvider() {
 // ============ Retry helpers ============
 
 function isTransientError(error) {
+  if (error instanceof TruncatedResponseError) return true;
   const status = error?.status || error?.statusCode || error?.response?.status;
   if ([429, 500, 502, 503, 529].includes(status)) return true;
   const msg = (error?.message || '').toLowerCase();
   if (msg.includes('overloaded') || msg.includes('rate limit') || msg.includes('econnreset')
-      || msg.includes('socket hang up') || msg.includes('timeout') || msg.includes('fetch failed')) {
+      || msg.includes('socket hang up') || msg.includes('timeout') || msg.includes('fetch failed')
+      || msg.includes('truncated') || msg.includes('unterminated string')) {
     return true;
   }
   return false;

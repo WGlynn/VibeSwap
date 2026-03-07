@@ -11,7 +11,7 @@
 //   await registerMIBridge();  // After initMIHost()
 // ============
 
-import { registerHandler } from './mi-host.js';
+import { registerHandler, emitSignal } from './mi-host.js';
 
 // ============ Handler Registry ============
 // Maps cellId.capabilityName → handler function
@@ -106,7 +106,12 @@ export async function registerMIBridge() {
   });
 
   count += registerIfExists('defi-analytics-cell', 'getYields', async (input) => {
-    return await tools.getYields(input.chain);
+    const result = await tools.getYields(input.chain);
+    // Emit yield alert for exceptionally high APY (>100%) — possible rug/unsustainable
+    if (result && typeof result === 'string' && /\d{3,}%/.test(result)) {
+      emitSignal('defi.yield.alert', { chain: input.chain, result: result.slice(0, 200) });
+    }
+    return result;
   });
 
   count += registerIfExists('defi-analytics-cell', 'getDexVolume', async () => {
@@ -160,7 +165,16 @@ export async function registerMIBridge() {
   });
 
   count += registerIfExists('community-engagement-cell', 'recordGM', async (input) => {
-    return toolsFun.recordGM(input.userId, input.username);
+    const result = toolsFun.recordGM(input.userId, input.username);
+    // Emit milestone signal when streak thresholds are hit
+    if (result && typeof result === 'string' && /streak/i.test(result)) {
+      emitSignal('community.streak.milestone', {
+        userId: input.userId,
+        username: input.username,
+        result,
+      });
+    }
+    return result;
   });
 
   count += registerIfExists('community-engagement-cell', 'getGMLeaderboard', async () => {
@@ -170,7 +184,17 @@ export async function registerMIBridge() {
   // ============ Rug Check Cell ============
   count += registerIfExists('rug-check-cell', 'checkRug', async (input) => {
     if (toolsAlerts.checkRug) {
-      return await toolsAlerts.checkRug(input.address, input.chain);
+      const result = await toolsAlerts.checkRug(input.address, input.chain);
+      // Emit security alert for high-risk findings
+      if (result && typeof result === 'object' && result.riskLevel === 'high') {
+        emitSignal('security.alert.high', {
+          address: input.address,
+          chain: input.chain,
+          riskLevel: result.riskLevel,
+          flags: result.flags,
+        });
+      }
+      return result;
     }
     return { error: 'Rug check API not configured' };
   });
@@ -234,12 +258,22 @@ export async function registerMIBridge() {
   });
 
   count += registerIfExists('knowledge-learner-cell', 'recallKnowledge', async (input) => {
-    // Use getUserKnowledgeSummary for recall — returns structured knowledge
+    // If a query is provided, use full knowledge context builder (searches facts by relevance)
+    if (input.query) {
+      const context = await learning.buildKnowledgeContext(
+        input.userId || 'mi-system',
+        input.chatId || 'mi-internal',
+        'private',
+        input.query
+      );
+      return { context, query: input.query };
+    }
+    // With userId only, return user knowledge summary
     if (input.userId) {
       const summary = await learning.getUserKnowledgeSummary(input.userId);
       return { facts: summary ? [summary] : [], count: summary ? 1 : 0 };
     }
-    // Without userId, return learning stats as general recall
+    // Fallback: general learning stats
     const stats = await learning.getLearningStats(input.userId || 'mi-system', input.chatId);
     return { facts: stats ? [stats] : [], count: stats ? 1 : 0 };
   });

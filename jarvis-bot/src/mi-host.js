@@ -536,6 +536,21 @@ function lifecycleCheck() {
   }
 
   telemetry.cellsActive = [...cells.values()].filter(c => c.state === 'active').length;
+
+  // Emit system.heartbeat — all cells subscribe to this for health monitoring
+  emitSignalInternal('system.heartbeat', {
+    ts: Date.now(),
+    cellsActive: telemetry.cellsActive,
+    cellsTotal: cells.size,
+    signalsProcessed: telemetry.signalsProcessed,
+    invocations: telemetry.invocations,
+  });
+
+  // Trigger pheromone decay — evicts expired entries
+  pheromoneBoard.decay();
+  emitSignalInternal('pheromone.decay', {
+    entries: pheromoneBoard.stats().entries,
+  });
 }
 
 // ============ State Persistence ============
@@ -621,8 +636,6 @@ export async function initMIHost(cellsDir = DEFAULT_CELLS_DIR) {
 
   // Restore pheromone board from persisted state
   if (savedState?.pheromones && Array.isArray(savedState.pheromones)) {
-    const restored = StigmergyBoard.deserialize(savedState.pheromones);
-    // Merge into global board
     for (const entry of savedState.pheromones) {
       if (entry.expiresAt > Date.now()) {
         pheromoneBoard.deposit(entry.key, entry.value, entry.depositor, entry.expiresAt - Date.now());

@@ -52,6 +52,11 @@ const signalQueue = [];
 // Signal handlers (signal name → Set<handler fn>)
 const signalHandlers = new Map();
 
+// Per-handler error tracking for auto-disable (handler → { errors, disabled, lastError })
+const handlerHealth = new WeakMap();
+const HANDLER_ERROR_THRESHOLD = 5;  // Disable after 5 consecutive errors
+const HANDLER_RECOVERY_MS = 60000;  // Re-enable after 60s
+
 // Global pheromone board for stigmergic coordination
 const pheromoneBoard = new StigmergyBoard({ defaultTTL: 300000, maxEntries: 500 });
 
@@ -420,15 +425,41 @@ function processSignals() {
       }
     }
 
-    // Deliver to host handlers
+    // Deliver to host handlers (with error budget)
     const handlers = signalHandlers.get(signal.name);
     if (handlers) {
       for (const handler of handlers) {
+        // Check handler health
+        let health = handlerHealth.get(handler);
+        if (!health) {
+          health = { errors: 0, disabled: false, lastError: 0 };
+          handlerHealth.set(handler, health);
+        }
+
+        // Skip disabled handlers (auto-recover after HANDLER_RECOVERY_MS)
+        if (health.disabled) {
+          if (Date.now() - health.lastError > HANDLER_RECOVERY_MS) {
+            health.disabled = false;
+            health.errors = 0;
+          } else {
+            continue;
+          }
+        }
+
         try {
           handler(signal);
+          // Reset on success
+          if (health.errors > 0) health.errors = Math.max(0, health.errors - 1);
         } catch (err) {
-          console.warn(`[mi-host] Signal handler error for ${signal.name}: ${err.message}`);
+          health.errors++;
+          health.lastError = Date.now();
           telemetry.errors++;
+          if (health.errors >= HANDLER_ERROR_THRESHOLD) {
+            health.disabled = true;
+            console.warn(`[mi-host] Handler disabled for ${signal.name} after ${health.errors} errors: ${err.message}`);
+          } else {
+            console.warn(`[mi-host] Signal handler error for ${signal.name} (${health.errors}/${HANDLER_ERROR_THRESHOLD}): ${err.message}`);
+          }
         }
       }
     }

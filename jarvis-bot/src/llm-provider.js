@@ -281,13 +281,94 @@ export function getProviderHealthString() {
   const lines = ['=== Wardenclyffe Provider Health ==='];
   for (const [name, cb] of circuitBreakers) {
     const stats = cb.getStats();
+    const perf = providerPerformance.get(name);
     const stateIcon = stats.state === 'closed' ? 'OK' : stats.state === 'open' ? 'DOWN' : 'PROBE';
-    lines.push(`  ${stateIcon} ${name}: ${stats.windowErrorRate} error rate (${stats.windowRequests} req/min), ${stats.totalRequests} total, ${stats.consecutiveFailures} consecutive failures`);
+    const latStr = perf ? ` ~${Math.round(perf.emaLatency)}ms` : '';
+    lines.push(`  ${stateIcon} ${name}: ${stats.windowErrorRate} error rate (${stats.windowRequests} req/min)${latStr}, ${stats.totalRequests} total`);
     if (stats.state === 'open') {
       lines.push(`     → reopens in ${Math.round(stats.timeUntilProbe / 1000)}s`);
     }
   }
+  if (fallbackProviders.length > 0) {
+    lines.push(`\nFallback order: ${fallbackProviders.map(p => p.name).join(' → ')}`);
+  }
   return lines.join('\n');
+}
+
+// ============ Provider Performance Ranking ============
+// Tracks per-provider latency and success rate using exponential moving average.
+// Used to dynamically reorder Tier 2 fallback providers by recent performance.
+// Tier 1 order stays fixed (quality-based), Tier 2 sorts by fastest/most reliable.
+
+const providerPerformance = new Map(); // provider name → { emaLatency, emaSuccessRate, samples }
+
+const PERF_EMA_ALPHA = 0.3; // Weight for new observations (0.3 = responsive to recent changes)
+
+function recordProviderPerformance(providerName, latencyMs, success) {
+  let perf = providerPerformance.get(providerName);
+  if (!perf) {
+    perf = { emaLatency: latencyMs, emaSuccessRate: success ? 1 : 0, samples: 0 };
+    providerPerformance.set(providerName, perf);
+  }
+
+  perf.samples++;
+  perf.emaLatency = PERF_EMA_ALPHA * latencyMs + (1 - PERF_EMA_ALPHA) * perf.emaLatency;
+  perf.emaSuccessRate = PERF_EMA_ALPHA * (success ? 1 : 0) + (1 - PERF_EMA_ALPHA) * perf.emaSuccessRate;
+}
+
+/**
+ * Score a provider for fallback ordering.
+ * Lower score = better (faster + more reliable).
+ * Providers with no data get a neutral score.
+ */
+function getProviderScore(providerName) {
+  const perf = providerPerformance.get(providerName);
+  if (!perf || perf.samples < 2) return 5000; // Neutral score for unknown providers
+
+  // Score = latency * (2 - successRate)
+  // Fast + reliable = low score. Slow + unreliable = high score.
+  return perf.emaLatency * (2 - perf.emaSuccessRate);
+}
+
+/**
+ * Reorder Tier 2 fallback providers by performance score.
+ * Called periodically or after cascade events.
+ */
+function reorderFallbacksByPerformance() {
+  // Only reorder Tier 2 providers within the fallback array
+  const tier1 = [];
+  const tier2 = [];
+
+  for (const fb of fallbackProviders) {
+    const info = PROVIDER_QUALITY[fb.name] || { tier: 2 };
+    if (info.tier === 1) {
+      tier1.push(fb);
+    } else {
+      tier2.push(fb);
+    }
+  }
+
+  // Sort Tier 2 by performance score (lower = better)
+  tier2.sort((a, b) => getProviderScore(a.name) - getProviderScore(b.name));
+
+  // Rebuild: Tier 1 first (fixed order), then Tier 2 (ranked)
+  fallbackProviders = [...tier1, ...tier2];
+}
+
+/**
+ * Get performance stats for monitoring.
+ */
+export function getProviderPerformanceStats() {
+  const stats = {};
+  for (const [name, perf] of providerPerformance) {
+    stats[name] = {
+      avgLatencyMs: Math.round(perf.emaLatency),
+      successRate: (perf.emaSuccessRate * 100).toFixed(1) + '%',
+      samples: perf.samples,
+      score: Math.round(getProviderScore(name)),
+    };
+  }
+  return stats;
 }
 
 // ============ Claude (Anthropic) Provider ============
@@ -1406,8 +1487,9 @@ export async function llmChat(request) {
     const attemptStart = Date.now();
     try {
       const result = await routedProvider.chat(request);
-      // Record success in circuit breaker
+      // Record success in circuit breaker + performance tracker
       getCircuitBreaker(routedProvider.name).recordSuccess();
+      recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, true);
       // Cascade trail — record successful attempt
       cascadeTrail.push({
         provider: routedProvider.name,
@@ -1431,8 +1513,9 @@ export async function llmChat(request) {
     } catch (error) {
       lastError = error;
 
-      // Record failure in circuit breaker
+      // Record failure in circuit breaker + performance tracker
       getCircuitBreaker(routedProvider.name).recordFailure(error);
+      recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, false);
 
       // Routed provider failed (non-transient) — fall back to primary before cascading
       if (routedProvider !== activeProvider && !isTransientError(error)) {
@@ -1488,6 +1571,8 @@ export async function llmChat(request) {
             try {
               const result = await activeProvider.chat(rest);
               getCircuitBreaker(activeProvider.name).recordSuccess();
+              recordProviderPerformance(activeProvider.name, Date.now() - fallbackStart, true);
+              reorderFallbacksByPerformance(); // Learn from cascade events
               cascadeTrail.push({
                 provider: activeProvider.name,
                 model: activeProvider.model,
@@ -1506,6 +1591,7 @@ export async function llmChat(request) {
             } catch (fbErr) {
               fallbackError = fbErr;
               getCircuitBreaker(activeProvider.name).recordFailure(fbErr);
+              recordProviderPerformance(activeProvider.name, Date.now() - fallbackStart, false);
               cascadeTrail.push({
                 provider: activeProvider.name,
                 model: activeProvider.model,

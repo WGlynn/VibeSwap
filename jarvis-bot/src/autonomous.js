@@ -92,6 +92,9 @@ export function registerChat(chatId) {
   targetChats.add(chatId);
 }
 
+const MAX_TRACKED_CHATS = 10000;
+const CHAT_STALE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 export function recordChatActivity(chatId) {
   const now = Date.now();
   const activity = chatActivity.get(chatId) || { lastMessage: 0, messageCount: 0, hourStart: now };
@@ -102,6 +105,13 @@ export function recordChatActivity(chatId) {
     activity.hourStart = now;
   }
   chatActivity.set(chatId, activity);
+
+  // Evict stale chats periodically (every 100 new recordings)
+  if (chatActivity.size > MAX_TRACKED_CHATS) {
+    for (const [id, a] of chatActivity) {
+      if (now - a.lastMessage > CHAT_STALE_MS) chatActivity.delete(id);
+    }
+  }
 }
 
 // ============ Main Tick ============
@@ -211,7 +221,8 @@ async function checkForMarketEvents(threshold) {
     if (events.length === 0) return null;
     const biggest = events.sort((a, b) => Math.abs(b.move) - Math.abs(a.move))[0];
     return await generateMarketComment(biggest);
-  } catch {
+  } catch (err) {
+    console.warn(`[autonomous] Market check failed: ${err.message}`);
     return null;
   }
 }

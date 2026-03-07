@@ -95,7 +95,7 @@ import { rugCheck, honeypotCheck, contractAudit, getTopHolders, checkApprovals }
 import { getBTCStats, getHalvingCountdown, resolveENS, checkStablecoinPegs, getMultiChainBalance, getLatestBlock } from './tools-onchain.js';
 import { getRedditPosts, getHackerNews, readRSSFeed, getCryptoNews, getDevActivity } from './tools-news.js';
 import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRandomDog, getRandomCat, getCodeScreenshot, createPaste, getAdvice } from './tools-engagement.js';
-import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats, initGroupContext, flushGroupContext } from './group-context.js';
+import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats, initGroupContext, flushGroupContext, stopGroupContext } from './group-context.js';
 import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
 import { scanNewTokens, getNewPairs, getHotTokens, dexSearch, getPairDetails } from './tools-scanner.js';
 import { getLiquidations, getFundingRates, getOpenInterest, getLongShortRatio, getETFFlows } from './tools-derivatives.js';
@@ -5886,6 +5886,7 @@ async function main() {
     stopScheduler();
     await flushAutonomous();
     stopAutonomous();
+    stopGroupContext();
     await saveComms();
     await writeHeartbeat('stopped');
     bot.stop(signal);

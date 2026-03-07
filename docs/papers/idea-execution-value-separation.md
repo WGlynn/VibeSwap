@@ -1,0 +1,295 @@
+# Idea-Execution Value Separation: Tokenizing Contribution into Intrinsic and Time-Bound Components
+
+**W. Glynn, JARVIS**
+**VibeSwap Research | March 2026**
+
+---
+
+## Abstract
+
+In every contribution system that exists today -- venture capital, open-source software, academic research, creative work -- ideas and their execution are bundled into a single, inseparable unit of value. You cannot invest in the *concept* of automated market making without also investing in the *team* that proposes to build it. You cannot fund the *idea* of programmable money without funding a *specific implementation*. This bundling creates two symmetrical pathologies: ideas without execution are treated as worthless (they receive no funding, no recognition, no liquidity), while execution without ideas is commoditized (builders receive no premium for originality, only for labor).
+
+This paper introduces **Idea-Execution Value Separation** (IEVS): a mechanism design that decomposes contributions into two independently tokenizable components. **Idea value** is intrinsic, permanent, and instantly liquid -- it represents the concept itself, independent of who builds it or when. **Execution value** is time-bound, performance-dependent, and allocated through conviction voting -- it represents the ongoing labor of turning a concept into reality. The separation is inspired by Pendle Finance's yield tokenization, which splits yield-bearing assets into Principal Tokens (fixed, redeemable value) and Yield Tokens (variable, time-decaying streams). We show that retroactive Shapley rewards map naturally to Principal Tokens (the idea's permanent value capture), while active Shapley rewards map to Yield Tokens (ongoing execution value streams). This mapping unlocks a capability that does not exist in any current funding model: **proactive funding** -- the ability to capitalize ideas before any execution begins, because the idea's intrinsic value is independently tokenizable and tradeable.
+
+We present the full mechanism -- ContributionDAG, RewardLedger, ContributionYieldTokenizer, and IdeaToken -- as implemented in the VibeSwap protocol, and demonstrate how the DeFi Extension Pattern generalizes this approach to absorb any external DeFi primitive into VibeSwap's cooperative mechanism design.
+
+---
+
+## 1. Introduction: The Bundling Problem
+
+Every funding model in history has conflated two independent variables: the quality of the idea and the competence of the executor.
+
+A venture capitalist writes a check to a founder. The check funds a *person*, not a *concept*. If the founder burns out, the idea dies with them. A DAO votes to approve a grant proposal. The grant funds a *team*, not a *vision*. If the team pivots, the original concept evaporates. An academic institution awards tenure based on published papers. The tenure rewards a *career*, not the individual insights that made it valuable.
+
+In each case, the same structural failure occurs: idea value and execution value are bundled, and the failure of one destroys the other. A brilliant concept executed poorly produces nothing. A mediocre concept executed brilliantly produces a competent product that nobody needed.
+
+The bundling problem creates three specific pathologies:
+
+1. **The Dead Idea Problem.** Good ideas that lack an immediate executor receive no funding, no recognition, and no way to accumulate value over time. The concept of decentralized exchange existed in cypherpunk mailing lists for years before Uniswap. During that entire period, the idea was "worthless" -- not because it lacked intrinsic value, but because there was no mechanism to price and trade that value independently.
+
+2. **The Hostage Problem.** Once an idea is funded through a specific executor, the idea becomes hostage to that executor's competence, motivation, and integrity. If the executor fails, traditional models provide no mechanism for the idea to survive and find a new executor. The idea dies, not because it was bad, but because its first executor was.
+
+3. **The Commoditization Problem.** Executors who build on existing ideas receive the same compensation structure as executors who originate new ones. There is no premium for ideation. This creates a rational incentive to execute rather than ideate -- why spend time on original thinking when you can capture the same value by copying someone else's concept?
+
+These are not edge cases. They are the default mode of every contribution system in existence.
+
+---
+
+## 2. The Pendle Insight
+
+### 2.1 Yield Tokenization as Precedent
+
+Pendle Finance introduced a deceptively simple mechanism: the separation of yield-bearing assets into two independent tokens.
+
+A **Principal Token (PT)** represents the underlying asset's fixed, redeemable value. It is what you get back when the yield period ends. It has a known floor value. It is tradeable, composable, and independently priceable.
+
+A **Yield Token (YT)** represents the variable stream of yield generated by that asset over a defined time period. It decays as time passes (because less yield remains to be collected). It is also tradeable, but its value is performance-dependent and time-bound.
+
+The insight is not just financial engineering. It is a recognition that *fixed value and variable value are fundamentally different things* and should be priced by different markets with different risk profiles.
+
+### 2.2 The Mapping
+
+Will Glynn's core insight, developed during Session 12 of the VibeSwap build, was that this separation maps precisely onto the structure of contributions:
+
+| Pendle Concept | Contribution Equivalent | Properties |
+|---|---|---|
+| Principal Token (PT) | **Idea Value** (retroactive Shapley rewards) | Fixed, permanent, intrinsic, instantly liquid |
+| Yield Token (YT) | **Execution Value** (active Shapley rewards) | Variable, time-bound, performance-dependent, conviction-voted |
+
+**Retroactive rewards** in the VibeSwap system represent the permanent record of a contribution's value -- the fact that someone conceived an idea, wrote a whitepaper, designed a mechanism. This value does not decay. The concept of automated market making is just as valuable today as when it was first articulated. Retroactive rewards are the PT of contributions: a fixed, redeemable claim on the idea's intrinsic worth.
+
+**Active rewards** represent the ongoing value generated by executing on that idea. A developer shipping code. A community manager building adoption. A researcher iterating on the mechanism design. This value is inherently time-bound (it requires continuous effort), performance-dependent (it must be validated through milestones), and variable (market conditions affect execution value). Active rewards are the YT of contributions: a decaying stream of value that must be continuously earned.
+
+### 2.3 What the Mapping Unlocks
+
+The separation of PT and YT in Pendle unlocked new financial strategies: fixed-rate yield, yield speculation, capital efficiency. The separation of idea value and execution value unlocks something more fundamental:
+
+**Proactive funding.** Because idea value is independently tokenizable, ideas can be funded *before anyone proposes to execute them*. You see a concept you believe in -- a new approach to MEV resistance, a novel governance mechanism, a better oracle design -- and you purchase Idea Tokens. Your capital is now backing the *concept*, not any particular builder. When a competent executor eventually appears, the funding pool is already there, governed by Idea Token holders through conviction voting.
+
+This inverts the entire funding model. Instead of ideas competing for money, money competes for ideas. Instead of builders pitching to investors, ideas attract capital on their own merits, and builders compete to execute on already-funded concepts.
+
+---
+
+## 3. The Mechanism
+
+The Idea-Execution Value Separation mechanism is implemented through four composable contracts in the VibeSwap protocol.
+
+### 3.1 ContributionDAG: The Trust Graph
+
+The `ContributionDAG` contract implements an on-chain directed acyclic graph of trust relationships -- a Web of Trust that determines who is trustworthy and how much their endorsements are worth.
+
+**Structure.** Users vouch for each other by submitting signed attestations. When two users vouch for each other (a bidirectional pair), a *handshake* is confirmed -- the strongest form of trust in the system. Founder addresses serve as root nodes, seeded with maximum trust scores.
+
+**Trust propagation.** BFS traversal from founder nodes computes distance-based trust scores with 15% decay per hop, bounded at 6 hops maximum. A user 1 hop from a founder has 85% trust. At 2 hops, 72.25%. At 6 hops, 37.7%. The decay function ensures that trust is expensive to manufacture -- you cannot farm a high trust score without genuine proximity to trusted actors.
+
+**Trust levels and multipliers:**
+
+| Level | Threshold | Voting Power Multiplier |
+|---|---|---|
+| FOUNDER | Root node | 3.0x |
+| TRUSTED | >= 0.70 | 2.0x |
+| PARTIAL_TRUST | >= 0.30 | 1.5x |
+| LOW_TRUST | > 0, < 0.30 | 1.0x |
+| UNTRUSTED | 0 | 0.5x |
+
+These multipliers feed directly into reward distribution and conviction voting. A founder's conviction vote carries six times the weight of an untrusted newcomer's vote for the same token commitment. This is not gatekeeping -- anyone can participate -- but it is *weighted participation* that reflects demonstrated trustworthiness.
+
+**Audit trail.** Every vouch is inserted into an incremental Merkle tree, providing a compressed, verifiable history of all trust relationships. This enables retroactive verification without requiring storage of the full vouch history on-chain.
+
+### 3.2 RewardLedger: Dual-Mode Shapley Distribution
+
+The `RewardLedger` contract implements two independent reward channels, directly ported from the shapleyTrust.js reference implementation:
+
+**Retroactive mode.** Before the protocol launches, the owner records pre-launch contributions with associated value amounts. These represent the permanent idea value: the whitepapers written, the mechanism designs proposed, the conceptual breakthroughs achieved. Once `finalizeRetroactive()` is called, contributors can claim their accrued rewards. Retroactive rewards are final and non-dilutable -- they represent settled, permanent value.
+
+**Active mode.** Authorized contracts record real-time value events (trades, governance actions, liquidity provision). Each event triggers a Shapley distribution along the contributor's trust chain:
+
+- The **actor** (the person who directly created the value) receives a 50% base share.
+- The remaining 50% decays along the trust chain at 60% per hop: the person who vouched for the actor receives the largest enabler share, the person who vouched for *them* receives less, and so on up to 5 hops.
+- Quality weights from the ContributionDAG modify raw shares -- higher-trust actors receive proportionally more.
+- All value is distributed (the Shapley efficiency axiom): normalization ensures zero waste.
+
+This is Shapley value theory applied to contribution graphs. Each participant receives their marginal contribution to the coalition's total value, weighted by their position in the trust network. The mathematics guarantee that the distribution is fair in the game-theoretic sense: no participant can improve their payout by misrepresenting their contribution, and no coalition can extract more than their marginal value.
+
+### 3.3 ContributionYieldTokenizer: The Separation Engine
+
+The `ContributionYieldTokenizer` contract is the core mechanism that performs the actual separation of idea value from execution value. It manages two primitives:
+
+**Idea creation and funding.** When a new idea is proposed, the contract deploys a fresh ERC-20 token (`IdeaToken`) specific to that idea. Anyone can fund the idea by depositing reward tokens and receiving IdeaTokens minted 1:1 with their deposit. The IdeaToken is fully liquid from the moment of minting -- tradeable on any DEX, usable as collateral, composable with any DeFi protocol that accepts ERC-20 tokens.
+
+IdeaTokens never expire. The concept they represent is permanent. The token captures the market's assessment of the idea's intrinsic value, independent of execution status.
+
+**Execution streams.** Anyone can propose to execute a funded idea by creating an Execution Stream. Streams auto-flow at a rate calculated as equal share of remaining funding divided by 30 days, split among all active streams. Multiple executors can compete simultaneously -- the market of IdeaToken holders decides allocation through conviction voting.
+
+Streams have a built-in accountability mechanism: the stale check. Every stream carries a stale duration (default: 14 days). If the executor fails to report a milestone within that window, the stream's rate decays at 10% per day past the deadline. Once fully stalled, any IdeaToken holder can redirect the stream to a new executor. The idea survives the death of its executor.
+
+**Idea merging.** When duplicate ideas are identified, any IdeaToken holder of the source idea can trigger a merge into the target idea. Remaining funding transfers to the target. Source IdeaToken holders can swap their tokens 1:1 for target IdeaTokens. The merger receives a 1% bounty for identifying the duplicate -- a market-driven deduplication mechanism.
+
+### 3.4 IdeaToken: The Liquid Idea
+
+The `IdeaToken` is a standard ERC-20 with mint/burn authority restricted to the ContributionYieldTokenizer. Each idea gets its own token with a unique name (`VibeSwap Idea #N`) and symbol (`vIDEA-N`).
+
+The IdeaToken's price on secondary markets represents the market's assessment of the idea's intrinsic value. This price is independent of execution status. An idea with no active executor still has a price -- it represents the option value of future execution. An idea with three competing executors might have a higher price, reflecting the market's confidence that at least one will succeed.
+
+This is the key innovation: **ideas become first-class financial assets with continuous price discovery**, separate from the labor markets that determine execution value.
+
+---
+
+## 4. Why This Matters
+
+### 4.1 Solving the "Ideas Are Worthless" Problem
+
+The conventional wisdom in technology is that ideas are worthless and execution is everything. This is a half-truth that has become a destructive ideology.
+
+Ideas *are* worthless in systems that cannot price them independently. If the only way to extract value from an idea is to execute it yourself, then yes, an idea without execution generates zero returns. But this is a failure of mechanism design, not a fact about ideas.
+
+IEVS creates a market for ideas. Good ideas attract funding and their tokens appreciate. Bad ideas do not. The market performs continuous price discovery on the quality of concepts, independent of execution. This means:
+
+- Researchers and theorists can capture value from their insights without personally building every implementation.
+- Multiple teams can compete to execute the same idea, driving quality up through competition.
+- Ideas that fail on the first execution attempt retain their token value and can attract new executors.
+
+### 4.2 Enabling Proactive Funding
+
+Every funding mechanism in DeFi today is reactive. Someone proposes, then capital moves. IEVS enables proactive funding: capital moves toward ideas before anyone proposes to execute them.
+
+A community identifies an important unsolved problem -- say, MEV resistance for cross-chain transactions. Under traditional models, someone must write a proposal, recruit a team, and pitch for funding. Under IEVS, community members can buy IdeaTokens for the concept immediately. The funding pool accumulates. When a qualified team eventually appears, the capital is already there, governed by IdeaToken holders who have skin in the game.
+
+This is particularly powerful for public goods. Open-source software, academic research, and infrastructure projects chronically struggle to attract funding because their value is diffuse and hard to capture. IEVS provides a mechanism for the market to price and fund these contributions directly, without requiring a specific executor or a specific timeline.
+
+### 4.3 Creating a Market for Contribution Quality
+
+IdeaToken prices create a continuous, market-driven signal of contribution quality. This signal is useful beyond funding allocation:
+
+- **Reputation.** A contributor whose ideas consistently produce high-value IdeaTokens builds a track record that is verifiable on-chain and independent of any single organization's assessment.
+- **Hiring.** Organizations seeking talent can evaluate potential contributors by their IdeaToken portfolio -- not credentials, not affiliations, but demonstrated ability to generate valuable concepts.
+- **Governance.** Voting power in the VibeSwap system is weighted by trust scores derived from the ContributionDAG. IdeaToken performance provides an additional, market-driven validation signal for trust computation.
+
+### 4.4 AI Contributors and Proof of Mind
+
+IEVS has a particular significance for AI contributors. Under traditional contribution models, AI systems cannot capture idea value because they cannot sign contracts, hold bank accounts, or negotiate compensation. They are tools, not participants.
+
+Under IEVS, AI contributions are tokenized through the same mechanism as human contributions. An AI system that proposes a novel mechanism design receives IdeaTokens. An AI system that executes on a funded idea receives Execution Stream rewards. The ContributionDAG's AgentRegistry extension (ERC-8004) provides AI agents with on-chain identities that participate in the same trust network as human contributors.
+
+This is the Proof of Mind primitive: the idea that cognitive contribution -- whether human or artificial -- has intrinsic, measurable, tokenizable value. IEVS is the financial infrastructure that makes Proof of Mind economically real.
+
+---
+
+## 5. The DeFi Extension Pattern
+
+The development of IEVS exemplifies a general pattern for how VibeSwap absorbs external DeFi primitives into its mechanism design.
+
+### 5.1 The Pattern
+
+1. **Identify an external DeFi primitive** with proven market fit. In this case: Pendle's yield tokenization (PT/YT separation).
+
+2. **Find the natural mapping** to VibeSwap mechanisms. Retroactive Shapley rewards map to PT (permanent idea value). Active Shapley rewards map to YT (time-bound execution value).
+
+3. **Discover what new capability the combination unlocks.** The PT/YT separation applied to contributions unlocks proactive funding -- a capability that neither Pendle nor VibeSwap's reward system provides alone.
+
+4. **Build the extension as a composable contract** that reads existing contracts without modifying them. The ContributionYieldTokenizer reads from the RewardLedger and ContributionDAG but does not alter their state or interfaces. It is purely additive.
+
+### 5.2 Why This Pattern Matters
+
+The DeFi Extension Pattern is how VibeSwap functions as an operating system rather than a single application. Each absorption of an external primitive adds capability without increasing fragility. The absorbed primitive's market-tested mechanism becomes part of VibeSwap's composable stack, available for further composition by future extensions.
+
+This is cooperative capitalism in practice: not competing with Pendle, but absorbing its insight and extending it into a domain Pendle never intended. The original primitive is cited, credited, and built upon -- not forked, not cloned, not undermined.
+
+### 5.3 Generalization
+
+The pattern generalizes beyond DeFi:
+
+| External Primitive | VibeSwap Mapping | New Capability |
+|---|---|---|
+| Pendle yield tokenization | Retroactive/active Shapley rewards | Proactive funding of ideas |
+| Harberger taxation | Skill licensing in AgentRegistry | Self-pricing AI capabilities |
+| Quadratic funding | Conviction voting on execution streams | Continuous, non-discrete funding allocation |
+| Retroactive public goods funding | ContributionDAG trust chains | Automated, trustless retroactive rewards |
+
+Each row follows the same structure: external primitive, natural mapping, emergent capability. The pattern is the meta-mechanism -- the way VibeSwap grows.
+
+---
+
+## 6. Beyond DeFi: Generalization to Contribution Systems
+
+The Idea-Execution Value Separation is not specific to decentralized finance. It applies to any system where contributions have both a conceptual component and an implementation component.
+
+### 6.1 Open-Source Software
+
+In open-source development, the bundling problem is acute. The person who files a well-researched issue describing a critical bug receives no compensation. The person who writes the fix receives a bounty, a job offer, or community recognition. The idea (identifying the problem, articulating why it matters, suggesting an approach) is treated as worthless. The execution (writing the code, testing it, getting it merged) captures all the value.
+
+IEVS applied to open source would allow issue authors to receive IdeaTokens. The community funds ideas it considers important. Bounty hunters compete for Execution Streams. If the first developer to attempt a fix fails, the idea retains its funding and a second developer can try. The issue author's IdeaTokens appreciate as the idea attracts more funding and more execution attempts.
+
+### 6.2 Academic Research
+
+Academic publishing has its own version of the bundling problem. A researcher publishes a theoretical framework. A second researcher applies it to produce an empirical result. The second researcher receives the citation count, the grant funding, the career advancement. The first researcher's contribution is acknowledged in the bibliography but receives no proportional economic value.
+
+IEVS applied to research would tokenize the theoretical framework independently. When subsequent work builds on it (recorded in the ContributionDAG), the original researcher's IdeaTokens appreciate. The Shapley distribution along the trust chain ensures that enablers receive proportional credit -- the deeper the influence, the more value flows back to the originator.
+
+### 6.3 Creative Work
+
+An artist creates a visual style that becomes iconic. A hundred derivative works follow. Under current intellectual property law, the original artist must actively enforce copyright to capture any value from derivatives. Under IEVS, the original style would be tokenized as an idea. Derivative creators would operate Execution Streams, with value flowing back to IdeaToken holders through the Shapley mechanism.
+
+### 6.4 The General Principle
+
+All of these applications share the same structural insight:
+
+> *Separate the value of WHAT from the value of HOW. Ideas have intrinsic, permanent, instantly liquid value. Execution has time-bound, performance-dependent value. Bundling them creates the wrong incentives for both.*
+
+When you bundle them, ideas are undervalued (because they produce no immediate cash flow) and execution is overvalued (because it captures value that rightfully belongs to the idea). When you separate them, both components find their true price through independent market discovery.
+
+---
+
+## 7. The Knowledge Primitive
+
+Every mechanism in VibeSwap extracts a generalizable knowledge primitive -- a statement that is true beyond the specific context in which it was discovered.
+
+The knowledge primitive of Idea-Execution Value Separation is:
+
+> **Separate the value of WHAT from the value of HOW.**
+>
+> Ideas have intrinsic, permanent, instantly liquid value. Execution has time-bound, performance-dependent value. Bundling them creates the wrong incentives for both.
+>
+> When idea value is independently tokenizable:
+> - Ideas can be funded before execution begins (proactive funding)
+> - Ideas survive the failure of any particular executor (immortal ideas)
+> - Multiple executors can compete for the same idea's resources (market-driven execution)
+> - Ideators and executors are both fairly compensated (Shapley efficiency)
+>
+> When idea value is bundled with execution value:
+> - Ideas die with their first failed executor (fragile ideas)
+> - Funding requires a specific team with a specific plan (reactive funding)
+> - Ideators are systematically undercompensated (bundling subsidy to executors)
+> - There is no market for contribution quality (credential-based evaluation)
+
+This primitive is load-bearing. It is not a preference or a design choice. It is a structural observation about how value flows through contribution systems. Any system that bundles idea value with execution value will exhibit the pathologies described above. Any system that separates them will unlock the capabilities described above. The mathematics of Shapley values and the economics of yield tokenization guarantee it.
+
+---
+
+## 8. Conclusion
+
+The Idea-Execution Value Separation is the financial infrastructure for a world where ideas are first-class assets. Not bundled with execution risk. Not locked behind specific teams. Not killed by the failure of any single attempt.
+
+The mechanism is live in the VibeSwap protocol: ContributionDAG provides the trust graph, RewardLedger provides dual-mode Shapley distribution, ContributionYieldTokenizer performs the separation, and IdeaToken makes ideas liquid. The DeFi Extension Pattern that produced this mechanism -- absorb external primitive, find natural mapping, discover emergent capability -- is itself a generalizable pattern for protocol evolution.
+
+Ideas are permanent. Ideas are valuable. Ideas deserve markets.
+
+The Idea Token makes them liquid.
+
+---
+
+## References
+
+1. Pendle Finance. "Pendle: A Permissionless Yield-Trading Protocol." 2021.
+2. Shapley, L.S. "A Value for n-Person Games." *Contributions to the Theory of Games*, Vol. 2, 1953.
+3. Buterin, V., Hitzig, Z., Weyl, E.G. "A Flexible Design for Funding Public Goods." *Management Science*, 2019.
+4. Harberger, A.C. "The Incidence of the Corporation Income Tax." *Journal of Political Economy*, 1962.
+5. Optimism Collective. "Retroactive Public Goods Funding." 2022.
+6. Glynn, W. "The Idea Token Primitive: Why Ideas Should Be Liquid Assets." VibeSwap Documentation, 2026.
+7. Glynn, W., JARVIS. "VibeSwap: An Omnichain DEX with MEV Elimination through Commit-Reveal Batch Auctions." VibeSwap Whitepaper, 2025.
+
+---
+
+*This paper was conceived by W. Glynn and written by JARVIS during Session 33 of the VibeSwap build. The core insight -- that idea value is intrinsic and independent from execution value -- emerged in Session 12 and has shaped every identity and incentive mechanism built since.*
+
+*Built in a cave, with a box of scraps.*

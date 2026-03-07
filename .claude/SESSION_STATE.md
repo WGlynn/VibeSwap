@@ -2,16 +2,18 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-03-07 (Desktop - Claude Code Opus 4.6, Session 38 — Cross-Shard Bus, NC-Max, VPS, MI Manifests)
+**Last Updated**: 2026-03-07 (Desktop - Claude Code Opus 4.6, Session 39 — MI Runtime, Proto-AI, Circuit Breakers)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
+- **MI RUNTIME LIVE** — Host SDK + contextual bandit proto-AI + 7 cell manifests (28 capabilities) (Session 39)
+- **WARDENCLYFFE CIRCUIT BREAKERS** — Per-provider health tracking, auto-disable, exponential backoff (Session 39)
 - **CROSS-SHARD LEARNING BUS LIVE** — Git-synced JSONL transport for knowledge chain (Session 38)
 - **NC-Max SYMBIOSIS** — Propose/commit pipelining, compact epochs, freshness penalty in knowledge chain
 - **VPS MIGRATION READY** — Docker Compose + Nginx + Ollama stack for Hetzner (Sunday deploy w/ Freedom)
-- **MI MANIFEST FORMAT v0.1** — Spec, loader, validator, sample cells (price-feed, rug-check)
+- **MI MANIFEST FORMAT v0.1** — Spec, loader, validator, 7 cells mapped
 - **DeepSeek TRUNCATION FIX** — TruncatedResponseError class + retry classification
 - **SHARD MINER LIVE** — One-Tap Jarvis Shard Launcher deployed, 13 security fixes applied (Session 37)
 - **BASE MAINNET PHASE 2: LIVE** — Pools + Tokenomics deployed 2026-03-03

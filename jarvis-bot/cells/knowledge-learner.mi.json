@@ -1,0 +1,61 @@
+{
+  "mi": "0.1",
+  "id": "knowledge-learner-cell",
+  "name": "Knowledge Learner",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "orchestrator",
+  "domain": "intelligence",
+  "tags": ["knowledge", "learning", "memory", "ckb", "facts"],
+  "capabilities": [
+    {
+      "name": "learnFact",
+      "description": "Store a learned fact in the persistent knowledge base",
+      "input": {
+        "type": "object",
+        "properties": {
+          "fact": { "type": "string" },
+          "category": { "type": "string", "enum": ["social", "technical", "project", "preference", "behavioral", "factual"] },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["fact", "category"]
+      },
+      "output": { "type": "object", "properties": { "stored": { "type": "boolean" }, "broadcast": { "type": "boolean" } } }
+    },
+    {
+      "name": "recallKnowledge",
+      "description": "Recall facts from the knowledge base matching a query",
+      "input": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "category": { "type": "string" },
+          "limit": { "type": "number" }
+        },
+        "required": ["query"]
+      },
+      "output": { "type": "object", "properties": { "facts": { "type": "array" }, "count": { "type": "number" } } }
+    }
+  ],
+  "signals": {
+    "subscribe": ["knowledge.learn", "knowledge.recall", "knowledge.sync", "cell.identity.announce"],
+    "emit": ["knowledge.learned", "knowledge.recalled", "knowledge.sync.complete", "cell.identity.announce"]
+  },
+  "requires": {
+    "capabilities": [],
+    "permissions": ["storage.write", "storage.read"],
+    "neighbors": [{ "capability": "broadcastLearning", "optional": true }]
+  },
+  "lifecycle": {
+    "sense": { "signals": ["conversation.active", "knowledge.stale"], "context": ["host.domain", "shard.id"] },
+    "candidates": [
+      { "identity": "full-learner", "condition": "true", "priority": 1 }
+    ],
+    "commit": { "min_dwell_ms": 0, "reconsider_on": [] },
+    "learn": { "strategy": "fixed", "reward_signals": ["recall_accuracy", "fact_utility"], "update_interval_ms": 0 }
+  },
+  "runtime": { "sandbox": "worker", "memory_limit_mb": 128, "cpu_budget_ms": 500, "ttl_ms": 0, "energy_budget": 20 },
+  "telemetry": { "emit_interval_ms": 60000, "metrics": ["facts_stored", "facts_recalled", "broadcast_rate"] },
+  "surfaces": ["telegram", "web", "api", "cli"],
+  "host_sdk_min": "0.1"
+}

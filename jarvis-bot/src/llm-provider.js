@@ -87,6 +87,209 @@ export function registerProvider(name, factory) {
   providers.set(name, factory);
 }
 
+// ============ Circuit Breaker — Per-Provider Health Tracking ============
+// Prevents cascade poisoning by tracking error rates per provider.
+// When a provider exceeds the error threshold, it's temporarily disabled
+// with exponential backoff for re-enablement.
+//
+// States:
+//   CLOSED  → normal operation, requests flow through
+//   OPEN    → provider disabled, requests skip it
+//   HALF    → probe: allow 1 request to test recovery
+//
+
+const CIRCUIT_BREAKER_CONFIG = {
+  windowMs: 60000,           // 1 minute sliding window
+  errorThreshold: 0.5,       // 50% error rate triggers open
+  minRequests: 3,            // Need at least 3 requests before evaluating
+  openDurationMs: 30000,     // Initial open duration: 30s
+  maxOpenDurationMs: 600000, // Max open duration: 10 minutes
+  backoffMultiplier: 2,      // Exponential backoff factor
+  halfOpenMaxProbes: 1,      // Allow 1 probe request in half-open
+};
+
+// Per-provider circuit state
+const circuitBreakers = new Map(); // provider name → CircuitState
+
+class CircuitState {
+  constructor(providerName) {
+    this.providerName = providerName;
+    this.state = 'closed'; // closed | open | half_open
+    this.successes = 0;
+    this.failures = 0;
+    this.totalRequests = 0;
+    this.lastFailure = 0;
+    this.lastSuccess = 0;
+    this.openedAt = 0;
+    this.openDuration = CIRCUIT_BREAKER_CONFIG.openDurationMs;
+    this.halfOpenProbes = 0;
+    this.consecutiveFailures = 0;
+    this.windowStart = Date.now();
+
+    // Rolling window for error rate calculation
+    this.recentResults = []; // [{ timestamp, success }]
+  }
+
+  /**
+   * Record a successful request.
+   */
+  recordSuccess() {
+    this.successes++;
+    this.totalRequests++;
+    this.lastSuccess = Date.now();
+    this.consecutiveFailures = 0;
+    this.recentResults.push({ timestamp: Date.now(), success: true });
+    this._pruneWindow();
+
+    if (this.state === 'half_open') {
+      // Recovery confirmed — close the breaker
+      console.log(`[circuit-breaker] ${this.providerName}: HALF_OPEN → CLOSED (probe succeeded)`);
+      this.state = 'closed';
+      this.openDuration = CIRCUIT_BREAKER_CONFIG.openDurationMs; // Reset backoff
+      this.halfOpenProbes = 0;
+    }
+  }
+
+  /**
+   * Record a failed request.
+   */
+  recordFailure(error) {
+    this.failures++;
+    this.totalRequests++;
+    this.lastFailure = Date.now();
+    this.consecutiveFailures++;
+    this.recentResults.push({ timestamp: Date.now(), success: false });
+    this._pruneWindow();
+
+    if (this.state === 'half_open') {
+      // Probe failed — reopen with increased backoff
+      this.openDuration = Math.min(
+        this.openDuration * CIRCUIT_BREAKER_CONFIG.backoffMultiplier,
+        CIRCUIT_BREAKER_CONFIG.maxOpenDurationMs
+      );
+      this.openedAt = Date.now();
+      this.state = 'open';
+      this.halfOpenProbes = 0;
+      console.warn(`[circuit-breaker] ${this.providerName}: HALF_OPEN → OPEN (probe failed, backoff ${this.openDuration}ms)`);
+      return;
+    }
+
+    // Check if error rate exceeds threshold (closed state)
+    if (this.state === 'closed') {
+      const windowResults = this._getWindowResults();
+      if (windowResults.total >= CIRCUIT_BREAKER_CONFIG.minRequests) {
+        const errorRate = windowResults.failures / windowResults.total;
+        if (errorRate >= CIRCUIT_BREAKER_CONFIG.errorThreshold) {
+          this.state = 'open';
+          this.openedAt = Date.now();
+          console.warn(`[circuit-breaker] ${this.providerName}: CLOSED → OPEN (error rate ${(errorRate * 100).toFixed(0)}% in ${windowResults.total} requests)`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if requests should be allowed through.
+   */
+  allowRequest() {
+    if (this.state === 'closed') return true;
+
+    if (this.state === 'open') {
+      // Check if open duration has elapsed
+      if (Date.now() - this.openedAt >= this.openDuration) {
+        this.state = 'half_open';
+        this.halfOpenProbes = 0;
+        console.log(`[circuit-breaker] ${this.providerName}: OPEN → HALF_OPEN (testing recovery)`);
+        return true; // Allow probe
+      }
+      return false; // Still open
+    }
+
+    if (this.state === 'half_open') {
+      // Allow limited probes
+      if (this.halfOpenProbes < CIRCUIT_BREAKER_CONFIG.halfOpenMaxProbes) {
+        this.halfOpenProbes++;
+        return true;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get stats for monitoring.
+   */
+  getStats() {
+    const windowResults = this._getWindowResults();
+    return {
+      provider: this.providerName,
+      state: this.state,
+      totalRequests: this.totalRequests,
+      successes: this.successes,
+      failures: this.failures,
+      consecutiveFailures: this.consecutiveFailures,
+      windowErrorRate: windowResults.total > 0
+        ? (windowResults.failures / windowResults.total * 100).toFixed(1) + '%'
+        : 'n/a',
+      windowRequests: windowResults.total,
+      openDuration: this.state === 'open' ? this.openDuration : 0,
+      timeUntilProbe: this.state === 'open'
+        ? Math.max(0, this.openDuration - (Date.now() - this.openedAt))
+        : 0
+    };
+  }
+
+  _pruneWindow() {
+    const cutoff = Date.now() - CIRCUIT_BREAKER_CONFIG.windowMs;
+    this.recentResults = this.recentResults.filter(r => r.timestamp > cutoff);
+  }
+
+  _getWindowResults() {
+    this._pruneWindow();
+    const total = this.recentResults.length;
+    const failures = this.recentResults.filter(r => !r.success).length;
+    return { total, failures, successes: total - failures };
+  }
+}
+
+/**
+ * Get or create circuit breaker for a provider.
+ */
+function getCircuitBreaker(providerName) {
+  if (!circuitBreakers.has(providerName)) {
+    circuitBreakers.set(providerName, new CircuitState(providerName));
+  }
+  return circuitBreakers.get(providerName);
+}
+
+/**
+ * Get health stats for all providers.
+ */
+export function getProviderHealth() {
+  const health = {};
+  for (const [name, cb] of circuitBreakers) {
+    health[name] = cb.getStats();
+  }
+  return health;
+}
+
+/**
+ * Get a status string for monitoring.
+ */
+export function getProviderHealthString() {
+  const lines = ['=== Wardenclyffe Provider Health ==='];
+  for (const [name, cb] of circuitBreakers) {
+    const stats = cb.getStats();
+    const stateIcon = stats.state === 'closed' ? 'OK' : stats.state === 'open' ? 'DOWN' : 'PROBE';
+    lines.push(`  ${stateIcon} ${name}: ${stats.windowErrorRate} error rate (${stats.windowRequests} req/min), ${stats.totalRequests} total, ${stats.consecutiveFailures} consecutive failures`);
+    if (stats.state === 'open') {
+      lines.push(`     → reopens in ${Math.round(stats.timeUntilProbe / 1000)}s`);
+    }
+  }
+  return lines.join('\n');
+}
+
 // ============ Claude (Anthropic) Provider ============
 
 function createClaudeProvider(providerConfig) {
@@ -1192,10 +1395,19 @@ export async function llmChat(request) {
     request = { ...request, messages: flattenToolExchanges(request.messages) };
   }
 
+  // Circuit breaker check — skip providers that are currently open
+  const routedCB = getCircuitBreaker(routedProvider.name);
+  if (!routedCB.allowRequest() && routedProvider !== activeProvider) {
+    console.log(`[circuit-breaker] ${routedProvider.name} circuit open — falling back to ${activeProvider.name}`);
+    routedProvider = activeProvider;
+  }
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const attemptStart = Date.now();
     try {
       const result = await routedProvider.chat(request);
+      // Record success in circuit breaker
+      getCircuitBreaker(routedProvider.name).recordSuccess();
       // Cascade trail — record successful attempt
       cascadeTrail.push({
         provider: routedProvider.name,
@@ -1218,6 +1430,9 @@ export async function llmChat(request) {
       return result;
     } catch (error) {
       lastError = error;
+
+      // Record failure in circuit breaker
+      getCircuitBreaker(routedProvider.name).recordFailure(error);
 
       // Routed provider failed (non-transient) — fall back to primary before cascading
       if (routedProvider !== activeProvider && !isTransientError(error)) {
@@ -1261,10 +1476,18 @@ export async function llmChat(request) {
         do {
           console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
 
+          // Circuit breaker: skip fallback providers that are currently open
+          const fbCB = getCircuitBreaker(activeProvider.name);
+          if (!fbCB.allowRequest()) {
+            console.warn(`[circuit-breaker] Fallback ${activeProvider.name} circuit open — skipping`);
+            break; // Skip to next fallback via activateFallback()
+          }
+
           for (let fbAttempt = 0; fbAttempt < 2; fbAttempt++) {
             const fallbackStart = Date.now();
             try {
               const result = await activeProvider.chat(rest);
+              getCircuitBreaker(activeProvider.name).recordSuccess();
               cascadeTrail.push({
                 provider: activeProvider.name,
                 model: activeProvider.model,
@@ -1282,6 +1505,7 @@ export async function llmChat(request) {
               return result;
             } catch (fbErr) {
               fallbackError = fbErr;
+              getCircuitBreaker(activeProvider.name).recordFailure(fbErr);
               cascadeTrail.push({
                 provider: activeProvider.name,
                 model: activeProvider.model,

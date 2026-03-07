@@ -23,6 +23,10 @@ import {
   handleMIToolCall,
   getCellStats,
   getMIStatusString,
+  getMetricsSnapshot,
+  getMetricsText,
+  getSignalHistory,
+  getSignalHistoryString,
   depositPheromone,
   queryPheromone,
   queryPheromonePrefix,
@@ -355,6 +359,61 @@ describe('pauseCell / resumeCell', () => {
   it('should return false for non-existent cell', () => {
     assert.equal(pauseCell('nonexistent'), false);
     assert.equal(resumeCell('nonexistent'), false);
+  });
+});
+
+// ============ Metrics Export Tests ============
+
+describe('metrics export', () => {
+  it('should return metrics snapshot as array', () => {
+    const metrics = getMetricsSnapshot();
+    assert.ok(Array.isArray(metrics));
+    assert.ok(metrics.length >= 5, 'Expected at least 5 host metrics');
+
+    const invocations = metrics.find(m => m.name === 'mi_host_invocations_total');
+    assert.ok(invocations, 'Should have invocations metric');
+    assert.ok(typeof invocations.value === 'number');
+  });
+
+  it('should include per-cell metrics', () => {
+    const metrics = getMetricsSnapshot();
+    const cellMetrics = metrics.filter(m => m.labels && m.labels.includes('test-cell'));
+    assert.ok(cellMetrics.length >= 3, 'Expected at least 3 per-cell metrics');
+  });
+
+  it('should format as Prometheus text', () => {
+    const text = getMetricsText();
+    assert.ok(typeof text === 'string');
+    assert.ok(text.includes('mi_host_invocations_total'));
+    assert.ok(text.includes('mi_cell_invocations_total'));
+  });
+});
+
+// ============ Signal History Tests ============
+
+describe('signal history', () => {
+  it('should record signal history after emission', async () => {
+    emitSignal('history.test', { val: 1 });
+    await new Promise(r => setTimeout(r, 200));
+
+    const history = getSignalHistory({ name: 'history.test' });
+    assert.ok(history.length >= 1, 'Should have at least 1 history.test entry');
+    assert.ok(history[0].payloadKeys.includes('val'));
+  });
+
+  it('should filter by prefix', async () => {
+    emitSignal('history.alpha', { a: 1 });
+    emitSignal('history.beta', { b: 2 });
+    await new Promise(r => setTimeout(r, 200));
+
+    const prefixed = getSignalHistory({ prefix: 'history.' });
+    assert.ok(prefixed.length >= 2);
+  });
+
+  it('should return formatted string', () => {
+    const str = getSignalHistoryString(5);
+    assert.ok(typeof str === 'string');
+    assert.ok(str.includes('Recent Signals') || str.includes('No recent'));
   });
 });
 

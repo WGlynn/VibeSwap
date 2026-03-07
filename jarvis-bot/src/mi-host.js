@@ -470,6 +470,7 @@ function processSignals() {
 
   for (const signal of batch) {
     telemetry.signalsProcessed++;
+    recordSignalHistory(signal);
 
     // ============ Pheromone Board Signals ============
     if (signal.name === 'pheromone.deposit') {
@@ -1071,4 +1072,109 @@ export function queryPheromonePrefix(prefix) {
  */
 export function getPheromoneStats() {
   return pheromoneBoard.stats();
+}
+
+// ============ Metrics Export ============
+
+/**
+ * Get a Prometheus-compatible metrics snapshot.
+ * Returns key-value pairs suitable for exposition format.
+ */
+export function getMetricsSnapshot() {
+  const metrics = [];
+  const ts = Date.now();
+
+  // Host-level metrics
+  metrics.push({ name: 'mi_host_cells_active', value: telemetry.cellsActive || 0, ts });
+  metrics.push({ name: 'mi_host_cells_total', value: cells.size, ts });
+  metrics.push({ name: 'mi_host_invocations_total', value: telemetry.invocations, ts });
+  metrics.push({ name: 'mi_host_errors_total', value: telemetry.errors, ts });
+  metrics.push({ name: 'mi_host_signals_emitted_total', value: telemetry.signalsEmitted, ts });
+  metrics.push({ name: 'mi_host_signals_processed_total', value: telemetry.signalsProcessed, ts });
+  metrics.push({ name: 'mi_host_signals_dropped_total', value: telemetry.signalsDropped, ts });
+  metrics.push({ name: 'mi_host_pheromones_active', value: pheromoneBoard.stats().entries, ts });
+  metrics.push({ name: 'mi_host_uptime_ms', value: ts - (telemetry._startedAt || ts), ts });
+
+  // Per-cell metrics
+  for (const [id, cell] of cells) {
+    const labels = `cell="${id}"`;
+    metrics.push({ name: 'mi_cell_invocations_total', labels, value: cell.invocations, ts });
+    metrics.push({ name: 'mi_cell_errors_total', labels, value: cell.errors, ts });
+    metrics.push({ name: 'mi_cell_confidence', labels, value: cell.confidence, ts });
+    metrics.push({ name: 'mi_cell_energy_used', labels, value: cell.energyUsed, ts });
+    metrics.push({ name: 'mi_cell_energy_budget', labels, value: cell.energyBudget, ts });
+    if (cell.metrics.avgLatencyMs) {
+      metrics.push({ name: 'mi_cell_avg_latency_ms', labels, value: Math.round(cell.metrics.avgLatencyMs), ts });
+    }
+    metrics.push({ name: 'mi_cell_state', labels, value: cell.state === 'active' ? 1 : 0, ts });
+  }
+
+  return metrics;
+}
+
+/**
+ * Format metrics as Prometheus exposition text.
+ */
+export function getMetricsText() {
+  return getMetricsSnapshot()
+    .map(m => m.labels ? `${m.name}{${m.labels}} ${m.value}` : `${m.name} ${m.value}`)
+    .join('\n');
+}
+
+// ============ Signal History ============
+
+const SIGNAL_HISTORY_MAX = 100;
+const signalHistory = [];
+
+/**
+ * Record a signal in the history ring buffer.
+ */
+function recordSignalHistory(signal) {
+  signalHistory.push({
+    name: signal.name,
+    source: signal.source,
+    timestamp: signal.timestamp,
+    payloadKeys: Object.keys(signal.payload || {}),
+  });
+  if (signalHistory.length > SIGNAL_HISTORY_MAX) {
+    signalHistory.shift();
+  }
+}
+
+/**
+ * Get recent signal history, optionally filtered.
+ */
+export function getSignalHistory(filter = {}) {
+  let results = [...signalHistory];
+
+  if (filter.name) {
+    results = results.filter(s => s.name === filter.name);
+  }
+  if (filter.prefix) {
+    results = results.filter(s => s.name.startsWith(filter.prefix));
+  }
+  if (filter.since) {
+    results = results.filter(s => s.timestamp >= filter.since);
+  }
+  if (filter.limit) {
+    results = results.slice(-filter.limit);
+  }
+
+  return results;
+}
+
+/**
+ * Format signal history as readable string.
+ */
+export function getSignalHistoryString(limit = 20) {
+  const recent = signalHistory.slice(-limit);
+  if (recent.length === 0) return 'No recent signals.';
+
+  const lines = ['=== Recent Signals ==='];
+  for (const s of recent) {
+    const ago = Math.round((Date.now() - s.timestamp) / 1000);
+    lines.push(`  ${s.name} (${ago}s ago) from ${s.source} [${s.payloadKeys.join(', ')}]`);
+  }
+  lines.push(`\n${signalHistory.length}/${SIGNAL_HISTORY_MAX} in buffer`);
+  return lines.join('\n');
 }

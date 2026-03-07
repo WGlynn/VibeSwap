@@ -64,6 +64,14 @@ try {
 } catch {
   getProviderHealthString_MI = () => 'Provider health not available.';
 }
+// MI Bridge — wires cell capabilities to tool functions
+let registerMIBridge = async () => ({ registered: 0 });
+try {
+  const bridge = await import('./mi-bridge.js');
+  registerMIBridge = bridge.registerMIBridge;
+} catch (err) {
+  console.warn(`[jarvis] MI Bridge unavailable: ${err.message}`);
+}
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
 import { getPrice, getTrending, getChart, getFearGreed, getGasPrices, setReminder, getQRUrl, generateImage, convertCrypto, getTVL, getATH, getDominance, getYields, getChains, getStables, getDexVolume, getWalletBalance } from './tools.js';
@@ -4424,7 +4432,7 @@ async function main() {
     console.log('[jarvis] Step 3: Loading learning + inner dialogue + deep storage + hell...');
     await initLearning();
     try { await initShardLearnings(); } catch (err) { console.warn(`[jarvis] Shard learnings init failed: ${err.message}`); }
-    try { await initMIHost('./cells'); } catch (err) { console.warn(`[jarvis] MI Host init failed: ${err.message}`); }
+    try { await initMIHost('./cells'); await registerMIBridge(); } catch (err) { console.warn(`[jarvis] MI Host init failed: ${err.message}`); }
     await initInnerDialogue();
     await initDeepStorage();
     await initHell();
@@ -4731,6 +4739,8 @@ async function main() {
   try {
     const miResult = await initMIHost('./cells');
     console.log(`[jarvis] MI Host: ${miResult.cellCount} cells active (${miResult.manifests} manifests loaded)`);
+    const bridgeResult = await registerMIBridge();
+    console.log(`[jarvis] MI Bridge: ${bridgeResult.registered} capability handlers registered`);
   } catch (err) { console.warn(`[jarvis] MI Host init failed: ${err.message}`); }
   await initInnerDialogue();
   await initStickers();

@@ -1,0 +1,188 @@
+{
+  "mi": "0.1",
+  "id": "limni-trading-cell",
+  "name": "Limni Trading Terminal",
+  "version": "1.0.0",
+  "author": "jarvis-shard-0",
+  "kind": "orchestrator",
+  "domain": "trading",
+  "tags": ["limni", "trading", "terminal", "strategy", "backtest", "monitor", "vps"],
+  "capabilities": [
+    {
+      "name": "registerTerminal",
+      "description": "Register a Limni trading terminal connection",
+      "input": {
+        "type": "object",
+        "properties": {
+          "terminalId": { "type": "string" },
+          "url": { "type": "string" },
+          "apiKey": { "type": "string" },
+          "operator": { "type": "string" }
+        },
+        "required": ["terminalId", "url"]
+      },
+      "output": { "type": "object", "properties": { "registered": { "type": "boolean" } } }
+    },
+    {
+      "name": "checkTerminalHealth",
+      "description": "Check health status of a trading terminal",
+      "input": { "type": "object", "properties": { "terminalId": { "type": "string" } }, "required": ["terminalId"] },
+      "output": { "type": "object", "properties": { "healthy": { "type": "boolean" }, "latency": { "type": "number" } } }
+    },
+    {
+      "name": "registerStrategy",
+      "description": "Register a trading strategy definition",
+      "input": {
+        "type": "object",
+        "properties": {
+          "strategyId": { "type": "string" },
+          "strategyDef": { "type": "object" }
+        },
+        "required": ["strategyId", "strategyDef"]
+      },
+      "output": { "type": "object", "properties": { "registered": { "type": "boolean" } } }
+    },
+    {
+      "name": "listStrategies",
+      "description": "List all registered trading strategies",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "strategies": { "type": "array" } } }
+    },
+    {
+      "name": "runBacktest",
+      "description": "Run a backtest on a strategy with historical data",
+      "input": {
+        "type": "object",
+        "properties": {
+          "strategyId": { "type": "string" },
+          "priceData": { "type": "array" }
+        },
+        "required": ["strategyId"]
+      },
+      "output": { "type": "object", "properties": { "sharpeRatio": { "type": "number" }, "totalReturn": { "type": "number" }, "maxDrawdown": { "type": "number" } } }
+    },
+    {
+      "name": "deployStrategy",
+      "description": "Deploy a strategy to a live terminal",
+      "input": {
+        "type": "object",
+        "properties": {
+          "strategyId": { "type": "string" },
+          "terminalId": { "type": "string" }
+        },
+        "required": ["strategyId", "terminalId"]
+      },
+      "output": { "type": "object", "properties": { "deployed": { "type": "boolean" } } }
+    },
+    {
+      "name": "getAlerts",
+      "description": "Get recent trading alerts and notifications",
+      "input": { "type": "object", "properties": { "limit": { "type": "number" } } },
+      "output": { "type": "object", "properties": { "alerts": { "type": "array" } } }
+    },
+    {
+      "name": "getLimniStats",
+      "description": "Get overall Limni system statistics",
+      "input": { "type": "object", "properties": {} },
+      "output": {
+        "type": "object",
+        "properties": {
+          "terminals": { "type": "number" },
+          "strategies": { "type": "number" },
+          "vps": { "type": "number" },
+          "alerts": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "registerVPS",
+      "description": "Register a VPS for strategy execution",
+      "input": {
+        "type": "object",
+        "properties": {
+          "vpsId": { "type": "string" },
+          "vpsConfig": { "type": "object" }
+        },
+        "required": ["vpsId"]
+      },
+      "output": { "type": "object", "properties": { "registered": { "type": "boolean" } } }
+    },
+    {
+      "name": "checkAllVPS",
+      "description": "Health check all registered VPS instances",
+      "input": { "type": "object", "properties": {} },
+      "output": { "type": "object", "properties": { "results": { "type": "array" } } }
+    }
+  ],
+  "signals": {
+    "subscribe": [
+      "trading.terminal.register",
+      "trading.strategy.request",
+      "trading.alert",
+      "market.volatility.spike",
+      "system.heartbeat"
+    ],
+    "emit": [
+      "trading.alert.new",
+      "trading.strategy.deployed",
+      "trading.terminal.health",
+      "trading.backtest.complete",
+      "cell.identity.announce"
+    ]
+  },
+  "requires": {
+    "capabilities": ["http.fetch"],
+    "permissions": ["network.outbound", "storage.read", "storage.write"],
+    "neighbors": [
+      { "capability": "getPrice", "optional": true },
+      { "capability": "checkRug", "optional": true }
+    ]
+  },
+  "lifecycle": {
+    "sense": {
+      "signals": ["trading.needs.terminal", "market.volatility.spike"],
+      "context": ["host.domain", "neighbor.capabilities"]
+    },
+    "candidates": [
+      {
+        "identity": "full-trading",
+        "condition": "network.outbound",
+        "priority": 1
+      },
+      {
+        "identity": "backtest-only",
+        "condition": "true",
+        "priority": 2
+      }
+    ],
+    "commit": {
+      "min_dwell_ms": 600000,
+      "reconsider_on": ["terminal.disconnected", "error_rate > 0.4"]
+    },
+    "learn": {
+      "strategy": "thompson",
+      "reward_signals": ["strategy_pnl", "execution_quality", "alert_accuracy"],
+      "update_interval_ms": 1800000
+    }
+  },
+  "runtime": {
+    "sandbox": "worker",
+    "memory_limit_mb": 128,
+    "cpu_budget_ms": 10000,
+    "ttl_ms": 0,
+    "energy_budget": 200
+  },
+  "telemetry": {
+    "emit_interval_ms": 60000,
+    "metrics": [
+      "invocations",
+      "latency_p50",
+      "error_rate",
+      "terminals_active",
+      "strategies_deployed",
+      "alerts_generated"
+    ]
+  },
+  "surfaces": ["telegram", "web", "api"],
+  "host_sdk_min": "0.1"
+}

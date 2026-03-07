@@ -27,6 +27,7 @@ import {
   getCell,
   listCells
 } from './mi-manifest.js';
+import { StigmergyBoard } from './mi-bandit.js';
 import { watch, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, basename, dirname } from 'path';
 
@@ -51,6 +52,9 @@ const signalQueue = [];
 // Signal handlers (signal name → Set<handler fn>)
 const signalHandlers = new Map();
 
+// Global pheromone board for stigmergic coordination
+const pheromoneBoard = new StigmergyBoard({ defaultTTL: 300000, maxEntries: 500 });
+
 // Global telemetry accumulator
 const telemetry = {
   signalsEmitted: 0,
@@ -58,7 +62,10 @@ const telemetry = {
   signalsDropped: 0,
   cellsActive: 0,
   identityChanges: 0,
-  errors: 0
+  errors: 0,
+  pheromonesDeposited: 0,
+  pheromonesQueried: 0,
+  pheromonesDecayed: 0
 };
 
 // Intervals
@@ -375,6 +382,34 @@ function processSignals() {
   for (const signal of batch) {
     telemetry.signalsProcessed++;
 
+    // ============ Pheromone Board Signals ============
+    if (signal.name === 'pheromone.deposit') {
+      const { key, value, depositor, ttlMs } = signal.payload || {};
+      if (key) {
+        pheromoneBoard.deposit(key, value, depositor || signal.source, ttlMs);
+        telemetry.pheromonesDeposited++;
+      }
+      continue;
+    }
+    if (signal.name === 'pheromone.query') {
+      telemetry.pheromonesQueried++;
+      // Query results delivered via callback in payload
+      const { key, prefix, callback } = signal.payload || {};
+      if (callback) {
+        if (prefix) {
+          callback(pheromoneBoard.queryPrefix(prefix));
+        } else if (key) {
+          callback(pheromoneBoard.query(key));
+        }
+      }
+      continue;
+    }
+    if (signal.name === 'pheromone.decay') {
+      const removed = pheromoneBoard.decay();
+      telemetry.pheromonesDecayed += removed;
+      continue;
+    }
+
     // Deliver to subscribed cells
     const subscribers = matchSignal(signal.name);
     for (const manifest of subscribers) {
@@ -431,7 +466,8 @@ export function persistMIState() {
     const state = {
       version: 1,
       timestamp: Date.now(),
-      cells: {}
+      cells: {},
+      pheromones: pheromoneBoard.serialize()
     };
 
     for (const [id, cell] of cells) {
@@ -498,6 +534,18 @@ export async function initMIHost(cellsDir = DEFAULT_CELLS_DIR) {
 
   // Load persisted state (strategy weights from previous runs)
   const savedState = loadMIState();
+
+  // Restore pheromone board from persisted state
+  if (savedState?.pheromones && Array.isArray(savedState.pheromones)) {
+    const restored = StigmergyBoard.deserialize(savedState.pheromones);
+    // Merge into global board
+    for (const entry of savedState.pheromones) {
+      if (entry.expiresAt > Date.now()) {
+        pheromoneBoard.deposit(entry.key, entry.value, entry.depositor, entry.expiresAt - Date.now());
+      }
+    }
+    console.log(`[mi-host] Restored ${pheromoneBoard.stats().entries} pheromones from persisted state`);
+  }
 
   // Load manifests
   const manifests = loadManifestDir(cellsDir);
@@ -767,6 +815,7 @@ export function getCellStats() {
       ...telemetry
     },
     registry: getRegistryStats(),
+    pheromones: pheromoneBoard.stats(),
     cells: cellStats
   };
 }
@@ -783,6 +832,7 @@ export function getMIStatusString() {
     `Cells: ${stats.registry.cells} registered, ${stats.host.cellsActive} active`,
     `Signals: ${stats.host.signalsEmitted} emitted, ${stats.host.signalsProcessed} processed, ${stats.host.signalsDropped} dropped`,
     `Identity changes: ${stats.host.identityChanges}`,
+    `Pheromones: ${stats.pheromones.entries} active (${stats.host.pheromonesDeposited} deposited, ${stats.host.pheromonesDecayed} decayed)`,
     `Errors: ${stats.host.errors}`,
     ''
   ];
@@ -795,4 +845,34 @@ export function getMIStatusString() {
   }
 
   return lines.join('\n');
+}
+
+// ============ Pheromone Board API ============
+
+/**
+ * Deposit a pheromone trace (convenience wrapper).
+ */
+export function depositPheromone(key, value, depositor, ttlMs) {
+  return emitSignal('pheromone.deposit', { key, value, depositor, ttlMs });
+}
+
+/**
+ * Query a pheromone by key (synchronous).
+ */
+export function queryPheromone(key) {
+  return pheromoneBoard.query(key);
+}
+
+/**
+ * Query pheromones by prefix (synchronous).
+ */
+export function queryPheromonePrefix(prefix) {
+  return pheromoneBoard.queryPrefix(prefix);
+}
+
+/**
+ * Get pheromone board stats.
+ */
+export function getPheromoneStats() {
+  return pheromoneBoard.stats();
 }

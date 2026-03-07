@@ -11,7 +11,7 @@
 //   await registerMIBridge();  // After initMIHost()
 // ============
 
-import { registerHandler, emitSignal } from './mi-host.js';
+import { registerHandler } from './mi-host.js';
 
 // ============ Handler Registry ============
 // Maps cellId.capabilityName → handler function

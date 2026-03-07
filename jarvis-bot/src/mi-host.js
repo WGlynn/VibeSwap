@@ -28,18 +28,20 @@ import {
   listCells
 } from './mi-manifest.js';
 import { StigmergyBoard } from './mi-bandit.js';
+import { config } from './config.js';
 import { watch, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, basename, dirname } from 'path';
 
-// ============ Constants ============
-const DEFAULT_CELLS_DIR = './cells';
-const MI_STATE_FILE = './data/mi-state.json';
-const MAX_SIGNAL_QUEUE = 1000;
-const SIGNAL_PROCESS_INTERVAL_MS = 100;
+// ============ Constants (from config with fallbacks) ============
+const miConfig = config.mi || {};
+const DEFAULT_CELLS_DIR = miConfig.cellsDir || './cells';
+const MI_STATE_FILE = miConfig.stateFile || './data/mi-state.json';
+const MAX_SIGNAL_QUEUE = miConfig.maxSignalQueue || 1000;
+const SIGNAL_PROCESS_INTERVAL_MS = miConfig.signalProcessIntervalMs || 100;
 const TELEMETRY_FLUSH_INTERVAL_MS = 30000;
-const STATE_PERSIST_INTERVAL_MS = 300000; // Persist every 5 minutes
-const HOT_RELOAD_DEBOUNCE_MS = 2000;
-const LIFECYCLE_CHECK_INTERVAL_MS = 60000;
+const STATE_PERSIST_INTERVAL_MS = miConfig.persistIntervalMs || 300000;
+const HOT_RELOAD_DEBOUNCE_MS = miConfig.hotReloadDebounceMs || 2000;
+const LIFECYCLE_CHECK_INTERVAL_MS = miConfig.lifecycleCheckIntervalMs || 60000;
 
 // ============ State ============
 
@@ -886,6 +888,7 @@ export function getMIStatusString() {
     `Version: ${stats.host.version}`,
     `Status: ${stats.host.uptime}`,
     `Cells: ${stats.registry.cells} registered, ${stats.host.cellsActive} active`,
+    `Invocations: ${stats.host.invocations} total`,
     `Signals: ${stats.host.signalsEmitted} emitted, ${stats.host.signalsProcessed} processed, ${stats.host.signalsDropped} dropped`,
     `Identity changes: ${stats.host.identityChanges}`,
     `Pheromones: ${stats.pheromones.entries} active (${stats.host.pheromonesDeposited} deposited, ${stats.host.pheromonesDecayed} decayed)`,
@@ -895,8 +898,17 @@ export function getMIStatusString() {
 
   if (stats.cells.length > 0) {
     lines.push('--- Cells ---');
-    for (const cell of stats.cells) {
-      lines.push(`  ${cell.id}: ${cell.state} → ${cell.identity || 'none'} (conf: ${(cell.confidence * 100).toFixed(0)}%, invocations: ${cell.invocations}, errors: ${cell.errorRate})`);
+    // Sort by confidence × (1 - errorRate) for ranking
+    const ranked = stats.cells.sort((a, b) => {
+      const scoreA = a.confidence * (1 - parseFloat(a.errorRate));
+      const scoreB = b.confidence * (1 - parseFloat(b.errorRate));
+      return scoreB - scoreA;
+    });
+    for (const cell of ranked) {
+      const rewards = cell.metrics?.totalRewards || 0;
+      const avgReward = cell.metrics?.avgReward ? cell.metrics.avgReward.toFixed(2) : 'n/a';
+      const latency = cell.metrics?.avgLatencyMs ? `~${Math.round(cell.metrics.avgLatencyMs)}ms` : '';
+      lines.push(`  ${cell.id}: ${cell.state} → ${cell.identity || 'none'} (conf: ${(cell.confidence * 100).toFixed(0)}%, inv: ${cell.invocations}, err: ${cell.errorRate}, rewards: ${rewards}, avg: ${avgReward}${latency ? ', ' + latency : ''})`);
     }
   }
 

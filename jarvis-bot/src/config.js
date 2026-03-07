@@ -118,6 +118,16 @@ export const config = {
     primaryApp: process.env.FLY_APP_NAME || 'jarvis-vibeswap',
     defaultRegion: process.env.FLY_DEFAULT_REGION || 'iad',
   },
+  // MI Host SDK — Micro-Interface cell runtime
+  mi: {
+    cellsDir: process.env.MI_CELLS_DIR || './cells',
+    stateFile: process.env.MI_STATE_FILE || './data/mi-state.json',
+    maxSignalQueue: parseInt(process.env.MI_MAX_SIGNAL_QUEUE || '1000'),
+    signalProcessIntervalMs: parseInt(process.env.MI_SIGNAL_INTERVAL || '100'),
+    persistIntervalMs: parseInt(process.env.MI_PERSIST_INTERVAL || '300000'),
+    hotReloadDebounceMs: parseInt(process.env.MI_HOT_RELOAD_DEBOUNCE || '2000'),
+    lifecycleCheckIntervalMs: parseInt(process.env.MI_LIFECYCLE_CHECK_INTERVAL || '60000'),
+  },
   // Tip jar — ETH address for voluntary contributions
   tipJarAddress: process.env.TIP_JAR_ADDRESS || '0xa-EOFc55d6f6478918076B5Bb85E8Cf3738549a2',
   // Runtime info

@@ -130,16 +130,23 @@ export function loadManifest(filePath) {
  * Load all manifests from a directory (*.mi.json files).
  */
 export function loadManifestDir(dirPath) {
-  if (!existsSync(dirPath)) return [];
+  if (!existsSync(dirPath)) {
+    console.warn(`[mi-manifest] Cells directory not found: ${dirPath}`);
+    return [];
+  }
   const files = readdirSync(dirPath).filter(f => f.endsWith('.mi.json'));
   const manifests = [];
+  const errors = [];
   for (const file of files) {
     try {
       manifests.push(loadManifest(join(dirPath, file)));
     } catch (err) {
+      errors.push({ file, error: err.message });
       console.warn(`[mi-manifest] Failed to load ${file}: ${err.message}`);
     }
   }
+  const totalCaps = manifests.reduce((n, m) => n + (m.capabilities?.length || 0), 0);
+  console.log(`[mi-manifest] Loaded ${manifests.length}/${files.length} manifests (${totalCaps} capabilities)${errors.length ? `, ${errors.length} failed` : ''}`);
   return manifests;
 }
 

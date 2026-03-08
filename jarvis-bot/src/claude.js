@@ -822,7 +822,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     dev: ['gas_tracker', 'contract_source', 'decode_tx', 'block_info',
           'ens_info', 'npm_lookup', 'crate_lookup', 'contract_abi', 'checksum_address'],
     education: ['explain_concept', 'crypto_glossary', 'vibeswap_explainer',
-                'crypto_tutorial', 'crypto_calendar', 'daily_challenge'],
+                'crypto_tutorial', 'crypto_calendar', 'crypto_quiz'],
   };
 
   function selectTools(msg, allTools) {
@@ -1433,9 +1433,14 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       input_schema: { type: 'object', properties: {} },
     },
     {
-      name: 'daily_challenge',
-      description: 'Get a daily crypto knowledge challenge/quiz question.',
-      input_schema: { type: 'object', properties: {} },
+      name: 'crypto_quiz',
+      description: 'Get a crypto quiz question on a topic (defi, security, bitcoin, ethereum, trading, vibeswap).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Quiz topic (default: general)' },
+        },
+      },
     },
   ];
 
@@ -1880,7 +1885,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         } else if (tb.name === 'vibeswap_explainer') {
           try {
             const { getVibeSwapExplainer } = await import('./tools-education.js');
-            result = getVibeSwapExplainer(tb.input?.topic);
+            result = await getVibeSwapExplainer();
           } catch (err) { result = `Failed: ${err.message}`; }
           console.log('[claude] Tool: vibeswap_explainer');
         } else if (tb.name === 'crypto_tutorial') {
@@ -1895,12 +1900,12 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = await getCryptoCalendar();
           } catch (err) { result = `Failed: ${err.message}`; }
           console.log('[claude] Tool: crypto_calendar');
-        } else if (tb.name === 'daily_challenge') {
+        } else if (tb.name === 'crypto_quiz') {
           try {
-            const { getDailyChallenge } = await import('./tools-education.js');
-            result = getDailyChallenge();
+            const { getCryptoQuiz } = await import('./tools-education.js');
+            result = await getCryptoQuiz(tb.input?.topic);
           } catch (err) { result = `Failed: ${err.message}`; }
-          console.log('[claude] Tool: daily_challenge');
+          console.log('[claude] Tool: crypto_quiz');
         } else {
           result = 'Unknown tool.';
         }

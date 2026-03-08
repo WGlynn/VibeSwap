@@ -48,6 +48,34 @@ function extractTitle(html) {
 }
 
 /**
+ * Extract author from HTML meta tags (og:author, twitter:creator, article:author, author).
+ */
+function extractAuthor(html) {
+  const patterns = [
+    /<meta[^>]*(?:name|property)=["'](?:author|article:author|og:author|twitter:creator)["'][^>]*content=["']([^"']+)["']/i,
+    /<meta[^>]*content=["']([^"']+)["'][^>]*(?:name|property)=["'](?:author|article:author|og:author|twitter:creator)["']/i,
+    /<a[^>]*class=["'][^"']*author[^"']*["'][^>]*>([^<]+)</i,
+    /<span[^>]*class=["'][^"']*author[^"']*["'][^>]*>([^<]+)</i,
+  ];
+  for (const re of patterns) {
+    const match = html.match(re);
+    if (match) {
+      const author = match[1].replace(/^@/, '').trim();
+      if (author && author.length < 100) return author;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract subreddit from Reddit HTML.
+ */
+function extractSubreddit(html) {
+  const match = html.match(/(?:property=["']og:title["'][^>]*content=["']r\/(\w+)|<title[^>]*>[^<]*r\/(\w+))/i);
+  return match ? `r/${match[1] || match[2]}` : null;
+}
+
+/**
  * Extract meta description from raw HTML.
  */
 function extractMetaDescription(html) {
@@ -134,8 +162,10 @@ async function fetchPage(url) {
     const title = extractTitle(html) || 'Untitled';
     const description = extractMetaDescription(html);
     const body = extractBodyText(html);
+    const author = extractAuthor(html);
+    const subreddit = extractSubreddit(html);
 
-    return { title, description, body, url };
+    return { title, description, body, url, author, subreddit };
   } catch (err) {
     console.warn(`[web-reader] Failed to fetch ${url}: ${err.message}`);
     return null;
@@ -160,8 +190,10 @@ function formatPage(page) {
 
 /**
  * Detect URLs in text, fetch their content, and return context string.
+ * Also attaches structured metadata (.pages) for attribution pipeline.
+ *
  * @param {string} text - Message text potentially containing URLs
- * @returns {Promise<string | null>} Formatted context or null if no URLs / all failed
+ * @returns {Promise<string | null>} Formatted context string (with .pages metadata) or null
  */
 export async function processWebLinks(text) {
   try {
@@ -175,7 +207,11 @@ export async function processWebLinks(text) {
 
     if (pages.length === 0) return null;
 
-    return pages.map(formatPage).join('\n\n');
+    const formatted = pages.map(formatPage).join('\n\n');
+    // Attach structured page data for attribution pipeline (non-enumerable so it doesn't show in string)
+    const result = new String(formatted);
+    result.pages = pages;
+    return result;
   } catch (err) {
     console.warn(`[web-reader] processWebLinks error: ${err.message}`);
     return null;

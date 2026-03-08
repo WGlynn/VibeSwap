@@ -435,14 +435,16 @@ export function attributeSource({ author, authorId, url, type, title, informedWo
  *
  * @param {object} context - The context object from youtube.js or web-reader.js
  * @param {string} context.title - Page/video title
- * @param {string} [context.author] - Author if detected
+ * @param {string} [context.author] - Author if detected from HTML meta
  * @param {string} context.url - Source URL
  * @param {string} context.type - 'youtube' or 'web'
+ * @param {string} [context.subreddit] - Reddit subreddit if applicable
  */
 export function autoAttributeContent(context) {
   if (!context?.url) return null;
 
-  const type = context.type === 'youtube' ? SourceType.VIDEO : SourceType.BLOG;
+  const type = detectSourceType(context);
+  // Priority: HTML meta author > URL-extracted author > fallback
   const author = context.author || extractAuthorFromUrl(context.url) || 'Unknown';
 
   return recordSource({
@@ -452,34 +454,105 @@ export function autoAttributeContent(context) {
     title: context.title || null,
     metadata: {
       autoDetected: true,
-      platform: context.type,
+      platform: detectPlatform(context.url),
+      subreddit: context.subreddit || null,
       processedAt: new Date().toISOString(),
     },
   });
 }
 
 /**
+ * Detect source type from URL/context.
+ */
+function detectSourceType(context) {
+  if (context.type === 'youtube') return SourceType.VIDEO;
+  const url = (context.url || '').toLowerCase();
+  if (url.includes('github.com')) return SourceType.CODE;
+  if (url.includes('reddit.com') || url.includes('x.com') || url.includes('twitter.com') || url.includes('facebook.com')) return SourceType.SOCIAL;
+  if (url.includes('arxiv.org')) return SourceType.PAPER;
+  if (url.includes('wikipedia.org')) return SourceType.PAPER;
+  return SourceType.BLOG;
+}
+
+/**
+ * Detect platform name from URL.
+ */
+function detectPlatform(url) {
+  if (!url) return 'unknown';
+  const lower = url.toLowerCase();
+  if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
+  if (lower.includes('reddit.com')) return 'reddit';
+  if (lower.includes('x.com') || lower.includes('twitter.com')) return 'x';
+  if (lower.includes('github.com')) return 'github';
+  if (lower.includes('wikipedia.org')) return 'wikipedia';
+  if (lower.includes('medium.com')) return 'medium';
+  if (lower.includes('substack.com')) return 'substack';
+  if (lower.includes('mirror.xyz')) return 'mirror';
+  if (lower.includes('facebook.com')) return 'facebook';
+  if (lower.includes('arxiv.org')) return 'arxiv';
+  if (lower.includes('dev.to')) return 'devto';
+  try { return new URL(url).hostname; } catch { return 'web'; }
+}
+
+/**
  * Best-effort author extraction from URL patterns.
+ * Covers: GitHub, Medium, X/Twitter, Reddit, Wikipedia, Substack,
+ * Mirror.xyz, HackMD, dev.to, personal blogs.
  */
 function extractAuthorFromUrl(url) {
   try {
     const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    const parts = u.pathname.split('/').filter(Boolean);
+
     // GitHub: github.com/username/repo
-    if (u.hostname === 'github.com') {
-      const parts = u.pathname.split('/').filter(Boolean);
+    if (host === 'github.com') {
       return parts[0] || null;
     }
     // Medium: medium.com/@username or username.medium.com
-    if (u.hostname.includes('medium.com')) {
-      const parts = u.pathname.split('/').filter(Boolean);
+    if (host.includes('medium.com')) {
       if (parts[0]?.startsWith('@')) return parts[0].slice(1);
-      if (u.hostname !== 'medium.com') return u.hostname.split('.')[0];
+      if (host !== 'medium.com') return host.split('.')[0];
     }
     // Twitter/X: twitter.com/username or x.com/username
-    if (u.hostname === 'twitter.com' || u.hostname === 'x.com') {
-      return u.pathname.split('/').filter(Boolean)[0] || null;
+    if (host === 'twitter.com' || host === 'x.com') {
+      const user = parts[0];
+      if (user && !['home', 'explore', 'search', 'i', 'settings'].includes(user)) return user;
     }
-    return null;
+    // Reddit: reddit.com/r/sub/comments/.../... or reddit.com/user/username
+    if (host.includes('reddit.com') || host === 'redd.it') {
+      if (parts[0] === 'user' || parts[0] === 'u') return parts[1] || null;
+      // For post URLs, author is in the page content, not URL — return subreddit as community source
+      if (parts[0] === 'r') return `r/${parts[1]}`;
+    }
+    // Wikipedia: en.wikipedia.org/wiki/Article_Name — attribute to Wikipedia community
+    if (host.includes('wikipedia.org')) {
+      return 'Wikipedia';
+    }
+    // Substack: username.substack.com
+    if (host.endsWith('.substack.com')) {
+      return host.split('.')[0];
+    }
+    // Mirror.xyz: mirror.xyz/username.eth
+    if (host === 'mirror.xyz') {
+      return parts[0] || null;
+    }
+    // dev.to: dev.to/username/article
+    if (host === 'dev.to') {
+      return parts[0] || null;
+    }
+    // HackMD: hackmd.io/@username
+    if (host === 'hackmd.io') {
+      if (parts[0]?.startsWith('@')) return parts[0].slice(1);
+    }
+    // ArXiv: arxiv.org/abs/... — attribute to ArXiv (author in page content)
+    if (host === 'arxiv.org') {
+      return 'ArXiv';
+    }
+    // YouTube handled separately in youtube.js
+    // Telegram handled separately
+    // Fallback: use domain as attribution (e.g., ergon.moe → ergon.moe)
+    return host;
   } catch {
     return null;
   }

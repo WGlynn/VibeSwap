@@ -4800,8 +4800,10 @@ bot.on('text', async (ctx) => {
           } else {
             const groupWebContext = await processWebLinks(msgText).catch(() => null);
             if (groupWebContext) {
-              // Passive attribution — record web content source
-              autoAttributeContent({ url: msgText.match(/https?:\/\/[^\s]+/)?.[0], title: groupWebContext.split('\n')[0], type: 'web' });
+              // Passive attribution — record each web source with author metadata
+              for (const page of (groupWebContext.pages || [])) {
+                autoAttributeContent({ url: page.url, title: page.title, author: page.author, subreddit: page.subreddit, type: 'web' });
+              }
               analysis = { action: 'engage', response_hint: `User shared a link. Here's the content:\n${groupWebContext}\n\nComment on it naturally — what's interesting, what you notice, or how it relates to what the group is working on. Be concise.`, confidence: 0.9 };
             } else {
               analysis = await analyzeMessage(msgText, userName, recentCtx);
@@ -4978,8 +4980,10 @@ bot.on('text', async (ctx) => {
       });
       if (webContext) {
         messageForLLM = `${messageForLLM}\n\n${webContext}`;
-        // Passive attribution — record web source in contribution graph
-        autoAttributeContent({ url: messageForLLM.match(/https?:\/\/[^\s]+/)?.[0], title: webContext.split('\n')[0], type: 'web' });
+        // Passive attribution — record each web source with author metadata
+        for (const page of (webContext.pages || [])) {
+          autoAttributeContent({ url: page.url, title: page.title, author: page.author, subreddit: page.subreddit, type: 'web' });
+        }
       }
     }
 

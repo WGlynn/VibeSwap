@@ -111,6 +111,12 @@ export const config = {
     apiKey: process.env.FIREFLIES_API_KEY || null,
     webhookSecret: process.env.FIREFLIES_WEBHOOK_SECRET || null, // HMAC verification
   },
+  // ElevenLabs TTS — JARVIS MCU voice (Paul Bettany British AI assistant)
+  elevenlabs: {
+    apiKey: process.env.ELEVENLABS_API_KEY || null,
+    voiceId: process.env.ELEVENLABS_VOICE_ID || 'JBFqnCBsd6RMkjVDRZzb', // Default: George (British male)
+    model: process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2',
+  },
   // Fly.io Machines API — for deploying operator shards
   fly: {
     apiToken: process.env.FLY_API_TOKEN || null,

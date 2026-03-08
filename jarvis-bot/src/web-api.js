@@ -160,12 +160,15 @@ function jsonResponse(res, status, data) {
 // "I am because we are" — tracks who's here right now
 const ubuntuPresence = new Map(); // sessionKey -> lastSeen timestamp
 
+// Last-known-good GitHub state — survives transient API failures / rate limits
+let lastKnownGithub = null;
+
 // ============ Response Cache ============
 // Short-lived cache for expensive endpoints (mesh, mind, health)
 
 const responseCache = new Map(); // key -> { data, expiry }
 const CACHE_TTL = {
-  '/web/mesh': 10_000,     // 10s — GitHub API call is slow
+  '/web/mesh': 60_000,     // 60s — GitHub API rate limit is 60/hr unauthenticated
   '/web/mind': 15_000,     // 15s — aggregates many subsystems
   '/web/health': 5_000,    // 5s — lightweight but called often
 };
@@ -731,6 +734,7 @@ export async function handleWebRequest(req, res, pathname) {
       };
 
       // Cell 2: GitHub (check recent push via API — no auth needed for public repo)
+      // Last-known-good: survive transient GitHub API failures / rate limits
       let githubCell = {
         id: 'github-repo',
         name: 'GitHub',
@@ -742,7 +746,7 @@ export async function handleWebRequest(req, res, pathname) {
       try {
         const ghRes = await fetch('https://api.github.com/repos/wglynn/vibeswap/commits?per_page=1', {
           headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'JARVIS-Mind-Network' },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(8000),
         });
         if (ghRes.ok) {
           const [latest] = await ghRes.json();
@@ -756,11 +760,21 @@ export async function handleWebRequest(req, res, pathname) {
               : commitAge < 86400000 ? `${Math.round(commitAge / 3600000)}h ago`
               : `${Math.round(commitAge / 86400000)}d ago`,
           };
+          // Store last-known-good for resilience
+          lastKnownGithub = { ...githubCell };
+        } else if (lastKnownGithub) {
+          // Rate limited or server error — use last known good
+          githubCell = { ...lastKnownGithub };
         } else {
           githubCell.status = 'unreachable';
         }
       } catch {
-        githubCell.status = 'unreachable';
+        // Network failure — use last known good if available
+        if (lastKnownGithub) {
+          githubCell = { ...lastKnownGithub };
+        } else {
+          githubCell.status = 'unreachable';
+        }
       }
 
       // Cell 3: Vercel (the caller is proof it's alive — report edge presence)

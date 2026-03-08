@@ -22,6 +22,7 @@ import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
 import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner } from './mining.js';
+import { createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { createHmac } from 'crypto';
 
 // ============ Rate Limiter ============
@@ -461,6 +462,95 @@ export async function handleWebRequest(req, res, pathname) {
     } catch (err) {
       console.error('[web-api] Mining stats error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch mining stats' });
+    }
+    return true;
+  }
+
+  // ============ Prediction Markets API ============
+
+  // GET /web/predictions — list all markets
+  if (pathname === '/web/predictions' && req.method === 'GET') {
+    try {
+      const result = listMarkets('web');
+      jsonResponse(res, 200, { markets: result });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  // POST /web/predictions/create — create a new market
+  if (pathname === '/web/predictions/create' && req.method === 'POST') {
+    if (!checkRateLimit(ip)) {
+      jsonResponse(res, 429, { error: 'Rate limited.' });
+      return true;
+    }
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { question, userId, userName, initData } = body;
+      if (!question) {
+        jsonResponse(res, 400, { error: 'Missing question' });
+        return true;
+      }
+      // Use Telegram auth if provided, otherwise use session ID
+      let authUserId = userId || `web-${ip}`;
+      let authUserName = userName || 'Anon';
+      if (initData && validateTelegramInitData(initData)) {
+        try {
+          const params = new URLSearchParams(initData);
+          const userJson = params.get('user');
+          if (userJson) {
+            const user = JSON.parse(userJson);
+            authUserId = String(user.id);
+            authUserName = user.first_name || authUserName;
+          }
+        } catch { /* use fallback */ }
+      }
+      const result = createPrediction(authUserId, authUserName, 'web', question);
+      jsonResponse(res, 200, { result });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  // POST /web/predictions/bet — place a bet
+  if (pathname === '/web/predictions/bet' && req.method === 'POST') {
+    if (!checkRateLimit(ip)) {
+      jsonResponse(res, 429, { error: 'Rate limited.' });
+      return true;
+    }
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { marketId, side, amount, userId, userName, initData } = body;
+      let authUserId = userId || `web-${ip}`;
+      let authUserName = userName || 'Anon';
+      if (initData && validateTelegramInitData(initData)) {
+        try {
+          const params = new URLSearchParams(initData);
+          const userJson = params.get('user');
+          if (userJson) {
+            const user = JSON.parse(userJson);
+            authUserId = String(user.id);
+            authUserName = user.first_name || authUserName;
+          }
+        } catch { /* use fallback */ }
+      }
+      const result = placeBet(authUserId, authUserName, marketId, side, amount);
+      jsonResponse(res, 200, { result });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  // GET /web/predictions/leaderboard — top predictors
+  if (pathname === '/web/predictions/leaderboard' && req.method === 'GET') {
+    try {
+      const result = getPredictorLeaderboard();
+      jsonResponse(res, 200, { leaderboard: result });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
     }
     return true;
   }

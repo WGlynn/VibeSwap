@@ -13,22 +13,32 @@ import {
 import { ethers } from 'ethers'
 
 // ============================================================
-// MOCK DATA — used when contracts are not deployed (demo mode)
+// PRICE DATA — live from CoinGecko via global cache, with fallbacks
 // ============================================================
-const MOCK_PRICES = {
-  ETH: 2847.32,
+const FALLBACK_PRICES = {
+  ETH: 2800,
   USDC: 1.00,
   USDT: 1.00,
-  WBTC: 67432.10,
-  ARB: 1.24,
+  WBTC: 96000,
+  ARB: 0.50,
+  CKB: 0.012,
 }
 
+// Live price proxy — reads CoinGecko cache first, falls back to static
+const MOCK_PRICES = new Proxy(FALLBACK_PRICES, {
+  get(target, prop) {
+    const live = window.__vibePriceCache?.[prop]
+    if (live && live > 0) return live
+    return target[prop] || 0
+  }
+})
+
 const MOCK_BALANCES = {
-  ETH: '2.5',
-  USDC: '5,000',
-  USDT: '1,000',
-  WBTC: '0.15',
-  ARB: '500',
+  ETH: '0',
+  USDC: '0',
+  USDT: '0',
+  WBTC: '0',
+  ARB: '0',
 }
 
 const TOKEN_LOGOS = {

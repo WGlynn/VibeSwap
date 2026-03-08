@@ -1,35 +1,34 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 
 // Rewards are not just numbers. They're acknowledgment.
 // They're recognition. They're a reason to come back.
 
 function RewardsWidget() {
-  const [claimable, setClaimable] = useState(127.45)
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
+
+  // Real rewards start at 0 — populated from on-chain ShapleyDistributor
+  const [claimable, setClaimable] = useState(0)
   const [isGlowing, setIsGlowing] = useState(false)
 
-  // Simulate rewards accruing
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setClaimable(prev => prev + 0.01 + Math.random() * 0.02)
-      setIsGlowing(true)
-      setTimeout(() => setIsGlowing(false), 500)
-    }, 3000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // No mock accrual — rewards only change via on-chain contract reads
+  // When ShapleyDistributor is deployed, this will poll the contract
 
   const rewards = [
     {
       name: 'Trading Rewards',
-      amount: 85.32,
+      amount: 0,
       icon: '💎',
       description: 'From your swap volume',
       color: '#00d4ff'
     },
     {
       name: 'LP Rewards',
-      amount: 42.13,
+      amount: 0,
       icon: '🌊',
       description: 'From providing liquidity',
       color: '#ff1ee8'

@@ -23,6 +23,8 @@ import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
 import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner } from './mining.js';
+import { getPendingCommands, acknowledgeCommand, acknowledgeAll } from './relay.js';
+import { getGraphStats, getAuthorAttribution } from './passive-attribution.js';
 import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStructured, getMyBets, getPredictorLeaderboard, getLeaderboardStructured } from './tools-predictions.js';
 import { createHmac } from 'crypto';
 
@@ -386,6 +388,46 @@ export async function handleWebRequest(req, res, pathname) {
     };
     setCache('/web/health', healthData);
     jsonResponse(res, 200, healthData);
+    return true;
+  }
+
+  // ============ GET /web/relay ============
+  // Claude Code polls this for pending commands from mobile
+  if (pathname === '/web/relay' && req.method === 'GET') {
+    const pending = getPendingCommands();
+    jsonResponse(res, 200, { pending, count: pending.length });
+    return true;
+  }
+
+  // ============ POST /web/relay/ack ============
+  // Claude Code acknowledges a command
+  if (pathname === '/web/relay/ack' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      if (body.all) {
+        const count = acknowledgeAll();
+        jsonResponse(res, 200, { acknowledged: count });
+      } else if (body.id) {
+        const ok = acknowledgeCommand(body.id);
+        jsonResponse(res, 200, { acknowledged: ok });
+      } else {
+        jsonResponse(res, 400, { error: 'Provide id or all:true' });
+      }
+    } catch { jsonResponse(res, 400, { error: 'Invalid JSON' }); }
+    return true;
+  }
+
+  // ============ GET /web/attribution ============
+  // View the passive attribution graph stats or a specific author
+  if (pathname === '/web/attribution' && req.method === 'GET') {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const author = url.searchParams.get('author');
+    if (author) {
+      const attribution = getAuthorAttribution(author);
+      jsonResponse(res, 200, attribution || { error: 'Author not found' });
+    } else {
+      jsonResponse(res, 200, getGraphStats());
+    }
     return true;
   }
 

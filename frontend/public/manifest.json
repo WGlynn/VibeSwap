@@ -1,0 +1,19 @@
+{
+  "name": "VibeSwap",
+  "short_name": "VibeSwap",
+  "description": "MEV-resistant omnichain DEX. Trade with zero frontrunning.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "cryptocurrency"],
+  "icons": [
+    {
+      "src": "/vibe-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

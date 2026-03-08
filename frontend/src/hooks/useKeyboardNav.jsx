@@ -9,10 +9,13 @@ const SHORTCUTS = {
   'k': '/',          // Ctrl+K → Swap (home)
   'j': '/jarvis',    // Ctrl+J → JARVIS
   'm': '/mesh',      // Ctrl+M → Mind Mesh
-  'e': '/earn',      // Ctrl+E → Earn (pools)
+  'e': '/economics', // Ctrl+E → Economics
   'b': '/buy',       // Ctrl+B → Buy/Sell
   'h': '/history',   // Ctrl+H → History
   'p': '/portfolio', // Ctrl+P → Portfolio
+  'r': '/research',  // Ctrl+R → Research
+  'a': '/abstraction', // Ctrl+A → Abstraction
+  'n': '/earn',      // Ctrl+N → Earn (pools)
 }
 
 export function useKeyboardNav() {

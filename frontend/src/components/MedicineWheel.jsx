@@ -52,6 +52,28 @@ const DIRECTIONS = [
     element: 'Wind',
     position: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2',
   },
+  {
+    direction: 'northeast',
+    label: 'Economics',
+    sublabel: 'Value flows',
+    path: '/economics',
+    color: 'from-amber-500/20 to-amber-600/5',
+    border: 'border-amber-500/30',
+    glyph: 'NE',
+    element: 'Lightning',
+    position: 'top-0 right-0 -translate-y-1/3 translate-x-1/3',
+  },
+  {
+    direction: 'northwest',
+    label: 'Research',
+    sublabel: 'Deep inquiry',
+    path: '/research',
+    color: 'from-purple-500/20 to-purple-600/5',
+    border: 'border-purple-500/30',
+    glyph: 'NW',
+    element: 'Aether',
+    position: 'top-0 left-0 -translate-y-1/3 -translate-x-1/3',
+  },
 ]
 
 export default function MedicineWheel() {
@@ -114,6 +136,8 @@ export default function MedicineWheel() {
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
           <line x1="50" y1="10" x2="50" y2="90" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
           <line x1="10" y1="50" x2="90" y2="50" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+          <line x1="18" y1="18" x2="82" y2="82" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+          <line x1="82" y1="18" x2="18" y2="82" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
         </svg>
       </div>
 
@@ -124,6 +148,9 @@ export default function MedicineWheel() {
           { label: 'Buy', path: '/buy' },
           { label: 'Predict', path: '/predict' },
           { label: 'Status', path: '/status' },
+          { label: 'Economics', path: '/economics' },
+          { label: 'Research', path: '/research' },
+          { label: 'Abstraction', path: '/abstraction' },
         ].map(link => (
           <Link
             key={link.path}

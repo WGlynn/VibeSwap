@@ -176,6 +176,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/mesh', label: 'Mind Mesh', icon: '#' },
     { path: '/docs', label: 'Learn', icon: '📚' },
     { path: '/wheel', label: 'Medicine Wheel', icon: 'O' },
+    { path: '/economics', label: 'Economics', icon: '$' },
+    { path: '/research', label: 'Research', icon: '~' },
     { path: '/abstraction', label: 'Abstraction Ladder', icon: '^' },
     { path: '/status', label: 'System Status', icon: '|' },
     { path: '/about', label: 'About', icon: '💡' },

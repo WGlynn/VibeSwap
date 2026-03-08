@@ -106,6 +106,48 @@ const EXPLORERS = {
   'Polygon': 'https://polygonscan.com',
 }
 
+const LIVE_FEED_ITEMS = [
+  { user: '0x7a2d...f1c3', action: 'swapped', detail: '2.5 ETH for 6,230 USDC', chain: 'Ethereum', time: '2s ago' },
+  { user: '0xb4e1...9a02', action: 'swapped', detail: '1,000 USDC for 625 ARB', chain: 'Arbitrum', time: '5s ago' },
+  { user: '0xf392...c7d8', action: 'added liquidity', detail: '5 ETH + 12,500 USDC', chain: 'Base', time: '8s ago' },
+  { user: '0x1d5c...e4b6', action: 'bridged', detail: '3,000 USDC to Optimism', chain: 'Ethereum', time: '12s ago' },
+  { user: '0x93af...2d71', action: 'swapped', detail: '0.15 WBTC for 4.2 ETH', chain: 'Ethereum', time: '15s ago' },
+  { user: '0xc8d4...5f09', action: 'removed liquidity', detail: '2.1 ETH + 5,250 USDC', chain: 'Arbitrum', time: '18s ago' },
+]
+
+function LiveActivityTicker() {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % LIVE_FEED_ITEMS.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const item = LIVE_FEED_ITEMS[currentIndex]
+
+  return (
+    <div className="mb-4 px-3 py-2 rounded-lg bg-black-800/80 border border-black-700 overflow-hidden">
+      <div className="flex items-center gap-2 text-xs">
+        <span className="flex-shrink-0 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-matrix-500 animate-pulse" />
+          <span className="text-matrix-400 font-semibold">LIVE</span>
+        </span>
+        <span className="text-black-400 truncate">
+          <span className="text-black-300 font-mono">{item.user}</span>
+          {' '}{item.action}{' '}
+          <span className="text-white">{item.detail}</span>
+          {' on '}
+          <span className="text-terminal-400">{item.chain}</span>
+          {' \u00B7 '}
+          <span className="text-black-500">{item.time}</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function ActivityPage() {
   const { isConnected: isExternalConnected, address: externalAddress } = useWallet()
   const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
@@ -221,9 +263,12 @@ function ActivityPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Live Activity Feed Ticker */}
+      <LiveActivityTicker />
+
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">Activity</h1>
+        <h1 className="text-2xl font-bold text-white mb-1 text-5d">Activity</h1>
         <p className="text-black-400 text-sm">Your transaction history</p>
       </div>
 
@@ -273,7 +318,7 @@ function ActivityPage() {
         ) : (
           filteredTransactions.map(tx => (
             <StaggerItem key={tx.id}>
-              <GlassCard className="p-3 sm:p-4">
+              <GlassCard className="p-3 sm:p-4 depth-card">
                 {/* Desktop layout */}
                 <div className="hidden sm:flex items-center space-x-4">
                   {getTypeIcon(tx.type)}

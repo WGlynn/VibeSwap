@@ -70,8 +70,11 @@ export default function JarvisBubble() {
                 <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-matrix-500 animate-pulse' : 'bg-red-500'}`} />
                 <span className="text-sm font-mono font-bold text-matrix-400">JARVIS</span>
                 {budget && (
-                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${budget.degraded ? 'bg-amber-500/20 text-amber-400' : 'text-black-500'}`}>
-                    {Math.round((budget.remaining / budget.daily) * 100)}%
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                    budget.degraded ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-matrix-500/10 text-matrix-500'
+                  }`}>
+                    {((Math.max(0, (budget.daily || 0) - (budget.used || 0))) / 1000).toFixed(1)} JUL
                   </span>
                 )}
               </div>

@@ -26,7 +26,7 @@ primary_region = 'iad'                        # Choose: iad, lhr, nrt, syd, etc.
   HEALTH_PORT = '8080'
   # Shard identity
   SHARD_MODE = 'worker'
-  TOTAL_SHARDS = '2'                          # Total shards in network
+  TOTAL_SHARDS = '8'                          # Total shards in network
   NODE_TYPE = 'full'                          # 'light' | 'full' | 'archive'
   # Router URL — points to primary shard's Fly.io internal address
   ROUTER_URL = 'http://jarvis-vibeswap.fly.dev'

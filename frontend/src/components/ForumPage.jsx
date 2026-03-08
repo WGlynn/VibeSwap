@@ -55,7 +55,7 @@ function ForumPage() {
       >
         <div className="flex items-start justify-between">
           <div className="text-center flex-1">
-            <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-3">
+            <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-3 text-5d">
               Build <span className="text-matrix-500">Together</span>
             </h1>
             <p className="text-lg text-black-400 max-w-2xl mx-auto">
@@ -153,7 +153,7 @@ function ForumPage() {
               {/* New Post Button */}
               <button
                 onClick={() => setShowNewPost(true)}
-                className="w-full px-4 py-3 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold transition-colors"
+                className="w-full px-4 py-3 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-semibold transition-colors animate-glow-breathe"
               >
                 + New Contribution
               </button>
@@ -395,7 +395,7 @@ function ContributionCard({ contribution, onUpvote, isThreaded = false, isLastIn
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`p-3 sm:p-5 rounded-lg bg-black-800 border ${
+      className={`depth-card p-3 sm:p-5 rounded-lg bg-black-800 border ${
         isKeyInsight ? 'border-yellow-500/50 bg-yellow-500/5' :
         isSignature ? 'border-purple-500/50 bg-purple-500/5' :
         contribution.implemented ? 'border-matrix-500/50' : 'border-black-600'
@@ -490,11 +490,26 @@ function ContributionCard({ contribution, onUpvote, isThreaded = false, isLastIn
               </span>
               <span>{timeAgo}</span>
             </div>
-            {contribution.rewardPoints > 0 && (
-              <span className="text-matrix-500 font-medium">
-                +{contribution.rewardPoints} reward points
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {contribution.rewardPoints > 0 && (
+                <span className="text-matrix-500 font-medium">
+                  +{contribution.rewardPoints} reward points
+                </span>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const url = `${window.location.origin}/forum?id=${contribution.id}`
+                  navigator.clipboard.writeText(url)
+                }}
+                className="p-1 rounded hover:bg-black-700 text-black-500 hover:text-matrix-400 transition-colors"
+                title="Copy link"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -723,7 +738,7 @@ function LeaderboardView({ leaderboard }) {
             transition={{ delay: i * 0.1 }}
             className={`p-4 rounded-lg border transition-colors ${
               i === 0 ? 'bg-matrix-500/10 border-matrix-500/30' : 'bg-black-900 border-black-700'
-            }`}
+            } ${i < 3 ? 'border-5d' : ''}`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">

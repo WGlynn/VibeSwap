@@ -72,7 +72,7 @@ function ChannelList({ boards, activeBoardId, onSelect }) {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-black-700">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-black-700 border-5d">
         <h2 className="font-semibold text-white text-base">Messages</h2>
       </div>
 
@@ -86,7 +86,7 @@ function ChannelList({ boards, activeBoardId, onSelect }) {
               onClick={() => onSelect(board.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
                 isActive
-                  ? 'bg-matrix-500/10 border-r-2 border-matrix-500'
+                  ? 'bg-matrix-500/10 border-r-2 border-matrix-500 holo-shimmer'
                   : 'hover:bg-black-800'
               }`}
             >
@@ -196,6 +196,9 @@ function ChatPanel({ boardId, username, isConnected, onBack, showBack }) {
         )}
       </div>
 
+      {/* Typing Indicator */}
+      <TypingIndicator />
+
       {/* Input Bar */}
       <ChatInput
         onSend={handleSend}
@@ -263,7 +266,20 @@ function MessageList({ messages, username, isConnected, onReply, vote, getVoteSc
 
 function ChatBubble({ message, parentMessage, isOwn, grouped, username, isConnected, onReply, score, userVote, onVote, canVote, replyCount }) {
   const [showActions, setShowActions] = useState(false)
+  const [reactions, setReactions] = useState({})
   const isPinned = message.metadata?.pinned
+
+  const toggleReaction = (emoji) => {
+    setReactions(prev => {
+      const count = prev[emoji] || 0
+      if (count > 0) {
+        const next = { ...prev }
+        delete next[emoji]
+        return next
+      }
+      return { ...prev, [emoji]: (prev[emoji] || 0) + 1 }
+    })
+  }
 
   return (
     <div
@@ -273,7 +289,7 @@ function ChatBubble({ message, parentMessage, isOwn, grouped, username, isConnec
     >
       <div className={`relative max-w-[85%] sm:max-w-[70%] group`}>
         {/* Bubble */}
-        <div className={`rounded-2xl px-3 py-2 ${
+        <div className={`depth-card rounded-2xl px-3 py-2 ${
           isOwn
             ? 'bg-matrix-600/20 border border-matrix-500/20 rounded-br-md'
             : 'bg-black-800 border border-black-700 rounded-bl-md'
@@ -301,7 +317,8 @@ function ChatBubble({ message, parentMessage, isOwn, grouped, username, isConnec
 
           {/* Author (if not grouped) */}
           {!grouped && !isOwn && (
-            <div className="text-xs font-semibold text-matrix-400 mb-0.5">
+            <div className="text-xs font-semibold text-matrix-400 mb-0.5 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-400 inline-block flex-shrink-0" />
               {message.author}
             </div>
           )}
@@ -329,6 +346,34 @@ function ChatBubble({ message, parentMessage, isOwn, grouped, username, isConnec
                 {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
               </span>
             )}
+          </div>
+
+          {/* Emoji Reactions */}
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            {Object.entries(reactions).map(([emoji, count]) => (
+              <button
+                key={emoji}
+                onClick={() => toggleReaction(emoji)}
+                className="px-1.5 py-0.5 rounded-full bg-matrix-500/10 border border-matrix-500/20 text-[11px] hover:bg-matrix-500/20 transition-colors"
+              >
+                {emoji} {count}
+              </button>
+            ))}
+            {['fire', 'heart', 'thumbsUp', 'eyes'].map(key => {
+              const emojiMap = { fire: '\uD83D\uDD25', heart: '\u2764\uFE0F', thumbsUp: '\uD83D\uDC4D', eyes: '\uD83D\uDC40' }
+              const emoji = emojiMap[key]
+              if (reactions[emoji]) return null
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleReaction(emoji)}
+                  className="px-1 py-0.5 rounded-full text-[11px] opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+                  title={key}
+                >
+                  {emoji}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -515,6 +560,38 @@ function DateSeparator({ timestamp }) {
       <div className="flex-1 h-px bg-black-700" />
       <span className="text-[11px] text-black-500 font-medium px-2">{label}</span>
       <div className="flex-1 h-px bg-black-700" />
+    </div>
+  )
+}
+
+// ============ Typing Indicator ============
+
+function TypingIndicator() {
+  const [typingUsers] = useState(() => {
+    const names = ['VibeTrader', 'CryptoSage', 'DeFiDegen']
+    return [names[Math.floor(Math.random() * names.length)]]
+  })
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const show = setTimeout(() => setVisible(true), 3000 + Math.random() * 5000)
+    const hide = setTimeout(() => setVisible(false), 8000 + Math.random() * 4000)
+    return () => { clearTimeout(show); clearTimeout(hide) }
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <div className="px-4 py-1.5 flex-shrink-0">
+      <div className="flex items-center gap-2 text-xs text-black-500">
+        <span className="w-2 h-2 rounded-full bg-green-400 inline-block flex-shrink-0" />
+        <span>{typingUsers[0]} is typing</span>
+        <span className="flex gap-0.5">
+          <span className="w-1 h-1 rounded-full bg-black-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1 h-1 rounded-full bg-black-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1 h-1 rounded-full bg-black-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </span>
+      </div>
     </div>
   )
 }

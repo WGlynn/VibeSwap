@@ -1,8 +1,9 @@
-# JARVIS Mind Network — Worker Shard: shard-2
-# Third node — unlocks CRPC pairwise comparison (needs 3+ shards)
+# JARVIS Mind Network — Worker Shard: shard-ap
+# Asia-Pacific node (Tokyo) — geographic redundancy, DeepSeek free tier
+# Covers APAC timezone, reduces latency for Asian users
 
-app = 'jarvis-shard-2'
-primary_region = 'iad'
+app = 'jarvis-shard-ap'
+primary_region = 'nrt'
 
 [build]
   dockerfile = 'Dockerfile'
@@ -16,8 +17,14 @@ primary_region = 'iad'
   SHARD_MODE = 'worker'
   TOTAL_SHARDS = '8'
   NODE_TYPE = 'full'
-  ROUTER_URL = 'http://jarvis-vibeswap.internal:8080'
-  CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
+  ROUTER_URL = 'https://jarvis-vibeswap.fly.dev'
+  LLM_PROVIDER = 'deepseek'
+  LLM_MODEL = 'deepseek-chat'
+
+# Secrets:
+#   fly secrets set DEEPSEEK_API_KEY=sk-... --app jarvis-shard-ap
+#   fly secrets set SHARD_ID=shard-ap --app jarvis-shard-ap
+#   fly secrets set SHARD_SECRET=<shared-secret> --app jarvis-shard-ap
 
 [[mounts]]
   source = 'jarvis_data'

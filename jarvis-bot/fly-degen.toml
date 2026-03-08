@@ -28,7 +28,7 @@ primary_region = 'iad'
   # Runs as a full primary with its own Telegram bot
   # Connects to the Mind Network as a peer
   SHARD_MODE = 'primary'
-  TOTAL_SHARDS = '3'
+  TOTAL_SHARDS = '8'
   NODE_TYPE = 'full'
   ROUTER_URL = 'http://jarvis-vibeswap.fly.dev'
   MEMORY_DIR = '/app/memory'

@@ -392,6 +392,102 @@ function MindPanels({ mind }) {
   )
 }
 
+// ============ JUL Balance Bar ============
+
+function JULBalanceBar({ budget, mind }) {
+  const compute = mind?.computeEconomics
+  const poolRemaining = compute?.poolRemaining || 0
+  const poolTotal = compute?.poolSize || 500000
+  const poolPct = poolTotal > 0 ? Math.round((poolRemaining / poolTotal) * 100) : 100
+  const activeUsers = compute?.activeUsers || 0
+
+  // User-specific budget from chat responses
+  const userUsed = budget?.used || 0
+  const userDaily = budget?.daily || 0
+  const userPct = userDaily > 0 ? Math.round((userUsed / userDaily) * 100) : 0
+  const userRemaining = Math.max(0, userDaily - userUsed)
+  const isDegraded = budget?.degraded || false
+  const isExhausted = userPct >= 100
+
+  // Convert tokens to approximate JUL (1000 tokens = 1 JUL)
+  const julRemaining = (userRemaining / 1000).toFixed(1)
+  const julDaily = (userDaily / 1000).toFixed(1)
+  const julPoolRemaining = (poolRemaining / 1000).toFixed(0)
+
+  return (
+    <div className="mb-3 rounded-lg border border-black-600 bg-black/80 backdrop-blur-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5">
+        {/* Left: JUL balance */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs font-mono ${
+              isExhausted ? 'bg-red-500/20 text-red-400' :
+              isDegraded ? 'bg-amber-500/20 text-amber-400' :
+              'bg-matrix-500/20 text-matrix-400'
+            }`}>
+              JUL
+            </div>
+            <div>
+              <div className="flex items-baseline space-x-1">
+                <span className={`text-lg font-bold font-mono tabular-nums ${
+                  isExhausted ? 'text-red-400' :
+                  isDegraded ? 'text-amber-400' :
+                  'text-matrix-400'
+                }`}>
+                  {julRemaining}
+                </span>
+                <span className="text-black-500 text-xs font-mono">/ {julDaily} JUL</span>
+              </div>
+              <span className="text-[10px] text-black-500 font-mono">
+                {isExhausted ? 'EXHAUSTED — resets daily' :
+                 isDegraded ? 'DEGRADED — responses capped' :
+                 'Your daily compute budget'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Pool + users */}
+        <div className="hidden sm:flex items-center space-x-4">
+          <div className="text-right">
+            <div className="text-xs text-black-400 font-mono">{julPoolRemaining}K JUL pool</div>
+            <div className="text-[10px] text-black-500 font-mono">{activeUsers} active minds</div>
+          </div>
+          <div className="w-12 h-12 relative">
+            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+              <circle
+                cx="18" cy="18" r="15" fill="none"
+                stroke={poolPct > 50 ? '#00ff41' : poolPct > 20 ? '#f59e0b' : '#ef4444'}
+                strokeWidth="3"
+                strokeDasharray={`${poolPct * 0.942} 100`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-black-300">
+              {poolPct}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Usage bar */}
+      <div className="h-1 bg-black-800">
+        <motion.div
+          className={`h-full transition-colors ${
+            isExhausted ? 'bg-red-500' :
+            isDegraded ? 'bg-amber-500' :
+            'bg-matrix-500'
+          }`}
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, userPct)}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ============ Main Page ============
 
 function JarvisPage() {
@@ -402,6 +498,9 @@ function JarvisPage() {
     <div className="flex flex-col h-full max-w-7xl mx-auto px-4 py-2">
       {/* Hero */}
       <HeroSection health={health} />
+
+      {/* JUL Balance Bar */}
+      <JULBalanceBar budget={budget} mind={mind} />
 
       {/* Main content: Chat + Mind */}
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">

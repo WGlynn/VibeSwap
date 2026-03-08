@@ -21,6 +21,7 @@
 
 import { config } from './config.js';
 import { randomUUID, createHash } from 'crypto';
+import { getActivePersonaId as _getPersonaId } from './persona.js';
 
 // ============ Truncated Response Error ============
 // Thrown when a provider returns incomplete/truncated JSON.
@@ -1334,8 +1335,14 @@ function classifyComplexity(request) {
 
   const len = text.length;
 
-  // Short + matches simple patterns → free tier
-  if (len < 80 && SIMPLE_PATTERNS.test(text)) return 'simple';
+  // Short + matches simple patterns → free tier (unless persona wants personality)
+  if (len < 80 && SIMPLE_PATTERNS.test(text)) {
+    // In degen mode, even simple messages deserve wit — route to moderate
+    try {
+      if (_getPersonaId?.() === 'degen') return 'moderate';
+    } catch {}
+    return 'simple';
+  }
 
   // Very short messages without complex signals → simple
   if (len < 30 && !COMPLEX_SIGNALS.test(text)) return 'simple';

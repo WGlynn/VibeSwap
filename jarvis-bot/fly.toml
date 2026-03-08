@@ -32,8 +32,9 @@ primary_region = 'iad'
   [checks.health]
     port = 8080
     type = 'http'
-    interval = '1m0s'
-    timeout = '10s'
+    interval = '10s'
+    timeout = '5s'
+    grace_period = '30s'
     path = '/health'
 
 [[restart]]

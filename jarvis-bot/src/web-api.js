@@ -156,6 +156,10 @@ function jsonResponse(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+// ============ Ubuntu Presence ============
+// "I am because we are" — tracks who's here right now
+const ubuntuPresence = new Map(); // sessionKey -> lastSeen timestamp
+
 // ============ Response Cache ============
 // Short-lived cache for expensive endpoints (mesh, mind, health)
 
@@ -797,6 +801,34 @@ export async function handleWebRequest(req, res, pathname) {
       console.error('[web-api] Mesh error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch mesh state' });
     }
+    return true;
+  }
+
+  // ============ POST /web/presence ============
+  // Ubuntu — "I am because we are"
+  // Lightweight presence: clients ping every 30s, server tracks active count.
+  if (pathname === '/web/presence' && req.method === 'POST') {
+    const sessionKey = `presence-${ip}`;
+    ubuntuPresence.set(sessionKey, Date.now());
+    // Prune stale (>60s)
+    const now = Date.now();
+    for (const [k, t] of ubuntuPresence) {
+      if (now - t > 60_000) ubuntuPresence.delete(k);
+    }
+    jsonResponse(res, 200, {
+      here: ubuntuPresence.size,
+      mantra: 'umuntu ngumuntu ngabantu',
+    });
+    return true;
+  }
+
+  // GET /web/presence — just read the count
+  if (pathname === '/web/presence' && req.method === 'GET') {
+    const now = Date.now();
+    for (const [k, t] of ubuntuPresence) {
+      if (now - t > 60_000) ubuntuPresence.delete(k);
+    }
+    jsonResponse(res, 200, { here: ubuntuPresence.size });
     return true;
   }
 

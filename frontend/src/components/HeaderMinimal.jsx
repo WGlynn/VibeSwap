@@ -10,6 +10,7 @@ import RecoverySetup from './RecoverySetup'
 import PulseIndicator from './ui/PulseIndicator'
 import InteractiveButton from './ui/InteractiveButton'
 import { useTheme } from '../hooks/useTheme'
+import { useUbuntu } from '../hooks/useUbuntu'
 
 /**
  * Minimal header - Logo, wallet, and hidden drawer for power users
@@ -22,6 +23,7 @@ function HeaderMinimal() {
   const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress, disconnect: deviceDisconnect } = useDeviceWallet()
   const { identity, hasIdentity } = useIdentity()
   const { mesh } = useMindMesh()
+  const { here } = useUbuntu()
   const [showDrawer, setShowDrawer] = useState(false)
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
 
@@ -76,6 +78,13 @@ function HeaderMinimal() {
                   {mesh ? `${mesh.cells?.filter(c => c.status === 'interlinked').length || 0}/3` : '...'}
                 </span>
               </Link>
+
+              {/* Ubuntu — souls present */}
+              {here > 1 && (
+                <span className="hidden sm:inline text-[10px] font-mono text-black-500">
+                  {here}
+                </span>
+              )}
 
               {/* Wallet */}
               {isConnected ? (
@@ -166,6 +175,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/prompts', label: 'Prompt Feed', icon: '>' },
     { path: '/mesh', label: 'Mind Mesh', icon: '#' },
     { path: '/docs', label: 'Learn', icon: '📚' },
+    { path: '/wheel', label: 'Medicine Wheel', icon: 'O' },
     { path: '/status', label: 'System Status', icon: '|' },
     { path: '/about', label: 'About', icon: '💡' },
     { path: '/jarvis', label: 'JARVIS', icon: '>' },

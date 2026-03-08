@@ -1,4 +1,4 @@
-import { lazy, Suspense, Component } from 'react'
+import { lazy, Suspense, Component, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
@@ -9,6 +9,8 @@ import { MessagingProvider } from './contexts/MessagingContext'
 import { useKeyboardNav } from './hooks/useKeyboardNav'
 import JarvisBubble from './components/JarvisBubble'
 import OnboardingTour from './components/OnboardingTour'
+import { useSynaptic } from './hooks/useSynaptic'
+import { remember } from './utils/sankofa'
 
 // Error boundary to catch React errors
 class ErrorBoundary extends Component {
@@ -68,8 +70,13 @@ const MindMesh = lazy(() => import('./components/MindMesh'))
 const PredictionMarket = lazy(() => import('./components/PredictionMarket'))
 const PortfolioDashboard = lazy(() => import('./components/PortfolioDashboard'))
 const StatusDashboard = lazy(() => import('./components/StatusDashboard'))
+const MedicineWheel = lazy(() => import('./components/MedicineWheel'))
 
-// Rocketship page transitions — blur + slide + opacity
+// Sacred Geometry page transitions
+// Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
+// Duration scaled to 1/phi^3 ~= 0.236s. Easing follows the golden spiral.
+const PHI = 1.618033988749895
+
 const pageVariants = {
   initial: { opacity: 0, y: 8, filter: 'blur(4px)' },
   in: { opacity: 1, y: 0, filter: 'blur(0px)' },
@@ -77,8 +84,8 @@ const pageVariants = {
 }
 
 const pageTransition = {
-  duration: 0.25,
-  ease: [0.25, 0.1, 0.25, 1],
+  duration: 1 / (PHI * PHI * PHI), // ~0.236s — golden ratio timing
+  ease: [0.25, 0.1, 1 / PHI, 1],   // golden spiral easing
 }
 
 function AnimatedRoutes() {
@@ -118,6 +125,7 @@ function AnimatedRoutes() {
             <Route path="/predict" element={<PredictionMarket />} />
             <Route path="/portfolio" element={<PortfolioDashboard />} />
             <Route path="/status" element={<StatusDashboard />} />
+            <Route path="/wheel" element={<MedicineWheel />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>
@@ -131,7 +139,14 @@ function AnimatedRoutes() {
 function App() {
   const location = useLocation()
   const isHomePage = location.pathname === '/'
+  const { fire } = useSynaptic()
   useKeyboardNav() // Ctrl+K swap, Ctrl+J jarvis, Ctrl+M mesh, etc.
+
+  // Synaptic plasticity — strengthen pathways on navigation
+  useEffect(() => {
+    fire(location.pathname)
+    remember('success', { page: location.pathname, action: 'navigate' })
+  }, [location.pathname, fire])
 
   return (
     <MessagingProvider>

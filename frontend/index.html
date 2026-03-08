@@ -7,11 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="description" content="VibeSwap - MEV-resistant omnichain DEX with batch auctions. Trade with zero frontrunning." />
     <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="/manifest.json" />
 
-    <!-- Cache Control - Force fresh fetch -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <title>VibeSwap | MEV-Protected Trading</title>
 
     <!-- iOS Native App Feel -->
@@ -117,23 +114,12 @@
     <script>
       // ============ PREVENTION MEASURES ============
 
-      // 1. Unregister stale service workers
+      // 1. Register service worker (Light Node cache layer)
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          registrations.forEach(function(registration) {
-            registration.unregister();
-            console.log('[VibeSwap] Cleared stale service worker');
-          });
-        });
-      }
-
-      // 2. Clear old caches
-      if ('caches' in window) {
-        caches.keys().then(function(names) {
-          names.forEach(function(name) {
-            caches.delete(name);
-            console.log('[VibeSwap] Cleared cache:', name);
-          });
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          console.log('[VibeSwap] Service worker registered (scope: ' + reg.scope + ')');
+        }).catch(function(err) {
+          console.warn('[VibeSwap] Service worker registration failed:', err.message);
         });
       }
 

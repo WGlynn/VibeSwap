@@ -5355,6 +5355,40 @@ async function main() {
   bot.launch();
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
 
+  // ============ Self-Healing Watchdog ============
+  // Pings own health endpoint every 60s. If 3 consecutive failures, notifies Will.
+  let watchdogFailures = 0;
+  const WATCHDOG_INTERVAL = 60_000;
+  const WATCHDOG_MAX_FAILURES = 3;
+  if (config.isDocker || process.env.HEALTH_PORT) {
+    setInterval(async () => {
+      try {
+        const res = await fetch(`http://localhost:${process.env.HEALTH_PORT || '8080'}/health`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok) {
+          if (watchdogFailures > 0) {
+            console.log(`[watchdog] Health recovered after ${watchdogFailures} failures`);
+            watchdogFailures = 0;
+          }
+        } else {
+          watchdogFailures++;
+        }
+      } catch {
+        watchdogFailures++;
+      }
+      if (watchdogFailures === WATCHDOG_MAX_FAILURES) {
+        console.error(`[watchdog] ${WATCHDOG_MAX_FAILURES} consecutive health check failures — notifying owner`);
+        try {
+          await bot.telegram.sendMessage(config.ownerUserId,
+            `[WATCHDOG] JARVIS health degraded — ${WATCHDOG_MAX_FAILURES} consecutive self-ping failures. Investigating...`
+          );
+        } catch { /* can't notify if bot itself is broken */ }
+      }
+    }, WATCHDOG_INTERVAL);
+    console.log('[jarvis] Watchdog armed (60s self-ping interval)');
+  }
+
   // HTTP health endpoint for cloud platforms (Fly.io, Railway, etc.)
   if (config.isDocker || process.env.HEALTH_PORT) {
     const healthPort = parseInt(process.env.HEALTH_PORT || '8080');

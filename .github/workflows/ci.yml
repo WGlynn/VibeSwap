@@ -70,6 +70,36 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # ============ Jarvis Bot ============
+  jarvis:
+    name: Jarvis Bot Import Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jarvis-bot
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: jarvis-bot/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate all tool module imports
+        run: |
+          node -e "await import('./src/tools-vibeswap.js'); console.log('tools-vibeswap OK')"
+          node -e "await import('./src/tools-portfolio.js'); console.log('tools-portfolio OK')"
+          node -e "await import('./src/tools-research.js'); console.log('tools-research OK')"
+          node -e "await import('./src/tools-dev.js'); console.log('tools-dev OK')"
+          node -e "await import('./src/tools-education.js'); console.log('tools-education OK')"
+          node -e "await import('./src/web-api.js'); console.log('web-api OK')"
+          echo "All modules validated"
+
   # ============ Smart Contracts ============
   contracts:
     name: Smart Contract Tests

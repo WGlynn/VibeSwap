@@ -885,6 +885,13 @@ FUN
   /gm /gmboard /fact /today
   /dog /cat /advice
 
+VOICE
+  /speak <text> — JARVIS speaks out loud
+
+REMOTE (Owner Only)
+  /relay <instruction> — Send command to active code session
+  /relay_status — View pending relay commands
+
 SYSTEM
   /mi_status — MI cell status & telemetry
   /mi_signals [N] — Recent signal history

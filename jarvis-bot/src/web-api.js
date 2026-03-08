@@ -13,6 +13,7 @@
 
 import { config } from './config.js';
 import { chat } from './claude.js';
+import { speak as jarvisSpeak, cleanup as ttsCleanup } from './tts.js';
 import { getChainStats } from './knowledge-chain.js';
 import { getShardInfo, isMultiShard } from './shard.js';
 import { getTopology } from './router.js';
@@ -538,6 +539,9 @@ export async function handleWebRequest(req, res, pathname) {
 
       const result = submitProof(authenticatedUserId, nonce, hash, challenge);
       const status = result.accepted ? 200 : 400;
+      if (!result.accepted) {
+        console.log(`[mining] Proof rejected for ${authenticatedUserId}: ${result.reason || 'unknown'} (IP: ${ip})`);
+      }
       jsonResponse(res, status, result);
     } catch (err) {
       console.error('[web-api] Mining submit error:', err.message);
@@ -794,6 +798,46 @@ export async function handleWebRequest(req, res, pathname) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
         res.end();
       } catch { res.end(); }
+    }
+    return true;
+  }
+
+  // ============ POST /web/tts ============
+  // Text-to-speech — returns MP3 audio of JARVIS speaking the given text
+  if (pathname === '/web/tts' && req.method === 'POST') {
+    if (!checkRateLimit(ip)) {
+      jsonResponse(res, 429, { error: 'Rate limited.' });
+      return true;
+    }
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { text } = body;
+      if (!text || typeof text !== 'string' || text.length > 5000) {
+        jsonResponse(res, 400, { error: 'Missing or invalid text (max 5000 chars)' });
+        return true;
+      }
+
+      const voicePath = await jarvisSpeak(text, 'web');
+      if (!voicePath) {
+        jsonResponse(res, 503, { error: 'Voice synthesis unavailable' });
+        return true;
+      }
+
+      // Read the MP3 file and return as binary
+      const { readFile } = await import('fs/promises');
+      const audioBuffer = await readFile(voicePath);
+      await ttsCleanup(voicePath);
+
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length,
+        'Access-Control-Allow-Origin': req.headers.origin || '*',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(audioBuffer);
+    } catch (err) {
+      console.error('[web-api] TTS error:', err.message);
+      jsonResponse(res, 500, { error: 'Voice generation failed' });
     }
     return true;
   }

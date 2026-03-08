@@ -225,6 +225,7 @@ import { processWebLinks } from './web-reader.js';
 import { initUserMemory, getUserMemoryContext, extractAndStoreMemories, flushUserMemory } from './user-memory.js';
 import { initTimeAwareness, getTimeContext, detectTimezone, setUserTimezone, flushTimezones } from './time-awareness.js';
 import { initAttribution, autoAttributeContent, attributeSource, detectTextAttribution, attributeAgent, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
+import { initRelay, addRelayCommand, getPendingCommands, acknowledgeAll, flushRelay } from './relay.js';
 
 // ============ Group Chat Text Sanitizer ============
 // Strip markdown formatting from group responses — bots should talk in plain text
@@ -735,6 +736,39 @@ bot.command('speak', async (ctx) => {
     console.error('[speak] Error:', err.message);
     await ctx.reply(`Voice generation failed: ${err.message}`);
   }
+});
+
+// /relay — Send a command to the active Claude Code session from mobile
+bot.command('relay', async (ctx) => {
+  // Owner-only
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Only the owner can relay commands to the code session.');
+  }
+  const command = ctx.message.text.replace(/^\/relay\s*/i, '').trim();
+  if (!command) {
+    return ctx.reply('Usage: /relay <instruction>\n\nSends a command to the active Claude Code session on your desktop.\n\nExamples:\n/relay fix the mining bug\n/relay deploy to fly.io\n/relay run the tests');
+  }
+  const entry = addRelayCommand({
+    userId: ctx.from.id,
+    username: ctx.from.username || ctx.from.first_name,
+    command,
+    priority: command.toLowerCase().includes('urgent') ? 'urgent' : 'normal',
+  });
+  await flushRelay();
+  await ctx.reply(`Command queued.\n\nID: ${entry.id}\nPriority: ${entry.priority}\n\nClaude Code will pick this up in the next session or active poll.`);
+});
+
+// /relay_status — Check pending relay commands
+bot.command('relay_status', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) return;
+  const pending = getPendingCommands();
+  if (pending.length === 0) {
+    return ctx.reply('No pending relay commands. All caught up.');
+  }
+  const lines = pending.map((c, i) =>
+    `${i + 1}. [${c.priority}] "${c.command.slice(0, 60)}${c.command.length > 60 ? '...' : ''}"\n   ${new Date(c.timestamp).toLocaleString()}`
+  );
+  await ctx.reply(`Pending relay commands (${pending.length}):\n\n${lines.join('\n\n')}`);
 });
 
 // /help — Command reference
@@ -5429,6 +5463,7 @@ async function main() {
   await initUserMemory();
   await initTimeAwareness();
   await initAttribution();
+  await initRelay();
   await initLimni();
   registerKataraktiStrategies();
   // Wire Limni alerts to owner's Telegram DM
@@ -6456,6 +6491,7 @@ async function main() {
       ['user-memory', flushUserMemory],
       ['timezones', flushTimezones],
       ['attribution', flushAttribution],
+      ['relay', flushRelay],
     ];
 
     let flushed = 0;

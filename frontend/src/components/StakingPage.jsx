@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useProtocolStats } from '../hooks/useProtocolStats'
 
 // ============================================================
 // Staking Page — Multi-pool with lock tiers
+// Lock tier APYs are from contract parameters (not fake)
+// TVL/staker counts show -- until contracts are deployed
 // ============================================================
 
 const LOCK_TIERS = [
@@ -15,15 +18,16 @@ const LOCK_TIERS = [
 ]
 
 const POOLS = [
-  { name: 'ETH Staking', token: 'ETH', tvl: '4,200 ETH', stakers: 890, baseAPY: '8%' },
-  { name: 'JUL Staking', token: 'JUL', tvl: '2.1M JUL', stakers: 1240, baseAPY: '12%' },
-  { name: 'LP Staking', token: 'LP-NFT', tvl: '680 LP', stakers: 340, baseAPY: '18%' },
+  { name: 'ETH Staking', token: 'ETH', tvl: '--', stakers: '--', baseAPY: '8%' },
+  { name: 'JUL Staking', token: 'JUL', tvl: '--', stakers: '--', baseAPY: '12%' },
+  { name: 'LP Staking', token: 'LP-NFT', tvl: '--', stakers: '--', baseAPY: '18%' },
 ]
 
 export default function StakingPage() {
   const { isConnected: isExternalConnected } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const { formatTvl, totalStaked, stakerCount, rewardsPaid } = useProtocolStats()
   const [selectedTier, setSelectedTier] = useState(1)
   const [amount, setAmount] = useState('')
 
@@ -41,9 +45,9 @@ export default function StakingPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Total Staked', value: '$18.2M' },
-          { label: 'Stakers', value: '2,470' },
-          { label: 'Rewards Paid', value: '$1.4M' },
+          { label: 'Total Staked', value: totalStaked ? formatTvl(totalStaked) : '--' },
+          { label: 'Stakers', value: stakerCount || '--' },
+          { label: 'Rewards Paid', value: rewardsPaid ? formatTvl(rewardsPaid) : '--' },
         ].map((s) => (
           <div key={s.label} className="text-center p-3 bg-black-800/40 border border-black-700/50 rounded-lg">
             <div className="text-white font-mono font-bold">{s.value}</div>

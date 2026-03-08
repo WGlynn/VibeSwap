@@ -71,6 +71,7 @@ const PredictionMarket = lazy(() => import('./components/PredictionMarket'))
 const PortfolioDashboard = lazy(() => import('./components/PortfolioDashboard'))
 const StatusDashboard = lazy(() => import('./components/StatusDashboard'))
 const MedicineWheel = lazy(() => import('./components/MedicineWheel'))
+const AbstractionLadder = lazy(() => import('./components/AbstractionLadder'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -126,6 +127,7 @@ function AnimatedRoutes() {
             <Route path="/portfolio" element={<PortfolioDashboard />} />
             <Route path="/status" element={<StatusDashboard />} />
             <Route path="/wheel" element={<MedicineWheel />} />
+            <Route path="/abstraction" element={<AbstractionLadder />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

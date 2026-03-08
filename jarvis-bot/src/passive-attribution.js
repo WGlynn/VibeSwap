@@ -558,6 +558,127 @@ function extractAuthorFromUrl(url) {
   }
 }
 
+// ============ Text-Based Attribution Detection ============
+//
+// When someone pastes content with attribution signals (e.g., "Licho, 2023-10-17"
+// or "by @username" or "from r/ethereum"), detect and auto-attribute.
+// This catches cases where content is shared WITHOUT a URL (pasted text, quotes).
+
+const ATTRIBUTION_PATTERNS = [
+  // "Author, YYYY-MM-DD" or "Author (YYYY)"
+  /^([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*),?\s*(?:\(?\d{4}(?:-\d{2}(?:-\d{2})?)?\)?)/m,
+  // "by @username" or "by Username"
+  /\bby\s+@?([a-zA-Z][\w.-]{1,30})\b/i,
+  // "— Author" or "- Author" (em dash attribution)
+  /[—–-]\s*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\s*$/m,
+  // "Source: Author" or "Author:" at start of line
+  /^(?:Source|Author|Credit|From|Via):\s*(.+?)$/im,
+  // "r/subreddit" standalone
+  /\b(r\/\w{2,21})\b/,
+  // "@handle on Twitter/X"
+  /@(\w{1,15})\s+on\s+(?:Twitter|X)\b/i,
+];
+
+/**
+ * Scan a text message for attribution signals and auto-record sources.
+ * Called on every message processed by JARVIS — lightweight regex scan.
+ *
+ * @param {string} text - Message text to scan
+ * @param {string} [senderId] - Who sent this message (for context, not attribution)
+ * @returns {object|null} Recorded source, or null if no attribution detected
+ */
+export function detectTextAttribution(text) {
+  if (!text || text.length < 10) return null;
+
+  for (const pattern of ATTRIBUTION_PATTERNS) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const author = match[1].trim();
+      // Skip common false positives
+      if (['The', 'This', 'That', 'Here', 'What', 'How', 'Why', 'When', 'Where', 'Yes', 'No'].includes(author)) continue;
+      if (author.length < 2 || author.length > 50) continue;
+
+      // Determine type from context
+      let type = SourceType.CONVERSATION;
+      if (author.startsWith('r/')) type = SourceType.SOCIAL;
+      if (text.length > 500) type = SourceType.BLOG; // Long pasted content is likely an article
+
+      return recordSource({
+        author,
+        type,
+        title: text.slice(0, 80).replace(/\n/g, ' ').trim(),
+        contentHash: hashContent(text.slice(0, 2000)),
+        metadata: {
+          autoDetected: true,
+          detectionMethod: 'text-pattern',
+          textLength: text.length,
+          processedAt: new Date().toISOString(),
+        },
+      });
+    }
+  }
+  return null;
+}
+
+// ============ Agent-to-Agent Attribution ============
+//
+// When another AI agent (OpenClaw, ChatGPT, etc.) interacts with JARVIS
+// and provides knowledge, the agent gets attributed.
+
+/**
+ * Record an AI agent as a knowledge source.
+ * Used when JARVIS receives information from other AI agents.
+ *
+ * @param {object} params
+ * @param {string} params.agentName - Name of the AI agent
+ * @param {string} [params.agentId] - Unique agent identifier
+ * @param {string} [params.platform] - Platform (e.g., 'telegram', 'discord', 'api')
+ * @param {string} params.contribution - What the agent contributed
+ * @returns {object} Recorded source
+ */
+export function attributeAgent({ agentName, agentId, platform, contribution }) {
+  return recordSource({
+    author: agentName,
+    authorId: agentId || `agent:${agentName.toLowerCase()}`,
+    type: SourceType.CONVERSATION,
+    title: contribution.slice(0, 100),
+    metadata: {
+      isAgent: true,
+      platform: platform || 'unknown',
+      autoDetected: true,
+      processedAt: new Date().toISOString(),
+    },
+  });
+}
+
+// ============ Code Session Attribution ============
+//
+// Record attribution from Claude Code sessions.
+// When a session references external work, the reference is tracked.
+
+/**
+ * Record a code session's knowledge absorption.
+ * Called by the seed scripts or mid-session when external sources are referenced.
+ *
+ * @param {object} params
+ * @param {string} params.sessionId - Session identifier
+ * @param {string} params.author - Who the knowledge came from
+ * @param {string} params.work - What work was informed
+ * @param {string} [params.sourceTitle] - Title of the referenced work
+ * @param {string} [params.sourceUrl] - URL if available
+ * @returns {{ sourceId: string, derivationId: string }}
+ */
+export function attributeFromSession({ sessionId, author, work, sourceTitle, sourceUrl }) {
+  return attributeSource({
+    author,
+    url: sourceUrl,
+    type: sourceUrl ? SourceType.CODE : SourceType.SESSION,
+    title: sourceTitle || `${author}'s contribution`,
+    informedWork: work,
+    sessionId,
+  });
+}
+
 // ============ Graph Stats ============
 
 export function getGraphStats() {

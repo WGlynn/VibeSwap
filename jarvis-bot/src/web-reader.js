@@ -51,11 +51,29 @@ function extractTitle(html) {
  * Extract author from HTML meta tags (og:author, twitter:creator, article:author, author).
  */
 function extractAuthor(html) {
+  // Try JSON-LD structured data first (most reliable)
+  const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (jsonLdMatch) {
+    try {
+      const ld = JSON.parse(jsonLdMatch[1]);
+      const authorObj = ld.author || ld[0]?.author;
+      if (authorObj) {
+        const name = typeof authorObj === 'string' ? authorObj
+          : Array.isArray(authorObj) ? authorObj[0]?.name
+          : authorObj.name;
+        if (name && name.length < 100) return name.trim();
+      }
+    } catch { /* malformed JSON-LD, fall through */ }
+  }
+
+  // Meta tag patterns
   const patterns = [
     /<meta[^>]*(?:name|property)=["'](?:author|article:author|og:author|twitter:creator)["'][^>]*content=["']([^"']+)["']/i,
     /<meta[^>]*content=["']([^"']+)["'][^>]*(?:name|property)=["'](?:author|article:author|og:author|twitter:creator)["']/i,
     /<a[^>]*class=["'][^"']*author[^"']*["'][^>]*>([^<]+)</i,
     /<span[^>]*class=["'][^"']*author[^"']*["'][^>]*>([^<]+)</i,
+    // rel="author" link
+    /<a[^>]*rel=["']author["'][^>]*>([^<]+)</i,
   ];
   for (const re of patterns) {
     const match = html.match(re);

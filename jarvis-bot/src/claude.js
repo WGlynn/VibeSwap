@@ -1954,6 +1954,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       inputLength: messageText?.length || 0,
       outputLength: assistantMessage?.length || 0,
       userName,
+      provider: response?._provider || 'unknown',
+      model: response?._model || 'unknown',
     });
 
     // Cross-chat context symmetry: extract user-specific context from conversation

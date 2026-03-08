@@ -1312,7 +1312,11 @@ function getProviderConfig(providerName) {
 //   moderate → mid tier (DeepSeek/Gemini) — conversation, explanations, summaries
 //   complex  → premium (Claude) — reasoning, code, tools, long-form analysis
 
-const SIMPLE_PATTERNS = /^(hey|hi|hello|yo|sup|gm|gn|gg|lol|lmao|ok|okay|sure|thanks|ty|thx|bet|word|facts|based|fr|w |l |nice|cool|dope|sick|fire|mid|nah|yep|yea|yeah|yes|no|nope|what'?s? ?(up|good|poppin)|how are you|who are you|what'?s? your name|good (morning|night|evening)|wagmi|ngmi|wen |gm fam|send it)\b/i;
+// Bare greetings — truly zero-effort, route to free tier
+const SIMPLE_PATTERNS = /^(hey|hi|hello|yo|sup|gm|gn|gg|lol|lmao|ok|okay|sure|thanks|ty|thx|bet|word|facts|based|fr|w |l |nice|cool|dope|sick|fire|mid|nah|yep|yea|yeah|yes|no|nope|good (morning|night|evening))\b/i;
+
+// Warm greetings — social energy, deserve personality even from standard JARVIS
+const WARM_GREETING_PATTERNS = /^(gm fam|gm frens?|yo what'?s? ?(up|good|poppin)|wagmi|ngmi|send it|what'?s? your name|who are you|how are you|wen )/i;
 
 const COMPLEX_SIGNALS = /```|contract |function |error |bug |debug|implement|refactor|analyze|compare|explain .{80,}|write a |build |create a |design |architect|security|audit|vulnerabil|exploit|smart contract|solidity|rust |python |javascript/i;
 
@@ -1335,9 +1339,14 @@ function classifyComplexity(request) {
 
   const len = text.length;
 
+  // Warm greetings — social energy, route to moderate for personality
+  if (len < 80 && WARM_GREETING_PATTERNS.test(text)) {
+    return 'moderate';
+  }
+
   // Short + matches simple patterns → free tier (unless persona wants personality)
   if (len < 80 && SIMPLE_PATTERNS.test(text)) {
-    // In degen mode, even simple messages deserve wit — route to moderate
+    // In degen mode, even bare greetings deserve wit — route to moderate
     try {
       if (_getPersonaId?.() === 'degen') return 'moderate';
     } catch {}

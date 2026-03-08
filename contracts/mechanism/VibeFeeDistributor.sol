@@ -7,11 +7,22 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 /**
  * @title VibeFeeDistributor — Protocol Fee Revenue Sharing
- * @notice Collects all protocol fees and distributes them to stakers
+ * @notice Collects NON-SWAP protocol fees and distributes them to stakers
  *         proportionally every epoch (1 week).
  *
+ * IMPORTANT: Swap fees go directly to LPs — that's the fairness guarantee.
+ * This contract only handles protocol-level revenue from:
+ *   - Priority auction bids (commit-reveal batch ordering)
+ *   - Flash loan fees (VibeFlashLoanProvider)
+ *   - OTC desk fees (VibeOTC, 0.25%)
+ *   - Name service registrations (VibeNameService)
+ *   - Insurance premium overflow
+ *   - Launchpad listing fees
+ *   - NFT marketplace platform fees
+ *   - Subscription platform fees
+ *
  * Distribution:
- * - 60% → Stakers (pro-rata by staked amount)
+ * - 60% → VIBE Stakers (pro-rata by staked amount)
  * - 20% → Treasury (DAO controlled)
  * - 10% → Insurance pool (risk buffer)
  * - 10% → Development fund (ongoing dev)

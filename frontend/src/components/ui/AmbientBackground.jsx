@@ -149,8 +149,24 @@ function AmbientBackground() {
         <circle cx="100" cy="100" r="40" fill="none" stroke="#00ff41" strokeWidth="0.2" />
         <circle cx="100" cy="100" r="60" fill="none" stroke="#00ff41" strokeWidth="0.1" />
       </svg>
+      {/* Aurora borealis layer */}
+      <div className="fixed inset-0 pointer-events-none z-0 aurora-glow" />
       {/* CSS grid overlay */}
       <div className="fixed inset-0 pointer-events-none z-0 ambient-grid" />
+      {/* Floating particles */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 rounded-full bg-matrix-500/20"
+            style={{
+              left: `${(i * 8.33) + Math.random() * 5}%`,
+              animation: `float-up ${15 + i * 3}s linear infinite`,
+              animationDelay: `${i * -2.5}s`,
+            }}
+          />
+        ))}
+      </div>
     </>
   )
 }

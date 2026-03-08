@@ -54,8 +54,8 @@ function GlassCard({
     : 'rgba(37,37,37,1)'
 
   const boxShadow = isHovered && hover
-    ? `0 8px 32px rgba(0,0,0,0.4), 0 0 30px -5px ${GLOW_MAP[glowColor]}`
-    : `0 2px 8px rgba(0,0,0,0.2)`
+    ? `0 8px 32px rgba(0,0,0,0.4), 0 0 30px -5px ${GLOW_MAP[glowColor]}, 0 0 60px -15px ${GLOW_MAP[glowColor]}, inset 0 1px 0 rgba(255,255,255,0.03)`
+    : `0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.02)`
 
   const spotlightBg = spotlight && isHovered
     ? `radial-gradient(circle at ${spotlightPos.x}% ${spotlightPos.y}%, rgba(255,255,255,0.03) 0%, transparent 50%)`
@@ -76,16 +76,20 @@ function GlassCard({
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       {...props}
     >
-      {/* Diagonal gradient overlay + spotlight */}
+      {/* Diagonal gradient overlay + spotlight + holographic edge */}
       <div
         className="absolute inset-0 pointer-events-none z-0"
         style={{
           background: `
-            linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%, rgba(0,0,0,0.05) 100%),
+            linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 40%, rgba(0,0,0,0.06) 100%),
             ${spotlightBg}
           `,
         }}
       />
+      {/* Holographic edge shimmer */}
+      {isHovered && glowColor !== 'none' && (
+        <div className="absolute inset-0 pointer-events-none z-0 holo-shimmer rounded-2xl" />
+      )}
       {/* Content */}
       <div className="relative z-10">
         {children}

@@ -44,7 +44,7 @@ function HeaderMinimal() {
         style={{
           paddingTop: 'env(safe-area-inset-top)',
           background: 'rgba(0,0,0,0.6)',
-          boxShadow: '0 1px 0 0 rgba(0,255,65,0.08), 0 4px 20px rgba(0,0,0,0.3)',
+          boxShadow: '0 1px 0 0 rgba(0,255,65,0.08), 0 4px 20px rgba(0,0,0,0.3), inset 0 -1px 0 rgba(0,255,65,0.03)',
         }}
       >
         <div className="max-w-7xl mx-auto px-4">
@@ -56,7 +56,7 @@ function HeaderMinimal() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <span className="font-bold text-lg hidden sm:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-matrix-300 to-white">VIBESWAP</span>
+              <span className="font-bold text-lg hidden sm:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-matrix-300 to-white text-5d">VIBESWAP</span>
             </Link>
 
             {/* Right side */}

@@ -472,6 +472,246 @@ input[type="number"] {
   @apply text-white;
 }
 
+/* ============================================
+   5D DIMENSIONAL EFFECTS
+   ============================================ */
+
+/* Aurora Borealis — ethereal color bands */
+@keyframes aurora {
+  0%, 100% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg);
+  }
+  25% {
+    background-position: 50% 100%;
+    filter: hue-rotate(15deg);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: hue-rotate(-10deg);
+  }
+  75% {
+    background-position: 50% 0%;
+    filter: hue-rotate(5deg);
+  }
+}
+
+.aurora-glow {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 255, 65, 0.03) 0%,
+    rgba(0, 212, 255, 0.02) 25%,
+    rgba(0, 255, 120, 0.03) 50%,
+    rgba(0, 180, 255, 0.02) 75%,
+    rgba(0, 255, 65, 0.03) 100%
+  );
+  background-size: 400% 400%;
+  animation: aurora 30s ease-in-out infinite;
+}
+
+/* Holographic shimmer on hover */
+@keyframes holographic {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.holo-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.holo-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(0, 255, 65, 0.03) 45%,
+    rgba(0, 212, 255, 0.05) 50%,
+    rgba(0, 255, 65, 0.03) 55%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: holographic 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Depth perspective — cards that feel 3D */
+.perspective-container {
+  perspective: 1000px;
+}
+
+.depth-card {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.618, 1);
+}
+
+.depth-card:hover {
+  transform: translateZ(8px) rotateX(1deg) rotateY(-1deg);
+  box-shadow:
+    0 4px 16px rgba(0, 255, 65, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Breathing glow — alive indicator */
+@keyframes glow-breathe {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(0, 255, 65, 0.2),
+                0 0 8px rgba(0, 255, 65, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.3),
+                0 0 16px rgba(0, 255, 65, 0.15),
+                0 0 32px rgba(0, 255, 65, 0.05);
+  }
+}
+
+.animate-glow-breathe {
+  animation: glow-breathe 4s ease-in-out infinite;
+}
+
+/* Dimensional text — subtle 3D extrusion */
+.text-5d {
+  text-shadow:
+    0 1px 0 rgba(0, 255, 65, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(0, 255, 65, 0.05);
+}
+
+/* Grid warp — perspective grid floor */
+@keyframes grid-scroll {
+  0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+  100% { transform: perspective(500px) rotateX(60deg) translateY(40px); }
+}
+
+.ambient-grid {
+  background-image:
+    linear-gradient(rgba(0, 255, 65, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Particle float — for ambient particle overlay */
+@keyframes float-up {
+  0% {
+    transform: translateY(100vh) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-10vh) scale(1);
+    opacity: 0;
+  }
+}
+
+/* Scanline effect — subtle CRT nostalgia */
+.scanlines::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Noise texture overlay */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Energy ripple — on click/tap */
+@keyframes ripple-5d {
+  0% {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-5d {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 255, 65, 0.2), transparent);
+  animation: ripple-5d 0.8s cubic-bezier(0, 0, 0.618, 1) forwards;
+  pointer-events: none;
+}
+
+/* Dimensional border — multi-layer glow */
+.border-5d {
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  box-shadow:
+    inset 0 0 8px rgba(0, 255, 65, 0.03),
+    0 0 8px rgba(0, 255, 65, 0.03),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.border-5d:hover {
+  border-color: rgba(0, 255, 65, 0.25);
+  box-shadow:
+    inset 0 0 12px rgba(0, 255, 65, 0.05),
+    0 0 16px rgba(0, 255, 65, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Matrix rain character effect */
+@keyframes matrix-fall {
+  0% {
+    transform: translateY(-100%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+/* Vortex spin — for loading states */
+@keyframes vortex {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(0.95); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.animate-vortex {
+  animation: vortex 3s cubic-bezier(0.25, 0.1, 0.618, 1) infinite;
+}
+
+/* Golden ratio spiral path */
+@keyframes golden-spiral {
+  0% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(90deg) translateX(2px); }
+  50% { transform: rotate(180deg) translateX(3px); }
+  75% { transform: rotate(270deg) translateX(2px); }
+  100% { transform: rotate(360deg) translateX(0); }
+}
+
+.animate-golden-spiral {
+  animation: golden-spiral 8s linear infinite;
+}
+
 .glow-vibe,
 .glow-cyber,
 .glow-success {

@@ -952,11 +952,23 @@ export async function buildKnowledgeContext(userId, chatId, chatType, messageTex
   const parts = [];
   const now = Date.now();
 
+  // ---- Load user + group CKB in PARALLEL (was sequential — 200-400ms saved) ----
+  const [userCKB, groupCKB] = await Promise.all([
+    loadUserCKB(userId),
+    chatType !== 'private' ? loadGroupCKB(chatId) : Promise.resolve(null),
+  ]);
+
   // ---- Per-user CKB (dyadic) ----
-  const userCKB = await loadUserCKB(userId);
   if (userCKB.facts.length > 0) {
-    // Run apoptosis before building context (archives pruned facts to L2)
-    userCKB.facts = await apoptosis(userCKB.facts, userCKB.tokenBudget, userId);
+    // Run apoptosis with timeout — defer if slow (>300ms)
+    try {
+      userCKB.facts = await Promise.race([
+        apoptosis(userCKB.facts, userCKB.tokenBudget, userId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('apoptosis timeout')), 300)),
+      ]);
+    } catch {
+      // Apoptosis slow — skip, defer to next message
+    }
 
     const ckbLabel = userCKB.username
       ? `Jarvisx${userCKB.username}`
@@ -999,11 +1011,16 @@ export async function buildKnowledgeContext(userId, chatId, chatType, messageTex
     dirty = true;
   }
 
-  // ---- Per-group CKB ----
-  if (chatType !== 'private') {
-    const groupCKB = await loadGroupCKB(chatId);
-    if (groupCKB.facts.length > 0) {
-      groupCKB.facts = await apoptosis(groupCKB.facts, groupCKB.tokenBudget);
+  // ---- Per-group CKB (already loaded in parallel above) ----
+  if (groupCKB && groupCKB.facts.length > 0) {
+    {
+      try {
+        groupCKB.facts = await Promise.race([
+          apoptosis(groupCKB.facts, groupCKB.tokenBudget),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('apoptosis timeout')), 300)),
+        ]);
+      } catch {}
+    }
 
       const groupLabel = groupCKB.groupName || `Group${chatId}`;
       const occupation = computeCKBOccupation(groupCKB.facts);
@@ -1037,7 +1054,6 @@ export async function buildKnowledgeContext(userId, chatId, chatType, messageTex
       parts.push('');
       dirty = true;
     }
-  }
 
   // ---- Inner Dialogue (Self-Reflection) ----
   const innerContext = buildInnerDialogueContext();
@@ -1056,7 +1072,13 @@ export async function buildKnowledgeContext(userId, chatId, chatType, messageTex
   if (skills.length > 0) {
     // Coordinated apoptosis: multi-shard proposes pruning via BFT,
     // single-shard applies directly. User/group CKBs are local-only (no change).
-    await runSkillApoptosis();
+    // Timeout skill apoptosis — BFT consensus can be slow
+    try {
+      await Promise.race([
+        runSkillApoptosis(),
+        new Promise((_, reject) => setTimeout(() => reject(), 300)),
+      ]);
+    } catch {}
 
     const skillTokens = computeCKBOccupation(skills);
     parts.push(`--- NETWORK KNOWLEDGE: Skills (${skillTokens}/${ECONOMICS.SKILL_BUDGET} tokens) ---`);

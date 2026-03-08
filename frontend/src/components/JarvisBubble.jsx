@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useJarvis } from '../hooks/useJarvis'
 import { remember } from '../utils/sankofa'
@@ -13,6 +14,7 @@ export default function JarvisBubble() {
   const { messages, isLoading, sendMessage, health, budget, voiceMode, toggleVoice, isSpeaking, speakText } = useJarvis()
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (isOpen) {
@@ -117,7 +119,9 @@ export default function JarvisBubble() {
                     className={`max-w-[85%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
                       msg.role === 'user'
                         ? 'bg-matrix-600/20 text-white border border-matrix-700/30'
-                        : 'bg-black-800 text-black-200 border border-black-700'
+                        : msg.budgetExceeded
+                          ? 'bg-amber-900/30 text-amber-200 border border-amber-700/50'
+                          : 'bg-black-800 text-black-200 border border-black-700'
                     } ${msg.role === 'jarvis' && voiceMode ? 'cursor-pointer hover:border-matrix-600/50' : ''}`}
                     onClick={() => {
                       if (msg.role === 'jarvis' && voiceMode && msg.text) speakText(msg.text)
@@ -125,6 +129,21 @@ export default function JarvisBubble() {
                     title={msg.role === 'jarvis' && voiceMode ? 'Click to hear' : undefined}
                   >
                     {msg.text || msg.content}
+                    {msg.budgetExceeded && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setIsOpen(false)
+                          navigate('/mine')
+                        }}
+                        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-matrix-600 hover:bg-matrix-500 text-black-900 font-bold text-xs rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Mine JUL for Extra Compute
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

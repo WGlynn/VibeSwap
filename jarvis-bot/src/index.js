@@ -532,16 +532,24 @@ function friendlyError(error) {
 }
 
 // ============ Ephemeral Error Reply ============
-// Send error message, log it for debugging, auto-delete after delay.
-// Good data for antifragility, bad UX if left visible.
-const ERROR_DELETE_DELAY = 15_000; // 15s — enough time to read, then clean up
+// DM error to owner for debugging, show briefly in chat then auto-delete.
+// Good data for antifragility, clean UX in group chats.
+const ERROR_DELETE_DELAY = 10_000; // 10s — enough to notice, then clean up
 
 async function ephemeralReply(ctx, text, opts = {}) {
   try {
+    // DM the full error to owner for debugging
+    const chatInfo = ctx.chat?.title || ctx.chat?.id || 'DM';
+    const userInfo = ctx.from?.username || ctx.from?.id || 'unknown';
+    try {
+      await bot.telegram.sendMessage(config.ownerUserId,
+        `[Error in ${chatInfo}] from @${userInfo}:\n${text}`
+      );
+    } catch {}
+
+    // Show briefly in chat, then delete
     const sent = await ctx.reply(text, opts);
-    // Log for debugging before deletion
     console.log(`[ephemeral] chatId=${ctx.chat?.id} error="${text.slice(0, 120)}"`);
-    // Schedule auto-delete
     setTimeout(async () => {
       try { await ctx.deleteMessage(sent.message_id); } catch {}
     }, ERROR_DELETE_DELAY);

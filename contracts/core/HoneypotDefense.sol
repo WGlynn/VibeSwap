@@ -403,4 +403,83 @@ contract HoneypotDefense {
         // Uses current block difficulty * multiplier
         return block.prevrandao * SHADOW_DIFFICULTY_MULTIPLIER;
     }
+
+    // ============ Resource Recycling (Extractors Get Extracted) ============
+
+    /// @notice Recycled resources from trapped attackers
+    uint256 public recycledStake;
+    uint256 public recycledFees;
+    uint256 public harvestedEntropy;
+
+    /// @notice Beneficiary addresses for recycled resources
+    address public insurancePool;
+    address public treasuryAddress;
+    address public entropyConsumer;    // VibeRNG address
+
+    event ResourcesRecycled(address indexed attacker, uint256 stakeRecycled, uint256 feesRecycled, uint256 entropyHarvested);
+    event RecycleTargetsSet(address insurance, address treasury, address entropy);
+
+    /**
+     * @notice Set recycling target addresses
+     */
+    function setRecycleTargets(
+        address _insurancePool,
+        address _treasury,
+        address _entropyConsumer
+    ) external onlySentinel {
+        insurancePool = _insurancePool;
+        treasuryAddress = _treasury;
+        entropyConsumer = _entropyConsumer;
+        emit RecycleTargetsSet(_insurancePool, _treasury, _entropyConsumer);
+    }
+
+    /**
+     * @notice Recycle captured attacker resources into the network
+     * @dev The extractors get extracted. Attack resources strengthen the network.
+     *      - Slashed stake → 50% insurance pool, 50% treasury
+     *      - Shadow branch entropy → fed to VibeRNG
+     *      - The more they attack, the stronger we become
+     */
+    function recycleResources(address attacker) external onlySentinel {
+        AttackProfile storage profile = attackProfiles[attacker];
+        require(profile.level == ThreatLevel.REVEALED, "Not revealed yet");
+
+        uint256 stakeToRecycle = profile.stakeLocked;
+        uint256 feesToRecycle = profile.fakeRewardsShown; // Fees captured from shadow txs
+        uint256 entropy = profile.computeWasted;
+
+        if (stakeToRecycle > 0) {
+            profile.stakeLocked = 0;
+            recycledStake += stakeToRecycle;
+
+            // 50/50 split: insurance + treasury
+            uint256 half = stakeToRecycle / 2;
+            if (insurancePool != address(0)) {
+                (bool ok1, ) = insurancePool.call{value: half}("");
+                require(ok1, "Insurance transfer failed");
+            }
+            if (treasuryAddress != address(0)) {
+                (bool ok2, ) = treasuryAddress.call{value: stakeToRecycle - half}("");
+                require(ok2, "Treasury transfer failed");
+            }
+        }
+
+        recycledFees += feesToRecycle;
+        harvestedEntropy += entropy;
+
+        emit ResourcesRecycled(attacker, stakeToRecycle, feesToRecycle, entropy);
+    }
+
+    /**
+     * @notice Get total recycled value from all attacks
+     * @dev Shows how much attackers have involuntarily donated to the network
+     */
+    function getTotalRecycled() external view returns (
+        uint256 stake_,
+        uint256 fees_,
+        uint256 entropy_,
+        string memory message
+    ) {
+        return (recycledStake, recycledFees, harvestedEntropy, "The extractors got extracted.");
+    }
 }

@@ -108,7 +108,7 @@ import { getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapl
 import { getPortfolio as getWalletPortfolio, getTokenBalances, getTransactionHistory, getNFTs, getDefiPositions, trackWallet, getTrackedWallets, getWhaleAlerts } from './tools-portfolio.js';
 import { getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernanceActivity, getGitHubActivity, getOnChainMetrics, getCorrelationAnalysis, getMarketRegime } from './tools-research.js';
 import { getGasTracker, getContractInfo, decodeTx, getLatestBlock as getDevBlock, resolveENS as resolveENSDev, checksumAddress, getContractABI, getNpmInfo, getCrateInfo } from './tools-dev.js';
-import { explainConcept, getGlossary, getVibeSwapExplainer, getTutorial, getCryptoCalendar, getDailyChallenge, getProtocolTimeline, getStreak, getLeaderboard as getEduLeaderboard } from './tools-education.js';
+import { explainConcept, getGlossary, getVibeSwapExplainer, getTutorial, getCryptoCalendar, getCryptoQuiz, compareTokens as compareTokensEdu, getFearGreedIndex as getFearEdu, getDominance as getDominanceEdu, getBitcoinEpoch } from './tools-education.js';
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
@@ -3201,37 +3201,32 @@ bot.command('explain', async (ctx) => {
   if (!concept) return ctx.reply('Usage: /explain impermanent loss\n\nELI5 crypto concepts.');
   ctx.reply(await explainConcept(concept));
 });
-bot.command('glossary', (ctx) => {
+bot.command('glossary', async (ctx) => {
   const term = ctx.message.text.replace(/^\/glossary(@\w+)?/i, '').trim();
   if (!term) return ctx.reply('Usage: /glossary TVL\n\nLook up crypto terminology.');
-  ctx.reply(getGlossary(term));
+  ctx.reply(await getGlossary(term));
 });
-bot.command('vibeswap', (ctx) => {
-  const topic = ctx.message.text.replace(/^\/vibeswap(@\w+)?/i, '').trim() || undefined;
-  ctx.reply(getVibeSwapExplainer(topic));
+bot.command('vibeswap', async (ctx) => {
+  ctx.reply(await getVibeSwapExplainer());
 });
-bot.command('tutorial', (ctx) => {
+bot.command('tutorial', async (ctx) => {
   const topic = ctx.message.text.replace(/^\/tutorial(@\w+)?/i, '').trim() || 'start';
-  ctx.reply(getTutorial(topic));
+  ctx.reply(await getTutorial(topic));
 });
 bot.command('calendar', async (ctx) => {
   ctx.reply(await getCryptoCalendar());
 });
-bot.command('challenge', (ctx) => {
-  ctx.reply(getDailyChallenge());
+bot.command('quiz', async (ctx) => {
+  const topic = ctx.message.text.replace(/^\/quiz(@\w+)?/i, '').trim() || 'general';
+  ctx.reply(await getCryptoQuiz(topic));
 });
-bot.command('timeline', (ctx) => {
-  ctx.reply(getProtocolTimeline());
+bot.command('comparetokens', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/comparetokens(@\w+)?/i, '').trim().split(/\s+/);
+  if (args.length < 2) return ctx.reply('Usage: /comparetokens btc eth');
+  ctx.reply(await compareTokensEdu(args[0], args[1]));
 });
-bot.command('streak', (ctx) => {
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
-  const username = ctx.from.username || ctx.from.first_name;
-  ctx.reply(getStreak(chatId, userId, username));
-});
-bot.command('eduleaderboard', (ctx) => {
-  const chatId = ctx.chat.id;
-  ctx.reply(getEduLeaderboard(chatId));
+bot.command('epoch', async (ctx) => {
+  ctx.reply(await getBitcoinEpoch());
 });
 
 // ============ Developer Productivity Commands ============

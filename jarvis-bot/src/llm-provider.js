@@ -484,11 +484,12 @@ function createOpenAIProvider(providerConfig) {
             type: 'function',
             function: { name: b.name, arguments: JSON.stringify(b.input) },
           }));
-          result.push({
-            role: 'assistant',
-            content: textParts || null,
-            ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
-          });
+          const entry = { role: 'assistant' };
+          // Groq/some providers reject null content — omit if empty, or use empty string
+          if (textParts) entry.content = textParts;
+          else if (!toolCalls.length) entry.content = '';
+          if (toolCalls.length) entry.tool_calls = toolCalls;
+          result.push(entry);
         } else {
           result.push({ role: 'assistant', content: msg.content });
         }

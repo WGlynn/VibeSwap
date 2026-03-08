@@ -46,7 +46,7 @@ export default function StatusDashboard() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white font-mono">SYSTEM STATUS</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white font-mono text-5d">SYSTEM STATUS</h1>
         <div className="flex items-center justify-center mt-3 space-x-3">
           <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-matrix-500 animate-pulse' : 'bg-red-500'}`} />
           <span className={`text-sm font-mono font-bold ${isOnline ? 'text-matrix-400' : 'text-red-400'}`}>
@@ -68,7 +68,7 @@ export default function StatusDashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="p-3 rounded-xl bg-black-800/60 border border-black-700"
+            className="p-3 rounded-xl bg-black-800/60 border border-black-700 border-5d"
           >
             <p className="text-[10px] font-mono text-black-500 uppercase">{metric.label}</p>
             <p className={`text-sm font-mono font-bold mt-1 ${metric.ok ? 'text-matrix-400' : 'text-black-400'}`}>
@@ -88,7 +88,7 @@ export default function StatusDashboard() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="flex items-center justify-between p-4 rounded-xl bg-black-800/60 border border-black-700"
+              className="flex items-center justify-between p-4 rounded-xl bg-black-800/60 border border-black-700 depth-card"
             >
               <div className="flex items-center space-x-3">
                 <span className={`w-2.5 h-2.5 rounded-full ${

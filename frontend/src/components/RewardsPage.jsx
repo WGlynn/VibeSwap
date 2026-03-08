@@ -75,7 +75,7 @@ function RewardsPage() {
     <div className="max-w-6xl mx-auto px-4">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold">Your Earnings</h1>
+        <h1 className="text-2xl font-display font-bold text-5d">Your Earnings</h1>
         <p className="text-void-400 mt-1">Track what you've earned and your bonus rewards</p>
       </div>
 

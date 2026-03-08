@@ -53,7 +53,7 @@ function PoolPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Earn</h1>
+          <h1 className="text-2xl font-bold text-5d">Earn</h1>
           <p className="text-black-400 mt-1">Put your money to work and earn passive income</p>
           {/* Trust badge */}
           <div className="flex items-center space-x-2 mt-2">

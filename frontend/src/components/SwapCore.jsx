@@ -1177,8 +1177,8 @@ function SwapCore() {
             animate={{ opacity: 1, y: 0 }}
           >
           {/* From */}
-          <div className="p-4">
-            <div className="text-sm text-black-400 mb-2">You pay</div>
+          <div className="p-4 border-5d rounded-lg">
+            <div className="text-sm text-black-400 mb-2 text-5d">You pay</div>
             <div className="flex items-center space-x-3">
               <input
                 type="text"
@@ -1222,7 +1222,7 @@ function SwapCore() {
             <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
               <motion.button
                 onClick={switchTokens}
-                className="w-10 h-10 rounded-full bg-black-700 border-4 border-black-800 flex items-center justify-center hover:bg-black-600 transition-colors hover:shadow-glow-green-md"
+                className="w-10 h-10 rounded-full bg-black-700 border-4 border-black-800 flex items-center justify-center hover:bg-black-600 transition-colors hover:shadow-glow-green-md animate-glow-breathe"
                 whileHover={{ rotate: 180, scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 15 }}
@@ -1235,8 +1235,8 @@ function SwapCore() {
           </div>
 
           {/* To */}
-          <div className="p-4 bg-black-900/50">
-            <div className="text-sm text-black-400 mb-2">You receive</div>
+          <div className="p-4 bg-black-900/50 border-5d rounded-lg">
+            <div className="text-sm text-black-400 mb-2 text-5d">You receive</div>
             <div className="flex items-center space-x-3">
               <input
                 type="text"
@@ -1291,7 +1291,7 @@ function SwapCore() {
               onClick={handleSwap}
               disabled={isAnyWalletConnected && (!fromAmount || parseFloat(fromAmount) <= 0)}
               loading={isSwapping || swapLoading}
-              className="w-full py-4 text-lg"
+              className="w-full py-4 text-lg holo-shimmer"
             >
               {!isAnyWalletConnected ? 'Get Started' :
                !fromAmount ? 'Enter amount' :

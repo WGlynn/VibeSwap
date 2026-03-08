@@ -217,7 +217,7 @@ function VaultPage() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Savings Vault</h1>
+        <h1 className="text-2xl font-bold text-5d">Savings Vault</h1>
         <p className="text-black-400 mt-1">Long-term storage with extra security</p>
       </div>
 

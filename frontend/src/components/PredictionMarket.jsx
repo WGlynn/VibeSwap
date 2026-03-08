@@ -83,7 +83,7 @@ function MarketCard({ market, onBet }) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-black-800/60 border border-black-700 rounded-xl p-4 hover:border-black-600 transition-colors"
+      className="bg-black-800/60 border border-black-700 rounded-xl p-4 hover:border-black-600 transition-colors depth-card"
     >
       <div className="flex items-start justify-between mb-3">
         <h3 className="text-white text-sm font-medium leading-snug flex-1 mr-3">
@@ -176,7 +176,7 @@ function CreateMarketForm({ onCreated }) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Will BTC hit $100k by end of March?"
-          className="flex-1 bg-black-800 border border-black-600 rounded-lg px-4 py-2.5 text-sm text-white placeholder-black-500 focus:border-matrix-600 focus:outline-none font-mono"
+          className="flex-1 bg-black-800 border border-black-600 rounded-lg px-4 py-2.5 text-sm text-white placeholder-black-500 focus:border-matrix-600 focus:outline-none font-mono border-5d"
           maxLength={200}
           disabled={submitting}
         />
@@ -203,7 +203,7 @@ export default function PredictionMarket() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="text-center mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white font-mono">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white font-mono text-5d">
           PREDICTIONS
         </h1>
         <p className="text-black-400 text-xs font-mono mt-1">
@@ -216,7 +216,7 @@ export default function PredictionMarket() {
         <button
           onClick={() => setTab('markets')}
           className={`flex-1 py-2 text-xs font-mono rounded-md transition-colors ${
-            tab === 'markets' ? 'bg-matrix-600 text-black-900 font-bold' : 'text-black-400 hover:text-white'
+            tab === 'markets' ? 'bg-matrix-600 text-black-900 font-bold holo-shimmer' : 'text-black-400 hover:text-white'
           }`}
         >
           MARKETS
@@ -224,7 +224,7 @@ export default function PredictionMarket() {
         <button
           onClick={() => setTab('leaderboard')}
           className={`flex-1 py-2 text-xs font-mono rounded-md transition-colors ${
-            tab === 'leaderboard' ? 'bg-matrix-600 text-black-900 font-bold' : 'text-black-400 hover:text-white'
+            tab === 'leaderboard' ? 'bg-matrix-600 text-black-900 font-bold holo-shimmer' : 'text-black-400 hover:text-white'
           }`}
         >
           LEADERBOARD

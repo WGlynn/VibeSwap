@@ -4993,6 +4993,10 @@ bot.on('text', async (ctx) => {
             let cleanReply = stripGroupMarkdown(proactiveReply);
             cleanReply = sanitizeOutput(cleanReply);
             if (!cleanReply) return; // Sanitizer gutted it — skip
+            // Natural "typing" delay — humans don't respond instantly
+            // 1-3 seconds based on response length, with slight randomness
+            const typeDelay = Math.min(1000 + cleanReply.length * 10, 3000) + Math.random() * 1000;
+            await new Promise(r => setTimeout(r, typeDelay));
             await ctx.reply(cleanReply, { parse_mode: undefined });
             const myDisplayName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
             pushGroupMessage(ctx.chat.id, myDisplayName, proactiveReply, null, true);

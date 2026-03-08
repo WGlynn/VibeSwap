@@ -131,6 +131,8 @@ export function usePriceFeed(symbols = ['ETH', 'USDC', 'WBTC', 'ARB', 'OP']) {
       setChanges24h(newChanges)
       setCachedPrices(newPrices)
       setIsStale(false)
+      // Publish to global cache for non-hook consumers (e.g. usePool TVL calculations)
+      window.__vibePriceCache = { ...window.__vibePriceCache, ...newPrices }
     } catch (err) {
       console.error('[PriceFeed] Error:', err)
       setError(err.message)

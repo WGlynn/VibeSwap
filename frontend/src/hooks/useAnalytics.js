@@ -208,13 +208,14 @@ export function useProtocolStats() {
   useEffect(() => {
     // In production, aggregate from multiple event sources
     // or query a subgraph/indexer
+    // Stats start at zero — populated from on-chain data when contracts deployed
     setStats({
-      totalMEVSaved: 6_300_000,
-      activeLPs: 2847,
-      ilClaimsPaid: 142_000,
-      shapleyDistributed: 892_000,
-      totalVolume: 1_250_000_000,
-      totalFees: 3_750_000,
+      totalMEVSaved: 0,
+      activeLPs: 0,
+      ilClaimsPaid: 0,
+      shapleyDistributed: 0,
+      totalVolume: 0,
+      totalFees: 0,
     })
     setLoading(false)
   }, [provider])
@@ -238,43 +239,13 @@ function getBlockRange(timeRange) {
   }
 }
 
-// Mock data generators (replace with real data in production)
+// Data generators — return empty arrays until subgraph/indexer is connected
+// Will be replaced with real on-chain queries when contracts are deployed
 
-function getMockMEVData() {
-  return [
-    { batchId: 1042, poolId: 'ETH/USDC', orderCount: 47, mevSaved: 1247.50, clearingPrice: 2341.25, timestamp: Date.now() - 300000 },
-    { batchId: 1041, poolId: 'ETH/USDC', orderCount: 32, mevSaved: 892.30, clearingPrice: 2338.90, timestamp: Date.now() - 600000 },
-    { batchId: 1040, poolId: 'WBTC/ETH', orderCount: 18, mevSaved: 2156.00, clearingPrice: 17.42, timestamp: Date.now() - 900000 },
-    { batchId: 1039, poolId: 'ETH/USDC', orderCount: 55, mevSaved: 1563.20, clearingPrice: 2335.60, timestamp: Date.now() - 1200000 },
-    { batchId: 1038, poolId: 'ARB/ETH', orderCount: 24, mevSaved: 445.80, clearingPrice: 0.00042, timestamp: Date.now() - 1500000 },
-  ]
-}
-
-function getMockLPData() {
-  return [
-    { pool: 'ETH/USDC', tvl: 12450000, apr: 18.4, volume24h: 8920000, fees24h: 26760, ilProtectionPaid: 4520 },
-    { pool: 'WBTC/ETH', tvl: 8230000, apr: 15.2, volume24h: 5640000, fees24h: 16920, ilProtectionPaid: 2890 },
-    { pool: 'ARB/ETH', tvl: 3450000, apr: 24.6, volume24h: 2340000, fees24h: 7020, ilProtectionPaid: 890 },
-    { pool: 'OP/ETH', tvl: 2180000, apr: 21.3, volume24h: 1560000, fees24h: 4680, ilProtectionPaid: 620 },
-  ]
-}
-
-function getMockShapleyData() {
-  return [
-    { batchId: 1042, totalValue: 3420.50, contributors: 12, topContributor: '0x7a...3f2d', topShare: 18.4 },
-    { batchId: 1041, totalValue: 2890.30, contributors: 9, topContributor: '0x4c...8e1a', topShare: 22.1 },
-    { batchId: 1040, totalValue: 5230.00, contributors: 15, topContributor: '0x9d...2b5c', topShare: 15.8 },
-    { batchId: 1039, totalValue: 4120.80, contributors: 11, topContributor: '0x2f...6a9d', topShare: 19.2 },
-  ]
-}
-
-function getMockILClaimsData() {
-  return [
-    { claimId: 'IL-1042', user: '0x7a...3f2d', pool: 'ETH/USDC', tier: 'Premium', ilAmount: 1250.40, covered: 1000.32, timestamp: Date.now() - 86400000 },
-    { claimId: 'IL-1041', user: '0x4c...8e1a', pool: 'WBTC/ETH', tier: 'Standard', ilAmount: 890.20, covered: 445.10, timestamp: Date.now() - 172800000 },
-    { claimId: 'IL-1040', user: '0x9d...2b5c', pool: 'ARB/ETH', tier: 'Basic', ilAmount: 320.50, covered: 80.12, timestamp: Date.now() - 259200000 },
-  ]
-}
+function getMockMEVData() { return [] }
+function getMockLPData() { return [] }
+function getMockShapleyData() { return [] }
+function getMockILClaimsData() { return [] }
 
 export default {
   useMEVSavings,

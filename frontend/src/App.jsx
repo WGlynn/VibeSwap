@@ -61,6 +61,7 @@ const PromptsPage = lazy(() => import('./components/PromptsPage'))
 const JarvisPage = lazy(() => import('./components/JarvisPage'))
 const MinePage = lazy(() => import('./components/MinePage'))
 const FairnessRace = lazy(() => import('./components/FairnessRace'))
+const MindMesh = lazy(() => import('./components/MindMesh'))
 
 // Rocketship page transitions — blur + slide + opacity
 const pageVariants = {
@@ -107,6 +108,7 @@ function AnimatedRoutes() {
             <Route path="/jarvis" element={<JarvisPage />} />
             <Route path="/mine" element={<MinePage />} />
             <Route path="/fairness" element={<FairnessRace />} />
+            <Route path="/mesh" element={<MindMesh />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

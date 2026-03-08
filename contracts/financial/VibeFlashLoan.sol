@@ -7,6 +7,17 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @notice EIP-3156 compatible callback interface
+interface IVibeFlashBorrower {
+    function onFlashLoan(
+        address initiator,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bytes32);
+}
+
 /**
  * @title VibeFlashLoan — Protocol-Wide Flash Loan Provider
  * @notice Unified flash loan facility across all VSOS liquidity pools.
@@ -74,19 +85,6 @@ contract VibeFlashLoan is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     event PoolRegistered(bytes32 indexed poolId, address pool, address token);
     event PoolRemoved(bytes32 indexed poolId);
 
-    // ============ Interfaces ============
-
-    /// @notice EIP-3156 compatible callback
-    interface IFlashBorrower {
-        function onFlashLoan(
-            address initiator,
-            address token,
-            uint256 amount,
-            uint256 fee,
-            bytes calldata data
-        ) external returns (bytes32);
-    }
-
     // ============ Init ============
 
     function initialize(address _insuranceFund) external initializer {
@@ -141,7 +139,7 @@ contract VibeFlashLoan is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
         IERC20(token).safeTransfer(receiver, amount);
 
         // Callback
-        bytes32 result = IFlashBorrower(receiver).onFlashLoan(
+        bytes32 result = IVibeFlashBorrower(receiver).onFlashLoan(
             msg.sender,
             token,
             amount,

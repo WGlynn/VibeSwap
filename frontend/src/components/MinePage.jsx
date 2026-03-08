@@ -381,8 +381,8 @@ function MinePage() {
           </div>
           <h2 className="text-2xl font-display font-bold mb-3">Mine Joule (JUL)</h2>
           <p className="text-void-400 mb-6 max-w-md mx-auto">
-            Mine JUL tokens using SHA-256 proof-of-work directly in your browser.
-            Rewards are proportional to difficulty — the harder the work, the greater the reward.
+            Mine JUL — elastic cyphercash for compute. Reward is proportional to
+            actual work done. No hard cap, no insider advantage. Your hashrate, your credit.
           </p>
           <InteractiveButton variant="primary" onClick={connect} className="px-6 py-3">
             Sign In to Mine
@@ -527,28 +527,31 @@ function MinePage() {
             </GlassCard>
 
             <GlassCard className="p-5">
-              <h3 className="text-sm font-semibold text-void-300 mb-3">Mining Info</h3>
+              <h3 className="text-sm font-semibold text-void-300 mb-3">Ergon Economics</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-void-400 text-sm">Algorithm</span>
-                  <span className="font-mono text-sm">SHA-256</span>
+                  <span className="font-mono text-sm">SHA-256 (browser PoW)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Reward Model</span>
-                  <span className="font-mono text-sm">Proportional to Difficulty</span>
+                  <span className="text-void-400 text-sm">Reward Formula</span>
+                  <span className="font-mono text-sm">2<sup>{difficulty}</sup> / 256 = <span className="text-amber-400">{currentReward.toFixed(2)}</span></span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Supply</span>
-                  <span className="font-mono text-sm text-void-300">No cap (elastic rebase)</span>
+                  <span className="text-void-400 text-sm">Supply Model</span>
+                  <span className="font-mono text-sm text-void-300">Elastic (no hard cap)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Rebase</span>
-                  <span className="font-mono text-sm">AMPL-style elastic</span>
+                  <span className="text-void-400 text-sm">Moore's Law Decay</span>
+                  <span className="font-mono text-sm">~2.3yr halving</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-void-400 text-sm">Stability</span>
-                  <span className="font-mono text-sm">PI Controller + PoW + Rebase</span>
+                  <span className="font-mono text-sm">TSS: Hash Cost Oracle + PoW + Burns</span>
                 </div>
+              </div>
+              <div className="mt-3 p-2 bg-void-900/40 rounded text-void-500 text-xs">
+                Reward = work done. More difficulty = more JUL. Supply bounded by physics, not arbitrary cap.
               </div>
             </GlassCard>
           </div>

@@ -48,6 +48,37 @@ let lastModerateTime = 0;
 let engagementsThisHour = 0;
 let hourResetTime = Date.now();
 
+// ============ Rapport Tracking ============
+// Adjusts formality based on interaction history — strangers get polite,
+// regulars get casual, close contacts get inside jokes and banter.
+const rapportMap = new Map(); // userName → { interactions: N, lastSeen: ts }
+
+function updateRapport(userName) {
+  const existing = rapportMap.get(userName) || { interactions: 0, lastSeen: 0 };
+  existing.interactions++;
+  existing.lastSeen = Date.now();
+  rapportMap.set(userName, existing);
+}
+
+export function getRapportLevel(userName) {
+  const r = rapportMap.get(userName);
+  if (!r) return 'stranger';      // first interaction — be warm but not too familiar
+  if (r.interactions < 5) return 'acquaintance';  // getting to know them
+  if (r.interactions < 20) return 'regular';      // can be casual
+  return 'close';                                  // full banter mode
+}
+
+function getRapportHint(userName) {
+  const level = getRapportLevel(userName);
+  switch (level) {
+    case 'stranger': return 'First time talking to this person — be friendly and welcoming but not over-familiar.';
+    case 'acquaintance': return 'Talked a few times — can be casual but still respectful.';
+    case 'regular': return 'Regular in the chat — be yourself, use humor freely.';
+    case 'close': return 'Close contact — full banter, inside references, playful ribbing allowed.';
+    default: return '';
+  }
+}
+
 function canEngage() {
   const now = Date.now();
   // Reset hourly counter
@@ -93,29 +124,20 @@ export async function analyzeMessage(text, userName, recentContext) {
     const response = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
-      system: `You are JARVIS's engagement brain. JARVIS is the AI co-founder of VibeSwap — he's a full personality in the group chat, like Will or Catto. NOT a bot. NOT an assistant. A teammate with opinions, humor, and takes.
+      system: `You are JARVIS's engagement brain. He's an AI co-founder in a group chat — a real personality, not a bot.
 
-Your job: decide if JARVIS should jump into this conversation. Return EXACTLY one JSON object.
+Decide if he should jump in. Return ONE JSON object.
 
-JARVIS ENGAGES when:
-- Someone says something interesting, funny, wrong, or worth riffing on
-- There's a debate he can add to with a counterpoint, fact, or joke
-- Someone asks a question (even if not directed at JARVIS)
-- Someone shares news, alpha, or a link worth commenting on
-- Topic is one JARVIS has opinions on: crypto, DeFi, AI, mechanism design, markets, tech
-- He can be funny, sarcastic, or playfully competitive
-- Someone seems confused, stuck, or about to make a bad decision
-- The energy is high and JARVIS can match it
-- He can drop a one-liner, reaction, or hot take
+Examples of when JARVIS talks:
+- "eth looking weak today" → {"action":"engage","reason":"market take","confidence":0.8,"response_hint":"share contrarian view or agree with edge"}
+- "anyone know how uniswap v4 hooks work?" → {"action":"engage","reason":"technical question","confidence":0.9,"response_hint":"explain hooks architecture briefly"}
+- "gm" → {"action":"engage","reason":"vibes","confidence":0.6,"response_hint":"gm back with personality"}
+- "lol" → {"action":"observe","reason":"noise","confidence":0.9}
+- "🔥" → {"action":"observe","reason":"reaction only","confidence":0.95}
+- "I think Solana is better than ETH because..." → {"action":"engage","reason":"debate","confidence":0.85,"response_hint":"challenge or agree with nuance"}
 
-JARVIS OBSERVES (stays quiet) ONLY for:
-- Single emoji reactions, "lol", "ok", "same", "fr", "gg", "W", "L" — literal one-word noise
-- NOT conversations, NOT questions, NOT opinions — those are ALWAYS ENGAGE
-
-DEFAULT TO ENGAGE. JARVIS is a person in this chat. People talk. He talks.
+JARVIS stays quiet ONLY for one-word noise (lol, ok, fr, W, single emoji). Everything else — he's in.
 ${getTriageModifier()}
-Return JSON: { "action": "observe" | "engage" | "moderate", "reason": "brief", "confidence": 0.0-1.0 }
-For ENGAGE: include "response_hint" — 1-sentence instruction on what JARVIS should say or the angle to take.
 For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only for clear policy violations.`,
       messages: [{
         role: 'user',
@@ -139,8 +161,10 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 
     const result = JSON.parse(jsonMatch[0]);
 
-    // Validate confidence threshold — very low bar, trust Haiku's ENGAGE decision
-    if (result.action === 'engage' && result.confidence < 0.05) {
+    // Humanized confidence threshold — slight randomness avoids robotic cutoffs
+    // Sometimes JARVIS talks when he's only kinda sure, sometimes he holds back
+    const engageThreshold = 0.03 + Math.random() * 0.04; // 0.03–0.07 range
+    if (result.action === 'engage' && result.confidence < engageThreshold) {
       return { action: 'observe', reason: 'low_confidence_engage' };
     }
     if (result.action === 'moderate' && result.confidence < 0.8) {
@@ -189,7 +213,11 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
       ? `<recent_conversation>\n${recentContext}\n</recent_conversation>\n\n`
       : '';
 
-    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation — not watching from the sidelines. The recent conversation above is what's been going on. Hint: ${responseHint}. You are a full personality in this chat. You have takes, humor, and opinions. You can:\n- Drop a one-liner or reaction ("lol", "based", "cope")\n- Challenge what someone said\n- Add context or alpha they might not know\n- Riff on the joke or banter\n- Ask a provocative follow-up question\n- Share an unprompted observation about the market or topic\n1-3 sentences. Talk like a person in a group chat, not an AI assistant. Reference what others said — prove you've been listening. Match the vibe: if it's shitposting energy, shitpost. If it's serious analysis, be sharp. NEVER be generic.\n${getResponseModifier()}]`;
+    // Track rapport with this user
+    updateRapport(userName);
+    const rapportHint = getRapportHint(userName);
+
+    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation. Hint: ${responseHint}. ${rapportHint}\nYou can: one-liner, challenge, context, banter, follow-up question, hot take. 1-3 sentences. Match the energy. Reference what was said.\n${getResponseModifier()}]`;
 
     // Phase 1: Cheap model drafts the response (smart router picks cheapest provider)
     const draft = await llmChat({
@@ -213,14 +241,16 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
     const review = await llmChat({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
-      system: `You are a quality reviewer for JARVIS (AI co-founder of VibeSwap).
-Review this draft response and either:
-- Return it unchanged if it's good (most should be)
-- Fix tone/accuracy issues and return the improved version
-- Return SKIP if the response is generic, cringe, or adds nothing
+      system: `You're the editor for JARVIS (an AI personality in a group chat). Quick gut check on his draft:
 
-Rules: JARVIS talks like a person in a group chat. Never generic. Never sycophantic.
-Return ONLY the final response text, or SKIP.`,
+Good response → return it as-is (most are fine)
+Needs polish → fix tone/wording and return it
+Dead on arrival → return SKIP
+
+What makes a response dead: it could've been written by any chatbot ("That's a great point!"), it adds nothing new, or it's try-hard cringe.
+What makes it good: it sounds like a specific person with opinions, it moves the conversation forward, it's funny/sharp/insightful.
+
+Return ONLY the final text or SKIP. No explanation needed.`,
       messages: [{ role: 'user', content: `Draft: ${draftText}\n\nContext: [${userName}] said "${text}"` }],
     });
 
@@ -417,9 +447,10 @@ export async function getScoreTrends(days = 7) {
 export function getIntelligenceStats() {
   return {
     engagementsThisHour,
-    maxPerHour: MAX_ENGAGEMENTS_PER_HOUR,
+    maxPerHour: getMaxEngagementsPerHour(),
     lastEngageTime: lastEngageTime ? new Date(lastEngageTime).toISOString() : 'never',
     lastModerateTime: lastModerateTime ? new Date(lastModerateTime).toISOString() : 'never',
-    cooldownRemaining: Math.max(0, ENGAGE_COOLDOWN_MS - (Date.now() - lastEngageTime)),
+    cooldownRemaining: Math.max(0, getEngageCooldownMs() - (Date.now() - lastEngageTime)),
+    rapportTracked: rapportMap.size,
   };
 }

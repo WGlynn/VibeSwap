@@ -85,7 +85,7 @@ export async function initAttribution() {
 
   // Auto-save timer
   saveTimer = setInterval(() => {
-    if (dirty) flushAttribution();
+    if (dirty) flushAttribution().catch(err => console.error(`[attribution] Auto-save failed: ${err.message}`));
   }, AUTO_SAVE_INTERVAL);
 
   console.log(`[attribution] Graph loaded — ${graph.sources.length} sources, ${graph.derivations.length} derivations, ${graph.outputs.length} outputs`);
@@ -749,10 +749,10 @@ export async function flushAttribution() {
 
 // ============ Cleanup ============
 
-export function shutdownAttribution() {
+export async function shutdownAttribution() {
   if (saveTimer) {
     clearInterval(saveTimer);
     saveTimer = null;
   }
-  flushAttribution();
+  await flushAttribution();
 }

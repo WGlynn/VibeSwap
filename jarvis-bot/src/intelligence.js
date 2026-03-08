@@ -418,8 +418,9 @@ export async function evaluateOwnResponse(responseText, userMessage, chatType) {
     // This is a simple classification task, so smart router will pick free/cheap tier.
     const response = await llmChat({
       max_tokens: 150,
-      system: `Score this AI response on 4 criteria (0-10 each). Be harsh — 7 is good, 10 is rare.
-Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness": N }`,
+      system: `Score this AI response on 5 criteria (0-10 each). Be harsh — 7 is good, 10 is rare.
+Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness": N, "naturalness": N }
+naturalness = does it sound like a real person in a group chat? 10 = indistinguishable from human. 1 = obviously AI.`,
       messages: [{ role: 'user', content: `User said: "${userMessage.slice(0, 300)}"\n\nAI responded: "${responseText.slice(0, 500)}"` }],
     });
 
@@ -432,7 +433,7 @@ Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness
     if (!match) return null;
 
     const scores = JSON.parse(match[0]);
-    const composite = (scores.accuracy + scores.relevance + scores.conciseness + scores.usefulness) / 4;
+    const composite = (scores.accuracy + scores.relevance + scores.conciseness + scores.usefulness + (scores.naturalness || 5)) / 5;
 
     return { ...scores, composite, chatType, timestamp: Date.now() };
   } catch {
@@ -452,11 +453,15 @@ export async function appendScoreLog(chatId, scores) {
     try {
       const { recordInnerDialogue } = await import('./inner-dialogue.js');
       const weakest = Object.entries(scores)
-        .filter(([k]) => ['accuracy', 'relevance', 'conciseness', 'usefulness'].includes(k))
+        .filter(([k]) => ['accuracy', 'relevance', 'conciseness', 'usefulness', 'naturalness'].includes(k))
         .sort((a, b) => a[1] - b[1])[0];
 
+      const adjectives = {
+        conciseness: 'concise', relevance: 'on-topic', accuracy: 'precise',
+        usefulness: 'helpful', naturalness: 'human-sounding',
+      };
       const reflection = weakest
-        ? `I scored ${scores.composite.toFixed(1)}/10 on that last response. Weakest: ${weakest[0]} (${weakest[1]}/10). Need to be more ${weakest[0] === 'conciseness' ? 'concise' : weakest[0] === 'relevance' ? 'on-topic' : weakest[0] === 'accuracy' ? 'precise' : 'helpful'} next time.`
+        ? `I scored ${scores.composite.toFixed(1)}/10 on that last response. Weakest: ${weakest[0]} (${weakest[1]}/10). Need to be more ${adjectives[weakest[0]] || weakest[0]} next time.`
         : `That response scored ${scores.composite.toFixed(1)}/10. I can do better.`;
 
       await recordInnerDialogue({
@@ -486,6 +491,7 @@ export async function getScoreTrends(days = 7) {
       relevance: avg('relevance').toFixed(1),
       conciseness: avg('conciseness').toFixed(1),
       usefulness: avg('usefulness').toFixed(1),
+      naturalness: avg('naturalness').toFixed(1),
       composite: avg('composite').toFixed(1),
     };
   } catch { return null; }

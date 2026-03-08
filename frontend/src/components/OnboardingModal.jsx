@@ -155,11 +155,9 @@ function OnboardingModal({ isOpen, onClose, onComplete }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 overflow-y-auto p-4"
+        className="fixed inset-0 z-50 overflow-y-auto bg-black/80"
       >
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
-
-        <div className="flex items-center justify-center min-h-full">
+        <div className="flex items-center justify-center min-h-full p-4">
         <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}

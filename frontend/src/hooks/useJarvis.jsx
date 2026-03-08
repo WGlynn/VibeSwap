@@ -29,7 +29,26 @@ export function useJarvis() {
     setIsSpeaking(false)
   }, [])
 
+  // Browser-native SpeechSynthesis fallback (works everywhere, no API needed)
+  const browserSpeak = useCallback((text) => {
+    if (!window.speechSynthesis) return false
+    const utterance = new SpeechSynthesisUtterance(text.slice(0, 5000))
+    // Pick a British English voice if available (JARVIS feel)
+    const voices = window.speechSynthesis.getVoices()
+    const british = voices.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('male'))
+      || voices.find(v => v.lang === 'en-GB')
+      || voices.find(v => v.lang.startsWith('en'))
+    if (british) utterance.voice = british
+    utterance.rate = 1.05
+    utterance.pitch = 0.95
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
+    window.speechSynthesis.speak(utterance)
+    return true
+  }, [])
+
   // Play TTS for a given text
+  // Priority: Server TTS (ElevenLabs/Google) → Browser SpeechSynthesis
   const speakText = useCallback(async (text) => {
     if (!text || !voiceMode) return
     stopSpeaking()
@@ -41,10 +60,18 @@ export function useJarvis() {
         body: JSON.stringify({ text: text.slice(0, 5000) }),
       })
       if (!res.ok) {
-        setIsSpeaking(false)
+        // Server TTS unavailable — fall back to browser speech
+        console.warn('[jarvis] Server TTS failed, using browser SpeechSynthesis')
+        if (!browserSpeak(text)) setIsSpeaking(false)
         return
       }
       const blob = await res.blob()
+      if (blob.size < 100) {
+        // Empty or near-empty audio — use browser fallback
+        console.warn('[jarvis] TTS returned empty audio, using browser SpeechSynthesis')
+        if (!browserSpeak(text)) setIsSpeaking(false)
+        return
+      }
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
       audioRef.current = audio
@@ -54,15 +81,19 @@ export function useJarvis() {
         audioRef.current = null
       }
       audio.onerror = () => {
+        // Audio playback failed — try browser speech
         setIsSpeaking(false)
         URL.revokeObjectURL(url)
         audioRef.current = null
+        browserSpeak(text)
       }
       await audio.play()
     } catch {
-      setIsSpeaking(false)
+      // Network error — try browser speech
+      console.warn('[jarvis] TTS network error, using browser SpeechSynthesis')
+      if (!browserSpeak(text)) setIsSpeaking(false)
     }
-  }, [voiceMode, stopSpeaking])
+  }, [voiceMode, stopSpeaking, browserSpeak])
 
   const toggleVoice = useCallback(() => {
     setVoiceMode(prev => {

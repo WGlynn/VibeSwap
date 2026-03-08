@@ -287,8 +287,45 @@ export default function MindMesh() {
         )}
       </AnimatePresence>
 
+      {/* Uptime Proof */}
+      {mesh?.uptime && mesh.uptime.samples > 0 && (
+        <div className="mt-4 p-3 rounded-lg bg-black-800/60 border border-black-700">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-mono text-black-400 uppercase tracking-wider">Uptime Proof</span>
+            <span className="text-[10px] font-mono text-black-500">{mesh.uptime.samples} samples</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { name: 'JARVIS', pct: mesh.uptime.fly },
+              { name: 'GitHub', pct: mesh.uptime.github },
+              { name: 'Vercel', pct: mesh.uptime.vercel },
+            ].map(node => (
+              <div key={node.name} className="text-center">
+                <div className={`text-lg font-bold font-mono ${
+                  node.pct >= 99 ? 'text-matrix-400' :
+                  node.pct >= 90 ? 'text-amber-400' : 'text-red-400'
+                }`}>
+                  {node.pct}%
+                </div>
+                <div className="text-[10px] font-mono text-black-500">{node.name}</div>
+                {/* Mini bar */}
+                <div className="mt-1 h-1 rounded-full bg-black-700 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      node.pct >= 99 ? 'bg-matrix-500' :
+                      node.pct >= 90 ? 'bg-amber-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${node.pct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Status bar */}
-      <div className="mt-6 flex items-center justify-between text-[10px] font-mono text-black-500 px-2">
+      <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-black-500 px-2">
         <span className="animate-glow-breathe">{cells.filter(c => c.status === 'interlinked').length}/{cells.length} cells interlinked</span>
         {here > 0 && <span>{here} {here === 1 ? 'soul' : 'souls'} present</span>}
         <span>{links.length} links</span>

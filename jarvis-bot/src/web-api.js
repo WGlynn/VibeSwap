@@ -163,6 +163,32 @@ const ubuntuPresence = new Map(); // sessionKey -> lastSeen timestamp
 // Last-known-good GitHub state — survives transient API failures / rate limits
 let lastKnownGithub = null;
 
+// ============ Uptime Proof Ring Buffer ============
+// Rolling 24h heartbeat history for trinity fault tolerance visibility.
+// Each entry: { ts, fly, github, vercel } where values are 1 (up) or 0 (down).
+// Capped at 1440 entries (1 per minute for 24h).
+const UPTIME_MAX = 1440;
+const uptimeRing = [];
+let lastUptimeTick = 0;
+
+function recordUptime(flyOk, githubOk, vercelOk) {
+  const now = Date.now();
+  // Only record once per minute
+  if (now - lastUptimeTick < 60_000) return;
+  lastUptimeTick = now;
+  uptimeRing.push({ ts: now, fly: flyOk ? 1 : 0, github: githubOk ? 1 : 0, vercel: vercelOk ? 1 : 0 });
+  if (uptimeRing.length > UPTIME_MAX) uptimeRing.shift();
+}
+
+function getUptimeStats() {
+  if (uptimeRing.length === 0) return { fly: 100, github: 100, vercel: 100, samples: 0 };
+  const n = uptimeRing.length;
+  const fly = Math.round(uptimeRing.reduce((s, e) => s + e.fly, 0) / n * 100);
+  const github = Math.round(uptimeRing.reduce((s, e) => s + e.github, 0) / n * 100);
+  const vercel = Math.round(uptimeRing.reduce((s, e) => s + e.vercel, 0) / n * 100);
+  return { fly, github, vercel, samples: n, since: new Date(uptimeRing[0].ts).toISOString() };
+}
+
 // ============ Response Cache ============
 // Short-lived cache for expensive endpoints (mesh, mind, health)
 
@@ -801,11 +827,19 @@ export async function handleWebRequest(req, res, pathname) {
         githubCell.status === 'interlinked' &&
         vercelCell.status === 'interlinked';
 
+      // Record uptime proof
+      recordUptime(
+        flyCell.status === 'interlinked',
+        githubCell.status === 'interlinked' || githubCell.status === 'dormant',
+        vercelCell.status === 'interlinked'
+      );
+
       const meshData = {
         mantra: 'cells within cells interlinked',
         status: allInterlinked ? 'fully-interlinked' : 'partial',
         cells: [flyCell, githubCell, vercelCell],
         links,
+        uptime: getUptimeStats(),
         topology: topology ? { shardCount: topology.shards?.length || 0 } : null,
         timestamp: new Date().toISOString(),
       };

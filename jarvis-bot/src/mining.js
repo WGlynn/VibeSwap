@@ -100,6 +100,8 @@ let state = {
 };
 
 let replaySet = new Set();       // in-memory Set for O(1) lookups
+let previousChallenge = '';      // keep last challenge valid for grace period
+let previousChallengeExpiry = 0; // when previous challenge becomes truly stale
 let rateLimits = new Map();      // userId -> [timestamps]
 let saveTimer = null;
 let dirty = false;
@@ -148,7 +150,13 @@ function verifyProof(challenge, nonce, claimedHash, difficulty) {
 
 // ============ Challenge Management ============
 
+const CHALLENGE_GRACE_PERIOD = 120; // 2 min grace after rotation (helps mobile miners)
+
 function rotateChallenge() {
+  // Keep old challenge valid during grace period (prevents stale_challenge rejections
+  // for miners who found a valid proof just as the challenge rotated)
+  previousChallenge = state.challenge;
+  previousChallengeExpiry = Date.now() + (CHALLENGE_GRACE_PERIOD * 1000);
   state.challenge = randomBytes(32).toString('hex');
   state.challengeCreatedAt = Date.now();
   dirty = true;
@@ -264,9 +272,11 @@ export function submitProof(userId, nonce, hash, challenge) {
     return { accepted: false, reason: 'rate_limited', retryAfter: 60 };
   }
 
-  // Challenge validity
+  // Challenge validity — accept current OR previous (during grace period)
   ensureChallenge();
-  if (challenge !== state.challenge) {
+  const isCurrentChallenge = (challenge === state.challenge);
+  const isPreviousValid = (challenge === previousChallenge && Date.now() < previousChallengeExpiry);
+  if (!isCurrentChallenge && !isPreviousValid) {
     return { accepted: false, reason: 'stale_challenge' };
   }
 

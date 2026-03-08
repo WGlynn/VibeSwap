@@ -155,15 +155,16 @@ function OnboardingModal({ isOpen, onClose, onComplete }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
+        className="fixed inset-0 z-50 overflow-y-auto p-4"
       >
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
 
+        <div className="flex items-center justify-center min-h-full">
         <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="relative w-full max-w-lg my-auto bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden"
+          className="relative w-full max-w-lg bg-black-800 rounded-2xl border border-black-600 shadow-2xl overflow-hidden"
         >
           {/* Progress indicator */}
           <div className="h-1 bg-black-700">
@@ -649,6 +650,7 @@ function OnboardingModal({ isOpen, onClose, onComplete }) {
             )}
           </div>
         </motion.div>
+        </div>
       </motion.div>
     </AnimatePresence>
   )

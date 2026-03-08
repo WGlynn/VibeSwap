@@ -12,6 +12,7 @@ const SHORTCUTS = {
   'e': '/earn',      // Ctrl+E → Earn (pools)
   'b': '/buy',       // Ctrl+B → Buy/Sell
   'h': '/history',   // Ctrl+H → History
+  'p': '/portfolio', // Ctrl+P → Portfolio
 }
 
 export function useKeyboardNav() {

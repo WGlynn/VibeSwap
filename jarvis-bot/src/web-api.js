@@ -22,7 +22,7 @@ import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
 import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner } from './mining.js';
-import { createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
+import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStructured, getMyBets, getPredictorLeaderboard, getLeaderboardStructured } from './tools-predictions.js';
 import { createHmac } from 'crypto';
 
 // ============ Rate Limiter ============
@@ -156,6 +156,32 @@ function jsonResponse(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+// ============ Response Cache ============
+// Short-lived cache for expensive endpoints (mesh, mind, health)
+
+const responseCache = new Map(); // key -> { data, expiry }
+const CACHE_TTL = {
+  '/web/mesh': 10_000,     // 10s — GitHub API call is slow
+  '/web/mind': 15_000,     // 15s — aggregates many subsystems
+  '/web/health': 5_000,    // 5s — lightweight but called often
+};
+
+function getCached(key) {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) {
+    responseCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key, data) {
+  const ttl = CACHE_TTL[key];
+  if (!ttl) return;
+  responseCache.set(key, { data, expiry: Date.now() + ttl });
+}
+
 // ============ Route Handler ============
 
 export async function handleWebRequest(req, res, pathname) {
@@ -242,6 +268,8 @@ export async function handleWebRequest(req, res, pathname) {
 
   // ============ GET /web/mind ============
   if (pathname === '/web/mind' && req.method === 'GET') {
+    const cached = getCached('/web/mind');
+    if (cached) { jsonResponse(res, 200, cached); return true; }
     try {
       const knowledgeChain = getChainStats();
       const shard = getShardInfo();
@@ -252,7 +280,7 @@ export async function handleWebRequest(req, res, pathname) {
       const shadowStats = getShadowStats();
       const computeEcon = getComputeStats();
 
-      jsonResponse(res, 200, {
+      const mindData = {
         knowledgeChain: {
           height: knowledgeChain.height,
           head: knowledgeChain.head,
@@ -299,7 +327,9 @@ export async function handleWebRequest(req, res, pathname) {
           teamSize: 15,
         },
         timestamp: new Date().toISOString(),
-      });
+      };
+      setCache('/web/mind', mindData);
+      jsonResponse(res, 200, mindData);
     } catch (err) {
       console.error('[web-api] Mind error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch mind data' });
@@ -309,14 +339,37 @@ export async function handleWebRequest(req, res, pathname) {
 
   // ============ GET /web/health ============
   if (pathname === '/web/health' && req.method === 'GET') {
-    jsonResponse(res, 200, {
+    const cached = getCached('/web/health');
+    if (cached) { jsonResponse(res, 200, cached); return true; }
+    const healthData = {
       status: 'online',
       uptime: Math.round(process.uptime()),
       provider: getProviderName(),
       model: getModelName(),
       shardId: config.shard?.id || 'shard-0',
+      rateLimit: { perMinute: RATE_LIMIT, window: RATE_WINDOW },
       timestamp: new Date().toISOString(),
-    });
+    };
+    setCache('/web/health', healthData);
+    jsonResponse(res, 200, healthData);
+    return true;
+  }
+
+  // ============ POST /web/report ============
+  // Frontend error/performance reporting — lightweight telemetry
+  if (pathname === '/web/report' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { type, message, url, userAgent, vitals } = body;
+      if (type === 'error') {
+        console.warn(`[web-report] Error from ${ip}: ${message} @ ${url}`);
+      } else if (type === 'vitals') {
+        console.log(`[web-report] Vitals from ${ip}: LCP=${vitals?.lcp}ms FCP=${vitals?.fcp}ms CLS=${vitals?.cls}`);
+      }
+      jsonResponse(res, 200, { received: true });
+    } catch {
+      jsonResponse(res, 400, { error: 'Invalid report' });
+    }
     return true;
   }
 
@@ -468,11 +521,11 @@ export async function handleWebRequest(req, res, pathname) {
 
   // ============ Prediction Markets API ============
 
-  // GET /web/predictions — list all markets
+  // GET /web/predictions — list all markets (structured JSON)
   if (pathname === '/web/predictions' && req.method === 'GET') {
     try {
-      const result = listMarkets('web');
-      jsonResponse(res, 200, { markets: result });
+      const result = listMarketsStructured('web');
+      jsonResponse(res, 200, result);
     } catch (err) {
       jsonResponse(res, 500, { error: err.message });
     }
@@ -544,11 +597,11 @@ export async function handleWebRequest(req, res, pathname) {
     return true;
   }
 
-  // GET /web/predictions/leaderboard — top predictors
+  // GET /web/predictions/leaderboard — top predictors (structured JSON)
   if (pathname === '/web/predictions/leaderboard' && req.method === 'GET') {
     try {
-      const result = getPredictorLeaderboard();
-      jsonResponse(res, 200, { leaderboard: result });
+      const result = getLeaderboardStructured();
+      jsonResponse(res, 200, result);
     } catch (err) {
       jsonResponse(res, 500, { error: err.message });
     }
@@ -647,6 +700,8 @@ export async function handleWebRequest(req, res, pathname) {
   //   2. Vercel (frontend light node — edge-deployed UI)
   //   3. GitHub (persistence layer — code + knowledge chain)
   if (pathname === '/web/mesh' && req.method === 'GET') {
+    const cached = getCached('/web/mesh');
+    if (cached) { jsonResponse(res, 200, cached); return true; }
     try {
       const shard = getShardInfo();
       const chain = getChainStats();
@@ -728,14 +783,16 @@ export async function handleWebRequest(req, res, pathname) {
         githubCell.status === 'interlinked' &&
         vercelCell.status === 'interlinked';
 
-      jsonResponse(res, 200, {
+      const meshData = {
         mantra: 'cells within cells interlinked',
         status: allInterlinked ? 'fully-interlinked' : 'partial',
         cells: [flyCell, githubCell, vercelCell],
         links,
         topology: topology ? { shardCount: topology.shards?.length || 0 } : null,
         timestamp: new Date().toISOString(),
-      });
+      };
+      setCache('/web/mesh', meshData);
+      jsonResponse(res, 200, meshData);
     } catch (err) {
       console.error('[web-api] Mesh error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch mesh state' });

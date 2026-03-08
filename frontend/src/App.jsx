@@ -7,6 +7,8 @@ import VibePlayer from './components/VibePlayer'
 import { ContributionsProvider } from './contexts/ContributionsContext'
 import { MessagingProvider } from './contexts/MessagingContext'
 import { useKeyboardNav } from './hooks/useKeyboardNav'
+import JarvisBubble from './components/JarvisBubble'
+import OnboardingTour from './components/OnboardingTour'
 
 // Error boundary to catch React errors
 class ErrorBoundary extends Component {
@@ -64,6 +66,8 @@ const MinePage = lazy(() => import('./components/MinePage'))
 const FairnessRace = lazy(() => import('./components/FairnessRace'))
 const MindMesh = lazy(() => import('./components/MindMesh'))
 const PredictionMarket = lazy(() => import('./components/PredictionMarket'))
+const PortfolioDashboard = lazy(() => import('./components/PortfolioDashboard'))
+const StatusDashboard = lazy(() => import('./components/StatusDashboard'))
 
 // Rocketship page transitions — blur + slide + opacity
 const pageVariants = {
@@ -112,6 +116,8 @@ function AnimatedRoutes() {
             <Route path="/fairness" element={<FairnessRace />} />
             <Route path="/mesh" element={<MindMesh />} />
             <Route path="/predict" element={<PredictionMarket />} />
+            <Route path="/portfolio" element={<PortfolioDashboard />} />
+            <Route path="/status" element={<StatusDashboard />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>
@@ -150,6 +156,8 @@ function App() {
         </div>
       )}
     <VibePlayer />
+    {location.pathname !== '/jarvis' && <JarvisBubble />}
+    <OnboardingTour />
     </ContributionsProvider>
     </MessagingProvider>
   )

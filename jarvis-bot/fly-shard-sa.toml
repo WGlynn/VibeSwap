@@ -1,8 +1,9 @@
-# JARVIS Mind Network — Worker Shard: shard-2
-# Third node — unlocks CRPC pairwise comparison (needs 3+ shards)
+# JARVIS Mind Network — Worker Shard: shard-sa
+# South America node (Sao Paulo) — global coverage, Cerebras free tier
+# Cerebras = Llama 3.3 70B at inference speeds, completely free
 
-app = 'jarvis-shard-2'
-primary_region = 'iad'
+app = 'jarvis-shard-sa'
+primary_region = 'gru'
 
 [build]
   dockerfile = 'Dockerfile'
@@ -15,9 +16,15 @@ primary_region = 'iad'
   HEALTH_PORT = '8080'
   SHARD_MODE = 'worker'
   TOTAL_SHARDS = '8'
-  NODE_TYPE = 'full'
-  ROUTER_URL = 'http://jarvis-vibeswap.internal:8080'
-  CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
+  NODE_TYPE = 'light'
+  ROUTER_URL = 'https://jarvis-vibeswap.fly.dev'
+  LLM_PROVIDER = 'cerebras'
+  LLM_MODEL = 'llama-3.3-70b'
+
+# Secrets:
+#   fly secrets set CEREBRAS_API_KEY=csk-... --app jarvis-shard-sa
+#   fly secrets set SHARD_ID=shard-sa --app jarvis-shard-sa
+#   fly secrets set SHARD_SECRET=<shared-secret> --app jarvis-shard-sa
 
 [[mounts]]
   source = 'jarvis_data'

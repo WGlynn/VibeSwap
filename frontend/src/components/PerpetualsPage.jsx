@@ -2,17 +2,37 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { usePriceFeed } from '../hooks/usePriceFeed'
 
 // ============================================================
 // Perpetuals Page — Perpetual futures with virtual AMM
+// Prices from real CoinGecko feed. OI/Volume show -- until live.
 // ============================================================
 
-const MARKETS_DATA = [
-  { pair: 'ETH/USD',  price: '$3,245.80', change: '+2.4%', funding: '+0.012%', oi: '$4.2M', volume24h: '$18.4M', positive: true },
-  { pair: 'BTC/USD',  price: '$67,120.40', change: '+1.8%', funding: '+0.008%', oi: '$8.1M', volume24h: '$42.1M', positive: true },
-  { pair: 'SOL/USD',  price: '$142.60',   change: '-0.9%', funding: '-0.003%', oi: '$1.8M', volume24h: '$9.2M',  positive: false },
-  { pair: 'JUL/USD',  price: '$0.84',     change: '+5.2%', funding: '+0.021%', oi: '$890K', volume24h: '$3.4M',  positive: true },
-]
+function usePerpMarkets() {
+  const { getPrice, getChange } = usePriceFeed(['ETH', 'BTC', 'SOL', 'JUL'])
+
+  const formatPrice = (p) => {
+    if (!p) return '--'
+    return p >= 1000
+      ? `$${p.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+      : `$${p.toFixed(2)}`
+  }
+
+  const formatChange = (c) => {
+    if (c === undefined || c === null) return '--'
+    return `${c >= 0 ? '+' : ''}${c.toFixed(1)}%`
+  }
+
+  return [
+    { pair: 'ETH/USD',  price: formatPrice(getPrice('ETH')),  change: formatChange(getChange('ETH')),  funding: '--', oi: '--', volume24h: '--', positive: (getChange('ETH') || 0) >= 0 },
+    { pair: 'BTC/USD',  price: formatPrice(getPrice('BTC')),  change: formatChange(getChange('BTC')),  funding: '--', oi: '--', volume24h: '--', positive: (getChange('BTC') || 0) >= 0 },
+    { pair: 'SOL/USD',  price: formatPrice(getPrice('SOL')),  change: formatChange(getChange('SOL')),  funding: '--', oi: '--', volume24h: '--', positive: (getChange('SOL') || 0) >= 0 },
+    { pair: 'JUL/USD',  price: formatPrice(getPrice('JUL')),  change: formatChange(getChange('JUL')),  funding: '--', oi: '--', volume24h: '--', positive: (getChange('JUL') || 0) >= 0 },
+  ]
+}
+
+const MARKETS_DATA_FALLBACK = [] // Empty — populated by hook
 
 const LEVERAGE_OPTIONS = [1, 2, 5, 10, 20]
 
@@ -20,6 +40,7 @@ export default function PerpetualsPage() {
   const { isConnected: isExternalConnected } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const MARKETS_DATA = usePerpMarkets()
   const [selectedMarket, setSelectedMarket] = useState(0)
   const [side, setSide] = useState('long')
   const [leverage, setLeverage] = useState(5)

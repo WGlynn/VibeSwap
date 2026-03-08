@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { useJarvis } from '../hooks/useJarvis'
+import { useMindMesh } from '../hooks/useMindMesh'
 
 // ============ Time Formatter ============
 
@@ -394,6 +396,7 @@ function MindPanels({ mind }) {
 
 function JarvisPage() {
   const { messages, isLoading, mind, health, budget, sendMessage } = useJarvis()
+  const { mesh } = useMindMesh()
 
   return (
     <div className="flex flex-col h-full max-w-7xl mx-auto px-4 py-2">
@@ -415,9 +418,21 @@ function JarvisPage() {
 
       {/* Status bar */}
       <div className="flex items-center justify-between mt-2 px-1 shrink-0">
-        <span className="text-black-500 font-mono text-[10px]">
-          ENCRYPTED | VIBESWAP MIND NETWORK | {health?.model || 'claude'}
-        </span>
+        <div className="flex items-center space-x-2">
+          <Link
+            to="/mesh"
+            className={`font-mono text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+              mesh?.status === 'fully-interlinked'
+                ? 'text-matrix-400 border-matrix-700 hover:border-matrix-500 bg-matrix-900/30'
+                : 'text-amber-400 border-amber-700 hover:border-amber-500 bg-amber-900/20'
+            }`}
+          >
+            MESH {mesh ? `${mesh.cells?.filter(c => c.status === 'interlinked').length || 0}/3` : '...'}
+          </Link>
+          <span className="text-black-500 font-mono text-[10px]">
+            ENCRYPTED | VIBESWAP MIND NETWORK | {health?.model || 'claude'}
+          </span>
+        </div>
         <div className="flex items-center space-x-3">
           {budget && (
             <div className="flex items-center space-x-1.5">

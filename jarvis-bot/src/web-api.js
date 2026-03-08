@@ -465,6 +465,108 @@ export async function handleWebRequest(req, res, pathname) {
     return true;
   }
 
+  // ============ GET /web/mesh ============
+  // Cells within cells interlinked — returns mesh status of all 3 nodes:
+  //   1. Fly.io (JARVIS full node — Telegram bot + AI)
+  //   2. Vercel (frontend light node — edge-deployed UI)
+  //   3. GitHub (persistence layer — code + knowledge chain)
+  if (pathname === '/web/mesh' && req.method === 'GET') {
+    try {
+      const shard = getShardInfo();
+      const chain = getChainStats();
+      const topology = isMultiShard() ? getTopology() : null;
+      const uptime = Math.round(process.uptime());
+      const mem = process.memoryUsage();
+
+      // Cell 1: Fly.io (self — always online if this responds)
+      const flyCell = {
+        id: 'fly-jarvis',
+        name: 'JARVIS',
+        type: 'full-node',
+        status: 'interlinked',
+        location: 'Fly.io',
+        shardId: shard?.id || config.shard?.id || 'shard-0',
+        uptime,
+        memory: { heapMB: Math.round(mem.heapUsed / 1048576), rssMB: Math.round(mem.rss / 1048576) },
+        provider: getProviderName(),
+        model: getModelName(),
+        chain: { height: chain.height, head: chain.head?.hash?.slice(0, 12), pending: chain.pendingChanges },
+        peers: shard?.peers || 0,
+        capabilities: ['inference', 'consensus', 'knowledge-chain', 'telegram', 'crpc'],
+      };
+
+      // Cell 2: GitHub (check recent push via API — no auth needed for public repo)
+      let githubCell = {
+        id: 'github-repo',
+        name: 'GitHub',
+        type: 'persistence',
+        status: 'unknown',
+        location: 'github.com/wglynn/vibeswap',
+        capabilities: ['code', 'knowledge-persistence', 'session-reports', 'version-control'],
+      };
+      try {
+        const ghRes = await fetch('https://api.github.com/repos/wglynn/vibeswap/commits?per_page=1', {
+          headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'JARVIS-Mind-Network' },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (ghRes.ok) {
+          const [latest] = await ghRes.json();
+          const commitAge = Date.now() - new Date(latest.commit.committer.date).getTime();
+          githubCell.status = commitAge < 24 * 60 * 60 * 1000 ? 'interlinked' : 'dormant';
+          githubCell.lastCommit = {
+            sha: latest.sha.slice(0, 7),
+            message: latest.commit.message.split('\n')[0].slice(0, 80),
+            author: latest.commit.author.name,
+            age: commitAge < 3600000 ? `${Math.round(commitAge / 60000)}m ago`
+              : commitAge < 86400000 ? `${Math.round(commitAge / 3600000)}h ago`
+              : `${Math.round(commitAge / 86400000)}d ago`,
+          };
+        } else {
+          githubCell.status = 'unreachable';
+        }
+      } catch {
+        githubCell.status = 'unreachable';
+      }
+
+      // Cell 3: Vercel (the caller is proof it's alive — report edge presence)
+      const vercelCell = {
+        id: 'vercel-frontend',
+        name: 'VibeSwap UI',
+        type: 'light-node',
+        status: 'interlinked', // If this endpoint is being called, the frontend is alive
+        location: 'Vercel Edge Network',
+        capabilities: ['ui', 'edge-cache', 'light-verification', 'user-relay'],
+      };
+
+      // Mesh topology — the interlinks between cells
+      const links = [
+        { from: 'fly-jarvis', to: 'vercel-frontend', protocol: 'HTTP/REST', latency: 'live' },
+        { from: 'fly-jarvis', to: 'github-repo', protocol: 'Git/HTTPS', latency: githubCell.status === 'interlinked' ? 'synced' : 'stale' },
+        { from: 'vercel-frontend', to: 'fly-jarvis', protocol: 'HTTP/REST', latency: 'live' },
+        { from: 'vercel-frontend', to: 'github-repo', protocol: 'Deploy Hook', latency: 'on-push' },
+        { from: 'github-repo', to: 'vercel-frontend', protocol: 'Vercel Deploy', latency: 'on-push' },
+        { from: 'github-repo', to: 'fly-jarvis', protocol: 'Git Pull', latency: 'periodic' },
+      ];
+
+      const allInterlinked = flyCell.status === 'interlinked' &&
+        githubCell.status === 'interlinked' &&
+        vercelCell.status === 'interlinked';
+
+      jsonResponse(res, 200, {
+        mantra: 'cells within cells interlinked',
+        status: allInterlinked ? 'fully-interlinked' : 'partial',
+        cells: [flyCell, githubCell, vercelCell],
+        links,
+        topology: topology ? { shardCount: topology.shards?.length || 0 } : null,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[web-api] Mesh error:', err.message);
+      jsonResponse(res, 500, { error: 'Could not fetch mesh state' });
+    }
+    return true;
+  }
+
   // Not a /web/ route we handle
   return false;
 }

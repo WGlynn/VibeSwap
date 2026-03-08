@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIdentity } from '../hooks/useIdentity'
+import { useMindMesh } from '../hooks/useMindMesh'
 import SoulboundAvatar from './SoulboundAvatar'
 import RecoverySetup from './RecoverySetup'
 import PulseIndicator from './ui/PulseIndicator'
@@ -19,6 +20,7 @@ function HeaderMinimal() {
   const { isConnected: isExternalConnected, shortAddress: externalShortAddress, connect, disconnect: externalDisconnect, isConnecting } = useWallet()
   const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress, disconnect: deviceDisconnect } = useDeviceWallet()
   const { identity, hasIdentity } = useIdentity()
+  const { mesh } = useMindMesh()
   const [showDrawer, setShowDrawer] = useState(false)
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
 
@@ -56,6 +58,24 @@ function HeaderMinimal() {
 
             {/* Right side */}
             <div className="flex items-center space-x-3">
+              {/* Mesh indicator — cells within cells interlinked */}
+              <Link
+                to="/mesh"
+                className="hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-matrix-700 transition-colors"
+                title="Mind Network Mesh"
+              >
+                {mesh?.status === 'fully-interlinked' ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-matrix-500 animate-pulse" />
+                ) : mesh?.status === 'partial' ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-black-500" />
+                )}
+                <span className="text-[10px] font-mono text-black-400">
+                  {mesh ? `${mesh.cells?.filter(c => c.status === 'interlinked').length || 0}/3` : '...'}
+                </span>
+              </Link>
+
               {/* Wallet */}
               {isConnected ? (
                 <button

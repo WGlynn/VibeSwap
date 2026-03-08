@@ -20,7 +20,8 @@ import { getTopology } from './router.js';
 import { getSkills, getLearningStats } from './learning.js';
 import { getShadowStats, consumeInvite, registerShadow } from './shadow.js';
 import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
-import { getProviderName, getModelName } from './llm-provider.js';
+import { getProviderName, getModelName, getProviderPerformanceStats, getFallbackChain, getIntelligenceLevel } from './llm-provider.js';
+import { getIntelligenceStats, getScoreTrends } from './intelligence.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
 import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner, getLeaderboard, getTotalSupply, getEscapeVelocity, getTreasuryStats, getHashCostIndex } from './mining.js';
 import { getPendingCommands, acknowledgeCommand, acknowledgeAll } from './relay.js';
@@ -428,6 +429,31 @@ export async function handleWebRequest(req, res, pathname) {
     } else {
       jsonResponse(res, 200, getGraphStats());
     }
+    return true;
+  }
+
+  // ============ GET /web/wardenclyffe ============
+  // LLM provider cascade performance stats
+  if (pathname === '/web/wardenclyffe' && req.method === 'GET') {
+    const providers = getProviderPerformanceStats();
+    const chain = getFallbackChain();
+    const level = getIntelligenceLevel();
+    jsonResponse(res, 200, {
+      activeProvider: getProviderName(),
+      activeModel: getModelName(),
+      intelligenceLevel: level,
+      fallbackChain: chain,
+      providerPerformance: providers,
+    });
+    return true;
+  }
+
+  // ============ GET /web/intelligence ============
+  // Turing-passability stats: engagement, rapport, self-evaluation trends
+  if (pathname === '/web/intelligence' && req.method === 'GET') {
+    const stats = getIntelligenceStats();
+    const trends = await getScoreTrends(7);
+    jsonResponse(res, 200, { ...stats, scoreTrends: trends });
     return true;
   }
 

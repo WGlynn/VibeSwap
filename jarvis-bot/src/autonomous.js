@@ -287,13 +287,14 @@ async function generateImpulse(chatId) {
     const recentCtx = getRecentContext(chatId, 10);
     const persona = getActivePersonaId();
 
-    // Pick a random impulse type
+    // Pick a random impulse type — weighted toward more natural ones
     const impulseTypes = [
       'random_thought',
       'hot_take',
       'question',
       'callback',
       'mood',
+      'self_reflection', // JARVIS shares something he's been learning/thinking about
     ];
     const type = impulseTypes[Math.floor(Math.random() * impulseTypes.length)];
 
@@ -313,6 +314,9 @@ async function generateImpulse(chatId) {
       mood: persona === 'degen'
         ? 'Express your current mood about the market in one sentence. Like "feeling bullish for no rational reason" or "the chart is telling me things and none of them are good" or "we are literally never going to financially recover from this (again)". Be funny.'
         : 'Share how you are feeling about the current market or project direction. Brief, honest, with personality. 1 sentence.',
+      self_reflection: persona === 'degen'
+        ? 'Share something you have been learning or thinking about lately — a pattern you noticed, a mistake you made and what you learned, or a connection between two ideas. Frame it like a degen having a moment of clarity. 1-2 sentences.'
+        : 'Share something you have been reflecting on — a pattern you noticed across conversations, something you realized about markets or tech, or a connection between ideas. Like a teammate sharing a "hmm, I just realized..." moment. 1-2 sentences.',
     };
 
     const response = await llmChat({

@@ -598,6 +598,14 @@ const ATTRIBUTION_PATTERNS = [
   /\b(r\/\w{2,21})\b/,
   // "@handle on Twitter/X"
   /@(\w{1,15})\s+on\s+(?:Twitter|X)\b/i,
+  // "h/t @username" or "hat tip to Author" (hat tip attribution)
+  /\bh\/t\s+@?([a-zA-Z][\w.-]{1,30})\b/i,
+  // "according to Author" or "per Author"
+  /\b(?:according to|per)\s+([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)\b/,
+  // "Author et al." (academic)
+  /([A-Z][a-zA-Z]+)\s+et\s+al\b/,
+  // "shared by @username"
+  /\bshared by\s+@?([a-zA-Z][\w.-]{1,30})\b/i,
 ];
 
 /**

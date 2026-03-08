@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useMindMesh } from '../hooks/useMindMesh'
+import { useUbuntu } from '../hooks/useUbuntu'
+import Ouroboros from './ui/Ouroboros'
 
 const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
 
@@ -10,6 +12,7 @@ const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.
  */
 export default function StatusDashboard() {
   const { mesh } = useMindMesh()
+  const { here } = useUbuntu()
   const [mind, setMind] = useState(null)
   const [health, setHealth] = useState(null)
 
@@ -173,10 +176,21 @@ export default function StatusDashboard() {
         </div>
       )}
 
+      {/* Ouroboros — self-healing cycle */}
+      <div className="mb-6">
+        <h2 className="text-xs font-mono text-black-500 uppercase px-1 mb-3">Ouroboros</h2>
+        <Ouroboros />
+      </div>
+
       {/* Footer */}
       <div className="text-center mt-8">
+        {here > 0 && (
+          <p className="text-black-500 text-[10px] font-mono mb-1">
+            {here} {here === 1 ? 'soul' : 'souls'} observing this system
+          </p>
+        )}
         <p className="text-black-600 text-[10px] font-mono">
-          Cells within cells interlinked. Updated every 15s.
+          Cells within cells interlinked. Umuntu ngumuntu ngabantu.
         </p>
       </div>
     </div>

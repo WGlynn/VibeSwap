@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useJarvis } from '../hooks/useJarvis'
+import { remember } from '../utils/sankofa'
 
 /**
  * Floating JARVIS chat bubble — available on every page.
@@ -25,6 +26,7 @@ export default function JarvisBubble() {
     if (!input.trim() || isLoading) return
     sendMessage(input)
     setInput('')
+    remember('success', { page: '/jarvis-bubble', action: 'chat' })
   }
 
   const isOnline = health?.status === 'online'

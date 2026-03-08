@@ -465,6 +465,92 @@ export async function handleWebRequest(req, res, pathname) {
     return true;
   }
 
+  // ============ POST /web/chat/stream ============
+  // SSE streaming endpoint — sends response chunks as they're ready.
+  // The response is generated in full, then streamed character-by-character
+  // to give instant-feeling feedback.
+  if (pathname === '/web/chat/stream' && req.method === 'POST') {
+    if (!checkRateLimit(ip)) {
+      jsonResponse(res, 429, { error: 'Rate limited.', retryAfter: 60 });
+      return true;
+    }
+
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { sessionId, message, userName } = body;
+
+      if (!sessionId || !message || typeof message !== 'string') {
+        jsonResponse(res, 400, { error: 'Missing sessionId or message' });
+        return true;
+      }
+      if (message.length > 2000) {
+        jsonResponse(res, 400, { error: 'Message too long (max 2000 chars)' });
+        return true;
+      }
+
+      const budgetCheck = checkBudget(sessionId);
+      if (!budgetCheck.allowed) {
+        jsonResponse(res, 429, { error: budgetCheck.message });
+        return true;
+      }
+      if (userName) markIdentified(sessionId);
+
+      // Set up SSE
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': req.headers.origin || '*',
+      });
+
+      // Send "thinking" event immediately
+      res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
+
+      const chatId = `web-${sessionId}`;
+      const name = (userName || 'Web Visitor').slice(0, 50);
+      const chatOptions = budgetCheck.degraded ? { maxTokensOverride: budgetCheck.maxTokens } : {};
+
+      const response = await chat(chatId, name, message, 'web', [], chatOptions);
+      const fullText = response.text || '';
+
+      // Stream in chunks (~word-by-word)
+      const words = fullText.split(/(\s+)/);
+      let buffer = '';
+      for (let i = 0; i < words.length; i++) {
+        buffer += words[i];
+        // Flush every ~3-5 words or at end
+        if ((i > 0 && i % 4 === 0) || i === words.length - 1) {
+          res.write(`data: ${JSON.stringify({ type: 'chunk', text: buffer })}\n\n`);
+          buffer = '';
+        }
+      }
+
+      // Record usage
+      const quality = computeWebQuality(message);
+      recordUsage(sessionId, response.usage, quality);
+
+      // Send done event with budget info
+      res.write(`data: ${JSON.stringify({
+        type: 'done',
+        budget: {
+          daily: budgetCheck.budget,
+          used: budgetCheck.used + (response.usage?.input || 0) + (response.usage?.output || 0),
+          remaining: Math.max(0, budgetCheck.remaining - (response.usage?.input || 0) - (response.usage?.output || 0)),
+          degraded: budgetCheck.degraded,
+        },
+      })}\n\n`);
+
+      res.end();
+    } catch (err) {
+      console.error('[web-api] Stream chat error:', err.message);
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+        res.end();
+      } catch { res.end(); }
+    }
+    return true;
+  }
+
   // ============ GET /web/mesh ============
   // Cells within cells interlinked — returns mesh status of all 3 nodes:
   //   1. Fly.io (JARVIS full node — Telegram bot + AI)

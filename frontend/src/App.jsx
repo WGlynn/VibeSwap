@@ -6,6 +6,7 @@ import AmbientBackground from './components/ui/AmbientBackground'
 import VibePlayer from './components/VibePlayer'
 import { ContributionsProvider } from './contexts/ContributionsContext'
 import { MessagingProvider } from './contexts/MessagingContext'
+import { useKeyboardNav } from './hooks/useKeyboardNav'
 
 // Error boundary to catch React errors
 class ErrorBoundary extends Component {
@@ -122,8 +123,7 @@ function AnimatedRoutes() {
 function App() {
   const location = useLocation()
   const isHomePage = location.pathname === '/'
-
-  // Scroll is now prevented globally in index.html for native iOS feel
+  useKeyboardNav() // Ctrl+K swap, Ctrl+J jarvis, Ctrl+M mesh, etc.
 
   return (
     <MessagingProvider>

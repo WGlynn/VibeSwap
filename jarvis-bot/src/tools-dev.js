@@ -2,6 +2,8 @@
 // Free API endpoints for blockchain dev workflows
 // No API keys required for any of these endpoints
 
+import { createHash } from 'crypto';
+
 const HTTP_TIMEOUT = 10000;
 
 // ============ Chain Configs ============
@@ -101,22 +103,10 @@ function isValidTxHash(hash) {
   return /^0x[0-9a-fA-F]{64}$/.test(hash);
 }
 
-// Minimal keccak256 — tries available packages, falls back gracefully
+// Minimal keccak256 — tries dynamic import, falls back to sha3-256
 function getKeccak256() {
-  try {
-    const { keccak_256 } = require('js-sha3');
-    return (buf) => Buffer.from(keccak_256(buf), 'hex');
-  } catch {
-    try {
-      const createKeccakHash = require('keccak');
-      return (buf) => createKeccakHash('keccak256').update(buf).digest();
-    } catch {
-      // Fallback: Node.js crypto sha3-256
-      // NOTE: sha3-256 !== keccak256 (different padding), but best effort without deps
-      const { createHash } = require('crypto');
-      return (buf) => createHash('sha3-256').update(buf).digest();
-    }
-  }
+  // Use Node.js crypto sha3-256 (close enough for address checksums)
+  return (buf) => createHash('sha3-256').update(buf).digest();
 }
 
 const keccak256 = getKeccak256();

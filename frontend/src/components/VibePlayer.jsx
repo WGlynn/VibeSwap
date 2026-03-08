@@ -8,6 +8,40 @@ export default function VibePlayer() {
   const [showPanel, setShowPanel] = useState(false)
   const iframeRef = useRef(null)
 
+  // Send commands to the YouTube iframe via postMessage
+  const sendCommand = useCallback((func, args = []) => {
+    if (!iframeRef.current?.contentWindow) return
+    iframeRef.current.contentWindow.postMessage(
+      JSON.stringify({ event: 'command', func, args }),
+      '*'
+    )
+  }, [])
+
+  const play = useCallback(() => {
+    sendCommand('playVideo')
+    setIsPlaying(true)
+  }, [sendCommand])
+
+  const pause = useCallback(() => {
+    sendCommand('pauseVideo')
+    setIsPlaying(false)
+  }, [sendCommand])
+
+  const togglePlayPause = useCallback(() => {
+    if (isPlaying) pause()
+    else play()
+  }, [isPlaying, play, pause])
+
+  const nextTrack = useCallback(() => {
+    sendCommand('nextVideo')
+    setIsPlaying(true)
+  }, [sendCommand])
+
+  const prevTrack = useCallback(() => {
+    sendCommand('previousVideo')
+    setIsPlaying(true)
+  }, [sendCommand])
+
   const togglePlayer = useCallback(() => {
     if (!isOpen) {
       setIsOpen(true)
@@ -31,7 +65,7 @@ export default function VibePlayer() {
 
   return (
     <div className="fixed bottom-4 right-4" style={{ zIndex: 50 }}>
-      {/* Hidden iframe — plays audio, never visible */}
+      {/* Hidden iframe — plays audio, never visible. enablejsapi=1 allows postMessage control */}
       {isOpen && (
         <div
           aria-hidden="true"
@@ -48,7 +82,7 @@ export default function VibePlayer() {
             ref={iframeRef}
             width="1"
             height="1"
-            src={`https://www.youtube.com/embed/videoseries?list=${PLAYLIST_ID}&autoplay=1&loop=1`}
+            src={`https://www.youtube.com/embed/videoseries?list=${PLAYLIST_ID}&autoplay=1&loop=1&enablejsapi=1`}
             title="VibeSwap Playlist"
             frameBorder="0"
             allow="autoplay; encrypted-media"
@@ -68,8 +102,10 @@ export default function VibePlayer() {
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-black-700">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-matrix-500 animate-pulse" />
-              <span className="text-xs font-mono font-bold text-matrix-400">NOW VIBING</span>
+              <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-matrix-500 animate-pulse' : 'bg-black-500'}`} />
+              <span className="text-xs font-mono font-bold text-matrix-400">
+                {isPlaying ? 'NOW VIBING' : 'PAUSED'}
+              </span>
             </div>
             <button
               onClick={() => setShowPanel(false)}
@@ -82,14 +118,14 @@ export default function VibePlayer() {
           </div>
 
           {/* Visualizer bars */}
-          <div className="px-4 py-4">
+          <div className="px-4 pt-4 pb-2">
             <div className="flex items-end justify-center gap-[3px] h-12 mb-3">
               {Array.from({ length: 16 }).map((_, i) => (
                 <span
                   key={i}
-                  className="w-[3px] rounded-full"
+                  className="w-[3px] rounded-full transition-all duration-300"
                   style={{
-                    background: `linear-gradient(to top, #10b981, #00ff41)`,
+                    background: 'linear-gradient(to top, #10b981, #00ff41)',
                     animation: isPlaying
                       ? `vibe-bar-${(i % 4) + 1} ${0.4 + (i % 5) * 0.15}s ease-in-out infinite`
                       : 'none',
@@ -106,11 +142,24 @@ export default function VibePlayer() {
             </div>
           </div>
 
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-4 px-4 pb-4">
+          {/* Transport controls */}
+          <div className="flex items-center justify-center gap-3 px-4 pb-4">
+            {/* Previous */}
             <button
-              onClick={togglePlayer}
-              className="w-10 h-10 rounded-full bg-matrix-600 hover:bg-matrix-500 text-black-900 flex items-center justify-center transition-colors"
+              onClick={prevTrack}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-black-300 hover:text-white hover:bg-white/10 transition-colors"
+              title="Previous track"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+              </svg>
+            </button>
+
+            {/* Play / Pause */}
+            <button
+              onClick={togglePlayPause}
+              className="w-11 h-11 rounded-full bg-matrix-600 hover:bg-matrix-500 text-black-900 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+              title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -121,6 +170,17 @@ export default function VibePlayer() {
                   <path d="M8 5v14l11-7z" />
                 </svg>
               )}
+            </button>
+
+            {/* Next */}
+            <button
+              onClick={nextTrack}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-black-300 hover:text-white hover:bg-white/10 transition-colors"
+              title="Next track"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+              </svg>
             </button>
           </div>
         </div>

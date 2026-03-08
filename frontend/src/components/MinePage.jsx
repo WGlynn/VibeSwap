@@ -200,11 +200,22 @@ function MinePage() {
     } catch {}
   }, [address])
 
+  // Refresh target on mount + every 4 min (challenge rotates every 5 min on server)
+  // Also restarts active workers with fresh challenge to prevent stale submissions
   useEffect(() => {
     refreshTarget()
-    const interval = setInterval(refreshTarget, 60_000)
+    const interval = setInterval(async () => {
+      const oldChallenge = challengeRef.current
+      await refreshTarget()
+      // If challenge changed and we're mining, restart workers with new challenge
+      if (isMining && challengeRef.current && challengeRef.current !== oldChallenge) {
+        workersRef.current.forEach(w => {
+          w.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
+        })
+      }
+    }, 4 * 60_000)
     return () => clearInterval(interval)
-  }, [refreshTarget])
+  }, [refreshTarget, isMining, difficulty])
 
   useEffect(() => {
     refreshStats()
@@ -279,8 +290,11 @@ function MinePage() {
               const reason = result.reason || result.error || 'unknown'
               addLog(`Rejected: ${reason}`, 'error')
               if (reason === 'stale_challenge' || reason.includes('challenge')) {
-                addLog('Refreshing challenge...', 'system')
+                addLog('Challenge expired — refreshing and restarting...', 'system')
                 await refreshTarget()
+                // Don't break — the worker restart below will use the fresh challenge
+              } else if (reason === 'rate_limited') {
+                addLog(`Rate limited — waiting ${result.retryAfter || 60}s`, 'warning')
               }
             }
           } catch (err) {

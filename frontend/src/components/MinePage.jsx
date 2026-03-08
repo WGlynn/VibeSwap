@@ -727,6 +727,42 @@ function MinePage() {
           </div>
         </StaggerItem>
 
+        {/* Jarvis Compute Vault — PROMINENT placement right after stats */}
+        <StaggerItem>
+          <GlassCard className="p-6 mb-4 border-2 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-amber-300">Convert JUL to Jarvis Credits</h3>
+                  <p className="text-void-400 text-sm">Spend your mined JUL to talk to Jarvis</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-void-400">Available</div>
+                <div className="font-mono text-xl text-amber-400 font-bold">{(serverBalance || 0).toFixed(2)} JUL</div>
+                <div className="text-xs text-void-500">{((serverBalance || 0) * 1000).toFixed(0)} compute credits</div>
+              </div>
+            </div>
+
+            <TipJarPanel
+              address={address}
+              serverBalance={serverBalance}
+              onTipSuccess={(newBalance) => {
+                setServerBalance(newBalance)
+                refreshStats()
+                addLog(`JUL converted to Jarvis compute credits!`, 'success')
+                toast.success('JUL converted — Jarvis compute credits activated!')
+              }}
+              apiUrl={API_URL}
+            />
+          </GlassCard>
+        </StaggerItem>
+
         {/* Network Info */}
         <StaggerItem>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
@@ -892,40 +928,7 @@ function MinePage() {
           <LeaderboardCard apiUrl={API_URL} />
         </StaggerItem>
 
-        {/* Tip Jar — Send JUL to Jarvis Compute Vault */}
-        <StaggerItem>
-          <GlassCard className="p-5 mb-4 border border-amber-500/20">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-amber-300">Jarvis Compute Vault</h3>
-                  <p className="text-void-500 text-xs">Send mined JUL here to top off your Jarvis credits</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-void-400">Your Balance</div>
-                <div className="font-mono text-amber-400 font-bold">{(serverBalance || 0).toFixed(4)} JUL</div>
-              </div>
-            </div>
-
-            <TipJarPanel
-              address={address}
-              serverBalance={serverBalance}
-              onTipSuccess={(newBalance) => {
-                setServerBalance(newBalance)
-                refreshStats()
-                addLog(`Tipped JUL to Jarvis Compute Vault — credits topped off!`, 'success')
-                toast.success('JUL sent to Jarvis — compute credits activated!')
-              }}
-              apiUrl={API_URL}
-            />
-          </GlassCard>
-        </StaggerItem>
+        {/* Old tip jar moved up — see "Convert JUL to Jarvis Credits" above stats */}
 
         {/* Current Challenge */}
         <StaggerItem>

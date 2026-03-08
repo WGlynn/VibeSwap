@@ -101,10 +101,10 @@ function CreateIdentityModal({ isOpen, onClose }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 overflow-y-auto bg-black/60"
-        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="flex items-center justify-center min-h-full p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -267,7 +267,6 @@ function CreateIdentityModal({ isOpen, onClose }) {
             )}
           </div>
         </motion.div>
-        </div>
       </motion.div>
     </AnimatePresence>
   )

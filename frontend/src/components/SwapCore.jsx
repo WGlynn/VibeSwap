@@ -25,15 +25,14 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 overflow-y-auto"
-        style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.85))' }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="flex items-center justify-center min-h-full p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
           animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
           exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
-          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl"
+          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto allow-scroll"
         >
           {/* Content */}
           <div className="text-center mb-6">
@@ -136,7 +135,6 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
             Just looking around
           </button>
         </motion.div>
-        </div>
       </motion.div>
     </AnimatePresence>
   )
@@ -156,10 +154,9 @@ function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isS
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 overflow-y-auto"
-        style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.85))' }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="flex items-center justify-center min-h-full p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
           animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
@@ -234,7 +231,6 @@ function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isS
             </div>
           </a>
         </motion.div>
-        </div>
       </motion.div>
     </AnimatePresence>
   )

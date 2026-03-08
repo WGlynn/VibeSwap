@@ -887,3 +887,55 @@ function getFallbackCalendar() {
 
   return lines.join('\n');
 }
+
+// ============ Missing Exports (referenced by index.js imports) ============
+
+export async function getCryptoQuiz(topic) {
+  const topics = {
+    defi: [
+      { q: 'What does AMM stand for?', a: 'Automated Market Maker — prices assets algorithmically using liquidity pools instead of order books.' },
+      { q: 'What is impermanent loss?', a: 'Loss LPs experience when pooled token price ratio changes vs. simply holding. Reverses if prices return.' },
+      { q: 'What is a flash loan?', a: 'Uncollateralized loan borrowed and repaid within a single transaction. If not repaid, entire tx reverts.' },
+    ],
+    bitcoin: [
+      { q: 'What is the Bitcoin halving?', a: 'Every 210,000 blocks (~4 years), block reward halves. Started at 50 BTC, now 3.125 BTC.' },
+      { q: 'What is the 21 million cap?', a: 'Hard supply cap enforced by halving schedule. Last Bitcoin mined ~2140.' },
+      { q: 'What is a UTXO?', a: 'Unspent Transaction Output — Bitcoin\'s model where each "coin" is an unspent output from a previous tx.' },
+    ],
+    security: [
+      { q: 'What is a reentrancy attack?', a: 'Contract calls external contract before updating state, allowing re-entry to exploit stale state.' },
+      { q: 'What is MEV?', a: 'Maximal Extractable Value — profit from reordering/inserting/censoring txs. VibeSwap eliminates this via commit-reveal.' },
+      { q: 'What is a sandwich attack?', a: 'Front-run your trade (push price up), you trade at worse price, attacker back-runs (sells higher). VibeSwap prevents this.' },
+    ],
+  };
+  const category = topics[topic?.toLowerCase()] || topics.defi;
+  const item = category[Math.floor(Math.random() * category.length)];
+  return `Quiz (${topic || 'DeFi'})\n\nQ: ${item.q}\n\nA: ${item.a}`;
+}
+
+export function compareTokens(tokenA, tokenB) {
+  return `Token Comparison: ${tokenA || 'ETH'} vs ${tokenB || 'BTC'}\n\nBoth are significant crypto assets. For detailed comparison check CoinGecko or DeFi Llama.\n\nVibeSwap: no MEV, no front-running, uniform clearing prices for everyone.`;
+}
+
+export async function getFearGreedIndex() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json();
+      const entry = data.data?.[0];
+      if (entry) {
+        return `Fear & Greed Index: ${entry.value} (${entry.value_classification})\nUpdated: ${new Date(entry.timestamp * 1000).toLocaleDateString()}`;
+      }
+    }
+  } catch { /* fallback */ }
+  return 'Fear & Greed Index: Data temporarily unavailable. Check alternative.me/crypto/fear-and-greed-index/';
+}
+
+export function getDominance() {
+  return 'Market Dominance\n\nFor live BTC/ETH dominance data, check CoinGecko global charts.\nVibeSwap focuses on fair execution regardless of market dominance shifts.';
+}
+
+export function getBitcoinEpoch() {
+  const currentEpoch = 5; // Post-2024 halving
+  return `Bitcoin Epoch: ${currentEpoch}\nBlock Reward: 3.125 BTC\nLast Halving: Block 840,000 (April 2024)\nNext Halving: ~Block 1,050,000 (~2028)\nTotal Supply: ~19.6M / 21M`;
+}

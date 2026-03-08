@@ -77,6 +77,13 @@ const ResearchPage = lazy(() => import('./components/ResearchPage'))
 const AppStore = lazy(() => import('./components/AppStore'))
 const VibeFeed = lazy(() => import('./components/VibeFeed'))
 const VibeWiki = lazy(() => import('./components/VibeWiki'))
+const DePINHub = lazy(() => import('./components/DePINHub'))
+const AgentHub = lazy(() => import('./components/AgentHub'))
+const RWAHub = lazy(() => import('./components/RWAHub'))
+const LendingPage = lazy(() => import('./components/LendingPage'))
+const StakingPage = lazy(() => import('./components/StakingPage'))
+const GovernancePage = lazy(() => import('./components/GovernancePage'))
+const InfoFiPage = lazy(() => import('./components/InfoFiPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -139,6 +146,14 @@ function AnimatedRoutes() {
             <Route path="/apps" element={<AppStore />} />
             <Route path="/feed" element={<VibeFeed />} />
             <Route path="/wiki" element={<VibeWiki />} />
+            {/* New protocol hubs */}
+            <Route path="/depin" element={<DePINHub />} />
+            <Route path="/agents" element={<AgentHub />} />
+            <Route path="/rwa" element={<RWAHub />} />
+            <Route path="/lend" element={<LendingPage />} />
+            <Route path="/stake" element={<StakingPage />} />
+            <Route path="/govern" element={<GovernancePage />} />
+            <Route path="/infofi" element={<InfoFiPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

@@ -531,6 +531,26 @@ function friendlyError(error) {
   return `Something went wrong: ${msg.slice(0, 150) || 'Unknown error'}`;
 }
 
+// ============ Ephemeral Error Reply ============
+// Send error message, log it for debugging, auto-delete after delay.
+// Good data for antifragility, bad UX if left visible.
+const ERROR_DELETE_DELAY = 15_000; // 15s — enough time to read, then clean up
+
+async function ephemeralReply(ctx, text, opts = {}) {
+  try {
+    const sent = await ctx.reply(text, opts);
+    // Log for debugging before deletion
+    console.log(`[ephemeral] chatId=${ctx.chat?.id} error="${text.slice(0, 120)}"`);
+    // Schedule auto-delete
+    setTimeout(async () => {
+      try { await ctx.deleteMessage(sent.message_id); } catch {}
+    }, ERROR_DELETE_DELAY);
+    return sent;
+  } catch (err) {
+    console.error('[ephemeral] Failed to send:', err.message);
+  }
+}
+
 // ============ Rate Limiting ============
 
 const rateLimitMap = new Map(); // userId -> [timestamps]
@@ -4096,7 +4116,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
     clearInterval(typingInterval);
     console.error('[bot] Media response error:', error.message);
     try {
-      await ctx.reply(friendlyError(error), { parse_mode: undefined });
+      await ephemeralReply(ctx, friendlyError(error), { parse_mode: undefined });
     } catch {
       console.error('[bot] Failed to send error reply to chat', ctx.chat?.id);
     }
@@ -4939,7 +4959,7 @@ bot.on('text', async (ctx) => {
     clearInterval(typingInterval);
     console.error('[bot] Error:', error.message);
     try {
-      await ctx.reply(friendlyError(error), { parse_mode: undefined });
+      await ephemeralReply(ctx, friendlyError(error), { parse_mode: undefined });
     } catch {
       // If even the error reply fails (user blocked bot, chat deleted, TG down), just log
       console.error('[bot] Failed to send error reply to chat', ctx.chat?.id);

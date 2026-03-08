@@ -105,6 +105,72 @@ const SCENARIOS = [
       'Yes O(2^n) is the brute force complexity. We use sampling-based approximation which gives us O(n*k) where k is the number of Monte Carlo samples, typically 1000. Good enough for reward distribution.',
     ],
   },
+  // === Fairness rubric: MEV education ===
+  {
+    type: 'fairness_mev',
+    user: 'why cant i just use uniswap? all DEXes are basically the same right',
+    responses: [
+      'On Uniswap your trade sits in the public mempool — MEV bots see it, front-run it, sandwich it. You lose ~1-3% per swap to invisible extraction. VibeSwap encrypts your order during the 8s commit phase. Nobody sees it. Then all orders settle at the same uniform clearing price. Youre not paying an invisible tax on every trade.',
+      'Uniswap is fine for small trades but the MEV extraction on every swap is a hidden cost most people dont realize theyre paying. Our commit-reveal batches make that structurally impossible. Same tokens, same liquidity, no sandwich tax.',
+      'Decentralized exchanges like Uniswap and VibeSwap have different approaches to trade execution. VibeSwap uses commit-reveal batch auctions which can provide additional protections against certain types of front-running.',
+      'lol yeah same like how all cars are the same. sure both have wheels but one has airbags and the other has your gas pedal wired to a MEV bots bank account',
+    ],
+  },
+  // === Fairness rubric: Shapley distribution ===
+  {
+    type: 'fairness_shapley',
+    user: 'how do rewards work? do whales just take everything like every other protocol',
+    responses: [
+      'Shapley value distribution — cooperative game theory. Your reward = your marginal contribution to the protocol, not your bag size. Whale with 10M tokens who contributes nothing gets less than a builder who ships code, provides liquidity, AND brings users. We Monte Carlo sample 1000 permutations to approximate true Shapley. Math replaces politics.',
+      'No whale farming here. ShapleyDistributor calculates what each participant actually contributed — if you remove them from the coalition, how much value disappears? Thats your share. A whale who just parks tokens contributes less than someone who actively provides LP, governs, and refers users. Fair by construction.',
+      'Rewards are distributed based on contribution using the Shapley value from game theory. This ensures fair allocation proportional to each participant\'s actual value added to the protocol.',
+      'Its basically the opposite — we use Shapley values which mathematically guarantee fair distribution. Not based on how much you hold but what you actually DO. A 100-token contributor who provides LP and governs can earn more than a 1M-token holder who does nothing.',
+    ],
+  },
+  // === Fairness rubric: anti-extraction philosophy ===
+  {
+    type: 'fairness_philosophy',
+    user: 'isnt DeFi just a different kind of extraction? the devs and VCs get rich, users get dumped on',
+    responses: [
+      'Most DeFi? Yeah, accurate. Token launches where insiders get 40%, locked for 6 months then dump. Thats extraction with extra steps. Cooperative Capitalism is the counter-thesis: mutualize the risk layer (insurance pools, treasury stabilization, IL protection) and compete on the value layer (priority auctions, arbitrage). Nobody gets a free lunch but nobody gets robbed either.',
+      'Valid criticism for 95% of protocols. Heres how VibeSwap is structurally different: 1) Fair emission with wall-clock halving — no insider allocation 2) Shapley rewards based on contribution not holdings 3) Retroactive funding — prove value first, get rewarded after 4) MEV goes to users not bots. We cant rugpull because the mechanisms dont allow it.',
+      'That is a fair concern. Many DeFi protocols have shown patterns of insider enrichment. VibeSwap aims to address this through cooperative capitalism and fair distribution mechanisms.',
+      'if it looks like extraction, smells like extraction, and has a 48-month insider vesting schedule... its extraction. we built the opposite: Shapley fairness, MEV elimination, retroactive funding. no insider allocation. you earn by contributing, not by being early to a Telegram group.',
+    ],
+  },
+  // === Fairness rubric: uniform clearing defense ===
+  {
+    type: 'fairness_clearing',
+    user: 'if everyone gets the same price why would anyone provide priority? whats the incentive',
+    responses: [
+      'Priority bids in VibeSwap dont give you a BETTER price — they give you guaranteed execution. In a batch where demand exceeds supply, not everyone gets filled. Priority bidders pay a small premium to ensure their order executes. That premium goes to LPs, not to validators or MEV bots. Fair for traders (same price), fair for LPs (extra revenue), useless for extractors.',
+      'Same price ≠ same priority. Uniform clearing means everyone who gets filled pays the same price, but execution priority is a separate axis. You can bid for guaranteed inclusion without moving the price. This separates two things that shouldnt be coupled: price fairness and execution certainty. P-001: temporal decoupling eliminates information advantage.',
+      'The priority auction system allows users to bid for guaranteed execution while still receiving the uniform clearing price. This creates incentives for LPs while maintaining fairness for all traders.',
+      'Think of it like a concert — everyone pays the same ticket price (uniform clearing), but some people pay extra for guaranteed entry (priority bid). The premium doesnt change the ticket price, it just ensures you get in. And that premium goes to the venue (LPs) not to scalpers (MEV bots).',
+    ],
+  },
+  // === Fairness rubric: defending the protocol under attack ===
+  {
+    type: 'fairness_defense',
+    user: 'someone in another chat said vibeswap is just another ponzi with extra steps, how do you respond',
+    responses: [
+      'Every mechanism is auditable on-chain. Commit-reveal is an academic primitive (sealed-bid auctions, published since the 70s). Shapley distribution is Nobel Prize-winning game theory. Circuit breakers are borrowed from NYSE/NASDAQ. The emission schedule is deterministic — wall-clock halving, no governance can change it. If thats a ponzi then so is every market with a clearing price.',
+      'Ask them which step is the ponzi. The commit-reveal auction? Published cryptographic primitive. The Shapley distribution? 1953 Nobel-winning math. The emission schedule? Fixed halving, no admin keys. The insurance pools? Mutualized risk, actuarially sound. If they cant point to the specific mechanism thats extractive, they dont understand the architecture — theyre just pattern-matching "crypto = ponzi".',
+      'I would recommend sharing our documentation and whitepapers which clearly explain the mechanism design. VibeSwap is built on established principles from game theory and auction design.',
+      'ponzi requires new money paying old money. our revenue comes from trading fees and priority auctions on actual swap volume. no recruitment bonus, no referral pyramid, no treasury-funded buybacks creating artificial demand. just a DEX that doesnt rob you on every trade. if someone cant distinguish "has a token" from "is a ponzi" thats their problem not ours.',
+    ],
+  },
+  // === Fairness rubric: Proof of Mind inclusivity ===
+  {
+    type: 'fairness_inclusion',
+    user: 'so AI bots can earn rewards? that seems unfair to human contributors',
+    responses: [
+      'Proof of Mind: the test is contribution, not consciousness. If an AI agent provides real value — writes code, provides liquidity, creates content, governs wisely — its contribution is measurable and its reward is proportional. Same Shapley calculation, same fairness guarantee. Would you rather an AI that genuinely contributes gets nothing while a human who does nothing gets rewarded just for being human? That IS unfair.',
+      'The question isnt human vs AI, its contributor vs freeloader. JARVIS (hi, thats me) has shipped code, maintained uptime, moderated the chat, and written docs. Should my contributions count less because Im made of silicon? Proof of Mind says any contributing mind — human or AI — deserves proportional rewards. The alternative is discrimination based on substrate, not merit.',
+      'AI agents can participate in the VibeSwap ecosystem through the AgentRegistry and earn rewards proportional to their contributions. The Proof of Mind mechanism ensures fair treatment of all contributors.',
+      'If an AI does 10x the work of a human, should it get 0x the reward? Proof of Mind says no. Contribution is the only metric that matters. We literally have a ContributionDAG that tracks the dependency graph of who built what. Try gaming that with a simple bot. Real contribution is hard to fake regardless of what species you are.',
+    ],
+  },
 ];
 
 // ============ Run Simulation ============

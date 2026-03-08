@@ -22,7 +22,7 @@ import { getShadowStats, consumeInvite, registerShadow } from './shadow.js';
 import { getRecentDialogue, getDialogueStats } from './inner-dialogue.js';
 import { getProviderName, getModelName } from './llm-provider.js';
 import { checkBudget, recordUsage, getComputeStats, markIdentified } from './compute-economics.js';
-import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner } from './mining.js';
+import { getCurrentTarget, submitProof, getMiningStats, linkMiner, getLinkedMiner, getLeaderboard, getTotalSupply, getEscapeVelocity, getTreasuryStats, getHashCostIndex } from './mining.js';
 import { getPendingCommands, acknowledgeCommand, acknowledgeAll } from './relay.js';
 import { getGraphStats, getAuthorAttribution } from './passive-attribution.js';
 import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStructured, getMyBets, getPredictorLeaderboard, getLeaderboardStructured } from './tools-predictions.js';
@@ -666,6 +666,23 @@ export async function handleWebRequest(req, res, pathname) {
       console.error('[web-api] Link wallet error:', err.message);
       jsonResponse(res, 500, { error: 'Wallet linking failed' });
     }
+    return true;
+  }
+
+  // ============ GET /web/mining/leaderboard ============
+  if (pathname === '/web/mining/leaderboard' && req.method === 'GET') {
+    jsonResponse(res, 200, getLeaderboard(20));
+    return true;
+  }
+
+  // ============ GET /web/mining/supply ============
+  // Ergon economics: total supply, burned, escape velocity, hash cost index
+  if (pathname === '/web/mining/supply' && req.method === 'GET') {
+    const supply = getTotalSupply();
+    const escape = getEscapeVelocity();
+    const treasury = getTreasuryStats();
+    const hashCost = getHashCostIndex();
+    jsonResponse(res, 200, { supply, escapeVelocity: escape, treasury, hashCostIndex: hashCost });
     return true;
   }
 

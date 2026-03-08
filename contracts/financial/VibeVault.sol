@@ -637,12 +637,12 @@ contract VibeVault is
             // Update balances (actual swap must happen externally via approved DEX)
             if (fromIsPrimary) {
                 // Primary -> Secondary: approve and track
-                IERC20(order.tokenFrom).safeApprove(msg.sender, order.amount);
+                IERC20(order.tokenFrom).forceApprove(msg.sender, order.amount);
             } else {
                 AssetConfig storage fromConfig = assetConfigs[order.tokenFrom];
                 if (fromConfig.balance < order.amount) continue;
                 fromConfig.balance -= order.amount;
-                IERC20(order.tokenFrom).safeApprove(msg.sender, order.amount);
+                IERC20(order.tokenFrom).forceApprove(msg.sender, order.amount);
             }
 
             executed++;
@@ -904,7 +904,7 @@ contract VibeVault is
      * @param shares Number of shares
      * @return assets Value in primary asset terms
      */
-    function _convertToAssets(uint256 shares) internal view override returns (uint256 assets) {
+    function _convertToAssets(uint256 shares) internal view returns (uint256 assets) {
         uint256 supply = totalSupply();
         if (supply == 0) return shares;
         assets = (shares * totalAssets()) / supply;

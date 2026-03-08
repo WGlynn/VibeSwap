@@ -1,6 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 
 const PLAYLIST_ID = 'PLQiikPOTiUt5_dXKg0WM_VIIzJcUrkyKq'
+const STORAGE_KEY = 'vibeswap_player_state'
+
+function savePlayerState(index, time) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ index, time, ts: Date.now() }))
+  } catch {}
+}
+
+function loadPlayerState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
 
 // Load YouTube IFrame API once
 let ytApiReady = false
@@ -63,16 +78,34 @@ export default function VibePlayer() {
         },
         events: {
           onReady: (e) => {
-            // Try to play — works if called within gesture context
-            e.target.playVideo()
+            // Restore saved position if available
+            const saved = loadPlayerState()
+            if (saved && typeof saved.index === 'number') {
+              e.target.playVideoAt(saved.index)
+              // seekTo after a short delay — player needs to load the video first
+              setTimeout(() => {
+                if (saved.time > 0) {
+                  e.target.seekTo(saved.time, true)
+                }
+              }, 500)
+            } else {
+              e.target.playVideo()
+            }
           },
           onStateChange: (e) => {
             // Sync UI to actual playback state
             const state = e.data
             if (state === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true)
-            } else if (state === window.YT.PlayerState.PAUSED ||
-                       state === window.YT.PlayerState.ENDED ||
+            } else if (state === window.YT.PlayerState.PAUSED) {
+              setIsPlaying(false)
+              // Save position on pause
+              try {
+                const idx = e.target.getPlaylistIndex()
+                const time = e.target.getCurrentTime()
+                savePlayerState(idx, time)
+              } catch {}
+            } else if (state === window.YT.PlayerState.ENDED ||
                        state === window.YT.PlayerState.UNSTARTED) {
               setIsPlaying(false)
             }
@@ -110,12 +143,28 @@ export default function VibePlayer() {
     if (playerRef.current?.previousVideo) playerRef.current.previousVideo()
   }, [])
 
+  // Save position every 5s while playing
+  useEffect(() => {
+    if (!isPlaying) return
+    const interval = setInterval(() => {
+      const p = playerRef.current
+      if (p?.getPlaylistIndex && p?.getCurrentTime) {
+        savePlayerState(p.getPlaylistIndex(), p.getCurrentTime())
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [isPlaying])
+
   const togglePlayer = useCallback(() => {
     if (!isOpen) {
       setIsOpen(true)
-      // Don't set isPlaying here — let onStateChange confirm actual playback
     } else {
-      if (playerRef.current?.pauseVideo) playerRef.current.pauseVideo()
+      // Save position before closing
+      const p = playerRef.current
+      if (p?.getPlaylistIndex && p?.getCurrentTime) {
+        savePlayerState(p.getPlaylistIndex(), p.getCurrentTime())
+      }
+      if (p?.pauseVideo) p.pauseVideo()
       setIsOpen(false)
       setIsPlaying(false)
       setShowPanel(false)

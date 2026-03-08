@@ -219,6 +219,12 @@ import { writeFile, readFile, mkdir, unlink, appendFile } from 'fs/promises';
 import { join } from 'path';
 const execFileAsync = promisify(execFile);
 import googleTTS from 'google-tts-api';
+import { speak as jarvisSpeak, cleanup as ttsCleanup } from './tts.js';
+import { processYouTubeLinks } from './youtube.js';
+import { processWebLinks } from './web-reader.js';
+import { initUserMemory, getUserMemoryContext, extractAndStoreMemories, flushUserMemory } from './user-memory.js';
+import { initTimeAwareness, getTimeContext, detectTimezone, setUserTimezone, flushTimezones } from './time-awareness.js';
+import { initAttribution, autoAttributeContent, attributeSource, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
 
 // ============ Group Chat Text Sanitizer ============
 // Strip markdown formatting from group responses — bots should talk in plain text
@@ -708,6 +714,26 @@ bot.command('start', async (ctx) => {
     ctx.reply('DIABLO JARVIS online. Same brain, zero filter. NFA. WAGMI. LFG.');
   } else {
     ctx.reply('JARVIS online. Just talk to me.');
+  }
+});
+
+// /speak — JARVIS voice response (ElevenLabs MCU voice)
+bot.command('speak', async (ctx) => {
+  const text = ctx.message.text.replace(/^\/speak\s*/i, '').trim();
+  if (!text) {
+    return ctx.reply('Usage: /speak <message> — I\'ll say it out loud, sir.');
+  }
+  try {
+    const voiceFile = await jarvisSpeak(text, 'speak');
+    if (voiceFile) {
+      await ctx.replyWithVoice({ source: voiceFile }, { caption: 'Jarvis' });
+      await ttsCleanup(voiceFile);
+    } else {
+      await ctx.reply('Voice synthesis unavailable. Set ELEVENLABS_API_KEY for the full JARVIS experience.');
+    }
+  } catch (err) {
+    console.error('[speak] Error:', err.message);
+    await ctx.reply(`Voice generation failed: ${err.message}`);
   }
 });
 
@@ -4765,7 +4791,22 @@ bot.on('text', async (ctx) => {
             analysis.response_hint = `Your sibling bot ${siblingName} just said this. Riff on it, agree, disagree, or roast them. You two are like coworkers who banter. 1 sentence. ${analysis.response_hint || ''}`;
           }
         } else {
-          analysis = await analyzeMessage(msgText, userName, recentCtx);
+          // YouTube Intelligence — if message has a YouTube link, boost to engage + fetch context
+          const groupYtContext = await processYouTubeLinks(msgText).catch(() => null);
+          if (groupYtContext) {
+            // Passive attribution — record that this content informed JARVIS
+            autoAttributeContent({ url: msgText.match(/https?:\/\/[^\s]+/)?.[0], title: groupYtContext.split('\n')[0], type: 'youtube' });
+            analysis = { action: 'engage', response_hint: `User shared a YouTube video. Here's the context:\n${groupYtContext}\n\nComment on it naturally — what's interesting, what you notice, or how it relates to what the group is working on. Be concise.`, confidence: 0.9 };
+          } else {
+            const groupWebContext = await processWebLinks(msgText).catch(() => null);
+            if (groupWebContext) {
+              // Passive attribution — record web content source
+              autoAttributeContent({ url: msgText.match(/https?:\/\/[^\s]+/)?.[0], title: groupWebContext.split('\n')[0], type: 'web' });
+              analysis = { action: 'engage', response_hint: `User shared a link. Here's the content:\n${groupWebContext}\n\nComment on it naturally — what's interesting, what you notice, or how it relates to what the group is working on. Be concise.`, confidence: 0.9 };
+            } else {
+              analysis = await analyzeMessage(msgText, userName, recentCtx);
+            }
+          }
         }
 
         if (analysis.action === 'engage' && analysis.response_hint) {
@@ -4918,6 +4959,42 @@ bot.on('text', async (ctx) => {
       }
     }
 
+    // YouTube Intelligence — detect links and fetch transcript/metadata for context
+    const ytContext = await processYouTubeLinks(messageForLLM).catch(err => {
+      console.warn(`[youtube] Failed: ${err.message}`);
+      return null;
+    });
+    if (ytContext) {
+      messageForLLM = `${messageForLLM}\n\n${ytContext}`;
+      // Passive attribution — record video source in contribution graph
+      autoAttributeContent({ url: messageForLLM.match(/https?:\/\/[^\s]+/)?.[0], title: ytContext.split('\n')[0], type: 'youtube' });
+    }
+
+    // Web Intelligence — fetch content from non-YouTube links
+    if (!ytContext) {
+      const webContext = await processWebLinks(messageForLLM).catch(err => {
+        console.warn(`[web-reader] Failed: ${err.message}`);
+        return null;
+      });
+      if (webContext) {
+        messageForLLM = `${messageForLLM}\n\n${webContext}`;
+        // Passive attribution — record web source in contribution graph
+        autoAttributeContent({ url: messageForLLM.match(/https?:\/\/[^\s]+/)?.[0], title: webContext.split('\n')[0], type: 'web' });
+      }
+    }
+
+    // Time awareness — inject current time context
+    const timeCtx = getTimeContext(String(ctx.from.id));
+    if (timeCtx) {
+      messageForLLM = `${messageForLLM}\n\n${timeCtx}`;
+    }
+
+    // User memory — inject what JARVIS remembers about this person
+    const memCtx = getUserMemoryContext(String(ctx.from.id));
+    if (memCtx) {
+      messageForLLM = `${messageForLLM}\n\n${memCtx}`;
+    }
+
     const response = await chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id });
 
     clearInterval(typingInterval);
@@ -4929,6 +5006,16 @@ bot.on('text', async (ctx) => {
 
     // Save conversation after every Claude response (resilience)
     await saveConversations();
+
+    // Learn about user (non-blocking)
+    extractAndStoreMemories(String(ctx.from.id), userName, ctx.message.text, response.text).catch(() => {});
+
+    // Detect timezone from message (non-blocking)
+    const detectedTz = detectTimezone(ctx.message.text);
+    if (detectedTz) {
+      setUserTimezone(String(ctx.from.id), detectedTz);
+      flushTimezones().catch(() => {});
+    }
 
     let text = response.text?.trim();
     if (!text) {
@@ -5329,6 +5416,9 @@ async function main() {
   await initMining();
   await initDeepStorage();
   await initHell();
+  await initUserMemory();
+  await initTimeAwareness();
+  await initAttribution();
   await initLimni();
   registerKataraktiStrategies();
   // Wire Limni alerts to owner's Telegram DM
@@ -5505,23 +5595,15 @@ async function main() {
                 `[Meeting: ${meetingTitle}]\n${speaker}: "${transcript.slice(0, 100)}${transcript.length > 100 ? '...' : ''}"`
               );
 
-              // Generate TTS voice message — Jarvis speaks
+              // Generate TTS voice message — JARVIS speaks (ElevenLabs MCU voice → Google fallback)
               try {
-                // google-tts-api getAllAudioBase64 handles long text + chunking automatically
-                const audioSegments = await googleTTS.getAllAudioBase64(jarvisText, {
-                  lang: 'en',
-                  slow: false,
-                  host: 'https://translate.google.co.uk', // UK endpoint for British accent
-                });
-
-                const audioBuffers = audioSegments.map(seg => Buffer.from(seg.base64, 'base64'));
-                const fullAudio = Buffer.concat(audioBuffers);
-
-                // Save temp file and send as voice
-                const tmpFile = join(config.dataDir, `tts_${Date.now()}.mp3`);
-                await writeFile(tmpFile, fullAudio);
-                await bot.telegram.sendVoice(chatId, { source: tmpFile }, { caption: 'Jarvis' });
-                await unlink(tmpFile).catch(() => {});
+                const voiceFile = await jarvisSpeak(jarvisText, 'transcript');
+                if (voiceFile) {
+                  await bot.telegram.sendVoice(chatId, { source: voiceFile }, { caption: 'Jarvis' });
+                  await ttsCleanup(voiceFile);
+                } else {
+                  await bot.telegram.sendMessage(chatId, `Jarvis: ${jarvisText}`);
+                }
               } catch (ttsErr) {
                 console.warn('[tts] Voice generation failed, sending text only:', ttsErr.message);
                 await bot.telegram.sendMessage(chatId, `Jarvis: ${jarvisText}`);
@@ -5723,18 +5805,13 @@ async function main() {
                 }
               }
 
-              // TTS voice response
+              // TTS voice response — JARVIS MCU voice
               try {
-                const audioSegments = await googleTTS.getAllAudioBase64(jarvisText.slice(0, 500), {
-                  lang: 'en', slow: false,
-                  host: 'https://translate.google.co.uk',
-                });
-                const audioBuffers = audioSegments.map(seg => Buffer.from(seg.base64, 'base64'));
-                const fullAudio = Buffer.concat(audioBuffers);
-                const tmpFile = join(config.dataDir, `tts_${Date.now()}.mp3`);
-                await writeFile(tmpFile, fullAudio);
-                await bot.telegram.sendVoice(chatId, { source: tmpFile }, { caption: 'Jarvis' });
-                await unlink(tmpFile).catch(() => {});
+                const voiceFile = await jarvisSpeak(jarvisText, 'fireflies');
+                if (voiceFile) {
+                  await bot.telegram.sendVoice(chatId, { source: voiceFile }, { caption: 'Jarvis' });
+                  await ttsCleanup(voiceFile);
+                }
               } catch (ttsErr) {
                 console.warn('[fireflies] TTS failed:', ttsErr.message);
               }
@@ -6366,6 +6443,9 @@ async function main() {
       ['social', flushSocial],
       ['autonomous', flushAutonomous],
       ['comms', saveComms],
+      ['user-memory', flushUserMemory],
+      ['timezones', flushTimezones],
+      ['attribution', flushAttribution],
     ];
 
     let flushed = 0;

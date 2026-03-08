@@ -8,7 +8,7 @@ let behaviorCache = null;
 
 const DEFAULTS = {
   welcomeNewMembers: false,
-  welcomeMessage: 'Welcome {name}. This is the VibeSwap community.',
+  welcomeMessage: null, // null = dynamic (LLM-generated), string = fixed template
   proactiveEngagement: true,
   dailyDigest: true,
   autoModeration: true,

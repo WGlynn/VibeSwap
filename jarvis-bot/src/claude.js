@@ -1946,10 +1946,14 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     // Add assistant response to history
     history.push({ role: 'assistant', content: assistantMessage });
 
-    // Track last response for correction detection
+    // Track last response with rich metadata — enables learning from own history
     lastResponses.set(chatId, {
       text: assistantMessage,
       timestamp: Date.now(),
+      chatType,
+      inputLength: messageText?.length || 0,
+      outputLength: assistantMessage?.length || 0,
+      userName,
     });
 
     // Cross-chat context symmetry: extract user-specific context from conversation

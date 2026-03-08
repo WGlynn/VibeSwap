@@ -667,12 +667,31 @@ async function checkLastShutdown() {
 // ============ New Member Welcome ============
 // Reads behavior.json flag — can be toggled at runtime via /setbehavior or conversation mandate
 
+// Dynamic welcome messages — varies by persona, never robotic
+const WELCOME_TEMPLATES = [
+  '{name}, welcome. we\'re building something here.',
+  'hey {name}. glad you found us.',
+  '{name} just walked in. welcome to the lab.',
+  'welcome {name}. pull up a chair.',
+  '{name}! good timing. things are happening.',
+  'yo {name}, welcome. make yourself at home.',
+  '{name} — welcome to VibeSwap. ask anything.',
+];
+
 bot.on('new_chat_members', async (ctx) => {
-  if (!getFlag('welcomeNewMembers')) return; // silently skip if disabled
+  if (!getFlag('welcomeNewMembers')) return;
   for (const member of ctx.message.new_chat_members) {
     if (member.is_bot) continue;
     const name = member.first_name || member.username || 'newcomer';
-    const msg = getFlag('welcomeMessage').replace(/\{name\}/g, name);
+    const custom = getFlag('welcomeMessage');
+    let msg;
+    if (custom) {
+      msg = custom.replace(/\{name\}/g, name);
+    } else {
+      // Pick a random template — feels human, never repetitive
+      const template = WELCOME_TEMPLATES[Math.floor(Math.random() * WELCOME_TEMPLATES.length)];
+      msg = template.replace(/\{name\}/g, name);
+    }
     await ctx.reply(msg);
   }
 });

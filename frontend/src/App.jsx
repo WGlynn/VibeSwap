@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
 import AmbientBackground from './components/ui/AmbientBackground'
+import VibePlayer from './components/VibePlayer'
 import { ContributionsProvider } from './contexts/ContributionsContext'
 import { MessagingProvider } from './contexts/MessagingContext'
 
@@ -142,6 +143,7 @@ function App() {
           </main>
         </div>
       )}
+    <VibePlayer />
     </ContributionsProvider>
     </MessagingProvider>
   )

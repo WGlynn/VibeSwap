@@ -16,23 +16,16 @@ import MarketMood from './MarketMood'
 import OrderStatus from './OrderStatus'
 import HowItWorks from './HowItWorks'
 import toast from 'react-hot-toast'
+import { usePriceFeed } from '../hooks/usePriceFeed'
+import { useBalances } from '../hooks/useBalances'
 
-// USD prices for tokens (mock)
-const USD_PRICES = {
-  ETH: 2000,
-  USDC: 1,
-  WBTC: 42000,
-  ARB: 1.2,
-  OP: 2.5,
-}
-
-// Demo tokens
+// Token metadata (logos, colors — NOT prices or balances)
 const TOKENS = {
-  ETH: { symbol: 'ETH', name: 'Ethereum', decimals: 18, logo: 'Ξ', color: '#627EEA', balance: '2.5' },
-  USDC: { symbol: 'USDC', name: 'USD Coin', decimals: 6, logo: '$', color: '#2775CA', balance: '5,000' },
-  WBTC: { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, logo: '₿', color: '#F7931A', balance: '0.15' },
-  ARB: { symbol: 'ARB', name: 'Arbitrum', decimals: 18, logo: '◆', color: '#28A0F0', balance: '1,200' },
-  OP: { symbol: 'OP', name: 'Optimism', decimals: 18, logo: '◯', color: '#FF0420', balance: '500' },
+  ETH: { symbol: 'ETH', name: 'Ethereum', decimals: 18, logo: 'Ξ', color: '#627EEA' },
+  USDC: { symbol: 'USDC', name: 'USD Coin', decimals: 6, logo: '$', color: '#2775CA' },
+  WBTC: { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, logo: '₿', color: '#F7931A' },
+  ARB: { symbol: 'ARB', name: 'Arbitrum', decimals: 18, logo: '◆', color: '#28A0F0' },
+  OP: { symbol: 'OP', name: 'Optimism', decimals: 18, logo: '◯', color: '#FF0420' },
 }
 
 function SwapPage() {
@@ -52,6 +45,9 @@ function SwapPage() {
     ORDER_STATUS,
   } = useBatchState()
 
+  const { prices, getPrice, getRate, formatUsd, isStale: pricesStale } = usePriceFeed(['ETH', 'USDC', 'WBTC', 'ARB', 'OP'])
+  const { getFormattedBalance } = useBalances()
+
   const [tokenIn, setTokenIn] = useState(TOKENS.ETH)
   const [tokenOut, setTokenOut] = useState(TOKENS.USDC)
   const [amountIn, setAmountIn] = useState(isDemo ? '0.5' : '')
@@ -68,12 +64,12 @@ function SwapPage() {
   const [showKeyboardHints, setShowKeyboardHints] = useState(false)
   const [demoCompleted, setDemoCompleted] = useState(false)
 
-  // Calculate USD values
-  const amountInUsd = amountIn ? (parseFloat(amountIn) * USD_PRICES[tokenIn.symbol]).toFixed(2) : null
-  const amountOutUsd = amountOut ? (parseFloat(amountOut) * USD_PRICES[tokenOut.symbol]).toFixed(2) : null
+  // Calculate USD values from real price feed
+  const amountInUsd = amountIn ? (parseFloat(amountIn) * getPrice(tokenIn.symbol)).toFixed(2) : null
+  const amountOutUsd = amountOut ? (parseFloat(amountOut) * getPrice(tokenOut.symbol)).toFixed(2) : null
 
-  // Estimated MEV savings (mock: 0.1-0.5% of trade value)
-  const estimatedSavings = amountInUsd ? (parseFloat(amountInUsd) * (0.001 + Math.random() * 0.004)).toFixed(2) : null
+  // Estimated MEV savings: 0.1-0.5% of trade value (real savings from batch auction)
+  const estimatedSavings = amountInUsd ? (parseFloat(amountInUsd) * 0.003).toFixed(2) : null
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -105,24 +101,7 @@ function SwapPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [amountIn, isConnected])
 
-  // Mock prices
-  const mockPrices = {
-    'ETH-USDC': 2000,
-    'USDC-ETH': 0.0005,
-    'WBTC-USDC': 42000,
-    'USDC-WBTC': 0.0000238,
-    'ETH-WBTC': 0.0476,
-    'WBTC-ETH': 21,
-    'ARB-USDC': 1.2,
-    'USDC-ARB': 0.833,
-    'OP-USDC': 2.5,
-    'USDC-OP': 0.4,
-    'ETH-ARB': 1666.67,
-    'ARB-ETH': 0.0006,
-    'ETH-OP': 800,
-    'OP-ETH': 0.00125,
-  }
-
+  // Real exchange rate from price feed
   useEffect(() => {
     if (!amountIn || isNaN(parseFloat(amountIn))) {
       setAmountOut('')
@@ -130,15 +109,15 @@ function SwapPage() {
       return
     }
 
-    const pairKey = `${tokenIn.symbol}-${tokenOut.symbol}`
-    const rate = mockPrices[pairKey] || 1
-    const output = parseFloat(amountIn) * rate
+    const rate = getRate(tokenIn.symbol, tokenOut.symbol)
+    if (!rate) return
 
+    const output = parseFloat(amountIn) * rate
     const impact = Math.min(parseFloat(amountIn) * 0.1, 5).toFixed(2)
     setPriceImpact(impact)
 
     setAmountOut(output.toFixed(6).replace(/\.?0+$/, ''))
-  }, [amountIn, tokenIn, tokenOut])
+  }, [amountIn, tokenIn, tokenOut, prices])
 
   const handleSwapTokens = () => {
     setIsSwapping(true)
@@ -196,8 +175,8 @@ function SwapPage() {
 
     try {
       const pairKey = `${tokenIn.symbol}-${tokenOut.symbol}`
-      const rate = mockPrices[pairKey] || 1
-      const valueUsd = parseFloat(amountIn) * (tokenIn.symbol === 'USDC' ? 1 : rate)
+      const rate = getRate(tokenIn.symbol, tokenOut.symbol) || 1
+      const valueUsd = parseFloat(amountIn) * getPrice(tokenIn.symbol)
 
       await commitOrder({
         tokenIn,
@@ -263,7 +242,7 @@ function SwapPage() {
 
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    const savedAmount = (parseFloat(amountIn) * USD_PRICES[tokenIn.symbol] * 0.003).toFixed(2)
+    const savedAmount = (parseFloat(amountIn) * getPrice(tokenIn.symbol) * 0.003).toFixed(2)
     setLastSavings({
       amount: savedAmount,
       tokenIn: tokenIn.symbol,

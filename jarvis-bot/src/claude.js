@@ -13,6 +13,7 @@ import { getGroupContext } from './group-context.js';
 import { evaluateOwnResponse, appendScoreLog } from './intelligence.js';
 import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
+import { gitCommitAndPush } from './git.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -1460,6 +1461,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     // Handle tool use loop (max 5 rounds to prevent infinite loops)
     let rounds = 0;
     const historyLenBeforeTools = history.length;
+    const filesWrittenInLoop = []; // Track write_file calls for auto-commit
     while (response.stop_reason === 'tool_use' && rounds < 5) {
       rounds++;
       const toolBlocks = response.content.filter(b => b.type === 'tool_use');
@@ -1539,6 +1541,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
               const parentDir = resolve(filePath, '..');
               await mkdir(parentDir, { recursive: true });
               await writeFile(filePath, tb.input.content, 'utf-8');
+              filesWrittenInLoop.push(tb.input.path);
               result = `Written ${tb.input.content.length} chars to ${tb.input.path}`;
               console.log(`[claude] Tool: write_file("${tb.input.path}") → ${tb.input.content.length} chars`);
             }
@@ -1934,6 +1937,20 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         history.length = historyLenBeforeTools;
         sanitizeHistory(history);
         throw toolLoopError;
+      }
+    }
+
+    // ============ Auto-Commit After File Writes ============
+    // If Jarvis wrote files during the tool loop, auto-commit and push.
+    // This ensures file writes always persist — no more "working on it" without pushing.
+    if (filesWrittenInLoop.length > 0) {
+      try {
+        const fileList = filesWrittenInLoop.join(', ');
+        const commitMsg = `jarvis: auto-commit ${filesWrittenInLoop.length} file(s)\n\nFiles: ${fileList}\nTriggered by: ${userName || 'unknown'} in ${chatType}`;
+        const pushResult = await gitCommitAndPush(commitMsg);
+        console.log(`[claude] Auto-commit after write_file: ${pushResult}`);
+      } catch (err) {
+        console.error(`[claude] Auto-commit failed: ${err.message}`);
       }
     }
 

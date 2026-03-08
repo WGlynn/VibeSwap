@@ -77,6 +77,31 @@ x402 AI Services
 └── Protocol-Owned Liquidity                   50%
 ```
 
+### 7. Frontend Token (Separate Monetization Layer)
+
+The protocol backend is a **common good** — open source, forkable, no rent extraction. But the frontend is a distinct product, privately owned, and can be monetized independently — just like Trust Wallet created TWT while remaining a wallet for open protocols.
+
+**$WILL Token:**
+- Ticker: WILL | Name: WILL
+- Issued by Will (frontend operator), not by the protocol
+- Can be fair-launched or sold to VCs — clean separation from backend economics
+- Utility: premium features, ad-free experience, priority support, governance over frontend-specific decisions
+- Does NOT affect swap fees, Shapley distribution, or any protocol-level mechanics
+- Revenue from token sale funds frontend development, UX improvements, and marketing
+
+**Personal Frontend DAO:**
+- Every builder can have their own frontend token — their decentralized business soul on web3
+- The frontend is your brand, your UX, your community. The backend is the common good.
+- This pattern scales: thousands of frontends, one shared protocol, each frontend with its own DAO
+- Starts a trend of personal frontend DAOs — your on-chain business identity
+
+**Why this works:**
+- Backend stays credibly neutral (no token capture)
+- Frontend competes on merit (anyone can build an alternative frontend)
+- Clean regulatory separation — frontend token ≠ protocol governance token
+- Precedent: Trust Wallet (TWT), 1inch (1INCH frontend incentives), MetaMask (planned token)
+- Novel: personal frontend DAOs as web3 business identity — WILL is the first
+
 ---
 
 ## What This Is NOT

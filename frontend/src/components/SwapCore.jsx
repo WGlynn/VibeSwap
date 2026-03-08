@@ -1105,7 +1105,7 @@ function SwapCore() {
 
   const handleSwap = async () => {
     if (!isAnyWalletConnected) {
-      connect()
+      setActiveModal('welcome')
       return
     }
 

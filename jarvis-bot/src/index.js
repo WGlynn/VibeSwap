@@ -224,7 +224,7 @@ import { processYouTubeLinks } from './youtube.js';
 import { processWebLinks } from './web-reader.js';
 import { initUserMemory, getUserMemoryContext, extractAndStoreMemories, flushUserMemory } from './user-memory.js';
 import { initTimeAwareness, getTimeContext, detectTimezone, setUserTimezone, flushTimezones } from './time-awareness.js';
-import { initAttribution, autoAttributeContent, attributeSource, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
+import { initAttribution, autoAttributeContent, attributeSource, detectTextAttribution, attributeAgent, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
 
 // ============ Group Chat Text Sanitizer ============
 // Strip markdown formatting from group responses — bots should talk in plain text
@@ -4550,6 +4550,9 @@ bot.on('text', async (ctx) => {
   // Track ALL messages silently (before auth check for chat responses)
   await trackMessage(ctx);
 
+  // Passive attribution — scan group messages for attribution signals
+  try { detectTextAttribution(ctx.message?.text || ''); } catch {}
+
   // Passive XP + catchup activity tracking for every message
   const msgUserName = ctx.from.username || ctx.from.first_name || 'Unknown';
   recordActivity(ctx.from.id);
@@ -5013,6 +5016,9 @@ bot.on('text', async (ctx) => {
 
     // Learn about user (non-blocking)
     extractAndStoreMemories(String(ctx.from.id), userName, ctx.message.text, response.text).catch(() => {});
+
+    // Passive attribution — scan message text for attribution signals (non-blocking)
+    try { detectTextAttribution(ctx.message.text); } catch {}
 
     // Detect timezone from message (non-blocking)
     const detectedTz = detectTimezone(ctx.message.text);

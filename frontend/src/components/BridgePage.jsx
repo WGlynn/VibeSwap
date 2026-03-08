@@ -167,7 +167,7 @@ function BridgePage() {
     <div className="max-w-lg mx-auto px-4">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Send</h1>
+        <h1 className="text-2xl font-bold text-5d">Send</h1>
         <p className="text-black-400 mt-1">Transfer money across networks instantly. No wire fees.</p>
         {/* Trust badges */}
         <div className="flex items-center space-x-2 mt-2">

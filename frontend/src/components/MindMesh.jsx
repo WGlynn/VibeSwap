@@ -61,7 +61,7 @@ function CellNode({ cell, position, onClick, isSelected }) {
         ${colors.bg} ${colors.ring} ring-1
         ${isSelected ? 'ring-2' : ''}
         shadow-lg ${isAlive ? colors.glow : ''}
-        transition-all duration-300
+        transition-all duration-300 depth-card
       `}>
         <svg className={`w-6 h-6 sm:w-8 sm:h-8 ${colors.text}`} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d={CELL_ICONS[cell.id]} />
@@ -225,7 +225,7 @@ export default function MindMesh() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Mantra */}
       <div className="text-center mb-8">
-        <div className="flex items-center justify-center space-x-2 font-mono text-lg sm:text-xl tracking-wider">
+        <div className="flex items-center justify-center space-x-2 font-mono text-lg sm:text-xl tracking-wider text-5d">
           {mantraWords.map((word, i) => (
             <motion.span
               key={i}
@@ -289,7 +289,7 @@ export default function MindMesh() {
 
       {/* Status bar */}
       <div className="mt-6 flex items-center justify-between text-[10px] font-mono text-black-500 px-2">
-        <span>{cells.filter(c => c.status === 'interlinked').length}/{cells.length} cells interlinked</span>
+        <span className="animate-glow-breathe">{cells.filter(c => c.status === 'interlinked').length}/{cells.length} cells interlinked</span>
         {here > 0 && <span>{here} {here === 1 ? 'soul' : 'souls'} present</span>}
         <span>{links.length} links</span>
         {mesh?.timestamp && <span>{new Date(mesh.timestamp).toLocaleTimeString()}</span>}

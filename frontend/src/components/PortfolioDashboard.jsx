@@ -37,7 +37,7 @@ export default function PortfolioDashboard() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold font-mono text-white tracking-wide">PORTFOLIO</h1>
+        <h1 className="text-2xl font-bold font-mono text-white tracking-wide text-5d">PORTFOLIO</h1>
         <p className="text-black-500 text-xs font-mono mt-1">{shortAddress}</p>
       </div>
 

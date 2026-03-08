@@ -593,8 +593,8 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       const savedContent = historyEntry.content;
       historyEntry.content = contentBlocks;
 
-      // Continuous context: summarize old messages before trimming
-      await summarizeIfNeeded(chatId, history);
+      // Continuous context: summarize in background — don't block response
+      summarizeIfNeeded(chatId, history).catch(() => {});
 
       // Trim remaining if still too long (safety net)
       while (history.length > config.maxConversationHistory) {
@@ -620,9 +620,8 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       history.push({ role: 'user', content: taggedMessage });
     }
 
-    // Continuous context: summarize old messages before trimming
-    // With Wardenclyffe providing free compute, summarization costs nothing
-    await summarizeIfNeeded(chatId, history);
+    // Continuous context: summarize in background — don't block response
+    summarizeIfNeeded(chatId, history).catch(() => {});
 
     // Trim remaining if still too long (safety net)
     while (history.length > config.maxConversationHistory) {

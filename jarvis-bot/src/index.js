@@ -205,7 +205,7 @@ import { initStickers, textToSticker, imageToSticker, imageWithText, addToSticke
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
 import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo, getUserTier, checkTieredBudget } from './compute-economics.js';
-import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner } from './mining.js';
+import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner, getTotalSupply, getEscapeVelocity, getHashCostIndex } from './mining.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
@@ -814,6 +814,58 @@ bot.command('attribution', async (ctx) => {
   );
 });
 
+// /supply — JUL supply economics (Ergon model)
+bot.command('supply', async (ctx) => {
+  const supply = getTotalSupply();
+  const escape = getEscapeVelocity();
+  const treasury = getTreasuryStats();
+  const hashCost = getHashCostIndex();
+
+  const trendEmoji = hashCost.trend === 'deflationary' ? '📉' : hashCost.trend === 'inflationary' ? '📈' : '⚖️';
+
+  ctx.reply(
+    `JUL Supply Economics (Ergon Model)\n\n` +
+    `Circulating: ${supply.circulating.toFixed(2)} JUL\n` +
+    `Total minted: ${supply.totalMinted.toFixed(2)} JUL\n` +
+    `Burned (sinks): ${supply.burned.toFixed(2)} JUL\n\n` +
+    `Escape velocity: ${escape.escapeVelocity.toLocaleString()} JUL\n` +
+    `Current reward: ${escape.currentReward} JUL/proof\n` +
+    `Difficulty: ${escape.difficulty} bits\n` +
+    `Epoch: ${escape.epoch}\n` +
+    `Moore's law decay: ${escape.mooreDecayPercent}%/epoch (~2.3yr halving)\n\n` +
+    `${trendEmoji} Hash cost index: ${hashCost.index} (${hashCost.trend})\n` +
+    `Confidence: ${(hashCost.confidence * 100).toFixed(0)}% (${hashCost.epochsUsed} epochs)\n\n` +
+    `Daily burns: ${treasury.dailyBurned.toFixed(2)} JUL\n` +
+    `All-time burns: ${treasury.totalBurned.toFixed(2)} JUL\n` +
+    `Tips today: ${treasury.tipsToday}\n\n` +
+    `No hard cap. Supply bounded by physics (escape velocity) + 3 natural sinks:\n` +
+    `1. Lost coins (broken phones, lost keys)\n` +
+    `2. Compute burns (JUL → API tokens)\n` +
+    `3. Fractional reserve collapses`
+  );
+});
+
+// /leaderboard — Top JUL miners
+bot.command('leaderboard', async (ctx) => {
+  const lb = getLeaderboard(10);
+  if (lb.leaderboard.length === 0) {
+    return ctx.reply('No miners yet. Start mining with /mine or at vibeswap.io');
+  }
+
+  const lines = lb.leaderboard.map((m, i) => {
+    const name = m.userId.length > 15 ? `${m.userId.slice(0, 12)}...` : m.userId;
+    return `${i + 1}. ${name} — ${m.julBalance.toFixed(2)} JUL (${m.proofsSubmitted} proofs)`;
+  });
+
+  ctx.reply(
+    `JUL Mining Leaderboard\n\n` +
+    lines.join('\n') +
+    `\n\nTotal miners: ${lb.totalMiners}\n` +
+    `Network proofs: ${lb.totalProofs.toLocaleString()}\n` +
+    `Difficulty: ${lb.difficulty} bits | Epoch: ${lb.epoch}`
+  );
+});
+
 // /help — Command reference
 bot.command('help', (ctx) => {
   const helpText = `JARVIS Command Reference
@@ -930,6 +982,10 @@ FUN
 
 VOICE
   /speak <text> — JARVIS speaks out loud
+
+JUL MINING
+  /supply — JUL supply economics (Ergon model)
+  /leaderboard — Top JUL miners
 
 ATTRIBUTION
   /attribution — View contribution attribution graph

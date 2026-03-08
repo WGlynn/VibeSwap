@@ -131,12 +131,18 @@ async function autonomousTick() {
 
   try {
     // ---- TRIGGER 1: Market reaction (checked every 5 min) ----
+    // Editorial judgment: not every price move is worth narrating.
+    // 15% chance to skip even significant moves — humans don't comment on every candle.
     if (now - lastMarketCheck > 5 * 60 * 1000) {
       lastMarketCheck = now;
       const marketEvent = await checkForMarketEvents(timings.priceMoveThreshold);
       if (marketEvent) {
-        await postToActiveChats(marketEvent);
-        return;
+        if (Math.random() < 0.15) {
+          console.log('[autonomous] Editorial skip — chose not to comment on market event');
+        } else {
+          await postToActiveChats(marketEvent);
+          return;
+        }
       }
     }
 
@@ -154,12 +160,20 @@ async function autonomousTick() {
     }
 
     // ---- TRIGGER 3: Boredom — chat went quiet ----
+    // Editorial judgment: sometimes skip even when the trigger fires.
+    // Humans don't always break silence — sometimes they just scroll and close the app.
+    // Skip chance increases the longer JARVIS has been "posting" (fatigue).
     for (const chatId of targetChats) {
       const activity = chatActivity.get(chatId);
       if (!activity) continue;
 
       const silence = now - activity.lastMessage;
       if (silence > timings.quietThreshold && silence < timings.maxQuietWindow) {
+        // 25% chance to skip — "nah, not feeling it right now"
+        if (Math.random() < 0.25) {
+          console.log(`[autonomous] Editorial skip — decided not to break silence in ${chatId}`);
+          continue;
+        }
         const spark = await generateBoredomMessage(chatId, silence);
         if (spark) {
           await sendFn(chatId, spark);

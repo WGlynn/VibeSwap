@@ -74,6 +74,9 @@ const MedicineWheel = lazy(() => import('./components/MedicineWheel'))
 const AbstractionLadder = lazy(() => import('./components/AbstractionLadder'))
 const EconomicsPage = lazy(() => import('./components/EconomicsPage'))
 const ResearchPage = lazy(() => import('./components/ResearchPage'))
+const AppStore = lazy(() => import('./components/AppStore'))
+const VibeFeed = lazy(() => import('./components/VibeFeed'))
+const VibeWiki = lazy(() => import('./components/VibeWiki'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -132,6 +135,10 @@ function AnimatedRoutes() {
             <Route path="/abstraction" element={<AbstractionLadder />} />
             <Route path="/economics" element={<EconomicsPage />} />
             <Route path="/research" element={<ResearchPage />} />
+            {/* VSOS Apps */}
+            <Route path="/apps" element={<AppStore />} />
+            <Route path="/feed" element={<VibeFeed />} />
+            <Route path="/wiki" element={<VibeWiki />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

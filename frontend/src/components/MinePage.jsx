@@ -42,6 +42,8 @@ const WORKER_CODE = `
   let mining = false
   let hashCount = 0
   let startTime = 0
+  let reporterInterval = null
+  let currentGeneration = 0
 
   // Convert hex string to Uint8Array (matches Node Buffer.from(hex, 'hex'))
   function hexToBytes(hex) {
@@ -77,9 +79,9 @@ const WORKER_CODE = `
     return 255
   }
 
-  async function mineBlock(challengeHex, difficulty, batchSize) {
+  async function mineBlock(challengeHex, difficulty, batchSize, generation) {
     for (let i = 0; i < batchSize; i++) {
-      if (!mining) return null
+      if (!mining || currentGeneration !== generation) return null
 
       const nonce = crypto.getRandomValues(new Uint8Array(32))
       const nonceHex = bytesToHex(nonce)
@@ -89,7 +91,7 @@ const WORKER_CODE = `
       hashCount++
 
       if (countLeadingZeroBits(hashBytes) >= difficulty) {
-        return { nonce: nonceHex, hash: bytesToHex(hashBytes) }
+        return { nonce: nonceHex, hash: bytesToHex(hashBytes), challenge: challengeHex }
       }
     }
     return undefined
@@ -99,34 +101,42 @@ const WORKER_CODE = `
     const { type, challenge, difficulty } = e.data
 
     if (type === 'start') {
+      // Stop any previous mining loop via generation counter
+      mining = false
+      if (reporterInterval) { clearInterval(reporterInterval); reporterInterval = null }
+      // Small yield to let previous loop exit
+      await new Promise(r => setTimeout(r, 10))
+
       mining = true
       hashCount = 0
       startTime = Date.now()
+      const gen = ++currentGeneration
 
-      const reporter = setInterval(() => {
-        if (!mining) { clearInterval(reporter); return }
+      reporterInterval = setInterval(() => {
+        if (!mining || currentGeneration !== gen) { clearInterval(reporterInterval); reporterInterval = null; return }
         const elapsed = (Date.now() - startTime) / 1000
         const hashrate = elapsed > 0 ? hashCount / elapsed : 0
         self.postMessage({ type: 'hashrate', hashrate, totalHashes: hashCount })
       }, 1000)
 
-      while (mining) {
-        const result = await mineBlock(challenge, difficulty, 100)
+      while (mining && currentGeneration === gen) {
+        const result = await mineBlock(challenge, difficulty, 100, gen)
         if (result === null) break
         if (result) {
           mining = false
-          clearInterval(reporter)
+          if (reporterInterval) { clearInterval(reporterInterval); reporterInterval = null }
           self.postMessage({ type: 'found', ...result, totalHashes: hashCount })
           return
         }
       }
 
-      clearInterval(reporter)
+      if (reporterInterval) { clearInterval(reporterInterval); reporterInterval = null }
       self.postMessage({ type: 'stopped' })
     }
 
     if (type === 'stop') {
       mining = false
+      currentGeneration++
     }
   }
 `
@@ -235,7 +245,7 @@ function MinePage() {
       const worker = new Worker(workerUrl)
 
       worker.onmessage = async (e) => {
-        const { type, hashrate: hr, nonce, hash } = e.data
+        const { type, hashrate: hr, nonce, hash, challenge: proofChallenge } = e.data
 
         if (type === 'hashrate') {
           setHashrate(hr * workerCount)
@@ -247,9 +257,16 @@ function MinePage() {
           addLog(`Nonce: ${nonce.slice(0, 18)}...`, 'success')
           addLog(`Hash: ${hash.slice(0, 18)}...`, 'success')
 
-          // Submit proof to JARVIS backend
+          // Submit proof to JARVIS backend — use the challenge the proof was mined against
           try {
-            const result = await submitMiningProof(address, nonce, hash, challengeRef.current)
+            const submitChallenge = proofChallenge || challengeRef.current
+            if (!submitChallenge) {
+              addLog('No challenge available — refreshing...', 'error')
+              await refreshTarget()
+              worker.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
+              return
+            }
+            const result = await submitMiningProof(address, nonce, hash, submitChallenge)
             if (result.accepted) {
               setBlocksFound(prev => prev + 1)
               setTotalReward(result.julBalance || 0)
@@ -259,8 +276,9 @@ function MinePage() {
               addLog(`ACCEPTED! +${result.reward?.toFixed(6) || '?'} JUL (total: ${result.julBalance?.toFixed(4) || '?'})`, 'success')
               toast.success(`Block accepted! +${result.reward?.toFixed(4) || '?'} JUL`)
             } else {
-              addLog(`Rejected: ${result.reason || 'unknown'}`, 'error')
-              if (result.reason === 'stale_challenge') {
+              const reason = result.reason || result.error || 'unknown'
+              addLog(`Rejected: ${reason}`, 'error')
+              if (reason === 'stale_challenge' || reason.includes('challenge')) {
                 addLog('Refreshing challenge...', 'system')
                 await refreshTarget()
               }
@@ -280,10 +298,15 @@ function MinePage() {
     }
 
     workersRef.current = workers
-    URL.revokeObjectURL(workerUrl)
+    // Don't revoke blob URL until workers are stopped — some mobile browsers
+    // (OnePlus/Android) fail if the source URL is revoked during worker init
+    workersRef.current._blobUrl = workerUrl
   }, [isConnected, connect, workerCount, difficulty, address, addLog, refreshTarget])
 
   const stopMining = useCallback(() => {
+    if (workersRef.current._blobUrl) {
+      URL.revokeObjectURL(workersRef.current._blobUrl)
+    }
     workersRef.current.forEach(w => {
       w.postMessage({ type: 'stop' })
       w.terminate()

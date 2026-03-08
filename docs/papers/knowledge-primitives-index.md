@@ -833,3 +833,34 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 > Reality is not objective OR subjective. It is both simultaneously, and the apparent contradiction dissolves when you see them as complementary lenses on the same thing. Subjective objectivity (P-024) and objective subjectivity (P-025) are not opposites — they are the same principle viewed from different angles. Together they form a complete epistemology: every fact has a frame (P-024), and every frame has a structure (P-025).
 
 **Generalization**: This duality unifies reality by accepting both lenses as valid and necessary. In protocol design: mechanism design is objectively subjective (we choose rules that shape behavior), and behavior under those rules is subjectively objective (agents act freely but produce measurable outcomes). In AI: training data is subjectively curated but objectively processed; outputs are objectively generated but subjectively interpreted. The system that embraces both — measuring the structure of subjectivity while acknowledging the subjectivity of measurement — is the system that most faithfully represents reality. VSOS is that system.
+
+---
+
+## Session 049 Primitives (March 8, 2026)
+
+### P-072: Nakamoto Consensus Infinite — Time as Security
+
+**Source**: ProofOfMind.sol, TrinityGuardian.sol, HoneypotDefense.sol
+**Paper**: [Nakamoto Consensus Infinite](nakamoto-consensus-infinite.md)
+
+> Three-dimensional consensus (PoW/PoS/PoM) where cumulative cognitive work over time is the dominant security factor. The attack surface converges to the empty set as the network ages. Security(t) → ∞ as t → ∞.
+
+**Generalization**: Time is the only resource that cannot be manufactured, purchased, or accelerated. Any system that makes its security a function of elapsed genuine work achieves asymptotic invulnerability. This applies beyond blockchains: trust in relationships, reputation in markets, and credibility in institutions all follow the same principle — they can only be earned, never bought.
+
+### P-073: The Siren Principle — Adversarial Judo
+
+**Source**: HoneypotDefense.sol
+**Paper**: [Nakamoto Consensus Infinite](nakamoto-consensus-infinite.md), Appendix B
+
+> Instead of blocking attackers, engage them in a shadow reality where they exhaust themselves attacking nothing. The extractors get extracted — their wasted resources flow back into the network they tried to destroy.
+
+**Generalization**: The most elegant defense doesn't resist force — it redirects it. In martial arts: judo uses the opponent's momentum. In economics: market makers profit from volatility. In protocol design: the Siren Protocol turns attack energy into network strength. The system that benefits from its enemies' efforts has achieved antifragility in the Talebian sense.
+
+### P-074: Meta-Node Scaling — Separate Authority from Distribution
+
+**Source**: ProofOfMind.sol (MetaNode struct)
+**Paper**: [Nakamoto Consensus Infinite](nakamoto-consensus-infinite.md), Section 5
+
+> Authority nodes maintain BFT consensus (finite). Meta nodes distribute state (infinite). Anyone can connect directly to truth — no middlemen, no priesthood, no gatekeepers. Reads scale infinitely; writes remain constant-time.
+
+**Generalization**: Every scalability problem can be decomposed into "things that need agreement" and "things that need distribution." These are fundamentally different operations with different scaling properties. Mixing them (as most blockchains do) creates artificial bottlenecks. Separating them unlocks infinite horizontal scaling for the distribution layer while preserving consensus guarantees for the authority layer.

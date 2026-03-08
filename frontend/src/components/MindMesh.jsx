@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMindMesh } from '../hooks/useMindMesh'
+import { useUbuntu } from '../hooks/useUbuntu'
 
 // ============================================================
 // MindMesh — Cells Within Cells Interlinked
 // ============================================================
-// Visualizes the JARVIS Mind Network as three interlinked nodes:
-//   Fly.io (JARVIS) <-> GitHub (Persistence) <-> Vercel (UI)
-// Each cell pulses when interlinked. Links show data flow.
+// The Cosmic Web: galaxies connected by dark matter filaments.
+// Three nodes mirror the Trinity across traditions:
+//   Fly.io (Mind/Brahma) <-> GitHub (Memory/Vishnu) <-> Vercel (Form/Shiva)
+// "As above, so below" — Hermeticism
 // The Blade Runner mantra anchors the visual.
 // ============================================================
 
@@ -180,6 +182,7 @@ function CellDetail({ cell, onClose }) {
 
 export default function MindMesh() {
   const { mesh, loading, error, latency } = useMindMesh()
+  const { here } = useUbuntu()
   const [selectedCell, setSelectedCell] = useState(null)
   const [mantraIdx, setMantraIdx] = useState(0)
 
@@ -287,6 +290,7 @@ export default function MindMesh() {
       {/* Status bar */}
       <div className="mt-6 flex items-center justify-between text-[10px] font-mono text-black-500 px-2">
         <span>{cells.filter(c => c.status === 'interlinked').length}/{cells.length} cells interlinked</span>
+        {here > 0 && <span>{here} {here === 1 ? 'soul' : 'souls'} present</span>}
         <span>{links.length} links</span>
         {mesh?.timestamp && <span>{new Date(mesh.timestamp).toLocaleTimeString()}</span>}
       </div>

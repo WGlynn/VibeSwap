@@ -130,6 +130,25 @@ function AmbientBackground() {
         className="fixed inset-0 pointer-events-none z-0"
         style={{ width: '100%', height: '100%' }}
       />
+      {/* Sacred geometry overlay — Flower of Life (Dreamtime) */}
+      <svg
+        className="fixed inset-0 w-full h-full pointer-events-none z-0"
+        style={{ opacity: 0.015 }}
+        viewBox="0 0 200 200"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        {/* Six circles around center — Seed of Life */}
+        {[0, 60, 120, 180, 240, 300].map(angle => {
+          const r = 20
+          const cx = 100 + r * Math.cos((angle * Math.PI) / 180)
+          const cy = 100 + r * Math.sin((angle * Math.PI) / 180)
+          return <circle key={angle} cx={cx} cy={cy} r={r} fill="none" stroke="#00ff41" strokeWidth="0.3" />
+        })}
+        <circle cx="100" cy="100" r="20" fill="none" stroke="#00ff41" strokeWidth="0.3" />
+        {/* Outer ring */}
+        <circle cx="100" cy="100" r="40" fill="none" stroke="#00ff41" strokeWidth="0.2" />
+        <circle cx="100" cy="100" r="60" fill="none" stroke="#00ff41" strokeWidth="0.1" />
+      </svg>
       {/* CSS grid overlay */}
       <div className="fixed inset-0 pointer-events-none z-0 ambient-grid" />
     </>

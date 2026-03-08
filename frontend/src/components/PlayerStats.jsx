@@ -14,25 +14,25 @@ const LEVELS = [
 
 // Achievements
 const ACHIEVEMENTS = [
-  { id: 'first_trade', name: 'First Steps', desc: 'Complete your first trade', icon: '◇', earned: true },
-  { id: 'batch_veteran', name: 'Batch Veteran', desc: 'Participate in 100 batches', icon: '≡', earned: true },
-  { id: 'diamond_hands', name: 'Diamond Hands', desc: 'Hold LP for 30 days', icon: '◆', earned: true },
+  { id: 'first_trade', name: 'First Steps', desc: 'Complete your first trade', icon: '◇', earned: false },
+  { id: 'batch_veteran', name: 'Batch Veteran', desc: 'Participate in 100 batches', icon: '≡', earned: false },
+  { id: 'diamond_hands', name: 'Diamond Hands', desc: 'Hold LP for 30 days', icon: '◆', earned: false },
   { id: 'whale_watcher', name: 'Whale Watcher', desc: 'Trade over $10,000 in one batch', icon: '◎', earned: false },
   { id: 'guild_master', name: 'Guild Master', desc: 'Refer 10 active traders', icon: '★', earned: false },
-  { id: 'perfect_reveal', name: 'Perfect Reveal', desc: '100% reveal rate', icon: '✓', earned: true },
+  { id: 'perfect_reveal', name: 'Perfect Reveal', desc: '100% reveal rate', icon: '✓', earned: false },
 ]
 
-// Mock player data
+// Player data starts at zero — populated from on-chain activity when contracts live
 const PLAYER_DATA = {
-  address: '0x1234...5678',
-  xp: 2847,
-  tradesCount: 156,
-  volumeUsd: 124500,
-  savingsTotal: 312.45,
-  winRate: 94,
-  avgBatchPosition: 3.2,
-  streakDays: 12,
-  guild: 'Alpha Traders',
+  address: '',
+  xp: 0,
+  tradesCount: 0,
+  volumeUsd: 0,
+  savingsTotal: 0,
+  winRate: 0,
+  avgBatchPosition: 0,
+  streakDays: 0,
+  guild: null,
 }
 
 function PlayerStats({ isConnected }) {

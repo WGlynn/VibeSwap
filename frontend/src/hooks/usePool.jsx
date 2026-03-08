@@ -87,12 +87,11 @@ const KNOWN_PAIRS = {
   31337: [['WETH', 'USDC']],
 }
 
-// ============ Rough USD Prices ============
-// Used to compute TVL from reserves in demo/fallback scenarios.
-// In production these should come from the oracle or a price feed.
-// Approximate USD prices — used for TVL display only, not for trading
-// These should be replaced with oracle price feeds in production
-const USD_PRICES = {
+// ============ USD Prices for TVL ============
+// Fallback prices for TVL display when CoinGecko is unavailable.
+// Primary source is usePriceFeed hook (CoinGecko real-time).
+// Stablecoins always = 1. Others are rough fallbacks only.
+const USD_PRICES_FALLBACK = {
   ETH: 2800,
   WETH: 2800,
   USDC: 1,
@@ -104,6 +103,23 @@ const USD_PRICES = {
   MATIC: 0.35,
   WMATIC: 0.35,
 }
+
+// Try to get live price, fall back to hardcoded
+function getTokenUsdPrice(symbol) {
+  try {
+    // Dynamic import would create circular dep — use global cache from usePriceFeed
+    const cached = window.__vibePriceCache?.[symbol?.toUpperCase()]
+    if (cached && cached > 0) return cached
+  } catch {}
+  return USD_PRICES_FALLBACK[symbol] || 1
+}
+
+// Alias for backward compat within this file
+const USD_PRICES = new Proxy(USD_PRICES_FALLBACK, {
+  get(target, prop) {
+    return getTokenUsdPrice(prop)
+  }
+})
 
 // ERC20 minimal ABI for LP balance lookups
 const ERC20_BALANCE_ABI = [

@@ -1,34 +1,15 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const MOCK_ACTIVITIES = [
-  { type: 'swap', from: 'ETH', to: 'USDC', amount: '2.5', value: '$5,000', wallet: '0x1a2b...3c4d', time: '2s ago' },
-  { type: 'swap', from: 'WBTC', to: 'ETH', amount: '0.15', value: '$6,300', wallet: '0x5e6f...7g8h', time: '5s ago' },
-  { type: 'add', pool: 'ETH/USDC', amount: '$12,500', wallet: '0x9i0j...1k2l', time: '12s ago' },
-  { type: 'swap', from: 'ARB', to: 'USDC', amount: '5,000', value: '$6,000', wallet: '0x3m4n...5o6p', time: '18s ago' },
-  { type: 'swap', from: 'USDC', to: 'OP', amount: '2,000', value: '$2,000', wallet: '0x7q8r...9s0t', time: '24s ago' },
-  { type: 'remove', pool: 'WBTC/ETH', amount: '$8,200', wallet: '0x1u2v...3w4x', time: '31s ago' },
-  { type: 'swap', from: 'ETH', to: 'ARB', amount: '1.2', value: '$2,400', wallet: '0x5y6z...7a8b', time: '45s ago' },
-]
+// Activity feed populated from on-chain events when contracts are live
+// No fake activity — users see real transactions or empty state
 
 function LiveActivityFeed() {
-  const [activities, setActivities] = useState(MOCK_ACTIVITIES.slice(0, 5))
+  const [activities, setActivities] = useState([])
   const [isExpanded, setIsExpanded] = useState(false)
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const randomActivity = MOCK_ACTIVITIES[Math.floor(Math.random() * MOCK_ACTIVITIES.length)]
-      const newActivity = {
-        ...randomActivity,
-        time: 'just now',
-        id: Date.now(),
-      }
-
-      setActivities(prev => [newActivity, ...prev.slice(0, 9)])
-    }, 4000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // TODO: Subscribe to on-chain swap/LP events via WebSocket when contracts deployed
+  // For now, show waiting state
 
   return (
     <div className="rounded-lg bg-black-800 border border-black-500 overflow-hidden">
@@ -51,6 +32,12 @@ function LiveActivityFeed() {
 
       {/* Activity List */}
       <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-96' : 'max-h-48'}`}>
+        {activities.length === 0 && (
+          <div className="px-3 py-6 text-center">
+            <div className="text-black-500 text-xs">Waiting for on-chain activity...</div>
+            <div className="text-black-600 text-[10px] mt-1">Transactions will appear here when contracts go live</div>
+          </div>
+        )}
         <AnimatePresence initial={false}>
           {activities.map((activity, index) => (
             <motion.div
@@ -106,7 +93,7 @@ function LiveActivityFeed() {
       <div className="p-3 bg-black-900 border-t border-black-600">
         <div className="flex items-center justify-between text-xs">
           <span className="text-black-500">24h volume</span>
-          <span className="font-mono font-medium text-white">$12.4M</span>
+          <span className="font-mono font-medium text-white">--</span>
         </div>
       </div>
     </div>

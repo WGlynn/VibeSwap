@@ -104,11 +104,80 @@ import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './
 import { initPredictions, flushPredictions, createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
-import { getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth } from './tools-vibeswap.js';
-import { getPortfolio as getWalletPortfolio, getTokenBalances, getTransactionHistory, getNFTs, getDefiPositions, trackWallet, getTrackedWallets, getWhaleAlerts } from './tools-portfolio.js';
-import { getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernanceActivity, getGitHubActivity, getOnChainMetrics, getCorrelationAnalysis, getMarketRegime } from './tools-research.js';
-import { getGasTracker, getContractInfo, decodeTx, getLatestBlock as getDevBlock, resolveENS as resolveENSDev, checksumAddress, getContractABI, getNpmInfo, getCrateInfo } from './tools-dev.js';
-import { explainConcept, getGlossary, getVibeSwapExplainer, getTutorial, getCryptoCalendar, getCryptoQuiz, compareTokens as compareTokensEdu, getFearGreedIndex as getFearEdu, getDominance as getDominanceEdu, getBitcoinEpoch } from './tools-education.js';
+// ============ Tool Module Imports — Graceful Fallback ============
+// These modules were written by background agents and have crashed the bot on import.
+// Wrap in try/catch so a single broken module doesn't take down the entire bot.
+const stubFn = (name) => async () => `${name}: module not loaded. Bot is recovering.`;
+
+let getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth;
+try {
+  const m = await import('./tools-vibeswap.js');
+  ({ getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth } = m);
+} catch (err) {
+  console.error(`[jarvis] tools-vibeswap.js FAILED: ${err.message}`);
+  getVibePrice = stubFn('vibeswap'); getPoolStats = stubFn('poolStats'); getEmissionRate = stubFn('emission');
+  getAuctionStatus = stubFn('auction'); getShapleyRewards = stubFn('shapley'); getStakingInfo = stubFn('staking');
+  getLPPositions = stubFn('lp'); getProtocolHealth = stubFn('health');
+}
+
+let getWalletPortfolio, getTokenBalances, getTransactionHistory, getNFTs, getDefiPositions, trackWallet, getTrackedWallets, getWhaleAlerts;
+try {
+  const m = await import('./tools-portfolio.js');
+  getWalletPortfolio = m.getPortfolio; getTokenBalances = m.getTokenBalances;
+  getTransactionHistory = m.getTransactionHistory; getNFTs = m.getNFTs;
+  getDefiPositions = m.getDefiPositions; trackWallet = m.trackWallet;
+  getTrackedWallets = m.getTrackedWallets; getWhaleAlerts = m.getWhaleAlerts;
+} catch (err) {
+  console.error(`[jarvis] tools-portfolio.js FAILED: ${err.message}`);
+  getWalletPortfolio = stubFn('portfolio'); getTokenBalances = stubFn('balances');
+  getTransactionHistory = stubFn('txHistory'); getNFTs = stubFn('nfts');
+  getDefiPositions = stubFn('defi'); trackWallet = stubFn('track');
+  getTrackedWallets = stubFn('tracked'); getWhaleAlerts = stubFn('whales');
+}
+
+let getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernanceActivity, getGitHubActivity, getOnChainMetrics, getCorrelationAnalysis, getMarketRegime;
+try {
+  const m = await import('./tools-research.js');
+  ({ getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernanceActivity, getGitHubActivity, getOnChainMetrics, getCorrelationAnalysis, getMarketRegime } = m);
+} catch (err) {
+  console.error(`[jarvis] tools-research.js FAILED: ${err.message}`);
+  getTokenomicsAnalysis = stubFn('tokenomics'); getProtocolComparison = stubFn('compare');
+  getYieldFarming = stubFn('yield'); getGovernanceActivity = stubFn('governance');
+  getGitHubActivity = stubFn('github'); getOnChainMetrics = stubFn('onchain');
+  getCorrelationAnalysis = stubFn('correlation'); getMarketRegime = stubFn('regime');
+}
+
+let getGasTracker, getContractInfo, decodeTx, getDevBlock, resolveENSDev, checksumAddress, getContractABI, getNpmInfo, getCrateInfo;
+try {
+  const m = await import('./tools-dev.js');
+  getGasTracker = m.getGasTracker; getContractInfo = m.getContractInfo;
+  decodeTx = m.decodeTx; getDevBlock = m.getLatestBlock;
+  resolveENSDev = m.resolveENS; checksumAddress = m.checksumAddress;
+  getContractABI = m.getContractABI; getNpmInfo = m.getNpmInfo; getCrateInfo = m.getCrateInfo;
+} catch (err) {
+  console.error(`[jarvis] tools-dev.js FAILED: ${err.message}`);
+  getGasTracker = stubFn('gas'); getContractInfo = stubFn('contract');
+  decodeTx = stubFn('decode'); getDevBlock = stubFn('block');
+  resolveENSDev = stubFn('ens'); checksumAddress = stubFn('checksum');
+  getContractABI = stubFn('abi'); getNpmInfo = stubFn('npm'); getCrateInfo = stubFn('crate');
+}
+
+let explainConcept, getGlossary, getVibeSwapExplainer, getTutorial, getCryptoCalendar, getCryptoQuiz, compareTokensEdu, getFearEdu, getDominanceEdu, getBitcoinEpoch;
+try {
+  const m = await import('./tools-education.js');
+  explainConcept = m.explainConcept; getGlossary = m.getGlossary;
+  getVibeSwapExplainer = m.getVibeSwapExplainer; getTutorial = m.getTutorial;
+  getCryptoCalendar = m.getCryptoCalendar; getCryptoQuiz = m.getCryptoQuiz;
+  compareTokensEdu = m.compareTokens; getFearEdu = m.getFearGreedIndex;
+  getDominanceEdu = m.getDominance; getBitcoinEpoch = m.getBitcoinEpoch;
+} catch (err) {
+  console.error(`[jarvis] tools-education.js FAILED: ${err.message}`);
+  explainConcept = stubFn('explain'); getGlossary = stubFn('glossary');
+  getVibeSwapExplainer = stubFn('vibeswap'); getTutorial = stubFn('tutorial');
+  getCryptoCalendar = stubFn('calendar'); getCryptoQuiz = stubFn('quiz');
+  compareTokensEdu = stubFn('compare'); getFearEdu = stubFn('fear');
+  getDominanceEdu = stubFn('dominance'); getBitcoinEpoch = stubFn('epoch');
+}
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
@@ -3073,6 +3142,63 @@ bot.command('spawnshard', async (ctx) => {
 
 // ============ Health Check ============
 
+// ============ Mind Network Mesh — Cells Within Cells Interlinked ============
+
+bot.command('mesh', async (ctx) => {
+  try {
+    const shard = getShardInfo();
+    const chain = getChainStats();
+    const mem = process.memoryUsage();
+    const uptime = Math.round(process.uptime());
+    const uptimeStr = uptime < 3600 ? `${Math.floor(uptime / 60)}m` :
+      uptime < 86400 ? `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m` :
+      `${Math.floor(uptime / 86400)}d ${Math.floor((uptime % 86400) / 3600)}h`;
+
+    // Check GitHub
+    let ghStatus = 'unknown', ghCommit = '';
+    try {
+      const ghRes = await fetch('https://api.github.com/repos/wglynn/vibeswap/commits?per_page=1', {
+        headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'JARVIS' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (ghRes.ok) {
+        const [latest] = await ghRes.json();
+        const age = Date.now() - new Date(latest.commit.committer.date).getTime();
+        ghStatus = age < 86400000 ? 'INTERLINKED' : 'DORMANT';
+        const ageStr = age < 3600000 ? `${Math.round(age / 60000)}m ago` :
+          age < 86400000 ? `${Math.round(age / 3600000)}h ago` :
+          `${Math.round(age / 86400000)}d ago`;
+        ghCommit = `${latest.sha.slice(0, 7)} (${ageStr})`;
+      } else { ghStatus = 'UNREACHABLE'; }
+    } catch { ghStatus = 'UNREACHABLE'; }
+
+    const lines = [
+      'CELLS WITHIN CELLS INTERLINKED',
+      '',
+      `[1] JARVIS (Fly.io) — INTERLINKED`,
+      `    Shard: ${shard?.id || 'shard-0'} | Up: ${uptimeStr}`,
+      `    Chain: height ${chain.height} | Heap: ${Math.round(mem.heapUsed / 1048576)}MB`,
+      '',
+      `[2] GitHub — ${ghStatus}`,
+      `    repo: wglynn/vibeswap`,
+      ghCommit ? `    Last: ${ghCommit}` : '',
+      '',
+      `[3] Vercel (Frontend) — INTERLINKED`,
+      `    frontend-jade-five-87.vercel.app`,
+      `    Auto-deploys on push`,
+      '',
+      `[4] Telegram (This Chat) — INTERLINKED`,
+      `    You're reading this. The cell is alive.`,
+      '',
+      `Mesh: ${ghStatus === 'INTERLINKED' ? '4/4' : '3/4'} cells interlinked`,
+      `View: https://frontend-jade-five-87.vercel.app/mesh`,
+    ];
+    ctx.reply(lines.filter(Boolean).join('\n'));
+  } catch (err) {
+    ctx.reply(`Mesh check failed: ${err.message}`);
+  }
+});
+
 bot.command('health', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
   const report = await diagnoseContext();
@@ -5562,6 +5688,50 @@ async function main() {
             res.end(JSON.stringify({ status: 'ok', title, sentences: sentences?.length || 0 }));
           } catch (err) {
             console.error('[fireflies] Webhook error:', err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+
+      // ============ GitHub Webhook — Live Push Feed to Telegram ============
+      // Receives push events from GitHub and posts to the Telegram group.
+      // Set up: GitHub repo → Settings → Webhooks → https://jarvis-vibeswap.fly.dev/github
+      } else if (req.url === '/github' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; if (body.length > 64 * 1024) req.destroy(); });
+        req.on('end', async () => {
+          try {
+            const event = req.headers['x-github-event'];
+            const payload = JSON.parse(body);
+
+            if (event === 'push' && payload.commits?.length > 0) {
+              const branch = payload.ref?.replace('refs/heads/', '') || 'unknown';
+              const repo = payload.repository?.name || 'vibeswap';
+              const pusher = payload.pusher?.name || 'unknown';
+              const commits = payload.commits.slice(0, 5); // Max 5 commits
+
+              const lines = [`[GitHub] ${pusher} pushed to ${repo}/${branch}`];
+              for (const c of commits) {
+                const msg = c.message.split('\n')[0].slice(0, 80);
+                const files = (c.added?.length || 0) + (c.modified?.length || 0) + (c.removed?.length || 0);
+                lines.push(`  ${c.id.slice(0, 7)} ${msg} (${files} files)`);
+              }
+              if (payload.commits.length > 5) {
+                lines.push(`  ... and ${payload.commits.length - 5} more commits`);
+              }
+
+              // Post to community group if configured, otherwise to owner
+              const chatId = config.communityGroupId || config.ownerUserId;
+              await bot.telegram.sendMessage(chatId, lines.join('\n'));
+              console.log(`[github] Push webhook: ${commits.length} commits by ${pusher} on ${branch}`);
+            } else if (event === 'ping') {
+              console.log(`[github] Webhook ping received — zen: ${payload.zen}`);
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', event }));
+          } catch (err) {
+            console.error('[github] Webhook error:', err.message);
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
           }

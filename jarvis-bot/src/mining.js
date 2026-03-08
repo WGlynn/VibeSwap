@@ -84,6 +84,14 @@ let state = {
     dailyBurned: 0,       // JUL burned today (resets on day rollover)
     dailyBurnDate: '',    // YYYY-MM-DD — triggers daily reset
     tips: [],             // tip records [{ userId, amount, timestamp }]
+    // ============ Tip Split: 50% POL + 50% Autonomous Treasury ============
+    // Tips are split 50/50:
+    //   - Protocol-Owned Liquidity (POL): permanent locked LP position on Base
+    //     mainnet VibeSwap. Lock-and-burn style — liquidity never leaves.
+    //   - Autonomous Treasury: funds objective value contributions to the DAG
+    //     and protocol growth. Self-sustaining, no human bottleneck.
+    liquidityPool: 0,     // 50% → permanent POL (lock-and-burn LP on Base)
+    autonomousTreasury: 0, // 50% → DAG contributions, protocol growth
   },
   // Layer 0 oracle: epoch history for trustless hash cost index
   // Tracks how long each epoch took vs target — the network's own
@@ -411,13 +419,26 @@ export function tipJUL(fromUserId, amount) {
     timestamp: Date.now(),
   });
 
+  // 50/50 tip split: POL + Autonomous Treasury
+  // Half bootstraps permanent liquidity (lock-and-burn LP on Base mainnet)
+  // Half funds DAG value contributions and protocol growth (self-sustaining)
+  if (!state.treasury.liquidityPool) state.treasury.liquidityPool = 0;
+  if (!state.treasury.autonomousTreasury) state.treasury.autonomousTreasury = 0;
+  const halfAmount = amount / 2;
+  state.treasury.liquidityPool += halfAmount;
+  state.treasury.autonomousTreasury += halfAmount;
+
   // Keep tips array bounded (last 1000)
   if (state.treasury.tips.length > 1000) {
     state.treasury.tips = state.treasury.tips.slice(-1000);
   }
 
   dirty = true;
-  return result;
+  return {
+    ...result,
+    liquidityPool: state.treasury.liquidityPool,
+    autonomousTreasury: state.treasury.autonomousTreasury,
+  };
 }
 
 /**
@@ -442,6 +463,8 @@ export function getTreasuryStats() {
     totalBurned: state.treasury.totalBurned,
     dailyBurned: state.treasury.dailyBurned,
     dailyPoolExpansion: state.treasury.dailyBurned * julToTokens(),
+    liquidityPool: state.treasury.liquidityPool || 0,
+    autonomousTreasury: state.treasury.autonomousTreasury || 0,
     tipsToday: todayTips.length,
     tipsAllTime: state.treasury.tips.length,
     topTippers: Object.entries(

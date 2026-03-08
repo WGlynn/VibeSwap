@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBalances } from '../hooks/useBalances'
+import { usePriceFeed } from '../hooks/usePriceFeed'
 import { Link } from 'react-router-dom'
 
 /**
@@ -12,13 +13,14 @@ export default function PortfolioDashboard() {
   const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
   const shortAddress = externalShortAddress || deviceShortAddress
-  const { balances } = useBalances()
+  const { getBalance } = useBalances()
+  const { getPrice, getChange } = usePriceFeed(['ETH', 'USDC', 'JUL', 'VIBE'])
 
   const holdings = [
-    { symbol: 'ETH', name: 'Ethereum', balance: balances?.ETH || 0, price: 3250, change: +2.4 },
-    { symbol: 'USDC', name: 'USD Coin', balance: balances?.USDC || 0, price: 1.00, change: 0 },
-    { symbol: 'JUL', name: 'Joule', balance: balances?.JUL || 0, price: 0.042, change: +15.3 },
-    { symbol: 'VIBE', name: 'VibeSwap', balance: balances?.VIBE || 0, price: 0.85, change: +5.7 },
+    { symbol: 'ETH', name: 'Ethereum', balance: getBalance('ETH'), price: getPrice('ETH'), change: getChange('ETH') },
+    { symbol: 'USDC', name: 'USD Coin', balance: getBalance('USDC'), price: getPrice('USDC'), change: getChange('USDC') },
+    { symbol: 'JUL', name: 'Joule', balance: getBalance('JUL'), price: getPrice('JUL'), change: getChange('JUL') },
+    { symbol: 'VIBE', name: 'VibeSwap', balance: getBalance('VIBE'), price: getPrice('VIBE'), change: getChange('VIBE') },
   ]
 
   const totalValue = holdings.reduce((sum, h) => sum + h.balance * h.price, 0)

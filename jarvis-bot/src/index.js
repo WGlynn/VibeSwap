@@ -104,6 +104,11 @@ import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './
 import { initPredictions, flushPredictions, createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
+import { getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth } from './tools-vibeswap.js';
+import { getPortfolio as getWalletPortfolio, getTokenBalances, getTransactionHistory, getNFTs, getDefiPositions, trackWallet, getTrackedWallets, getWhaleAlerts } from './tools-portfolio.js';
+import { getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernanceActivity, getGitHubActivity, getOnChainMetrics, getCorrelationAnalysis, getMarketRegime } from './tools-research.js';
+import { getGasTracker, getContractInfo, decodeTx, getLatestBlock as getDevBlock, resolveENS as resolveENSDev, checksumAddress, getContractABI, getNpmInfo, getCrateInfo } from './tools-dev.js';
+import { explainConcept, getGlossary, getVibeSwapExplainer, getTutorial, getCryptoCalendar, getDailyChallenge, getProtocolTimeline, getStreak, getLeaderboard as getEduLeaderboard } from './tools-education.js';
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
@@ -3104,6 +3109,222 @@ bot.command('context', async (ctx) => {
     lines.push('\nNo summaries yet — context will build as conversations grow beyond 40 messages.');
   }
   ctx.reply(lines.join('\n'));
+});
+
+// ============ VibeSwap Protocol Commands ============
+
+bot.command('vibeprice', async (ctx) => {
+  ctx.reply(await getVibePrice());
+});
+bot.command('poolstats', async (ctx) => {
+  ctx.reply(await getPoolStats());
+});
+bot.command('emission', async (ctx) => {
+  ctx.reply(await getEmissionRate());
+});
+bot.command('auction', async (ctx) => {
+  ctx.reply(await getAuctionStatus());
+});
+bot.command('shapley', async (ctx) => {
+  const addr = ctx.message.text.replace(/^\/shapley(@\w+)?/i, '').trim();
+  if (!addr) return ctx.reply('Usage: /shapley 0x...');
+  ctx.reply(await getShapleyRewards(addr));
+});
+bot.command('staking', async (ctx) => {
+  const addr = ctx.message.text.replace(/^\/staking(@\w+)?/i, '').trim();
+  if (!addr) return ctx.reply('Usage: /staking 0x...');
+  ctx.reply(await getStakingInfo(addr));
+});
+bot.command('lp', async (ctx) => {
+  const addr = ctx.message.text.replace(/^\/lp(@\w+)?/i, '').trim();
+  if (!addr) return ctx.reply('Usage: /lp 0x...');
+  ctx.reply(await getLPPositions(addr));
+});
+bot.command('protocolhealth', async (ctx) => {
+  ctx.reply(await getProtocolHealth());
+});
+
+// ============ Portfolio & Wallet Commands ============
+
+bot.command('walletview', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/walletview(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  if (!addr) return ctx.reply('Usage: /walletview 0x... [chains]\n\nExample: /walletview 0xabc eth base arb');
+  const chains = args.slice(1).length > 0 ? args.slice(1) : undefined;
+  ctx.reply(await getWalletPortfolio(addr, chains));
+});
+bot.command('tokens', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/tokens(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  const chain = args[1];
+  if (!addr) return ctx.reply('Usage: /tokens 0x... [chain]\n\nExample: /tokens 0xabc base');
+  ctx.reply(await getTokenBalances(addr, chain));
+});
+bot.command('txhistory', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/txhistory(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  const chain = args[1];
+  if (!addr) return ctx.reply('Usage: /txhistory 0x... [chain]');
+  ctx.reply(await getTransactionHistory(addr, chain));
+});
+bot.command('nfts', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/nfts(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  const chain = args[1];
+  if (!addr) return ctx.reply('Usage: /nfts 0x... [chain]');
+  ctx.reply(await getNFTs(addr, chain));
+});
+bot.command('defi', async (ctx) => {
+  const addr = ctx.message.text.replace(/^\/defi(@\w+)?/i, '').trim();
+  if (!addr) return ctx.reply('Usage: /defi 0x...');
+  ctx.reply(await getDefiPositions(addr));
+});
+bot.command('track', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/track(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  const label = args.slice(1).join(' ') || 'unlabeled';
+  if (!addr) return ctx.reply('Usage: /track 0x... [label]\n\nExample: /track 0xabc my-wallet');
+  ctx.reply(trackWallet(addr, label));
+});
+bot.command('tracked', async (ctx) => {
+  ctx.reply(await getTrackedWallets());
+});
+bot.command('whales', async (ctx) => {
+  const chain = ctx.message.text.replace(/^\/whales(@\w+)?/i, '').trim() || 'eth';
+  ctx.reply(await getWhaleAlerts(chain));
+});
+
+// ============ Education & Community Commands ============
+
+bot.command('explain', async (ctx) => {
+  const concept = ctx.message.text.replace(/^\/explain(@\w+)?/i, '').trim();
+  if (!concept) return ctx.reply('Usage: /explain impermanent loss\n\nELI5 crypto concepts.');
+  ctx.reply(await explainConcept(concept));
+});
+bot.command('glossary', (ctx) => {
+  const term = ctx.message.text.replace(/^\/glossary(@\w+)?/i, '').trim();
+  if (!term) return ctx.reply('Usage: /glossary TVL\n\nLook up crypto terminology.');
+  ctx.reply(getGlossary(term));
+});
+bot.command('vibeswap', (ctx) => {
+  const topic = ctx.message.text.replace(/^\/vibeswap(@\w+)?/i, '').trim() || undefined;
+  ctx.reply(getVibeSwapExplainer(topic));
+});
+bot.command('tutorial', (ctx) => {
+  const topic = ctx.message.text.replace(/^\/tutorial(@\w+)?/i, '').trim() || 'start';
+  ctx.reply(getTutorial(topic));
+});
+bot.command('calendar', async (ctx) => {
+  ctx.reply(await getCryptoCalendar());
+});
+bot.command('challenge', (ctx) => {
+  ctx.reply(getDailyChallenge());
+});
+bot.command('timeline', (ctx) => {
+  ctx.reply(getProtocolTimeline());
+});
+bot.command('streak', (ctx) => {
+  const chatId = ctx.chat.id;
+  const userId = ctx.from.id;
+  const username = ctx.from.username || ctx.from.first_name;
+  ctx.reply(getStreak(chatId, userId, username));
+});
+bot.command('eduleaderboard', (ctx) => {
+  const chatId = ctx.chat.id;
+  ctx.reply(getEduLeaderboard(chatId));
+});
+
+// ============ Developer Productivity Commands ============
+
+bot.command('gastracker', async (ctx) => {
+  ctx.reply(await getGasTracker());
+});
+bot.command('contract', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/contract(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  const chain = args[1];
+  if (!addr) return ctx.reply('Usage: /contract 0x... [chain]\n\nGet contract info from block explorer.');
+  ctx.reply(await getContractInfo(addr, chain));
+});
+bot.command('decode', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/decode(@\w+)?/i, '').trim().split(/\s+/);
+  const txHash = args[0];
+  const chain = args[1];
+  if (!txHash) return ctx.reply('Usage: /decode 0x... [chain]\n\nDecode a transaction.');
+  ctx.reply(await decodeTx(txHash, chain));
+});
+bot.command('blockinfo', async (ctx) => {
+  const chain = ctx.message.text.replace(/^\/blockinfo(@\w+)?/i, '').trim() || 'eth';
+  ctx.reply(await getDevBlock(chain));
+});
+bot.command('ensinfo', async (ctx) => {
+  const input = ctx.message.text.replace(/^\/ensinfo(@\w+)?/i, '').trim();
+  if (!input) return ctx.reply('Usage: /ensinfo vitalik.eth or /ensinfo 0x...');
+  ctx.reply(await resolveENSDev(input));
+});
+bot.command('npm', async (ctx) => {
+  const pkg = ctx.message.text.replace(/^\/npm(@\w+)?/i, '').trim();
+  if (!pkg) return ctx.reply('Usage: /npm ethers\n\nnpm package info.');
+  ctx.reply(await getNpmInfo(pkg));
+});
+bot.command('crate', async (ctx) => {
+  const name = ctx.message.text.replace(/^\/crate(@\w+)?/i, '').trim();
+  if (!name) return ctx.reply('Usage: /crate tokio\n\nRust crate info from crates.io.');
+  ctx.reply(await getCrateInfo(name));
+});
+bot.command('abi', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/abi(@\w+)?/i, '').trim().split(/\s+/);
+  const addr = args[0];
+  const chain = args[1];
+  if (!addr) return ctx.reply('Usage: /abi 0x... [chain]\n\nFetch contract ABI.');
+  ctx.reply(await getContractABI(addr, chain));
+});
+bot.command('checksum', async (ctx) => {
+  const addr = ctx.message.text.replace(/^\/checksum(@\w+)?/i, '').trim();
+  if (!addr) return ctx.reply('Usage: /checksum 0x...\n\nEIP-55 checksum an address.');
+  ctx.reply(await checksumAddress(addr));
+});
+
+// ============ Research & Analysis Commands ============
+
+bot.command('tokenomics', async (ctx) => {
+  const token = ctx.message.text.replace(/^\/tokenomics(@\w+)?/i, '').trim();
+  if (!token) return ctx.reply('Usage: /tokenomics ETH\n\nDeep tokenomics breakdown for any token.');
+  ctx.reply(await getTokenomicsAnalysis(token));
+});
+bot.command('protocol', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/protocol(@\w+)?/i, '').trim().split(/\s+/);
+  if (args.length < 2) return ctx.reply('Usage: /protocol uniswap curve\n\nSide-by-side protocol comparison.');
+  ctx.reply(await getProtocolComparison(args[0], args[1]));
+});
+bot.command('farms', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/farms(@\w+)?/i, '').trim().split(/\s+/);
+  const minApy = parseFloat(args[0]) || 5;
+  const chain = args[1] || null;
+  ctx.reply(await getYieldFarming(minApy, chain));
+});
+bot.command('governance', async (ctx) => {
+  const protocol = ctx.message.text.replace(/^\/governance(@\w+)?/i, '').trim();
+  if (!protocol) return ctx.reply('Usage: /governance aave\n\nActive governance proposals from Snapshot.');
+  ctx.reply(await getGovernanceActivity(protocol));
+});
+bot.command('github', async (ctx) => {
+  const repo = ctx.message.text.replace(/^\/github(@\w+)?/i, '').trim();
+  if (!repo) return ctx.reply('Usage: /github uniswap/v3-core\n\nGitHub repo activity analysis.');
+  ctx.reply(await getGitHubActivity(repo));
+});
+bot.command('onchain', async (ctx) => {
+  const chain = ctx.message.text.replace(/^\/onchain(@\w+)?/i, '').trim() || 'ethereum';
+  ctx.reply(await getOnChainMetrics(chain));
+});
+bot.command('correlation', async (ctx) => {
+  const args = ctx.message.text.replace(/^\/correlation(@\w+)?/i, '').trim().split(/\s+/);
+  if (args.length < 2) return ctx.reply('Usage: /correlation btc eth [days]\n\nPrice correlation analysis.');
+  const days = parseInt(args[2]) || 30;
+  ctx.reply(await getCorrelationAnalysis(args[0], args[1], days));
+});
+bot.command('regime', async (ctx) => {
+  ctx.reply(await getMarketRegime());
 });
 
 // ============ Limni — Trading Terminal Monitoring ============

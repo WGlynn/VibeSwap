@@ -147,16 +147,23 @@ export function useJarvis() {
         }
       }
     } catch (err) {
+      const isBudgetExceeded = err.message.toLowerCase().includes('budget exceeded') || err.message.toLowerCase().includes('daily budget')
       const errorText = err.message.includes('Rate limited')
         ? '> Rate limited. Please wait a moment before sending another message.'
         : `> Connection error: ${err.message}`
       setMessages(prev => {
         const updated = [...prev]
+        const errorMsg = {
+          role: 'jarvis',
+          text: errorText,
+          timestamp: new Date(),
+          budgetExceeded: isBudgetExceeded,
+        }
         // Replace the empty streaming placeholder with error
         if (updated[updated.length - 1]?.role === 'jarvis' && !updated[updated.length - 1]?.text) {
-          updated[updated.length - 1] = { role: 'jarvis', text: errorText, timestamp: new Date() }
+          updated[updated.length - 1] = errorMsg
         } else {
-          updated.push({ role: 'jarvis', text: errorText, timestamp: new Date() })
+          updated.push(errorMsg)
         }
         return updated
       })

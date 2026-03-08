@@ -40,7 +40,7 @@ function CellNode({ cell, position, onClick, isSelected }) {
   return (
     <motion.div
       className="absolute cursor-pointer"
-      style={{ left: `${position.x}%`, top: `${position.y}%`, transform: 'translate(-50%, -50%)' }}
+      style={{ left: `${position.x}%`, top: `${position.y}%`, marginLeft: '-2.5rem', marginTop: '-2.5rem' }}
       onClick={() => onClick(cell)}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}

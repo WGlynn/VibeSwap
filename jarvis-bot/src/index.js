@@ -3128,14 +3128,17 @@ bot.command('tip', async (ctx) => {
     return ctx.reply('Tip failed. Try again.');
   }
 
+  const halfTip = (amount / 2).toFixed(2);
   const lines = [
     `${userName} tipped ${amount.toFixed(2)} JUL`,
     '',
-    `Pool expanded by ${result.poolExpansion.toLocaleString()} tokens`,
-    `Daily JUL burned: ${result.dailyBurned.toFixed(2)}`,
+    `  ${halfTip} JUL → Protocol Liquidity (permanent LP)`,
+    `  ${halfTip} JUL → Autonomous Treasury (DAG growth)`,
+    '',
+    `Pool: ${(result.liquidityPool || 0).toFixed(2)} JUL | Treasury: ${(result.autonomousTreasury || 0).toFixed(2)} JUL`,
     `Your remaining balance: ${result.newBalance.toFixed(2)} JUL`,
     '',
-    'The entire network benefits. Work in, access out.',
+    'Self-sustaining. Every tip strengthens the protocol.',
   ];
 
   // Wardenclyffe: attempt to restore premium provider after tip

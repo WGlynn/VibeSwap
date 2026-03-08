@@ -10,7 +10,7 @@ import { remember } from '../utils/sankofa'
 export default function JarvisBubble() {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
-  const { messages, isLoading, sendMessage, health, budget } = useJarvis()
+  const { messages, isLoading, sendMessage, health, budget, voiceMode, toggleVoice, isSpeaking, speakText } = useJarvis()
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -78,11 +78,30 @@ export default function JarvisBubble() {
                   </span>
                 )}
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-black-700 rounded">
-                <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Voice mode toggle */}
+                <button
+                  onClick={toggleVoice}
+                  className={`p-1.5 rounded transition-colors ${voiceMode ? 'bg-matrix-600/30 text-matrix-400' : 'hover:bg-black-700 text-black-400'}`}
+                  title={voiceMode ? 'Voice mode ON — click to disable' : 'Enable voice responses'}
+                >
+                  {voiceMode ? (
+                    <svg className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                  )}
+                </button>
+                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-black-700 rounded">
+                  <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Messages */}
@@ -94,11 +113,17 @@ export default function JarvisBubble() {
               )}
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-matrix-600/20 text-white border border-matrix-700/30'
-                      : 'bg-black-800 text-black-200 border border-black-700'
-                  }`}>
+                  <div
+                    className={`max-w-[85%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
+                      msg.role === 'user'
+                        ? 'bg-matrix-600/20 text-white border border-matrix-700/30'
+                        : 'bg-black-800 text-black-200 border border-black-700'
+                    } ${msg.role === 'jarvis' && voiceMode ? 'cursor-pointer hover:border-matrix-600/50' : ''}`}
+                    onClick={() => {
+                      if (msg.role === 'jarvis' && voiceMode && msg.text) speakText(msg.text)
+                    }}
+                    title={msg.role === 'jarvis' && voiceMode ? 'Click to hear' : undefined}
+                  >
                     {msg.text || msg.content}
                   </div>
                 </div>

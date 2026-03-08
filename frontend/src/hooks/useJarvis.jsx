@@ -15,7 +15,61 @@ export function useJarvis() {
   const [health, setHealth] = useState(null)
   const [error, setError] = useState(null)
   const [budget, setBudget] = useState(null)
+  const [voiceMode, setVoiceMode] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const sessionIdRef = useRef(crypto.randomUUID())
+  const audioRef = useRef(null)
+
+  // Stop any playing audio
+  const stopSpeaking = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setIsSpeaking(false)
+  }, [])
+
+  // Play TTS for a given text
+  const speakText = useCallback(async (text) => {
+    if (!text || !voiceMode) return
+    stopSpeaking()
+    setIsSpeaking(true)
+    try {
+      const res = await fetch(`${API_URL}/web/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.slice(0, 5000) }),
+      })
+      if (!res.ok) {
+        setIsSpeaking(false)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => {
+        setIsSpeaking(false)
+        URL.revokeObjectURL(url)
+        audioRef.current = null
+      }
+      audio.onerror = () => {
+        setIsSpeaking(false)
+        URL.revokeObjectURL(url)
+        audioRef.current = null
+      }
+      await audio.play()
+    } catch {
+      setIsSpeaking(false)
+    }
+  }, [voiceMode, stopSpeaking])
+
+  const toggleVoice = useCallback(() => {
+    setVoiceMode(prev => {
+      if (prev) stopSpeaking() // turning off — stop any playing audio
+      return !prev
+    })
+  }, [stopSpeaking])
 
   const sendMessage = useCallback(async (text) => {
     if (!text.trim() || isLoading) return
@@ -87,6 +141,10 @@ export function useJarvis() {
           updated[updated.length - 1] = { ...updated[updated.length - 1], text: accumulated }
           return updated
         })
+        // Auto-speak in voice mode
+        if (voiceMode) {
+          speakText(accumulated)
+        }
       }
     } catch (err) {
       const errorText = err.message.includes('Rate limited')
@@ -106,7 +164,7 @@ export function useJarvis() {
     } finally {
       setIsLoading(false)
     }
-  }, [isLoading])
+  }, [isLoading, voiceMode, speakText])
 
   const fetchMind = useCallback(async () => {
     try {
@@ -144,5 +202,10 @@ export function useJarvis() {
     }
   }, [fetchHealth, fetchMind])
 
-  return { messages, isLoading, mind, health, error, budget, sendMessage }
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => stopSpeaking()
+  }, [stopSpeaking])
+
+  return { messages, isLoading, mind, health, error, budget, sendMessage, voiceMode, toggleVoice, isSpeaking, stopSpeaking, speakText }
 }

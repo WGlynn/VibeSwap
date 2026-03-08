@@ -7,7 +7,7 @@ import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
 import { generateDigest, generateWeeklyDigest } from './digest.js';
-import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats } from './intelligence.js';
+import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats, checkGroupNorms } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName, compressCKB } from './learning.js';
@@ -4974,6 +4974,14 @@ bot.on('text', async (ctx) => {
             } else {
               analysis = await analyzeMessage(msgText, userName, recentCtx);
             }
+          }
+        }
+
+        // Passive norm learning — fire and forget, zero-cost heuristic
+        const normResult = checkGroupNorms(ctx.chat.id);
+        if (normResult) {
+          for (const norm of normResult.norms) {
+            addGroupNorm(ctx.chat.id, norm).catch(() => {});
           }
         }
 

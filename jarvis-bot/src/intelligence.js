@@ -109,6 +109,9 @@ function recordModeration() {
 // Returns: { action: 'observe' | 'engage' | 'moderate', reason, response? }
 
 export async function analyzeMessage(text, userName, recentContext) {
+  // Passive observation for norm learning (zero cost, runs on every message)
+  observeForNorms(text, userName);
+
   // Skip only literal noise (single char, emoji-only)
   if (text.length < 3) return { action: 'observe', reason: 'too_short' };
 
@@ -302,6 +305,52 @@ export async function evaluateModeration(text, userName, violation, severity) {
     severity,
     automated: true,
   };
+}
+
+// ============ Passive Norm Learning ============
+// Every ~50 messages, JARVIS infers group norms from conversation patterns.
+// No LLM call — pure heuristic pattern matching to stay cheap.
+
+const messageBuffer = []; // recent messages for norm detection
+const MAX_NORM_BUFFER = 50;
+let lastNormCheck = 0;
+const NORM_CHECK_INTERVAL = 30 * 60 * 1000; // 30 min
+
+export function observeForNorms(text, userName) {
+  messageBuffer.push({ text, userName, ts: Date.now() });
+  if (messageBuffer.length > MAX_NORM_BUFFER) messageBuffer.shift();
+}
+
+export function checkGroupNorms(chatId) {
+  if (Date.now() - lastNormCheck < NORM_CHECK_INTERVAL) return null;
+  if (messageBuffer.length < 20) return null;
+  lastNormCheck = Date.now();
+
+  const norms = [];
+  const texts = messageBuffer.map(m => m.text);
+
+  // Detect language patterns
+  const lowercaseRatio = texts.filter(t => t === t.toLowerCase()).length / texts.length;
+  if (lowercaseRatio > 0.8) norms.push('Group prefers lowercase/casual typing');
+
+  // Detect topic patterns
+  const cryptoMentions = texts.filter(t => /\b(eth|btc|sol|defi|nft|token|chain|swap|yield|apy)\b/i.test(t)).length;
+  if (cryptoMentions / texts.length > 0.4) norms.push('Crypto/DeFi is the dominant topic');
+
+  // Detect average message length
+  const avgLen = texts.reduce((s, t) => s + t.length, 0) / texts.length;
+  if (avgLen < 50) norms.push('Group communicates in short bursts');
+  else if (avgLen > 200) norms.push('Group writes detailed messages — match the depth');
+
+  // Detect emoji usage
+  const emojiMessages = texts.filter(t => /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}]/u.test(t)).length;
+  if (emojiMessages / texts.length > 0.3) norms.push('Group uses emojis frequently');
+
+  // Detect question frequency
+  const questionRatio = texts.filter(t => t.includes('?')).length / texts.length;
+  if (questionRatio > 0.3) norms.push('Group is discussion-oriented (lots of questions)');
+
+  return norms.length > 0 ? { chatId, norms } : null;
 }
 
 // ============ Contribution Quality Analysis ============

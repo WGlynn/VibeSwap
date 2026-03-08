@@ -2,30 +2,100 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 
 const PLAYLIST_ID = 'PLQiikPOTiUt5_dXKg0WM_VIIzJcUrkyKq'
 
+// Load YouTube IFrame API once
+let ytApiReady = false
+let ytApiCallbacks = []
+
+function loadYTApi() {
+  if (ytApiReady || document.getElementById('yt-iframe-api')) return
+  const tag = document.createElement('script')
+  tag.id = 'yt-iframe-api'
+  tag.src = 'https://www.youtube.com/iframe_api'
+  document.head.appendChild(tag)
+  window.onYouTubeIframeAPIReady = () => {
+    ytApiReady = true
+    ytApiCallbacks.forEach(cb => cb())
+    ytApiCallbacks = []
+  }
+}
+
+function onYTReady(cb) {
+  if (ytApiReady) cb()
+  else ytApiCallbacks.push(cb)
+}
+
 export default function VibePlayer() {
   const [isOpen, setIsOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [showPanel, setShowPanel] = useState(false)
-  const iframeRef = useRef(null)
+  const playerRef = useRef(null)
+  const containerRef = useRef(null)
 
-  // Send commands to the YouTube iframe via postMessage
-  const sendCommand = useCallback((func, args = []) => {
-    if (!iframeRef.current?.contentWindow) return
-    iframeRef.current.contentWindow.postMessage(
-      JSON.stringify({ event: 'command', func, args }),
-      '*'
-    )
-  }, [])
+  // Load YT API on mount
+  useEffect(() => { loadYTApi() }, [])
+
+  // Create/destroy YT.Player when isOpen changes
+  useEffect(() => {
+    if (!isOpen) {
+      if (playerRef.current) {
+        try { playerRef.current.destroy() } catch {}
+        playerRef.current = null
+      }
+      return
+    }
+
+    onYTReady(() => {
+      if (!containerRef.current || playerRef.current) return
+      playerRef.current = new window.YT.Player(containerRef.current, {
+        height: '1',
+        width: '1',
+        playerVars: {
+          listType: 'playlist',
+          list: PLAYLIST_ID,
+          autoplay: 1,
+          loop: 1,
+          playsinline: 1,       // iOS: play inline, not fullscreen
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          rel: 0,
+        },
+        events: {
+          onReady: (e) => {
+            // Try to play — works if called within gesture context
+            e.target.playVideo()
+          },
+          onStateChange: (e) => {
+            // Sync UI to actual playback state
+            const state = e.data
+            if (state === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true)
+            } else if (state === window.YT.PlayerState.PAUSED ||
+                       state === window.YT.PlayerState.ENDED ||
+                       state === window.YT.PlayerState.UNSTARTED) {
+              setIsPlaying(false)
+            }
+          },
+        },
+      })
+    })
+
+    return () => {
+      if (playerRef.current) {
+        try { playerRef.current.destroy() } catch {}
+        playerRef.current = null
+      }
+    }
+  }, [isOpen])
 
   const play = useCallback(() => {
-    sendCommand('playVideo')
-    setIsPlaying(true)
-  }, [sendCommand])
+    if (playerRef.current?.playVideo) playerRef.current.playVideo()
+  }, [])
 
   const pause = useCallback(() => {
-    sendCommand('pauseVideo')
-    setIsPlaying(false)
-  }, [sendCommand])
+    if (playerRef.current?.pauseVideo) playerRef.current.pauseVideo()
+  }, [])
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) pause()
@@ -33,20 +103,19 @@ export default function VibePlayer() {
   }, [isPlaying, play, pause])
 
   const nextTrack = useCallback(() => {
-    sendCommand('nextVideo')
-    setIsPlaying(true)
-  }, [sendCommand])
+    if (playerRef.current?.nextVideo) playerRef.current.nextVideo()
+  }, [])
 
   const prevTrack = useCallback(() => {
-    sendCommand('previousVideo')
-    setIsPlaying(true)
-  }, [sendCommand])
+    if (playerRef.current?.previousVideo) playerRef.current.previousVideo()
+  }, [])
 
   const togglePlayer = useCallback(() => {
     if (!isOpen) {
       setIsOpen(true)
-      setIsPlaying(true)
+      // Don't set isPlaying here — let onStateChange confirm actual playback
     } else {
+      if (playerRef.current?.pauseVideo) playerRef.current.pauseVideo()
       setIsOpen(false)
       setIsPlaying(false)
       setShowPanel(false)
@@ -56,7 +125,6 @@ export default function VibePlayer() {
   const togglePanel = useCallback(() => {
     if (!isOpen) {
       setIsOpen(true)
-      setIsPlaying(true)
       setShowPanel(true)
     } else {
       setShowPanel(p => !p)
@@ -65,7 +133,7 @@ export default function VibePlayer() {
 
   return (
     <div className="fixed bottom-4 right-4" style={{ zIndex: 50 }}>
-      {/* Hidden iframe — plays audio, never visible. enablejsapi=1 allows postMessage control */}
+      {/* Hidden YT player container — 1x1px, invisible */}
       {isOpen && (
         <div
           aria-hidden="true"
@@ -78,15 +146,7 @@ export default function VibePlayer() {
             pointerEvents: 'none',
           }}
         >
-          <iframe
-            ref={iframeRef}
-            width="1"
-            height="1"
-            src={`https://www.youtube.com/embed/videoseries?list=${PLAYLIST_ID}&autoplay=1&loop=1&enablejsapi=1`}
-            title="VibeSwap Playlist"
-            frameBorder="0"
-            allow="autoplay; encrypted-media"
-          />
+          <div ref={containerRef} />
         </div>
       )}
 

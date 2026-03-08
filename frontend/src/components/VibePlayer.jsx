@@ -295,26 +295,46 @@ export default function VibePlayer() {
         </div>
       )}
 
-      {/* Toggle button */}
-      <div className="flex items-center gap-2">
-        {/* Expand panel button (only when playing) */}
+      {/* Controls */}
+      <div className="flex items-center gap-1.5">
         {isPlaying && !showPanel && (
-          <button
-            onClick={togglePanel}
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
-            style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-            }}
-            title="Show player"
-          >
-            <svg className="w-3.5 h-3.5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-            </svg>
-          </button>
+          <>
+            {/* Previous */}
+            <button
+              onClick={prevTrack}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 active:text-white active:scale-90 transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+              </svg>
+            </button>
+
+            {/* Pause */}
+            <button
+              onClick={togglePlayPause}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 active:text-white active:scale-90 transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+              </svg>
+            </button>
+
+            {/* Next */}
+            <button
+              onClick={nextTrack}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 active:text-white active:scale-90 transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+              </svg>
+            </button>
+          </>
         )}
 
-        {/* Main play/vibe button */}
+        {/* Main VIBE button */}
         <button
           onClick={togglePlayer}
           className="flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-all duration-300 hover:scale-105 active:scale-95"

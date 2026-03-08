@@ -1,34 +1,23 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-
-const GAS_LEVELS = [
-  { label: 'slow', multiplier: 0.8, time: '~5 min' },
-  { label: 'normal', multiplier: 1.0, time: '~2 min' },
-  { label: 'fast', multiplier: 1.2, time: '~30 sec' },
-  { label: 'instant', multiplier: 1.5, time: '~15 sec' },
-]
+import { useGasPrice } from '../hooks/useGasPrice'
+import { usePriceFeed } from '../hooks/usePriceFeed'
 
 function GasTracker({ onSelect }) {
-  const [baseGas, setBaseGas] = useState(12)
+  const { gasPrice, levels, trend, estimateTransferCost } = useGasPrice()
+  const { getPrice } = usePriceFeed(['ETH'])
   const [selectedLevel, setSelectedLevel] = useState(1)
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBaseGas(prev => {
-        const change = (Math.random() - 0.5) * 2
-        return Math.max(5, Math.min(50, prev + change))
-      })
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
+  const gasLevels = levels
+  const baseGas = gasPrice || 0
 
   const handleSelect = (index) => {
     setSelectedLevel(index)
-    onSelect?.(Math.round(baseGas * GAS_LEVELS[index].multiplier))
+    onSelect?.(gasLevels[index]?.price || 0)
   }
 
-  const currentGas = Math.round(baseGas * GAS_LEVELS[selectedLevel].multiplier)
+  const currentGas = gasLevels[selectedLevel]?.price || Math.round(baseGas)
+  const ethPrice = getPrice('ETH') || 2000
 
   return (
     <div className="rounded-lg bg-black-800 border border-black-500 overflow-hidden">
@@ -58,7 +47,7 @@ function GasTracker({ onSelect }) {
           <div className="text-left">
             <div className="text-xs text-black-400">gwei</div>
             <div className="text-[10px] text-black-500 font-mono">
-              ~${((currentGas * 21000 * 2000) / 1e9).toFixed(2)}
+              ~${((currentGas * 21000 * ethPrice) / 1e9).toFixed(2)}
             </div>
           </div>
         </div>
@@ -80,7 +69,7 @@ function GasTracker({ onSelect }) {
 
       {/* Speed Options */}
       <div className="p-3 grid grid-cols-4 gap-1.5">
-        {GAS_LEVELS.map((level, index) => (
+        {gasLevels.map((level, index) => (
           <button
             key={level.label}
             onClick={() => handleSelect(index)}
@@ -106,11 +95,11 @@ function GasTracker({ onSelect }) {
       <div className="px-3 pb-3">
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-black-500">30m trend</span>
-          <div className="flex items-center space-x-1 text-matrix-500">
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <div className={`flex items-center space-x-1 ${trend === 'decreasing' ? 'text-matrix-500' : trend === 'increasing' ? 'text-red-400' : 'text-black-400'}`}>
+            <svg className={`w-3 h-3 ${trend === 'increasing' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
             </svg>
-            <span>decreasing</span>
+            <span>{trend}</span>
           </div>
         </div>
       </div>

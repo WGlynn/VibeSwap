@@ -25,8 +25,12 @@ export function useJarvis() {
     setIsLoading(true)
     setError(null)
 
+    // Add placeholder for streaming response
+    const jarvisMsg = { role: 'jarvis', text: '', timestamp: new Date() }
+    setMessages(prev => [...prev, jarvisMsg])
+
     try {
-      const res = await fetch(`${API_URL}/web/chat`, {
+      const res = await fetch(`${API_URL}/web/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -35,28 +39,69 @@ export function useJarvis() {
         }),
       })
 
-      const data = await res.json()
-
       if (!res.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`)
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `HTTP ${res.status}`)
       }
 
-      if (data.budget) setBudget(data.budget)
+      // Read SSE stream
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+      let buffer = ''
 
-      setMessages(prev => [...prev, {
-        role: 'jarvis',
-        text: data.reply,
-        timestamp: new Date(data.timestamp || Date.now()),
-      }])
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'chunk') {
+              accumulated += event.text
+              setMessages(prev => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { ...updated[updated.length - 1], text: accumulated }
+                return updated
+              })
+            } else if (event.type === 'done') {
+              if (event.budget) setBudget(event.budget)
+            } else if (event.type === 'error') {
+              throw new Error(event.message)
+            }
+          } catch (parseErr) {
+            if (parseErr.message !== 'Unexpected end of JSON input') throw parseErr
+          }
+        }
+      }
+
+      // Final update with complete text
+      if (accumulated) {
+        setMessages(prev => {
+          const updated = [...prev]
+          updated[updated.length - 1] = { ...updated[updated.length - 1], text: accumulated }
+          return updated
+        })
+      }
     } catch (err) {
       const errorText = err.message.includes('Rate limited')
         ? '> Rate limited. Please wait a moment before sending another message.'
         : `> Connection error: ${err.message}`
-      setMessages(prev => [...prev, {
-        role: 'jarvis',
-        text: errorText,
-        timestamp: new Date(),
-      }])
+      setMessages(prev => {
+        const updated = [...prev]
+        // Replace the empty streaming placeholder with error
+        if (updated[updated.length - 1]?.role === 'jarvis' && !updated[updated.length - 1]?.text) {
+          updated[updated.length - 1] = { role: 'jarvis', text: errorText, timestamp: new Date() }
+        } else {
+          updated.push({ role: 'jarvis', text: errorText, timestamp: new Date() })
+        }
+        return updated
+      })
       setError(err.message)
     } finally {
       setIsLoading(false)

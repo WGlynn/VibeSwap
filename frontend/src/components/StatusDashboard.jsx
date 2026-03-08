@@ -15,15 +15,21 @@ export default function StatusDashboard() {
   const { here } = useUbuntu()
   const [mind, setMind] = useState(null)
   const [health, setHealth] = useState(null)
+  const [intelligence, setIntelligence] = useState(null)
+  const [wardenclyffe, setWardenclyffe] = useState(null)
 
   const fetchData = useCallback(async () => {
     try {
-      const [healthRes, mindRes] = await Promise.allSettled([
+      const [healthRes, mindRes, intelRes, wardenRes] = await Promise.allSettled([
         fetch(`${API_URL}/web/health`).then(r => r.json()),
         fetch(`${API_URL}/web/mind`).then(r => r.json()),
+        fetch(`${API_URL}/web/intelligence`).then(r => r.json()),
+        fetch(`${API_URL}/web/wardenclyffe`).then(r => r.json()),
       ])
       if (healthRes.status === 'fulfilled') setHealth(healthRes.value)
       if (mindRes.status === 'fulfilled') setMind(mindRes.value)
+      if (intelRes.status === 'fulfilled') setIntelligence(intelRes.value)
+      if (wardenRes.status === 'fulfilled') setWardenclyffe(wardenRes.value)
     } catch { /* silent */ }
   }, [])
 
@@ -172,6 +178,76 @@ export default function StatusDashboard() {
                 <p className="text-[10px] font-mono text-black-600 mt-1">{thought.category}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Wardenclyffe — LLM Provider Cascade */}
+      {wardenclyffe && (
+        <div className="mb-6">
+          <h2 className="text-xs font-mono text-black-500 uppercase px-1 mb-3">Wardenclyffe Cascade</h2>
+          <div className="p-4 rounded-xl bg-black-800/60 border border-black-700">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-mono text-black-300">Active Provider</span>
+              <span className="text-sm font-mono font-bold text-matrix-400">{wardenclyffe.activeProvider}</span>
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-mono text-black-300">Model</span>
+              <span className="text-sm font-mono text-black-400">{wardenclyffe.activeModel?.split('/').pop()}</span>
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-mono text-black-300">Tier</span>
+              <span className={`text-sm font-mono font-bold ${wardenclyffe.intelligenceLevel?.degraded ? 'text-amber-400' : 'text-matrix-400'}`}>
+                {wardenclyffe.intelligenceLevel?.tierLabel || 'Unknown'}
+              </span>
+            </div>
+            {wardenclyffe.providerPerformance && Object.entries(wardenclyffe.providerPerformance).length > 0 && (
+              <div className="mt-3 pt-3 border-t border-black-700">
+                <p className="text-[10px] font-mono text-black-500 mb-2">Provider Performance</p>
+                {Object.entries(wardenclyffe.providerPerformance).map(([name, perf]) => (
+                  <div key={name} className="flex items-center justify-between py-1">
+                    <span className="text-xs font-mono text-black-400">{name}</span>
+                    <span className="text-xs font-mono text-black-500">
+                      {perf.avgLatencyMs}ms | {perf.successRate} | {perf.samples} calls
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Intelligence — Turing Metrics */}
+      {intelligence?.scoreTrends && (
+        <div className="mb-6">
+          <h2 className="text-xs font-mono text-black-500 uppercase px-1 mb-3">Turing Metrics (7d)</h2>
+          <div className="p-4 rounded-xl bg-black-800/60 border border-black-700">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              {['accuracy', 'relevance', 'naturalness'].map(key => (
+                <div key={key}>
+                  <p className="text-[10px] font-mono text-black-500 capitalize">{key}</p>
+                  <p className={`text-lg font-mono font-bold ${
+                    parseFloat(intelligence.scoreTrends[key] || 0) >= 7 ? 'text-matrix-400' :
+                    parseFloat(intelligence.scoreTrends[key] || 0) >= 5 ? 'text-amber-400' : 'text-red-400'
+                  }`}>
+                    {intelligence.scoreTrends[key] || '—'}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-black-700">
+              <span className="text-xs font-mono text-black-400">Composite</span>
+              <span className="text-sm font-mono font-bold text-white">{intelligence.scoreTrends.composite}/10</span>
+            </div>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs font-mono text-black-400">Evaluations</span>
+              <span className="text-sm font-mono text-black-400">{intelligence.scoreTrends.count}</span>
+            </div>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs font-mono text-black-400">Rapport Tracked</span>
+              <span className="text-sm font-mono text-black-400">{intelligence.rapportTracked || 0} users</span>
+            </div>
           </div>
         </div>
       )}

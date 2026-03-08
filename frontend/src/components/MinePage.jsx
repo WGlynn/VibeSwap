@@ -141,6 +141,95 @@ const WORKER_CODE = `
   }
 `
 
+function LeaderboardCard({ apiUrl }) {
+  const [leaders, setLeaders] = useState([])
+  const [supply, setSupply] = useState(null)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [lbRes, supRes] = await Promise.allSettled([
+          fetch(`${apiUrl}/web/mining/leaderboard`).then(r => r.json()),
+          fetch(`${apiUrl}/web/mining/supply`).then(r => r.json()),
+        ])
+        if (lbRes.status === 'fulfilled') setLeaders(lbRes.value?.leaderboard || [])
+        if (supRes.status === 'fulfilled') setSupply(supRes.value)
+      } catch {}
+    }
+    fetchData()
+    const interval = setInterval(fetchData, 30_000)
+    return () => clearInterval(interval)
+  }, [apiUrl])
+
+  const formatId = (id) => {
+    if (!id) return '???'
+    if (id.startsWith('wallet:')) return `${id.slice(7, 13)}...${id.slice(-4)}`
+    if (id.length > 12) return `${id.slice(0, 8)}...`
+    return id
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+      <GlassCard className="p-5">
+        <h3 className="text-sm font-semibold text-void-300 mb-3">Top Miners</h3>
+        {leaders.length === 0 ? (
+          <div className="text-void-600 text-sm">No miners yet — be the first!</div>
+        ) : (
+          <div className="space-y-1.5">
+            {leaders.slice(0, 10).map((m, i) => (
+              <div key={m.userId} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-2">
+                  <span className={`font-mono w-5 text-right ${i < 3 ? 'text-amber-400' : 'text-void-500'}`}>
+                    {i + 1}.
+                  </span>
+                  <span className="text-void-300 font-mono text-xs">{formatId(m.userId)}</span>
+                </div>
+                <span className="text-amber-400 font-mono text-xs">{m.julBalance?.toFixed(2)} JUL</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </GlassCard>
+
+      <GlassCard className="p-5">
+        <h3 className="text-sm font-semibold text-void-300 mb-3">Supply Economics</h3>
+        {supply ? (
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-void-400 text-sm">Circulating</span>
+              <span className="font-mono text-sm text-amber-400">{supply.supply?.circulating?.toFixed(2) || '0'} JUL</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-void-400 text-sm">Burned (sinks)</span>
+              <span className="font-mono text-sm text-red-400">{supply.supply?.burned?.toFixed(2) || '0'} JUL</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-void-400 text-sm">Escape Velocity</span>
+              <span className="font-mono text-sm text-void-300">{supply.escapeVelocity?.escapeVelocity?.toLocaleString() || '—'} JUL</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-void-400 text-sm">Hash Cost Index</span>
+              <span className={`font-mono text-sm ${
+                supply.hashCostIndex?.trend === 'deflationary' ? 'text-green-400' :
+                supply.hashCostIndex?.trend === 'inflationary' ? 'text-red-400' :
+                'text-void-300'
+              }`}>
+                {supply.hashCostIndex?.index || '1.0'} ({supply.hashCostIndex?.trend || 'equilibrium'})
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-void-400 text-sm">Daily Burns</span>
+              <span className="font-mono text-sm">{supply.treasury?.dailyBurned?.toFixed(2) || '0'} JUL</span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-void-600 text-sm">Loading supply data...</div>
+        )}
+      </GlassCard>
+    </div>
+  )
+}
+
 function MinePage() {
   const { isConnected: isExternalConnected, connect, address: externalAddress } = useWallet()
   const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
@@ -655,6 +744,11 @@ function MinePage() {
               </div>
             </div>
           </GlassCard>
+        </StaggerItem>
+
+        {/* Leaderboard */}
+        <StaggerItem>
+          <LeaderboardCard apiUrl={API_URL} />
         </StaggerItem>
 
         {/* Current Challenge */}

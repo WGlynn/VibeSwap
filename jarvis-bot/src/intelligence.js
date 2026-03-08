@@ -52,12 +52,22 @@ let hourResetTime = Date.now();
 // Adjusts formality based on interaction history — strangers get polite,
 // regulars get casual, close contacts get inside jokes and banter.
 const rapportMap = new Map(); // userName → { interactions: N, lastSeen: ts }
+const RAPPORT_MAX_ENTRIES = 5000;
+const RAPPORT_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function updateRapport(userName) {
   const existing = rapportMap.get(userName) || { interactions: 0, lastSeen: 0 };
   existing.interactions++;
   existing.lastSeen = Date.now();
   rapportMap.set(userName, existing);
+
+  // Evict stale entries when map grows too large
+  if (rapportMap.size > RAPPORT_MAX_ENTRIES) {
+    const now = Date.now();
+    for (const [key, val] of rapportMap) {
+      if (now - val.lastSeen > RAPPORT_STALE_MS) rapportMap.delete(key);
+    }
+  }
 }
 
 export function getRapportLevel(userName) {

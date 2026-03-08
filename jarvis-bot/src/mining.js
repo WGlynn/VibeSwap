@@ -747,7 +747,7 @@ export async function initMining() {
 
   // Auto-save timer
   saveTimer = setInterval(() => {
-    if (dirty) flushMining();
+    if (dirty) flushMining().catch(err => console.error(`[mining] Auto-save failed: ${err.message}`));
   }, AUTO_SAVE_INTERVAL);
 
   // Rate limit cleanup (every 5 min — mirrors web-api pattern)

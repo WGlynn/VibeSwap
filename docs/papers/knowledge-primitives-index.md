@@ -803,3 +803,33 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 > Every decentralized system needs three layers: WHERE things live (substrate/execution environment), WHAT lives there (the native objects/assets), and HOW agreement happens (consensus mechanism). Conflating layers creates coupling. Separating them creates composability. GenTu is WHERE, IT is WHAT, Proof of Mind is HOW.
 
 **Generalization**: This maps to any distributed system: infrastructure (WHERE), application (WHAT), coordination (HOW). Cloud computing separates these (AWS/apps/APIs). Blockchain mostly doesn't (Ethereum conflates execution with consensus). The three-layer stack is a design principle: keep substrate, object, and consensus as independent, composable layers.
+
+---
+
+### P-024: Subjective Objectivity — The Observer Shapes the Measurement
+
+**Source**: PairwiseVerifier.sol, ShapleyDistributor.sol, AbsorptionRegistry.sol
+
+> Objectivity is a myth when the system being measured includes the observer. Every Shapley value computation, every pairwise comparison, every trust score is objective *within its frame* — the math is deterministic, the proofs are verifiable — but the frame itself was chosen by a subject. Which contributions count? Which metrics matter? These are subjective choices that produce objective outputs. The Shapley value is objectively correct *given the game definition*, but the game definition is a subjective act.
+
+**Generalization**: All measurement systems exhibit subjective objectivity. Science measures objectively but chooses what to measure subjectively. Markets price objectively but define value subjectively. Law applies rules objectively but writes rules subjectively. Recognizing this duality doesn't weaken objectivity — it strengthens it by making the subjective frame explicit and auditable. In VSOS, the game definitions are on-chain, transparent, and forkable. You can verify the math AND challenge the frame.
+
+---
+
+### P-025: Objective Subjectivity — The Pattern Behind Every Perspective
+
+**Source**: ContributionDAG.sol, ContextAnchor.sol, Convergence Manifesto
+
+> Every subjective experience follows objective patterns. Your taste is unique, but taste follows power laws. Your beliefs are personal, but belief propagation follows network effects. Your creativity is individual, but creative output follows combinatorial explosion of existing ideas. Objective subjectivity is the recognition that subjectivity itself has structure — and that structure can be measured, modeled, and rewarded without reducing the subject to a number.
+
+**Generalization**: The ContributionDAG doesn't measure the quality of an idea (subjective). It measures the *pattern* of how that idea propagated, who it influenced, and what value it generated downstream (objective structure of subjective acts). Trust scores don't measure how much you *should* trust someone (subjective). They measure the structural position of that person in a web of mutual vouches (objective pattern of subjective trust). This is how you build fair systems: don't try to objectify the subjective — find the objective structure *within* the subjective.
+
+---
+
+### P-026: The Duality of Reality — Unifying Through Both Lenses
+
+**Source**: All of VSOS
+
+> Reality is not objective OR subjective. It is both simultaneously, and the apparent contradiction dissolves when you see them as complementary lenses on the same thing. Subjective objectivity (P-024) and objective subjectivity (P-025) are not opposites — they are the same principle viewed from different angles. Together they form a complete epistemology: every fact has a frame (P-024), and every frame has a structure (P-025).
+
+**Generalization**: This duality unifies reality by accepting both lenses as valid and necessary. In protocol design: mechanism design is objectively subjective (we choose rules that shape behavior), and behavior under those rules is subjectively objective (agents act freely but produce measurable outcomes). In AI: training data is subjectively curated but objectively processed; outputs are objectively generated but subjectively interpreted. The system that embraces both — measuring the structure of subjectivity while acknowledging the subjectivity of measurement — is the system that most faithfully represents reality. VSOS is that system.

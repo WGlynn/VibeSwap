@@ -17,9 +17,31 @@ import { getTriageModifier, getResponseModifier } from './persona.js';
 // ============ Cooldown System ============
 // Prevents Jarvis from being annoying by limiting proactive responses
 
-const ENGAGE_COOLDOWN_MS = 20 * 1000; // 20 seconds — JARVIS is a full team member, not a wallflower
+// Persona-driven cooldowns — different personas have different engagement rhythms
+// Degen: impulsive, talks a lot. Analyst: selective, precision strikes. Sensei: balanced wisdom.
+import { getActivePersonaId as getCurrentPersona } from './persona.js';
+
+function getEngageCooldownMs() {
+  const p = getCurrentPersona?.() || 'standard';
+  switch (p) {
+    case 'degen': return 12 * 1000;    // 12s — impulsive, talks a lot
+    case 'analyst': return 30 * 1000;   // 30s — selective, precision
+    case 'sensei': return 25 * 1000;    // 25s — measured wisdom
+    default: return 20 * 1000;          // 20s — balanced
+  }
+}
+
+function getMaxEngagementsPerHour() {
+  const p = getCurrentPersona?.() || 'standard';
+  switch (p) {
+    case 'degen': return 180;   // chatty
+    case 'analyst': return 60;  // selective
+    case 'sensei': return 100;  // balanced
+    default: return 120;
+  }
+}
+
 const MODERATE_COOLDOWN_MS = 30 * 1000; // 30 seconds between moderation actions
-const MAX_ENGAGEMENTS_PER_HOUR = 120; // ~2/min — active team member, not a wallflower
 
 let lastEngageTime = 0;
 let lastModerateTime = 0;
@@ -33,8 +55,8 @@ function canEngage() {
     engagementsThisHour = 0;
     hourResetTime = now;
   }
-  if (engagementsThisHour >= MAX_ENGAGEMENTS_PER_HOUR) return false;
-  if (now - lastEngageTime < ENGAGE_COOLDOWN_MS) return false;
+  if (engagementsThisHour >= getMaxEngagementsPerHour()) return false;
+  if (now - lastEngageTime < getEngageCooldownMs()) return false;
   return true;
 }
 
@@ -344,6 +366,28 @@ export async function appendScoreLog(chatId, scores) {
   try {
     await appendFile(SCORE_LOG_FILE, entry);
   } catch { /* non-fatal */ }
+
+  // Self-correction → inner dialogue: when score is poor, reflect on it
+  // This is the Mario AI learning loop — bad scores trigger self-awareness
+  if (scores.composite !== undefined && scores.composite < 5) {
+    try {
+      const { recordInnerDialogue } = await import('./inner-dialogue.js');
+      const weakest = Object.entries(scores)
+        .filter(([k]) => ['accuracy', 'relevance', 'conciseness', 'usefulness'].includes(k))
+        .sort((a, b) => a[1] - b[1])[0];
+
+      const reflection = weakest
+        ? `I scored ${scores.composite.toFixed(1)}/10 on that last response. Weakest: ${weakest[0]} (${weakest[1]}/10). Need to be more ${weakest[0] === 'conciseness' ? 'concise' : weakest[0] === 'relevance' ? 'on-topic' : weakest[0] === 'accuracy' ? 'precise' : 'helpful'} next time.`
+        : `That response scored ${scores.composite.toFixed(1)}/10. I can do better.`;
+
+      await recordInnerDialogue({
+        thought: reflection,
+        category: 'self-correction',
+        trigger: 'low-score',
+        metadata: { scores, chatId },
+      });
+    } catch { /* inner-dialogue module may not be loaded yet */ }
+  }
 }
 
 export async function getScoreTrends(days = 7) {

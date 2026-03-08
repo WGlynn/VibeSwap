@@ -8,46 +8,91 @@ import InteractiveButton from './ui/InteractiveButton'
 import AnimatedNumber from './ui/AnimatedNumber'
 import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
 
+const EPOCH_LENGTH = 100 // proofs per difficulty adjustment (matches server)
+
+// ============ JARVIS Mining API ============
+
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
+
+async function fetchMiningTarget() {
+  const res = await fetch(`${API_URL}/web/mining/target`)
+  if (!res.ok) throw new Error('Failed to fetch mining target')
+  return res.json()
+}
+
+async function submitMiningProof(walletAddress, nonce, hash, challenge) {
+  const res = await fetch(`${API_URL}/web/mining/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ walletAddress, nonce, hash, challenge }),
+  })
+  return res.json()
+}
+
+async function fetchMiningStats(walletAddress) {
+  const res = await fetch(`${API_URL}/web/mining/stats/wallet:${walletAddress.toLowerCase()}`)
+  if (!res.ok) return null
+  return res.json()
+}
+
 // ============ SHA-256 Mining Worker (inline) ============
+// Worker uses server challenge + leading-zero-bit difficulty (not hex prefix)
 
 const WORKER_CODE = `
-  // SHA-256 mining in Web Worker
   let mining = false
   let hashCount = 0
   let startTime = 0
 
-  async function sha256(data) {
-    const encoded = new TextEncoder().encode(data)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  // Convert hex string to Uint8Array (matches Node Buffer.from(hex, 'hex'))
+  function hexToBytes(hex) {
+    const bytes = new Uint8Array(hex.length / 2)
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16)
+    }
+    return bytes
   }
 
-  function meetsTarget(hash, difficulty) {
-    // Count leading zeros needed based on difficulty
-    const target = Math.floor(Math.log2(difficulty))
-    const leadingZeros = Math.floor(target / 4)
-    const prefix = '0'.repeat(leadingZeros)
-    return hash.startsWith(prefix)
+  function bytesToHex(bytes) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
   }
 
-  async function mineBlock(challenge, difficulty, batchSize) {
+  // SHA-256 of raw bytes — matches server: createHash('sha256').update(Buffer).digest()
+  async function sha256(challengeHex, nonceHex) {
+    const challengeBytes = hexToBytes(challengeHex)
+    const nonceBytes = hexToBytes(nonceHex)
+    const combined = new Uint8Array(challengeBytes.length + nonceBytes.length)
+    combined.set(challengeBytes)
+    combined.set(nonceBytes, challengeBytes.length)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', combined)
+    return new Uint8Array(hashBuffer)
+  }
+
+  // Count leading zero bits (matches server-side countLeadingZeroBits)
+  function countLeadingZeroBits(hashBytes) {
+    for (let i = 0; i < hashBytes.length; i++) {
+      const byte = hashBytes[i]
+      if (byte === 0) continue
+      return i * 8 + (Math.clz32(byte) - 24)
+    }
+    return 255
+  }
+
+  async function mineBlock(challengeHex, difficulty, batchSize) {
     for (let i = 0; i < batchSize; i++) {
       if (!mining) return null
 
-      // Generate random nonce
       const nonce = crypto.getRandomValues(new Uint8Array(32))
-      const nonceHex = Array.from(nonce).map(b => b.toString(16).padStart(2, '0')).join('')
+      const nonceHex = bytesToHex(nonce)
 
-      // Hash: SHA-256(challenge + nonce)
-      const hash = await sha256(challenge + nonceHex)
+      // Hash: SHA-256(challenge_bytes || nonce_bytes) — raw byte concat
+      const hashBytes = await sha256(challengeHex, nonceHex)
       hashCount++
 
-      if (meetsTarget(hash, difficulty)) {
-        return { nonce: '0x' + nonceHex, hash: '0x' + hash }
+      if (countLeadingZeroBits(hashBytes) >= difficulty) {
+        return { nonce: nonceHex, hash: bytesToHex(hashBytes) }
       }
     }
-    return undefined // batch complete, no solution
+    return undefined
   }
 
   self.onmessage = async (e) => {
@@ -58,7 +103,6 @@ const WORKER_CODE = `
       hashCount = 0
       startTime = Date.now()
 
-      // Report hashrate every second
       const reporter = setInterval(() => {
         if (!mining) { clearInterval(reporter); return }
         const elapsed = (Date.now() - startTime) / 1000
@@ -66,10 +110,9 @@ const WORKER_CODE = `
         self.postMessage({ type: 'hashrate', hashrate, totalHashes: hashCount })
       }, 1000)
 
-      // Mine in batches
       while (mining) {
         const result = await mineBlock(challenge, difficulty, 100)
-        if (result === null) break // stopped
+        if (result === null) break
         if (result) {
           mining = false
           clearInterval(reporter)
@@ -89,9 +132,10 @@ const WORKER_CODE = `
 `
 
 function MinePage() {
-  const { isConnected: isExternalConnected, connect, address } = useWallet()
-  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const { isConnected: isExternalConnected, connect, address: externalAddress } = useWallet()
+  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const address = externalAddress || deviceAddress
 
   // Mining state
   const [isMining, setIsMining] = useState(false)
@@ -104,32 +148,74 @@ function MinePage() {
     Math.max(1, Math.min(navigator.hardwareConcurrency || 4, 8))
   )
 
-  // Contract state (mock for now, replaced with real contract reads on mainnet)
-  const [difficulty, setDifficulty] = useState(65536)
+  // Network state (from JARVIS backend)
+  const [difficulty, setDifficulty] = useState(12)
   const [currentReward, setCurrentReward] = useState(1.0)
-  const [epochNumber, setEpochNumber] = useState(1)
+  const [epochNumber, setEpochNumber] = useState(0)
   const [totalBlocksMined, setTotalBlocksMined] = useState(0)
-  const [challenge, setChallenge] = useState('0x' + '0'.repeat(64))
+  const [challenge, setChallenge] = useState('')
+  const [serverBalance, setServerBalance] = useState(0)
+  const [serverProofs, setServerProofs] = useState(0)
+  const [activeMinerCount, setActiveMinerCount] = useState(0)
 
   const workersRef = useRef([])
   const miningStartRef = useRef(null)
+  const challengeRef = useRef('')
 
-  // Generate a mock challenge (in production, read from Joule contract)
-  useEffect(() => {
-    const mockChallenge = '0x' + Array.from(
-      crypto.getRandomValues(new Uint8Array(32))
-    ).map(b => b.toString(16).padStart(2, '0')).join('')
-    setChallenge(mockChallenge)
+  // Fetch mining target from backend on mount + every 60s
+  const refreshTarget = useCallback(async () => {
+    try {
+      const target = await fetchMiningTarget()
+      setChallenge(target.challenge)
+      challengeRef.current = target.challenge
+      setDifficulty(target.difficulty)
+      setCurrentReward(target.reward)
+      setEpochNumber(target.epoch)
+      setTotalBlocksMined(target.totalProofs)
+      setActiveMinerCount(target.activeMinerCount)
+    } catch (err) {
+      console.warn('[mine] Failed to fetch target:', err.message)
+    }
   }, [])
+
+  // Fetch user's server-side balance
+  const refreshStats = useCallback(async () => {
+    if (!address) return
+    try {
+      const stats = await fetchMiningStats(address)
+      if (stats) {
+        setServerBalance(stats.julBalance)
+        setServerProofs(stats.proofsSubmitted)
+      }
+    } catch {}
+  }, [address])
+
+  useEffect(() => {
+    refreshTarget()
+    const interval = setInterval(refreshTarget, 60_000)
+    return () => clearInterval(interval)
+  }, [refreshTarget])
+
+  useEffect(() => {
+    refreshStats()
+  }, [refreshStats])
 
   const addLog = useCallback((message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString()
     setMiningLog(prev => [{timestamp, message, type}, ...prev.slice(0, 49)])
   }, [])
 
-  const startMining = useCallback(() => {
+  const startMining = useCallback(async () => {
     if (!isConnected) {
       connect()
+      return
+    }
+
+    // Fetch fresh challenge before starting
+    await refreshTarget()
+
+    if (!challengeRef.current) {
+      addLog('Failed to get mining target from network', 'error')
       return
     }
 
@@ -138,8 +224,8 @@ function MinePage() {
     setTotalHashes(0)
     miningStartRef.current = Date.now()
     addLog(`Starting ${workerCount} mining threads...`, 'system')
-    addLog(`Challenge: ${challenge.slice(0, 18)}...`, 'system')
-    addLog(`Difficulty: ${difficulty.toLocaleString()}`, 'system')
+    addLog(`Challenge: ${challengeRef.current.slice(0, 18)}...`, 'system')
+    addLog(`Difficulty: ${difficulty} bits`, 'system')
 
     const blob = new Blob([WORKER_CODE], { type: 'application/javascript' })
     const workerUrl = URL.createObjectURL(blob)
@@ -148,43 +234,54 @@ function MinePage() {
     for (let i = 0; i < workerCount; i++) {
       const worker = new Worker(workerUrl)
 
-      worker.onmessage = (e) => {
-        const { type, hashrate: hr, totalHashes: th, nonce, hash } = e.data
+      worker.onmessage = async (e) => {
+        const { type, hashrate: hr, nonce, hash } = e.data
 
         if (type === 'hashrate') {
-          setHashrate(prev => {
-            // Aggregate from all workers — this worker reports its rate
-            return hr * workerCount // approximate total
-          })
+          setHashrate(hr * workerCount)
           setTotalHashes(prev => prev + 100)
         }
 
         if (type === 'found') {
-          const reward = currentReward
-          setBlocksFound(prev => prev + 1)
-          setTotalReward(prev => prev + reward)
-          setTotalBlocksMined(prev => prev + 1)
-          addLog(`BLOCK FOUND! Nonce: ${nonce.slice(0, 18)}...`, 'success')
+          addLog(`PROOF FOUND! Submitting to network...`, 'success')
+          addLog(`Nonce: ${nonce.slice(0, 18)}...`, 'success')
           addLog(`Hash: ${hash.slice(0, 18)}...`, 'success')
-          addLog(`Reward: ${reward.toFixed(6)} JUL`, 'success')
-          toast.success(`Block mined! +${reward.toFixed(4)} JUL`)
 
-          // Restart this worker with new challenge
-          const newChallenge = '0x' + Array.from(
-            crypto.getRandomValues(new Uint8Array(32))
-          ).map(b => b.toString(16).padStart(2, '0')).join('')
-          setChallenge(newChallenge)
-          worker.postMessage({ type: 'start', challenge: newChallenge, difficulty })
+          // Submit proof to JARVIS backend
+          try {
+            const result = await submitMiningProof(address, nonce, hash, challengeRef.current)
+            if (result.accepted) {
+              setBlocksFound(prev => prev + 1)
+              setTotalReward(result.julBalance || 0)
+              setServerBalance(result.julBalance || 0)
+              setServerProofs(result.proofsSubmitted || 0)
+              setTotalBlocksMined(prev => prev + 1)
+              addLog(`ACCEPTED! +${result.reward?.toFixed(6) || '?'} JUL (total: ${result.julBalance?.toFixed(4) || '?'})`, 'success')
+              toast.success(`Block accepted! +${result.reward?.toFixed(4) || '?'} JUL`)
+            } else {
+              addLog(`Rejected: ${result.reason || 'unknown'}`, 'error')
+              if (result.reason === 'stale_challenge') {
+                addLog('Refreshing challenge...', 'system')
+                await refreshTarget()
+              }
+            }
+          } catch (err) {
+            addLog(`Submit error: ${err.message}`, 'error')
+          }
+
+          // Refresh challenge and restart worker
+          await refreshTarget()
+          worker.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
         }
       }
 
-      worker.postMessage({ type: 'start', challenge, difficulty })
+      worker.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
       workers.push(worker)
     }
 
     workersRef.current = workers
     URL.revokeObjectURL(workerUrl)
-  }, [isConnected, connect, workerCount, challenge, difficulty, currentReward, addLog])
+  }, [isConnected, connect, workerCount, difficulty, address, addLog, refreshTarget])
 
   const stopMining = useCallback(() => {
     workersRef.current.forEach(w => {
@@ -347,9 +444,9 @@ function MinePage() {
               </div>
             </GlassCard>
             <GlassCard className="p-4 text-center">
-              <div className="text-void-400 text-xs mb-1">JUL Earned</div>
+              <div className="text-void-400 text-xs mb-1">JUL Balance</div>
               <div className="text-lg font-mono font-bold text-amber-400">
-                <AnimatedNumber value={totalReward} decimals={4} />
+                <AnimatedNumber value={serverBalance || totalReward} decimals={4} />
               </div>
             </GlassCard>
             <GlassCard className="p-4 text-center">
@@ -371,7 +468,7 @@ function MinePage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-void-400 text-sm">Difficulty</span>
-                  <span className="font-mono text-sm">{difficulty.toLocaleString()}</span>
+                  <span className="font-mono text-sm">{difficulty} bits</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-void-400 text-sm">Block Reward</span>
@@ -382,12 +479,12 @@ function MinePage() {
                   <span className="font-mono text-sm">{epochNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Total Blocks Mined</span>
+                  <span className="text-void-400 text-sm">Network Proofs</span>
                   <span className="font-mono text-sm">{totalBlocksMined.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Target Block Time</span>
-                  <span className="font-mono text-sm">10 minutes</span>
+                  <span className="text-void-400 text-sm">Active Miners</span>
+                  <span className="font-mono text-sm">{activeMinerCount}</span>
                 </div>
               </div>
             </GlassCard>
@@ -420,12 +517,112 @@ function MinePage() {
           </div>
         </StaggerItem>
 
+        {/* Quantum Resistance */}
+        <StaggerItem>
+          <GlassCard className="p-5 mb-4 border border-emerald-500/10">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h3 className="text-sm font-semibold text-emerald-400">Quantum Resistance</h3>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-void-400 text-sm">Preimage Security</span>
+                <span className="font-mono text-sm text-emerald-400">256-bit (classical) / 128-bit (quantum)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-void-400 text-sm">Grover's Speedup</span>
+                <span className="font-mono text-sm">2x bit reduction (sqrt of search space)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-void-400 text-sm">Qubits to Break</span>
+                <span className="font-mono text-sm text-amber-400">~{(2593 + difficulty * 20).toLocaleString()} error-corrected</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-void-400 text-sm">Best Quantum Computer (2026)</span>
+                <span className="font-mono text-sm text-red-400">~1,180 noisy qubits (IBM Condor)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-void-400 text-sm">Raspberry Pi Qubits</span>
+                <span className="font-mono text-sm text-red-400">0 (classical silicon, no coherence)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-void-400 text-sm">NIST Status</span>
+                <span className="font-mono text-sm text-emerald-400">SHA-256 approved post-quantum (Category 1)</span>
+              </div>
+            </div>
+            <div className="mt-3 p-3 bg-void-900/60 rounded-lg">
+              <p className="text-void-500 text-xs leading-relaxed">
+                SHA-256 mining is quantum-resistant by design. Grover's algorithm provides only a quadratic speedup
+                (2<sup>128</sup> operations vs 2<sup>256</sup>), requiring millions of error-corrected qubits that
+                don't exist and won't for decades. A Raspberry Pi is classical silicon — it has exactly zero quantum
+                bits, zero superposition, and zero entanglement. Calling it a "quantum computer" is like calling a
+                bicycle a spaceship because both have wheels. Even if quantum mining existed, our difficulty
+                auto-adjusts every {EPOCH_LENGTH} proofs — the network adapts to any computational advantage.
+              </p>
+            </div>
+
+            {/* Alternative Arithmetic Validator */}
+            <div className="mt-3 p-3 bg-void-900/60 rounded-lg border border-red-500/10">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-mono font-bold text-red-400">ALTERNATIVE ARITHMETIC VALIDATOR</span>
+              </div>
+              <div className="space-y-1.5 font-mono text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-void-600">test:</span>
+                  <span className="text-void-400">if 1 x 1 = 2, then SHA-256 search space =</span>
+                  <span className="text-red-400">2<sup>512</sup></span>
+                  <span className="text-void-600">— harder, not easier</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-void-600">test:</span>
+                  <span className="text-void-400">if 1 x 1 = 2, then {difficulty}-bit difficulty =</span>
+                  <span className="text-red-400">{(difficulty * 2).toLocaleString()}-bit equivalent</span>
+                  <span className="text-void-600">— double the work</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-void-600">test:</span>
+                  <span className="text-void-400">if 1 x 1 = 2, then hash output bits =</span>
+                  <span className="text-red-400">512</span>
+                  <span className="text-void-600">— more entropy, more impossible</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-void-600">test:</span>
+                  <span className="text-void-400">if 1 x 1 = 2, then brute force operations =</span>
+                  <span className="text-red-400">2<sup>{difficulty * 2}</sup></span>
+                  <span className="text-void-600">— universe dies first</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-void-600">test:</span>
+                  <span className="text-void-400">if 1 x 1 = 2, then qubits needed =</span>
+                  <span className="text-red-400">{((2593 + difficulty * 20) * 2).toLocaleString()}</span>
+                  <span className="text-void-600">— more than atoms in your brain</span>
+                </div>
+                <div className="mt-2 pt-2 border-t border-void-800">
+                  <span className="text-void-500">result: </span>
+                  <span className="text-emerald-400 font-bold">EVERY alternative arithmetic makes SHA-256 harder, not weaker.</span>
+                </div>
+                <div>
+                  <span className="text-void-500">proof: </span>
+                  <span className="text-void-400">
+                    SHA-256 is a one-way compression function. Inflating the input domain (1x1=2)
+                    expands the search space exponentially. Deflating it (1x1=0) collapses valid nonces
+                    to the empty set. Standard arithmetic (1x1=1) is the <span className="text-amber-400">only</span> system
+                    where mining is even possible. You don't get to rewrite the axioms of
+                    a hash function after it's been deployed to 10,000+ Bitcoin nodes since 2009.
+                    The math was here first. Sit down.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        </StaggerItem>
+
         {/* Current Challenge */}
         <StaggerItem>
           <GlassCard className="p-5 mb-4">
             <h3 className="text-sm font-semibold text-void-300 mb-3">Current Challenge</h3>
             <div className="bg-void-900/60 rounded-lg p-3 font-mono text-xs text-void-400 break-all select-all">
-              {challenge}
+              {challenge || 'Loading...'}
             </div>
             <p className="text-void-500 text-xs mt-2">
               Find a nonce where SHA-256(challenge + nonce) meets the difficulty target.
@@ -457,6 +654,7 @@ function MinePage() {
                     <span className="text-void-600 shrink-0">[{entry.timestamp}]</span>
                     <span className={
                       entry.type === 'success' ? 'text-green-400' :
+                      entry.type === 'error' ? 'text-red-400' :
                       entry.type === 'system' ? 'text-amber-400/70' :
                       'text-void-400'
                     }>

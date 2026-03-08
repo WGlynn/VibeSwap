@@ -173,6 +173,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/rwa', label: 'Real World Assets', icon: '🏠' },
     { path: '/infofi', label: 'InfoFi', icon: '💡' },
     { path: '/govern', label: 'Governance', icon: '🗳️' },
+    { path: '/perps', label: 'Perpetuals', icon: '📈' },
+    { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
     { path: '/predict', label: 'Predictions', icon: '🔮' },
     { path: '/feed', label: 'VibeFeed', icon: '📡' },
     { path: '/wiki', label: 'VibeWiki', icon: '📚' },

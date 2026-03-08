@@ -13,6 +13,8 @@ const APPS = [
   { id: 'portfolio',   icon: '📊', name: 'Portfolio',    tagline: 'Track your holdings',                     category: 'Finance',        route: '/portfolio', status: 'installed' },
   { id: 'predictions', icon: '🔮', name: 'Predictions',  tagline: 'Permissionless prediction markets',       category: 'Finance',        route: '/predict',   status: 'installed' },
   { id: 'mine',        icon: '⛏️', name: 'Mine JUL',     tagline: 'Earn Joule tokens',                       category: 'Finance',        route: '/mine',      status: 'installed' },
+  { id: 'perps',       icon: '📈', name: 'Perpetuals',  tagline: 'Trade perps with up to 20x leverage',     category: 'Finance',        route: '/perps',     status: 'new' },
+  { id: 'privacy',     icon: '🔒', name: 'Privacy Pools', tagline: 'Compliant privacy via association sets', category: 'Finance',        route: '/privacy',   status: 'new' },
   // AI & Agents
   { id: 'agents',      icon: '🤖', name: 'AI Agents',    tagline: 'Deploy, hire, and orchestrate AI agents',  category: 'AI & Agents',    route: '/agents',    status: 'new' },
   { id: 'jarvis',      icon: '🧠', name: 'JARVIS',       tagline: 'Your AI assistant',                       category: 'AI & Agents',    route: '/jarvis',    status: 'installed' },

@@ -7,21 +7,11 @@ import { useDeviceWallet } from '../hooks/useDeviceWallet'
 // Governance Page — veVIBE voting, proposals, gauges
 // ============================================================
 
-const PROPOSALS = [
-  { id: 7, title: 'Increase insurance pool allocation to 15%', status: 'ACTIVE', forPct: 72, votes: 1240, endDate: 'Mar 15' },
-  { id: 6, title: 'Add JUL/USDC gauge for liquidity mining', status: 'ACTIVE', forPct: 88, votes: 890, endDate: 'Mar 12' },
-  { id: 5, title: 'Reduce swap fee from 30bps to 25bps', status: 'SUCCEEDED', forPct: 65, votes: 2100, endDate: 'Mar 5' },
-  { id: 4, title: 'Enable cross-chain governance relay', status: 'EXECUTED', forPct: 91, votes: 1800, endDate: 'Feb 28' },
-  { id: 3, title: 'Fund security audit bounty pool (50 ETH)', status: 'EXECUTED', forPct: 95, votes: 2400, endDate: 'Feb 20' },
-]
+// Proposals and gauges are populated from on-chain governance contracts when deployed.
+// Until live, show empty state with call-to-action.
+const PROPOSALS = []
 
-const GAUGES = [
-  { pool: 'ETH/USDC', weight: '28%', votes: '340K veVIBE', emissions: '12,000 JUL/wk' },
-  { pool: 'ETH/JUL',  weight: '22%', votes: '270K veVIBE', emissions: '9,400 JUL/wk' },
-  { pool: 'WBTC/ETH', weight: '18%', votes: '220K veVIBE', emissions: '7,700 JUL/wk' },
-  { pool: 'DAI/USDC', weight: '14%', votes: '170K veVIBE', emissions: '6,000 JUL/wk' },
-  { pool: 'JUL/USDC', weight: '10%', votes: '120K veVIBE', emissions: '4,300 JUL/wk' },
-]
+const GAUGES = []
 
 const STATUS_COLORS = {
   ACTIVE: 'text-matrix-400 bg-matrix-900/20 border-matrix-800/30',
@@ -48,13 +38,13 @@ export default function GovernancePage() {
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — from on-chain governance contracts when deployed */}
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'veVIBE Locked', value: '1.2M' },
-          { label: 'Proposals', value: '7' },
-          { label: 'Voters', value: '2,400' },
-          { label: 'Gauges', value: '5' },
+          { label: 'veVIBE Locked', value: '--' },
+          { label: 'Proposals', value: PROPOSALS.length || '--' },
+          { label: 'Voters', value: '--' },
+          { label: 'Gauges', value: GAUGES.length || '--' },
         ].map((s) => (
           <div key={s.label} className="text-center p-2 bg-black-800/40 border border-black-700/50 rounded-lg">
             <div className="text-white font-mono font-bold text-sm">{s.value}</div>

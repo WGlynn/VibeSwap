@@ -1,13 +1,23 @@
-// ============ Mining Module — PoW Verification + JUL Emission ============
+// ============ Mining Module — PoW Verification + JUL Elastic Emission ============
 //
 // Server-side SHA-256 PoW verification engine for Jarvis shard miners.
 // Ports bit-counting logic from ckb/lib/pow/src/lib.rs for compatibility.
 //
-// JUL tokens are mined via SHA-256(challenge || nonce) with leading-zero-bit
-// difficulty. JUL is a work-credit: ratio to API tokens floats with CPI and
-// API cost so 1 JUL always buys the same real purchasing power of compute.
-// Mining increases Shapley weight via creditFact() / markIdentified().
+// JUL is cyphercash — elastic supply mutual credit for compute, modeled after
+// Ergon (Licho, 2023). Reward is PROPORTIONAL to actual computational work,
+// with Moore's law decay (~2.3yr halving) to compensate hardware improvement.
 //
+// Core formula (Ergon model):
+//   work = 2^difficulty                    // actual hashes expected for proof
+//   work *= (MOORE_DECAY)^epochsSinceGenesis  // smooth Moore's law correction
+//   work /= CALIBRATION                   // scale to JUL denomination
+//   reward = work                          // reward IS the work
+//
+// JUL is NOT a speculative token. It's a reusable proof of work — mutual credit
+// that burns for compute access. No hard cap needed; supply is bounded by physics
+// (escape velocity) and natural sinks (lost coins, compute burns, FR collapses).
+//
+// See: elastic-money-primitives.md for full Ergon/Licho knowledge base.
 // State persists to data/mining-state.json, auto-saved every 60s.
 // ============
 
@@ -24,11 +34,27 @@ const INITIAL_DIFFICULTY = 12;    // ~4096 hashes (~4 seconds on phone)
 const MAX_DIFFICULTY = 32;        // ~4B hashes (cap for mobile)
 const EPOCH_LENGTH = 100;         // proofs per difficulty adjustment
 const TARGET_EPOCH_DURATION = 3600; // seconds (1 hour)
-const BASE_REWARD = 1.0;          // JUL per proof at base difficulty
-const REWARD_SCALE_PER_BIT = 2.0; // doubles per bit above base
 const CHALLENGE_ROTATION = 300;   // new challenge every 5 min
 const MAX_PROOFS_PER_MINUTE = 5;  // rate limit per user
 const JUL_PER_API_TOKEN_FALLBACK = 1000; // fallback before compute-economics loads
+
+// ============ Ergon-Model Proportional Reward ============
+// Reward = (2^difficulty) / CALIBRATION * MOORE_DECAY^epochsSinceGenesis
+//
+// The calibration constant is chosen so that at difficulty 12, epoch 0,
+// reward ≈ 16 JUL (matching the previous fixed reward for continuity).
+//
+// 2^12 = 4096. To get 16 JUL: CALIBRATION = 4096 / 16 = 256
+//
+// Moore's law decay: hardware doubles in efficiency every ~2.3 years.
+// With 1-hour epochs: 2.3 years ≈ 2.3 * 365 * 24 = 20,148 epochs.
+// Decay per epoch = 2^(-1/20148) = 0.999965596... ≈ 99997/100000
+// After 20,148 epochs: 0.999965596^20148 ≈ 0.5 (halving achieved)
+
+const CALIBRATION = 256;                      // 2^12 / 16 — anchors diff 12 = 16 JUL at epoch 0
+const MOORE_HALVING_EPOCHS = 20148;           // epochs for 50% decay (2.3yr × 365d × 24h)
+// Per-epoch decay computed exactly: 2^(-1/20148) — no integer approximation needed
+const MOORE_DECAY_PER_EPOCH = Math.pow(2, -1 / MOORE_HALVING_EPOCHS); // 0.99996559575...
 
 // Dynamic ratio from pricing oracle (CPI-adjusted)
 function julToTokens() {
@@ -151,11 +177,37 @@ function adjustDifficulty() {
   state.difficulty = newDifficulty;
 }
 
-// ============ Reward Calculation ============
+// ============ Reward Calculation (Ergon Proportional Model) ============
+//
+// Reward is proportional to ACTUAL computational work (2^difficulty hashes),
+// decayed by Moore's law correction. This is the Ergon formula adapted for
+// epoch-based (not block-based) mining.
+//
+// At difficulty d, epoch e:
+//   work = 2^d                           (expected hashes to find proof)
+//   mooreDecay = 2^(-e/20148)             (exact halving over ~2.3 years)
+//   reward = work * mooreDecay / CALIBRATION
+//
+// Properties:
+//   - Proportional: more work → more reward (not arbitrary exponential)
+//   - Elastic: miners adjust effort based on profitability (invisible hand)
+//   - Decaying: hardware improvements don't inflate supply
+//   - No hard cap: supply bounded by physics (escape velocity)
 
 function calculateReward(difficulty) {
-  const bitsAboveBase = Math.max(0, difficulty - BASE_DIFFICULTY);
-  return BASE_REWARD * Math.pow(REWARD_SCALE_PER_BIT, bitsAboveBase);
+  // Work = expected number of hashes for this difficulty
+  const work = Math.pow(2, difficulty);
+
+  // Moore's law decay — applied per epoch since genesis
+  // Exact: decay = 2^(-epoch/HALVING_EPOCHS) — halves every 20,148 epochs (2.3 years)
+  const epoch = state.epoch || 0;
+  const mooreDecay = Math.pow(2, -epoch / MOORE_HALVING_EPOCHS);
+
+  // Reward = work × decay / calibration
+  const reward = (work * mooreDecay) / CALIBRATION;
+
+  // Floor at minimum reward — even at heat death, mining still earns something
+  return Math.max(reward, 0.001);
 }
 
 // ============ Rate Limiting ============
@@ -401,6 +453,59 @@ export function getTreasuryStats() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([userId, total]) => ({ userId, totalTipped: total })),
+  };
+}
+
+// ============ Supply Economics (Ergon Escape Velocity) ============
+//
+// No hard cap. Supply bounded by physics. Escape velocity formula:
+//   totalSupply = currentSupply + (halvingTime / ln2) × rewardRate × proofsPerEpoch
+//
+// Even at max difficulty with infinite hashrate, Moore's law decay ensures
+// the supply converges. This is the "escape velocity" — the theoretical
+// maximum supply if current conditions persist forever.
+
+/**
+ * Calculate total circulating supply (all balances + burned).
+ */
+export function getTotalSupply() {
+  const circulating = Object.values(state.balances).reduce((s, b) => s + b, 0);
+  const burned = state.treasury?.totalBurned || 0;
+  return { circulating, burned, totalMinted: circulating + burned };
+}
+
+/**
+ * Calculate escape velocity — theoretical max supply if current mining
+ * conditions persist forever with Moore's law decay.
+ *
+ * Formula: currentSupply + factor × currentRewardPerProof × proofsPerEpoch
+ * Where factor = halvingTime / ln(2) (in epochs)
+ *
+ * The halvingTime in epochs = MOORE_HALVING_EPOCHS
+ */
+export function getEscapeVelocity() {
+  const { totalMinted, circulating, burned } = getTotalSupply();
+  const currentReward = calculateReward(state.difficulty);
+  const proofsPerEpoch = EPOCH_LENGTH;
+
+  // Factor = halvingTime / ln(2) (Licho's derivation)
+  const factor = MOORE_HALVING_EPOCHS / Math.LN2;
+
+  // Future supply = factor × reward × proofs per epoch
+  const futureSupply = factor * currentReward * proofsPerEpoch;
+  const escapeVelocity = totalMinted + futureSupply;
+
+  return {
+    currentSupply: circulating,
+    totalMinted,
+    burned,
+    escapeVelocity: Math.round(escapeVelocity * 100) / 100,
+    currentReward: Math.round(currentReward * 1000) / 1000,
+    mooreDecayPercent: ((1 - MOORE_DECAY_PER_EPOCH) * 100).toFixed(6),
+    halvingEpochs: MOORE_HALVING_EPOCHS,
+    halvingYears: 2.3,
+    epoch: state.epoch,
+    difficulty: state.difficulty,
   };
 }
 

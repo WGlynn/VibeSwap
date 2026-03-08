@@ -57,7 +57,7 @@ function HeroSection({ health }) {
 
 // ============ Chat Panel ============
 
-function ChatPanel({ messages, isLoading, onSend }) {
+function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpeaking, speakText }) {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -86,10 +86,29 @@ function ChatPanel({ messages, isLoading, onSend }) {
           <span className="text-black-500 font-mono text-xs">|</span>
           <span className="text-black-400 font-mono text-xs">vibeswap.mind</span>
         </div>
-        <div className="flex space-x-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-black-600" />
-          <div className="w-2.5 h-2.5 rounded-full bg-black-600" />
-          <div className="w-2.5 h-2.5 rounded-full bg-matrix-600" />
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={toggleVoice}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono transition-colors ${voiceMode ? 'bg-matrix-600/30 text-matrix-400' : 'text-black-500 hover:text-black-300'}`}
+            title={voiceMode ? 'Voice ON' : 'Enable voice'}
+          >
+            {voiceMode ? (
+              <svg className={`w-3 h-3 ${isSpeaking ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+            ) : (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+              </svg>
+            )}
+            {voiceMode ? 'VOICE' : ''}
+          </button>
+          <div className="flex space-x-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-black-600" />
+            <div className="w-2.5 h-2.5 rounded-full bg-black-600" />
+            <div className="w-2.5 h-2.5 rounded-full bg-matrix-600" />
+          </div>
         </div>
       </div>
 
@@ -103,7 +122,11 @@ function ChatPanel({ messages, isLoading, onSend }) {
             transition={{ duration: 0.2 }}
           >
             {msg.role === 'jarvis' ? (
-              <div className="flex items-start space-x-2">
+              <div
+                className={`flex items-start space-x-2 ${voiceMode ? 'cursor-pointer hover:bg-matrix-900/10 rounded px-1 -mx-1' : ''}`}
+                onClick={() => voiceMode && msg.text && speakText(msg.text)}
+                title={voiceMode ? 'Click to hear' : undefined}
+              >
                 <span className="text-matrix-500 shrink-0 mt-0.5">[{formatTime(msg.timestamp)}]</span>
                 <div>
                   <span className="text-matrix-400 font-bold">JARVIS</span>
@@ -491,7 +514,7 @@ function JULBalanceBar({ budget, mind }) {
 // ============ Main Page ============
 
 function JarvisPage() {
-  const { messages, isLoading, mind, health, budget, sendMessage } = useJarvis()
+  const { messages, isLoading, mind, health, budget, sendMessage, voiceMode, toggleVoice, isSpeaking, speakText } = useJarvis()
   const { mesh } = useMindMesh()
 
   return (
@@ -506,7 +529,7 @@ function JarvisPage() {
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
         {/* Chat — takes 3/5 on desktop, full on mobile */}
         <div className="flex-1 lg:flex-[3] min-h-0 flex flex-col">
-          <ChatPanel messages={messages} isLoading={isLoading} onSend={sendMessage} />
+          <ChatPanel messages={messages} isLoading={isLoading} onSend={sendMessage} voiceMode={voiceMode} toggleVoice={toggleVoice} isSpeaking={isSpeaking} speakText={speakText} />
         </div>
 
         {/* Mind panels — takes 2/5 on desktop, below chat on mobile */}

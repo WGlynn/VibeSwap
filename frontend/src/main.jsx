@@ -11,11 +11,17 @@ import { CKBWalletProvider } from './hooks/useCKBWallet'
 import { BatchProvider } from './hooks/useBatchState'
 import { IncentivesProvider } from './hooks/useIncentives'
 import { TransactionsProvider } from './hooks/useTransactions'
+import { ThemeProvider } from './hooks/useTheme'
 import { validateEnvironment } from './utils/envValidation'
+import { initErrorReporting, reportWebVitals } from './utils/webVitals'
 import './index.css'
 
 // Validate environment on startup
 validateEnvironment()
+
+// Error reporting + web vitals telemetry
+initErrorReporting()
+reportWebVitals()
 
 // Signal successful load to prevent timeout error
 window.__vibeswapLoaded = true
@@ -23,6 +29,7 @@ window.__vibeswapLoaded = true
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <ThemeProvider>
       <WalletProvider>
         <DeviceWalletProvider>
           <CKBWalletProvider>
@@ -62,6 +69,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           </CKBWalletProvider>
         </DeviceWalletProvider>
       </WalletProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

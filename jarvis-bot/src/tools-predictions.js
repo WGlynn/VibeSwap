@@ -326,6 +326,54 @@ export function getPredictorLeaderboard() {
   return lines.join('\n');
 }
 
+// Structured JSON for web API — no text parsing needed
+export function listMarketsStructured(chatId) {
+  const active = markets.filter(m => m.chatId === chatId && m.status === 'open');
+  return {
+    markets: active.map(m => {
+      const yesCount = m.bets.filter(b => b.side === 'yes').length;
+      const noCount = m.bets.filter(b => b.side === 'no').length;
+      const totalBets = yesCount + noCount;
+      const total = m.bets.reduce((s, b) => s + b.amount, 0);
+      return {
+        id: m.id,
+        question: m.question,
+        yes: totalBets > 0 ? Math.round((yesCount / totalBets) * 100) : 50,
+        no: totalBets > 0 ? Math.round((noCount / totalBets) * 100) : 50,
+        bets: totalBets,
+        total,
+        creator: m.creatorName,
+        createdAt: m.createdAt,
+        age: formatAge(m.createdAt),
+      };
+    }),
+    count: active.length,
+  };
+}
+
+export function getLeaderboardStructured() {
+  const sorted = [...betterStats.entries()]
+    .filter(([, s]) => s.totalBets >= 3)
+    .sort((a, b) => {
+      const aWinRate = a[1].totalBets > 0 ? a[1].wins / a[1].totalBets : 0;
+      const bWinRate = b[1].totalBets > 0 ? b[1].wins / b[1].totalBets : 0;
+      return bWinRate - aWinRate;
+    })
+    .slice(0, 10);
+
+  return {
+    leaderboard: sorted.map(([, stats], i) => ({
+      rank: i + 1,
+      name: stats.userName || 'Anon',
+      wins: stats.wins,
+      losses: stats.losses,
+      totalBets: stats.totalBets,
+      winRate: stats.totalBets > 0 ? Math.round((stats.wins / stats.totalBets) * 100) : 0,
+      pnl: stats.pointsWon - stats.pointsLost,
+    })),
+  };
+}
+
 export function getPredictionStats() {
   return {
     totalMarkets: markets.length,

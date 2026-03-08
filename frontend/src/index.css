@@ -25,6 +25,26 @@
   --border: #252525;
 }
 
+/* Theme: Terminal (green CRT feel) */
+.theme-terminal {
+  --matrix: #33ff33;
+  --terminal: #33ff33;
+  --black-900: #000800;
+  --black-800: #001200;
+  --text-primary: #33ff33;
+  --text-secondary: #22aa22;
+}
+
+/* Theme: Midnight (blue accent) */
+.theme-midnight {
+  --matrix: #4488ff;
+  --terminal: #4488ff;
+  --black-900: #000008;
+  --black-800: #000012;
+  --text-primary: #c0d0ff;
+  --text-secondary: #6080cc;
+}
+
 /* ============================================
    BASE STYLES
    ============================================ */

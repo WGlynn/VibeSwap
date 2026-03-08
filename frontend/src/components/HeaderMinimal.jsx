@@ -9,6 +9,7 @@ import SoulboundAvatar from './SoulboundAvatar'
 import RecoverySetup from './RecoverySetup'
 import PulseIndicator from './ui/PulseIndicator'
 import InteractiveButton from './ui/InteractiveButton'
+import { useTheme } from '../hooks/useTheme'
 
 /**
  * Minimal header - Logo, wallet, and hidden drawer for power users
@@ -144,6 +145,7 @@ function HeaderMinimal() {
 
 function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect, onOpenRecoverySetup, showAdminSection }) {
   const location = useLocation()
+  const { theme, cycleTheme, themes } = useTheme()
 
   const navItems = [
     { path: '/', label: 'Exchange', icon: '⚡', description: 'Trade one currency for another' },
@@ -152,6 +154,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/earn', label: 'Earn Interest', icon: '📈', description: 'Grow your savings' },
     { path: '/send', label: 'Send Money', icon: '→', description: 'Transfer to anyone' },
     { path: '/history', label: 'Activity', icon: '📋', description: 'Your transactions' },
+    { path: '/portfolio', label: 'Portfolio', icon: '📊', description: 'Your holdings at a glance' },
   ]
 
   const secondaryItems = [
@@ -163,6 +166,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/prompts', label: 'Prompt Feed', icon: '>' },
     { path: '/mesh', label: 'Mind Mesh', icon: '#' },
     { path: '/docs', label: 'Learn', icon: '📚' },
+    { path: '/status', label: 'System Status', icon: '|' },
     { path: '/about', label: 'About', icon: '💡' },
     { path: '/jarvis', label: 'JARVIS', icon: '>' },
   ]
@@ -285,6 +289,16 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             <div className="text-left">
               <div>Protect My Account</div>
               <div className="text-xs text-black-500">Set up backup options in case you lose access</div>
+            </div>
+          </button>
+          <button
+            onClick={cycleTheme}
+            className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors hover:bg-black-700/50 text-black-400 hover:text-matrix-400"
+          >
+            <span>🎨</span>
+            <div className="text-left">
+              <div>Theme: {themes[theme]?.label}</div>
+              <div className="text-xs text-black-500">Tap to cycle themes</div>
             </div>
           </button>
         </div>

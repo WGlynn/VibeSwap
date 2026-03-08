@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 
 const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
 
@@ -21,11 +22,7 @@ function useMarkets() {
       const res = await fetch(`${API_URL}/web/predictions`)
       if (res.ok) {
         const data = await res.json()
-        // Parse the text response from listMarkets
-        if (typeof data.markets === 'string') {
-          // Parse text format into structured data
-          setMarkets(parseMarketsText(data.markets))
-        } else if (Array.isArray(data.markets)) {
+        if (Array.isArray(data.markets)) {
           setMarkets(data.markets)
         }
       }
@@ -38,8 +35,8 @@ function useMarkets() {
       const res = await fetch(`${API_URL}/web/predictions/leaderboard`)
       if (res.ok) {
         const data = await res.json()
-        if (typeof data.leaderboard === 'string') {
-          setLeaderboard(parseLeaderboardText(data.leaderboard))
+        if (Array.isArray(data.leaderboard)) {
+          setLeaderboard(data.leaderboard)
         }
       }
     } catch { /* silent */ }
@@ -55,47 +52,6 @@ function useMarkets() {
   return { markets, leaderboard, loading, refresh: fetchMarkets }
 }
 
-// Parse the text-based listMarkets response into structured data
-function parseMarketsText(text) {
-  if (!text || text.includes('No active') || text.includes('no markets')) return []
-  const lines = text.split('\n').filter(Boolean)
-  const markets = []
-  let current = null
-
-  for (const line of lines) {
-    const idMatch = line.match(/^#(\d+)\s*[—-]\s*(.+)/i) || line.match(/Market #(\d+):\s*(.+)/)
-    if (idMatch) {
-      if (current) markets.push(current)
-      current = { id: parseInt(idMatch[1]), question: idMatch[2].trim(), yes: 50, no: 50, total: 0, bets: 0, status: 'open' }
-    }
-    if (current) {
-      const yesMatch = line.match(/Yes:\s*(\d+)%/)
-      const noMatch = line.match(/No:\s*(\d+)%/)
-      const betsMatch = line.match(/(\d+)\s*bets?/)
-      const poolMatch = line.match(/(\d+)\s*pts?\s*pool/i)
-      if (yesMatch) current.yes = parseInt(yesMatch[1])
-      if (noMatch) current.no = parseInt(noMatch[1])
-      if (betsMatch) current.bets = parseInt(betsMatch[1])
-      if (poolMatch) current.total = parseInt(poolMatch[1])
-    }
-  }
-  if (current) markets.push(current)
-  return markets
-}
-
-function parseLeaderboardText(text) {
-  if (!text || text.includes('No predictions')) return []
-  const lines = text.split('\n').filter(Boolean)
-  const entries = []
-  for (const line of lines) {
-    const match = line.match(/(\d+)\.\s*(.+?)\s*[—-]\s*(\d+)W\s*\/\s*(\d+)L/i) ||
-                  line.match(/(.+?)\s*:\s*(\d+)\s*wins?,\s*(\d+)\s*loss/i)
-    if (match) {
-      entries.push({ rank: entries.length + 1, name: match[2]?.trim() || match[1]?.trim(), wins: parseInt(match[3] || match[2]), losses: parseInt(match[4] || match[3]) })
-    }
-  }
-  return entries
-}
 
 function MarketCard({ market, onBet }) {
   const [betting, setBetting] = useState(null) // 'yes' | 'no'
@@ -104,15 +60,20 @@ function MarketCard({ market, onBet }) {
 
   const handleBet = async (side) => {
     setBetting(side)
-    const res = await fetch(`${API_URL}/web/predictions/bet`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ marketId: market.id, side, amount, userId: `web-${Date.now()}`, userName: 'Anon' }),
-    })
-    const data = await res.json()
-    setResult(data.result)
+    try {
+      const res = await fetch(`${API_URL}/web/predictions/bet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ marketId: market.id, side, amount, userId: `web-${Date.now()}`, userName: 'Anon' }),
+      })
+      const data = await res.json()
+      setResult(data.result)
+      toast.success(`Bet ${amount} pts on ${side.toUpperCase()} for #${market.id}`)
+      if (onBet) onBet()
+    } catch {
+      toast.error('Failed to place bet')
+    }
     setBetting(null)
-    if (onBet) onBet()
   }
 
   return (

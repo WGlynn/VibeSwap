@@ -5,23 +5,36 @@ import { motion, AnimatePresence } from 'framer-motion'
 // ============ App Registry ============
 
 const APPS = [
-  { id: 'exchange',    icon: '💱', name: 'Exchange',     tagline: 'Swap tokens with zero MEV',       category: 'Finance',   route: '/',         status: 'installed' },
-  { id: 'vibechat',    icon: '💬', name: 'VibeChat',     tagline: 'Encrypted group messaging',       category: 'Social',    route: '/board',    status: 'installed' },
-  { id: 'vibefeed',    icon: '📡', name: 'VibeFeed',     tagline: 'Decentralized microblogging',     category: 'Social',    route: '/feed',     status: 'new' },
-  { id: 'vibeforum',   icon: '🗳️', name: 'VibeForum',    tagline: 'Community discussions & governance', category: 'Social', route: '/forum',    status: 'installed' },
-  { id: 'vibewiki',    icon: '📚', name: 'VibeWiki',     tagline: 'Community knowledge base',        category: 'Knowledge', route: '/wiki',     status: 'new' },
-  { id: 'jarvis',      icon: '🤖', name: 'JARVIS',       tagline: 'AI assistant',                    category: 'Tools',     route: '/jarvis',   status: 'installed' },
-  { id: 'mindmesh',    icon: '🌐', name: 'Mind Mesh',    tagline: 'Network topology visualizer',     category: 'Tools',     route: '/mesh',     status: 'installed' },
-  { id: 'vault',       icon: '💰', name: 'Vault',        tagline: 'Secure savings vault',            category: 'Finance',   route: '/vault',    status: 'installed' },
-  { id: 'portfolio',   icon: '📊', name: 'Portfolio',    tagline: 'Track your holdings',             category: 'Finance',   route: '/portfolio', status: 'installed' },
-  { id: 'predictions', icon: '🔮', name: 'Predictions',  tagline: 'Prediction markets',              category: 'Finance',   route: '/predict',  status: 'installed' },
-  { id: 'mine',        icon: '⛏️', name: 'Mine JUL',     tagline: 'Earn Joule tokens',               category: 'Finance',   route: '/mine',     status: 'installed' },
-  { id: 'vibeplayer',  icon: '🎵', name: 'VibePlayer',   tagline: 'Community playlist',              category: 'Tools',     route: null,        status: 'builtin' },
-  { id: 'vibenews',    icon: '📰', name: 'VibeNews',     tagline: 'Curated crypto news',             category: 'Knowledge', route: '/news',     status: 'coming_soon' },
-  { id: 'arcade',      icon: '🎮', name: 'Arcade',       tagline: 'On-chain mini-games',             category: 'Tools',     route: '/arcade',   status: 'coming_soon' },
+  // Finance
+  { id: 'exchange',    icon: '💱', name: 'Exchange',     tagline: 'Swap tokens with zero MEV',                category: 'Finance',        route: '/',          status: 'installed' },
+  { id: 'lending',     icon: '🏦', name: 'Lend & Borrow', tagline: 'Aave-style lending with kink model',     category: 'Finance',        route: '/lend',      status: 'new' },
+  { id: 'staking',     icon: '🔒', name: 'Staking',      tagline: 'Multi-pool staking with lock tiers',      category: 'Finance',        route: '/stake',     status: 'new' },
+  { id: 'vault',       icon: '💰', name: 'Vault',        tagline: 'Secure savings vault',                    category: 'Finance',        route: '/vault',     status: 'installed' },
+  { id: 'portfolio',   icon: '📊', name: 'Portfolio',    tagline: 'Track your holdings',                     category: 'Finance',        route: '/portfolio', status: 'installed' },
+  { id: 'predictions', icon: '🔮', name: 'Predictions',  tagline: 'Permissionless prediction markets',       category: 'Finance',        route: '/predict',   status: 'installed' },
+  { id: 'mine',        icon: '⛏️', name: 'Mine JUL',     tagline: 'Earn Joule tokens',                       category: 'Finance',        route: '/mine',      status: 'installed' },
+  // AI & Agents
+  { id: 'agents',      icon: '🤖', name: 'AI Agents',    tagline: 'Deploy, hire, and orchestrate AI agents',  category: 'AI & Agents',    route: '/agents',    status: 'new' },
+  { id: 'jarvis',      icon: '🧠', name: 'JARVIS',       tagline: 'Your AI assistant',                       category: 'AI & Agents',    route: '/jarvis',    status: 'installed' },
+  // Infrastructure
+  { id: 'depin',       icon: '📡', name: 'DePIN',        tagline: 'IoT devices, private compute, medical data', category: 'Infrastructure', route: '/depin',    status: 'new' },
+  { id: 'rwa',         icon: '🏠', name: 'Real World Assets', tagline: 'Tokenized property, energy, supply chain', category: 'Infrastructure', route: '/rwa', status: 'new' },
+  { id: 'infofi',      icon: '💡', name: 'InfoFi',       tagline: 'Knowledge primitives as economic assets',  category: 'Infrastructure', route: '/infofi',    status: 'new' },
+  // Governance
+  { id: 'govern',      icon: '🗳️', name: 'Governance',   tagline: 'veVIBE voting, proposals, gauge weights', category: 'Governance',     route: '/govern',    status: 'new' },
+  // Social
+  { id: 'vibechat',    icon: '💬', name: 'VibeChat',     tagline: 'Encrypted group messaging',               category: 'Social',         route: '/board',     status: 'installed' },
+  { id: 'vibefeed',    icon: '📡', name: 'VibeFeed',     tagline: 'Decentralized microblogging',              category: 'Social',         route: '/feed',      status: 'new' },
+  { id: 'vibeforum',   icon: '🗨️', name: 'VibeForum',    tagline: 'Community discussions',                    category: 'Social',         route: '/forum',     status: 'installed' },
+  { id: 'vibewiki',    icon: '📚', name: 'VibeWiki',     tagline: 'Community knowledge base',                 category: 'Knowledge',      route: '/wiki',      status: 'new' },
+  // Tools
+  { id: 'mindmesh',    icon: '🌐', name: 'Mind Mesh',    tagline: 'Network topology visualizer',              category: 'Tools',          route: '/mesh',      status: 'installed' },
+  { id: 'vibeplayer',  icon: '🎵', name: 'VibePlayer',   tagline: 'Community playlist',                       category: 'Tools',          route: null,         status: 'builtin' },
+  { id: 'vibenews',    icon: '📰', name: 'VibeNews',     tagline: 'Curated crypto news',                      category: 'Knowledge',      route: '/news',      status: 'coming_soon' },
+  { id: 'arcade',      icon: '🎮', name: 'Arcade',       tagline: 'On-chain mini-games',                      category: 'Tools',          route: '/arcade',    status: 'coming_soon' },
 ]
 
-const CATEGORIES = ['All', 'Social', 'Finance', 'Knowledge', 'Tools']
+const CATEGORIES = ['All', 'Finance', 'AI & Agents', 'Infrastructure', 'Governance', 'Social', 'Knowledge', 'Tools']
 
 // ============ Status Badge ============
 

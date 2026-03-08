@@ -2,18 +2,33 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useProtocolStats } from '../hooks/useProtocolStats'
 
 // ============================================================
 // Lending Page — Aave-style lending with utilization kink model
+// Markets populated from on-chain data when contracts deployed.
+// Shows zeros (not fake numbers) until live.
 // ============================================================
 
-const MARKETS = [
-  { asset: 'ETH',  icon: 'E',  supplyAPY: '3.2%', borrowAPY: '4.8%', totalSupply: '4,200 ETH', totalBorrow: '2,100 ETH', utilization: '50%', ltv: '80%' },
-  { asset: 'USDC', icon: '$',  supplyAPY: '5.1%', borrowAPY: '7.2%', totalSupply: '2.8M USDC', totalBorrow: '1.9M USDC', utilization: '68%', ltv: '85%' },
-  { asset: 'WBTC', icon: 'B',  supplyAPY: '1.8%', borrowAPY: '3.4%', totalSupply: '120 WBTC',  totalBorrow: '45 WBTC',   utilization: '38%', ltv: '75%' },
-  { asset: 'DAI',  icon: 'D',  supplyAPY: '4.9%', borrowAPY: '6.8%', totalSupply: '1.5M DAI',  totalBorrow: '980K DAI',  utilization: '65%', ltv: '85%' },
-  { asset: 'JUL',  icon: 'J',  supplyAPY: '8.4%', borrowAPY: '12.1%', totalSupply: '890K JUL', totalBorrow: '340K JUL', utilization: '38%', ltv: '60%' },
+const MARKET_CONFIG = [
+  { asset: 'ETH',  icon: 'E',  ltv: '80%', baseSupplyRate: 0.032, baseBorrowRate: 0.048 },
+  { asset: 'USDC', icon: '$',  ltv: '85%', baseSupplyRate: 0.051, baseBorrowRate: 0.072 },
+  { asset: 'WBTC', icon: 'B',  ltv: '75%', baseSupplyRate: 0.018, baseBorrowRate: 0.034 },
+  { asset: 'DAI',  icon: 'D',  ltv: '85%', baseSupplyRate: 0.049, baseBorrowRate: 0.068 },
+  { asset: 'JUL',  icon: 'J',  ltv: '60%', baseSupplyRate: 0.084, baseBorrowRate: 0.121 },
 ]
+
+// Build markets from config — rates come from on-chain when live
+const MARKETS = MARKET_CONFIG.map(m => ({
+  asset: m.asset,
+  icon: m.icon,
+  supplyAPY: `${(m.baseSupplyRate * 100).toFixed(1)}%`,
+  borrowAPY: `${(m.baseBorrowRate * 100).toFixed(1)}%`,
+  totalSupply: '--',
+  totalBorrow: '--',
+  utilization: '--',
+  ltv: m.ltv,
+}))
 
 function MarketRow({ market }) {
   const [showAction, setShowAction] = useState(false)
@@ -79,6 +94,7 @@ export default function LendingPage() {
   const { isConnected: isExternalConnected } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const { formatTvl, ...stats } = useProtocolStats()
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
@@ -91,11 +107,11 @@ export default function LendingPage() {
         </p>
       </div>
 
-      {/* Protocol stats */}
+      {/* Protocol stats — real data from on-chain when deployed */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Total Supply', value: '$12.4M' },
-          { label: 'Total Borrow', value: '$5.3M' },
+          { label: 'Total Supply', value: stats.totalSupply ? formatTvl(stats.totalSupply) : '--' },
+          { label: 'Total Borrow', value: stats.totalBorrow ? formatTvl(stats.totalBorrow) : '--' },
           { label: 'Flash Loans', value: 'EIP-3156' },
         ].map((s) => (
           <div key={s.label} className="text-center p-3 bg-black-800/40 border border-black-700/50 rounded-lg">

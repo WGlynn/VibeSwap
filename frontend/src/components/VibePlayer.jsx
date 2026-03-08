@@ -42,6 +42,7 @@ function onYTReady(cb) {
 export default function VibePlayer() {
   const [isOpen, setIsOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [showPanel, setShowPanel] = useState(false)
   const playerRef = useRef(null)
   const containerRef = useRef(null)
@@ -96,8 +97,10 @@ export default function VibePlayer() {
             // Sync UI to actual playback state
             const state = e.data
             if (state === window.YT.PlayerState.PLAYING) {
+              setIsLoading(false)
               setIsPlaying(true)
             } else if (state === window.YT.PlayerState.PAUSED) {
+              setIsLoading(false)
               setIsPlaying(false)
               // Save position on pause
               try {
@@ -143,6 +146,13 @@ export default function VibePlayer() {
     if (playerRef.current?.previousVideo) playerRef.current.previousVideo()
   }, [])
 
+  // Safety timeout — clear loading if player never starts (10s)
+  useEffect(() => {
+    if (!isLoading) return
+    const timeout = setTimeout(() => setIsLoading(false), 10000)
+    return () => clearTimeout(timeout)
+  }, [isLoading])
+
   // Save position every 5s while playing
   useEffect(() => {
     if (!isPlaying) return
@@ -156,8 +166,10 @@ export default function VibePlayer() {
   }, [isPlaying])
 
   const togglePlayer = useCallback(() => {
+    if (isLoading) return // Prevent double-tap while loading
     if (!isOpen) {
       setIsOpen(true)
+      setIsLoading(true)
     } else {
       // Save position before closing
       const p = playerRef.current
@@ -167,9 +179,10 @@ export default function VibePlayer() {
       if (p?.pauseVideo) p.pauseVideo()
       setIsOpen(false)
       setIsPlaying(false)
+      setIsLoading(false)
       setShowPanel(false)
     }
-  }, [isOpen])
+  }, [isOpen, isLoading])
 
   const togglePanel = useCallback(() => {
     if (!isOpen) {
@@ -341,6 +354,8 @@ export default function VibePlayer() {
           style={{
             background: isPlaying
               ? 'linear-gradient(135deg, #10b981, #059669)'
+              : isLoading
+              ? 'linear-gradient(135deg, rgba(16,185,129,0.3), rgba(5,150,105,0.2))'
               : 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
             border: '1px solid rgba(255,255,255,0.15)',
             backdropFilter: 'blur(12px)',
@@ -353,6 +368,11 @@ export default function VibePlayer() {
               <span className="w-[3px] bg-white rounded-full animate-vibe-3" />
               <span className="w-[3px] bg-white rounded-full animate-vibe-4" />
             </div>
+          ) : isLoading ? (
+            <svg className="w-4 h-4 text-white/70 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
           ) : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
               <path d="M9 18V5l12-2v13" />
@@ -361,7 +381,7 @@ export default function VibePlayer() {
             </svg>
           )}
           <span className="text-white text-sm font-medium">
-            {isPlaying ? 'VIBING' : 'VIBE'}
+            {isPlaying ? 'VIBING' : isLoading ? 'LOADING' : 'VIBE'}
           </span>
         </button>
       </div>

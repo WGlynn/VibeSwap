@@ -141,6 +141,147 @@ const WORKER_CODE = `
   }
 `
 
+// ============ TIP JAR PANEL ============
+
+function TipJarPanel({ address, serverBalance, onTipSuccess, apiUrl }) {
+  const [tipAmount, setTipAmount] = useState('')
+  const [isTipping, setIsTipping] = useState(false)
+  const [tipStatus, setTipStatus] = useState(null) // { type: 'success'|'error', message }
+
+  const presets = [
+    { label: '1 JUL', value: '1' },
+    { label: '5 JUL', value: '5' },
+    { label: '10 JUL', value: '10' },
+    { label: 'All', value: String(serverBalance || 0) },
+  ]
+
+  const handleTip = async () => {
+    const amount = parseFloat(tipAmount)
+    if (!amount || amount <= 0) return
+    if (amount > (serverBalance || 0)) {
+      setTipStatus({ type: 'error', message: 'Insufficient JUL balance — mine more first!' })
+      return
+    }
+
+    setIsTipping(true)
+    setTipStatus(null)
+
+    try {
+      // Step 1: Generate binding proof (commit-reveal)
+      const nonce = crypto.randomUUID()
+      const timestamp = Date.now()
+
+      // Step 2: Submit tip to backend with proof binding
+      const res = await fetch(`${apiUrl}/web/mining/tip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: address,
+          amount,
+          nonce,
+          timestamp,
+          // Binding proof: hash(address + amount + nonce + timestamp)
+          bindingProof: await generateBindingProof(address, amount, nonce, timestamp),
+        }),
+      })
+
+      const result = await res.json()
+
+      if (result.success) {
+        setTipStatus({
+          type: 'success',
+          message: `${amount.toFixed(2)} JUL sent to Jarvis Compute Vault! +${(amount * 1000).toFixed(0)} compute credits activated.`
+        })
+        setTipAmount('')
+        onTipSuccess(result.newBalance || (serverBalance - amount))
+      } else {
+        setTipStatus({ type: 'error', message: result.error || 'Tip failed — try again' })
+      }
+    } catch (err) {
+      setTipStatus({ type: 'error', message: `Network error: ${err.message}` })
+    } finally {
+      setIsTipping(false)
+    }
+  }
+
+  return (
+    <div>
+      {/* Quick presets */}
+      <div className="flex gap-2 mb-3">
+        {presets.map(p => (
+          <button
+            key={p.label}
+            onClick={() => setTipAmount(p.value)}
+            disabled={isTipping || !(serverBalance > 0)}
+            className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors border ${
+              tipAmount === p.value
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                : 'bg-void-800/50 text-void-400 border-void-700/50 hover:text-void-200 hover:border-void-500/50'
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Custom amount + send button */}
+      <div className="flex gap-2">
+        <input
+          type="number"
+          value={tipAmount}
+          onChange={(e) => setTipAmount(e.target.value)}
+          placeholder="JUL amount..."
+          min="0"
+          step="0.001"
+          disabled={isTipping}
+          className="flex-1 bg-void-900/60 border border-void-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-void-500 focus:border-amber-500/50 focus:outline-none disabled:opacity-40"
+        />
+        <button
+          onClick={handleTip}
+          disabled={isTipping || !tipAmount || parseFloat(tipAmount) <= 0}
+          className="px-4 py-2 bg-amber-500/80 hover:bg-amber-500 disabled:bg-void-700 disabled:text-void-500 text-black font-bold text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {isTipping ? (
+            <span className="animate-pulse">Sending...</span>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Top Off Jarvis
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Status message */}
+      {tipStatus && (
+        <div className={`mt-2 p-2 rounded text-xs font-mono ${
+          tipStatus.type === 'success'
+            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+        }`}>
+          {tipStatus.message}
+        </div>
+      )}
+
+      {/* Rate info */}
+      <div className="mt-2 flex items-center justify-between text-void-500 text-xs">
+        <span>1 JUL = 1,000 compute credits</span>
+        <span>Credits expire in 30 days</span>
+      </div>
+    </div>
+  )
+}
+
+// Generate a binding proof hash (SHA-256)
+async function generateBindingProof(address, amount, nonce, timestamp) {
+  const data = new TextEncoder().encode(`${address}:${amount}:${nonce}:${timestamp}`)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = new Uint8Array(hashBuffer)
+  return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 function LeaderboardCard({ apiUrl }) {
   const [leaders, setLeaders] = useState([])
   const [supply, setSupply] = useState(null)
@@ -749,6 +890,41 @@ function MinePage() {
         {/* Leaderboard */}
         <StaggerItem>
           <LeaderboardCard apiUrl={API_URL} />
+        </StaggerItem>
+
+        {/* Tip Jar — Send JUL to Jarvis Compute Vault */}
+        <StaggerItem>
+          <GlassCard className="p-5 mb-4 border border-amber-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-300">Jarvis Compute Vault</h3>
+                  <p className="text-void-500 text-xs">Send mined JUL here to top off your Jarvis credits</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-void-400">Your Balance</div>
+                <div className="font-mono text-amber-400 font-bold">{(serverBalance || 0).toFixed(4)} JUL</div>
+              </div>
+            </div>
+
+            <TipJarPanel
+              address={address}
+              serverBalance={serverBalance}
+              onTipSuccess={(newBalance) => {
+                setServerBalance(newBalance)
+                refreshStats()
+                addLog(`Tipped JUL to Jarvis Compute Vault — credits topped off!`, 'success')
+                toast.success('JUL sent to Jarvis — compute credits activated!')
+              }}
+              apiUrl={API_URL}
+            />
+          </GlassCard>
         </StaggerItem>
 
         {/* Current Challenge */}

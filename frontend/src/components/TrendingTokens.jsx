@@ -1,17 +1,39 @@
 import { motion } from 'framer-motion'
+import { usePriceFeed } from '../hooks/usePriceFeed'
 
 // What's hot. What's moving. What you might be missing.
 // This creates urgency. This creates discovery. This creates action.
 
-const TRENDING = [
-  { rank: 1, symbol: 'ARB', name: 'Arbitrum', price: '$1.20', change: 12.5, volume: '$45M', logo: '◆', color: '#28A0F0', isHot: true },
-  { rank: 2, symbol: 'OP', name: 'Optimism', price: '$2.50', change: 8.3, volume: '$32M', logo: '◯', color: '#FF0420', isHot: true },
-  { rank: 3, symbol: 'ETH', name: 'Ethereum', price: '$2,000', change: 3.2, volume: '$89M', logo: '⟠', color: '#627EEA', isHot: false },
-  { rank: 4, symbol: 'WBTC', name: 'Bitcoin', price: '$42,000', change: -1.5, volume: '$28M', logo: '₿', color: '#F7931A', isHot: false },
-  { rank: 5, symbol: 'LINK', name: 'Chainlink', price: '$15.20', change: 5.7, volume: '$18M', logo: '⬡', color: '#2A5ADA', isHot: false },
+const TOKEN_META = [
+  { symbol: 'ARB', name: 'Arbitrum', logo: '◆', color: '#28A0F0' },
+  { symbol: 'OP', name: 'Optimism', logo: '◯', color: '#FF0420' },
+  { symbol: 'ETH', name: 'Ethereum', logo: '⟠', color: '#627EEA' },
+  { symbol: 'WBTC', name: 'Bitcoin', logo: '₿', color: '#F7931A' },
+  { symbol: 'LINK', name: 'Chainlink', logo: '⬡', color: '#2A5ADA' },
 ]
 
 function TrendingTokens({ onSelectToken }) {
+  const { getPrice, getChange } = usePriceFeed(['ARB', 'OP', 'ETH', 'WBTC', 'LINK'])
+
+  // Build trending list from real price data, sorted by 24h change
+  const TRENDING = TOKEN_META.map((t, i) => {
+    const price = getPrice(t.symbol)
+    const change = getChange(t.symbol)
+    const priceStr = price >= 1000
+      ? `$${price.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+      : price >= 1
+        ? `$${price.toFixed(2)}`
+        : `$${price.toFixed(4)}`
+    return {
+      ...t,
+      price: priceStr,
+      change: parseFloat(change?.toFixed(1) || '0'),
+      volume: '--', // Volume requires paid API or on-chain indexer
+      isHot: Math.abs(change || 0) > 5,
+      rank: i + 1,
+    }
+  }).sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+    .map((t, i) => ({ ...t, rank: i + 1 }))
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

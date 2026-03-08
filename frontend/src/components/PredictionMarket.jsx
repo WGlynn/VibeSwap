@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { remember } from '../utils/sankofa'
 
 const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
 
@@ -69,9 +70,11 @@ function MarketCard({ market, onBet }) {
       const data = await res.json()
       setResult(data.result)
       toast.success(`Bet ${amount} pts on ${side.toUpperCase()} for #${market.id}`)
+      remember('success', { page: '/predict', action: 'bet', detail: `${side} #${market.id}` })
       if (onBet) onBet()
     } catch {
       toast.error('Failed to place bet')
+      remember('error', { page: '/predict', action: 'bet', detail: `failed #${market.id}` })
     }
     setBetting(null)
   }

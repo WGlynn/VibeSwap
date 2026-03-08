@@ -812,6 +812,17 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     moderation: ['flag_deceiver'],
     limni: ['limni_status', 'limni_register_terminal', 'limni_register_vps',
             'limni_check_health', 'limni_monitor', 'limni_alerts'],
+    vibeswap: ['vibe_price', 'vibe_pool_stats', 'vibe_emission', 'vibe_auction',
+               'vibe_shapley', 'vibe_staking', 'vibe_lp', 'vibe_health'],
+    portfolio: ['portfolio_overview', 'token_balances', 'tx_history', 'nft_holdings',
+                'defi_positions', 'whale_alerts'],
+    research: ['tokenomics_analysis', 'protocol_comparison', 'yield_farming',
+               'governance_activity', 'github_activity', 'onchain_metrics',
+               'correlation_analysis', 'market_regime'],
+    dev: ['gas_tracker', 'contract_source', 'decode_tx', 'block_info',
+          'ens_info', 'npm_lookup', 'crate_lookup', 'contract_abi', 'checksum_address'],
+    education: ['explain_concept', 'crypto_glossary', 'vibeswap_explainer',
+                'crypto_tutorial', 'crypto_calendar', 'daily_challenge'],
   };
 
   function selectTools(msg, allTools) {
@@ -832,6 +843,21 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     }
     if (/flag|deceiv|scam|fraud|report/.test(lc)) {
       selected.add('moderation');
+    }
+    if (/vibe|vibeswap|pool|emission|auction|shapley|staking|protocol health/.test(lc)) {
+      selected.add('vibeswap');
+    }
+    if (/portfolio|wallet|balance|token|nft|defi position|whale|track/.test(lc)) {
+      selected.add('portfolio');
+    }
+    if (/tokenomics|compare protocol|yield|farm|governance|github|on.?chain|correlation|regime|research|analy/.test(lc)) {
+      selected.add('research');
+    }
+    if (/gas|contract|decode|tx|transaction|block|ens|\.eth|npm|crate|rust|abi|wei|gwei|unit/.test(lc)) {
+      selected.add('dev');
+    }
+    if (/explain|glossary|define|what is|tutorial|learn|teach|vibeswap|calendar|event|challenge|quiz/.test(lc)) {
+      selected.add('education');
     }
 
     const selectedNames = new Set();
@@ -1045,6 +1071,371 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           limit: { type: 'number', description: 'Number of alerts to return (default: 20)' },
         },
       },
+    },
+    // ============ VibeSwap Protocol Tools ============
+    {
+      name: 'vibe_price',
+      description: 'Get VIBE token price from DEX pools. Use when asked about VIBE price, token value, or market data.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'vibe_pool_stats',
+      description: 'Get VibeSwap pool statistics — TVL, volume, fees. Use when asked about pool data or protocol metrics.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'vibe_emission',
+      description: 'Get current VIBE emission rate and halving era info.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'vibe_auction',
+      description: 'Get current batch auction status — phase, time remaining, pending orders.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'vibe_shapley',
+      description: 'Check pending Shapley rewards for an address.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address to check' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'vibe_staking',
+      description: 'Get staking position details for an address.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address to check' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'vibe_lp',
+      description: 'Get LP positions across all VibeSwap pools for an address.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address to check' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'vibe_health',
+      description: 'Get overall VibeSwap protocol health dashboard — contracts, parameters, security status.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    // ============ Portfolio & Wallet Tools ============
+    {
+      name: 'portfolio_overview',
+      description: 'Get aggregate wallet balances across multiple chains (ETH, Base, Arbitrum, etc). Use when asked about someone\'s portfolio or wallet value.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address' },
+          chains: { type: 'array', items: { type: 'string' }, description: 'Chains to check (default: eth, base, arb)' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'token_balances',
+      description: 'Get ERC20 token balances for a wallet on a specific chain.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address' },
+          chain: { type: 'string', description: 'Chain (eth, base, arb, polygon, op). Default: eth' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'tx_history',
+      description: 'Get recent transaction history for a wallet.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address' },
+          chain: { type: 'string', description: 'Chain (default: eth)' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'nft_holdings',
+      description: 'Get NFT holdings for a wallet on a specific chain.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address' },
+          chain: { type: 'string', description: 'Chain (default: eth)' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'defi_positions',
+      description: 'Get DeFi positions (lending, LPs, staking) across protocols for an address.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'whale_alerts',
+      description: 'Get recent large transfers (whale movements) on a chain.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          chain: { type: 'string', description: 'Chain to monitor (default: eth)' },
+        },
+      },
+    },
+    // ============ Research & Analysis Tools ============
+    {
+      name: 'tokenomics_analysis',
+      description: 'Deep tokenomics breakdown for any token — supply, distribution, inflation, valuation metrics.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Token name or ticker (e.g., "ethereum", "sol", "ckb")' },
+        },
+        required: ['token'],
+      },
+    },
+    {
+      name: 'protocol_comparison',
+      description: 'Side-by-side DeFi protocol comparison — TVL, fees, revenue, users.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          protocolA: { type: 'string', description: 'First protocol (e.g., "uniswap")' },
+          protocolB: { type: 'string', description: 'Second protocol (e.g., "curve")' },
+        },
+        required: ['protocolA', 'protocolB'],
+      },
+    },
+    {
+      name: 'yield_farming',
+      description: 'Top yield farming opportunities across DeFi — sorted by APY with risk indicators.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          minApy: { type: 'number', description: 'Minimum APY filter (default: 5)' },
+          chain: { type: 'string', description: 'Filter by chain (optional)' },
+        },
+      },
+    },
+    {
+      name: 'governance_activity',
+      description: 'Get governance proposals from Snapshot for any protocol.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          protocol: { type: 'string', description: 'Protocol name (e.g., "aave", "uniswap")' },
+        },
+        required: ['protocol'],
+      },
+    },
+    {
+      name: 'github_activity',
+      description: 'Analyze GitHub repo activity — commits, contributors, recent changes, languages.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          repo: { type: 'string', description: 'GitHub repo (e.g., "uniswap/v3-core")' },
+        },
+        required: ['repo'],
+      },
+    },
+    {
+      name: 'onchain_metrics',
+      description: 'Chain-level on-chain metrics — gas, blocks, DEX volume, TVL, stablecoin flows.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          chain: { type: 'string', description: 'Chain to analyze (default: ethereum)' },
+        },
+      },
+    },
+    {
+      name: 'correlation_analysis',
+      description: 'Price correlation analysis between two tokens over a given period.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          tokenA: { type: 'string', description: 'First token (e.g., "bitcoin")' },
+          tokenB: { type: 'string', description: 'Second token (e.g., "ethereum")' },
+          days: { type: 'number', description: 'Period in days (default: 30)' },
+        },
+        required: ['tokenA', 'tokenB'],
+      },
+    },
+    {
+      name: 'market_regime',
+      description: 'Market regime analysis — risk on/off, rotation, accumulation. Analyzes BTC dominance, altseason signals, volume trends.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    // ============ Developer Productivity Tools ============
+    {
+      name: 'gas_tracker',
+      description: 'Multi-chain gas prices (ETH, Base, Arbitrum, Polygon, Optimism).',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'contract_source',
+      description: 'Get contract info from block explorer — name, compiler, proxy status.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Contract address' },
+          chain: { type: 'string', description: 'Chain (eth, base, arb, polygon, op). Default: eth' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'decode_tx',
+      description: 'Decode a transaction — from, to, value, gas, status, method selector.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          txHash: { type: 'string', description: 'Transaction hash' },
+          chain: { type: 'string', description: 'Chain (default: eth)' },
+        },
+        required: ['txHash'],
+      },
+    },
+    {
+      name: 'block_info',
+      description: 'Get block info — number, timestamp, tx count, gas used/limit, base fee.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          chain: { type: 'string', description: 'Chain (default: eth)' },
+          blockNumber: { type: 'string', description: 'Block number or "latest" (default: latest)' },
+        },
+      },
+    },
+    {
+      name: 'ens_info',
+      description: 'Resolve ENS name to address or reverse-resolve address to ENS name.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          nameOrAddress: { type: 'string', description: 'ENS name (vitalik.eth) or Ethereum address' },
+        },
+        required: ['nameOrAddress'],
+      },
+    },
+    {
+      name: 'npm_lookup',
+      description: 'npm package info — version, description, downloads, dependencies.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          packageName: { type: 'string', description: 'npm package name (e.g., "ethers")' },
+        },
+        required: ['packageName'],
+      },
+    },
+    {
+      name: 'crate_lookup',
+      description: 'Rust crate info from crates.io — version, downloads, categories.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          crateName: { type: 'string', description: 'Crate name (e.g., "tokio")' },
+        },
+        required: ['crateName'],
+      },
+    },
+    {
+      name: 'contract_abi',
+      description: 'Fetch verified contract ABI and show function signatures.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Contract address' },
+          chain: { type: 'string', description: 'Chain (default: eth)' },
+        },
+        required: ['address'],
+      },
+    },
+    {
+      name: 'checksum_address',
+      description: 'EIP-55 checksum an Ethereum address.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          address: { type: 'string', description: 'Ethereum address to checksum' },
+        },
+        required: ['address'],
+      },
+    },
+    // ============ Education & Community Tools ============
+    {
+      name: 'explain_concept',
+      description: 'ELI5 explanation of a crypto/DeFi concept using analogies. Use when someone asks "what is X" or needs a concept explained simply.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          concept: { type: 'string', description: 'The concept to explain (e.g., "impermanent loss", "MEV", "flash loan")' },
+        },
+        required: ['concept'],
+      },
+    },
+    {
+      name: 'crypto_glossary',
+      description: 'Look up crypto/DeFi terminology. 100+ built-in definitions.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          term: { type: 'string', description: 'Term to look up (e.g., "TVL", "AMM", "yield farming")' },
+        },
+        required: ['term'],
+      },
+    },
+    {
+      name: 'vibeswap_explainer',
+      description: 'Explain VibeSwap — its MEV elimination, cooperative capitalism, Shapley distribution, and architecture.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Specific topic (optional): mev, shapley, auction, security, philosophy' },
+        },
+      },
+    },
+    {
+      name: 'crypto_tutorial',
+      description: 'Step-by-step tutorials for common crypto operations.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Tutorial topic: start, swap, lp, bridge, security' },
+        },
+        required: ['topic'],
+      },
+    },
+    {
+      name: 'crypto_calendar',
+      description: 'Upcoming crypto events — upgrades, halvings, conferences, token unlocks.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'daily_challenge',
+      description: 'Get a daily crypto knowledge challenge/quiz question.',
+      input_schema: { type: 'object', properties: {} },
     },
   ];
 
@@ -1283,6 +1674,233 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             ? 'No recent alerts.'
             : alerts.map(a => `[${new Date(a.timestamp).toISOString()}] ${a.type}: ${a.message}`).join('\n');
           console.log(`[claude] Tool: limni_alerts → ${alerts.length} alerts`);
+        // ============ VibeSwap Protocol Tools ============
+        } else if (tb.name === 'vibe_price') {
+          try {
+            const { getVibePrice } = await import('./tools-vibeswap.js');
+            result = await getVibePrice();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: vibe_price');
+        } else if (tb.name === 'vibe_pool_stats') {
+          try {
+            const { getPoolStats } = await import('./tools-vibeswap.js');
+            result = await getPoolStats();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: vibe_pool_stats');
+        } else if (tb.name === 'vibe_emission') {
+          try {
+            const { getEmissionRate } = await import('./tools-vibeswap.js');
+            result = await getEmissionRate();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: vibe_emission');
+        } else if (tb.name === 'vibe_auction') {
+          try {
+            const { getAuctionStatus } = await import('./tools-vibeswap.js');
+            result = await getAuctionStatus();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: vibe_auction');
+        } else if (tb.name === 'vibe_shapley') {
+          try {
+            const { getShapleyRewards } = await import('./tools-vibeswap.js');
+            result = await getShapleyRewards(tb.input.address);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: vibe_shapley("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'vibe_staking') {
+          try {
+            const { getStakingInfo } = await import('./tools-vibeswap.js');
+            result = await getStakingInfo(tb.input.address);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: vibe_staking("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'vibe_lp') {
+          try {
+            const { getLPPositions } = await import('./tools-vibeswap.js');
+            result = await getLPPositions(tb.input.address);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: vibe_lp("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'vibe_health') {
+          try {
+            const { getProtocolHealth } = await import('./tools-vibeswap.js');
+            result = await getProtocolHealth();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: vibe_health');
+        // ============ Portfolio & Wallet Tools ============
+        } else if (tb.name === 'portfolio_overview') {
+          try {
+            const { getPortfolio } = await import('./tools-portfolio.js');
+            result = await getPortfolio(tb.input.address, tb.input.chains);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: portfolio_overview("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'token_balances') {
+          try {
+            const { getTokenBalances } = await import('./tools-portfolio.js');
+            result = await getTokenBalances(tb.input.address, tb.input.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: token_balances("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'tx_history') {
+          try {
+            const { getTransactionHistory } = await import('./tools-portfolio.js');
+            result = await getTransactionHistory(tb.input.address, tb.input.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: tx_history("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'nft_holdings') {
+          try {
+            const { getNFTs } = await import('./tools-portfolio.js');
+            result = await getNFTs(tb.input.address, tb.input.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: nft_holdings("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'defi_positions') {
+          try {
+            const { getDefiPositions } = await import('./tools-portfolio.js');
+            result = await getDefiPositions(tb.input.address);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: defi_positions("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'whale_alerts') {
+          try {
+            const { getWhaleAlerts } = await import('./tools-portfolio.js');
+            result = await getWhaleAlerts(tb.input?.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: whale_alerts');
+        // ============ Research & Analysis Tools ============
+        } else if (tb.name === 'tokenomics_analysis') {
+          try {
+            const { getTokenomicsAnalysis } = await import('./tools-research.js');
+            result = await getTokenomicsAnalysis(tb.input.token);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: tokenomics_analysis("${tb.input.token}")`);
+        } else if (tb.name === 'protocol_comparison') {
+          try {
+            const { getProtocolComparison } = await import('./tools-research.js');
+            result = await getProtocolComparison(tb.input.protocolA, tb.input.protocolB);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: protocol_comparison("${tb.input.protocolA}" vs "${tb.input.protocolB}")`);
+        } else if (tb.name === 'yield_farming') {
+          try {
+            const { getYieldFarming } = await import('./tools-research.js');
+            result = await getYieldFarming(tb.input?.minApy, tb.input?.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: yield_farming');
+        } else if (tb.name === 'governance_activity') {
+          try {
+            const { getGovernanceActivity } = await import('./tools-research.js');
+            result = await getGovernanceActivity(tb.input.protocol);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: governance_activity("${tb.input.protocol}")`);
+        } else if (tb.name === 'github_activity') {
+          try {
+            const { getGitHubActivity } = await import('./tools-research.js');
+            result = await getGitHubActivity(tb.input.repo);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: github_activity("${tb.input.repo}")`);
+        } else if (tb.name === 'onchain_metrics') {
+          try {
+            const { getOnChainMetrics } = await import('./tools-research.js');
+            result = await getOnChainMetrics(tb.input?.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: onchain_metrics');
+        } else if (tb.name === 'correlation_analysis') {
+          try {
+            const { getCorrelationAnalysis } = await import('./tools-research.js');
+            result = await getCorrelationAnalysis(tb.input.tokenA, tb.input.tokenB, tb.input?.days);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: correlation_analysis("${tb.input.tokenA}" vs "${tb.input.tokenB}")`);
+        } else if (tb.name === 'market_regime') {
+          try {
+            const { getMarketRegime } = await import('./tools-research.js');
+            result = await getMarketRegime();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: market_regime');
+        // ============ Developer Productivity Tools ============
+        } else if (tb.name === 'gas_tracker') {
+          try {
+            const { getGasTracker } = await import('./tools-dev.js');
+            result = await getGasTracker();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: gas_tracker');
+        } else if (tb.name === 'contract_source') {
+          try {
+            const { getContractInfo } = await import('./tools-dev.js');
+            result = await getContractInfo(tb.input.address, tb.input.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: contract_source("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'decode_tx') {
+          try {
+            const { decodeTx } = await import('./tools-dev.js');
+            result = await decodeTx(tb.input.txHash, tb.input.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: decode_tx("${tb.input.txHash?.slice(0, 14)}...")`);
+        } else if (tb.name === 'block_info') {
+          try {
+            const { getLatestBlock: getDevBlock } = await import('./tools-dev.js');
+            result = await getDevBlock(tb.input?.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: block_info');
+        } else if (tb.name === 'ens_info') {
+          try {
+            const { resolveENS: resolveENSDev } = await import('./tools-dev.js');
+            result = await resolveENSDev(tb.input.nameOrAddress);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: ens_info("${tb.input.nameOrAddress}")`);
+        } else if (tb.name === 'npm_lookup') {
+          try {
+            const { getNpmInfo } = await import('./tools-dev.js');
+            result = await getNpmInfo(tb.input.packageName);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: npm_lookup("${tb.input.packageName}")`);
+        } else if (tb.name === 'crate_lookup') {
+          try {
+            const { getCrateInfo } = await import('./tools-dev.js');
+            result = await getCrateInfo(tb.input.crateName);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: crate_lookup("${tb.input.crateName}")`);
+        } else if (tb.name === 'contract_abi') {
+          try {
+            const { getContractABI } = await import('./tools-dev.js');
+            result = await getContractABI(tb.input.address, tb.input.chain);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: contract_abi("${tb.input.address?.slice(0, 10)}...")`);
+        } else if (tb.name === 'checksum_address') {
+          try {
+            const { checksumAddress } = await import('./tools-dev.js');
+            result = await checksumAddress(tb.input.address);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: checksum_address("${tb.input.address?.slice(0, 10)}...")`);
+        // ============ Education & Community Tools ============
+        } else if (tb.name === 'explain_concept') {
+          try {
+            const { explainConcept } = await import('./tools-education.js');
+            result = await explainConcept(tb.input.concept);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: explain_concept("${tb.input.concept}")`);
+        } else if (tb.name === 'crypto_glossary') {
+          try {
+            const { getGlossary } = await import('./tools-education.js');
+            result = getGlossary(tb.input.term);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: crypto_glossary("${tb.input.term}")`);
+        } else if (tb.name === 'vibeswap_explainer') {
+          try {
+            const { getVibeSwapExplainer } = await import('./tools-education.js');
+            result = getVibeSwapExplainer(tb.input?.topic);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: vibeswap_explainer');
+        } else if (tb.name === 'crypto_tutorial') {
+          try {
+            const { getTutorial } = await import('./tools-education.js');
+            result = getTutorial(tb.input.topic);
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log(`[claude] Tool: crypto_tutorial("${tb.input.topic}")`);
+        } else if (tb.name === 'crypto_calendar') {
+          try {
+            const { getCryptoCalendar } = await import('./tools-education.js');
+            result = await getCryptoCalendar();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: crypto_calendar');
+        } else if (tb.name === 'daily_challenge') {
+          try {
+            const { getDailyChallenge } = await import('./tools-education.js');
+            result = getDailyChallenge();
+          } catch (err) { result = `Failed: ${err.message}`; }
+          console.log('[claude] Tool: daily_challenge');
         } else {
           result = 'Unknown tool.';
         }

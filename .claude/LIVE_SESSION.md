@@ -78,6 +78,25 @@ The architecture generates ideas at every layer. Write them up as standalone pap
 
 9. Vercel Light Node design doc: `docs/papers/vercel-light-node-design.md` (3-phase implementation plan, architecture diagram, code sketches)
 
+## Session 045b — Bot Capability Upgrade
+
+10. **5 NEW TOOL MODULES** (3,637 lines, 48 exports total):
+    - `tools-vibeswap.js` (503 lines, 8 exports) — VIBE price, pools, emission, auctions, Shapley, staking, LP, health
+    - `tools-portfolio.js` (776 lines, 10 exports) — Multi-chain portfolio, tokens, tx history, NFTs, DeFi positions, whale alerts
+    - `tools-research.js` (874 lines, 8 exports) — Tokenomics, protocol comparison, yield farming, governance, GitHub, on-chain, correlation, regime
+    - `tools-dev.js` (595 lines, 12 exports) — Gas tracker, contract source, tx decode, ENS, npm/crate lookup, ABI, unit conversion, block info
+    - `tools-education.js` (889 lines, 13 exports) — Glossary, explainer, tutorials, calendar, challenges, timeline, streaks, leaderboard
+
+11. **Claude tool_use integration** — All 5 modules wired into claude.js:
+    - 6 new TOOL_GROUPS (vibeswap, portfolio, research, dev, education + updated regexes)
+    - 35 new tool definitions in allTools array
+    - 35 new tool handlers in execution loop
+    - Total Claude tools: 56 (was ~12)
+
+12. **40+ new slash commands** registered in index.js:
+    - Total bot commands: 240 (was 197)
+    - All commands use free APIs (no keys required)
+
 ## FINAL TALLY
 - **27 papers** in docs/papers/ (1.2 MB total)
 - **19 new this session** (16 papers + cheatsheet + README + primitives index)

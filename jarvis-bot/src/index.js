@@ -224,7 +224,7 @@ import { processYouTubeLinks } from './youtube.js';
 import { processWebLinks } from './web-reader.js';
 import { initUserMemory, getUserMemoryContext, extractAndStoreMemories, flushUserMemory } from './user-memory.js';
 import { initTimeAwareness, getTimeContext, detectTimezone, setUserTimezone, flushTimezones } from './time-awareness.js';
-import { initAttribution, autoAttributeContent, attributeSource, detectTextAttribution, attributeAgent, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
+import { initAttribution, autoAttributeContent, attributeSource, detectTextAttribution, attributeAgent, getGraphStats, getAuthorAttribution, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
 import { initRelay, addRelayCommand, getPendingCommands, acknowledgeAll, flushRelay } from './relay.js';
 
 // ============ Group Chat Text Sanitizer ============
@@ -771,6 +771,49 @@ bot.command('relay_status', async (ctx) => {
   await ctx.reply(`Pending relay commands (${pending.length}):\n\n${lines.join('\n\n')}`);
 });
 
+// /attribution — View the passive attribution graph
+bot.command('attribution', async (ctx) => {
+  const query = ctx.message.text.replace(/^\/attribution\s*/i, '').trim();
+
+  if (query) {
+    // Search for specific author
+    const result = getAuthorAttribution(query);
+    if (!result) {
+      return ctx.reply(`No attribution found for "${query}". They may not have been credited yet.`);
+    }
+    const sources = result.sources.map(s => `  ${s.type}: "${s.title}"`).join('\n');
+    const outputs = result.outputs.slice(0, 5).map(o =>
+      `  ${o.description?.slice(0, 60) || 'unnamed'} (weight: ${(o.weight * 100).toFixed(1)}%)`
+    ).join('\n');
+
+    return ctx.reply(
+      `Attribution for ${result.author}\n\n` +
+      `Sources: ${result.totalSources}\n` +
+      `Derivations: ${result.totalDerivations}\n` +
+      `Outputs: ${result.totalOutputs}\n` +
+      `Total weighted value: ${result.totalWeightedValue}\n\n` +
+      `Sources:\n${sources || '  none'}\n\n` +
+      `Top outputs:\n${outputs || '  none'}`
+    );
+  }
+
+  // Show graph overview
+  const stats = getGraphStats();
+  const topAuthors = stats.topAuthors.slice(0, 5).map(a =>
+    `  ${a.author}: ${a.sources} sources`
+  ).join('\n');
+
+  ctx.reply(
+    `Attribution Graph\n\n` +
+    `Sources: ${stats.totalSources}\n` +
+    `Derivations: ${stats.totalDerivations}\n` +
+    `Outputs: ${stats.totalOutputs}\n` +
+    `Unique authors: ${stats.uniqueAuthors}\n\n` +
+    `Top contributors:\n${topAuthors || '  (empty — share links to populate)'}\n\n` +
+    `Usage: /attribution <name> — view specific author`
+  );
+});
+
 // /help — Command reference
 bot.command('help', (ctx) => {
   const helpText = `JARVIS Command Reference
@@ -887,6 +930,10 @@ FUN
 
 VOICE
   /speak <text> — JARVIS speaks out loud
+
+ATTRIBUTION
+  /attribution — View contribution attribution graph
+  /attribution <name> — View specific author's credits
 
 REMOTE (Owner Only)
   /relay <instruction> — Send command to active code session

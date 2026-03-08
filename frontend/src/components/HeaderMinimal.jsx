@@ -164,9 +164,12 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/send', label: 'Send Money', icon: '→', description: 'Transfer to anyone' },
     { path: '/history', label: 'Activity', icon: '📋', description: 'Your transactions' },
     { path: '/portfolio', label: 'Portfolio', icon: '📊', description: 'Your holdings at a glance' },
+    { path: '/apps', label: 'App Store', icon: '🏪', description: 'Apps for VSOS' },
   ]
 
   const secondaryItems = [
+    { path: '/feed', label: 'VibeFeed', icon: '📡' },
+    { path: '/wiki', label: 'VibeWiki', icon: '📚' },
     { path: '/mine', label: 'Mine JUL', icon: '⛏' },
     { path: '/rewards', label: 'Rewards', icon: '🎁' },
     { path: '/board', label: 'Discussions', icon: '📢' },

@@ -468,47 +468,58 @@ export async function handleWebRequest(req, res, pathname) {
         return true;
       }
 
-      // Require valid Telegram initData — binds proof to authenticated identity
-      if (!initData) {
-        jsonResponse(res, 403, { error: 'Telegram initData required' });
-        return true;
-      }
-      if (!validateTelegramInitData(initData)) {
-        jsonResponse(res, 403, { error: 'Invalid Telegram initData' });
-        return true;
-      }
-
-      // Extract authenticated userId from initData (not from request body)
+      // Two auth paths:
+      // 1. Telegram initData (mobile mini app) → uses Telegram user ID
+      // 2. Wallet address (web frontend) → uses wallet address as userId
       let authenticatedUserId = null;
-      try {
-        const params = new URLSearchParams(initData);
-        const userJson = params.get('user');
-        if (userJson) {
-          const user = JSON.parse(userJson);
-          authenticatedUserId = String(user.id); // Telegram user ID — tamper-proof
+
+      if (initData) {
+        // Path 1: Telegram initData — cryptographic proof of Telegram identity
+        if (!validateTelegramInitData(initData)) {
+          jsonResponse(res, 403, { error: 'Invalid Telegram initData' });
+          return true;
         }
-      } catch (parseErr) {
-        console.warn(`[web-api] initData user parse failed (IP: ${ip}): ${parseErr.message}`);
+        try {
+          const params = new URLSearchParams(initData);
+          const userJson = params.get('user');
+          if (userJson) {
+            const user = JSON.parse(userJson);
+            authenticatedUserId = String(user.id);
+          }
+        } catch (parseErr) {
+          console.warn(`[web-api] initData user parse failed (IP: ${ip}): ${parseErr.message}`);
+        }
+        if (!authenticatedUserId) authenticatedUserId = userId;
+
+        // SPV auto-link: if initData yielded a Telegram ID different from body userId,
+        // cryptographically link the mobile miner to the Telegram account.
+        if (userId && authenticatedUserId !== userId && userId.startsWith('mobile-')) {
+          const existing = getLinkedMiner(authenticatedUserId);
+          if (!existing) {
+            const link = linkMiner(authenticatedUserId, userId);
+            if (link.success) {
+              console.log(`[web-api] SPV auto-link: ${userId} → Telegram ${authenticatedUserId} (${link.transferred.toFixed(2)} JUL transferred)`);
+            }
+          }
+        }
+      } else if (body.walletAddress) {
+        // Path 2: Wallet address — web frontend miners
+        // Wallet address is the identity; PoW is the proof of work.
+        // Rate limiting per IP prevents abuse.
+        const wallet = body.walletAddress.toLowerCase();
+        if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
+          jsonResponse(res, 400, { error: 'Invalid wallet address format' });
+          return true;
+        }
+        authenticatedUserId = `wallet:${wallet}`;
+      } else {
+        jsonResponse(res, 403, { error: 'Authentication required: provide initData (Telegram) or walletAddress (web)' });
+        return true;
       }
-      // Fallback to body userId ONLY if initData didn't yield an ID
-      if (!authenticatedUserId) authenticatedUserId = userId;
 
       if (!authenticatedUserId) {
         jsonResponse(res, 400, { error: 'Could not determine userId' });
         return true;
-      }
-
-      // SPV auto-link: if initData yielded a Telegram ID different from body userId,
-      // cryptographically link the mobile miner to the Telegram account.
-      // The initData HMAC IS the proof — signed by Telegram's servers.
-      if (userId && authenticatedUserId !== userId && userId.startsWith('mobile-')) {
-        const existing = getLinkedMiner(authenticatedUserId);
-        if (!existing) {
-          const link = linkMiner(authenticatedUserId, userId);
-          if (link.success) {
-            console.log(`[web-api] SPV auto-link: ${userId} → Telegram ${authenticatedUserId} (${link.transferred.toFixed(2)} JUL transferred)`);
-          }
-        }
       }
 
       // Input validation — prevent oversized or malformed inputs
@@ -548,6 +559,66 @@ export async function handleWebRequest(req, res, pathname) {
     } catch (err) {
       console.error('[web-api] Mining stats error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch mining stats' });
+    }
+    return true;
+  }
+
+  // ============ POST /web/mining/link-wallet ============
+  // Link a Telegram mining identity to a wallet address (or vice versa).
+  // Merges balances so the same user can mine on both platforms.
+  // Requires Telegram initData + wallet address.
+  if (pathname === '/web/mining/link-wallet' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { walletAddress, initData } = body;
+
+      if (!walletAddress || !initData) {
+        jsonResponse(res, 400, { error: 'Both walletAddress and initData required' });
+        return true;
+      }
+
+      // Validate Telegram identity
+      if (!validateTelegramInitData(initData)) {
+        jsonResponse(res, 403, { error: 'Invalid Telegram initData' });
+        return true;
+      }
+
+      const wallet = walletAddress.toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
+        jsonResponse(res, 400, { error: 'Invalid wallet address' });
+        return true;
+      }
+
+      // Extract Telegram user ID
+      let telegramId = null;
+      try {
+        const params = new URLSearchParams(initData);
+        const userJson = params.get('user');
+        if (userJson) telegramId = String(JSON.parse(userJson).id);
+      } catch { /* skip */ }
+
+      if (!telegramId) {
+        jsonResponse(res, 400, { error: 'Could not extract Telegram user ID' });
+        return true;
+      }
+
+      const walletId = `wallet:${wallet}`;
+
+      // Link wallet miner → Telegram ID (merge balances into Telegram ID)
+      const result = linkMiner(telegramId, walletId);
+      if (result.success) {
+        console.log(`[web-api] Wallet link: ${walletId} → Telegram ${telegramId} (${result.transferred.toFixed(2)} JUL merged)`);
+      }
+
+      jsonResponse(res, 200, {
+        linked: result.success,
+        telegramId,
+        walletAddress: wallet,
+        ...result,
+      });
+    } catch (err) {
+      console.error('[web-api] Link wallet error:', err.message);
+      jsonResponse(res, 500, { error: 'Wallet linking failed' });
     }
     return true;
   }

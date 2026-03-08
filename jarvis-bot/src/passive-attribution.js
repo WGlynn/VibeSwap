@@ -468,9 +468,10 @@ function detectSourceType(context) {
   if (context.type === 'youtube') return SourceType.VIDEO;
   const url = (context.url || '').toLowerCase();
   if (url.includes('github.com')) return SourceType.CODE;
-  if (url.includes('reddit.com') || url.includes('x.com') || url.includes('twitter.com') || url.includes('facebook.com')) return SourceType.SOCIAL;
+  if (url.includes('reddit.com') || url.includes('x.com') || url.includes('twitter.com') || url.includes('facebook.com') || url.includes('linkedin.com') || url.includes('discord.com')) return SourceType.SOCIAL;
   if (url.includes('arxiv.org')) return SourceType.PAPER;
   if (url.includes('wikipedia.org')) return SourceType.PAPER;
+  if (url.includes('stackoverflow.com') || url.includes('stackexchange.com')) return SourceType.CODE;
   return SourceType.BLOG;
 }
 
@@ -491,6 +492,12 @@ function detectPlatform(url) {
   if (lower.includes('facebook.com')) return 'facebook';
   if (lower.includes('arxiv.org')) return 'arxiv';
   if (lower.includes('dev.to')) return 'devto';
+  if (lower.includes('linkedin.com')) return 'linkedin';
+  if (lower.includes('stackoverflow.com') || lower.includes('stackexchange.com')) return 'stackoverflow';
+  if (lower.includes('notion.so') || lower.includes('notion.site')) return 'notion';
+  if (lower.includes('hackmd.io')) return 'hackmd';
+  if (lower.includes('docs.google.com')) return 'gdocs';
+  if (lower.includes('discord.com') || lower.includes('discord.gg')) return 'discord';
   try { return new URL(url).hostname; } catch { return 'web'; }
 }
 
@@ -548,6 +555,20 @@ function extractAuthorFromUrl(url) {
     // ArXiv: arxiv.org/abs/... — attribute to ArXiv (author in page content)
     if (host === 'arxiv.org') {
       return 'ArXiv';
+    }
+    // LinkedIn: linkedin.com/in/username or linkedin.com/posts/username
+    if (host.includes('linkedin.com')) {
+      if (parts[0] === 'in' || parts[0] === 'posts') return parts[1] || null;
+      if (parts[0] === 'company') return parts[1] || null;
+    }
+    // Stack Overflow: stackoverflow.com/users/12345/username or stackoverflow.com/a/12345
+    if (host.includes('stackoverflow.com') || host.includes('stackexchange.com')) {
+      if (parts[0] === 'users' && parts[2]) return parts[2]; // username slug
+      return 'StackOverflow';
+    }
+    // Notion: notion.so/username/page-id
+    if (host.includes('notion.so') || host.includes('notion.site')) {
+      return parts[0] || null;
     }
     // YouTube handled separately in youtube.js
     // Telegram handled separately

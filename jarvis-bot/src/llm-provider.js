@@ -91,12 +91,13 @@ function stripMediaBlocks(messages) {
   return messages.map(msg => {
     if (!Array.isArray(msg.content)) return msg;
 
-    const hasMedia = msg.content.some(b => b.type === 'image' || b.type === 'document');
+    // Catch both Anthropic format (type: 'image') and OpenAI format (type: 'image_url')
+    const hasMedia = msg.content.some(b => b.type === 'image' || b.type === 'image_url' || b.type === 'document');
     if (!hasMedia) return msg;
 
     const newContent = [];
     for (const block of msg.content) {
-      if (block.type === 'image') {
+      if (block.type === 'image' || block.type === 'image_url') {
         newContent.push({ type: 'text', text: '[The user sent an image, but this model does not support vision. Describe that you cannot see images and suggest they try again when a vision-capable model is active.]' });
       } else if (block.type === 'document') {
         newContent.push({ type: 'text', text: '[The user sent a document, but this model does not support document input.]' });
@@ -1692,17 +1693,19 @@ export async function llmChat(request) {
     request = { ...request, messages: flattenToolExchanges(request.messages) };
   }
 
-  // Strip image/document blocks for non-vision providers — they'll crash on base64 image data
-  if (!VISION_PROVIDERS.has(routedProvider.name) && request.messages) {
-    request = { ...request, messages: stripMediaBlocks(request.messages) };
-  }
-
   // Circuit breaker check — skip providers that are currently open
   // Background tasks use isolated breaker pool so they can't poison user-facing requests
+  // NOTE: Must happen BEFORE media stripping so we strip for the actual provider, not the original
   const routedCB = getCircuitBreaker(routedProvider.name, bg);
   if (!routedCB.allowRequest() && routedProvider !== activeProvider) {
     console.log(`[circuit-breaker] ${routedProvider.name} circuit open — falling back to ${activeProvider.name}`);
     routedProvider = activeProvider;
+  }
+
+  // Strip image/document blocks for non-vision providers — they'll crash on base64 image data
+  // AFTER circuit breaker swap so we check the actual provider, not the originally routed one
+  if (!VISION_PROVIDERS.has(routedProvider.name) && request.messages) {
+    request = { ...request, messages: stripMediaBlocks(request.messages) };
   }
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

@@ -703,8 +703,18 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
   // Extract latest user message text for relevance scoring
   const latestMessage = history.length > 0 ? history[history.length - 1] : null;
-  const messageText = latestMessage?.role === 'user' && typeof latestMessage.content === 'string'
-    ? latestMessage.content : '';
+  let messageText = '';
+  if (latestMessage?.role === 'user') {
+    if (typeof latestMessage.content === 'string') {
+      messageText = latestMessage.content;
+    } else if (Array.isArray(latestMessage.content)) {
+      // Multimodal content — extract text parts for classification
+      messageText = latestMessage.content
+        .filter(b => b.type === 'text' && b.text)
+        .map(b => b.text)
+        .join(' ');
+    }
+  }
 
   // ============ Context Tier Routing ============
   // "Every extra call slows him down exponentially" — Will
@@ -717,9 +727,14 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   const { classify } = getProvider() || {};
   const complexity = classify ? classify(messageText) : 'moderate';
 
+  // Detect multimodal content — always full context for vision queries
+  const hasMedia = latestMessage && Array.isArray(latestMessage.content) &&
+    latestMessage.content.some(b => b.type === 'image' || b.type === 'document');
+
   // Light context for simple/moderate messages — skip expensive context building
   const isLightContext = (complexity === 'simple' || complexity === 'moderate')
-    && chatType !== 'private'; // DMs always get full context (user expects depth)
+    && chatType !== 'private' // DMs always get full context (user expects depth)
+    && !hasMedia; // Multimodal always gets full context
 
   if (isLightContext) {
     console.log(`[context-tier] LIGHT — "${messageText.slice(0, 40)}" (${complexity})`);

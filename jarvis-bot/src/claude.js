@@ -2110,11 +2110,23 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       }
     }
 
-    const assistantMessage = response.content
+    let assistantMessage = response.content
       .filter(block => block.type === 'text')
       .map(block => block.text)
       .join('\n')
       || '...';
+
+    // ============ Group Chat Length Gate ============
+    // LLMs ignore "be concise" rules. Code doesn't.
+    // Hard cap: 600 chars for group chats (~3 sentences).
+    // DMs get full length. Complex queries (tool use happened) get more room.
+    if (chatType !== 'private' && rounds === 0 && assistantMessage.length > 600) {
+      // Trim to last complete sentence within limit
+      const trimmed = assistantMessage.slice(0, 600);
+      const lastPeriod = Math.max(trimmed.lastIndexOf('. '), trimmed.lastIndexOf('.\n'), trimmed.lastIndexOf('!'), trimmed.lastIndexOf('?'));
+      assistantMessage = lastPeriod > 200 ? trimmed.slice(0, lastPeriod + 1) : trimmed;
+      console.log(`[length-gate] Trimmed group response from ${response.content.filter(b => b.type === 'text').map(b => b.text).join('').length} to ${assistantMessage.length} chars`);
+    }
 
     // ============ Response Audit — Flag Unverified Claims ============
     // "Boolean logic gate knowledge primitives that hardcode prevent lying" — Will

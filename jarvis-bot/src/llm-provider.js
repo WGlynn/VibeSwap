@@ -7,11 +7,11 @@
 // from the ambient compute surplus of the modern API economy.
 // When paid providers exhaust, free-tier providers sustain the signal.
 //
-// Tier 1 (paid):  Claude → DeepSeek → Gemini → OpenAI (GPT-5.4)
+// Tier 1 (paid):  Claude → DeepSeek → OpenAI (GPT-5.4) → xAI (Grok-3) → Gemini
 // Tier 2 (free):  Cerebras → Groq → OpenRouter → Mistral → Together → SambaNova → Fireworks → Novita
 //
-// Availability: 1 - (1-a)^12 ≈ 1.0 (fifteen nines)
-// Single-provider dependency: 100% → 8.3%
+// Availability: 1 - (1-a)^13 ≈ 1.0 (fifteen nines)
+// Single-provider dependency: 100% → 7.7%
 //
 // All providers return normalized Anthropic-format responses:
 //   { content, stop_reason, usage, _provider, _model }
@@ -1029,6 +1029,19 @@ function createNovitaProvider(providerConfig) {
 
 registerProvider('novita', createNovitaProvider);
 
+// ============ xAI Grok Provider (OpenAI-compatible, Free Tier available) ============
+
+function createXAIProvider(providerConfig) {
+  return createOpenAIProvider({
+    ...providerConfig,
+    providerName: 'xai',
+    baseUrl: providerConfig.baseUrl || 'https://api.x.ai/v1',
+    model: providerConfig.model || 'grok-3',
+  });
+}
+
+registerProvider('xai', createXAIProvider);
+
 // ============ Factory ============
 
 let activeProvider = null;
@@ -1096,6 +1109,7 @@ const PROVIDER_QUALITY = {
   sambanova:  { quality: 0.60, tier: 2, label: 'Free' },
   fireworks:  { quality: 0.60, tier: 2, label: 'Free' },
   novita:     { quality: 0.55, tier: 2, label: 'Free' },
+  xai:        { quality: 0.90, tier: 1, label: 'Premium' },
   ollama:     { quality: 0.40, tier: 3, label: 'Local' },
 };
 
@@ -1116,6 +1130,7 @@ const PROVIDER_COST_PER_MTOK = {
   sambanova:  0.001,  // Free tier
   fireworks:  0.001,  // Free tier
   novita:     0.001,  // Free tier
+  xai:        5.00,   // $2 input + $8 output, blended (Grok-3)
   ollama:     0.001,  // Local (electricity only)
 };
 
@@ -1244,6 +1259,7 @@ function isCreditError(error) {
 
 function isTransientOrGlitch(error) {
   if (error instanceof TruncatedResponseError) return true;
+  if (error instanceof EmptyResponseError) return true;
   const msg = (error?.message || '').toLowerCase();
   const status = error?.status || error?.statusCode || error?.response?.status;
   return msg.includes('model not exist') ||   // DeepSeek transient glitch
@@ -1299,6 +1315,7 @@ function getProviderConfig(providerName) {
         case 'sambanova': return 'Meta-Llama-3.3-70B-Instruct';
         case 'fireworks': return 'accounts/fireworks/models/llama-v3p3-70b-instruct';
         case 'novita': return 'meta-llama/llama-3.3-70b-instruct';
+        case 'xai': return 'grok-3';
         default: return config.llm?.model;
       }
     })(),
@@ -1317,6 +1334,7 @@ function getProviderConfig(providerName) {
         case 'sambanova': return config.llm?.sambanovaApiKey || process.env.SAMBANOVA_API_KEY;
         case 'fireworks': return config.llm?.fireworksApiKey || process.env.FIREWORKS_API_KEY;
         case 'novita': return config.llm?.novitaApiKey || process.env.NOVITA_API_KEY;
+        case 'xai': return config.llm?.xaiApiKey || process.env.XAI_API_KEY;
         default: return config.anthropic?.apiKey;
       }
     })(),
@@ -1332,6 +1350,7 @@ function getProviderConfig(providerName) {
         case 'sambanova': return 'https://api.sambanova.ai/v1';
         case 'fireworks': return 'https://api.fireworks.ai/inference/v1';
         case 'novita': return 'https://api.novita.ai/v3/openai';
+        case 'xai': return 'https://api.x.ai/v1';
         default: return config.llm?.baseUrl || process.env.LLM_BASE_URL || undefined;
       }
     })(),
@@ -1451,16 +1470,16 @@ function getProviderForComplexity(complexity) {
   // Cooperative routing — each model does what it's best at
   const routes = {
     // Skill-based (cooperative delegation)
-    coding:     ['openai', 'claude', 'deepseek', 'gemini'],     // GPT-5.4 leads coding
-    reasoning:  ['claude', 'openai', 'deepseek', 'gemini'],     // Claude leads reasoning
-    math:       ['deepseek', 'openai', 'claude', 'gemini'],     // DeepSeek leads math
-    tooluse:    ['claude', 'openai', 'deepseek'],                // Claude has native tool use
-    multimodal: ['gemini', 'claude', 'openai'],                  // Gemini leads multimodal
+    coding:     ['openai', 'xai', 'claude', 'deepseek', 'gemini'],     // GPT-5.4 leads coding, Grok strong
+    reasoning:  ['claude', 'xai', 'openai', 'deepseek', 'gemini'],   // Claude leads reasoning, Grok 2nd
+    math:       ['deepseek', 'openai', 'xai', 'claude', 'gemini'],   // DeepSeek leads math
+    tooluse:    ['claude', 'openai', 'xai', 'deepseek'],              // Claude has native tool use
+    multimodal: ['gemini', 'xai', 'claude', 'openai'],                // Gemini leads multimodal, Grok has vision
 
     // Complexity-based (legacy, still useful)
     simple:     ['groq', 'cerebras', 'sambanova', 'deepseek', 'gemini'],
-    moderate:   ['deepseek', 'gemini', 'groq', 'cerebras'],
-    complex:    ['claude', 'openai', 'deepseek', 'gemini'],     // Claude + GPT-5.4 for complex
+    moderate:   ['deepseek', 'xai', 'gemini', 'groq', 'cerebras'],
+    complex:    ['claude', 'xai', 'openai', 'deepseek', 'gemini'],   // Frontier models for complex
 
     explicit:   [], // Caller specified model — use activeProvider
   };
@@ -1496,7 +1515,7 @@ export function initProvider() {
   // Init ALL available providers into the pool + fallback chain
   // Cascade: quality-first, Ollama as floor (never runs out of credits)
   // "When people top off credits, the network Nash-equilibriums at positive-sum" — Will
-  const fallbackOrder = ['claude', 'deepseek', 'openai', 'gemini', 'ollama', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
+  const fallbackOrder = ['claude', 'deepseek', 'openai', 'xai', 'gemini', 'ollama', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
   fallbackProviders = [];
 
   for (const name of fallbackOrder) {
@@ -1530,10 +1549,69 @@ export function initProvider() {
   return activeProvider;
 }
 
+// ============ Response Quality Gate ============
+// Validate that a provider's response actually has content.
+// Empty responses from free-tier providers shouldn't count as success.
+
+class EmptyResponseError extends Error {
+  constructor(providerName) {
+    super(`${providerName} returned empty response (no text, no tool calls)`);
+    this.name = 'EmptyResponseError';
+  }
+}
+
+function validateResponse(result, providerName) {
+  if (!result || !result.content) {
+    throw new EmptyResponseError(providerName);
+  }
+
+  // Check if content is actually empty
+  const hasText = result.content.some(b => b.type === 'text' && b.text?.trim());
+  const hasToolUse = result.content.some(b => b.type === 'tool_use');
+
+  if (!hasText && !hasToolUse) {
+    throw new EmptyResponseError(providerName);
+  }
+
+  return result;
+}
+
+// ============ Per-Provider Adaptive Timeouts ============
+// Fast providers (Groq, Cerebras) fail fast. Slow providers (Ollama) wait longer.
+// Adapts based on EMA latency if enough samples exist.
+
+const PROVIDER_BASE_TIMEOUT = {
+  claude: 60000,      // 60s — can be slow on complex tool use
+  openai: 45000,      // 45s
+  xai: 45000,         // 45s — Grok
+  deepseek: 45000,    // 45s
+  gemini: 45000,      // 45s
+  ollama: 120000,     // 120s — cold start can be very slow
+  cerebras: 15000,    // 15s — ultra fast inference
+  groq: 15000,        // 15s — ultra fast inference
+  openrouter: 30000,  // 30s — variable depending on upstream
+  mistral: 30000,     // 30s
+  together: 30000,    // 30s
+  sambanova: 20000,   // 20s — fast inference
+  fireworks: 20000,   // 20s — fast inference
+  novita: 30000,      // 30s
+};
+
+function getProviderTimeout(providerName) {
+  const base = PROVIDER_BASE_TIMEOUT[providerName] || 30000;
+  const perf = providerPerformance.get(providerName);
+  if (perf && perf.samples >= 5) {
+    // Adaptive: 4x EMA latency, clamped between base/4 and base
+    return Math.max(base / 4, Math.min(base, perf.emaLatency * 4));
+  }
+  return base;
+}
+
 // ============ Retry helpers ============
 
 function isTransientError(error) {
   if (error instanceof TruncatedResponseError) return true;
+  if (error instanceof EmptyResponseError) return true;
   const status = error?.status || error?.statusCode || error?.response?.status;
   if ([429, 500, 502, 503, 529].includes(status)) return true;
   const msg = (error?.message || '').toLowerCase();
@@ -1593,6 +1671,8 @@ export async function llmChat(request) {
     const attemptStart = Date.now();
     try {
       const result = await routedProvider.chat(request);
+      // Quality gate — reject empty responses from free-tier providers
+      validateResponse(result, routedProvider.name);
       // Record success in circuit breaker + performance tracker
       getCircuitBreaker(routedProvider.name, bg).recordSuccess();
       recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, true);

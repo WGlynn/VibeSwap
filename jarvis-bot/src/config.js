@@ -47,7 +47,7 @@ export const config = {
   transcriptWebhookSecret: process.env.TRANSCRIPT_WEBHOOK_SECRET || null,
   transcriptChatId: process.env.TRANSCRIPT_CHAT_ID ? parseInt(process.env.TRANSCRIPT_CHAT_ID, 10) || null : null,
   maxConversationHistory: 50,
-  maxTokens: 2048,
+  maxTokens: 4096,
   // Rate limit: max Claude API calls per user per minute
   rateLimitPerMinute: parseInt(process.env.RATE_LIMIT_PER_MINUTE, 10) || 5,
   // Auto-sync: pull from git + reload context (ms, default 10s)

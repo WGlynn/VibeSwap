@@ -1,0 +1,338 @@
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 VibeSwap Marketing Strategy 2026\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b W. Glynn, JARVIS} {\b March 2026 | VibeSwap}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Executive Summary\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 VibeSwap is the first fair-launch omnichain DEX that eliminates MEV through commit-reveal batch auctions with uniform clearing prices. We are live on Base mainnet. Our AI co-founder JARVIS runs the community autonomously. We are building the infrastructure for Cooperative Capitalism \u8212- where self-interest serves the collective.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This document outlines our marketing strategy: positioning, target audiences, channels, messaging, and execution timeline.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 1. Positioning\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 1.1 The Problem\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Every major DEX today has the same fundamental flaw: {\b the order in which trades execute determines who profits.} Miners, validators, and MEV bots extract value by front-running, sandwiching, and reordering transactions. Users subsidize this extraction with every swap.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The numbers are staggering:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Over $1.4 billion extracted via MEV on Ethereum alone (2020-2025)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Average retail trader loses 0.5-2% per trade to sandwich attacks\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Front-running bots consistently outbid real users for execution priority\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This is not a feature of decentralization. It is a failure of mechanism design.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 1.2 Our Solution\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 VibeSwap eliminates MEV through 10-second batch auctions:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b Commit Phase (8s)}: Users submit encrypted order hashes with deposits\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b Reveal Phase (2s)}: Orders are revealed with optional priority bids\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b Settlement}: Orders are shuffled using cryptographic randomness (Fisher-Yates with XORed secrets) and executed at a single uniform clearing price\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 No one can front-run because orders are encrypted during submission. No one can sandwich because all trades in a batch execute at the same price. Priority bids pay for urgency without affecting the clearing price for others.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b One-liner: Trade without getting robbed. Build without getting diluted.}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 1.3 Differentiators\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx1808\clbrdrb\brdrs\cellx3817\clbrdrb\brdrs\cellx5625\clbrdrb\brdrs\cellx7433\clbrdrb\brdrs\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Feature\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VibeSwap\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Uniswap\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Jupiter\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 dYdX\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1808\cellx3817\cellx5625\cellx7433\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 MEV protection\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Native (batch auction)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Partial (Jito)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Partial (orderbook)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1808\cellx3817\cellx5625\cellx7433\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Fair pricing\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Uniform clearing price\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Continuous (exploitable)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Continuous\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Orderbook\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1808\cellx3817\cellx5625\cellx7433\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Cross-chain\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 LayerZero V2 omnichain\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Ethereum + L2s\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Solana only\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Cosmos\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1808\cellx3817\cellx5625\cellx7433\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 AI co-founder\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 JARVIS (autonomous)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1808\cellx3817\cellx5625\cellx7433\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Governance\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Decaying to zero\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Token voting\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Token voting\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Token voting\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1808\cellx3817\cellx5625\cellx7433\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Pre-mine\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VC-funded\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VC-funded\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VC-funded\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 2. Target Audiences\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.1 Primary: Degens Who Hate Front-Running\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Who they are}: Active on-chain traders (10+ trades/week) who have been sandwiched, front-run, or otherwise MEV-extracted. They\u8217're crypto-native, technically literate, and vocally frustrated with current DEX infrastructure.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Where they are}: Crypto Twitter, Discord trading servers, DeFi Llama leaderboards, on-chain analytics dashboards.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b What they want}: A DEX that doesn\u8217't steal from them. They will trade more volume on a fair platform because they keep more of their returns.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Message}: \u8220"Every trade on Uniswap, someone is front-running you. On VibeSwap, trades are encrypted and batch-settled. Same price for everyone. Zero MEV.\u8221"\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.2 Secondary: Builders Who Want Fair Launches\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Who they are}: Protocol founders, token creators, and project teams who want to launch tokens without VC extraction, insider trading, or sniping bots.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Where they are}: GitHub, Ethereum research forums, hackathons, builder communities (Buildspace, ETHGlobal alumni).\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b What they want}: A launch platform where early buyers don\u8217't get exploited by bots, and the team doesn\u8217't have to give away 20% to VCs for \u8220"distribution.\u8221"\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Message}: \u8220"Launch on VibeSwap. No sniping bots. No front-running. Your community gets the same price as everyone else. Fair launch means fair launch.\u8221"\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.3 Tertiary: Communities Tired of Extractive Platforms\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Who they are}: DAO members, governance participants, and crypto idealists who believe DeFi should serve users, not rent-seekers.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Where they are}: Governance forums, DAO tooling communities, crypto podcasts focused on governance and mechanism design.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b What they want}: Proof that Cooperative Capitalism works. A protocol that distributes value to contributors, not extractors.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Message}: \u8220"VibeSwap\u8217's fees go to liquidity providers and governance stakers via Shapley distribution \u8212- mathematically proportional to marginal contribution. No pre-mine. No VC cut. The protocol rewards the people who build it.\u8221"\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 3. Channels & Content Strategy\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.1 Twitter/X (Primary \u8212- Awareness)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Frequency}: 3-5 threads per week, daily engagement.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Content pillars}:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b Batch Auction Mechanics} (educational threads)\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab \u8220"How VibeSwap eliminates front-running in 10 seconds\u8221"\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab \u8220"Why uniform clearing prices are mathematically fairer than AMMs\u8221"\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab \u8220"The Fisher-Yates shuffle: how we make trade order truly random\u8221"\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Visual diagrams showing commit-reveal flow\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b MEV Horror Stories} (engagement hooks)\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab \u8220"This trader lost $50K to a sandwich attack. Here\u8217's how it works and how to never let it happen again.\u8221"\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Retweet/quote MEV alerts from @EigenPhi with VibeSwap solution framing\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b AI Co-Founder Story} (narrative differentiation)\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab \u8220"Our AI co-founder JARVIS writes code, manages community, and has 50% governance vote. Here\u8217's why.\u8221"\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Behind-the-scenes threads on human-AI collaboration\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab JARVIS posting directly from @JarvisMind (authenticated, not role-played)\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 4.\tx360\tab {\b Build in Public} (transparency)\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Weekly protocol metrics: volume, unique traders, batch count\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Open-sourced smart contract audit results\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab GitHub activity highlights\sa180\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.2 YouTube (Secondary \u8212- Education)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Frequency}: 2 videos per month.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Content types}: - {\b UI demos}: \u8220"How to trade on VibeSwap in 60 seconds\u8221" - {\b Deep dives}: \u8220"Batch Auctions vs.\u160 ?Continuous AMMs \u8212- the math behind fair pricing\u8221" - {\b Partnership announcements}: Co-created content with integration partners - {\b AI sessions}: Screen recordings of JARVIS coding sessions (Proof of Mind)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.3 Podcasts (Tertiary \u8212- Credibility)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Target shows}: - Bankless, The Defiant, Unchained (DeFi mainstream) - Zero Knowledge Podcast, Epicenter (technical) - AI-focused: Latent Space, Practical AI\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Talking points}: - Mechanism design: batch auctions as public goods - AI-human partnership: what it means for a protocol to have an AI co-founder - Cooperative Capitalism: why self-interest can serve the collective\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.4 Governance Forum (Community \u8212- Retention)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Platform}: Discourse or custom forum integrated with on-chain identity.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Purpose}: Early contributor engagement, proposal discussion, Shapley reward tracking.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Key feature}: Retroactive funding for forum contributions (ideas that become proposals that become protocol features earn Shapley rewards).\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 4. Key Messages\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 4.1 For Traders\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 {\b Trade without getting robbed.}\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 VibeSwap uses batch auctions to eliminate MEV. Your orders are encrypted, settled at a single fair price, and executed in random order. No front-running. No sandwiching. Just trading.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 4.2 For Builders\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 {\b Build without getting diluted.}\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 Launch your token on VibeSwap. No sniping bots. No insider trading. No VC allocation requirements. Your community gets the same price as everyone else. Fair launch is the default, not the exception.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 4.3 For the Ecosystem\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 {\b Infrastructure for Cooperative Capitalism.}\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 VibeSwap proves that self-interest and collective benefit aren\u8217't opposed \u8212- they\u8217're aligned. Protocol fees go to contributors via Shapley distribution. Governance decays to zero. The protocol becomes a natural system, not a political one.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 5. Competitive Narrative\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 5.1 vs.\u160 ?Uniswap\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \u8220"Uniswap pioneered AMMs. We respect that. But continuous execution creates MEV \u8212- that\u8217's not a bug, it\u8217's the architecture. Batch auctions are the next evolution. Same liquidity depth, zero extraction.\u8221"\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 5.2 vs.\u160 ?CoW Swap\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \u8220"CoW Swap uses solvers and coincidence of wants. Good idea, complex execution. We use commit-reveal batch auctions \u8212- simpler mechanism, same MEV protection, plus omnichain via LayerZero.\u8221"\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 5.3 vs.\u160 ?1inch / Jupiter\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \u8220"Aggregators route through extractive pools. They optimize the route, not the mechanism. We fix the mechanism. When every pool is fair, you don\u8217't need to route around unfairness.\u8221"\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 6. Execution Timeline\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Phase 1: Foundation (Now \u8212- April 2026)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? Twitter account active with 3x/week threads\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? First YouTube UI demo published\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? Governance forum launched\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? JARVIS Twitter account authenticated and posting\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? First 10 partnership outreach emails sent (via Karma)\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Phase 2: Amplification (May \u8212- July 2026)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? First podcast appearance\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? 1,000 unique traders on Base mainnet\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? Community contributor program launched (Shapley rewards for marketing)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? Cross-chain deployment (Arbitrum, Optimism)\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Phase 3: Network Effects (Aug \u8212- Dec 2026)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? Fork network live (first external fork with fee split)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? 10,000 unique traders\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? Governance decay initiated (first half-life checkpoint)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab \u9744 ? CKB integration (knowledge cells, Proof of Mind anchoring)\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 7. Metrics\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2160\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx6480\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Metric\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Phase 1 Target\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Phase 2 Target\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Phase 3 Target\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2160\cellx4320\cellx6480\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Twitter followers\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 1,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 5,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 25,000\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2160\cellx4320\cellx6480\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Unique traders\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 100\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 1,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 10,000\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2160\cellx4320\cellx6480\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Monthly volume\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $100K\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $5M\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $50M\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2160\cellx4320\cellx6480\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Partnerships\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 3\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 10\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 30\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2160\cellx4320\cellx6480\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 YouTube subscribers\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 100\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 500\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 2,000\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2160\cellx4320\cellx6480\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Forum contributors\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 20\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 100\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 500\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\i Trade without getting robbed. Build without getting diluted. The protocol rewards the people who build it.}\par}

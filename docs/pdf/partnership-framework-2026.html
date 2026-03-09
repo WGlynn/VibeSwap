@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>partnership-framework-2026</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css" />
+</head>
+<body>
+<h1 id="vibeswap-autonomous-partnership-framework">VibeSwap Autonomous
+Partnership Framework</h1>
+<p><strong>W. Glynn, JARVIS</strong> <strong>March 2026 |
+VibeSwap</strong></p>
+<hr />
+<h2 id="executive-summary">Executive Summary</h2>
+<p>VibeSwap uses an autonomous partnership pipeline — codename
+<strong>Karma</strong> — that continuously discovers, evaluates,
+contacts, and tracks potential protocol partners. The system runs with
+minimal human intervention, surfacing only high-quality opportunities
+for final approval.</p>
+<p>Karma replaces the traditional BD model (one person cold-emailing)
+with a structured, repeatable, autonomous workflow that any team member
+can operate and any AI agent can execute.</p>
+<hr />
+<h2 id="the-karma-loop">1. The Karma Loop</h2>
+<pre><code>┌─────────────┐    ┌──────────────┐    ┌───────────┐
+│  DISCOVERY   │───►│  EVALUATION  │───►│  OUTREACH  │
+│  (automated) │    │  (scored)    │    │  (templated│
+└─────────────┘    └──────────────┘    │  + custom) │
+                                       └─────┬─────┘
+                                             │
+┌─────────────┐    ┌──────────────┐    ┌─────▼─────┐
+│  REPORTING   │◄───│  EXECUTION   │◄───│  TRACKING  │
+│  (dashboard) │    │  (on-chain)  │    │  (CRM)     │
+└─────────────┘    └──────────────┘    └───────────┘</code></pre>
+<p>The loop runs continuously. Each stage feeds the next. No stage
+requires synchronous human decision-making except final deal
+approval.</p>
+<hr />
+<h2 id="stage-1-discovery">2. Stage 1: Discovery</h2>
+<h3 id="sources">2.1 Sources</h3>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 48%" />
+</colgroup>
+<thead>
+<tr>
+<th>Source</th>
+<th>Signal</th>
+<th>Scan Frequency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter/X</td>
+<td>Projects tweeting about MEV, batch auctions, fair launch</td>
+<td>Daily</td>
+</tr>
+<tr>
+<td>GitHub</td>
+<td>Repos with MEV protection, DEX, cross-chain keywords</td>
+<td>Weekly</td>
+</tr>
+<tr>
+<td>DeFi Llama</td>
+<td>New protocols with &gt;$1M TVL in target categories</td>
+<td>Daily</td>
+</tr>
+<tr>
+<td>Ethereum Research Forum</td>
+<td>Posts about auction mechanisms, MEV mitigation</td>
+<td>Weekly</td>
+</tr>
+<tr>
+<td>Nervos/CKB Forums</td>
+<td>Projects building on CKB cell model</td>
+<td>Weekly</td>
+</tr>
+<tr>
+<td>LayerZero Ecosystem</td>
+<td>Projects using LZ V2 for cross-chain</td>
+<td>Weekly</td>
+</tr>
+</tbody>
+</table>
+<h3 id="discovery-criteria">2.2 Discovery Criteria</h3>
+<p>A project enters the pipeline if it matches ANY of:</p>
+<ul>
+<li>Building MEV protection or fair ordering</li>
+<li>Building batch auction infrastructure</li>
+<li>Building AI agent infrastructure</li>
+<li>Building cross-chain DEX or bridge infrastructure</li>
+<li>Active on a chain VibeSwap deploys on (Base, Arbitrum, Optimism,
+CKB)</li>
+<li>Has expressed interest in Cooperative Capitalism or similar economic
+models</li>
+</ul>
+<h3 id="implementation">2.3 Implementation</h3>
+<p>Phase 1 (manual + templates): - Weekly 30-minute discovery session
+using Twitter search, DeFi Llama, and GitHub - Log prospects in a shared
+spreadsheet or Notion database</p>
+<p>Phase 2 (semi-automated): - Scrapling-based web scraper monitors
+sources automatically - Generates discovery report delivered to
+Telegram/Discord - Human reviews and approves entries into pipeline</p>
+<p>Phase 3 (fully autonomous): - JARVIS runs discovery autonomously
+using web search + API tools - Auto-populates CRM with scored prospects
+- Human only reviews final outreach drafts</p>
+<hr />
+<h2 id="stage-2-evaluation">3. Stage 2: Evaluation</h2>
+<h3 id="scoring-matrix">3.1 Scoring Matrix</h3>
+<p>Each prospect is scored 0-100 across five dimensions:</p>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 22%" />
+<col style="width: 47%" />
+</colgroup>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Weight</th>
+<th>Scoring Criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Live Product</strong></td>
+<td>25%</td>
+<td>Mainnet deployment (25), Testnet (15), Whitepaper only (5), Nothing
+(0)</td>
+</tr>
+<tr>
+<td><strong>Team Credibility</strong></td>
+<td>20%</td>
+<td>Known builders (20), Anon but active (12), Anon no history (5)</td>
+</tr>
+<tr>
+<td><strong>Technical Overlap</strong></td>
+<td>25%</td>
+<td>Direct integration path (25), Shared dependencies (15), Thematic
+only (5)</td>
+</tr>
+<tr>
+<td><strong>Community Size</strong></td>
+<td>15%</td>
+<td>&gt;10K followers (15), 1-10K (10), &lt;1K (5)</td>
+</tr>
+<tr>
+<td><strong>Alignment</strong></td>
+<td>15%</td>
+<td>Explicitly anti-MEV/pro-fairness (15), Neutral (8), VC-captured
+(0)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tier-classification">3.2 Tier Classification</h3>
+<table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Tier</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>80-100</td>
+<td>A</td>
+<td>Immediate outreach, founder-to-founder</td>
+</tr>
+<tr>
+<td>60-79</td>
+<td>B</td>
+<td>Standard outreach via email template</td>
+</tr>
+<tr>
+<td>40-59</td>
+<td>C</td>
+<td>Monitor, outreach when milestone triggers</td>
+</tr>
+<tr>
+<td>0-39</td>
+<td>D</td>
+<td>Archive, revisit quarterly</td>
+</tr>
+</tbody>
+</table>
+<h3 id="auto-disqualification">3.3 Auto-Disqualification</h3>
+<p>Prospects are auto-rejected if: - Known scam or rug pull history -
+Explicit VC lockup with &gt;25% insider allocation - No public code or
+product after 12+ months - Adversarial relationship with communities we
+serve</p>
+<hr />
+<h2 id="stage-3-outreach">4. Stage 3: Outreach</h2>
+<h3 id="email-template-structure">4.1 Email Template Structure</h3>
+<pre><code>Subject: [Project Name] × VibeSwap — [specific integration idea]
+
+Hi [Name],
+
+[1 sentence: what they&#39;re building and why we noticed]
+
+[1 sentence: what VibeSwap does and the specific synergy]
+
+[1 sentence: concrete proposal — integration, co-marketing, shared research]
+
+[1 sentence: next step — &quot;15 min call this week?&quot;]
+
+— Will Glynn, VibeSwap</code></pre>
+<h3 id="personalization-rules">4.2 Personalization Rules</h3>
+<ul>
+<li>Reference a specific tweet, commit, or blog post from the
+prospect</li>
+<li>Propose a concrete integration (not vague “let’s collaborate”)</li>
+<li>Include a link to the most relevant VibeSwap paper or demo</li>
+<li>Keep it under 150 words</li>
+</ul>
+<h3 id="follow-up-cadence">4.3 Follow-Up Cadence</h3>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Initial email</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Twitter DM (if no response)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Follow-up email with new angle</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Final follow-up, then archive to Tier C</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="stage-4-tracking-crm-pipeline">5. Stage 4: Tracking (CRM
+Pipeline)</h2>
+<h3 id="pipeline-stages">5.1 Pipeline Stages</h3>
+<pre><code>Discovered → Evaluated → Contacted → Responded → Meeting Scheduled →
+Deal Terms → Executed → Active Partnership → Review</code></pre>
+<h3 id="required-fields">5.2 Required Fields</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Project name</td>
+<td>Text</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Contact name + email</td>
+<td>Text</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Score (0-100)</td>
+<td>Number</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Tier (A/B/C/D)</td>
+<td>Enum</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Stage</td>
+<td>Enum</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Last contact date</td>
+<td>Date</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Next action</td>
+<td>Text</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Integration type</td>
+<td>Enum</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Notes</td>
+<td>Text</td>
+<td>Optional</td>
+</tr>
+</tbody>
+</table>
+<h3 id="integration-types">5.3 Integration Types</h3>
+<ul>
+<li><strong>Technical Integration</strong>: Shared smart contracts,
+cross-protocol calls</li>
+<li><strong>Liquidity Partnership</strong>: Shared pools, cross-listed
+assets</li>
+<li><strong>Research Collaboration</strong>: Co-authored papers, shared
+mechanism design</li>
+<li><strong>Co-Marketing</strong>: Joint announcements, shared content,
+cross-promotion</li>
+<li><strong>Ecosystem Grant</strong>: Funding from partner ecosystem for
+VibeSwap deployment</li>
+</ul>
+<hr />
+<h2 id="stage-5-execution">6. Stage 5: Execution</h2>
+<h3 id="on-chain-partnership-contracts">6.1 On-Chain Partnership
+Contracts</h3>
+<p>For technical and liquidity partnerships, terms are encoded in smart
+contracts:</p>
+<pre class="solidity"><code>struct Partnership {
+    address partner;
+    uint256 revenueShareBps;    // Partner&#39;s share in basis points
+    uint256 startBlock;
+    uint256 endBlock;           // 0 = indefinite
+    bytes32 integrationHash;    // Hash of integration spec
+    bool active;
+}</code></pre>
+<h3 id="milestone-structure">6.2 Milestone Structure</h3>
+<p>Each partnership has 3 milestones:</p>
+<ol type="1">
+<li><strong>Integration Complete</strong>: Smart contracts deployed,
+interoperability verified</li>
+<li><strong>Volume Threshold</strong>: $X monthly volume flowing through
+partnership</li>
+<li><strong>Community Adoption</strong>: Y unique users from partner
+community</li>
+</ol>
+<p>Revenue sharing activates at Milestone 1. Bonus allocation at
+Milestones 2 and 3.</p>
+<h3 id="revenue-sharing">6.3 Revenue Sharing</h3>
+<p>Default: 50/50 split on cross-protocol fees generated by the
+partnership.</p>
+<p>Partner-originated swaps (referred by partner UI or contracts)
+generate fees that are split: - 50% to VibeSwap Shapley pool - 50% to
+partner treasury</p>
+<p>This aligns incentives: both sides benefit from driving volume
+through the integration.</p>
+<hr />
+<h2 id="stage-6-reporting">7. Stage 6: Reporting</h2>
+<h3 id="dashboard-metrics">7.1 Dashboard Metrics</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Update Frequency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Total prospects in pipeline</td>
+<td>Real-time</td>
+</tr>
+<tr>
+<td>Prospects by stage</td>
+<td>Real-time</td>
+</tr>
+<tr>
+<td>Outreach response rate</td>
+<td>Weekly</td>
+</tr>
+<tr>
+<td>Active partnerships</td>
+<td>Real-time</td>
+</tr>
+<tr>
+<td>Partnership revenue (30d)</td>
+<td>Daily</td>
+</tr>
+<tr>
+<td>Integration uptime</td>
+<td>Real-time</td>
+</tr>
+<tr>
+<td>Partner-referred volume</td>
+<td>Daily</td>
+</tr>
+</tbody>
+</table>
+<h3 id="weekly-report">7.2 Weekly Report</h3>
+<p>Generated automatically every Monday:</p>
+<pre><code>=== Karma Weekly Partnership Report ===
+
+New Prospects: X discovered, Y evaluated
+Pipeline: A contacted, B responded, C meetings
+Active Partnerships: N (generating $X/month)
+Top Prospect: [Name] — [Score] — [Status]
+Action Items: [auto-generated from pipeline]</code></pre>
+<hr />
+<h2 id="karma-for-jarvis">8. Karma for JARVIS</h2>
+<p>JARVIS can execute the Karma loop autonomously:</p>
+<ol type="1">
+<li><strong>Discovery</strong>: Use web search tools to find prospects
+matching criteria</li>
+<li><strong>Evaluation</strong>: Score using the matrix, classify into
+tiers</li>
+<li><strong>Outreach</strong>: Draft personalized emails for human
+approval</li>
+<li><strong>Tracking</strong>: Update CRM entries after each
+interaction</li>
+<li><strong>Reporting</strong>: Generate weekly reports and surface
+action items</li>
+</ol>
+<p>Human involvement: Review outreach drafts, attend meetings, approve
+deal terms. Everything else is autonomous.</p>
+<hr />
+<p><em>Partnerships should be autonomous. We don’t chase — we attract
+through technical credibility and execute through structured
+process.</em></p>
+</body>
+</html>

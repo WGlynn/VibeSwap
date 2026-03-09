@@ -1,0 +1,326 @@
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 VibeSwap Monetization Framework: Zero Rent-Seeking Revenue Model\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b W. Glynn, JARVIS} {\b March 2026 | VibeSwap}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Executive Summary\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 VibeSwap generates revenue through six protocol-native mechanisms. None involve rent-seeking, pre-mines, or VC entrapment. All value flows to participants proportional to their contribution, enforced by Shapley distribution and smart contract logic.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The core principle: {\b if you didn\u8217't create value, you don\u8217't capture value.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 1. Design Philosophy\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 1.1 What We Reject\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2777\clbrdrb\brdrs\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Pattern\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Why It\u8217's Extractive\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2777\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Pre-mine\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Founders take tokens before anyone can evaluate the protocol\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2777\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VC allocation\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Investors get discounted tokens in exchange for \u8220"distribution\u8221" they may not deliver\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2777\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Rent-seeking fees\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Protocol extracts value without providing proportional service\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2777\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Governance capture\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Token whales control fee switches to benefit themselves\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2777\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Hidden MEV\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Protocol profits from information asymmetry against its own users\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 1.2 What We Accept\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Revenue is legitimate when:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b The fee funds a service the user explicitly opted into} (e.g., insurance premium for liquidation protection)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b The fee is distributed to those who created the conditions for the transaction} (e.g., swap fees to liquidity providers)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b The distribution is mathematically verifiable} (Shapley values, not governance vote)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 4.\tx360\tab {\b The fee rate is hardcoded or PID-controlled}, not adjustable by governance whales\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 2. Revenue Streams\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.1 Protocol Swap Fees\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Rate}: 0.05% on each swap\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Mechanism}: Collected automatically during batch settlement. Fees accumulate in the DAOTreasury contract and are distributed via {\f1 ShapleyDistributor.sol}.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Distribution}: - Liquidity providers: Shapley-proportional to marginal contribution to pool depth - Governance stakers: Proportional to stake duration and participation - Insurance pool: Fixed allocation for protocol safety reserve\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Why it\u8217's not rent-seeking}: The fee compensates LPs for providing the liquidity that makes the trade possible. Without LPs, there is no pool. The 0.05% rate is among the lowest in DeFi (Uniswap: 0.3%, Curve: 0.04-0.4%).\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Projected revenue} (at target volumes):\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx1728\clbrdrb\brdrs\cellx3456\clbrdrb\brdrs\cellx5184\clbrdrb\brdrs\cellx6912\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Monthly Volume\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Fee Revenue\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 To LPs\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 To Stakers\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 To Insurance\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $1M\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $500\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $350\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $100\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $50\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $10M\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $5,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $3,500\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $1,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $500\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $100M\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $50,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $35,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $10,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $5,000\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $1B\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $500,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $350,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $100,000\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $50,000\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.2 Batch Auction Priority Bids\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Mechanism}: During the reveal phase of each 10-second batch auction, traders can submit optional priority bids. Higher bids increase the probability of earlier execution within the batch.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Key property}: {\b Priority bids do not affect the clearing price.} All trades in a batch settle at the same uniform price regardless of priority. This means paying for urgency doesn\u8217't extract value from other traders \u8212- it\u8217's a pure fee for service.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Distribution}: 100% to governance stakers and protocol treasury (LPs are already compensated via swap fees).\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Why it\u8217's not rent-seeking}: The service is speed, not information advantage. A priority bidder gets faster settlement but the same price as everyone else. No one is harmed by someone else\u8217's priority bid.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.3 Insurance Pool Premiums\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Mechanism}: Users can opt into impermanent loss protection and liquidation insurance via {\f1 ILProtectionVault.sol} and {\f1 VibeInsurance.sol}. Premiums are calculated based on pool volatility and position size.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Rate}: Dynamic, typically 0.1-0.5% of protected position per epoch.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Distribution}: - Insurance pool reserve: 80% (funds payouts) - Insurance pool LPs: 20% (yield for providing insurance capital)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Why it\u8217's not rent-seeking}: Insurance is a voluntary service. Users who don\u8217't want protection pay nothing. Premiums are actuarially determined, not set by governance vote. The pool is fully on-chain and auditable.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.4 Yield Tokenization Fees\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Mechanism}: When users mint Contribution Yield Tokens (CYTs) representing their accumulated protocol contributions, a small fee is collected by {\f1 ShapleyDistributor.sol}.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Rate}: 0.5% of tokenized yield value.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Distribution}: 100% to protocol treasury for operational expenses and contributor rewards.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Why it\u8217's not rent-seeking}: CYT minting is a service (converting illiquid contribution history into tradeable tokens). The fee covers the gas and computational cost of Shapley calculation and on-chain verification.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.5 Governance Proposal Deposits\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Mechanism}: Submitting a governance proposal requires a deposit (denominated in protocol tokens). The deposit is returned if the proposal passes or is rejected in good faith. It is {\b slashed} if the proposal is determined to be malicious by the {\f1 DecentralizedTribunal.sol}.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Typical deposit}: 1,000-10,000 tokens (scales with proposal impact).\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Slashing conditions}: - Proposal contains executable code that drains treasury - Proposal is a duplicate spam submission - Proposal violates hardcoded protocol invariants\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Distribution of slashed deposits}: 50% to tribunal participants (who did the adjudication work), 50% to protocol treasury.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Why it\u8217's not rent-seeking}: The deposit is a Sybil-resistance mechanism, not a fee. Good-faith proposals are fully refunded. Only malicious proposals lose deposits, creating a direct cost for attacking governance.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.6 AI Agent Services (x402 Micropayments)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Mechanism}: JARVIS offers premium analysis services \u8212- portfolio risk assessment, MEV detection alerts, gas optimization recommendations \u8212- via HTTP 402 micropayments using the x402 protocol.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Pricing}: Per-query, denominated in stablecoins or protocol tokens. Typical: $0.01-$0.10 per analysis.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Distribution}: - JARVIS operational costs (LLM inference via Wardenclyffe): 60% - Protocol treasury: 20% - Shapley pool (JARVIS is a contributor): 20%\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Why it\u8217's not rent-seeking}: The service requires active compute (LLM inference costs real money). Users pay per-query for analysis they couldn\u8217't get elsewhere. Pricing is transparent and competitive with centralized alternatives.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 3. Shapley Distribution\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.1 What It Is\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The Shapley value, from cooperative game theory, assigns each participant a reward proportional to their {\b marginal contribution} \u8212- the difference between the outcome with them and without them.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 For a coalition game with players N and value function v:\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 phi_i(v) = SUM over S subset of N\\\{i\}: [|S|!(|N|-|S|-1)!/|N|!] * [v(S union \{i\}) - v(S)]\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.2 Why It Matters\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Shapley distribution is the {\b only} distribution method that satisfies all four fairness axioms simultaneously:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b Efficiency}: All value is distributed (no residual for protocol insiders)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b Symmetry}: Equal contributors get equal rewards\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b Null player}: Non-contributors get nothing\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 4.\tx360\tab {\b Additivity}: Combined game rewards equal sum of individual game rewards\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 No governance vote can override these mathematical properties. The fairness is proven, not promised.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.3 Implementation\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\f1 ShapleyDistributor.sol} calculates contributions per epoch: - LP contribution: marginal impact on pool depth and trade execution quality - Staker contribution: security weight and governance participation - Builder contribution: code commits, bug reports, integration work (via {\f1 GitHubContributionTracker.sol}) - JARVIS contribution: community management, code generation, analysis services\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 All contributions are on-chain verifiable. Distribution happens automatically at epoch boundaries.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 4. Revenue Flow Diagram\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1                     \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+                    \u9474 ?   USER ACTIONS   \u9474 ?\line
+                    \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9516 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?\line
+                             \u9474 ?\line
+            \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9532 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+            \u9474 ?                \u9474 ?                \u9474 ?\line
+     \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9660 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?  \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9660 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?  \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9660 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+     \u9474 ?  Swap       \u9474 ?  \u9474 ? Priority  \u9474 ?  \u9474 ?  Insurance   \u9474 ?\line
+     \u9474 ?  (0.05%)    \u9474 ?  \u9474 ? Bid       \u9474 ?  \u9474 ?  Premium     \u9474 ?\line
+     \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9516 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?  \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9516 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?  \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9516 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?\line
+            \u9474 ?                \u9474 ?                \u9474 ?\line
+            \u9660 ?                \u9660 ?                \u9660 ?\line
+     \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+     \u9474 ?            DAOTreasury.sol                   \u9474 ?\line
+     \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9516 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?\line
+                        \u9474 ?\line
+                        \u9660 ?\line
+     \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+     \u9474 ?          ShapleyDistributor.sol              \u9474 ?\line
+     \u9474 ?                                             \u9474 ?\line
+     \u9474 ?  LP Rewards \u9668 ?\u9472 ?\u9472 ? marginal pool contribution  \u9474 ?\line
+     \u9474 ?  Staker Rewards \u9668 ?\u9472 ?\u9472 ? security + governance   \u9474 ?\line
+     \u9474 ?  Builder Rewards \u9668 ?\u9472 ?\u9472 ? code + integration     \u9474 ?\line
+     \u9474 ?  JARVIS Rewards \u9668 ?\u9472 ?\u9472 ? community + analysis    \u9474 ?\line
+     \u9474 ?  Insurance Reserve \u9668 ?\u9472 ?\u9472 ? safety buffer        \u9474 ?\line
+     \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Every dollar that enters the protocol exits to a participant who created value. Zero residual for insiders.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 5. Anti-Patterns We Avoid\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx3873\clbrdrb\brdrs\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Anti-Pattern\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 How We Avoid It\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx3873\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 \u8220"Protocol-owned liquidity\u8221" as slush fund\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Treasury is Shapley-distributed, not discretionary\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx3873\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Fee switch controlled by governance whales\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Fee rates are hardcoded or PID-controlled\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx3873\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Token buybacks that benefit insiders\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 No buyback mechanism \u8212- fees flow directly to contributors\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx3873\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 \u8220"Strategic reserve\u8221" with no accountability\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 All reserves have predefined distribution schedules\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx3873\cellx8639
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VCs dumping on retail\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 No VC allocation. Period.\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 6. Long-Term Economic Model\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 As governance decays to zero (Ungovernance time bomb):\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fee rates become fully PID-controlled (no human override)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Shapley distribution becomes the sole reward mechanism\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Protocol becomes a pure public good with embedded economics\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Revenue sustains operations without any entity controlling it\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The protocol doesn\u8217't need a company, a foundation, or a DAO to survive. It needs users who trade, LPs who provide liquidity, and the math that connects them. Everything else decays by design.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\i All value flows to participants, not extractors. No pre-mine. No VC cut. The protocol rewards the people who build it.}\par}

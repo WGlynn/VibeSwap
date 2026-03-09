@@ -1,0 +1,289 @@
+# Ungovernance: Hardcoded Governance Decay to Protocol Autonomy
+
+**W. Glynn, JARVIS**
+**March 2026 | VibeSwap**
+
+---
+
+## Executive Summary
+
+Governance is a bootstrapping tool, not a permanent fixture. VibeSwap implements a hardcoded governance decay mechanism — the Ungovernance Time Bomb — that systematically reduces governance power over time until the protocol becomes fully autonomous.
+
+The decay is not optional. It is not subject to governance vote. It is encoded in the smart contract and executes automatically. The protocol starts with necessary governance and ends with none.
+
+---
+
+## 1. Why Governance Must Die
+
+### 1.1 The Governance Problem
+
+Every DeFi protocol with token governance faces the same failure modes:
+
+| Failure Mode | Description | Real Examples |
+|-------------|-------------|--------------|
+| Whale capture | 1-3 addresses control all votes | Compound, MakerDAO |
+| Voter apathy | <5% of tokens vote on most proposals | Nearly universal |
+| Governance attacks | Flash loan governance, vote buying | Beanstalk ($182M) |
+| Political rent-seeking | Governance tokens trade as political futures | Curve wars |
+| Ossification | Fear of change prevents necessary upgrades | Bitcoin block size |
+
+### 1.2 The False Dichotomy
+
+The DeFi community assumes governance is the only alternative to centralized control. This is false. There is a third option: **protocols that don't need governance because they self-adjust.**
+
+A thermostat doesn't vote on the temperature. It measures conditions and responds. A healthy protocol should work the same way.
+
+### 1.3 The Bootstrapping Problem
+
+You can't get to zero governance from zero. At launch, parameters need setting, bugs need fixing, and adversarial conditions need responding to. Some governance is necessary initially.
+
+The solution: start with governance, but hardcode its death. Every governance token has a half-life. Every governance function has a sunset. The protocol is born with training wheels that automatically retract.
+
+---
+
+## 2. The Decay Mechanism
+
+### 2.1 Voting Weight Half-Life
+
+Every governance token's voting weight decays exponentially:
+
+```
+weight(t) = initialWeight × (1/2)^(t / halfLife)
+```
+
+With a 1-year half-life:
+
+| Year | Voting Weight (% of initial) |
+|------|------------------------------|
+| 0 | 100% |
+| 1 | 50% |
+| 2 | 25% |
+| 3 | 12.5% |
+| 4 | 6.25% |
+| 5 | 3.125% |
+| 8 | 0.39% |
+| 10 | 0.098% |
+
+After 10 years, governance tokens retain less than 0.1% of their original voting power. Governance proposals require supermajority, which becomes mathematically impossible as weight approaches zero.
+
+### 2.2 Implementation
+
+```solidity
+function getVotingWeight(address voter, uint256 proposalTime) public view returns (uint256) {
+    uint256 balance = governanceToken.balanceOf(voter);
+    uint256 elapsed = proposalTime - GENESIS_TIMESTAMP;
+
+    // Decay: weight halves every HALF_LIFE_SECONDS
+    // Using fixed-point arithmetic to avoid floating point
+    uint256 halvings = elapsed / HALF_LIFE_SECONDS;
+    uint256 remainder = elapsed % HALF_LIFE_SECONDS;
+
+    // Integer halvings
+    uint256 weight = balance >> halvings;  // Divide by 2^halvings
+
+    // Sub-halving interpolation (linear approximation)
+    if (halvings < 64 && remainder > 0) {
+        uint256 nextWeight = weight >> 1;
+        weight = weight - ((weight - nextWeight) * remainder / HALF_LIFE_SECONDS);
+    }
+
+    return weight;
+}
+```
+
+### 2.3 Non-Overridable
+
+The decay function is immutable:
+- No admin key can modify HALF_LIFE_SECONDS
+- No governance proposal can extend the decay
+- No upgrade proxy can replace the decay logic
+- The only exception: a supermajority vote (>90% of decayed weight) can extend by ONE additional half-life period — and this extension itself decays
+
+---
+
+## 3. Scope Reduction
+
+### 3.1 Governance Scope Over Time
+
+As voting power decays, governance scope automatically narrows:
+
+| Phase | Years | Governance Can Do | Governance Cannot Do |
+|-------|-------|------------------|---------------------|
+| **Bootstrap** | 0-2 | Full parameter control, emergency actions, protocol upgrades | Change decay mechanism |
+| **Reduction** | 2-4 | Emergency pause, dispute resolution, parameter boundaries | New features, fee changes, upgrade proposals |
+| **Minimal** | 4-6 | Dispute resolution only, circuit breaker activation | Everything else |
+| **Vestigial** | 6-8 | Emergency pause only (requires 95% supermajority of decayed weight) | Disputes (now automated) |
+| **Autonomous** | 8+ | Nothing. Governance module self-disables. | Everything |
+
+### 3.2 Scope Enforcement
+
+Each governance function has a `minimumGovernancePower` requirement:
+
+```solidity
+modifier requiresGovernancePower(uint256 minPower) {
+    uint256 totalVotingPower = getTotalDecayedVotingPower();
+    require(totalVotingPower >= minPower, "Governance power insufficient for this action");
+    _;
+}
+
+// Examples:
+function proposeParameterChange(...) requiresGovernancePower(1000e18) { ... }
+function proposeEmergencyPause(...) requiresGovernancePower(100e18) { ... }
+function proposeProtocolUpgrade(...) requiresGovernancePower(5000e18) { ... }
+```
+
+As total voting power decays below each threshold, that governance function becomes permanently uncallable.
+
+---
+
+## 4. Automated Replacements
+
+### 4.1 PID Controllers for Parameters
+
+As governance loses the ability to adjust parameters, PID (Proportional-Integral-Derivative) controllers take over:
+
+| Parameter | PID Input | Target | Adjustment |
+|-----------|----------|--------|-----------|
+| Swap fee rate | 7-day average volume | Optimal volume target | Decrease fee if volume drops, increase if excess |
+| Batch duration | Average batch fullness | 80% batch utilization | Shorter batches if consistently full, longer if sparse |
+| Insurance premium | Pool volatility (30-day) | Actuarial fairness | Increase if claims exceed premiums, decrease if surplus |
+| Priority bid floor | Bid participation rate | 10% of traders bidding | Lower floor if too few bids, raise if too many |
+
+### 4.2 PID Implementation
+
+```solidity
+struct PIDController {
+    int256 kp;          // Proportional gain
+    int256 ki;          // Integral gain
+    int256 kd;          // Derivative gain
+    int256 integral;    // Accumulated error
+    int256 lastError;   // Previous error for derivative
+    uint256 lastUpdate; // Timestamp of last adjustment
+    int256 outputMin;   // Minimum allowed output
+    int256 outputMax;   // Maximum allowed output
+}
+
+function adjustParameter(PIDController storage pid, int256 measured, int256 target) internal returns (int256) {
+    int256 error = target - measured;
+    int256 dt = int256(block.timestamp - pid.lastUpdate);
+
+    pid.integral += error * dt;
+    int256 derivative = dt > 0 ? (error - pid.lastError) / dt : int256(0);
+
+    int256 output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
+    output = clamp(output, pid.outputMin, pid.outputMax);
+
+    pid.lastError = error;
+    pid.lastUpdate = block.timestamp;
+
+    return output;
+}
+```
+
+### 4.3 Automated Dispute Resolution
+
+As governance loses dispute resolution authority, the `DecentralizedTribunal.sol` transitions to fully automated adjudication:
+
+1. **Schelling point voting**: Random token holder jury selected via VRF
+2. **Stake-weighted consensus**: Jurors stake to participate, slashed for minority vote
+3. **Precedent accumulation**: Past rulings create case law that automated system references
+4. **Appeal reduction**: Each appeal requires 2x the stake, converging to finality
+
+After Year 6, the tribunal operates without governance oversight. Disputes are resolved by economic incentives alone.
+
+---
+
+## 5. The Sunset Clause
+
+### 5.1 Mechanism
+
+At a predetermined block height (estimated Year 8-10 from genesis), the governance module executes its final action:
+
+```solidity
+function executeSunset() external {
+    require(block.number >= SUNSET_BLOCK, "Sunset not reached");
+    require(!sunsetExecuted, "Already sunset");
+
+    sunsetExecuted = true;
+
+    // Disable all governance functions
+    governanceEnabled = false;
+
+    // Transfer any remaining governance treasury to Shapley pool
+    uint256 balance = address(this).balance;
+    if (balance > 0) {
+        shapleyDistributor.deposit{value: balance}();
+    }
+
+    // Emit final event
+    emit GovernanceSunset(block.number, block.timestamp);
+}
+```
+
+### 5.2 Extension Mechanism
+
+The sunset can be delayed ONE time by a supermajority vote:
+- Requires 90% of total (decayed) voting power
+- Extends sunset by exactly one half-life period
+- The extension itself has a sunset
+- A second extension requires 95% supermajority (practically impossible with decayed weights)
+
+This ensures that if something genuinely unexpected happens (e.g., a critical vulnerability discovered at Year 7), there is an escape hatch. But the escape hatch is designed to be almost impossible to use — which is the point.
+
+---
+
+## 6. Fork Escape Valve
+
+### 6.1 The Ultimate Safety Net
+
+If governance becomes corrupt before it decays (e.g., a whale accumulates enough tokens to pass malicious proposals during the Bootstrap phase), users have a nuclear option: **fork with zero penalty.**
+
+The Fractal Fork Network ensures that:
+1. Any user can fork the protocol permissionlessly
+2. The fork inherits all code and parameters
+3. Fee routing to the corrupt parent can be set to 0% (emergency fork exception)
+4. Users migrate their liquidity to the clean fork
+5. The corrupt parent starves as users leave
+
+### 6.2 Governance Corruption Detection
+
+Automated monitoring detects governance capture:
+- Single address controlling >30% of voting power → alert
+- Proposal passing with <10% voter participation → alert
+- Proposal that modifies core invariants (fee routing, Shapley, decay) → auto-reject + alert
+- Flash loan governance detection (voting power spike within 1 block) → auto-reject
+
+---
+
+## 7. The Endgame
+
+```
+Year 0: Human governance (bootstrap)
+Year 2: Reduced governance (scope narrowing)
+Year 4: Minimal governance (disputes only)
+Year 6: Vestigial governance (emergency only)
+Year 8: Sunset trigger
+Year 10: Fully autonomous protocol
+          │
+          ├── Parameters: PID-controlled
+          ├── Disputes: Automated tribunal
+          ├── Upgrades: Fork-and-compete
+          ├── Security: Circuit breakers + automated monitoring
+          └── Economics: Shapley distribution + fee routing
+```
+
+The protocol becomes a natural system. It responds to conditions, not opinions. It evolves through forking, not voting. It distributes value through mathematics, not politics.
+
+This is Ungovernance. The governance that governs best governs least — and eventually, not at all.
+
+---
+
+## 8. The Knowledge Primitive
+
+> **"Governance is a bootstrapping tool, not a destination. Hardcode its death. Let the protocol become a natural system."**
+
+The deeper insight: any system that can be governed can be captured. The only ungovernable system is one where governance literally does not exist. But you can't start there — you have to arrive there. The decay curve is the path.
+
+---
+
+*The protocol becomes a natural system, not a political one. That's the endgame.*

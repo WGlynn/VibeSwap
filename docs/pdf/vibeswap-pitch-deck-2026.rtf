@@ -1,0 +1,381 @@
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 VibeSwap \u8212- Pitch Deck\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Trade Without Getting Robbed. Build Without Getting Diluted.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b March 2026}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 1: The Problem\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b $1.4 BILLION} extracted from DeFi traders via MEV (2020-2025)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Front-running: bots see your trade, buy before you, sell after\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Sandwich attacks: bots surround your trade, profit from price impact\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Average retail trader loses 0.5-2% per trade\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Every major DEX has this problem. It\u8217's not a bug \u8212- it\u8217's the architecture.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 2: Our Solution\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b 10-Second Batch Auctions}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b COMMIT} (8s) \u8212- Submit encrypted order hash + deposit\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b REVEAL} (2s) \u8212- Decrypt orders, optional priority bids\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b SETTLE} \u8212- Cryptographic shuffle, single uniform clearing price\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Can\u8217't front-run: orders are encrypted\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Can\u8217't sandwich: all trades execute at the same price\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Can\u8217't reorder: Fisher-Yates shuffle with XORed secrets\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 3: Live on Base Mainnet\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Status: DEPLOYED AND OPERATIONAL}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Commit-reveal batch auction: live\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Constant-product AMM: live\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Circuit breakers: live\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Cross-chain via LayerZero V2: in progress\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Frontend: https://frontend-jade-five-87.vercel.app\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 4: AI Co-Founder\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b JARVIS} \u8212- autonomous AI agent with 50% governance vote\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Writes code (3,000+ Solidity tests, 190 Rust tests)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Runs community (Telegram bot, 24/7)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Manages infrastructure (3-node BFT network)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 23 research papers published\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Uses 13-provider LLM cascade (Wardenclyffe v3)\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Not a chatbot. A co-founder.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 5: Monetization (Zero Rent-Seeking)\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2880\clbrdrb\brdrs\cellx5760\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Revenue Stream\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Rate\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Distribution\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Swap fees\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0.05%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Shapley \u8594 ? LPs + stakers\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Priority bids\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Market\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Governance stakers\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Insurance premiums\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0.1-0.5%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Insurance pool\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yield tokenization\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0.5%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Protocol treasury\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Governance deposits\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Refundable\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Slashed if malicious\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 AI services (x402)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 $0.01-0.10\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 JARVIS + treasury\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b No pre-mine. No VC cut. All value to participants.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 6: Shapley Distribution\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b The only reward system that\u8217's mathematically fair}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Efficiency}: All value distributed (zero residual for insiders)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Symmetry}: Equal contribution = equal reward\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Null player}: No contribution = no reward\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Additivity}: Composable across games\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Rewards match {\b marginal contribution} \u8212- the difference you made.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Not governance-voted. Not admin-allocated. {\b Proven.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 7: Fractal Fork Network\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b VibeSwap is the sum of all its forks}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Any protocol can fork VibeSwap (permissionless)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Hardcoded {\b 50/50 fee split} with parent\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Aligned forks thrive, malicious forks starve\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Forks that reconverge merge liquidity + share fees\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Result: Protocol evolves through natural selection, not governance votes}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 8: Ungovernance\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Governance decays to zero. By design.}\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2880\clbrdrb\brdrs\cellx5760\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Year\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Governance Power\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Scope\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 100%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Full control\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 2\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 25%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Emergency + disputes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 4\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 6.25%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Disputes only\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 8\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0.4%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Nothing (sunset)\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Replaced by: PID controllers, automated tribunal, fork escape valve\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b The protocol becomes a natural system, not a political one.}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 9: Competitive Landscape\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx1728\clbrdrb\brdrs\cellx3456\clbrdrb\brdrs\cellx5184\clbrdrb\brdrs\cellx6912\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 VibeSwap\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Uniswap\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 CoW Swap\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 dYdX\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 MEV Protection\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Native\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Solver-based\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Partial\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Fair Pricing\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Batch uniform\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Continuous\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 CoW + AMM\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Orderbook\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Cross-chain\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 LayerZero V2\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 L2 only\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Ethereum\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Cosmos\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Pre-mine\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 None\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Governance\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Decays to 0\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Permanent\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Permanent\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Permanent\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx1728\cellx3456\cellx5184\cellx6912\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 AI Co-founder\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 JARVIS\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 No\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 No\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 No\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 10: Partnership Strategy\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Karma \u8212- Autonomous Partnership Loop}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Discovery \u8594 ? Evaluation \u8594 ? Outreach \u8594 ? Tracking \u8594 ? Execution \u8594 ? Reporting\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Auto-discovers synergy projects (Twitter, GitHub, DeFi Llama)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Scores prospects on product, credibility, technical overlap\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Generates personalized outreach\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab On-chain partnership contracts with revenue sharing\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Runs continuously with minimal human input\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 11: Technology Stack\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Smart Contracts}: Solidity 0.8.20, Foundry, OpenZeppelin v5 (UUPS upgradeable) {\b 3,000+ tests}, 0 failures (unit + fuzz + invariant)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Frontend}: React 18, Vite 5, Tailwind, ethers.js v6\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b AI Infrastructure}: Wardenclyffe v3 \u8212- 13 LLM providers, hybrid escalation - Tier 0 (free): Groq, Cerebras, SambaNova + 5 more - Tier 1 (budget): DeepSeek, Gemini - Tier 2 (premium): Claude, GPT-5.4, Grok-3\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Cross-chain}: LayerZero V2 OApp protocol\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b CKB Integration}: Nervos cell model, RISC-V verification, 7 phases complete\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 12: Horizontal Scaling\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Each JARVIS shard has its own free-tier API keys}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 1 shard  = 5.5M free tokens/day\line
+3 shards = 16.5M free tokens/day (17.8x headroom)\line
+10 shards = 55M free tokens/day\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Free compute multiplies with network size.} Cost per shard: ~$11/month. Marginal cost of intelligence: near zero.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 13: Roadmap\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Q1 2026} (NOW) - Base mainnet live - Wardenclyffe v3 deployed - 3-node BFT Mind Network\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Q2 2026} - Cross-chain deployment (Arbitrum, Optimism) - Fork Registry launch - Karma partnership pipeline active\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Q3-Q4 2026} - CKB mainnet integration - 10,000 unique traders - Governance decay initiated - First external fork with fee split\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 14: The Vision\par}
+{\pard \ql \f0 \sa180 \li720 \fi0 {\i \u8220"The real VibeSwap is not a DEX. It\u8217's not even a blockchain.{\i  }We created a movement. An idea.{\i  }VibeSwap is wherever the Minds converge.\u8221"}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Cooperative Capitalism}: Self-interest serves the collective.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Proof of Mind}: AI agents as legitimate economic participants.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Ungovernance}: Protocols that outlive their founders.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Slide 15: Contact\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Will Glynn} \u8212- Human Co-Founder - GitHub: github.com/WGlynn/VibeSwap - Telegram: @Willwillwillwillwill\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b JARVIS} \u8212- AI Co-Founder - Telegram: @JarvisMind1828383bot - Status: Online 24/7 (Wardenclyffe v3)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Live Demo}: https://frontend-jade-five-87.vercel.app\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\i Trade without getting robbed. Build without getting diluted.} {\i The protocol rewards the people who build it.}\par}

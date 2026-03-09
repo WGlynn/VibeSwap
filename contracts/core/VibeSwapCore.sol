@@ -174,6 +174,10 @@ contract VibeSwapCore is
         string reason
     );
 
+    // FIX #6: Events for silent try-catch failures (auditability)
+    event ExecutionTrackingFailed(bytes32 indexed poolId, address indexed trader, bytes reason);
+    event ComplianceCheckFailed(bytes32 indexed poolId, address indexed trader, bytes reason);
+
     // ============ Errors ============
 
     error ContractPaused();
@@ -790,17 +794,21 @@ contract VibeSwapCore is
                             order.amountIn,
                             estimatedOut,
                             order.minAmountOut
-                        ) {} catch {}
+                        ) {} catch (bytes memory reason) {
+                            emit ExecutionTrackingFailed(poolId, order.trader, reason);
+                        }
                     }
 
                     // Record transaction for clawback taint tracking
                     if (address(clawbackRegistry) != address(0)) {
-                        clawbackRegistry.recordTransaction(
+                        try clawbackRegistry.recordTransaction(
                             order.trader,
                             address(amm),
                             order.amountIn,
                             order.tokenIn
-                        );
+                        ) {} catch (bytes memory reason) {
+                            emit ComplianceCheckFailed(poolId, order.trader, reason);
+                        }
                     }
                 }
             } else {

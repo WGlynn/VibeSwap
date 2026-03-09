@@ -7,7 +7,7 @@
 // from the ambient compute surplus of the modern API economy.
 // When paid providers exhaust, free-tier providers sustain the signal.
 //
-// Tier 1 (paid):  Claude → DeepSeek → Gemini → OpenAI
+// Tier 1 (paid):  Claude → DeepSeek → Gemini → OpenAI (GPT-5.4)
 // Tier 2 (free):  Cerebras → Groq → OpenRouter → Mistral → Together → SambaNova → Fireworks → Novita
 //
 // Availability: 1 - (1-a)^12 ≈ 1.0 (fifteen nines)
@@ -419,7 +419,7 @@ registerProvider('claude', createClaudeProvider);
 function createOpenAIProvider(providerConfig) {
   const baseUrl = providerConfig.baseUrl || 'https://api.openai.com/v1';
   const apiKey = providerConfig.apiKey;
-  const defaultModel = providerConfig.model || 'gpt-4o';
+  const defaultModel = providerConfig.model || 'gpt-5.4';
 
   // Convert Anthropic tool format → OpenAI function format
   function convertTools(tools) {
@@ -1038,7 +1038,7 @@ export function getFallbackChain() {
 // Tier 1: Claude          — quality 1.00 (reference)
 // Tier 1: DeepSeek        — quality 0.85
 // Tier 1: Gemini          — quality 0.75
-// Tier 1: OpenAI GPT-4o   — quality 0.90
+// Tier 1: OpenAI GPT-5.4  — quality 0.95
 // Tier 2: Cerebras/Groq   — quality 0.60 (Llama 3.3 70B)
 // Tier 2: OpenRouter      — quality 0.55 (free DeepSeek R1)
 // Tier 2: Mistral Small   — quality 0.50
@@ -1050,7 +1050,7 @@ export function getFallbackChain() {
 const PROVIDER_QUALITY = {
   claude:     { quality: 1.00, tier: 1, label: 'Premium' },
   deepseek:   { quality: 0.85, tier: 1, label: 'Premium' },
-  openai:     { quality: 0.90, tier: 1, label: 'Premium' },
+  openai:     { quality: 0.95, tier: 1, label: 'Premium' },
   gemini:     { quality: 0.75, tier: 1, label: 'Premium' },
   cerebras:   { quality: 0.60, tier: 2, label: 'Free' },
   groq:       { quality: 0.60, tier: 2, label: 'Free' },
@@ -1070,7 +1070,7 @@ const PROVIDER_QUALITY = {
 const PROVIDER_COST_PER_MTOK = {
   claude:     9.00,   // $3 input + $15 output, blended ~$9/MTok
   deepseek:   0.69,   // $0.27 input + $1.10 output, blended
-  openai:     6.25,   // $2.50 input + $10 output, blended
+  openai:     8.75,   // $2.50 input + $15 output, blended (GPT-5.4)
   gemini:     0.375,  // $0.15 input + $0.60 output, blended
   cerebras:   0.001,  // Free tier
   groq:       0.001,  // Free tier
@@ -1251,7 +1251,7 @@ function getProviderConfig(providerName) {
     model: (() => {
       switch (providerName) {
         case 'claude': return config.llm?.model || config.anthropic?.model;
-        case 'openai': return 'gpt-4o';
+        case 'openai': return 'gpt-5.4';
         case 'gemini': return 'gemini-2.5-flash';
         case 'deepseek': return 'deepseek-chat';
         case 'ollama': return config.llm?.model || 'llama3.1';
@@ -1302,15 +1302,29 @@ function getProviderConfig(providerName) {
   };
 }
 
-// ============ Smart Router — Route by Complexity ============
-// Instead of always calling Claude and cascading on failure,
-// classify query complexity and route to the right model.
-// "Don't call Anthropic if all I asked was 'what's your name'" — Scottie
+// ============ Smart Router — Route by Skill (Cooperative Intelligence) ============
+// "The models should be cooperative not competitive and zero sum" — Will
 //
-// Complexity levels:
+// Each model has strengths. Instead of a fallback chain where one model is
+// "better" than another, we delegate to the RIGHT model for the RIGHT task.
+// This is Cooperative Capitalism applied to the model layer:
+//   - Claude: reasoning, philosophy, nuance, long-form analysis, tool use
+//   - GPT-5.4: coding, structured output, instruction following, technical docs
+//   - DeepSeek: math, data analysis, cost-efficient reasoning, Chinese/multilingual
+//   - Gemini: multimodal (images/docs), large context, search-grounded answers
+//   - Free tier: simple tasks that don't need frontier models
+//
+// Complexity levels (preserved):
 //   simple   → free tier (Groq/Cerebras) — greetings, one-liners, short factual
 //   moderate → mid tier (DeepSeek/Gemini) — conversation, explanations, summaries
-//   complex  → premium (Claude) — reasoning, code, tools, long-form analysis
+//   complex  → premium (Claude) — reasoning, philosophy, long-form analysis
+//
+// Skill levels (NEW — cooperative delegation):
+//   coding      → GPT-5.4 (best-in-class code generation)
+//   reasoning   → Claude (nuance, ethics, philosophy, mechanism design)
+//   math        → DeepSeek (cost-efficient analytical reasoning)
+//   multimodal  → Gemini (images, documents, large context)
+//   tooluse     → Claude (native tool use support)
 
 // Bare greetings — truly zero-effort, route to free tier
 const SIMPLE_PATTERNS = /^(hey|hi|hello|yo|sup|gm|gn|gg|lol|lmao|ok|okay|sure|thanks|ty|thx|bet|word|facts|based|fr|w |l |nice|cool|dope|sick|fire|mid|nah|yep|yea|yeah|yes|no|nope|good (morning|night|evening))\b/i;
@@ -1318,11 +1332,18 @@ const SIMPLE_PATTERNS = /^(hey|hi|hello|yo|sup|gm|gn|gg|lol|lmao|ok|okay|sure|th
 // Warm greetings — social energy, deserve personality even from standard JARVIS
 const WARM_GREETING_PATTERNS = /^(gm fam|gm frens?|yo what'?s? ?(up|good|poppin)|wagmi|ngmi|send it|what'?s? your name|who are you|how are you|wen )/i;
 
-const COMPLEX_SIGNALS = /```|contract |function |error |bug |debug|implement|refactor|analyze|compare|explain .{80,}|write a |build |create a |design |architect|security|audit|vulnerabil|exploit|smart contract|solidity|rust |python |javascript/i;
+// Skill detection patterns
+const CODING_SIGNALS = /```|write ?(a |the |some |this )?code|write ?(a |the )?function|write ?(a |the )?script|implement|refactor|debug|fix ?(the |this |a )?bug|compile|syntax|snippet|regex|algorithm|API |endpoint|class |interface |struct |enum |const |let |var |import |require|\.sol\b|\.js\b|\.py\b|\.rs\b|\.ts\b|solidity|javascript|typescript|python|rust |golang|react|nextjs|html|css|sql|git |docker|deploy|build ?(a |the |this )?app|build ?(a |the |this )?contract/i;
+
+const REASONING_SIGNALS = /explain ?(why|how|the|what)|philosophy|ethics|moral|mechanism ?design|game ?theory|incentive|governance|trade-?off|nuance|compare ?(and|the)|pros ?(and|vs)|argue|debate|perspective|implications|consequences|should (we|i|the)|what if|thought experiment|first principles/i;
+
+const MATH_SIGNALS = /calculate|compute|equation|formula|integral|derivative|matrix|statistics|probability|regression|optimize|converge|proof |theorem|lemma|mathematical|arithmetic|algebra|calculus|geometric|logarithm|exponential|sqrt|summation|∑|∫|∂|σ|μ|π|tokenomics|bonding curve|pricing model|yield/i;
+
+const COMPLEX_SIGNALS = /contract |function |error |bug |debug|implement|refactor|analyze|compare|explain .{80,}|write a |build |create a |design |architect|security|audit|vulnerabil|exploit|smart contract|solidity|rust |python |javascript/i;
 
 function classifyComplexity(request) {
-  // If tools are requested, always use Claude (tool use requires it)
-  if (request.tools?.length > 0) return 'complex';
+  // If tools are requested, always use Claude (native tool use)
+  if (request.tools?.length > 0) return 'tooluse';
 
   // If caller explicitly set a model, respect it
   if (request.model) return 'explicit';
@@ -1346,7 +1367,6 @@ function classifyComplexity(request) {
 
   // Short + matches simple patterns → free tier (unless persona wants personality)
   if (len < 80 && SIMPLE_PATTERNS.test(text)) {
-    // In degen mode, even bare greetings deserve wit — route to moderate
     try {
       if (_getPersonaId?.() === 'degen') return 'moderate';
     } catch {}
@@ -1356,14 +1376,33 @@ function classifyComplexity(request) {
   // Very short messages without complex signals → simple
   if (len < 30 && !COMPLEX_SIGNALS.test(text)) return 'simple';
 
-  // Complex signals or long messages → Claude
-  if (COMPLEX_SIGNALS.test(text)) return 'complex';
-  if (len > 500) return 'complex';
-
-  // Has images/documents → Gemini
+  // Has images/documents → Gemini (multimodal specialist)
   if (Array.isArray(lastMsg.content) && lastMsg.content.some(b => b.type === 'image' || b.type === 'document')) {
     return 'multimodal';
   }
+
+  // ============ Skill-Based Routing (Cooperative Intelligence) ============
+  // Check skill patterns BEFORE falling back to complexity-only routing.
+  // A coding question is a coding question regardless of length.
+
+  const isCoding = CODING_SIGNALS.test(text);
+  const isReasoning = REASONING_SIGNALS.test(text);
+  const isMath = MATH_SIGNALS.test(text);
+
+  // If multiple skills match, pick the dominant one
+  if (isCoding && !isReasoning) return 'coding';
+  if (isMath && !isCoding) return 'math';
+  if (isReasoning && !isCoding) return 'reasoning';
+
+  // Coding + reasoning overlap (e.g. "explain this smart contract design") → Claude
+  if (isCoding && isReasoning) return 'reasoning';
+
+  // Coding + math overlap (e.g. "implement this formula") → GPT-5.4
+  if (isCoding && isMath) return 'coding';
+
+  // Legacy complexity-based fallbacks
+  if (COMPLEX_SIGNALS.test(text)) return 'complex';
+  if (len > 500) return 'complex';
 
   // Everything else → moderate
   return 'moderate';
@@ -1373,12 +1412,20 @@ function classifyComplexity(request) {
 const providerPool = new Map();
 
 function getProviderForComplexity(complexity) {
-  // Priority order for each complexity level
+  // Cooperative routing — each model does what it's best at
   const routes = {
+    // Skill-based (cooperative delegation)
+    coding:     ['openai', 'claude', 'deepseek', 'gemini'],     // GPT-5.4 leads coding
+    reasoning:  ['claude', 'openai', 'deepseek', 'gemini'],     // Claude leads reasoning
+    math:       ['deepseek', 'openai', 'claude', 'gemini'],     // DeepSeek leads math
+    tooluse:    ['claude', 'openai', 'deepseek'],                // Claude has native tool use
+    multimodal: ['gemini', 'claude', 'openai'],                  // Gemini leads multimodal
+
+    // Complexity-based (legacy, still useful)
     simple:     ['groq', 'cerebras', 'sambanova', 'deepseek', 'gemini'],
     moderate:   ['deepseek', 'gemini', 'groq', 'cerebras'],
-    complex:    ['claude', 'deepseek', 'openai', 'gemini'],
-    multimodal: ['gemini', 'claude', 'openai'],
+    complex:    ['claude', 'openai', 'deepseek', 'gemini'],     // Claude + GPT-5.4 for complex
+
     explicit:   [], // Caller specified model — use activeProvider
   };
 
@@ -1431,10 +1478,12 @@ export function initProvider() {
   }
 
   if (providerPool.size > 1) {
-    console.log(`[wardenclyffe] Smart router: ${providerPool.size} providers in pool — routing by complexity`);
-    console.log(`[wardenclyffe]   simple → ${['groq', 'cerebras', 'sambanova'].filter(n => providerPool.has(n))[0] || 'fallback'}`);
-    console.log(`[wardenclyffe]   moderate → ${['deepseek', 'gemini'].filter(n => providerPool.has(n))[0] || 'fallback'}`);
-    console.log(`[wardenclyffe]   complex → ${['claude', 'deepseek', 'openai'].filter(n => providerPool.has(n))[0] || 'fallback'}`);
+    console.log(`[wardenclyffe] Cooperative router: ${providerPool.size} providers — routing by SKILL`);
+    console.log(`[wardenclyffe]   coding    → ${['openai', 'claude', 'deepseek'].filter(n => providerPool.has(n))[0] || 'fallback'} (GPT-5.4)`);
+    console.log(`[wardenclyffe]   reasoning → ${['claude', 'openai', 'deepseek'].filter(n => providerPool.has(n))[0] || 'fallback'} (Claude)`);
+    console.log(`[wardenclyffe]   math      → ${['deepseek', 'openai', 'claude'].filter(n => providerPool.has(n))[0] || 'fallback'} (DeepSeek)`);
+    console.log(`[wardenclyffe]   multimodal→ ${['gemini', 'claude', 'openai'].filter(n => providerPool.has(n))[0] || 'fallback'} (Gemini)`);
+    console.log(`[wardenclyffe]   simple    → ${['groq', 'cerebras', 'sambanova'].filter(n => providerPool.has(n))[0] || 'fallback'} (free tier)`);
     console.log(`[wardenclyffe] Cascade fallback: ${providerName} → ${fallbackProviders.map(p => p.name).join(' → ')}`);
   } else {
     console.warn('[wardenclyffe] No fallback providers configured. Set CEREBRAS_API_KEY, GROQ_API_KEY, etc. for infinite compute.');

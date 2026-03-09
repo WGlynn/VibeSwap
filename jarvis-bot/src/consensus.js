@@ -67,6 +67,20 @@ const VOTES = {
   REJECT: 'reject',
 };
 
+// ============ Canonical JSON ============
+// JSON.stringify key ordering is NOT stable across engines/versions.
+// Canonical form: recursively sort object keys before stringifying.
+
+function canonicalJSON(obj) {
+  if (obj === null || obj === undefined) return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(canonicalJSON).join(',') + ']';
+  if (typeof obj === 'object') {
+    const sorted = Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k]));
+    return '{' + sorted.join(',') + '}';
+  }
+  return JSON.stringify(obj);
+}
+
 // ============ HMAC Authentication for Inter-Shard Communication ============
 
 function getShardSecret() {
@@ -77,7 +91,7 @@ function signPayload(data) {
   const secret = getShardSecret();
   if (!secret) return null;
   return createHmac('sha256', secret)
-    .update(JSON.stringify(data))
+    .update(canonicalJSON(data))
     .digest('hex');
 }
 
@@ -86,7 +100,7 @@ function verifyShardSignature(body, signature) {
   if (!secret) return false; // Fail-closed: no secret = reject all
   if (!signature || typeof signature !== 'string') return false;
   const expected = createHmac('sha256', secret)
-    .update(JSON.stringify(body))
+    .update(canonicalJSON(body))
     .digest('hex');
   try {
     return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
@@ -96,24 +110,35 @@ function verifyShardSignature(body, signature) {
 }
 
 // ============ Replay Protection ============
-// Track seen proposal IDs to reject duplicates
+// Track seen proposal IDs with per-entry timestamps to reject duplicates.
+// Old entries expire individually (not all at once via global timer).
 
-const seenProposals = new Set();
+const seenProposals = new Map(); // id -> timestamp
 const SEEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+const SEEN_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Cleanup scan every 5 min
 let lastSeenCleanup = Date.now();
 
 function trackProposalId(id) {
-  seenProposals.add(id);
-  // Periodic cleanup
   const now = Date.now();
-  if (now - lastSeenCleanup > SEEN_EXPIRY_MS) {
-    seenProposals.clear(); // Simple: clear all every hour
+  seenProposals.set(id, now);
+  // Periodic cleanup: expire individual entries older than SEEN_EXPIRY_MS
+  if (now - lastSeenCleanup > SEEN_CLEANUP_INTERVAL_MS) {
+    for (const [key, ts] of seenProposals) {
+      if (now - ts > SEEN_EXPIRY_MS) seenProposals.delete(key);
+    }
     lastSeenCleanup = now;
   }
 }
 
 function isReplayedProposal(id) {
-  return seenProposals.has(id);
+  if (!seenProposals.has(id)) return false;
+  // Check if entry has expired (stale entries don't count as replays)
+  const ts = seenProposals.get(id);
+  if (Date.now() - ts > SEEN_EXPIRY_MS) {
+    seenProposals.delete(id);
+    return false;
+  }
+  return true;
 }
 
 // ============ State ============
@@ -343,6 +368,14 @@ export async function handlePrevote(prevote) {
   if (!consensusEnabled) return;
   const state = pendingProposals.get(prevote.proposalId);
   if (!state || state.committed) return;
+
+  // Validate that the prevote's proposal hash matches the actual proposal data hash.
+  // Prevents a byzantine node from voting on a different proposal under the same ID.
+  const expectedHash = hashProposal(state.type, state.data);
+  if (prevote.proposalHash && prevote.proposalHash !== expectedHash) {
+    console.warn(`[consensus] Rejected prevote from ${prevote.shardId}: proposalHash mismatch (got ${prevote.proposalHash}, expected ${expectedHash})`);
+    return;
+  }
 
   state.prevotes.set(prevote.shardId, prevote.vote);
 
@@ -613,7 +646,7 @@ export async function recoverCommittedIds() {
 
 function hashProposal(type, data) {
   return createHash('sha256')
-    .update(JSON.stringify({ type, data }))
+    .update(canonicalJSON({ type, data }))
     .digest('hex')
     .slice(0, 16);
 }
@@ -650,11 +683,20 @@ export function handleConsensusRequest(path, method) {
 }
 
 export async function processConsensusBody(handler, body, signature) {
-  // Authenticate inter-shard messages (fail-closed if secret configured)
-  if (handler !== 'state' && getShardSecret()) {
-    if (!verifyShardSignature(body, signature)) {
-      console.warn(`[consensus] Rejected ${handler}: invalid or missing HMAC signature`);
-      return { error: 'Authentication failed' };
+  // Authenticate inter-shard messages.
+  // Fail-closed in multi-shard mode: if no secret is configured but peers exist, reject.
+  if (handler !== 'state') {
+    const secret = getShardSecret();
+    const peers = getShardPeers();
+    if (!secret && peers.length > 0) {
+      console.warn(`[consensus] Rejected ${handler}: no shard secret configured but ${peers.length} peers exist — fail closed`);
+      return { error: 'Authentication failed: no shard secret configured' };
+    }
+    if (secret) {
+      if (!verifyShardSignature(body, signature)) {
+        console.warn(`[consensus] Rejected ${handler}: invalid or missing HMAC signature`);
+        return { error: 'Authentication failed' };
+      }
     }
   }
 

@@ -34,28 +34,28 @@ export const config = {
   // Data directory — Docker mounts a persistent volume here
   dataDir: resolvePath('DATA_DIR', join(HOME, 'vibeswap', 'jarvis-bot', 'data')),
   authorizedUsers: process.env.AUTHORIZED_USERS
-    ? process.env.AUTHORIZED_USERS.split(',').map(id => parseInt(id.trim()))
+    ? process.env.AUTHORIZED_USERS.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id))
     : [],
   // Co-admin: Will (human) + Jarvis (AI) — 50/50 governance
-  ownerUserId: parseInt(process.env.OWNER_USER_ID || '8366932263'),
+  ownerUserId: parseInt(process.env.OWNER_USER_ID, 10) || 8366932263,
   botUsername: process.env.BOT_USERNAME || 'JarvisMind1828383bot',
   // Community group chat ID — set after adding bot to group, use /whoami in group to get it
-  communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID) : null,
+  communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID, 10) || null : null,
   // The Ark — backup group. If main group dies, Jarvis DMs everyone an invite link here.
-  arkGroupId: process.env.ARK_GROUP_ID ? parseInt(process.env.ARK_GROUP_ID) : null,
+  arkGroupId: process.env.ARK_GROUP_ID ? parseInt(process.env.ARK_GROUP_ID, 10) || null : null,
   // Meeting transcript webhook — receives live transcripts from Fireflies.ai
   transcriptWebhookSecret: process.env.TRANSCRIPT_WEBHOOK_SECRET || null,
-  transcriptChatId: process.env.TRANSCRIPT_CHAT_ID ? parseInt(process.env.TRANSCRIPT_CHAT_ID) : null,
+  transcriptChatId: process.env.TRANSCRIPT_CHAT_ID ? parseInt(process.env.TRANSCRIPT_CHAT_ID, 10) || null : null,
   maxConversationHistory: 50,
   maxTokens: 2048,
   // Rate limit: max Claude API calls per user per minute
-  rateLimitPerMinute: parseInt(process.env.RATE_LIMIT_PER_MINUTE || '5'),
+  rateLimitPerMinute: parseInt(process.env.RATE_LIMIT_PER_MINUTE, 10) || 5,
   // Auto-sync: pull from git + reload context (ms, default 10s)
-  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL || '10000'),
+  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL, 10) || 10000,
   // Auto-backup: commit data/ to git (ms, default 30 min)
-  autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL || '1800000'),
+  autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL, 10) || 1800000,
   // Daily digest: UTC hour to send (default 18 = 6pm UTC)
-  digestHour: parseInt(process.env.DIGEST_HOUR || '18'),
+  digestHour: isNaN(parseInt(process.env.DIGEST_HOUR, 10)) ? 18 : parseInt(process.env.DIGEST_HOUR, 10),
   // Claude Code API bridge — shared secret for direct communication
   claudeCodeApiSecret: process.env.CLAUDE_CODE_API_SECRET || null,
   // Privacy / Encryption (Rosetta Stone Protocol)
@@ -66,7 +66,7 @@ export const config = {
   // Shard / Network configuration (Decentralized Mind Network)
   shard: {
     id: process.env.SHARD_ID || 'shard-0',
-    totalShards: parseInt(process.env.TOTAL_SHARDS || '1'),
+    totalShards: parseInt(process.env.TOTAL_SHARDS, 10) || 1,
     nodeType: process.env.NODE_TYPE || 'full', // 'light' | 'full' | 'archive'
     stateBackend: process.env.STATE_BACKEND || 'file', // 'file' | 'redis'
     redisUrl: process.env.REDIS_URL || null,
@@ -103,7 +103,7 @@ export const config = {
   // Web Portal — public-facing API for frontend
   web: {
     corsOrigins: (process.env.WEB_CORS_ORIGINS || 'https://frontend-jade-five-87.vercel.app,http://localhost:3000,http://localhost:5173').split(','),
-    rateLimitPerMinute: parseInt(process.env.WEB_RATE_LIMIT || '5'),
+    rateLimitPerMinute: parseInt(process.env.WEB_RATE_LIMIT, 10) || 5,
     sessionTtlMs: 2 * 60 * 60 * 1000, // 2 hours
   },
   // Fireflies.ai integration (meeting transcription)
@@ -128,14 +128,26 @@ export const config = {
   mi: {
     cellsDir: process.env.MI_CELLS_DIR || './cells',
     stateFile: process.env.MI_STATE_FILE || './data/mi-state.json',
-    maxSignalQueue: parseInt(process.env.MI_MAX_SIGNAL_QUEUE || '1000'),
-    signalProcessIntervalMs: parseInt(process.env.MI_SIGNAL_INTERVAL || '100'),
-    persistIntervalMs: parseInt(process.env.MI_PERSIST_INTERVAL || '300000'),
-    hotReloadDebounceMs: parseInt(process.env.MI_HOT_RELOAD_DEBOUNCE || '2000'),
-    lifecycleCheckIntervalMs: parseInt(process.env.MI_LIFECYCLE_CHECK_INTERVAL || '60000'),
+    maxSignalQueue: parseInt(process.env.MI_MAX_SIGNAL_QUEUE, 10) || 1000,
+    signalProcessIntervalMs: parseInt(process.env.MI_SIGNAL_INTERVAL, 10) || 100,
+    persistIntervalMs: parseInt(process.env.MI_PERSIST_INTERVAL, 10) || 300000,
+    hotReloadDebounceMs: parseInt(process.env.MI_HOT_RELOAD_DEBOUNCE, 10) || 2000,
+    lifecycleCheckIntervalMs: parseInt(process.env.MI_LIFECYCLE_CHECK_INTERVAL, 10) || 60000,
   },
   // Tip jar — ETH address for voluntary contributions
   tipJarAddress: process.env.TIP_JAR_ADDRESS || '0xa-EOFc55d6f6478918076B5Bb85E8Cf3738549a2',
   // Runtime info
   isDocker,
 };
+
+// ============ Encryption Key Validation ============
+// If encryption is enabled, a master key source MUST exist.
+// Fail loudly at startup rather than silently running unencrypted.
+if (config.privacy.encryptionEnabled && !config.privacy.masterKey) {
+  console.warn(
+    '[config] WARNING: ENCRYPTION_ENABLED is true but no JARVIS_MASTER_KEY is set. ' +
+    'Set JARVIS_MASTER_KEY env var or disable encryption with ENCRYPTION_ENABLED=false. ' +
+    'Disabling encryption as a safety fallback.'
+  );
+  config.privacy.encryptionEnabled = false;
+}

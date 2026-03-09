@@ -43,7 +43,7 @@ const PROVIDERS = {
   '1': { id: 'claude', name: 'Claude (Anthropic)', model: 'claude-sonnet-4-5-20250929', keyEnv: 'ANTHROPIC_API_KEY', keyPrefix: 'sk-ant-' },
   '2': { id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat', keyEnv: 'DEEPSEEK_API_KEY', keyPrefix: 'sk-' },
   '3': { id: 'gemini', name: 'Gemini (Google)', model: 'gemini-2.0-flash', keyEnv: 'GEMINI_API_KEY', keyPrefix: 'AIza' },
-  '4': { id: 'openai', name: 'OpenAI', model: 'gpt-4o', keyEnv: 'OPENAI_API_KEY', keyPrefix: 'sk-' },
+  '4': { id: 'openai', name: 'OpenAI', model: 'gpt-5.4', keyEnv: 'OPENAI_API_KEY', keyPrefix: 'sk-' },
 };
 
 const PROVIDER_HELP = {

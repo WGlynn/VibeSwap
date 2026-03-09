@@ -838,8 +838,8 @@ function SwapCore() {
 
   // Use swapTokens from hook, fall back to sensible defaults
   const TOKENS = swapTokens.length > 0 ? swapTokens : [
-    { symbol: 'ETH', name: 'Ethereum', logo: '\u27E0', price: 2847.32, balance: '2.5', address: null, decimals: 18 },
-    { symbol: 'USDC', name: 'USD Coin', logo: '$', price: 1.00, balance: '5,000', address: null, decimals: 6 },
+    { symbol: 'ETH', name: 'Ethereum', logo: '\u27E0', price: window.__vibePriceCache?.ETH || 2800, balance: '0', address: null, decimals: 18 },
+    { symbol: 'USDC', name: 'USD Coin', logo: '$', price: 1.00, balance: '0', address: null, decimals: 6 },
   ]
 
   const [fromToken, setFromToken] = useState(TOKENS[0])

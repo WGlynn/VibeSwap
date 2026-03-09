@@ -147,6 +147,7 @@ export async function archiveThread(chatId, chatTitle, requestedBy) {
 
   try {
     const response = await llmChat({
+      _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       system: `Summarize this community discussion thread in 2-3 sentences. Also extract 1-3 topic tags. Return JSON: { "summary": "...", "topics": ["topic1", "topic2"] }`,

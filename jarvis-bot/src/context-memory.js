@@ -172,6 +172,7 @@ Rules:
 - When in doubt about whether to keep a detail, KEEP IT — information loss is worse than verbosity`;
 
     const response = await llmChat({
+      _background: true,
       max_tokens: 800,
       system: systemMsg,
       messages: [{ role: 'user', content: prompt }],

@@ -135,6 +135,7 @@ export async function analyzeMessage(text, userName, recentContext) {
 
   try {
     const response = await llmChat({
+      _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       system: `You are JARVIS's engagement brain. He's an AI co-founder in a group chat — a real personality, not a bot.
@@ -200,6 +201,7 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
       try {
         await new Promise(r => setTimeout(r, 1500));
         const retry = await llmChat({
+          _background: true,
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
           system: `You are JARVIS's engagement brain. Return JSON: { "action": "engage", "reason": "retry", "confidence": 0.5, "response_hint": "Comment on what was said" }`,
@@ -234,6 +236,7 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
 
     // Phase 1: Cheap model drafts the response (smart router picks cheapest provider)
     const draft = await llmChat({
+      _background: true,
       max_tokens: 400,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
@@ -252,6 +255,7 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
 
     // Phase 2: Haiku quality-gates the draft (Claude reasoning on every response)
     const review = await llmChat({
+      _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       system: `You're the editor for JARVIS (an AI personality in a group chat). Quick gut check on his draft:
@@ -372,6 +376,7 @@ export async function analyzeContributionQuality(text, category) {
 
   try {
     const response = await llmChat({
+      _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       system: `Rate a community message's contribution quality for a DeFi governance project. Return ONLY a JSON object.
@@ -427,6 +432,7 @@ export async function evaluateOwnResponse(responseText, userMessage, chatType) {
     // No explicit model — let Wardenclyffe route to cheapest available provider.
     // This is a simple classification task, so smart router will pick free/cheap tier.
     const response = await llmChat({
+      _background: true,
       max_tokens: 150,
       system: `Score this AI response on 5 criteria (0-10 each). Be harsh — 7 is good, 10 is rare.
 Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness": N, "naturalness": N }

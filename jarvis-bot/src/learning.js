@@ -403,6 +403,7 @@ export async function detectCorrection(userMessage, previousJarvisResponse, user
 
   try {
     const response = await llmChat({
+      _background: true,
       max_tokens: 400,
       system: `You detect when a user is correcting an AI assistant. Analyze whether the user's message corrects something the assistant said previously.
 
@@ -453,6 +454,7 @@ Important: Disagreement is NOT a correction. The user must be saying the AI is W
 async function extractLesson(correction, userMessage, context) {
   try {
     const response = await llmChat({
+      _background: true,
       max_tokens: 300,
       system: `Extract a concise, actionable lesson from a correction. The lesson should be written as an instruction that a future AI can follow.
 
@@ -1222,6 +1224,7 @@ export async function compressCKB(userId) {
     ).join('\n');
 
     const response = await llmChat({
+      _background: true,
       max_tokens: 600,
       system: `You compress knowledge by merging related facts into denser statements. Given a numbered list of facts, identify groups that can be merged. Return JSON:
 {

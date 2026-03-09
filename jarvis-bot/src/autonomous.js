@@ -266,6 +266,7 @@ async function generateMarketComment(event) {
 - "SOL down 5% — another day, another halt."`;
 
     const response = await llmChat({
+      _background: true, // Isolated circuit breaker — can't poison user-facing cascade
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       system: `${getPersonaSystemPrompt()} You just noticed a price move and cannot help but comment on it. 1-2 sentences max. Never say "I noticed" or "It appears that." ${examples}`,
@@ -320,6 +321,7 @@ async function generateImpulse(chatId) {
     };
 
     const response = await llmChat({
+      _background: true, // Isolated circuit breaker — can't poison user-facing cascade
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       system: getPersonaSystemPrompt(),
@@ -357,6 +359,7 @@ async function generateBoredomMessage(chatId, silenceMs) {
     const prompt = boredomPrompts[Math.floor(Math.random() * boredomPrompts.length)];
 
     const response = await llmChat({
+      _background: true, // Isolated circuit breaker — can't poison user-facing cascade
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       system: getPersonaSystemPrompt(),

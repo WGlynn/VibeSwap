@@ -17,6 +17,9 @@ import { gitCommitAndPush } from './git.js';
 import { processConversation as processCKBConversation, getUserCKB } from './ckb-generator.js';
 import { gate as verificationGate, auditResponse } from './verification-gate.js';
 import { createTask, DEFER_TASK_TOOL, TASK_TOOL_GROUP_NAME, TASK_TOOL_NAMES } from './task-queue.js';
+import { WALLET_TOOLS, WALLET_TOOL_NAMES, handleWalletTool } from './wallet.js';
+import { SOCIAL_TOOLS, SOCIAL_TOOL_NAMES, handleSocialTool } from './social.js';
+import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -875,6 +878,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     education: ['explain_concept', 'crypto_glossary', 'vibeswap_explainer',
                 'crypto_tutorial', 'crypto_calendar', 'crypto_quiz'],
     tasks: TASK_TOOL_NAMES,
+    wallet: WALLET_TOOL_NAMES,
+    social_outbound: SOCIAL_TOOL_NAMES,
+    proactive: PROACTIVE_TOOL_NAMES,
   };
 
   function selectTools(msg, allTools) {
@@ -910,6 +916,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     }
     if (/explain|glossary|define|what is|tutorial|learn|teach|vibeswap|calendar|event|challenge|quiz/.test(lc)) {
       selected.add('education');
+    }
+    if (/wallet|balance|send|sign|transaction|eth |wei|fund|treasury|pay|tip|whitelist/.test(lc)) {
+      selected.add('wallet');
+    }
+    if (/tweet|post|social|twitter|discord|github issue|announce|share|publish|spread/.test(lc)) {
+      selected.add('social_outbound');
+    }
+    if (/proactive|autonomous|schedule post|auto.?post|content|market pulse|thought/.test(lc)) {
+      selected.add('proactive');
     }
     // Tasks — always available so Jarvis can defer work instead of hallucinating promises
     selected.add('tasks');
@@ -1540,6 +1555,12 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     },
     // ============ Task Queue — Deferred Execution ============
     DEFER_TASK_TOOL,
+    // ============ Sovereign Wallet — On-Chain Agency ============
+    ...WALLET_TOOLS,
+    // ============ Social Presence — Outbound Voice ============
+    ...SOCIAL_TOOLS,
+    // ============ Proactive Engine — Autonomous Actions ============
+    ...PROACTIVE_TOOLS,
   ];
 
   // Select only relevant tools based on message content
@@ -2075,6 +2096,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = await getCryptoQuiz(tb.input?.topic);
           } catch (err) { result = `Failed: ${err.message}`; }
           console.log('[claude] Tool: crypto_quiz');
+        } else if (WALLET_TOOL_NAMES.includes(tb.name)) {
+          result = await handleWalletTool(tb.name, tb.input);
+          console.log(`[claude] Tool: ${tb.name}`);
+        } else if (SOCIAL_TOOL_NAMES.includes(tb.name)) {
+          result = await handleSocialTool(tb.name, tb.input);
+          console.log(`[claude] Tool: ${tb.name}`);
+        } else if (PROACTIVE_TOOL_NAMES.includes(tb.name)) {
+          result = await handleProactiveTool(tb.name, tb.input);
+          console.log(`[claude] Tool: ${tb.name}`);
         } else if (tb.name === 'defer_task') {
           const taskResult = createTask({
             type: tb.input.type || 'llm_query',

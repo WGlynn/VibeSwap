@@ -58,6 +58,9 @@ class TruncatedResponseError extends Error {
 // provider and reference Jarvis-specific tools, the safest approach is to flatten them
 // to plain text before sending to fallback providers.
 
+// Providers that support vision (image input)
+const VISION_PROVIDERS = new Set(['claude', 'openai', 'gemini', 'xai']);
+
 function flattenToolExchanges(messages) {
   // Strip tool_use/tool_result blocks entirely — fallback models don't need them
   // and will echo ANY visible format (brackets, parens, natural language) as text.
@@ -78,6 +81,36 @@ function flattenToolExchanges(messages) {
     const flatText = textParts.join('\n').trim();
     return flatText ? { role: msg.role, content: flatText } : null;
   }).filter(Boolean);
+}
+
+/**
+ * Strip image/document blocks from messages for non-vision providers.
+ * Replaces image blocks with text descriptions so the LLM knows an image was sent.
+ */
+function stripMediaBlocks(messages) {
+  return messages.map(msg => {
+    if (!Array.isArray(msg.content)) return msg;
+
+    const hasMedia = msg.content.some(b => b.type === 'image' || b.type === 'document');
+    if (!hasMedia) return msg;
+
+    const newContent = [];
+    for (const block of msg.content) {
+      if (block.type === 'image') {
+        newContent.push({ type: 'text', text: '[The user sent an image, but this model does not support vision. Describe that you cannot see images and suggest they try again when a vision-capable model is active.]' });
+      } else if (block.type === 'document') {
+        newContent.push({ type: 'text', text: '[The user sent a document, but this model does not support document input.]' });
+      } else {
+        newContent.push(block);
+      }
+    }
+
+    // If all blocks became text, flatten to string
+    if (newContent.every(b => b.type === 'text')) {
+      return { role: msg.role, content: newContent.map(b => b.text).join('\n') };
+    }
+    return { ...msg, content: newContent };
+  });
 }
 
 // ============ Provider Registry ============
@@ -1659,6 +1692,11 @@ export async function llmChat(request) {
     request = { ...request, messages: flattenToolExchanges(request.messages) };
   }
 
+  // Strip image/document blocks for non-vision providers — they'll crash on base64 image data
+  if (!VISION_PROVIDERS.has(routedProvider.name) && request.messages) {
+    request = { ...request, messages: stripMediaBlocks(request.messages) };
+  }
+
   // Circuit breaker check — skip providers that are currently open
   // Background tasks use isolated breaker pool so they can't poison user-facing requests
   const routedCB = getCircuitBreaker(routedProvider.name, bg);
@@ -1737,6 +1775,10 @@ export async function llmChat(request) {
         const { model, tools, ...rest } = request;
         if (rest.messages) {
           rest.messages = flattenToolExchanges(rest.messages);
+          // Strip image blocks for non-vision fallback providers
+          if (!VISION_PROVIDERS.has(activeProvider.name)) {
+            rest.messages = stripMediaBlocks(rest.messages);
+          }
         }
 
         // Try each fallback provider until one succeeds

@@ -99,6 +99,7 @@ export const config = {
     sambanovaApiKey: process.env.SAMBANOVA_API_KEY || null,
     fireworksApiKey: process.env.FIREWORKS_API_KEY || null,
     novitaApiKey: process.env.NOVITA_API_KEY || null,
+    xaiApiKey: process.env.XAI_API_KEY || null,
   },
   // Web Portal — public-facing API for frontend
   web: {

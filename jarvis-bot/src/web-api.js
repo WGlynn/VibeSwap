@@ -31,66 +31,65 @@ import { createHmac } from 'crypto';
 
 // ============ Rate Limiter ============
 
-const rateBuckets = new Map(); // IP -> [timestamps]
-const miningRateBuckets = new Map(); // IP -> [timestamps]
+const rateBuckets = new Map(); // IP -> { timestamps: [], lastAccess: number }
+const miningRateBuckets = new Map(); // IP -> { timestamps: [], lastAccess: number }
 const RATE_LIMIT = config.web?.rateLimitPerMinute || 5;
 const MINING_RATE_LIMIT = 10; // mining submissions per minute per IP
 const RATE_WINDOW = 60_000; // 1 minute
 const MAX_TRACKED_IPS = 10000;
 
-function pruneOldestBuckets(map) {
+function evictLRU(map) {
   if (map.size <= MAX_TRACKED_IPS) return;
-  // Drop oldest entries (Map preserves insertion order)
+  // Evict least recently used entries (by lastAccess timestamp)
+  const entries = [...map.entries()];
+  entries.sort((a, b) => a[1].lastAccess - b[1].lastAccess);
   const excess = map.size - MAX_TRACKED_IPS;
-  let removed = 0;
-  for (const key of map.keys()) {
-    if (removed >= excess) break;
-    map.delete(key);
-    removed++;
+  for (let i = 0; i < excess; i++) {
+    map.delete(entries[i][0]);
   }
 }
 
 function checkRateLimit(ip) {
   const now = Date.now();
-  const bucket = rateBuckets.get(ip) || [];
+  const entry = rateBuckets.get(ip) || { timestamps: [], lastAccess: now };
   // Prune old entries
-  const recent = bucket.filter(t => now - t < RATE_WINDOW);
+  const recent = entry.timestamps.filter(t => now - t < RATE_WINDOW);
   if (recent.length >= RATE_LIMIT) {
-    rateBuckets.set(ip, recent);
+    rateBuckets.set(ip, { timestamps: recent, lastAccess: now });
     return false;
   }
   recent.push(now);
-  rateBuckets.set(ip, recent);
-  pruneOldestBuckets(rateBuckets);
+  rateBuckets.set(ip, { timestamps: recent, lastAccess: now });
+  evictLRU(rateBuckets);
   return true;
 }
 
 function checkMiningRateLimit(ip) {
   const now = Date.now();
-  const bucket = miningRateBuckets.get(ip) || [];
-  const recent = bucket.filter(t => now - t < RATE_WINDOW);
+  const entry = miningRateBuckets.get(ip) || { timestamps: [], lastAccess: now };
+  const recent = entry.timestamps.filter(t => now - t < RATE_WINDOW);
   if (recent.length >= MINING_RATE_LIMIT) {
-    miningRateBuckets.set(ip, recent);
+    miningRateBuckets.set(ip, { timestamps: recent, lastAccess: now });
     return false;
   }
   recent.push(now);
-  miningRateBuckets.set(ip, recent);
-  pruneOldestBuckets(miningRateBuckets);
+  miningRateBuckets.set(ip, { timestamps: recent, lastAccess: now });
+  evictLRU(miningRateBuckets);
   return true;
 }
 
 // Periodic cleanup (every 5 min)
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, bucket] of rateBuckets) {
-    const recent = bucket.filter(t => now - t < RATE_WINDOW);
+  for (const [ip, entry] of rateBuckets) {
+    const recent = entry.timestamps.filter(t => now - t < RATE_WINDOW);
     if (recent.length === 0) rateBuckets.delete(ip);
-    else rateBuckets.set(ip, recent);
+    else rateBuckets.set(ip, { timestamps: recent, lastAccess: entry.lastAccess });
   }
-  for (const [ip, bucket] of miningRateBuckets) {
-    const recent = bucket.filter(t => now - t < RATE_WINDOW);
+  for (const [ip, entry] of miningRateBuckets) {
+    const recent = entry.timestamps.filter(t => now - t < RATE_WINDOW);
     if (recent.length === 0) miningRateBuckets.delete(ip);
-    else miningRateBuckets.set(ip, recent);
+    else miningRateBuckets.set(ip, { timestamps: recent, lastAccess: entry.lastAccess });
   }
 }, 5 * 60_000);
 
@@ -128,14 +127,27 @@ function addCorsHeaders(res, req) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Secret, X-Telegram-Init-Data');
   res.setHeader('Access-Control-Max-Age', '86400');
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 }
 
 // ============ Helpers ============
 
 function getClientIP(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+  // SECURITY: x-forwarded-for is only trustworthy when running behind a known reverse proxy
+  // (Fly.io sets this header reliably). If exposed directly to the internet without a proxy,
+  // clients can spoof this header to bypass rate limiting. In that case, use req.socket.remoteAddress only.
+  if (config.isDocker || process.env.FLY_APP_NAME) {
+    // Behind Fly.io proxy — trust x-forwarded-for (first entry = real client IP)
+    return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+  }
+  // Local/direct exposure — do not trust x-forwarded-for
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 const MAX_BODY_SIZE = 64 * 1024; // 64 KB max request body
@@ -376,6 +388,16 @@ export async function handleWebRequest(req, res, pathname) {
 
   // ============ GET /web/health ============
   if (pathname === '/web/health' && req.method === 'GET') {
+    // Check if request is authenticated (API secret)
+    const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
+    const isAuthenticated = apiSecret && req.headers['x-api-secret'] === apiSecret;
+
+    if (!isAuthenticated) {
+      // Minimal info for unauthenticated requests
+      jsonResponse(res, 200, { status: 'ok', uptime: Math.round(process.uptime()) });
+      return true;
+    }
+
     const cached = getCached('/web/health');
     if (cached) { jsonResponse(res, 200, cached); return true; }
     const healthData = {
@@ -395,6 +417,14 @@ export async function handleWebRequest(req, res, pathname) {
   // ============ GET /web/relay ============
   // Claude Code polls this for pending commands from mobile
   if (pathname === '/web/relay' && req.method === 'GET') {
+    const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
+    if (apiSecret && req.headers['x-api-secret'] !== apiSecret) {
+      const initData = req.headers['x-telegram-init-data'];
+      if (!initData || !validateTelegramInitData(initData)) {
+        jsonResponse(res, 401, { error: 'Unauthorized' });
+        return true;
+      }
+    }
     const pending = getPendingCommands();
     jsonResponse(res, 200, { pending, count: pending.length });
     return true;
@@ -403,6 +433,14 @@ export async function handleWebRequest(req, res, pathname) {
   // ============ POST /web/relay/ack ============
   // Claude Code acknowledges a command
   if (pathname === '/web/relay/ack' && req.method === 'POST') {
+    const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
+    if (apiSecret && req.headers['x-api-secret'] !== apiSecret) {
+      const initData = req.headers['x-telegram-init-data'];
+      if (!initData || !validateTelegramInitData(initData)) {
+        jsonResponse(res, 401, { error: 'Unauthorized' });
+        return true;
+      }
+    }
     try {
       const body = JSON.parse(await readBody(req));
       if (body.all) {
@@ -832,12 +870,16 @@ export async function handleWebRequest(req, res, pathname) {
       if (userName) markIdentified(sessionId);
 
       // Set up SSE
-      res.writeHead(200, {
+      const sseHeaders = {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': req.headers.origin || '*',
-      });
+      };
+      const sseOrigin = req.headers.origin || '';
+      if (ALLOWED_ORIGINS.includes(sseOrigin) || ALLOWED_ORIGINS.includes('*')) {
+        sseHeaders['Access-Control-Allow-Origin'] = sseOrigin;
+      }
+      res.writeHead(200, sseHeaders);
 
       // Send "thinking" event immediately
       res.write(`data: ${JSON.stringify({ type: 'thinking' })}\n\n`);
@@ -913,12 +955,16 @@ export async function handleWebRequest(req, res, pathname) {
       const audioBuffer = await readFile(voicePath);
       await ttsCleanup(voicePath);
 
-      res.writeHead(200, {
+      const ttsHeaders = {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuffer.length,
-        'Access-Control-Allow-Origin': req.headers.origin || '*',
         'Cache-Control': 'no-cache',
-      });
+      };
+      const ttsOrigin = req.headers.origin || '';
+      if (ALLOWED_ORIGINS.includes(ttsOrigin) || ALLOWED_ORIGINS.includes('*')) {
+        ttsHeaders['Access-Control-Allow-Origin'] = ttsOrigin;
+      }
+      res.writeHead(200, ttsHeaders);
       res.end(audioBuffer);
     } catch (err) {
       console.error('[web-api] TTS error:', err.message);

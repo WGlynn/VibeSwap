@@ -194,6 +194,9 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
 
         if (!config.enabled) return;
 
+        // Verify this breaker was actually configured (cooldownPeriod > 0)
+        require(config.cooldownPeriod > 0, "Breaker not configured");
+
         if (state.tripped) {
             // Check if cooldown has passed
             if (block.timestamp < state.trippedAt + config.cooldownPeriod) {

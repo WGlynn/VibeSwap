@@ -8,7 +8,7 @@
   body { background: #0a0a0a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; padding: 20px; }
   h1 { color: #00d4ff; margin-bottom: 10px; font-size: 24px; }
   .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
-  .controls { display: flex; gap: 12px; margin-bottom: 20px; }
+  .controls { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
   button { padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
   #startBtn { background: #00d4ff; color: #000; }
   #startBtn:hover { background: #00b8e0; }
@@ -28,18 +28,21 @@
   .log-entry.jarvis { color: #00ff88; }
   .log-entry.system { color: #888; }
   .log-entry.error { color: #ff4444; }
-  .config { margin-bottom: 20px; display: flex; gap: 12px; align-items: center; }
+  .config { margin-bottom: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .config label { color: #888; font-size: 13px; }
-  .config select { background: #222; color: #fff; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; }
+  .config select { background: #222; color: #fff; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; max-width: 300px; }
+  .config input[type="text"] { background: #222; color: #fff; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; width: 340px; font-family: monospace; font-size: 12px; }
   .manual { display: flex; gap: 8px; margin-bottom: 20px; }
   .manual input { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
   .manual button { background: #00d4ff; color: #000; padding: 10px 20px; }
+  .level-meter { width: 200px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+  .level-bar { height: 100%; background: #00ff88; width: 0%; transition: width 50ms; }
 </style>
 </head>
 <body>
 
 <h1>JARVIS Voice Bridge</h1>
-<p class="subtitle">Routes Google Meet audio → Jarvis → back to Meet via VB-Cable</p>
+<p class="subtitle">Routes Google Meet audio -> Jarvis -> back to Meet via VB-Cable | Whisper STT</p>
 
 <div class="config">
   <label>Input (from Meet):</label>
@@ -49,20 +52,25 @@
   <button onclick="loadDevices()" style="background:#333;color:#fff;padding:6px 12px;font-size:12px;">Refresh</button>
 </div>
 
+<div class="config">
+  <label>OpenAI Key:</label>
+  <input type="text" id="apiKey" placeholder="sk-proj-..." value="">
+  <button onclick="saveKey()" style="background:#333;color:#fff;padding:6px 12px;font-size:12px;">Save</button>
+  <span id="keyStatus" style="color:#888;font-size:12px;"></span>
+</div>
+
 <div class="controls">
   <button id="startBtn" onclick="toggleBridge()">Start Listening</button>
   <button id="stopBtn" onclick="stopBridge()">Stop</button>
+  <div class="level-meter"><div class="level-bar" id="levelBar"></div></div>
   <label style="display:flex;align-items:center;gap:6px;color:#888;font-size:13px;">
-    <input type="checkbox" id="autoListen" checked> Auto-resume listening
-  </label>
-  <label style="display:flex;align-items:center;gap:6px;color:#888;font-size:13px;">
-    <input type="checkbox" id="silenceFilter" checked> Filter silence/noise
+    <input type="checkbox" id="silenceFilter" checked> Voice activity detection
   </label>
 </div>
 
 <div class="status">
   <div class="dot idle" id="statusDot"></div>
-  <span id="statusText">Idle — click Start to begin</span>
+  <span id="statusText">Idle -- click Start to begin</span>
 </div>
 
 <div class="manual">
@@ -75,22 +83,49 @@
 <script>
 const JARVIS_CHAT = 'https://jarvis-vibeswap.fly.dev/web/chat/stream';
 const JARVIS_TTS = 'https://jarvis-vibeswap.fly.dev/web/tts';
+const WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
-let recognition = null;
 let isListening = false;
 let isSpeaking = false;
 let isProcessing = false;
-let audioContext = null;
 let currentAudio = null;
-let conversationId = 'voice-bridge-' + Date.now();
-let silenceTimeout = null;
-let transcript = '';
+let sessionId = 'voice-bridge-' + Date.now();
+
+// Audio capture state
+let mediaStream = null;
+let audioContext = null;
+let analyserNode = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let silenceTimer = null;
+let speechDetected = false;
+let recordingStartTime = 0;
+
+const SILENCE_THRESHOLD = 0.015; // RMS threshold for "silence"
+const SPEECH_TIMEOUT = 1500;     // ms of silence before processing
+const MIN_RECORDING_MS = 500;    // minimum recording length to bother transcribing
+
+// ============ API Key Management ============
+
+function saveKey() {
+  const key = document.getElementById('apiKey').value.trim();
+  if (key) {
+    localStorage.setItem('openai_api_key', key);
+    document.getElementById('keyStatus').textContent = 'Saved';
+    log('system', 'API key saved to localStorage');
+  }
+}
+
+function getKey() {
+  const field = document.getElementById('apiKey').value.trim();
+  if (field) return field;
+  return localStorage.getItem('openai_api_key') || '';
+}
 
 // ============ Audio Device Setup ============
 
 async function loadDevices() {
   try {
-    // Need permission first
     await navigator.mediaDevices.getUserMedia({ audio: true });
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs = devices.filter(d => d.kind === 'audioinput');
@@ -105,7 +140,6 @@ async function loadDevices() {
       const opt = document.createElement('option');
       opt.value = d.deviceId;
       opt.textContent = d.label || `Mic ${inputSelect.options.length + 1}`;
-      // Auto-select VB-Cable output (what comes FROM Meet)
       if (d.label.toLowerCase().includes('cable output') || d.label.toLowerCase().includes('vb-audio')) {
         opt.selected = true;
       }
@@ -116,7 +150,6 @@ async function loadDevices() {
       const opt = document.createElement('option');
       opt.value = d.deviceId;
       opt.textContent = d.label || `Speaker ${outputSelect.options.length + 1}`;
-      // Auto-select VB-Cable input (what goes TO Meet)
       if (d.label.toLowerCase().includes('cable input') || d.label.toLowerCase().includes('vb-audio')) {
         opt.selected = true;
       }
@@ -129,74 +162,195 @@ async function loadDevices() {
   }
 }
 
-// ============ Speech Recognition ============
+// ============ Whisper STT (replaces Web Speech API) ============
 
-function createRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    log('error', 'Speech Recognition not supported — use Chrome');
-    return null;
+async function startCapture() {
+  const deviceId = document.getElementById('inputDevice').value;
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: deviceId ? { exact: deviceId } : undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      }
+    });
+
+    // Set up analyser for voice activity detection
+    audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    analyserNode = audioContext.createAnalyser();
+    analyserNode.fftSize = 2048;
+    source.connect(analyserNode);
+
+    startVADLoop();
+    startRecording();
+
+    log('system', 'Audio capture started (Whisper STT)');
+  } catch (e) {
+    log('error', 'Failed to capture audio: ' + e.message);
+    isListening = false;
+  }
+}
+
+function startRecording() {
+  recordedChunks = [];
+  speechDetected = false;
+  recordingStartTime = Date.now();
+
+  mediaRecorder = new MediaRecorder(mediaStream, {
+    mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm'
+  });
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+
+  mediaRecorder.onstop = async () => {
+    if (!isListening) return;
+
+    const duration = Date.now() - recordingStartTime;
+    if (speechDetected && duration > MIN_RECORDING_MS && recordedChunks.length > 0) {
+      const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+      if (blob.size > 1000) { // skip tiny blobs
+        await transcribeAndProcess(blob);
+      }
+    }
+
+    // Start next recording cycle
+    if (isListening && !isSpeaking) {
+      startRecording();
+    }
+  };
+
+  mediaRecorder.start(250); // collect data every 250ms
+}
+
+function startVADLoop() {
+  const dataArray = new Float32Array(analyserNode.fftSize);
+
+  function checkLevel() {
+    if (!isListening) return;
+
+    analyserNode.getFloatTimeDomainData(dataArray);
+
+    // Calculate RMS
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i] * dataArray[i];
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
+
+    // Update level meter
+    const bar = document.getElementById('levelBar');
+    bar.style.width = Math.min(100, rms * 500) + '%';
+    bar.style.background = rms > SILENCE_THRESHOLD ? '#00ff88' : '#444';
+
+    const useVAD = document.getElementById('silenceFilter').checked;
+
+    if (rms > SILENCE_THRESHOLD) {
+      speechDetected = true;
+      clearTimeout(silenceTimer);
+      setStatus('listening', `Hearing speech (${(rms * 100).toFixed(1)})`);
+
+      silenceTimer = setTimeout(() => {
+        if (isListening && mediaRecorder && mediaRecorder.state === 'recording') {
+          setStatus('thinking', 'Processing speech...');
+          mediaRecorder.stop(); // triggers onstop -> transcribe
+        }
+      }, SPEECH_TIMEOUT);
+    } else if (!useVAD && speechDetected) {
+      // No VAD mode: still use silence detection
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        if (isListening && mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+      }, SPEECH_TIMEOUT);
+    }
+
+    requestAnimationFrame(checkLevel);
   }
 
-  const r = new SpeechRecognition();
-  r.continuous = true;
-  r.interimResults = true;
-  r.lang = 'en-US';
-  r.maxAlternatives = 1;
-
-  r.onresult = (event) => {
-    let interim = '';
-    let finalText = '';
-
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (result.isFinal) {
-        finalText += result[0].transcript;
-      } else {
-        interim += result[0].transcript;
-      }
-    }
-
-    if (interim) {
-      setStatus('listening', `Hearing: "${interim.trim()}"`);
-    }
-
-    if (finalText) {
-      const text = finalText.trim();
-      if (text && (!document.getElementById('silenceFilter').checked || text.length > 2)) {
-        // Accumulate transcript, wait for pause
-        transcript += (transcript ? ' ' : '') + text;
-        clearTimeout(silenceTimeout);
-        silenceTimeout = setTimeout(() => {
-          if (transcript.trim()) {
-            const full = transcript.trim();
-            transcript = '';
-            processInput(full);
-          }
-        }, 1500); // 1.5s pause = end of utterance
-      }
-    }
-  };
-
-  r.onerror = (event) => {
-    if (event.error === 'no-speech') return; // Normal
-    if (event.error === 'aborted') return;
-    log('error', `Speech error: ${event.error}`);
-  };
-
-  r.onend = () => {
-    if (isListening && document.getElementById('autoListen').checked && !isSpeaking) {
-      // Auto-restart
-      setTimeout(() => {
-        if (isListening && !isSpeaking) {
-          try { r.start(); } catch(e) {}
-        }
-      }, 300);
-    }
-  };
-
-  return r;
+  requestAnimationFrame(checkLevel);
 }
+
+async function transcribeAndProcess(audioBlob) {
+  const apiKey = getKey();
+  if (!apiKey) {
+    log('error', 'No OpenAI API key set -- enter it above');
+    return;
+  }
+
+  setStatus('thinking', 'Transcribing with Whisper...');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'en');
+
+    const response = await fetch(WHISPER_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      log('error', `Whisper API ${response.status}: ${errText.slice(0, 200)}`);
+      return;
+    }
+
+    const result = await response.json();
+    const text = result.text?.trim();
+
+    if (!text || text.length < 2) {
+      setStatus('listening', 'Listening for speech...');
+      return;
+    }
+
+    // Filter out Whisper hallucinations on silence
+    const hallucinations = [
+      'thank you', 'thanks for watching', 'subscribe', 'you', 'bye',
+      'thank you for watching', 'the end', 'thanks', 'so',
+    ];
+    if (hallucinations.includes(text.toLowerCase())) {
+      setStatus('listening', 'Listening for speech...');
+      return;
+    }
+
+    processInput(text);
+  } catch (e) {
+    log('error', `Transcription failed: ${e.message}`);
+  }
+}
+
+function stopCapture() {
+  clearTimeout(silenceTimer);
+
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  mediaRecorder = null;
+
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+  }
+
+  document.getElementById('levelBar').style.width = '0%';
+}
+
+// ============ Bridge Controls ============
 
 function toggleBridge() {
   if (isListening) {
@@ -207,28 +361,23 @@ function toggleBridge() {
 }
 
 function startListening() {
-  if (!recognition) {
-    recognition = createRecognition();
-    if (!recognition) return;
+  if (!getKey()) {
+    log('error', 'Enter your OpenAI API key first (for Whisper STT)');
+    return;
   }
 
-  try {
-    recognition.start();
-    isListening = true;
-    document.getElementById('startBtn').textContent = 'Listening...';
-    document.getElementById('startBtn').classList.add('active');
-    setStatus('listening', 'Listening for speech...');
-    log('system', 'Voice bridge active — listening for speech');
-  } catch (e) {
-    log('error', 'Failed to start: ' + e.message);
-  }
+  isListening = true;
+  document.getElementById('startBtn').textContent = 'Listening...';
+  document.getElementById('startBtn').classList.add('active');
+  setStatus('listening', 'Listening for speech...');
+  log('system', 'Voice bridge active -- Whisper STT + Jarvis chat + TTS');
+
+  startCapture();
 }
 
 function stopListening() {
   isListening = false;
-  if (recognition) {
-    try { recognition.stop(); } catch(e) {}
-  }
+  stopCapture();
   document.getElementById('startBtn').textContent = 'Start Listening';
   document.getElementById('startBtn').classList.remove('active');
   setStatus('idle', 'Stopped');
@@ -256,28 +405,23 @@ async function processInput(text) {
   isProcessing = true;
   log('human', text);
 
-  // Pause listening while Jarvis responds
-  if (recognition && isListening) {
-    try { recognition.stop(); } catch(e) {}
-  }
-
+  // Pause capture while Jarvis responds to avoid feedback
+  stopCapture();
   setStatus('thinking', 'Jarvis is thinking...');
 
   try {
-    // Get Jarvis response via SSE
     const response = await fetch(JARVIS_CHAT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: text,
-        conversationId: conversationId,
+        sessionId: sessionId,
         platform: 'voice-bridge'
       })
     });
 
     if (!response.ok) throw new Error(`Chat API ${response.status}`);
 
-    // Read SSE stream
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullResponse = '';
@@ -297,9 +441,8 @@ async function processInput(text) {
             if (data.text) fullResponse = data.text;
             if (data.response) fullResponse = data.response;
           } catch(e) {
-            // Non-JSON data line
-            const text = line.slice(6).trim();
-            if (text && text !== '[DONE]') fullResponse += text;
+            const t = line.slice(6).trim();
+            if (t && t !== '[DONE]') fullResponse += t;
           }
         }
       }
@@ -310,26 +453,20 @@ async function processInput(text) {
     }
 
     log('jarvis', fullResponse.trim());
-
-    // Now speak the response
     await speakResponse(fullResponse.trim());
 
   } catch (e) {
     log('error', `Chat error: ${e.message}`);
-    // Try speaking error via browser TTS
     browserSpeak('Sorry, I had trouble processing that.');
   }
 
   isProcessing = false;
 
-  // Resume listening
-  if (isListening && document.getElementById('autoListen').checked) {
+  // Resume capture
+  if (isListening) {
     setTimeout(() => {
       if (isListening && !isSpeaking) {
-        try {
-          recognition = createRecognition();
-          recognition.start();
-        } catch(e) {}
+        startCapture();
         setStatus('listening', 'Listening for speech...');
       }
     }, 500);
@@ -341,7 +478,6 @@ async function speakResponse(text) {
   setStatus('speaking', 'Jarvis is speaking...');
 
   try {
-    // Try server TTS first
     const ttsResponse = await fetch(JARVIS_TTS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -360,7 +496,6 @@ async function speakResponse(text) {
     log('system', 'Server TTS unavailable, using browser voice');
   }
 
-  // Fallback: browser TTS
   browserSpeak(text);
 }
 
@@ -370,7 +505,6 @@ function playAudioBlob(blob) {
     const audio = new Audio(url);
     currentAudio = audio;
 
-    // Try to route to selected output device
     const outputId = document.getElementById('outputDevice').value;
     if (outputId && audio.setSinkId) {
       audio.setSinkId(outputId).catch(() => {});
@@ -437,7 +571,7 @@ function log(type, text) {
   const entry = document.createElement('div');
   entry.className = 'log-entry ' + type;
   const time = new Date().toLocaleTimeString();
-  const prefix = type === 'human' ? '🗣️ Human' : type === 'jarvis' ? '🤖 Jarvis' : type === 'error' ? '❌ Error' : '⚙️ System';
+  const prefix = type === 'human' ? 'Human' : type === 'jarvis' ? 'Jarvis' : type === 'error' ? 'Error' : 'System';
   entry.textContent = `[${time}] ${prefix}: ${text}`;
   div.appendChild(entry);
   div.scrollTop = div.scrollHeight;
@@ -446,15 +580,25 @@ function log(type, text) {
 // ============ Init ============
 
 window.addEventListener('load', () => {
+  // Restore saved API key
+  const savedKey = localStorage.getItem('openai_api_key');
+  if (savedKey) {
+    document.getElementById('apiKey').value = savedKey;
+    document.getElementById('keyStatus').textContent = '(restored)';
+  }
+
   loadDevices();
-  // Load voices (Chrome loads async)
+
   if (window.speechSynthesis) {
     window.speechSynthesis.onvoiceschanged = () => {};
     window.speechSynthesis.getVoices();
   }
-  log('system', 'Voice bridge ready. Select VB-Cable devices and click Start.');
-  log('system', 'Input = "CABLE Output" (audio FROM Meet) | Output = "CABLE Input" (audio TO Meet)');
-  log('system', 'Tip: In Google Meet settings, set Speaker → VB-Cable Input, Mic → VB-Cable Output');
+
+  log('system', 'Voice bridge ready (Whisper STT mode).');
+  log('system', '1. Enter OpenAI API key (for Whisper transcription)');
+  log('system', '2. Select audio devices (VB-Cable for Meet routing)');
+  log('system', '3. Click Start Listening');
+  log('system', 'Tip: Test with manual input first to verify Jarvis connection.');
 });
 </script>
 

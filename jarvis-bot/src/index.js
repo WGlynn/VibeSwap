@@ -1255,7 +1255,7 @@ bot.command('shard_sync', async (ctx) => {
   }
 
   if (sub === 'recent') {
-    const hours = parseInt(args[1]) || 24;
+    const hours = parseInt(args[1], 10) || 24;
     const results = getRecentLearnings(hours * 60 * 60 * 1000);
     if (results.length === 0) return ctx.reply(`No learnings in the last ${hours}h.`);
     const lines = results.slice(0, 15).map(e =>
@@ -1282,7 +1282,7 @@ bot.command('mi_status', async (ctx) => {
 bot.command('mi_signals', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
   try {
-    const limit = parseInt(ctx.message.text.split(' ')[1]) || 20;
+    const limit = parseInt(ctx.message.text.split(' ')[1], 10) || 20;
     ctx.reply(getSignalHistoryString_MI(limit));
   } catch (err) {
     ctx.reply(`Signal history error: ${err.message}`);
@@ -1440,7 +1440,7 @@ bot.command('trending', async (ctx) => {
 bot.command('chart', async (ctx) => {
   const args = ctx.message.text.replace(/^\/chart(@\w+)?/i, '').trim().split(/\s+/);
   const token = args[0];
-  const days = parseInt(args[1]) || 7;
+  const days = parseInt(args[1], 10) || 7;
   if (!token) return ctx.reply('Usage: /chart ETH [days]\n\nExamples: /chart btc 30, /chart sol 1');
   const result = await getChart(token, Math.min(days, 365));
   if (result.error) return ctx.reply(result.error);
@@ -1792,14 +1792,14 @@ bot.command('save', (ctx) => {
 
 // /bookmarks — List saved messages
 bot.command('bookmarks', (ctx) => {
-  const page = parseInt(ctx.message.text.replace(/^\/bookmarks(@\w+)?/i, '').trim()) || 1;
+  const page = parseInt(ctx.message.text.replace(/^\/bookmarks(@\w+)?/i, '').trim(), 10) || 1;
   const result = getBookmarks(ctx.from.id, page);
   ctx.reply(result);
 });
 
 // /delbookmark <number> — Delete a bookmark
 bot.command('delbookmark', (ctx) => {
-  const num = parseInt(ctx.message.text.replace(/^\/delbookmark(@\w+)?/i, '').trim());
+  const num = parseInt(ctx.message.text.replace(/^\/delbookmark(@\w+)?/i, '').trim(), 10);
   if (!num) return ctx.reply('Usage: /delbookmark 3');
   const result = deleteBookmark(ctx.from.id, num);
   ctx.reply(result);
@@ -1820,7 +1820,7 @@ bot.command('notes', (ctx) => {
 
 // /delnote <number> — Delete a note
 bot.command('delnote', (ctx) => {
-  const num = parseInt(ctx.message.text.replace(/^\/delnote(@\w+)?/i, '').trim());
+  const num = parseInt(ctx.message.text.replace(/^\/delnote(@\w+)?/i, '').trim(), 10);
   if (!num) return ctx.reply('Usage: /delnote 3');
   const result = deleteNote(ctx.from.id, num);
   ctx.reply(result);
@@ -2207,7 +2207,7 @@ bot.command('top', (ctx) => {
 // ============ Catchup & Events ============
 
 bot.command('catchup', async (ctx) => {
-  const hours = parseInt(ctx.message.text.split(/\s+/)[1]);
+  const hours = parseInt(ctx.message.text.split(/\s+/)[1], 10);
   awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
   ctx.reply(await getCatchup(ctx.from.id, hours || undefined));
 });
@@ -2259,7 +2259,7 @@ function resolveTarget(ctx) {
     return { targetId: from.id, targetName: from.username || from.first_name || String(from.id) };
   }
   if (args.length > 0) {
-    const parsed = parseInt(args[0]);
+    const parsed = parseInt(args[0], 10);
     if (!isNaN(parsed)) return { targetId: parsed, targetName: args[1] || String(parsed) };
   }
   return { targetId: null, targetName: null };
@@ -2471,7 +2471,7 @@ bot.command('mute', async (ctx) => {
   let duration = 3600; // default 1h
   let reason = args;
   if (durationMatch) {
-    const val = parseInt(durationMatch[1]);
+    const val = parseInt(durationMatch[1], 10);
     const unit = durationMatch[2];
     duration = unit === 'm' ? val * 60 : unit === 'h' ? val * 3600 : val * 86400;
     reason = args.slice(durationMatch[0].length).trim() || 'Muted by admin';
@@ -3661,7 +3661,7 @@ bot.command('onchain', async (ctx) => {
 bot.command('correlation', async (ctx) => {
   const args = ctx.message.text.replace(/^\/correlation(@\w+)?/i, '').trim().split(/\s+/);
   if (args.length < 2) return ctx.reply('Usage: /correlation btc eth [days]\n\nPrice correlation analysis.');
-  const days = parseInt(args[2]) || 30;
+  const days = parseInt(args[2], 10) || 30;
   ctx.reply(await getCorrelationAnalysis(args[0], args[1], days));
 });
 bot.command('regime', async (ctx) => {
@@ -5290,10 +5290,17 @@ async function main() {
     registerConsensusHandlers();
 
     // Worker HTTP server — consensus, CRPC, knowledge chain, health, proxy processing
-    const healthPort = parseInt(process.env.HEALTH_PORT || '8080');
+    const healthPort = parseInt(process.env.HEALTH_PORT, 10) || 8080;
     createServer(async (req, res) => {
       // Health check
       if (req.url === '/health') {
+        const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
+        const isAuthenticated = apiSecret && req.headers['x-api-secret'] === apiSecret;
+        if (!isAuthenticated) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+          return;
+        }
         const info = getShardInfo();
         const chainStats = getChainStats();
         const consensusState = getConsensusState();
@@ -5698,9 +5705,15 @@ async function main() {
 
   // HTTP health endpoint for cloud platforms (Fly.io, Railway, etc.)
   if (config.isDocker || process.env.HEALTH_PORT) {
-    const healthPort = parseInt(process.env.HEALTH_PORT || '8080');
+    const healthPort = parseInt(process.env.HEALTH_PORT, 10) || 8080;
     createServer(async (req, res) => {
       if (req.url === '/health') {
+        const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
+        const isAuthenticated = apiSecret && req.headers['x-api-secret'] === apiSecret;
+        if (!isAuthenticated) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+        } else {
         try {
           const report = await diagnoseContext();
           const chainStats = getChainStats();
@@ -5724,6 +5737,7 @@ async function main() {
         } catch {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+        }
         }
       } else if (req.url === '/transcript' && req.method === 'POST') {
         // ============ Meeting Transcript Webhook ============
@@ -6150,7 +6164,7 @@ async function main() {
         const apiSecret = req.headers['x-api-secret'];
         if (!config.claudeCodeApiSecret || apiSecret !== config.claudeCodeApiSecret) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Unauthorized. Set CLAUDE_CODE_API_SECRET on both sides.' }));
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
           return;
         }
 
@@ -6186,7 +6200,7 @@ async function main() {
             return;
           }
           const group = url.searchParams.get('group') || MONITORED_GROUPS[0] || 'NervosNation';
-          const count = parseInt(url.searchParams.get('count') || '50');
+          const count = parseInt(url.searchParams.get('count') || '50', 10);
           const messages = getMessagesForAnalysis(group, count);
           const report = formatIntelReport(group);
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -6263,7 +6277,7 @@ async function main() {
 
         // GET /api/comms/log — Audit trail
         } else if (path === '/api/comms/log' && req.method === 'GET') {
-          const count = parseInt(url.searchParams.get('count') || '20');
+          const count = parseInt(url.searchParams.get('count') || '20', 10);
           const log = getCommsLog(count);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ count: log.length, log }));

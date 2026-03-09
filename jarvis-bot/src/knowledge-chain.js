@@ -119,6 +119,20 @@ function createEpoch(changes, parentHash) {
 // ============ Chain Operations ============
 
 export async function addChange(change) {
+  // Schema validation: reject clearly malformed changes
+  if (!change || typeof change !== 'object') {
+    console.warn('[knowledge-chain] addChange rejected: change must be an object');
+    return;
+  }
+  if (typeof change.type !== 'string' || change.type.trim() === '') {
+    console.warn('[knowledge-chain] addChange rejected: missing or invalid "type" (must be non-empty string)');
+    return;
+  }
+  if (change.data !== undefined && typeof change.data !== 'object' && typeof change.data !== 'string') {
+    console.warn(`[knowledge-chain] addChange rejected: "data" must be object or string, got ${typeof change.data}`);
+    return;
+  }
+
   const entry = {
     ...change,
     timestamp: new Date().toISOString(),
@@ -131,7 +145,9 @@ export async function addChange(change) {
   // Append to WAL immediately (crash-safe — survives restarts)
   try {
     await appendFile(WAL_FILE, JSON.stringify(entry) + '\n');
-  } catch { /* first write or dir missing — non-fatal */ }
+  } catch (err) {
+    console.warn(`[knowledge-chain] WAL append failed: ${err.message} (first write or dir missing — non-fatal)`);
+  }
 
   // NC-Max: pre-propagate immediately (peers cache for compact epoch reconstruction)
   try {
@@ -361,7 +377,13 @@ export async function syncFileChange(filePath, content) {
   const contentHash = hashContent(content);
 
   // Dedup: don't re-sync if hash hasn't changed
-  if (syncedFileHashes.get(filePath) === contentHash) return false;
+  const existingHash = syncedFileHashes.get(filePath);
+  if (existingHash === contentHash) return false;
+
+  // Conflict detection: same path but different content hash
+  if (existingHash && existingHash !== contentHash) {
+    console.warn(`[knowledge-chain] File sync conflict: ${filePath} — local hash ${existingHash.slice(0, 12)} vs incoming ${contentHash.slice(0, 12)} (accepting newer)`);
+  }
   syncedFileHashes.set(filePath, contentHash);
 
   // Update inventory
@@ -501,7 +523,9 @@ export async function recoverWAL() {
 async function truncateWAL() {
   try {
     await writeFile(WAL_FILE, '');
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    console.warn(`[knowledge-chain] WAL truncate failed: ${err.message}`);
+  }
 }
 
 export async function produceEpoch() {
@@ -693,6 +717,15 @@ export async function receiveEpoch(epoch) {
   if (expectedHash !== epoch.hash) {
     console.warn(`[knowledge-chain] Invalid epoch from ${epoch.shardId}: hash mismatch`);
     return false;
+  }
+
+  // Validate Merkle root against actual changes (if full changes are available)
+  if (epoch._fullChanges && Array.isArray(epoch._fullChanges)) {
+    const recomputedRoot = computeMerkleRoot(epoch._fullChanges);
+    if (recomputedRoot !== epoch.merkleRoot) {
+      console.warn(`[knowledge-chain] Invalid epoch from ${epoch.shardId}: Merkle root mismatch (claimed ${epoch.merkleRoot.slice(0, 12)} vs computed ${recomputedRoot.slice(0, 12)})`);
+      return false;
+    }
   }
 
   // NC-Max: log freshness of received epoch

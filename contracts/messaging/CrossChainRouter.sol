@@ -462,24 +462,28 @@ contract CrossChainRouter is
      * @dev Called by authorized bridge receiver after OFT/bridge transfer arrives
      * @param commitId The commit ID to fund
      */
-    function fundBridgedDeposit(bytes32 commitId) external payable onlyAuthorized {
+    function fundBridgedDeposit(bytes32 commitId) external payable onlyAuthorized nonReentrant {
         CrossChainCommit memory commit = pendingCommits[commitId];
         require(commit.depositor != address(0), "Unknown commit");
         require(msg.value >= commit.depositAmount, "Insufficient deposit");
         require(bridgedDeposits[commitId] > 0, "Already funded or not pending");
 
-        // Clear the pending bridged deposit
+        // Cache deposit amount before state changes (CEI pattern)
+        uint256 depositAmount = commit.depositAmount;
+        uint256 excess = msg.value - depositAmount;
+
+        // Clear the pending bridged deposit BEFORE external calls (Checks-Effects-Interactions)
         bridgedDeposits[commitId] = 0;
-        totalBridgedDeposits -= commit.depositAmount;
+        totalBridgedDeposits -= depositAmount;
 
         // Now forward to auction with verified funds
-        ICommitRevealAuction(auction).commitOrder{value: commit.depositAmount}(
+        ICommitRevealAuction(auction).commitOrder{value: depositAmount}(
             commit.commitHash
         );
 
         // Refund excess
-        if (msg.value > commit.depositAmount) {
-            (bool success, ) = msg.sender.call{value: msg.value - commit.depositAmount}("");
+        if (excess > 0) {
+            (bool success, ) = msg.sender.call{value: excess}("");
             require(success, "Refund failed");
         }
     }

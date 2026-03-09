@@ -248,6 +248,7 @@ contract ContextAnchor is IContextAnchor, OwnableUpgradeable, UUPSUpgradeable {
             revoked: false
         });
 
+        require(_accessGrantList[graphId].length < MAX_ACCESS_GRANTS, "Max access grants reached");
         _accessGrantList[graphId].push(grantee);
 
         emit AccessGranted(graphId, grantee, granteeAgentId, canMerge);

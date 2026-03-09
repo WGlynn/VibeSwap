@@ -2,66 +2,67 @@
 
 This file maintains continuity between Claude Code sessions across devices.
 
-**Last Updated**: 2026-03-08 (Desktop - Claude Code Opus 4.6, Session 050 — GO-LIVE Sprint Autopilot)
+**Last Updated**: 2026-03-09 (Desktop - Claude Code Opus 4.6, Session 052)
 **Auto-sync**: Enabled - pull at start, push at end of each response
 
 ---
 
 ## Current Focus
-- **SESSION 050 — GO-LIVE SPRINT AUTOPILOT** — 50+ commits, full mock data elimination, 23 new contracts, 4 hooks, voice/mining fixes
-- **VOICE BRIDGE BUILT** — `jarvis-bot/voice-bridge.html` — routes Google Meet audio ↔ Jarvis via VB-Cable
-- **VB-CABLE INSTALLED** — User rebooting system. After reboot, test the voice bridge with Freedom on Google Meet.
+- **Dr. Nadal Visit**: Psychiatrist + husband checking Vercel site. Chat is FREE, warm, no token gates.
+- **System prompt deployed**: JARVIS personality rewrite — warm, present, adaptive. Subtle work-curiosity nudge.
+- **Provider cascade live**: DeepSeek (cheap) → Anthropic Haiku (fallback) on Vercel `/api/chat`
+- **Prices oracle live**: `/api/prices` — CoinGecko + Chainlink cross-validation on Base mainnet
 
-## ACTIVE TASK: Google Meet Voice Bridge
-**Status**: Bridge HTML built, VB-Cable installed, awaiting reboot
-**What**: Jarvis joins Google Meet as live voice participant with Freedom (Freedomwarrior13)
-**How**:
-1. Open Chrome → join Google Meet with Jarvis's Gmail (separate profile)
-2. Meet settings: Speaker → "CABLE Input", Mic → "CABLE Output"
-3. Open `jarvis-bot/voice-bridge.html` in separate tab
-4. Select VB-Cable devices in dropdowns, click Start
-5. Bridge: Meet audio → Web Speech API (STT) → Jarvis chat API (SSE) → Jarvis TTS → back into Meet
+## PENDING: Fly.io Redeploy
+**Status**: Code committed to git but NOT deployed to Fly.io. TG bot running stale code.
+**What needs deploying**:
+- `jarvis-bot/src/task-queue.js` — deferred execution engine (defer_task LLM tool)
+- `jarvis-bot/src/claude.js` — defer_task tool registered in TOOL_GROUPS
+- `jarvis-bot/src/index.js` — triggerednometry unlimited, tbhxnest REMOVED, task queue init/flush/stop
+- `jarvis-bot/src/memory.js` — Rule #10: never say "I'll check" without calling defer_task
 
-**Key APIs**:
-- Chat: `POST https://jarvis-vibeswap.fly.dev/web/chat/stream` (SSE streaming)
-- TTS: `POST https://jarvis-vibeswap.fly.dev/web/tts` (returns MP3)
-- Fallback: Browser SpeechSynthesis (British voice)
+## Session 052 Completed Work
 
-**File**: `jarvis-bot/voice-bridge.html`
+### Contracts
+- **VibePointsSeason.sol** — Seasonal leaderboard & cross-system points aggregator (37/37 tests, 34 unit + 3 fuzz)
 
-## Session 050 Completed Work
+### Vercel Serverless Endpoints
+- **`/api/prices`** — Three-source oracle: CoinGecko (primary) + Chainlink (referee on Base mainnet) + TruePriceOracle (future)
+  - Chainlink feeds: ETH, BTC, LINK, USDC, DAI via AggregatorV3Interface
+  - 1% deviation threshold, auto-override if Chainlink disagrees
+  - 30s CoinGecko cache, 60s Chainlink cache, CDN edge caching
+- **`/api/chat`** — Provider cascade: DeepSeek-chat → Anthropic Haiku
+  - System prompt: JARVIS personality — warm, genuine, adaptive, work-curiosity nudge
+  - Zero token gates, zero mining, zero budget limits
+  - 30 message history, 4000 chars/msg, 2048 max_tokens
 
-### Frontend Mock Data → Real Data (ALL DONE)
-- SwapPage, GasTracker, TrendingTokens, PortfolioDashboard, LendingPage, StakingPage, PerpetualsPage, GovernancePage, RewardsWidget, AnalyticsPage, LiveActivityFeed, PlayerStats, useAnalytics, usePool — ALL converted from mock to real (CoinGecko + RPC)
-- Global price cache: `window.__vibePriceCache` published by usePriceFeed, consumed via Proxy objects
+### Jarvis Bot (committed, NOT deployed)
+- **Task Queue** (`task-queue.js`): 5 task types, persistent JSON, 30s background processor, 3 retries w/ exponential backoff, auto-reports to originating chat
+- **defer_task tool**: LLM can schedule deferred work instead of hallucinating "I'll check later"
+- **Access changes**: triggerednometry → UNLIMITED, tbhxnest → REVOKED (all access removed)
 
-### New Hooks
-- `usePriceFeed.jsx` — CoinGecko real-time prices (30s cache, stale fallback)
-- `useGasPrice.jsx` — RPC gas prices with trend tracking
-- `useProtocolStats.jsx` — On-chain stats (zeros until deployed)
-- `useWalletSecurity.jsx` — Client-side pre-tx security checks
-
-### Security Contracts (8-Layer Fund Protection)
-WalletGuardian, KeyRecoveryVault, BiometricAuthBridge, TransactionFirewall, EmergencyEjector, AntiPhishing, GaslessRescue, VibeSecurityOracle, WalletRecoveryInsurance
-
-### Mechanism Contracts (16+ new)
-VibeInsurancePool, VibeYieldAggregator, VibeBountyBoard, VibeReferralEngine, VibePointsEngine, VibeNFTMarketplace, VibeP2PLending, VibeTWAPExecutor, VibeMultiSend, VibePaymaster, VibeSubscriptions, VibeOTC, VibeVesting, VibeDAO, VibeNameService, VibeConsensusRewards, VibeSavingsAccount, VibeFlashLoanProvider, VibeLiquidStaking, VibeFeeDistributor, VibeRebalancer, VibeEmergencyDAO, VibeRewardStreamer
-
-### Bug Fixes
-- Voice button: 3-tier TTS fallback (ElevenLabs → Google TTS → browser SpeechSynthesis)
-- Mining rejected proofs: 2-minute grace period for previous challenge after rotation
-- JUL conversion: Moved to top of mine page with prominent styling
-- VibeFeeDistributor: Clarified non-swap fees only (LP fairness invariant)
+### Frontend Fixes
+- Removed "Mine JUL for Extra Compute" button from JarvisBubble.jsx
+- Removed budget-exceeded amber styling from chat messages
+- useJarvis.jsx: VPS failure → auto-fallback to Vercel `/api/chat` (silent, no budget errors shown)
 
 ### Key Decisions
-- LP Fairness Invariant: Swap fees ALWAYS go to LPs. Saved to defi-math.md as permanent self-check.
-- Honest empty states: '--' or 0 for undeployed metrics
-- Browser TTS fallback: Three-tier chain
+- Budget gates temporarily removed for Dr. Nadal visit — will restore when scaling
+- tbhxnest fully revoked — "genuine threat to our light"
+- triggerednometry (Rodney) gets unlimited compute — building trading bot for VibeSwap
+- DeepSeek for casual chat (cheap), Anthropic as safety net only
+- Chainlink as referee (cross-validation), not primary oracle
+
+## Access Control (Current)
+- **UNLIMITED_USERNAMES**: `['vibeswapofficial', 'triggerednometry']`
+- **tbhxnest**: ALL access revoked, references cleaned from codebase
+- **Freedom (Freedomwarrior13)**: STAYS — active collaborator, POM consensus design partner
 
 ## Infrastructure
-- **Fly.io**: jarvis-bot redeployed with mining grace period fix
-- **Vercel**: Frontend deployed at https://frontend-jade-five-87.vercel.app
-- **Session Report**: `docs/session-reports/session-050.md` written
+- **Vercel**: Deployed 2026-03-09 — `frontend-jade-five-87.vercel.app`
+- **Fly.io**: STALE — needs redeploy with task queue + access changes
+- **Hetzner VPS**: `46.225.173.213` — Jarvis shard-0, Engram cloud, Cloudflare tunnel
+- **DeepSeek API**: Added to Vercel env vars (`DEEPSEEK_API_KEY`)
 
 ## Previous Context (Carried Forward)
 - BASE MAINNET PHASE 2: LIVE — 11 contracts deployed + verified on Basescan
@@ -71,3 +72,4 @@ VibeInsurancePool, VibeYieldAggregator, VibeBountyBoard, VibeReferralEngine, Vib
 - PsiNet × VibeSwap merge: COMPLETE
 - 27 research papers (1.2 MB), 71 knowledge primitives
 - Git remotes: origin (public) + stealth (private) — push to both
+- Voice bridge: `jarvis-bot/voice-bridge.html` (built Session 050, VB-Cable installed)

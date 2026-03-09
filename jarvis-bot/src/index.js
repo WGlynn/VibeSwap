@@ -121,7 +121,7 @@ import { initPredictions, flushPredictions, createPrediction, placeBet, resolveM
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
-import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances } from './wallet.js';
+import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -2230,6 +2230,12 @@ bot.command('wallet', async (ctx) => {
       const info = getWalletInfo();
       ctx.reply(`Whitelist (${info.limits?.whitelistCount || 0}): Owner-only. /wallet whitelist add <addr>`);
     }
+  } else if (sub === 'mnemonic' || sub === 'backup') {
+    if (ctx.chat.type !== 'private') return ctx.reply('Mnemonic can only be revealed in DMs.');
+    const passphrase = args.slice(1).join(' ');
+    const result = revealMnemonic(passphrase);
+    if (result.error) return ctx.reply(result.error);
+    ctx.reply(`${result.mnemonic}\n\n${result.warning}`);
   } else if (sub === 'balance' || sub === 'bal') {
     const chain = args[1] || 'base';
     const balances = await getAllBalances();

@@ -176,6 +176,18 @@ export function unlockWallet(passphrase) {
   }
 }
 
+// One-time mnemonic reveal — requires passphrase, owner-only
+export function revealMnemonic(passphrase) {
+  if (!walletData) return { error: 'No wallet exists.' }
+  try {
+    const { mnemonic } = decrypt(walletData.encryptedKey, passphrase)
+    if (!mnemonic) return { error: 'No mnemonic stored (imported key?)' }
+    return { mnemonic, warning: 'SAVE THIS OFFLINE. Do NOT share it.' }
+  } catch {
+    return { error: 'Wrong passphrase.' }
+  }
+}
+
 export function lockWallet() {
   unlocked = null
   console.log('[wallet] Locked')

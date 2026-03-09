@@ -6,6 +6,7 @@
   "rewrites": [
     { "source": "/api/mind", "destination": "/api/mind" },
     { "source": "/api/chat", "destination": "/api/chat" },
+    { "source": "/api/prices", "destination": "/api/prices" },
     { "source": "/((?!assets/|api/).*)", "destination": "/index.html" }
   ],
   "headers": [

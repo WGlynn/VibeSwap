@@ -712,7 +712,8 @@ registerProvider('ollama', createOllamaProvider);
 async function warmOllama() {
   try {
     const url = process.env.OLLAMA_URL || 'http://localhost:11434';
-    const model = process.env.LLM_MODEL || 'qwen2.5:7b';
+    // Always warm the Ollama model (may differ from LLM_MODEL when Claude is primary)
+    const model = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
     console.log(`[ollama] Pre-warming model ${model}...`);
     const res = await fetch(`${url}/api/generate`, {
       method: 'POST',
@@ -726,8 +727,8 @@ async function warmOllama() {
     console.warn(`[ollama] Pre-warm skipped: ${e.message}`);
   }
 }
-// Fire and forget — don't block startup
-if (process.env.LLM_PROVIDER === 'ollama' || process.env.OLLAMA_URL) warmOllama();
+// Fire and forget — don't block startup. Always warm if Ollama URL is set (it's in the cascade)
+if (process.env.OLLAMA_URL) warmOllama();
 
 // ============ Gemini Provider ============
 

@@ -61,37 +61,60 @@ export default async function handler(req, res) {
     content: String(m.content).slice(0, 4000),
   }));
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'JARVIS is offline — API key not configured.' });
-  }
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+  // Provider cascade: DeepSeek (cheap, fast) → Anthropic (fallback)
+  const providers = [
+    {
+      name: 'deepseek',
+      url: 'https://api.deepseek.com/chat/completions',
+      key: process.env.DEEPSEEK_API_KEY,
+      body: {
+        model: 'deepseek-chat',
+        max_tokens: 2048,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...trimmed],
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+      headers: (key) => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }),
+      extract: (data) => data.choices?.[0]?.message?.content,
+    },
+    {
+      name: 'anthropic',
+      url: 'https://api.anthropic.com/v1/messages',
+      key: process.env.ANTHROPIC_API_KEY,
+      body: {
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: trimmed,
-      }),
-    });
+      },
+      headers: (key) => ({ 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }),
+      extract: (data) => data.content?.[0]?.text,
+    },
+  ];
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error('[chat] Anthropic error:', response.status, err);
-      return res.status(502).json({ error: 'JARVIS is having a moment. Try again.' });
+  try {
+    for (const provider of providers) {
+      if (!provider.key) continue;
+      try {
+        const response = await fetch(provider.url, {
+          method: 'POST',
+          headers: provider.headers(provider.key),
+          body: JSON.stringify(provider.body),
+        });
+
+        if (!response.ok) {
+          console.error(`[chat] ${provider.name} error: ${response.status}`);
+          continue; // Try next provider
+        }
+
+        const data = await response.json();
+        const reply = provider.extract(data) || "I'm here, but words are failing me. Try again.";
+        return res.status(200).json({ reply, provider: provider.name });
+      } catch (providerErr) {
+        console.error(`[chat] ${provider.name} failed: ${providerErr.message}`);
+        continue; // Try next provider
+      }
     }
 
-    const data = await response.json();
-    const reply = data.content?.[0]?.text || "I'm here, but words are failing me. Try again.";
-
-    return res.status(200).json({ reply });
+    return res.status(502).json({ error: 'JARVIS is having a moment. Try again.' });
   } catch (err) {
     console.error('[chat] Error:', err.message);
     return res.status(500).json({ error: 'Something broke. JARVIS will be back.' });

@@ -1482,7 +1482,9 @@ export function initProvider() {
   providerPool.set(providerName, activeProvider);
 
   // Init ALL available providers into the pool + fallback chain
-  const fallbackOrder = ['claude', 'deepseek', 'gemini', 'openai', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
+  // Cascade: quality-first, Ollama as floor (never runs out of credits)
+  // "When people top off credits, the network Nash-equilibriums at positive-sum" — Will
+  const fallbackOrder = ['claude', 'deepseek', 'openai', 'gemini', 'ollama', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
   fallbackProviders = [];
 
   for (const name of fallbackOrder) {

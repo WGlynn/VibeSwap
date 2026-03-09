@@ -99,6 +99,21 @@ import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRan
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats, initGroupContext, flushGroupContext, stopGroupContext } from './group-context.js';
 import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
 import { scanNewTokens, getNewPairs, getHotTokens, dexSearch, getPairDetails } from './tools-scanner.js';
+// Memecoin Hunter — composite scoring + background monitor
+let huntMemecoins, getMemeScore, startMemeMonitor, stopMemeMonitor, getMonitorStatus_Meme;
+try {
+  const mh = await import('./tools-memehunter.js');
+  huntMemecoins = mh.huntMemecoins;
+  getMemeScore = mh.getMemeScore;
+  startMemeMonitor = mh.startMemeMonitor;
+  stopMemeMonitor = mh.stopMemeMonitor;
+  getMonitorStatus_Meme = mh.getMonitorStatus;
+} catch (err) {
+  console.error(`[jarvis] tools-memehunter.js FAILED: ${err.message}`);
+  huntMemecoins = stubFn('hunt'); getMemeScore = stubFn('score');
+  startMemeMonitor = stubFn('mememonitor'); stopMemeMonitor = stubFn('memestop');
+  getMonitorStatus_Meme = stubFn('memestatus');
+}
 import { getLiquidations, getFundingRates, getOpenInterest, getLongShortRatio, getETFFlows } from './tools-derivatives.js';
 import { initXP, flushXP, awardXP, getXPStatus, getAchievements, getXPLeaderboard } from './tools-xp.js';
 import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './tools-catchup.js';
@@ -615,6 +630,8 @@ const COMMAND_COOLDOWNS = {
   weekly: 120000,        // 2min — very heavy
   codegen: 30000,        // 30s — LLM call
   briefing: 30000,       // 30s — LLM call
+  hunt: 15000,           // 15s — DEXScreener + GoPlus
+  memescore: 10000,      // 10s — GoPlus + DEXScreener
 };
 
 function isCommandRateLimited(userId, command) {
@@ -969,6 +986,13 @@ SCANNER (DEXScreener)
   /hot — Trending/boosted tokens
   /dexsearch <query> — Search tokens
   /pair <address> — Pair details
+
+MEMECOIN HUNTER
+  /hunt [chain] — Scan + score new tokens (default: base)
+  /memescore <addr> [chain] — Deep risk analysis (0-100)
+  /mememonitor [chain] — Start auto-alert monitor
+  /memestop — Stop monitor
+  /memestatus — Monitor status
 
 DERIVATIVES
   /liquidations [token] — Liquidation data
@@ -2157,6 +2181,43 @@ bot.command('dexsearch', async (ctx) => {
 bot.command('pair', async (ctx) => {
   const addr = ctx.message.text.split(/\s+/)[1];
   ctx.reply(await getPairDetails(addr));
+});
+
+// ============ Memecoin Hunter ============
+
+bot.command('hunt', async (ctx) => {
+  if (isCommandRateLimited(ctx.from.id, 'hunt')) return ctx.reply('Hunt on cooldown. Try again in a few seconds.');
+  const chain = ctx.message.text.split(/\s+/)[1];
+  awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
+  ctx.reply(await huntMemecoins(chain));
+});
+
+bot.command('memescore', async (ctx) => {
+  if (isCommandRateLimited(ctx.from.id, 'memescore')) return ctx.reply('Score on cooldown. Try again in a few seconds.');
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  awardXP(ctx.from.id, ctx.from.username || ctx.from.first_name, 'command');
+  ctx.reply(await getMemeScore(args[0], args[1]));
+});
+
+bot.command('mememonitor', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const chain = ctx.message.text.split(/\s+/)[1];
+  const chatId = ctx.chat.id;
+  const result = startMemeMonitor(chain, (alertMsg) => {
+    bot.telegram.sendMessage(chatId, alertMsg).catch(err => {
+      console.error(`[memehunter] Alert send failed: ${err.message}`);
+    });
+  });
+  ctx.reply(result);
+});
+
+bot.command('memestop', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  ctx.reply(stopMemeMonitor());
+});
+
+bot.command('memestatus', async (ctx) => {
+  ctx.reply(getMonitorStatus_Meme());
 });
 
 // ============ Derivatives Data ============

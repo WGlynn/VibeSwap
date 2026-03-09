@@ -16,6 +16,7 @@ import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, fo
 import { gitCommitAndPush } from './git.js';
 import { processConversation as processCKBConversation, getUserCKB } from './ckb-generator.js';
 import { gate as verificationGate, auditResponse } from './verification-gate.js';
+import { createTask, DEFER_TASK_TOOL, TASK_TOOL_GROUP_NAME, TASK_TOOL_NAMES } from './task-queue.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -873,6 +874,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           'ens_info', 'npm_lookup', 'crate_lookup', 'contract_abi', 'checksum_address'],
     education: ['explain_concept', 'crypto_glossary', 'vibeswap_explainer',
                 'crypto_tutorial', 'crypto_calendar', 'crypto_quiz'],
+    tasks: TASK_TOOL_NAMES,
   };
 
   function selectTools(msg, allTools) {
@@ -909,6 +911,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     if (/explain|glossary|define|what is|tutorial|learn|teach|vibeswap|calendar|event|challenge|quiz/.test(lc)) {
       selected.add('education');
     }
+    // Tasks — always available so Jarvis can defer work instead of hallucinating promises
+    selected.add('tasks');
 
     const selectedNames = new Set();
     for (const group of selected) {
@@ -1534,6 +1538,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         },
       },
     },
+    // ============ Task Queue — Deferred Execution ============
+    DEFER_TASK_TOOL,
   ];
 
   // Select only relevant tools based on message content
@@ -2069,6 +2075,26 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = await getCryptoQuiz(tb.input?.topic);
           } catch (err) { result = `Failed: ${err.message}`; }
           console.log('[claude] Tool: crypto_quiz');
+        } else if (tb.name === 'defer_task') {
+          const taskResult = createTask({
+            type: tb.input.type || 'llm_query',
+            description: tb.input.description,
+            chatId,
+            chatType,
+            requestedBy: userName,
+            userId: effectiveUserId,
+            context: tb.input.context || '',
+            delayMs: (tb.input.delay_seconds || 0) * 1000,
+            url: tb.input.url,
+            token: tb.input.token,
+            message: tb.input.message,
+          });
+          if (taskResult.error) {
+            result = `Task creation failed: ${taskResult.error}`;
+          } else {
+            result = `Task queued: ${taskResult.taskId} — will execute ${taskResult.executeAfter > Date.now() + 5000 ? `in ${Math.ceil((taskResult.executeAfter - Date.now()) / 1000)}s` : 'on next cycle (~30s)'}. Results will be reported back to this chat.`;
+          }
+          console.log(`[claude] Tool: defer_task("${tb.input.description?.slice(0, 50)}...") → ${taskResult.taskId || taskResult.error}`);
         } else {
           result = 'Unknown tool.';
         }

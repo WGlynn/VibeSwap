@@ -120,6 +120,7 @@ import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './
 import { initPredictions, flushPredictions, createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
+import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 // ============ Tool Module Imports — Graceful Fallback ============
 // These modules were written by background agents and have crashed the bot on import.
 // Wrap in try/catch so a single broken module doesn't take down the entire bot.
@@ -517,7 +518,8 @@ const TRUSTED_AUTHORIZERS = new Set([
 // ============ Unlimited Users (by username) ============
 // Co-founders and core partners — no token limits. Matched by Telegram @username.
 const UNLIMITED_USERNAMES = new Set([
-  'txbxhxnest',   // tbhxnest — GenTu substrate co-founder
+  'txbxhxnest',        // tbhxnest — GenTu substrate co-founder
+  'triggerednometry',   // Rodney — trading bot builder, core contributor
 ]);
 
 function isTrustedAuthorizer(ctx) {
@@ -961,6 +963,11 @@ SCHEDULED ALERTS
   /schedule price btc 5 — Price alerts
   /schedule gas 20 — Gas alerts
   /schedule list — View schedules
+
+TASK QUEUE
+  /tasks — View queued/completed tasks
+  /tasks stats — Queue statistics
+  /tasks cancel <id> — Cancel a queued task
 
 NEWS & SOCIAL
   /news — Crypto news aggregator
@@ -2152,6 +2159,22 @@ bot.command('schedule', async (ctx) => {
     ctx.reply(addSchedule(userId, chatId, 'gas', { gwei: args[1] }));
   } else {
     ctx.reply('Usage:\n  /schedule morning 08:00\n  /schedule price btc 5\n  /schedule gas 20\n  /schedule list\n  /schedule remove <id>');
+  }
+});
+
+// ============ Task Queue ============
+
+bot.command('tasks', async (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'cancel' || sub === 'rm') {
+    ctx.reply(cancelTask(args[1], ctx.from.username || String(ctx.from.id)));
+  } else if (sub === 'stats') {
+    const stats = getTaskStats();
+    ctx.reply(`Task Queue Stats:\n  Queued: ${stats.queued}\n  Running: ${stats.running}\n  Completed: ${stats.completed}\n  Failed: ${stats.failed}\n  Total: ${stats.total}`);
+  } else {
+    ctx.reply(listTasks(ctx.from.id));
   }
 });
 
@@ -5666,6 +5689,10 @@ async function main() {
   await initSocial();
   await initCKB();
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
+  await initTaskQueue(
+    (chatId, text, opts) => bot.telegram.sendMessage(chatId, text, opts),
+    null // LLM chat function wired after bot.launch() — deferred tasks use direct LLM calls
+  );
   // Autonomous engagement — JARVIS as active community member
   await loadChatActivity(); // Restore activity state before init
   const autonomousChatIds = config.authorizedGroups || [];
@@ -6612,6 +6639,7 @@ async function main() {
     await flushContextMemory();
     await flushPreferences();
     await flushScheduler();
+    await flushTaskQueue();
     await flushGroupContext();
     await flushXP();
     await flushPredictions();
@@ -6703,6 +6731,7 @@ async function main() {
       ['mining', flushMining],
       ['preferences', flushPreferences],
       ['scheduler', flushScheduler],
+      ['task-queue', flushTaskQueue],
       ['group-context', flushGroupContext],
       ['xp', flushXP],
       ['predictions', flushPredictions],
@@ -6724,6 +6753,7 @@ async function main() {
     console.log(`[jarvis] Flushed ${flushed}/${flushOps.length} modules`);
 
     stopScheduler();
+    stopTaskQueue();
     stopAutonomous();
     stopGroupContext();
     stopCRPC();

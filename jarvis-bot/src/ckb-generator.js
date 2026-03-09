@@ -124,6 +124,7 @@ export async function extractKnowledge(chatId, userName, messages) {
     }).join('\n\n');
 
     const response = await llmChat({
+      _background: true,
       max_tokens: 800,
       system: EXTRACTION_PROMPT,
       messages: [{ role: 'user', content: conversationText }],

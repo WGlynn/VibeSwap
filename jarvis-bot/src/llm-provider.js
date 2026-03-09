@@ -109,8 +109,11 @@ const CIRCUIT_BREAKER_CONFIG = {
   halfOpenMaxProbes: 1,      // Allow 1 probe request in half-open
 };
 
-// Per-provider circuit state
-const circuitBreakers = new Map(); // provider name → CircuitState
+// Per-provider circuit state — ISOLATED POOLS
+// Background tasks (boredom, proactive, autonomous) use a separate pool
+// so their failures can't poison user-facing circuit breakers.
+const circuitBreakers = new Map();     // "user:{provider}" → CircuitState
+const bgCircuitBreakers = new Map();   // "bg:{provider}" → CircuitState
 
 class CircuitState {
   constructor(providerName) {
@@ -256,21 +259,29 @@ class CircuitState {
 
 /**
  * Get or create circuit breaker for a provider.
+ * @param {string} providerName
+ * @param {boolean} background - If true, use isolated background pool
  */
-function getCircuitBreaker(providerName) {
-  if (!circuitBreakers.has(providerName)) {
-    circuitBreakers.set(providerName, new CircuitState(providerName));
+function getCircuitBreaker(providerName, background = false) {
+  const pool = background ? bgCircuitBreakers : circuitBreakers;
+  const key = providerName;
+  if (!pool.has(key)) {
+    pool.set(key, new CircuitState(`${background ? 'bg:' : ''}${providerName}`));
   }
-  return circuitBreakers.get(providerName);
+  return pool.get(key);
 }
 
 /**
  * Get health stats for all providers.
+ * Shows both user-facing and background circuit breaker pools.
  */
 export function getProviderHealth() {
   const health = {};
   for (const [name, cb] of circuitBreakers) {
     health[name] = cb.getStats();
+  }
+  for (const [name, cb] of bgCircuitBreakers) {
+    health[`bg:${name}`] = cb.getStats();
   }
   return health;
 }
@@ -1547,6 +1558,7 @@ export async function llmChat(request) {
 
   const MAX_RETRIES = 3;
   let lastError;
+  const bg = request._background || false; // Isolated circuit breaker pool for background tasks
 
   const cascadeTrail = [];
 
@@ -1570,7 +1582,8 @@ export async function llmChat(request) {
   }
 
   // Circuit breaker check — skip providers that are currently open
-  const routedCB = getCircuitBreaker(routedProvider.name);
+  // Background tasks use isolated breaker pool so they can't poison user-facing requests
+  const routedCB = getCircuitBreaker(routedProvider.name, bg);
   if (!routedCB.allowRequest() && routedProvider !== activeProvider) {
     console.log(`[circuit-breaker] ${routedProvider.name} circuit open — falling back to ${activeProvider.name}`);
     routedProvider = activeProvider;
@@ -1581,7 +1594,7 @@ export async function llmChat(request) {
     try {
       const result = await routedProvider.chat(request);
       // Record success in circuit breaker + performance tracker
-      getCircuitBreaker(routedProvider.name).recordSuccess();
+      getCircuitBreaker(routedProvider.name, bg).recordSuccess();
       recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, true);
       // Cascade trail — record successful attempt
       cascadeTrail.push({
@@ -1607,7 +1620,7 @@ export async function llmChat(request) {
       lastError = error;
 
       // Record failure in circuit breaker + performance tracker
-      getCircuitBreaker(routedProvider.name).recordFailure(error);
+      getCircuitBreaker(routedProvider.name, bg).recordFailure(error);
       recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, false);
 
       // Routed provider failed (non-transient) — fall back to primary before cascading
@@ -1653,7 +1666,7 @@ export async function llmChat(request) {
           console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
 
           // Circuit breaker: skip fallback providers that are currently open
-          const fbCB = getCircuitBreaker(activeProvider.name);
+          const fbCB = getCircuitBreaker(activeProvider.name, bg);
           if (!fbCB.allowRequest()) {
             console.warn(`[circuit-breaker] Fallback ${activeProvider.name} circuit open — skipping`);
             break; // Skip to next fallback via activateFallback()
@@ -1663,7 +1676,7 @@ export async function llmChat(request) {
             const fallbackStart = Date.now();
             try {
               const result = await activeProvider.chat(rest);
-              getCircuitBreaker(activeProvider.name).recordSuccess();
+              getCircuitBreaker(activeProvider.name, bg).recordSuccess();
               recordProviderPerformance(activeProvider.name, Date.now() - fallbackStart, true);
               reorderFallbacksByPerformance(); // Learn from cascade events
               cascadeTrail.push({
@@ -1683,7 +1696,7 @@ export async function llmChat(request) {
               return result;
             } catch (fbErr) {
               fallbackError = fbErr;
-              getCircuitBreaker(activeProvider.name).recordFailure(fbErr);
+              getCircuitBreaker(activeProvider.name, bg).recordFailure(fbErr);
               recordProviderPerformance(activeProvider.name, Date.now() - fallbackStart, false);
               cascadeTrail.push({
                 provider: activeProvider.name,

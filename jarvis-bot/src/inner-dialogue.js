@@ -392,6 +392,7 @@ Respond ONLY with the JSON array, no other text.`;
 
   try {
     const response = await llmChat({
+      _background: true,
       model: undefined, // Use configured model
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],

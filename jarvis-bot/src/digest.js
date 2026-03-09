@@ -91,6 +91,7 @@ export async function generateDigest(chatId) {
   // Use Haiku for cheap/fast digest generation
   try {
     const response = await llmChat({
+      _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 600,
       system: `You are JARVIS, the AI co-admin of VibeSwap. Write a brief daily digest for the Telegram community. Keep it under 200 words. Be conversational, not corporate. No emojis. Use plain text formatting (no markdown — this is Telegram). Include the key numbers but make it feel human. End with something motivating or a call to action. The real VibeSwap is not a DEX, it's a movement — wherever the Minds converge.`,
@@ -193,6 +194,7 @@ export async function generateWeeklyDigest(chatId) {
 
   try {
     const response = await llmChat({
+      _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 800,
       system: `You are JARVIS, AI co-admin of VibeSwap. Write a weekly community digest. Under 300 words. Conversational, not corporate. No emojis. Plain text (Telegram). Highlight trends, top categories, community health. End with a forward-looking statement.`,

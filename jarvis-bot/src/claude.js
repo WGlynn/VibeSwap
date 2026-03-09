@@ -14,6 +14,7 @@ import { evaluateOwnResponse, appendScoreLog } from './intelligence.js';
 import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 import { gitCommitAndPush } from './git.js';
+import { processConversation as processCKBConversation, getUserCKB } from './ckb-generator.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -2096,6 +2097,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
     // Mark dirty for periodic save
     conversationsDirty = true;
+
+    // CKB Generator — extract knowledge from conversation and append to per-user markdown
+    // Runs in background (non-blocking) — writes to data/ckb/{userId}.md
+    processCKBConversation(chatId, effectiveUserId, userName, history)
+      .catch(err => console.warn('[ckb] Background processing failed:', err.message));
 
     return {
       text: assistantMessage,

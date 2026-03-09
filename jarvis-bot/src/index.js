@@ -22,6 +22,7 @@ import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, process
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
+import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
 // Shard learnings — graceful fallback if module fails to load
 let initShardLearnings, readLearnings, archiveExpired, queryLearnings, getRecentLearnings, getShardSyncStatus;
 try {
@@ -5602,6 +5603,7 @@ async function main() {
   await initXP();
   await initPredictions();
   await initSocial();
+  await initCKB();
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
   // Autonomous engagement — JARVIS as active community member
   await loadChatActivity(); // Restore activity state before init

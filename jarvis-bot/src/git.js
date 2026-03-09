@@ -1,6 +1,7 @@
 import simpleGit from 'simple-git';
 import { existsSync } from 'fs';
 import { config } from './config.js';
+import { getCKBDataFiles } from './ckb-generator.js';
 
 const REPO_PATH = config.repo.path;
 const repoExists = existsSync(REPO_PATH);
@@ -148,6 +149,8 @@ export async function backupData() {
       '.claude/shard_learnings.jsonl',
       'jarvis-bot/data/mi-state.json',
       'jarvis-bot/data/chat-activity.json',
+      // CKB Generator — per-user knowledge base markdown files
+      ...getCKBDataFiles(),
     ];
 
     // Check if any data files have changes

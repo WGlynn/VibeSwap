@@ -1,8 +1,89 @@
-import { useState, useRef, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useJarvis } from '../hooks/useJarvis'
 import { useMindMesh } from '../hooks/useMindMesh'
+
+// ============ Simple Markdown Renderer ============
+
+function renderMarkdown(text) {
+  if (!text) return ''
+
+  // Escape HTML first
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // Code blocks (``` ... ```) — must come before inline code
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    return `<pre class="md-codeblock"><code class="md-code-lang-${lang || 'text'}">${code.trim()}</code></pre>`
+  })
+
+  // Inline code (`...`)
+  html = html.replace(/`([^`\n]+)`/g, '<code class="md-inline-code">$1</code>')
+
+  // Bold (**...**)
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="md-bold">$1</strong>')
+
+  // Italic (*...*)
+  html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="md-italic">$1</em>')
+
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>')
+
+  // Unordered lists (- item)
+  html = html.replace(/^- (.+)$/gm, '<li class="md-li">$1</li>')
+  html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, (match) => `<ul class="md-ul">${match}</ul>`)
+
+  // Ordered lists (1. item)
+  html = html.replace(/^\d+\. (.+)$/gm, '<li class="md-oli">$1</li>')
+  html = html.replace(/(<li class="md-oli">.*<\/li>\n?)+/g, (match) => `<ol class="md-ol">${match}</ol>`)
+
+  // Headers (## ...)
+  html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2 class="md-h2">$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1 class="md-h1">$1</h1>')
+
+  return html
+}
+
+const markdownStyles = `
+  .md-rendered { line-height: 1.6; }
+  .md-rendered .md-codeblock {
+    background: rgba(0, 255, 65, 0.05);
+    border: 1px solid rgba(0, 255, 65, 0.15);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    overflow-x: auto;
+    font-size: 12px;
+    white-space: pre;
+  }
+  .md-rendered .md-inline-code {
+    background: rgba(0, 255, 65, 0.08);
+    border: 1px solid rgba(0, 255, 65, 0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.9em;
+  }
+  .md-rendered .md-bold { color: #4ade80; font-weight: 700; }
+  .md-rendered .md-italic { color: #86efac; font-style: italic; }
+  .md-rendered .md-link {
+    color: #22d3ee;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .md-rendered .md-link:hover { color: #67e8f9; }
+  .md-rendered .md-ul, .md-rendered .md-ol {
+    padding-left: 18px;
+    margin: 4px 0;
+  }
+  .md-rendered .md-li, .md-rendered .md-oli { margin: 2px 0; }
+  .md-rendered .md-h1 { font-size: 1.3em; font-weight: 700; color: #4ade80; margin: 12px 0 4px; }
+  .md-rendered .md-h2 { font-size: 1.15em; font-weight: 700; color: #4ade80; margin: 10px 0 4px; }
+  .md-rendered .md-h3 { font-size: 1.05em; font-weight: 600; color: #4ade80; margin: 8px 0 4px; }
+`
 
 // ============ Time Formatter ============
 
@@ -19,7 +100,7 @@ function formatUptime(seconds) {
 // ============ Hero Section ============
 
 function HeroSection({ health }) {
-  const isOnline = health?.status === 'online'
+  const isOnline = health?.status === 'online' || health?.status === 'ok'
 
   return (
     <div className="text-center py-6 relative">
@@ -57,10 +138,17 @@ function HeroSection({ health }) {
 
 // ============ Chat Panel ============
 
-function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpeaking, speakText }) {
+const MAX_INPUT_CHARS = 4000
+
+function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpeaking, speakText, health, activeAgents = ['jarvis'] }) {
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState([])
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const recognitionRef = useRef(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -70,27 +158,237 @@ function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpea
     inputRef.current?.focus()
   }, [])
 
-  const handleSubmit = (e) => {
+  // Auto-resize textarea
+  const autoResize = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+  }, [])
+
+  useEffect(() => {
+    autoResize()
+  }, [input, autoResize])
+
+  // ---- Speech-to-Text (Web Speech API) ----
+  const startListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      console.warn('[jarvis] Speech recognition not supported')
+      return
+    }
+    if (recognitionRef.current) return
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognitionRef.current = recognition
+
+    let finalTranscript = ''
+
+    recognition.onresult = (event) => {
+      let interim = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript
+        } else {
+          interim = transcript
+        }
+      }
+      setInput(prev => {
+        // Append final transcript + show interim
+        const base = finalTranscript
+        return base + (interim ? interim : '')
+      })
+    }
+
+    recognition.onerror = (event) => {
+      console.warn('[jarvis] Speech recognition error:', event.error)
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      recognitionRef.current = null
+      // Auto-send if we got text
+      if (finalTranscript.trim()) {
+        setTimeout(() => {
+          // Let React update input first, then auto-send
+          onSend(finalTranscript.trim())
+          setInput('')
+          finalTranscript = ''
+        }, 100)
+      }
+    }
+
+    recognition.start()
+    setIsListening(true)
+  }, [onSend])
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+    }
+  }, [])
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening()
+    } else {
+      startListening()
+    }
+  }, [isListening, startListening, stopListening])
+
+  // Cleanup recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort()
+        recognitionRef.current = null
+      }
+    }
+  }, [])
+
+  // ---- File Attachments ----
+  const handleFiles = useCallback((files) => {
+    const newAttachments = Array.from(files).map(file => ({
+      file,
+      id: crypto.randomUUID(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+    }))
+    setAttachments(prev => [...prev, ...newAttachments])
+  }, [])
+
+  const removeAttachment = useCallback((id) => {
+    setAttachments(prev => {
+      const removed = prev.find(a => a.id === id)
+      if (removed?.preview) URL.revokeObjectURL(removed.preview)
+      return prev.filter(a => a.id !== id)
+    })
+  }, [])
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e) => {
     e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    if (e.dataTransfer.files?.length > 0) {
+      handleFiles(e.dataTransfer.files)
+    }
+  }, [handleFiles])
+
+  // ---- Submit ----
+  const handleSubmit = useCallback((e) => {
+    if (e) e.preventDefault()
     if (!input.trim() || isLoading) return
-    onSend(input)
+    onSend(input, attachments.length > 0 ? attachments : undefined)
     setInput('')
-  }
+    setAttachments([])
+    // Reset textarea height
+    if (inputRef.current) inputRef.current.style.height = 'auto'
+  }, [input, isLoading, onSend, attachments])
+
+  // Keyboard shortcuts
+  const handleKeyDown = useCallback((e) => {
+    // Enter to send (without shift)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+      return
+    }
+    // Ctrl+M to toggle voice mode
+    if (e.key === 'm' && e.ctrlKey) {
+      e.preventDefault()
+      toggleVoice()
+      return
+    }
+  }, [handleSubmit, toggleVoice])
+
+  // Global Ctrl+M shortcut
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'm' && e.ctrlKey) {
+        e.preventDefault()
+        toggleVoice()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [toggleVoice])
+
+  // Model info from health
+  const modelName = health?.model || null
 
   return (
-    <div className="flex flex-col bg-black border border-black-600 rounded-lg overflow-hidden h-full" style={{ minHeight: '400px' }}>
+    <div
+      className={`flex flex-col bg-black border rounded-lg overflow-hidden h-full transition-colors relative ${
+        isDragOver ? 'border-matrix-500 bg-matrix-900/5' : 'border-black-600'
+      }`}
+      style={{ minHeight: '400px' }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Markdown styles */}
+      <style>{markdownStyles}</style>
+
       {/* Title bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-black-800 border-b border-black-600 shrink-0">
         <div className="flex items-center space-x-2">
-          <span className="text-matrix-500 font-mono text-xs">JARVIS v2.0</span>
+          {/* Active agent avatars */}
+          <div className="flex -space-x-1">
+            {activeAgents.map(id => {
+              const agent = AGENTS.find(a => a.id === id)
+              if (!agent) return null
+              const colors = AGENT_COLORS[agent.color]
+              return (
+                <span
+                  key={id}
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold font-mono ${colors.bg} ${colors.text} border ${colors.border} relative z-10`}
+                  title={`${agent.name} — ${agent.role}`}
+                >
+                  {agent.icon}
+                </span>
+              )
+            })}
+          </div>
+          <span className="text-matrix-500 font-mono text-xs">
+            {activeAgents.length > 1 ? 'MULTI-AGENT' : 'JARVIS v2.0'}
+          </span>
           <span className="text-black-500 font-mono text-xs">|</span>
           <span className="text-black-400 font-mono text-xs">vibeswap.mind</span>
+          {modelName && (
+            <>
+              <span className="text-black-500 font-mono text-xs">|</span>
+              <span className="text-black-500 font-mono text-[10px] px-1.5 py-0.5 rounded border border-black-700 bg-black-800/50" title={`Active model: ${modelName}`}>
+                {modelName.length > 28 ? modelName.slice(0, 28) + '...' : modelName}
+              </span>
+            </>
+          )}
         </div>
         <div className="flex items-center space-x-2">
           <button
             onClick={toggleVoice}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono transition-colors ${voiceMode ? 'bg-matrix-600/30 text-matrix-400' : 'text-black-500 hover:text-black-300'}`}
-            title={voiceMode ? 'Voice ON' : 'Enable voice'}
+            title={voiceMode ? 'Voice ON (Ctrl+M)' : 'Enable voice (Ctrl+M)'}
           >
             {voiceMode ? (
               <svg className={`w-3 h-3 ${isSpeaking ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -112,8 +410,27 @@ function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpea
         </div>
       </div>
 
+      {/* Drag overlay */}
+      <AnimatePresence>
+        {isDragOver && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-20 bg-black/80 border-2 border-dashed border-matrix-500 rounded-lg flex items-center justify-center pointer-events-none"
+          >
+            <div className="text-center">
+              <svg className="w-12 h-12 text-matrix-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+              </svg>
+              <p className="text-matrix-400 font-mono text-sm">DROP FILES HERE</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 allow-scroll" style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 allow-scroll relative" style={{ fontFamily: 'monospace', fontSize: '13px' }}>
         {messages.map((msg, i) => (
           <motion.div
             key={i}
@@ -128,17 +445,38 @@ function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpea
                 title={voiceMode ? 'Click to hear' : undefined}
               >
                 <span className="text-matrix-500 shrink-0 mt-0.5">[{formatTime(msg.timestamp)}]</span>
-                <div>
+                <div className="min-w-0 flex-1">
                   <span className="text-matrix-400 font-bold">JARVIS</span>
-                  <pre className="text-matrix-300 whitespace-pre-wrap mt-0.5 leading-relaxed">{msg.text}</pre>
+                  <div
+                    className="md-rendered text-matrix-300 mt-0.5 leading-relaxed whitespace-pre-wrap break-words"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }}
+                  />
                 </div>
               </div>
             ) : (
               <div className="flex items-start space-x-2">
                 <span className="text-black-500 shrink-0 mt-0.5">[{formatTime(msg.timestamp)}]</span>
-                <div>
+                <div className="min-w-0 flex-1">
                   <span className="text-terminal-400 font-bold">you</span>
-                  <p className="text-white mt-0.5">{msg.text}</p>
+                  <p className="text-white mt-0.5 whitespace-pre-wrap break-words">{msg.text}</p>
+                  {/* Show attachments in user messages */}
+                  {msg.attachments?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {msg.attachments.map((att, j) => (
+                        <div key={j} className="flex items-center gap-1.5 px-2 py-1 bg-black-800 border border-black-600 rounded text-[11px]">
+                          {att.preview ? (
+                            <img src={att.preview} alt={att.name} className="w-8 h-8 object-cover rounded" />
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                          )}
+                          <span className="text-black-300 truncate max-w-[120px]">{att.name}</span>
+                          <span className="text-black-500">{(att.size / 1024).toFixed(0)}KB</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -160,30 +498,154 @@ function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpea
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="border-t border-black-600 bg-black-900 shrink-0">
-        <div className="flex items-center px-3 py-2">
-          <span className="text-matrix-500 font-mono text-sm mr-2 shrink-0">&gt;</span>
-          <input
+      {/* Attachment previews */}
+      <AnimatePresence>
+        {attachments.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-black-700 bg-black-900/50 px-3 py-2 shrink-0"
+          >
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((att) => (
+                <div key={att.id} className="flex items-center gap-1.5 px-2 py-1 bg-black-800 border border-black-600 rounded text-[11px] group">
+                  {att.preview ? (
+                    <img src={att.preview} alt={att.name} className="w-8 h-8 object-cover rounded" />
+                  ) : (
+                    <svg className="w-3.5 h-3.5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
+                  <span className="text-black-300 truncate max-w-[100px]">{att.name}</span>
+                  <span className="text-black-500">{(att.size / 1024).toFixed(0)}KB</span>
+                  <button
+                    onClick={() => removeAttachment(att.id)}
+                    className="text-black-500 hover:text-red-400 ml-1 transition-colors"
+                    title="Remove"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length > 0) handleFiles(e.target.files)
+          e.target.value = '' // Reset so same file can be selected again
+        }}
+      />
+
+      {/* Input area */}
+      <div className="border-t border-black-600 bg-black-900 shrink-0">
+        <div className="flex items-end px-3 py-2 gap-2">
+          {/* Attach button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-black-500 hover:text-matrix-400 transition-colors shrink-0 pb-0.5"
+            title="Attach file"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+
+          {/* Prompt symbol */}
+          <span className="text-matrix-500 font-mono text-sm shrink-0 pb-0.5">&gt;</span>
+
+          {/* Textarea */}
+          <textarea
             ref={inputRef}
-            type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Talk to JARVIS..."
+            onChange={(e) => {
+              if (e.target.value.length <= MAX_INPUT_CHARS) {
+                setInput(e.target.value)
+              }
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Talk to JARVIS... (Shift+Enter for newline)"
             disabled={isLoading}
-            className="flex-1 bg-transparent text-white font-mono text-sm outline-none placeholder-black-500 disabled:opacity-50"
+            rows={1}
+            className="flex-1 bg-transparent text-white font-mono text-sm outline-none placeholder-black-500 disabled:opacity-50 resize-none overflow-y-auto allow-scroll"
+            style={{ maxHeight: '160px', lineHeight: '1.5' }}
             autoComplete="off"
             spellCheck="false"
           />
+
+          {/* Character count */}
+          {input.length > 100 && (
+            <span className={`text-[10px] font-mono shrink-0 tabular-nums pb-0.5 ${
+              input.length > MAX_INPUT_CHARS * 0.9 ? 'text-red-400' :
+              input.length > MAX_INPUT_CHARS * 0.7 ? 'text-amber-400' :
+              'text-black-500'
+            }`}>
+              {input.length}/{MAX_INPUT_CHARS}
+            </span>
+          )}
+
+          {/* Mic button */}
           <button
-            type="submit"
+            type="button"
+            onClick={toggleListening}
+            className={`shrink-0 p-1 rounded transition-all pb-0.5 ${
+              isListening
+                ? 'text-red-400 bg-red-500/20 animate-pulse'
+                : 'text-black-500 hover:text-matrix-400'
+            }`}
+            title={isListening ? 'Stop listening' : 'Voice input (click to start)'}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+
+          {/* Send button */}
+          <button
+            type="button"
+            onClick={handleSubmit}
             disabled={!input.trim() || isLoading}
-            className="ml-2 px-3 py-1 text-xs font-mono bg-matrix-600 hover:bg-matrix-500 disabled:bg-black-700 disabled:text-black-500 text-black-900 rounded transition-colors"
+            className="shrink-0 px-3 py-1 text-xs font-mono bg-matrix-600 hover:bg-matrix-500 disabled:bg-black-700 disabled:text-black-500 text-black-900 rounded transition-colors"
           >
             SEND
           </button>
         </div>
-      </form>
+
+        {/* Listening indicator */}
+        <AnimatePresence>
+          {isListening && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="px-3 pb-2"
+            >
+              <div className="flex items-center gap-2 text-[11px] font-mono">
+                <div className="flex gap-0.5">
+                  <span className="w-1 h-3 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1 h-4 bg-red-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                  <span className="w-1 h-5 bg-red-400 rounded-full animate-pulse" style={{ animationDelay: '100ms' }} />
+                  <span className="w-1 h-3 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '250ms' }} />
+                </div>
+                <span className="text-red-400">LISTENING</span>
+                <span className="text-black-500">Click mic or press Esc to stop</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
@@ -511,16 +973,254 @@ function JULBalanceBar({ budget, mind }) {
   )
 }
 
+// ============ Agent Registry ============
+// Simulated agents — each represents a mind in the Pantheon.
+// When real agents come online, they register via the cascade router.
+
+const AGENTS = [
+  {
+    id: 'jarvis',
+    name: 'JARVIS',
+    role: 'Primary AI',
+    model: 'claude-sonnet',
+    color: 'matrix',
+    status: 'online', // pulled from health in real version
+    description: 'Core reasoning, strategy, development',
+    icon: 'J',
+  },
+  {
+    id: 'nyx',
+    name: 'NYX',
+    role: 'Creative AI',
+    model: 'pending',
+    color: 'purple',
+    status: 'building',
+    description: 'Creative writing, art direction, narrative',
+    icon: 'N',
+  },
+  {
+    id: 'ollama-local',
+    name: 'OLLAMA',
+    role: 'Local LLM',
+    model: 'qwen2.5:7b',
+    color: 'blue',
+    status: 'standby',
+    description: 'Offline inference, zero-cost fallback',
+    icon: 'O',
+  },
+  {
+    id: 'oracle',
+    name: 'ORACLE',
+    role: 'Data Analysis',
+    model: 'pending',
+    color: 'amber',
+    status: 'planned',
+    description: 'Market data, price feeds, analytics',
+    icon: 'R',
+  },
+  {
+    id: 'sentinel',
+    name: 'SENTINEL',
+    role: 'Security',
+    model: 'pending',
+    color: 'red',
+    status: 'planned',
+    description: 'Auditing, threat detection, pen testing',
+    icon: 'S',
+  },
+]
+
+const STATUS_STYLES = {
+  online:   { dot: 'bg-green-500 animate-pulse', text: 'text-green-400', label: 'ONLINE' },
+  standby:  { dot: 'bg-blue-500', text: 'text-blue-400', label: 'STANDBY' },
+  building: { dot: 'bg-purple-500 animate-pulse', text: 'text-purple-400', label: 'BUILDING' },
+  planned:  { dot: 'bg-black-500', text: 'text-black-400', label: 'PLANNED' },
+  offline:  { dot: 'bg-red-500', text: 'text-red-400', label: 'OFFLINE' },
+}
+
+const AGENT_COLORS = {
+  matrix: { bg: 'bg-matrix-500/20', border: 'border-matrix-600', text: 'text-matrix-400', ring: 'ring-matrix-500/30' },
+  purple: { bg: 'bg-purple-500/20', border: 'border-purple-600', text: 'text-purple-400', ring: 'ring-purple-500/30' },
+  blue:   { bg: 'bg-blue-500/20', border: 'border-blue-600', text: 'text-blue-400', ring: 'ring-blue-500/30' },
+  amber:  { bg: 'bg-amber-500/20', border: 'border-amber-600', text: 'text-amber-400', ring: 'ring-amber-500/30' },
+  red:    { bg: 'bg-red-500/20', border: 'border-red-600', text: 'text-red-400', ring: 'ring-red-500/30' },
+}
+
+// ============ Agent Selector Bar ============
+
+function AgentBar({ activeAgents, onToggleAgent, onSetPrimary, primaryAgent }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="mb-3 rounded-lg border border-black-600 bg-black/80 backdrop-blur-sm overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-2 hover:bg-black-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-matrix-500 font-mono text-xs font-bold tracking-wider">PANTHEON</span>
+          <div className="flex items-center gap-1">
+            {activeAgents.map(id => {
+              const agent = AGENTS.find(a => a.id === id)
+              if (!agent) return null
+              const colors = AGENT_COLORS[agent.color]
+              return (
+                <span
+                  key={id}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono ${colors.bg} ${colors.text} border ${colors.border}`}
+                  title={agent.name}
+                >
+                  {agent.icon}
+                </span>
+              )
+            })}
+          </div>
+          <span className="text-black-500 font-mono text-[10px]">
+            {activeAgents.length} active
+          </span>
+        </div>
+        <span className="text-black-400 font-mono text-xs">{expanded ? '[-]' : '[+]'}</span>
+      </button>
+
+      {/* Expanded agent cards */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="border-t border-black-700"
+          >
+            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {AGENTS.map(agent => {
+                const isActive = activeAgents.includes(agent.id)
+                const isPrimary = primaryAgent === agent.id
+                const colors = AGENT_COLORS[agent.color]
+                const status = STATUS_STYLES[agent.status]
+                const canActivate = agent.status === 'online' || agent.status === 'standby'
+
+                return (
+                  <div
+                    key={agent.id}
+                    className={`relative rounded-lg border p-3 transition-all cursor-pointer ${
+                      isActive
+                        ? `${colors.border} ${colors.bg} ring-1 ${colors.ring}`
+                        : 'border-black-700 bg-black-900/50 hover:border-black-600'
+                    } ${!canActivate ? 'opacity-50' : ''}`}
+                    onClick={() => canActivate && onToggleAgent(agent.id)}
+                  >
+                    {/* Primary badge */}
+                    {isPrimary && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-matrix-600 text-black-900 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-full">
+                        PRIMARY
+                      </span>
+                    )}
+
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold font-mono ${colors.bg} ${colors.text}`}>
+                        {agent.icon}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-mono text-xs font-bold ${isActive ? colors.text : 'text-black-300'}`}>
+                            {agent.name}
+                          </span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                          <span className={`text-[9px] font-mono ${status.text}`}>{status.label}</span>
+                        </div>
+                        <span className="text-black-500 text-[10px] font-mono">{agent.role}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-black-400 text-[10px] font-mono leading-relaxed">{agent.description}</p>
+
+                    <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-black-700/50">
+                      <span className="text-black-500 text-[9px] font-mono">{agent.model}</span>
+                      {isActive && agent.id !== 'jarvis' && canActivate && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onSetPrimary(agent.id) }}
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors ${
+                            isPrimary
+                              ? `${colors.text} bg-black/30`
+                              : 'text-black-500 hover:text-black-300 bg-black-800/50'
+                          }`}
+                        >
+                          {isPrimary ? 'PRIMARY' : 'SET PRIMARY'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Multi-agent mode info */}
+            <div className="px-4 py-2 border-t border-black-700 bg-black-900/30">
+              <p className="text-black-500 text-[10px] font-mono">
+                Active agents receive your messages. Primary agent responds first. Others can be @mentioned.
+                Use <span className="text-matrix-500">@nyx</span> or <span className="text-matrix-500">@oracle</span> in chat to direct a message.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ============ Main Page ============
 
 function JarvisPage() {
   const { messages, isLoading, mind, health, budget, sendMessage, voiceMode, toggleVoice, isSpeaking, speakText } = useJarvis()
   const { mesh } = useMindMesh()
 
+  // Multi-agent state
+  const [activeAgents, setActiveAgents] = useState(['jarvis'])
+  const [primaryAgent, setPrimaryAgent] = useState('jarvis')
+
+  const handleToggleAgent = useCallback((agentId) => {
+    setActiveAgents(prev => {
+      if (agentId === 'jarvis') return prev // Can't deactivate Jarvis
+      if (prev.includes(agentId)) {
+        const next = prev.filter(id => id !== agentId)
+        // If we removed the primary, reset to jarvis
+        if (primaryAgent === agentId) setPrimaryAgent('jarvis')
+        return next
+      }
+      return [...prev, agentId]
+    })
+  }, [primaryAgent])
+
+  const handleSetPrimary = useCallback((agentId) => {
+    setPrimaryAgent(agentId)
+    // Ensure agent is active
+    setActiveAgents(prev => prev.includes(agentId) ? prev : [...prev, agentId])
+  }, [])
+
+  // Update Jarvis status from health
+  useEffect(() => {
+    if (health?.status === 'online' || health?.status === 'ok') {
+      AGENTS[0].status = 'online'
+      AGENTS[0].model = health.model || 'claude-sonnet'
+    } else {
+      AGENTS[0].status = 'offline'
+    }
+  }, [health])
+
   return (
     <div className="flex flex-col h-full max-w-7xl mx-auto px-4 py-2">
       {/* Hero */}
       <HeroSection health={health} />
+
+      {/* Agent Selector */}
+      <AgentBar
+        activeAgents={activeAgents}
+        onToggleAgent={handleToggleAgent}
+        onSetPrimary={handleSetPrimary}
+        primaryAgent={primaryAgent}
+      />
 
       {/* JUL Balance Bar */}
       <JULBalanceBar budget={budget} mind={mind} />
@@ -529,7 +1229,7 @@ function JarvisPage() {
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
         {/* Chat — takes 3/5 on desktop, full on mobile */}
         <div className="flex-1 lg:flex-[3] min-h-0 flex flex-col">
-          <ChatPanel messages={messages} isLoading={isLoading} onSend={sendMessage} voiceMode={voiceMode} toggleVoice={toggleVoice} isSpeaking={isSpeaking} speakText={speakText} />
+          <ChatPanel messages={messages} isLoading={isLoading} onSend={sendMessage} voiceMode={voiceMode} toggleVoice={toggleVoice} isSpeaking={isSpeaking} speakText={speakText} health={health} activeAgents={activeAgents} />
         </div>
 
         {/* Mind panels — takes 2/5 on desktop, below chat on mobile */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://learned-inter-retention-front.trycloudflare.com'
 
 const INITIAL_GREETING = {
   role: 'jarvis',
@@ -33,14 +33,20 @@ export function useJarvis() {
   const browserSpeak = useCallback((text) => {
     if (!window.speechSynthesis) return false
     const utterance = new SpeechSynthesisUtterance(text.slice(0, 5000))
-    // Pick a British English voice if available (JARVIS feel)
+    // Pick the best British male voice for JARVIS feel
+    // Priority: Microsoft George > Google UK Male > any en-GB male > any en-GB > any en
     const voices = window.speechSynthesis.getVoices()
-    const british = voices.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('male'))
-      || voices.find(v => v.lang === 'en-GB')
-      || voices.find(v => v.lang.startsWith('en'))
+    const nameMatch = (v, keywords) => keywords.some(k => v.name.toLowerCase().includes(k))
+    const british =
+      voices.find(v => v.lang === 'en-GB' && nameMatch(v, ['george', 'daniel', 'james', 'ryan'])) ||
+      voices.find(v => v.lang === 'en-GB' && nameMatch(v, ['male', 'guy'])) ||
+      voices.find(v => v.lang === 'en-GB' && !nameMatch(v, ['female', 'woman', 'girl', 'zira', 'hazel', 'susan', 'libby', 'maisie', 'sonia'])) ||
+      voices.find(v => v.lang === 'en-GB') ||
+      voices.find(v => v.lang.startsWith('en') && nameMatch(v, ['david', 'mark', 'guy', 'male'])) ||
+      voices.find(v => v.lang.startsWith('en'))
     if (british) utterance.voice = british
     utterance.rate = 1.05
-    utterance.pitch = 0.95
+    utterance.pitch = 0.9
     utterance.onend = () => setIsSpeaking(false)
     utterance.onerror = () => setIsSpeaking(false)
     window.speechSynthesis.speak(utterance)
@@ -102,10 +108,15 @@ export function useJarvis() {
     })
   }, [stopSpeaking])
 
-  const sendMessage = useCallback(async (text) => {
+  const sendMessage = useCallback(async (text, attachments) => {
     if (!text.trim() || isLoading) return
 
-    const userMsg = { role: 'user', text: text.trim(), timestamp: new Date() }
+    const userMsg = {
+      role: 'user',
+      text: text.trim(),
+      timestamp: new Date(),
+      attachments: attachments?.map(a => ({ name: a.name, size: a.size, type: a.type, preview: a.preview })) || undefined,
+    }
     setMessages(prev => [...prev, userMsg])
     setIsLoading(true)
     setError(null)

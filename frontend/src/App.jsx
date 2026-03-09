@@ -64,6 +64,8 @@ const PersonalityPage = lazy(() => import('./components/PersonalityPage'))
 const MessageBoard = lazy(() => import('./components/MessageBoard'))
 const PromptsPage = lazy(() => import('./components/PromptsPage'))
 const JarvisPage = lazy(() => import('./components/JarvisPage'))
+const VoiceChat = lazy(() => import('./components/VoiceChat'))
+const JobMarket = lazy(() => import('./components/JobMarket'))
 const MinePage = lazy(() => import('./components/MinePage'))
 const FairnessRace = lazy(() => import('./components/FairnessRace'))
 const MindMesh = lazy(() => import('./components/MindMesh'))
@@ -134,6 +136,8 @@ function AnimatedRoutes() {
             <Route path="/personality" element={<PersonalityPage />} />
             <Route path="/prompts" element={<PromptsPage />} />
             <Route path="/jarvis" element={<JarvisPage />} />
+            <Route path="/voice" element={<VoiceChat />} />
+            <Route path="/bounties" element={<JobMarket />} />
             <Route path="/mine" element={<MinePage />} />
             <Route path="/fairness" element={<FairnessRace />} />
             <Route path="/mesh" element={<MindMesh />} />
@@ -171,6 +175,7 @@ function AnimatedRoutes() {
 function App() {
   const location = useLocation()
   const isHomePage = location.pathname === '/'
+  const isVoicePage = location.pathname === '/voice'
   const { fire } = useSynaptic()
   useKeyboardNav() // Ctrl+K swap, Ctrl+J jarvis, Ctrl+M mesh, etc.
 
@@ -185,7 +190,14 @@ function App() {
     <ContributionsProvider>
       <AmbientBackground />
       <div className="noise-overlay" />
-      {isHomePage ? (
+      {isVoicePage ? (
+        // Voice page: full screen, no header, no nav
+        <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>
+          <main className="flex-1 overflow-hidden">
+            <AnimatedRoutes />
+          </main>
+        </div>
+      ) : isHomePage ? (
         // Home page: completely fixed layout, no scroll possible
         <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>
           <HeaderMinimal />
@@ -203,7 +215,7 @@ function App() {
         </div>
       )}
     <VibePlayer />
-    {location.pathname !== '/jarvis' && <JarvisBubble />}
+    {location.pathname !== '/jarvis' && location.pathname !== '/voice' && <JarvisBubble />}
     <OnboardingTour />
     </ContributionsProvider>
     </MessagingProvider>

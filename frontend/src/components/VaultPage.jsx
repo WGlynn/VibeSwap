@@ -22,12 +22,20 @@ import AnimatedNumber from './ui/AnimatedNumber'
  * @version 1.0.0
  */
 
+// Token metadata only — prices come from CoinGecko via global cache
 const TOKENS = [
-  { symbol: 'ETH', name: 'Ethereum', logo: '⟠', price: 3250 },
-  { symbol: 'USDC', name: 'USD Coin', logo: '💵', price: 1 },
-  { symbol: 'USDT', name: 'Tether', logo: '💲', price: 1 },
-  { symbol: 'WBTC', name: 'Wrapped Bitcoin', logo: '₿', price: 65000 },
+  { symbol: 'ETH', name: 'Ethereum', logo: '⟠' },
+  { symbol: 'USDC', name: 'USD Coin', logo: '$' },
+  { symbol: 'USDT', name: 'Tether', logo: '$' },
+  { symbol: 'WBTC', name: 'Wrapped Bitcoin', logo: '\u20BF' },
 ]
+
+function getTokenPrice(symbol) {
+  const live = window.__vibePriceCache?.[symbol]
+  if (live && live > 0) return live
+  const fallback = { ETH: 2800, USDC: 1, USDT: 1, WBTC: 96000 }
+  return fallback[symbol] || 0
+}
 
 function VaultPage() {
   const { isConnected: isExternalConnected, connect } = useWallet()
@@ -121,7 +129,7 @@ function VaultPage() {
   const getTotalSpendingValue = () => {
     let total = 0
     for (const token of TOKENS) {
-      total += getBalance(token.symbol) * token.price
+      total += getBalance(token.symbol) * getTokenPrice(token.symbol)
     }
     return total
   }
@@ -288,7 +296,7 @@ function VaultPage() {
           {TOKENS.map((token) => {
             const vaultBal = vaultBalances[token.symbol] || 0
             const spendingBal = getBalance(token.symbol)
-            const vaultValue = vaultBal * token.price
+            const vaultValue = vaultBal * getTokenPrice(token.symbol)
 
             return (
               <div key={token.symbol} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

@@ -518,7 +518,6 @@ const TRUSTED_AUTHORIZERS = new Set([
 // ============ Unlimited Users (by username) ============
 // Co-founders and core partners — no token limits. Matched by Telegram @username.
 const UNLIMITED_USERNAMES = new Set([
-  'txbxhxnest',        // tbhxnest — GenTu substrate co-founder
   'triggerednometry',   // Rodney — trading bot builder, core contributor
 ]);
 

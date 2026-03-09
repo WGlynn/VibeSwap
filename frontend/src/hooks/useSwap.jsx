@@ -5,7 +5,8 @@ import { useContracts } from './useContracts'
 import { useBalances } from './useBalances'
 import { useCKBWallet } from './useCKBWallet'
 import { useCKBContracts } from './useCKBContracts'
-import { TOKENS as CHAIN_TOKENS, areContractsDeployed } from '../utils/constants'
+import { areContractsDeployed } from '../utils/constants'
+import { useTokens } from './useTokens'
 import {
   isCKBChain, CKB_TOKENS, CKB_PRECISION, CKB_PHASES,
   formatTokenAmount, formatCKB,
@@ -90,6 +91,7 @@ function clearSecret(commitId) {
 // HOOK
 // ============================================================
 export function useSwap() {
+  const { tokens: CHAIN_TOKENS } = useTokens()
   const { chainId: evmChainId, provider } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const {

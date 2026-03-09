@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from './useWallet'
-import { CONTRACTS, TOKENS, areContractsDeployed } from '../utils/constants'
+import { CONTRACTS, areContractsDeployed } from '../utils/constants'
+import { useTokens } from './useTokens'
 import VibeSwapCoreABI from '../abis/VibeSwapCore.json'
 import VibeAMMABI from '../abis/VibeAMM.json'
 import CommitRevealAuctionABI from '../abis/CommitRevealAuction.json'
@@ -41,6 +42,7 @@ const ERC20_ABI = [
 
 export function useContracts() {
   const { provider, signer, chainId, account, isConnected } = useWallet()
+  const { tokens: TOKENS } = useTokens()
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)

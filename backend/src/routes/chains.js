@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { SUPPORTED_CHAINS } from '../utils/tokenRegistry.js';
+import { SUPPORTED_CHAINS, LZ_ENDPOINTS } from '../utils/tokenRegistry.js';
 import { validateChainId } from '../middleware/validate.js';
 
 const router = Router();
@@ -8,6 +8,7 @@ const router = Router();
 router.get('/', (_req, res) => {
   res.json({
     chains: SUPPORTED_CHAINS,
+    lzEndpoints: LZ_ENDPOINTS,
     count: SUPPORTED_CHAINS.length,
   });
 });

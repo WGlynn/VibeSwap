@@ -163,7 +163,7 @@ contract AntiPhishing is OwnableUpgradeable, UUPSUpgradeable {
     // ============ Verification Queries ============
 
     /// @notice Check if an address is safe to interact with
-    /// @return status 0=unknown, 1=verified, 2=blacklisted
+    /// @return status_ 0=unknown, 1=verified, 2=blacklisted
     function checkAddress(address addr) external view returns (uint8 status_) {
         if (blacklisted[addr]) return 2;
         if (verified[addr].active) return 1;

@@ -5,7 +5,8 @@ import { useDeviceWallet } from './useDeviceWallet'
 import { useContracts } from './useContracts'
 import { useCKBWallet } from './useCKBWallet'
 import { useCKBContracts } from './useCKBContracts'
-import { TOKENS, areContractsDeployed } from '../utils/constants'
+import { areContractsDeployed } from '../utils/constants'
+import { useTokens } from './useTokens'
 import { isCKBChain, CKB_PRECISION } from '../utils/ckb-constants'
 import toast from 'react-hot-toast'
 
@@ -145,6 +146,7 @@ const CKB_LAUNCH_POOLS = [
 
 // ============ Hook: usePool ============
 export function usePool() {
+  const { tokens: TOKENS } = useTokens()
   const { chainId: evmChainId, provider, account: externalAccount } = useWallet()
   const { address: deviceAddress } = useDeviceWallet()
   const {

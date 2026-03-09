@@ -4,7 +4,8 @@ import { useWallet } from './useWallet'
 import { useDeviceWallet } from './useDeviceWallet'
 import { useCKBWallet } from './useCKBWallet'
 import { useBalances } from './useBalances'
-import { CONTRACTS, LZ_ENDPOINTS, SUPPORTED_CHAINS, areContractsDeployed } from '../utils/constants'
+import { CONTRACTS, areContractsDeployed } from '../utils/constants'
+import { useChains } from './useChains'
 import { isCKBChain } from '../utils/ckb-constants'
 import CrossChainRouterABI from '../abis/CrossChainRouter.json'
 
@@ -42,6 +43,7 @@ export function useBridge() {
   const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
   const { isConnected: isCKBConnected, chainId: ckbChainId, address: ckbAddress } = useCKBWallet()
   const { simulateSend, refresh } = useBalances()
+  const { chains: SUPPORTED_CHAINS, getLzEndpointId: getLzEid } = useChains()
 
   // ============ CKB Detection ============
   const isCKB = isCKBConnected && isCKBChain(ckbChainId)
@@ -75,8 +77,8 @@ export function useBridge() {
 
   // Get LZ endpoint ID for a chain
   const getLzEndpointId = useCallback((targetChainId) => {
-    return LZ_ENDPOINTS[targetChainId] || null
-  }, [])
+    return getLzEid(targetChainId)
+  }, [getLzEid])
 
   // Get chain info from SUPPORTED_CHAINS
   const getChainInfo = useCallback((targetChainId) => {
@@ -101,7 +103,7 @@ export function useBridge() {
         }
 
         const router = new ethers.Contract(contracts.router, CrossChainRouterABI, provider)
-        const dstEid = LZ_ENDPOINTS[toChainId]
+        const dstEid = getLzEndpointId(toChainId)
         if (!dstEid) throw new Error(`No LZ endpoint for chain ${toChainId}`)
 
         // Build a sample message for quoting (commitHash placeholder)
@@ -141,7 +143,7 @@ export function useBridge() {
       lzTokenFee: '0',
       time,
     }
-  }, [provider, activeAccount])
+  }, [provider, activeAccount, getLzEndpointId])
 
   // ============ Live Bridge Execution ============
 

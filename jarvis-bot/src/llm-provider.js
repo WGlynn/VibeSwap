@@ -653,41 +653,30 @@ function createOllamaProvider(providerConfig) {
       result.push({ role: 'system', content: system });
     }
     for (const msg of messages) {
-      if (msg.role === 'user') {
-        if (Array.isArray(msg.content)) {
-          const toolResults = msg.content.filter(b => b.type === 'tool_result');
-          if (toolResults.length > 0) {
-            // Ollama doesn't support tool results natively — inject as user context
-            const resultText = toolResults.map(tr =>
-              `[Tool result for ${tr.tool_use_id}]: ${typeof tr.content === 'string' ? tr.content : JSON.stringify(tr.content)}`
-            ).join('\n');
-            result.push({ role: 'user', content: resultText });
-          } else {
-            // Strip media blocks — Ollama is text-only, extract text parts
-            const textParts = msg.content.filter(b => b.type === 'text').map(b => b.text);
-            const mediaDescs = msg.content.filter(b => b.type === 'image' || b.type === 'document')
-              .map(b => `[${b.type} attached]`);
-            result.push({ role: 'user', content: [...mediaDescs, ...textParts].join('\n') || '' });
+      // Ollama requires ALL content to be plain strings — not arrays, not objects.
+      // Force-flatten every message regardless of role.
+      let content;
+      if (Array.isArray(msg.content)) {
+        const parts = [];
+        for (const block of msg.content) {
+          if (block.type === 'text' && block.text) parts.push(block.text);
+          else if (block.type === 'tool_result') {
+            parts.push(`[Tool result for ${block.tool_use_id}]: ${typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}`);
+          } else if (block.type === 'tool_use') {
+            parts.push(`[Using tool: ${block.name}(${JSON.stringify(block.input)})]`);
+          } else if (block.type === 'image' || block.type === 'image_url' || block.type === 'document') {
+            parts.push(`[${block.type} attached]`);
           }
-        } else {
-          result.push({ role: 'user', content: msg.content });
         }
-      } else if (msg.role === 'assistant') {
-        if (Array.isArray(msg.content)) {
-          const text = msg.content.filter(b => b.type === 'text').map(b => b.text).join('');
-          const toolCalls = msg.content.filter(b => b.type === 'tool_use');
-          if (toolCalls.length > 0) {
-            // Represent tool calls as structured text for models without native tool support
-            const toolText = toolCalls.map(tc =>
-              `[Using tool: ${tc.name}(${JSON.stringify(tc.input)})]`
-            ).join('\n');
-            result.push({ role: 'assistant', content: (text + '\n' + toolText).trim() });
-          } else {
-            result.push({ role: 'assistant', content: text });
-          }
-        } else {
-          result.push({ role: 'assistant', content: msg.content });
-        }
+        content = parts.join('\n') || '';
+      } else if (typeof msg.content === 'string') {
+        content = msg.content;
+      } else {
+        content = msg.content ? String(msg.content) : '';
+      }
+
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        if (content) result.push({ role: msg.role, content });
       }
     }
     return result;
@@ -1456,8 +1445,40 @@ function classifyComplexity(request) {
   // If tools are requested, always use Claude (native tool use)
   if (request.tools?.length > 0) return 'tooluse';
 
-  // If caller explicitly set a model, respect it
-  if (request.model) return 'explicit';
+  // If caller explicitly set a model, check if any available provider can serve it.
+  // Background tasks often request 'claude-haiku-4-5-20251001' but when Claude credits
+  // are exhausted, this model can't be served by anyone. Instead of failing the entire
+  // chain, treat unserviceable explicit models as 'simple' (background tasks are low-priority).
+  if (request.model) {
+    // Check if any pool provider can serve this model
+    const modelName = request.model.toLowerCase();
+    const providerOwnsModel = (name) => {
+      const p = providerPool.get(name);
+      return p && p.model && modelName.includes(name);
+    };
+    // Claude models → needs claude provider. OpenAI models → needs openai. etc.
+    const isClaudeModel = modelName.startsWith('claude');
+    const isOpenAIModel = modelName.startsWith('gpt');
+    const isGeminiModel = modelName.startsWith('gemini');
+
+    if (isClaudeModel && !getCircuitBreaker('claude').allowRequest()) {
+      // Claude is down/exhausted — don't force explicit, let router handle it
+      request._strippedModel = request.model; // Remember for logging
+      delete request.model;
+      return request._background ? 'simple' : 'moderate';
+    }
+    if (isOpenAIModel && !getCircuitBreaker('openai').allowRequest()) {
+      request._strippedModel = request.model;
+      delete request.model;
+      return request._background ? 'simple' : 'moderate';
+    }
+    if (isGeminiModel && !getCircuitBreaker('gemini').allowRequest()) {
+      request._strippedModel = request.model;
+      delete request.model;
+      return request._background ? 'simple' : 'moderate';
+    }
+    return 'explicit';
+  }
 
   // Analyze the last user message
   const lastMsg = [...(request.messages || [])].reverse().find(m => m.role === 'user');
@@ -1862,12 +1883,14 @@ export async function llmChat(request) {
     // Prepare request for this provider
     let providerRequest = originalRequest;
 
-    // Non-Claude: flatten tool exchanges
+    // Non-Claude: flatten tool exchanges, strip tools AND model name
+    // The original request carries model: 'claude-sonnet-4-5-...' which other providers reject.
+    // Each provider's .chat() uses `request.model || this.model` — stripping model lets the
+    // provider use its own default model.
     if (currentProvider.name !== 'claude' && providerRequest.messages) {
       providerRequest = { ...providerRequest, messages: flattenToolExchanges(providerRequest.messages) };
-      // Also strip tools — non-Claude providers can't use Jarvis tools reliably
-      const { tools, ...noTools } = providerRequest;
-      providerRequest = noTools;
+      const { tools, model, ...cleaned } = providerRequest;
+      providerRequest = cleaned;
     }
 
     // Non-vision: strip image blocks
@@ -1996,8 +2019,8 @@ export async function llmChat(request) {
     let fbRequest = originalRequest;
     if (fb.name !== 'claude' && fbRequest.messages) {
       fbRequest = { ...fbRequest, messages: flattenToolExchanges(fbRequest.messages) };
-      const { tools, ...noTools } = fbRequest;
-      fbRequest = noTools;
+      const { tools, model, ...cleaned } = fbRequest;
+      fbRequest = cleaned;
     }
     if (!VISION_PROVIDERS.has(fb.name) && fbRequest.messages) {
       fbRequest = { ...fbRequest, messages: stripMediaBlocks(fbRequest.messages) };

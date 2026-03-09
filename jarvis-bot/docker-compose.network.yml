@@ -38,8 +38,15 @@ services:
       - OWNER_USER_ID=8366932263
       - GITHUB_REPO_URL=${GITHUB_REPO_URL:-https://github.com/WGlynn/vibeswap-private.git}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
-      - ENCRYPTION_ENABLED=true
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED:-true}
+      - JARVIS_MASTER_KEY=${JARVIS_MASTER_KEY:-}
+      - SHARD_SECRET=${SHARD_SECRET:-}
+      - CLAUDE_CODE_API_SECRET=${CLAUDE_CODE_API_SECRET:-}
       - HEALTH_PORT=8080
+      - COMMUNITY_GROUP_ID=${COMMUNITY_GROUP_ID:-}
+      - ARK_GROUP_ID=${ARK_GROUP_ID:-}
+      - AUTHORIZED_USERS=${AUTHORIZED_USERS:-}
+      - BOT_USERNAME=${BOT_USERNAME:-JarvisMind1828383bot}
       # Wardenclyffe v3 — all provider API keys (each shard gets its own)
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -57,7 +64,7 @@ services:
       # Shard config
       - SHARD_ID=shard-0
       - SHARD_MODE=primary
-      - TOTAL_SHARDS=3
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
       - NODE_TYPE=full
       - ROUTER_URL=http://shard-0:8080
     volumes:
@@ -79,7 +86,9 @@ services:
       - DOCKER=1
       - NODE_ENV=production
       - DATA_DIR=/app/data
-      - ENCRYPTION_ENABLED=true
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED:-true}
+      - JARVIS_MASTER_KEY=${JARVIS_MASTER_KEY:-}
+      - SHARD_SECRET=${SHARD_SECRET:-}
       - HEALTH_PORT=8080
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
       # Wardenclyffe v3 — each shard multiplies free-tier capacity
@@ -98,7 +107,7 @@ services:
       # Shard config — NO TELEGRAM_BOT_TOKEN = worker mode
       - SHARD_ID=shard-1
       - SHARD_MODE=worker
-      - TOTAL_SHARDS=3
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
       - NODE_TYPE=full
       - ROUTER_URL=http://shard-0:8080
     volumes:
@@ -121,7 +130,9 @@ services:
       - DOCKER=1
       - NODE_ENV=production
       - DATA_DIR=/app/data
-      - ENCRYPTION_ENABLED=true
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED:-true}
+      - JARVIS_MASTER_KEY=${JARVIS_MASTER_KEY:-}
+      - SHARD_SECRET=${SHARD_SECRET:-}
       - HEALTH_PORT=8080
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
       # Wardenclyffe v3 — each shard multiplies free-tier capacity
@@ -140,7 +151,7 @@ services:
       # Shard config — light node
       - SHARD_ID=shard-2
       - SHARD_MODE=worker
-      - TOTAL_SHARDS=3
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
       - NODE_TYPE=light
       - ROUTER_URL=http://shard-0:8080
     volumes:

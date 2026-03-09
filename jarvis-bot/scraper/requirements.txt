@@ -1,0 +1,4 @@
+scrapling[all]>=0.4
+fastapi>=0.115
+uvicorn>=0.34
+curl_cffi>=0.9

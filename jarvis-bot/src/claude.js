@@ -810,6 +810,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     web: ['web_search'],
     behavior: ['set_behavior', 'get_behavior'],
     moderation: ['flag_deceiver'],
+    scraping: ['scrape_page', 'scrape_sentiment', 'scrape_prices'],
     limni: ['limni_status', 'limni_register_terminal', 'limni_register_vps',
             'limni_check_health', 'limni_monitor', 'limni_alerts'],
     vibeswap: ['vibe_price', 'vibe_pool_stats', 'vibe_emission', 'vibe_auction',
@@ -1003,6 +1004,48 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           },
         },
         required: ['identifier', 'evidence', 'pattern', 'severity'],
+      },
+    },
+    // ============ Scrapling — Web Scraping & Data Ingestion ============
+    {
+      name: 'scrape_page',
+      description: 'Scrape a web page and extract data using CSS selectors or full text. Supports stealth mode for anti-bot sites (Cloudflare etc), dynamic mode for JS-heavy pages, and adaptive selectors that survive site redesigns. Use this when you need to gather data from websites that don\'t have APIs — competitor DEXes, social feeds, news sites, governance forums, blockchain explorers.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'URL to scrape' },
+          selectors: {
+            type: 'object',
+            description: 'Named CSS/XPath selectors to extract specific data. Keys are field names, values are selectors. XPath selectors start with //. Example: {"price": ".token-price", "name": "h1.title"}',
+          },
+          stealth: { type: 'boolean', description: 'Use stealth mode to bypass Cloudflare/anti-bot (default: false)' },
+          dynamic: { type: 'boolean', description: 'Use full browser for JS-rendered pages (default: false)' },
+          extract_text: { type: 'boolean', description: 'Extract full page text (default: true)' },
+          extract_links: { type: 'boolean', description: 'Extract all links from page (default: false)' },
+        },
+        required: ['url'],
+      },
+    },
+    {
+      name: 'scrape_sentiment',
+      description: 'Search Reddit and Hacker News for recent mentions of a topic. Returns post titles and subreddits. Use for social sentiment analysis on tokens, protocols, or DeFi topics.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query (e.g., "vibeswap", "base chain defi", "layerzero bridge")' },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'scrape_prices',
+      description: 'Scrape token prices from DEX aggregators (DexScreener, CoinGecko) as backup when API feeds are down or rate-limited. Returns prices from multiple sources for cross-validation.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Token name or symbol (e.g., "ethereum", "vibeswap")' },
+        },
+        required: ['token'],
       },
     },
     // ============ Limni — Trading Terminal Integration ============
@@ -1619,6 +1662,67 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             console.log(`[claude] Tool: flag_deceiver("${tb.input.identifier}") — severity: ${tb.input.severity}`);
           } catch (err) {
             result = `Failed to flag: ${err.message}`;
+          }
+        // ============ Scrapling Tools ============
+        } else if (tb.name === 'scrape_page' || tb.name === 'scrape_sentiment' || tb.name === 'scrape_prices') {
+          try {
+            const scraperUrl = process.env.SCRAPER_URL || 'http://localhost:8900';
+            let endpoint, body, method = 'POST';
+
+            if (tb.name === 'scrape_page') {
+              endpoint = '/scrape';
+              body = JSON.stringify({
+                url: tb.input.url,
+                selectors: tb.input.selectors || null,
+                stealth: tb.input.stealth || false,
+                dynamic: tb.input.dynamic || false,
+                extract_text: tb.input.extract_text !== false,
+                extract_links: tb.input.extract_links || false,
+                max_text_length: 5000,
+              });
+            } else if (tb.name === 'scrape_sentiment') {
+              endpoint = `/sentiment/${encodeURIComponent(tb.input.query)}`;
+              method = 'GET';
+              body = null;
+            } else if (tb.name === 'scrape_prices') {
+              endpoint = `/prices/${encodeURIComponent(tb.input.token)}`;
+              method = 'GET';
+              body = null;
+            }
+
+            const fetchOpts = {
+              method,
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-secret': process.env.SCRAPER_API_SECRET || '',
+              },
+              signal: AbortSignal.timeout(30000),
+            };
+            if (body) fetchOpts.body = body;
+
+            const resp = await fetch(`${scraperUrl}${endpoint}`, fetchOpts);
+
+            if (!resp.ok) {
+              const errText = await resp.text();
+              result = `Scraper error ${resp.status}: ${errText.slice(0, 500)}`;
+            } else {
+              const data = await resp.json();
+              result = JSON.stringify(data, null, 2);
+              // Truncate if too long for context
+              if (result.length > 8000) {
+                result = result.slice(0, 8000) + '\n... (truncated)';
+              }
+            }
+            console.log(`[claude] Tool: ${tb.name}(${tb.input.url || tb.input.query || tb.input.token})`);
+          } catch (err) {
+            if (err.name === 'TimeoutError') {
+              result = 'Scraper request timed out (30s). The page may be slow or protected.';
+            } else if (err.code === 'ECONNREFUSED') {
+              result = 'Scraper service not running. Start it with: cd jarvis-bot/scraper && python server.py';
+            } else {
+              result = `Scraper error: ${err.message}`;
+            }
+            console.warn(`[claude] Tool: ${tb.name} failed: ${err.message}`);
           }
         // ============ Limni Tools ============
         } else if (tb.name === 'limni_status') {

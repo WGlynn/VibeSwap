@@ -40,7 +40,7 @@ IMPORTANT:
 
 // Simple in-memory rate limit (resets per cold start, good enough)
 const rateLimit = new Map();
-const RATE_LIMIT = 10; // max requests per IP per minute
+const RATE_LIMIT = 30; // max requests per IP per minute
 const RATE_WINDOW = 60_000;
 
 function checkRateLimit(ip) {
@@ -69,10 +69,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Messages required.' });
   }
 
-  // Limit conversation length to prevent abuse
-  const trimmed = messages.slice(-10).map(m => ({
+  // Limit conversation length
+  const trimmed = messages.slice(-20).map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
-    content: String(m.content).slice(0, 500),
+    content: String(m.content).slice(0, 2000),
   }));
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -89,8 +89,8 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
+        model: 'claude-sonnet-4-6-20250514',
+        max_tokens: 1500,
         system: SYSTEM_PROMPT,
         messages: trimmed,
       }),

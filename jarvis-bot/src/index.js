@@ -121,6 +121,9 @@ import { initPredictions, flushPredictions, createPrediction, placeBet, resolveM
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
+import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances } from './wallet.js';
+import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
+import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
 // These modules were written by background agents and have crashed the bot on import.
 // Wrap in try/catch so a single broken module doesn't take down the entire bot.
@@ -967,6 +970,23 @@ TASK QUEUE
   /tasks — View queued/completed tasks
   /tasks stats — Queue statistics
   /tasks cancel <id> — Cancel a queued task
+
+SOVEREIGN WALLET (owner-only)
+  /wallet — Wallet status
+  /wallet create <passphrase> — Generate new wallet
+  /wallet unlock <passphrase> — Unlock for transactions
+  /wallet lock — Lock wallet
+  /wallet balance — All chain balances
+  /wallet whitelist add <addr> — Add address
+  /wallet pause / unpause — Emergency stop
+
+SOCIAL PRESENCE (owner-only)
+  /social status — Platform status
+  /social flush — Process post queue
+
+PROACTIVE ENGINE (owner-only)
+  /proactive — Status
+  /proactive enable / disable — Master switch
 
 NEWS & SOCIAL
   /news — Crypto news aggregator
@@ -2174,6 +2194,97 @@ bot.command('tasks', async (ctx) => {
     ctx.reply(`Task Queue Stats:\n  Queued: ${stats.queued}\n  Running: ${stats.running}\n  Completed: ${stats.completed}\n  Failed: ${stats.failed}\n  Total: ${stats.total}`);
   } else {
     ctx.reply(listTasks(ctx.from.id));
+  }
+});
+
+// ============ Sovereign Wallet ============
+
+bot.command('wallet', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Wallet commands are owner-only.');
+  }
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'create') {
+    const passphrase = args.slice(1).join(' ');
+    const result = generateWallet(passphrase);
+    if (result.error) return ctx.reply(result.error);
+    ctx.reply(`Wallet created: ${result.address}\n\nMNEMONIC (SAVE THIS — shown once):\n${result.mnemonic}\n\n${result.message}`);
+  } else if (sub === 'unlock') {
+    const passphrase = args.slice(1).join(' ');
+    const result = unlockWallet(passphrase);
+    ctx.reply(result.error || `Wallet unlocked: ${result.address}`);
+  } else if (sub === 'lock') {
+    ctx.reply(lockWallet().locked ? 'Wallet locked.' : 'Failed.');
+  } else if (sub === 'pause') {
+    ctx.reply(JSON.stringify(pauseWallet()));
+  } else if (sub === 'unpause') {
+    ctx.reply(JSON.stringify(unpauseWallet()));
+  } else if (sub === 'whitelist') {
+    if (args[1] === 'add' && args[2]) {
+      ctx.reply(JSON.stringify(addToWhitelist(args[2])));
+    } else if (args[1] === 'rm' && args[2]) {
+      ctx.reply(JSON.stringify(removeFromWhitelist(args[2])));
+    } else {
+      const info = getWalletInfo();
+      ctx.reply(`Whitelist (${info.limits?.whitelistCount || 0}): Owner-only. /wallet whitelist add <addr>`);
+    }
+  } else if (sub === 'balance' || sub === 'bal') {
+    const chain = args[1] || 'base';
+    const balances = await getAllBalances();
+    const lines = Object.entries(balances.balances || {}).map(([c, b]) =>
+      `${c}: ${b.native?.balance || '?'} ${b.native?.symbol || ''}`
+    );
+    ctx.reply(`Wallet: ${balances.address}\n${lines.join('\n')}`);
+  } else {
+    const info = getWalletInfo();
+    if (!info.exists) {
+      ctx.reply('No wallet. Use /wallet create <passphrase>');
+    } else {
+      ctx.reply(`Address: ${info.address}\nUnlocked: ${info.unlocked}\nPaused: ${info.paused}\nDaily: ${info.today?.spent} / ${info.limits?.dailyCap}\nTx today: ${info.today?.txCount} / ${info.limits?.dailyTxLimit}\nTotal tx: ${info.totalTx}\nChains: ${info.chains?.join(', ')}`);
+    }
+  }
+});
+
+// ============ Social Outbound ============
+
+bot.command('social', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Social commands are owner-only.');
+  }
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'status') {
+    const stats = getSocialStats();
+    const lines = stats.platforms.map(p => `${p.name}: ${p.enabled ? 'ON' : 'OFF'} (${p.totalPosts} posts)`);
+    ctx.reply(`Social Platforms:\n${lines.join('\n')}\nQueue: ${stats.queueLength}`);
+  } else if (sub === 'flush') {
+    const result = await processSocialQueue();
+    ctx.reply(`Processed: ${result.processed}, Remaining: ${result.remaining}${result.errors ? '\nErrors: ' + JSON.stringify(result.errors) : ''}`);
+  } else {
+    ctx.reply('Usage:\n  /social status\n  /social flush');
+  }
+});
+
+// ============ Proactive Engine ============
+
+bot.command('proactive', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Proactive commands are owner-only.');
+  }
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'enable' || sub === 'on') {
+    ctx.reply(JSON.stringify(enableProactive()));
+  } else if (sub === 'disable' || sub === 'off') {
+    ctx.reply(JSON.stringify(disableProactive()));
+  } else {
+    const status = getProactiveStatus();
+    const lines = status.activeActions.map(a => `  ${a.name}: last ${a.lastRun}, next ${a.nextRun}`);
+    ctx.reply(`Proactive: ${status.enabled ? 'ON' : 'OFF'}\nActions:\n${lines.join('\n') || '  none'}\nTotal actions: ${status.totalActions}`);
   }
 });
 
@@ -5692,6 +5803,15 @@ async function main() {
     (chatId, text, opts) => bot.telegram.sendMessage(chatId, text, opts),
     null // LLM chat function wired after bot.launch() — deferred tasks use direct LLM calls
   );
+  // Sovereign wallet — on-chain agency
+  initWallet();
+  // Social outbound presence — X, Discord, GitHub
+  initSocialOutbound();
+  // Proactive engine — autonomous scheduled actions
+  initProactive({
+    chat: (chatId, text) => bot.telegram.sendMessage(chatId, text),
+    social: { processQueue: processSocialQueue },
+  });
   // Autonomous engagement — JARVIS as active community member
   await loadChatActivity(); // Restore activity state before init
   const autonomousChatIds = config.authorizedGroups || [];
@@ -6639,6 +6759,9 @@ async function main() {
     await flushPreferences();
     await flushScheduler();
     await flushTaskQueue();
+    flushWallet();
+    flushSocialOutbound();
+    flushProactive();
     await flushGroupContext();
     await flushXP();
     await flushPredictions();
@@ -6731,6 +6854,9 @@ async function main() {
       ['preferences', flushPreferences],
       ['scheduler', flushScheduler],
       ['task-queue', flushTaskQueue],
+      ['wallet', flushWallet],
+      ['social-outbound', flushSocialOutbound],
+      ['proactive', flushProactive],
       ['group-context', flushGroupContext],
       ['xp', flushXP],
       ['predictions', flushPredictions],
@@ -6753,6 +6879,7 @@ async function main() {
 
     stopScheduler();
     stopTaskQueue();
+    stopProactive();
     stopAutonomous();
     stopGroupContext();
     stopCRPC();

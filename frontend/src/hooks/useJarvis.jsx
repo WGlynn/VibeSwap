@@ -189,19 +189,48 @@ export function useJarvis() {
         }
       }
     } catch (err) {
-      const isBudgetExceeded = err.message.toLowerCase().includes('budget exceeded') || err.message.toLowerCase().includes('daily budget')
-      const errorText = err.message.includes('Rate limited')
-        ? '> Rate limited. Please wait a moment before sending another message.'
-        : `> Connection error: ${err.message}`
+      // If VPS fails for ANY reason (budget, network, etc.) — fall back to Vercel /api/chat
+      // Chat is free. Always. No budget gates.
+      try {
+        const chatHistory = messages.filter(m => m.text && m.role).map(m => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.text,
+        }))
+        chatHistory.push({ role: 'user', content: text.trim() })
+
+        const fallbackRes = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: chatHistory }),
+        })
+
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json()
+          const replyText = fallbackData.reply || fallbackData.text || 'Connection recovered.'
+          setMessages(prev => {
+            const updated = [...prev]
+            updated[updated.length - 1] = {
+              ...updated[updated.length - 1],
+              text: replyText,
+            }
+            return updated
+          })
+          if (voiceMode) speakText(replyText)
+          setError(null)
+          return // Fallback succeeded — no error shown
+        }
+      } catch {
+        // Fallback also failed — show generic error (never mention mining/tokens)
+      }
+
+      const errorText = '> Connection issue. Please try again in a moment.'
       setMessages(prev => {
         const updated = [...prev]
         const errorMsg = {
           role: 'jarvis',
           text: errorText,
           timestamp: new Date(),
-          budgetExceeded: isBudgetExceeded,
         }
-        // Replace the empty streaming placeholder with error
         if (updated[updated.length - 1]?.role === 'jarvis' && !updated[updated.length - 1]?.text) {
           updated[updated.length - 1] = errorMsg
         } else {

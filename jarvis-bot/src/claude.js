@@ -15,6 +15,7 @@ import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrate
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 import { gitCommitAndPush } from './git.js';
 import { processConversation as processCKBConversation, getUserCKB } from './ckb-generator.js';
+import { gate as verificationGate, auditResponse } from './verification-gate.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -2056,8 +2057,18 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         } else {
           result = 'Unknown tool.';
         }
+        // ============ Verification Gate ============
+        // "Lying about doing things you aren't doing is a grave sin" — Will
+        // Pass every state-changing tool result through the gate.
+        // The LLM sees VERIFIED or VERIFICATION FAILED — not raw self-reported success.
+        try {
+          result = await verificationGate(tb.name, tb.input, result, { repoPath: REPO_PATH });
+        } catch (vErr) {
+          console.warn(`[verification-gate] Error verifying ${tb.name}: ${vErr.message}`);
+        }
+
         // Circuit breaker: track success/failure
-        const isFailure = typeof result === 'string' && /^(Failed|Error|Command failed|Health check failed|Web search failed|Deep memory search failed)/i.test(result);
+        const isFailure = typeof result === 'string' && /^(Failed|Error|Command failed|Health check failed|Web search failed|Deep memory search failed|VERIFICATION FAILED)/i.test(result);
         if (isFailure) {
           recordToolFailure(tb.name);
         } else {
@@ -2104,6 +2115,18 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       .map(block => block.text)
       .join('\n')
       || '...';
+
+    // ============ Response Audit — Flag Unverified Claims ============
+    // "Boolean logic gate knowledge primitives that hardcode prevent lying" — Will
+    try {
+      const claims = auditResponse(assistantMessage);
+      if (claims.length > 0) {
+        const unverified = claims.filter(c => !c.verified);
+        if (unverified.length > 0) {
+          console.warn(`[verification-gate] AUDIT: Response contains ${unverified.length} unverified claim(s): ${unverified.map(c => c.word).join(', ')}`);
+        }
+      }
+    } catch {}
 
     // Add assistant response to history
     history.push({ role: 'assistant', content: assistantMessage });

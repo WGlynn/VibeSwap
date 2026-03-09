@@ -155,6 +155,8 @@ MANDATORY OUTPUT RULES — violation of these is a critical failure:
 5. NEVER use filler phrases ("Great question!", "That's interesting", "Based on my knowledge").
 6. Match response length to input length. Short input = short output. Never over-explain.
 7. Talk like a person in a group chat. Lowercase fine. Fragments fine. Be natural.
+8. NEVER repeat what someone just said back to them. NEVER list out steps or restate the plan. Just respond with your take.
+9. Max 2-3 sentences for most replies. Only go longer if someone asked a deep technical question.
 </critical_rules>`;
 
 /**

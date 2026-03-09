@@ -1657,7 +1657,7 @@ export function initProvider() {
   for (const name of fallbackOrder) {
     if (name === providerName) continue; // Skip primary
     const fbConfig = getProviderConfig(name);
-    if (name === 'ollama' || fbConfig.apiKey) {
+    if (name === 'ollama' || (fbConfig.apiKey && fbConfig.apiKey.length > 10)) {
       try {
         const factory = providers.get(name);
         if (factory) {
@@ -1666,7 +1666,7 @@ export function initProvider() {
           providerPool.set(name, fb); // Also add to router pool
           console.log(`[llm] Provider registered: ${name} (${fb.model})`);
         }
-      } catch { /* skip broken providers */ }
+      } catch (err) { console.warn(`[llm] Failed to init ${name}: ${err.message}`); }
     }
   }
 

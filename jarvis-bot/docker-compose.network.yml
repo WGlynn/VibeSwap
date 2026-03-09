@@ -40,6 +40,20 @@ services:
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
       - ENCRYPTION_ENABLED=true
       - HEALTH_PORT=8080
+      # Wardenclyffe v3 — all provider API keys (each shard gets its own)
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY:-}
+      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
+      - NOVITA_API_KEY=${NOVITA_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
       # Shard config
       - SHARD_ID=shard-0
       - SHARD_MODE=primary
@@ -68,6 +82,19 @@ services:
       - ENCRYPTION_ENABLED=true
       - HEALTH_PORT=8080
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      # Wardenclyffe v3 — each shard multiplies free-tier capacity
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY:-}
+      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
+      - NOVITA_API_KEY=${NOVITA_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
       # Shard config — NO TELEGRAM_BOT_TOKEN = worker mode
       - SHARD_ID=shard-1
       - SHARD_MODE=worker
@@ -97,6 +124,19 @@ services:
       - ENCRYPTION_ENABLED=true
       - HEALTH_PORT=8080
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      # Wardenclyffe v3 — each shard multiplies free-tier capacity
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY:-}
+      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
+      - NOVITA_API_KEY=${NOVITA_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
       # Shard config — light node
       - SHARD_ID=shard-2
       - SHARD_MODE=worker

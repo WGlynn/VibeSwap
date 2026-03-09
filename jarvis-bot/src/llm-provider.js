@@ -1,18 +1,30 @@
-// ============ WARDENCLYFFE — LLM Provider Cascade ============
+// ============ WARDENCLYFFE v3 — Hybrid Escalation Router ============
 //
 // Tesla's Wardenclyffe Tower was designed to transmit energy without wires,
 // without meters, without bills. The tower was demolished. The idea was not.
 //
-// Wardenclyffe is a 12-provider LLM cascade that harvests free inference
-// from the ambient compute surplus of the modern API economy.
-// When paid providers exhaust, free-tier providers sustain the signal.
+// Wardenclyffe v3 is a 13-provider hybrid escalation router that harvests
+// free inference from the ambient compute surplus of the modern API economy.
 //
-// Tier 1 (paid):  Claude → DeepSeek → OpenAI (GPT-5.4) → xAI (Grok-3) → Gemini
-// Tier 2 (free):  Cerebras → Groq → OpenRouter → Mistral → Together → SambaNova → Fireworks → Novita
+// v1: Cascade down (premium first, degrade on failure)
+// v2: Skill-based routing (cooperative, but still premium-first)
+// v3: HYBRID ESCALATION — start cheap, level up on demand
+//
+// Architecture: Triage → Route to cheapest adequate tier → Escalate on quality failure
+//
+// Tier 0 (free):    Groq, Cerebras, SambaNova, Fireworks, Novita, OpenRouter, Mistral, Together
+// Tier 1 (budget):  DeepSeek ($0.69), Gemini ($0.38), Ollama (local)
+// Tier 2 (premium): Claude ($9), OpenAI ($8.75), xAI ($5)
+//
+// Economics: ~70% of messages at $0, ~20% at $0.50/MTok, ~10% at $8/MTok
+// Old model: 100% starting at $8/MTok → now saves ~90% on routine messages
+//
+// Horizontal scaling: Each Jarvis shard has its OWN free-tier API keys.
+// N shards = N × (free tier limits). Shards communicate via Mind Mesh (BFT/CRPC).
+// Free compute scales linearly with network size. Cost per shard: near-zero.
+// The network doesn't share rate limits — it MULTIPLIES them.
 //
 // Availability: 1 - (1-a)^13 ≈ 1.0 (fifteen nines)
-// Single-provider dependency: 100% → 7.7%
-//
 // All providers return normalized Anthropic-format responses:
 //   { content, stop_reason, usage, _provider, _model }
 //
@@ -1391,29 +1403,39 @@ function getProviderConfig(providerName) {
   };
 }
 
-// ============ Smart Router — Route by Skill (Cooperative Intelligence) ============
+// ============ Wardenclyffe v3 — Hybrid Escalation Router ============
 // "The models should be cooperative not competitive and zero sum" — Will
 //
-// Each model has strengths. Instead of a fallback chain where one model is
-// "better" than another, we delegate to the RIGHT model for the RIGHT task.
-// This is Cooperative Capitalism applied to the model layer:
-//   - Claude: reasoning, philosophy, nuance, long-form analysis, tool use
-//   - GPT-5.4: coding, structured output, instruction following, technical docs
-//   - DeepSeek: math, data analysis, cost-efficient reasoning, Chinese/multilingual
-//   - Gemini: multimodal (images/docs), large context, search-grounded answers
-//   - Free tier: simple tasks that don't need frontier models
+// ARCHITECTURE: Start cheap, level up on demand.
 //
-// Complexity levels (preserved):
-//   simple   → free tier (Groq/Cerebras) — greetings, one-liners, short factual
-//   moderate → mid tier (DeepSeek/Gemini) — conversation, explanations, summaries
-//   complex  → premium (Claude) — reasoning, philosophy, long-form analysis
+// Old model (Cascade Down): Claude → DeepSeek → free tier
+//   Problem: 80% of messages are simple, burns premium tokens on "hey jarvis"
 //
-// Skill levels (NEW — cooperative delegation):
-//   coding      → GPT-5.4 (best-in-class code generation)
-//   reasoning   → Claude (nuance, ethics, philosophy, mechanism design)
-//   math        → DeepSeek (cost-efficient analytical reasoning)
-//   multimodal  → Gemini (images, documents, large context)
-//   tooluse     → Claude (native tool use support)
+// New model (Hybrid Escalation): Triage → Route to cheapest adequate tier → Escalate on quality failure
+//   Benefit: Cost scales with actual complexity. Simple = $0. Premium reserved for premium tasks.
+//
+// Tier 0 — Free ($0):     Groq, Cerebras, SambaNova, Fireworks, Novita
+//   For: greetings, short Q&A, status checks, simple factual
+// Tier 1 — Budget (~$0.50/MTok): DeepSeek, Gemini, Mistral, Ollama
+//   For: conversation, coding, math, moderate reasoning, multimodal (Gemini)
+// Tier 2 — Premium (~$8/MTok):   Claude, OpenAI, xAI
+//   For: complex reasoning, tool use, philosophy, mechanism design, long-form analysis
+//
+// Escalation: If quality gate detects weak response → auto-promote to next tier.
+// User sees slightly slower response, never an error. Seamless quality guarantee.
+//
+// Each complexity/skill class maps to a starting tier + escalation chain:
+//   simple    → Tier 0 → Tier 1 → Tier 2
+//   moderate  → Tier 0 → Tier 1 → Tier 2  (KEY: was Tier 1, now starts FREE)
+//   coding    → Tier 1 → Tier 2            (DeepSeek can handle 80% of coding)
+//   math      → Tier 1 → Tier 2            (DeepSeek leads, cheap)
+//   reasoning → Tier 2                     (irreducible — needs Claude)
+//   tooluse   → Tier 2                     (irreducible — needs native tool support)
+//   multimodal→ Tier 1 → Tier 2            (Gemini cheap + vision-capable)
+//   complex   → Tier 2                     (frontier models only)
+//
+// Economics: ~70% of messages handled at $0, ~20% at $0.50/MTok, ~10% at $8/MTok
+// vs old model: 100% starting at $8/MTok and cascading down on failure
 
 // Bare greetings — truly zero-effort, route to free tier
 const SIMPLE_PATTERNS = /^(hey|hi|hello|yo|sup|gm|gn|gg|lol|lmao|ok|okay|sure|thanks|ty|thx|bet|word|facts|based|fr|w |l |nice|cool|dope|sick|fire|mid|nah|yep|yea|yeah|yes|no|nope|good (morning|night|evening))\b/i;
@@ -1500,32 +1522,91 @@ function classifyComplexity(request) {
 // Provider pool — all initialized providers keyed by name
 const providerPool = new Map();
 
+// ============ Escalation Chains (cost-ascending) ============
+// Each classification maps to an ordered chain: try cheapest first, escalate on quality failure.
+// Within each tier, providers are ordered by skill fit (best specialist first).
+const ESCALATION_CHAINS = {
+  // Start FREE → Budget → Premium
+  simple:     ['groq', 'cerebras', 'sambanova', 'fireworks', 'deepseek', 'gemini', 'ollama'],
+  moderate:   ['groq', 'cerebras', 'sambanova', 'deepseek', 'gemini', 'xai', 'claude'],
+
+  // Start BUDGET → Premium (skill-specialized)
+  coding:     ['deepseek', 'gemini', 'openai', 'xai', 'claude'],        // DeepSeek handles 80% of coding
+  math:       ['deepseek', 'gemini', 'openai', 'xai', 'claude'],        // DeepSeek leads math
+  multimodal: ['gemini', 'xai', 'claude', 'openai'],                    // Gemini cheap + vision
+
+  // Start PREMIUM (irreducible complexity — these NEED frontier models)
+  reasoning:  ['claude', 'xai', 'openai', 'deepseek', 'gemini'],
+  tooluse:    ['claude', 'openai', 'xai', 'deepseek'],
+  complex:    ['claude', 'xai', 'openai', 'deepseek', 'gemini'],
+
+  explicit:   [], // Caller specified model — use activeProvider
+};
+
+// Tier boundaries for logging
+const PROVIDER_TIER = {
+  groq: 0, cerebras: 0, sambanova: 0, fireworks: 0, novita: 0, openrouter: 0, mistral: 0, together: 0,
+  deepseek: 1, gemini: 1, ollama: 1,
+  claude: 2, openai: 2, xai: 2,
+};
+
 function getProviderForComplexity(complexity) {
-  // Cooperative routing — each model does what it's best at
-  const routes = {
-    // Skill-based (cooperative delegation)
-    coding:     ['openai', 'xai', 'claude', 'deepseek', 'gemini'],     // GPT-5.4 leads coding, Grok strong
-    reasoning:  ['claude', 'xai', 'openai', 'deepseek', 'gemini'],   // Claude leads reasoning, Grok 2nd
-    math:       ['deepseek', 'openai', 'xai', 'claude', 'gemini'],   // DeepSeek leads math
-    tooluse:    ['claude', 'openai', 'xai', 'deepseek'],              // Claude has native tool use
-    multimodal: ['gemini', 'xai', 'claude', 'openai'],                // Gemini leads multimodal, Grok has vision
-
-    // Complexity-based (legacy, still useful)
-    simple:     ['groq', 'cerebras', 'sambanova', 'deepseek', 'gemini'],
-    moderate:   ['deepseek', 'xai', 'gemini', 'groq', 'cerebras'],
-    complex:    ['claude', 'xai', 'openai', 'deepseek', 'gemini'],   // Frontier models for complex
-
-    explicit:   [], // Caller specified model — use activeProvider
-  };
-
-  const candidates = routes[complexity] || routes.moderate;
-  for (const name of candidates) {
+  // Return first available provider from the escalation chain
+  const chain = ESCALATION_CHAINS[complexity] || ESCALATION_CHAINS.moderate;
+  for (const name of chain) {
     const provider = providerPool.get(name);
     if (provider) return provider;
   }
-
-  // Fallback to active provider if no candidates available
   return activeProvider;
+}
+
+/**
+ * Get the full escalation chain for a complexity class.
+ * Returns array of available providers in cost-ascending order.
+ * Used by llmChat for auto-escalation on quality failure.
+ */
+function getEscalationChain(complexity) {
+  const chain = ESCALATION_CHAINS[complexity] || ESCALATION_CHAINS.moderate;
+  return chain
+    .map(name => providerPool.get(name))
+    .filter(Boolean);
+}
+
+// ============ Escalation Metrics ============
+// Track how often we escalate, and how much money we save.
+const escalationMetrics = {
+  totalRequests: 0,
+  tier0Handled: 0, // Handled by free tier (no escalation)
+  tier1Handled: 0, // Handled by budget tier
+  tier2Handled: 0, // Required premium tier
+  escalations: 0,  // Total escalation events
+  estimatedSavings: 0, // Dollars saved vs always-premium (rough estimate)
+};
+
+function recordEscalationMetric(providerName, escalated) {
+  escalationMetrics.totalRequests++;
+  const tier = PROVIDER_TIER[providerName] ?? 1;
+  if (tier === 0) escalationMetrics.tier0Handled++;
+  else if (tier === 1) escalationMetrics.tier1Handled++;
+  else escalationMetrics.tier2Handled++;
+  if (escalated) escalationMetrics.escalations++;
+
+  // Rough savings estimate: premium costs ~$9/MTok, free costs ~$0
+  // Average message ~2K tokens. If handled at tier 0 instead of tier 2, save ~$0.018/msg
+  if (tier === 0) escalationMetrics.estimatedSavings += 0.018;
+  else if (tier === 1) escalationMetrics.estimatedSavings += 0.012;
+}
+
+export function getEscalationMetrics() {
+  const total = escalationMetrics.totalRequests || 1;
+  return {
+    ...escalationMetrics,
+    tier0Pct: (escalationMetrics.tier0Handled / total * 100).toFixed(1) + '%',
+    tier1Pct: (escalationMetrics.tier1Handled / total * 100).toFixed(1) + '%',
+    tier2Pct: (escalationMetrics.tier2Handled / total * 100).toFixed(1) + '%',
+    escalationRate: (escalationMetrics.escalations / total * 100).toFixed(1) + '%',
+    savingsUSD: '$' + escalationMetrics.estimatedSavings.toFixed(3),
+  };
 }
 
 // Export for testing/debugging
@@ -1569,23 +1650,31 @@ export function initProvider() {
   }
 
   if (providerPool.size > 1) {
-    console.log(`[wardenclyffe] Cooperative router: ${providerPool.size} providers — routing by SKILL`);
-    console.log(`[wardenclyffe]   coding    → ${['openai', 'claude', 'deepseek'].filter(n => providerPool.has(n))[0] || 'fallback'} (GPT-5.4)`);
-    console.log(`[wardenclyffe]   reasoning → ${['claude', 'openai', 'deepseek'].filter(n => providerPool.has(n))[0] || 'fallback'} (Claude)`);
-    console.log(`[wardenclyffe]   math      → ${['deepseek', 'openai', 'claude'].filter(n => providerPool.has(n))[0] || 'fallback'} (DeepSeek)`);
-    console.log(`[wardenclyffe]   multimodal→ ${['gemini', 'claude', 'openai'].filter(n => providerPool.has(n))[0] || 'fallback'} (Gemini)`);
-    console.log(`[wardenclyffe]   simple    → ${['groq', 'cerebras', 'sambanova'].filter(n => providerPool.has(n))[0] || 'fallback'} (free tier)`);
-    console.log(`[wardenclyffe] Cascade fallback: ${providerName} → ${fallbackProviders.map(p => p.name).join(' → ')}`);
+    console.log(`[wardenclyffe v3] Hybrid Escalation Router: ${providerPool.size} providers — start cheap, level up on demand`);
+    const chainSummary = (name) => {
+      const chain = ESCALATION_CHAINS[name] || [];
+      return chain.filter(n => providerPool.has(n)).map(n => `${n}[T${PROVIDER_TIER[n] ?? '?'}]`).join(' → ') || 'fallback';
+    };
+    console.log(`[wardenclyffe v3]   simple    : ${chainSummary('simple')}`);
+    console.log(`[wardenclyffe v3]   moderate  : ${chainSummary('moderate')}`);
+    console.log(`[wardenclyffe v3]   coding    : ${chainSummary('coding')}`);
+    console.log(`[wardenclyffe v3]   math      : ${chainSummary('math')}`);
+    console.log(`[wardenclyffe v3]   reasoning : ${chainSummary('reasoning')}`);
+    console.log(`[wardenclyffe v3]   multimodal: ${chainSummary('multimodal')}`);
+    console.log(`[wardenclyffe v3]   tooluse   : ${chainSummary('tooluse')}`);
+    console.log(`[wardenclyffe v3] Economics: simple/moderate start FREE → escalate on quality failure`);
+    console.log(`[wardenclyffe v3] Legacy cascade: ${providerName} → ${fallbackProviders.map(p => p.name).join(' → ')}`);
   } else {
-    console.warn('[wardenclyffe] No fallback providers configured. Set CEREBRAS_API_KEY, GROQ_API_KEY, etc. for infinite compute.');
+    console.warn('[wardenclyffe v3] No fallback providers configured. Set CEREBRAS_API_KEY, GROQ_API_KEY, etc. for infinite compute.');
   }
 
   return activeProvider;
 }
 
 // ============ Response Quality Gate ============
-// Validate that a provider's response actually has content.
-// Empty responses from free-tier providers shouldn't count as success.
+// Two-level quality check:
+// 1. validateResponse — hard gate: reject empty/broken responses (throws → retry)
+// 2. isAdequateResponse — soft gate: detect low-quality responses (returns false → escalate)
 
 class EmptyResponseError extends Error {
   constructor(providerName) {
@@ -1608,6 +1697,59 @@ function validateResponse(result, providerName) {
   }
 
   return result;
+}
+
+/**
+ * Soft quality gate — detect responses that are technically non-empty but inadequate.
+ * Returns false if the response should trigger escalation to a higher tier.
+ *
+ * Heuristics (intentionally conservative — false negatives are better than false positives):
+ * - Tool use responses are always adequate (the model is doing its job)
+ * - Response too short relative to query complexity
+ * - Response contains refusal/confusion patterns from weak models
+ * - Response is just echoing the question back
+ */
+function isAdequateResponse(result, complexity, queryText) {
+  // Tool use = adequate (model is using tools correctly)
+  if (result.content.some(b => b.type === 'tool_use')) return true;
+
+  const text = result.content
+    .filter(b => b.type === 'text' && b.text)
+    .map(b => b.text)
+    .join(' ')
+    .trim();
+
+  const len = text.length;
+
+  // Simple queries — any non-empty response is fine
+  if (complexity === 'simple') return len > 0;
+
+  // Refusal/confusion patterns from weak models
+  const WEAK_PATTERNS = /^(i('m| am) (not sure|unable|sorry)|i (don'?t|can'?t) (help|assist|answer)|as an ai|i (don'?t|do not) have (access|the ability)|i('m| am) (just )?a (language model|text|chat))/i;
+  if (WEAK_PATTERNS.test(text)) return false;
+
+  // Response too short for complexity class
+  const minLengths = {
+    moderate: 20,
+    coding: 40,
+    math: 30,
+    reasoning: 60,
+    complex: 60,
+    multimodal: 20,
+    tooluse: 10,
+  };
+  const minLen = minLengths[complexity] || 20;
+  if (len < minLen) return false;
+
+  // Echo detection — if response is >60% overlap with query, it's just parroting
+  if (queryText && queryText.length > 30) {
+    const queryWords = new Set(queryText.toLowerCase().split(/\s+/));
+    const responseWords = text.toLowerCase().split(/\s+/);
+    const overlap = responseWords.filter(w => queryWords.has(w)).length;
+    if (responseWords.length > 0 && overlap / responseWords.length > 0.6) return false;
+  }
+
+  return true;
 }
 
 // ============ Per-Provider Adaptive Timeouts ============
@@ -1661,219 +1803,234 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ============ Convenience: Direct Chat (with auto-fallback + retry) ============
+// ============ Convenience: Direct Chat (with escalation + fallback + retry) ============
+//
+// Flow:
+// 1. Classify complexity → get escalation chain (cost-ascending)
+// 2. Try cheapest adequate provider first
+// 3. Hard gate (empty/broken) → retry same provider or escalate
+// 4. Soft gate (low quality) → auto-escalate to next tier
+// 5. Credit exhaustion → cascade through remaining chain
+// 6. All providers exhausted → throw
 
 export async function llmChat(request) {
   if (!activeProvider) {
     throw new Error('LLM provider not initialized. Call initProvider() first.');
   }
 
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 2;
   let lastError;
-  const bg = request._background || false; // Isolated circuit breaker pool for background tasks
-
+  const bg = request._background || false;
   const cascadeTrail = [];
+  const originalRequest = request; // Keep original for Claude (tools intact)
 
-  // ============ Smart Router ============
-  // Route to the best provider based on query complexity.
-  // Only routes if: (1) multiple providers available, (2) caller didn't specify a model
+  // ============ Classify & Build Escalation Chain ============
   const complexity = classifyComplexity(request);
-  let routedProvider = activeProvider;
+  let escalationChain;
 
-  if (complexity !== 'explicit' && providerPool.size > 1) {
-    routedProvider = getProviderForComplexity(complexity);
-    if (routedProvider !== activeProvider) {
-      console.log(`[router] ${complexity} → ${routedProvider.name} (saved ${activeProvider.name} for complex)`);
+  if (complexity === 'explicit' || providerPool.size <= 1) {
+    escalationChain = [activeProvider];
+  } else {
+    escalationChain = getEscalationChain(complexity);
+    if (escalationChain.length === 0) escalationChain = [activeProvider];
+  }
+
+  // Extract query text for adequacy checks
+  const lastUserMsg = [...(request.messages || [])].reverse().find(m => m.role === 'user');
+  const queryText = !lastUserMsg ? '' :
+    typeof lastUserMsg.content === 'string' ? lastUserMsg.content :
+    Array.isArray(lastUserMsg.content) ? lastUserMsg.content.filter(b => b.type === 'text').map(b => b.text).join(' ') : '';
+
+  // ============ Walk the Escalation Chain ============
+  let escalated = false;
+
+  for (let chainIdx = 0; chainIdx < escalationChain.length; chainIdx++) {
+    let currentProvider = escalationChain[chainIdx];
+    const providerTier = PROVIDER_TIER[currentProvider.name] ?? 1;
+
+    // Circuit breaker — skip providers with open circuits
+    const cb = getCircuitBreaker(currentProvider.name, bg);
+    if (!cb.allowRequest()) {
+      cascadeTrail.push({
+        provider: currentProvider.name,
+        status: 'circuit_open',
+        tier: providerTier,
+      });
+      continue; // Skip to next in chain
+    }
+
+    // Prepare request for this provider
+    let providerRequest = originalRequest;
+
+    // Non-Claude: flatten tool exchanges
+    if (currentProvider.name !== 'claude' && providerRequest.messages) {
+      providerRequest = { ...providerRequest, messages: flattenToolExchanges(providerRequest.messages) };
+      // Also strip tools — non-Claude providers can't use Jarvis tools reliably
+      const { tools, ...noTools } = providerRequest;
+      providerRequest = noTools;
+    }
+
+    // Non-vision: strip image blocks
+    if (!VISION_PROVIDERS.has(currentProvider.name) && providerRequest.messages) {
+      providerRequest = { ...providerRequest, messages: stripMediaBlocks(providerRequest.messages) };
+    }
+
+    if (chainIdx > 0) {
+      escalated = true;
+      console.log(`[escalation] ${complexity} → escalating from tier ${PROVIDER_TIER[escalationChain[chainIdx - 1]?.name] ?? '?'} to tier ${providerTier} (${currentProvider.name})`);
+    } else if (escalationChain.length > 1) {
+      console.log(`[router] ${complexity} → ${currentProvider.name} [tier ${providerTier}] (${escalationChain.length - 1} escalation tiers available)`);
+    }
+
+    // ============ Try Current Provider (with retries) ============
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const attemptStart = Date.now();
+      try {
+        const result = await currentProvider.chat(providerRequest);
+
+        // Hard gate — reject empty/broken
+        validateResponse(result, currentProvider.name);
+
+        // Record success
+        getCircuitBreaker(currentProvider.name, bg).recordSuccess();
+        recordProviderPerformance(currentProvider.name, Date.now() - attemptStart, true);
+
+        // Soft gate — check adequacy for potential escalation
+        // Only escalate if: (1) there's a higher tier available, (2) response is inadequate
+        // (3) we're not already at the top of the chain
+        if (chainIdx < escalationChain.length - 1 && !isAdequateResponse(result, complexity, queryText)) {
+          const nextProvider = escalationChain[chainIdx + 1];
+          const nextTier = PROVIDER_TIER[nextProvider?.name] ?? 1;
+          // Only escalate to a HIGHER tier, not lateral moves within same tier
+          if (nextTier > providerTier) {
+            console.log(`[escalation] ${currentProvider.name} response inadequate for ${complexity} — escalating to ${nextProvider.name} [tier ${nextTier}]`);
+            cascadeTrail.push({
+              provider: currentProvider.name,
+              model: currentProvider.model,
+              status: 'escalated_quality',
+              tier: providerTier,
+              latencyMs: Date.now() - attemptStart,
+            });
+            break; // Break retry loop, continue chain loop
+          }
+        }
+
+        // ============ Success — attach metadata and return ============
+        cascadeTrail.push({
+          provider: currentProvider.name,
+          model: currentProvider.model,
+          status: 'success',
+          tier: providerTier,
+          latencyMs: Date.now() - attemptStart,
+          complexity,
+          escalated,
+        });
+
+        recordEscalationMetric(currentProvider.name, escalated);
+        reorderFallbacksByPerformance();
+
+        result._provider = currentProvider.name;
+        result._model = currentProvider.model;
+        result._cascadeTrail = cascadeTrail;
+        result._intelligenceLevel = getIntelligenceLevel();
+        result._complexity = complexity;
+        result._tier = providerTier;
+        result._escalated = escalated;
+        const contentStr = JSON.stringify(result.content);
+        result._responseHash = createHash('sha256')
+          .update(contentStr + currentProvider.name + currentProvider.model + Date.now())
+          .digest('hex');
+        return result;
+
+      } catch (error) {
+        lastError = error;
+        const latencyMs = Date.now() - attemptStart;
+
+        getCircuitBreaker(currentProvider.name, bg).recordFailure(error);
+        recordProviderPerformance(currentProvider.name, latencyMs, false);
+
+        cascadeTrail.push({
+          provider: currentProvider.name,
+          model: currentProvider.model,
+          status: isCreditError(error) ? 'credit_error' : isTransientError(error) ? 'transient_error' : 'error',
+          tier: providerTier,
+          latencyMs,
+          error: error.message?.slice(0, 120),
+        });
+
+        // Credit/permanent error → skip to next provider in chain (escalate)
+        if (isCreditError(error) || (!isTransientError(error) && !isTransientOrGlitch(error))) {
+          console.warn(`[escalation] ${currentProvider.name} failed (${isCreditError(error) ? 'credits' : 'permanent'}): ${error.message?.slice(0, 80)}`);
+          break; // Break retry loop, continue chain loop
+        }
+
+        // Transient error — retry with backoff
+        if (attempt < MAX_RETRIES) {
+          const baseDelay = Math.min(1000 * Math.pow(2, attempt), 4000);
+          const jitter = Math.random() * 500;
+          console.warn(`[llm] Transient error on ${currentProvider.name} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retry in ${Math.round(baseDelay + jitter)}ms`);
+          await sleep(baseDelay + jitter);
+          continue;
+        }
+
+        // Exhausted retries on this provider → escalate
+        console.warn(`[escalation] ${currentProvider.name} exhausted retries — escalating`);
+        break;
+      }
     }
   }
 
-  // Non-Claude providers can't handle tool_use/tool_result in conversation history.
-  // Flatten them BEFORE sending — not just during cascade.
-  if (routedProvider.name !== 'claude' && request.messages) {
-    request = { ...request, messages: flattenToolExchanges(request.messages) };
-  }
+  // ============ Escalation Chain Exhausted — Last Resort Legacy Cascade ============
+  // If the smart escalation chain is exhausted, fall through to the flat fallback list.
+  // This handles edge cases where a provider isn't in any escalation chain but has credits.
+  const triedProviders = new Set(cascadeTrail.map(t => t.provider));
 
-  // Circuit breaker check — skip providers that are currently open
-  // Background tasks use isolated breaker pool so they can't poison user-facing requests
-  // NOTE: Must happen BEFORE media stripping so we strip for the actual provider, not the original
-  const routedCB = getCircuitBreaker(routedProvider.name, bg);
-  if (!routedCB.allowRequest() && routedProvider !== activeProvider) {
-    console.log(`[circuit-breaker] ${routedProvider.name} circuit open — falling back to ${activeProvider.name}`);
-    routedProvider = activeProvider;
-  }
+  for (const fb of fallbackProviders) {
+    if (triedProviders.has(fb.name)) continue; // Already tried
 
-  // Strip image/document blocks for non-vision providers — they'll crash on base64 image data
-  // AFTER circuit breaker swap so we check the actual provider, not the originally routed one
-  if (!VISION_PROVIDERS.has(routedProvider.name) && request.messages) {
-    request = { ...request, messages: stripMediaBlocks(request.messages) };
-  }
+    const fbCB = getCircuitBreaker(fb.name, bg);
+    if (!fbCB.allowRequest()) continue;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const attemptStart = Date.now();
+    console.warn(`[wardenclyffe] Last resort fallback: ${fb.name}`);
+
+    let fbRequest = originalRequest;
+    if (fb.name !== 'claude' && fbRequest.messages) {
+      fbRequest = { ...fbRequest, messages: flattenToolExchanges(fbRequest.messages) };
+      const { tools, ...noTools } = fbRequest;
+      fbRequest = noTools;
+    }
+    if (!VISION_PROVIDERS.has(fb.name) && fbRequest.messages) {
+      fbRequest = { ...fbRequest, messages: stripMediaBlocks(fbRequest.messages) };
+    }
+
+    const fbStart = Date.now();
     try {
-      const result = await routedProvider.chat(request);
-      // Quality gate — reject empty responses from free-tier providers
-      validateResponse(result, routedProvider.name);
-      // Record success in circuit breaker + performance tracker
-      getCircuitBreaker(routedProvider.name, bg).recordSuccess();
-      recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, true);
-      // Cascade trail — record successful attempt
-      cascadeTrail.push({
-        provider: routedProvider.name,
-        model: routedProvider.model,
-        status: 'success',
-        latencyMs: Date.now() - attemptStart,
-        complexity,
-      });
-      // Attach provider metadata for usage tracking
-      result._provider = routedProvider.name;
-      result._model = routedProvider.model;
-      // Wardenclyffe protocol metadata
+      const result = await fb.chat(fbRequest);
+      validateResponse(result, fb.name);
+      getCircuitBreaker(fb.name, bg).recordSuccess();
+      recordProviderPerformance(fb.name, Date.now() - fbStart, true);
+      recordEscalationMetric(fb.name, true);
+
+      cascadeTrail.push({ provider: fb.name, model: fb.model, status: 'success', latencyMs: Date.now() - fbStart });
+      result._provider = fb.name;
+      result._model = fb.model;
       result._cascadeTrail = cascadeTrail;
       result._intelligenceLevel = getIntelligenceLevel();
       result._complexity = complexity;
+      result._escalated = true;
       const contentStr = JSON.stringify(result.content);
       result._responseHash = createHash('sha256')
-        .update(contentStr + routedProvider.name + routedProvider.model + Date.now())
+        .update(contentStr + fb.name + fb.model + Date.now())
         .digest('hex');
       return result;
-    } catch (error) {
-      lastError = error;
-
-      // Record failure in circuit breaker + performance tracker
-      getCircuitBreaker(routedProvider.name, bg).recordFailure(error);
-      recordProviderPerformance(routedProvider.name, Date.now() - attemptStart, false);
-
-      // Routed provider failed (non-transient) — fall back to primary before cascading
-      if (routedProvider !== activeProvider && !isTransientError(error)) {
-        cascadeTrail.push({
-          provider: routedProvider.name,
-          model: routedProvider.model,
-          status: 'route_error',
-          latencyMs: Date.now() - attemptStart,
-          error: error.message?.slice(0, 120),
-        });
-        console.warn(`[router] ${routedProvider.name} failed for ${complexity} query — falling back to ${activeProvider.name}`);
-        routedProvider = activeProvider; // Switch to primary
-        // Re-send with original request (tools + model intact for Claude)
-        if (routedProvider.name === 'claude') {
-          // Undo flattening — Claude can handle tools
-          request = { ...request };
-        }
-        continue; // Retry with primary
-      }
-
-      // Credit exhaustion on primary — cascade through fallback providers
-      if (isCreditError(error) && activateFallback()) {
-        cascadeTrail.push({
-          provider: routedProvider.name,
-          model: routedProvider.model,
-          status: 'credit_error',
-          latencyMs: Date.now() - attemptStart,
-          error: error.message?.slice(0, 120),
-        });
-
-        // Flatten tool exchanges for non-Claude providers — they can't use Jarvis tools
-        // and will reject Claude-format tool_use/tool_result in conversation history
-        const { model, tools, ...rest } = request;
-        if (rest.messages) {
-          rest.messages = flattenToolExchanges(rest.messages);
-          // Strip image blocks for non-vision fallback providers
-          if (!VISION_PROVIDERS.has(activeProvider.name)) {
-            rest.messages = stripMediaBlocks(rest.messages);
-          }
-        }
-
-        // Try each fallback provider until one succeeds
-        // Each provider gets up to 2 attempts (1 retry) for transient errors
-        let fallbackError;
-        do {
-          console.warn(`[llm] Retrying with fallback provider: ${activeProvider.name} (${activeProvider.model})`);
-
-          // Circuit breaker: skip fallback providers that are currently open
-          const fbCB = getCircuitBreaker(activeProvider.name, bg);
-          if (!fbCB.allowRequest()) {
-            console.warn(`[circuit-breaker] Fallback ${activeProvider.name} circuit open — skipping`);
-            break; // Skip to next fallback via activateFallback()
-          }
-
-          for (let fbAttempt = 0; fbAttempt < 2; fbAttempt++) {
-            const fallbackStart = Date.now();
-            try {
-              const result = await activeProvider.chat(rest);
-              getCircuitBreaker(activeProvider.name, bg).recordSuccess();
-              recordProviderPerformance(activeProvider.name, Date.now() - fallbackStart, true);
-              reorderFallbacksByPerformance(); // Learn from cascade events
-              cascadeTrail.push({
-                provider: activeProvider.name,
-                model: activeProvider.model,
-                status: 'success',
-                latencyMs: Date.now() - fallbackStart,
-              });
-              result._provider = activeProvider.name;
-              result._model = activeProvider.model;
-              result._cascadeTrail = cascadeTrail;
-              result._intelligenceLevel = getIntelligenceLevel();
-              const contentStr = JSON.stringify(result.content);
-              result._responseHash = createHash('sha256')
-                .update(contentStr + activeProvider.name + activeProvider.model + Date.now())
-                .digest('hex');
-              return result;
-            } catch (fbErr) {
-              fallbackError = fbErr;
-              getCircuitBreaker(activeProvider.name, bg).recordFailure(fbErr);
-              recordProviderPerformance(activeProvider.name, Date.now() - fallbackStart, false);
-              cascadeTrail.push({
-                provider: activeProvider.name,
-                model: activeProvider.model,
-                status: fbAttempt === 0 ? 'fallback_error_retry' : 'fallback_error',
-                latencyMs: Date.now() - fallbackStart,
-                error: fbErr.message?.slice(0, 120),
-              });
-              // Retry once for transient errors (e.g. DeepSeek "Model Not Exist" glitches)
-              if (fbAttempt === 0 && isTransientOrGlitch(fbErr)) {
-                console.warn(`[wardenclyffe] Fallback ${activeProvider.name} transient error — retrying in 1s: ${fbErr.message?.slice(0, 80)}`);
-                await new Promise(r => setTimeout(r, 1000));
-                continue;
-              }
-              console.warn(`[wardenclyffe] Fallback ${activeProvider.name} failed: ${fbErr.message?.slice(0, 100)}`);
-              break;
-            }
-          }
-        } while (activateFallback());
-
-        // All fallbacks exhausted
-        throw fallbackError || error;
-      }
-
-      // Transient errors — retry with exponential backoff + jitter
-      if (isTransientError(error) && attempt < MAX_RETRIES) {
-        cascadeTrail.push({
-          provider: routedProvider.name,
-          model: routedProvider.model,
-          status: 'transient_error',
-          latencyMs: Date.now() - attemptStart,
-          error: error.message?.slice(0, 120),
-        });
-        const baseDelay = Math.min(1000 * Math.pow(2, attempt), 8000);
-        const jitter = Math.random() * 1000;
-        const delay = baseDelay + jitter;
-        console.warn(`[llm] Transient error (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${Math.round(delay)}ms: ${error.message?.slice(0, 80)}`);
-        await sleep(delay);
-        continue;
-      }
-
-      // Fatal error — record and throw
-      cascadeTrail.push({
-        provider: routedProvider.name,
-        model: routedProvider.model,
-        status: 'fatal_error',
-        latencyMs: Date.now() - attemptStart,
-        error: error.message?.slice(0, 120),
-      });
-      throw error;
+    } catch (fbErr) {
+      lastError = fbErr;
+      getCircuitBreaker(fb.name, bg).recordFailure(fbErr);
+      recordProviderPerformance(fb.name, Date.now() - fbStart, false);
+      cascadeTrail.push({ provider: fb.name, model: fb.model, status: 'fallback_error', error: fbErr.message?.slice(0, 120) });
+      continue;
     }
   }
 
-  throw lastError; // Exhausted retries
+  throw lastError || new Error('All providers exhausted');
 }

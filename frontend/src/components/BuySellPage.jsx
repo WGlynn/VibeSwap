@@ -142,15 +142,22 @@ const PAYMENT_METHODS = [
   },
 ]
 
-// Supported cryptocurrencies
+// Supported cryptocurrencies — prices from CoinGecko global cache
 const CRYPTO_OPTIONS = [
-  { symbol: 'ETH', name: 'Ethereum', icon: '⟠', price: 3250.00 },
-  { symbol: 'BTC', name: 'Bitcoin', icon: '₿', price: 67500.00 },
-  { symbol: 'USDC', name: 'USD Coin', icon: '💵', price: 1.00 },
-  { symbol: 'USDT', name: 'Tether', icon: '💲', price: 1.00 },
-  { symbol: 'SOL', name: 'Solana', icon: '◎', price: 145.00 },
-  { symbol: 'MATIC', name: 'Polygon', icon: '🟣', price: 0.85 },
+  { symbol: 'ETH', name: 'Ethereum', icon: '\u27E0' },
+  { symbol: 'BTC', name: 'Bitcoin', icon: '\u20BF' },
+  { symbol: 'USDC', name: 'USD Coin', icon: '$' },
+  { symbol: 'USDT', name: 'Tether', icon: '$' },
+  { symbol: 'SOL', name: 'Solana', icon: '\u25CE' },
+  { symbol: 'MATIC', name: 'Polygon', icon: 'M' },
 ]
+
+function getCryptoPrice(symbol) {
+  const live = window.__vibePriceCache?.[symbol]
+  if (live && live > 0) return live
+  const fb = { ETH: 2800, BTC: 96000, USDC: 1, USDT: 1, SOL: 145, MATIC: 0.35 }
+  return fb[symbol] || 0
+}
 
 function BuySellPage() {
   const { isConnected: isExternalConnected, connect, account: externalAccount } = useWallet()
@@ -173,12 +180,12 @@ function BuySellPage() {
 
   // Calculate crypto amount from fiat
   const cryptoAmount = amount && selectedCrypto
-    ? (parseFloat(amount) / selectedCrypto.price).toFixed(6)
+    ? (parseFloat(amount) / getCryptoPrice(selectedCrypto.symbol)).toFixed(6)
     : '0'
 
   // Calculate fiat from crypto amount (for sell mode)
   const fiatAmount = amount && selectedCrypto
-    ? (parseFloat(amount) * selectedCrypto.price).toFixed(2)
+    ? (parseFloat(amount) * getCryptoPrice(selectedCrypto.symbol)).toFixed(2)
     : '0'
 
   // Calculate fee
@@ -389,7 +396,7 @@ function BuySellPage() {
               <div className="p-3 rounded-lg bg-black-700/50 text-sm">
                 <div className="flex justify-between text-black-400">
                   <span>1 {selectedCrypto.symbol}</span>
-                  <span>${selectedCrypto.price.toLocaleString()}</span>
+                  <span>${getCryptoPrice(selectedCrypto.symbol).toLocaleString()}</span>
                 </div>
               </div>
 
@@ -785,7 +792,7 @@ function BuySellPage() {
                       <div className="text-sm text-black-400">{crypto.name}</div>
                     </div>
                   </div>
-                  <span className="text-black-300">${crypto.price.toLocaleString()}</span>
+                  <span className="text-black-300">${getCryptoPrice(crypto.symbol).toLocaleString()}</span>
                 </button>
               ))}
             </div>

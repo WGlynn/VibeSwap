@@ -28,6 +28,24 @@ services:
       - ARK_GROUP_ID=${ARK_GROUP_ID:-}
       - AUTHORIZED_USERS=${AUTHORIZED_USERS:-}
       - BOT_USERNAME=${BOT_USERNAME:-JarvisMind1828383bot}
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED:-true}
+      - JARVIS_MASTER_KEY=${JARVIS_MASTER_KEY:-}
+      - SHARD_SECRET=${SHARD_SECRET:-}
+      - CLAUDE_CODE_API_SECRET=${CLAUDE_CODE_API_SECRET:-}
+      # Wardenclyffe v3 — all provider API keys
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY:-}
+      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
+      - NOVITA_API_KEY=${NOVITA_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
     volumes:
       # Persistent data — survives container rebuilds
       - ./data:/app/data

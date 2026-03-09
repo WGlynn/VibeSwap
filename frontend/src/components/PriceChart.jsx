@@ -1,23 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
-// Generate mock price data
-function generateMockData(days, basePrice, volatility) {
-  const data = []
-  let price = basePrice
-  const now = Date.now()
-  const interval = (days * 24 * 60 * 60 * 1000) / 100
-
-  for (let i = 100; i >= 0; i--) {
-    const change = (Math.random() - 0.5) * volatility * price
-    price = Math.max(price + change, basePrice * 0.5)
-    data.push({
-      time: now - i * interval,
-      price: price,
-      volume: Math.random() * 1000000 + 500000,
-    })
-  }
-  return data
-}
+// TODO: Fetch real price data from CoinGecko or on-chain oracle
+// No mock data — show empty chart until real data is available
 
 const TIMEFRAMES = [
   { label: '1H', days: 1/24 },
@@ -34,19 +18,10 @@ function PriceChart({ tokenIn, tokenOut }) {
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Generate data when tokens or timeframe change
+  // TODO: Fetch real price data when available
   useEffect(() => {
-    setIsLoading(true)
-    const tf = TIMEFRAMES.find(t => t.label === timeframe)
-
-    // Simulate API delay
-    setTimeout(() => {
-      const basePrice = tokenIn?.symbol === 'ETH' ? 2000 :
-                       tokenIn?.symbol === 'WBTC' ? 42000 : 1
-      const newData = generateMockData(tf.days, basePrice, 0.02)
-      setData(newData)
-      setIsLoading(false)
-    }, 300)
+    setIsLoading(false)
+    setData([])
   }, [tokenIn, tokenOut, timeframe])
 
   // Draw chart
@@ -269,6 +244,10 @@ function PriceChart({ tokenIn, tokenOut }) {
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-8 h-8 border-2 border-vibe-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : data.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center text-dark-400 text-sm">
+            Price data not yet available
+          </div>
         ) : (
           <canvas
             ref={canvasRef}
@@ -283,19 +262,19 @@ function PriceChart({ tokenIn, tokenOut }) {
       <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-dark-700">
         <div>
           <div className="text-xs text-dark-400">24h High</div>
-          <div className="font-medium">${(currentPrice * 1.02).toFixed(2)}</div>
+          <div className="font-medium">{currentPrice ? `$${(currentPrice * 1.02).toFixed(2)}` : '--'}</div>
         </div>
         <div>
           <div className="text-xs text-dark-400">24h Low</div>
-          <div className="font-medium">${(currentPrice * 0.98).toFixed(2)}</div>
+          <div className="font-medium">{currentPrice ? `$${(currentPrice * 0.98).toFixed(2)}` : '--'}</div>
         </div>
         <div>
           <div className="text-xs text-dark-400">24h Volume</div>
-          <div className="font-medium">$4.2M</div>
+          <div className="font-medium">--</div>
         </div>
         <div>
           <div className="text-xs text-dark-400">Liquidity</div>
-          <div className="font-medium">$12.5M</div>
+          <div className="font-medium">--</div>
         </div>
       </div>
     </div>

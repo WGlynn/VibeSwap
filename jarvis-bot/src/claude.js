@@ -705,50 +705,69 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   const messageText = latestMessage?.role === 'user' && typeof latestMessage.content === 'string'
     ? latestMessage.content : '';
 
-  // Build knowledge context for this user/chat (with relevance scoring)
+  // ============ Context Tier Routing ============
+  // "Every extra call slows him down exponentially" — Will
+  // Classify the message and decide how much context to send.
+  // Light tier: ~5K chars (identity + personality only) — handles 80% of messages
+  // Full tier:  ~75K chars (everything) — only for deep/complex questions
+  //
+  // The classifier already exists in llm-provider.js. We reuse it here
+  // to decide context depth, not just provider routing.
+  const { classify } = getProvider() || {};
+  const complexity = classify ? classify(messageText) : 'moderate';
+
+  // Light context for simple/moderate messages — skip expensive context building
+  const isLightContext = (complexity === 'simple' || complexity === 'moderate')
+    && chatType !== 'private'; // DMs always get full context (user expects depth)
+
+  if (isLightContext) {
+    console.log(`[context-tier] LIGHT — "${messageText.slice(0, 40)}" (${complexity})`);
+  } else {
+    console.log(`[context-tier] FULL — "${messageText.slice(0, 40)}" (${complexity}, ${chatType})`);
+  }
+
+  // Build knowledge context only for full-tier messages
   let knowledgeContext = '';
-  try {
-    knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType, messageText);
-  } catch {}
+  if (!isLightContext) {
+    try {
+      knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType, messageText);
+    } catch {}
+  }
 
-  // Continuous context: inject rolling summary of all past conversation
-  const contextSummary = getContextSummary(chatId);
+  // Continuous context: inject rolling summary only for full-tier
+  const contextSummary = isLightContext ? '' : getContextSummary(chatId);
 
-  // Group Context Primitive: inject recent group messages as explicit context
-  // This ensures Jarvis always knows what was just discussed — no more fumbled context
+  // Group context: always inject (it's cheap and prevents fumbled context)
   const groupContext = chatType !== 'private' ? getGroupContext(chatId) : '';
 
   // ============ Token Budget Enforcement (JUL-Integrated) ============
   // Context zones scale with the user's JUL-derived compute budget.
   // Mine JUL → higher Shapley weight → larger context zones → richer responses.
-  // Free-tier users get lean context. Contributors get full context.
   //
-  // Budget tiers:
-  //   Free (5K-10K tokens/day):  contextScale = 0.5 (minimum viable context)
-  //   Base (10K-50K):            contextScale = 0.75
-  //   Premium (50K+):            contextScale = 1.0 (full context)
-  //   Degraded (>80% used):      contextScale = 0.3 (conserve for response)
-  //
-  // This creates the incentive loop:
-  //   Mine JUL → burn for compute → larger context → better JARVIS → more value
+  // Light tier overrides: minimal budgets regardless of JUL tier.
+  // This is the perf win — simple messages don't need 75K of context.
   //
   let contextScale = 0.75; // default for most users
-  try {
-    const budgetCheck = checkBudget(effectiveUserId);
-    if (budgetCheck.degraded) {
-      contextScale = 0.3; // conserve input tokens — user is near limit
-    } else if (budgetCheck.budget >= 50000) {
-      contextScale = 1.0; // premium tier — full context
-    } else if (budgetCheck.budget >= 10000) {
-      contextScale = 0.75; // base tier
-    } else {
-      contextScale = 0.5; // free tier — lean context
+  if (isLightContext) {
+    contextScale = 0.15; // light tier — minimal context, maximum speed
+  } else {
+    try {
+      const budgetCheck = checkBudget(effectiveUserId);
+      if (budgetCheck.degraded) {
+        contextScale = 0.3;
+      } else if (budgetCheck.budget >= 50000) {
+        contextScale = 1.0;
+      } else if (budgetCheck.budget >= 10000) {
+        contextScale = 0.75;
+      } else {
+        contextScale = 0.5;
+      }
+    } catch {
+      // compute-economics not initialized yet or error — use default
     }
-  } catch {
-    // compute-economics not initialized yet or error — use default
   }
 
-  // Base caps scaled by user's compute tier
+  // Base caps scaled by context tier
   const TOKEN_BUDGETS = {
     contextSummary: Math.round(6000 * contextScale),  // rolling conversation memory
     groupContext: Math.round(4000 * contextScale),     // recent group messages
@@ -769,11 +788,24 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   const isClaude = getProviderName() === 'claude';
 
   let fullSystemPrompt;
-  if (isClaude && systemPrompt.static) {
-    // Structured array format — Claude API supports this natively
-    // Static part: cached for 5 min (identity, personality, rules, examples)
-    // Dynamic part: uncached (knowledge context, group context, summaries)
-    // Recency part: critical rules repeated at end for maximum adherence
+
+  if (isLightContext) {
+    // ============ LIGHT TIER — Static identity only ============
+    // ~5K chars instead of ~75K. Handles greetings, simple questions, banter.
+    // No memory files, no CKB, no conversation summary = 10-15x faster on Ollama.
+    const lightPrompt = systemPrompt.static
+      + (cappedGroup || '')
+      + '\n' + systemPrompt.recency;
+
+    if (isClaude) {
+      fullSystemPrompt = [
+        { type: 'text', text: lightPrompt, cache_control: { type: 'ephemeral' } },
+      ];
+    } else {
+      fullSystemPrompt = lightPrompt;
+    }
+  } else if (isClaude && systemPrompt.static) {
+    // ============ FULL TIER — Claude with prompt caching ============
     const dynamicContent = [
       systemPrompt.dynamic,
       cappedSummary,
@@ -794,7 +826,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       },
     ];
   } else {
-    // Non-Claude providers: plain string (no cache_control support)
+    // ============ FULL TIER — Non-Claude providers ============
     fullSystemPrompt = systemPrompt.full
       + (cappedSummary || '')
       + (cappedGroup || '')
@@ -1489,17 +1521,25 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   ];
 
   // Select only relevant tools based on message content
-  const tools = selectTools(messageText, allTools);
+  // Light tier: NO tools at all — simple messages don't need tool calls
+  const tools = isLightContext ? [] : selectTools(messageText, allTools);
+
+  // ============ History Trimming for Light Tier ============
+  // "Every extra call slows him down exponentially" — Will
+  // Simple messages don't need 50 messages of context. Last 6 is plenty.
+  const trimmedHistory = isLightContext ? history.slice(-6) : history;
 
   try {
-    const effectiveMaxTokens = maxTokensOverride || config.maxTokens;
+    const effectiveMaxTokens = isLightContext
+      ? Math.min(maxTokensOverride || config.maxTokens, 1024)  // Cap light responses
+      : (maxTokensOverride || config.maxTokens);
 
     let response = await llmChat({
       model: getModelName(),
       max_tokens: effectiveMaxTokens,
       system: fullSystemPrompt,
-      messages: history,
-      tools,
+      messages: trimmedHistory,
+      tools: tools.length > 0 ? tools : undefined,
     });
 
     // Handle tool use loop (max 5 rounds to prevent infinite loops)

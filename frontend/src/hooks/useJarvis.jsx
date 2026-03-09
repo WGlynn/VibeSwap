@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://learned-inter-retention-front.trycloudflare.com'
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://46-225-173-213.sslip.io'
 
 const INITIAL_GREETING = {
   role: 'jarvis',
@@ -226,24 +226,35 @@ export function useJarvis() {
     }
   }, [])
 
+  // Require 3 consecutive failures before showing offline — transient blips don't count
+  const healthFailsRef = useRef(0)
+  const HEALTH_FAIL_THRESHOLD = 3
+
   const fetchHealth = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/web/health`)
+      const res = await fetch(`${API_URL}/web/health`, { signal: AbortSignal.timeout(10000) })
       if (res.ok) {
+        healthFailsRef.current = 0
         setHealth(await res.json())
       } else {
-        setHealth({ status: 'offline' })
+        healthFailsRef.current++
+        if (healthFailsRef.current >= HEALTH_FAIL_THRESHOLD) {
+          setHealth({ status: 'offline' })
+        }
       }
     } catch {
-      setHealth({ status: 'offline' })
+      healthFailsRef.current++
+      if (healthFailsRef.current >= HEALTH_FAIL_THRESHOLD) {
+        setHealth({ status: 'offline' })
+      }
     }
   }, [])
 
-  // Poll mind data every 30s, health every 15s
+  // Poll mind data every 30s, health every 30s (3 fails = 90s before offline)
   useEffect(() => {
     fetchHealth()
     fetchMind()
-    const healthInterval = setInterval(fetchHealth, 15_000)
+    const healthInterval = setInterval(fetchHealth, 30_000)
     const mindInterval = setInterval(fetchMind, 30_000)
     return () => {
       clearInterval(healthInterval)

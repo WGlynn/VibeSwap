@@ -2110,6 +2110,12 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       }
     }
 
+    // Guard: if response or response.content is missing, the LLM call silently failed
+    if (!response || !response.content) {
+      console.error(`[claude] Response missing .content — provider returned: ${JSON.stringify(response)?.slice(0, 200)}`);
+      throw new Error('LLM returned empty response');
+    }
+
     let assistantMessage = response.content
       .filter(block => block.type === 'text')
       .map(block => block.text)

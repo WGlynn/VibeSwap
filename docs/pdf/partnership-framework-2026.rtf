@@ -1,0 +1,633 @@
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 VibeSwap Autonomous Partnership Framework\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b W. Glynn, JARVIS} {\b March 2026 | VibeSwap}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Executive Summary\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 VibeSwap uses an autonomous partnership pipeline \u8212- codename {\b Karma} \u8212- that continuously discovers, evaluates, contacts, and tracks potential protocol partners. The system runs with minimal human intervention, surfacing only high-quality opportunities for final approval.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Karma replaces the traditional BD model (one person cold-emailing) with a structured, repeatable, autonomous workflow that any team member can operate and any AI agent can execute.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 1. The Karma Loop\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?    \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?    \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+\u9474 ?  DISCOVERY   \u9474 ?\u9472 ?\u9472 ?\u9472 ?\u9658 ?\u9474 ?  EVALUATION  \u9474 ?\u9472 ?\u9472 ?\u9472 ?\u9658 ?\u9474 ?  OUTREACH  \u9474 ?\line
+\u9474 ?  (automated) \u9474 ?    \u9474 ?  (scored)    \u9474 ?    \u9474 ?  (templated\u9474 ?\line
+\u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?    \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?    \u9474 ?  + custom) \u9474 ?\line
+                                       \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9516 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?\line
+                                             \u9474 ?\line
+\u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?    \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?    \u9484 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9660 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9488 ?\line
+\u9474 ?  REPORTING   \u9474 ?\u9668 ?\u9472 ?\u9472 ?\u9472 ?\u9474 ?  EXECUTION   \u9474 ?\u9668 ?\u9472 ?\u9472 ?\u9472 ?\u9474 ?  TRACKING  \u9474 ?\line
+\u9474 ?  (dashboard) \u9474 ?    \u9474 ?  (on-chain)  \u9474 ?    \u9474 ?  (CRM)     \u9474 ?\line
+\u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?    \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?    \u9492 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9472 ?\u9496 ?\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The loop runs continuously. Each stage feeds the next. No stage requires synchronous human decision-making except final deal approval.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 2. Stage 1: Discovery\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.1 Sources\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2229\clbrdrb\brdrs\cellx4458\clbrdrb\brdrs\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Source\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Signal\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Scan Frequency\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2229\cellx4458\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Twitter/X\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Projects tweeting about MEV, batch auctions, fair launch\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Daily\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2229\cellx4458\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 GitHub\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Repos with MEV protection, DEX, cross-chain keywords\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Weekly\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2229\cellx4458\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 DeFi Llama\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 New protocols with >$1M TVL in target categories\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Daily\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2229\cellx4458\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Ethereum Research Forum\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Posts about auction mechanisms, MEV mitigation\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Weekly\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2229\cellx4458\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Nervos/CKB Forums\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Projects building on CKB cell model\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Weekly\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2229\cellx4458\cellx8638
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 LayerZero Ecosystem\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Projects using LZ V2 for cross-chain\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Weekly\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.2 Discovery Criteria\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 A project enters the pipeline if it matches ANY of:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Building MEV protection or fair ordering\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Building batch auction infrastructure\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Building AI agent infrastructure\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Building cross-chain DEX or bridge infrastructure\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Active on a chain VibeSwap deploys on (Base, Arbitrum, Optimism, CKB)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Has expressed interest in Cooperative Capitalism or similar economic models\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 2.3 Implementation\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Phase 1 (manual + templates): - Weekly 30-minute discovery session using Twitter search, DeFi Llama, and GitHub - Log prospects in a shared spreadsheet or Notion database\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Phase 2 (semi-automated): - Scrapling-based web scraper monitors sources automatically - Generates discovery report delivered to Telegram/Discord - Human reviews and approves entries into pipeline\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Phase 3 (fully autonomous): - JARVIS runs discovery autonomously using web search + API tools - Auto-populates CRM with scored prospects - Human only reviews final outreach drafts\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 3. Stage 2: Evaluation\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.1 Scoring Matrix\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Each prospect is scored 0-100 across five dimensions:\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2640\clbrdrb\brdrs\cellx4560\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Dimension\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Weight\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Scoring Criteria\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2640\cellx4560\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Live Product}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 25%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Mainnet deployment (25), Testnet (15), Whitepaper only (5), Nothing (0)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2640\cellx4560\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Team Credibility}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 20%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Known builders (20), Anon but active (12), Anon no history (5)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2640\cellx4560\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Technical Overlap}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 25%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Direct integration path (25), Shared dependencies (15), Thematic only (5)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2640\cellx4560\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Community Size}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 15%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 >10K followers (15), 1-10K (10), <1K (5)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2640\cellx4560\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Alignment}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 15%\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Explicitly anti-MEV/pro-fairness (15), Neutral (8), VC-captured (0)\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.2 Tier Classification\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2880\clbrdrb\brdrs\cellx5760\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Score\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Tier\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Action\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 80-100\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 A\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Immediate outreach, founder-to-founder\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 60-79\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 B\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Standard outreach via email template\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 40-59\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 C\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Monitor, outreach when milestone triggers\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0-39\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 D\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Archive, revisit quarterly\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 3.3 Auto-Disqualification\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Prospects are auto-rejected if: - Known scam or rug pull history - Explicit VC lockup with >25% insider allocation - No public code or product after 12+ months - Adversarial relationship with communities we serve\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 4. Stage 3: Outreach\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 4.1 Email Template Structure\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 Subject: [Project Name] \u215 ? VibeSwap \u8212- [specific integration idea]\line
+\line
+Hi [Name],\line
+\line
+[1 sentence: what they're building and why we noticed]\line
+\line
+[1 sentence: what VibeSwap does and the specific synergy]\line
+\line
+[1 sentence: concrete proposal \u8212- integration, co-marketing, shared research]\line
+\line
+[1 sentence: next step \u8212- "15 min call this week?"]\line
+\line
+\u8212- Will Glynn, VibeSwap\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 4.2 Personalization Rules\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Reference a specific tweet, commit, or blog post from the prospect\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Propose a concrete integration (not vague \u8220"let\u8217's collaborate\u8221")\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Include a link to the most relevant VibeSwap paper or demo\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Keep it under 150 words\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 4.3 Follow-Up Cadence\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Day\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Action\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 0\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Initial email\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 3\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Twitter DM (if no response)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 7\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Follow-up email with new angle\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 14\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Final follow-up, then archive to Tier C\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 5. Stage 4: Tracking (CRM Pipeline)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 5.1 Pipeline Stages\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 Discovered \u8594 ? Evaluated \u8594 ? Contacted \u8594 ? Responded \u8594 ? Meeting Scheduled \u8594 ?\line
+Deal Terms \u8594 ? Executed \u8594 ? Active Partnership \u8594 ? Review\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 5.2 Required Fields\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx2880\clbrdrb\brdrs\cellx5760\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Field\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Type\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Required\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Project name\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Text\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Contact name + email\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Text\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Score (0-100)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Number\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Tier (A/B/C/D)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Enum\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Stage\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Enum\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Last contact date\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Date\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Next action\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Text\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Integration type\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Enum\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Yes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx2880\cellx5760\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Notes\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Text\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Optional\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 5.3 Integration Types\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Technical Integration}: Shared smart contracts, cross-protocol calls\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Liquidity Partnership}: Shared pools, cross-listed assets\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Research Collaboration}: Co-authored papers, shared mechanism design\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Co-Marketing}: Joint announcements, shared content, cross-promotion\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Ecosystem Grant}: Funding from partner ecosystem for VibeSwap deployment\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 6. Stage 5: Execution\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 6.1 On-Chain Partnership Contracts\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 For technical and liquidity partnerships, terms are encoded in smart contracts:\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 struct Partnership \{\line
+    address partner;\line
+    uint256 revenueShareBps;    // Partner's share in basis points\line
+    uint256 startBlock;\line
+    uint256 endBlock;           // 0 = indefinite\line
+    bytes32 integrationHash;    // Hash of integration spec\line
+    bool active;\line
+\}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 6.2 Milestone Structure\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Each partnership has 3 milestones:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b Integration Complete}: Smart contracts deployed, interoperability verified\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b Volume Threshold}: $X monthly volume flowing through partnership\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b Community Adoption}: Y unique users from partner community\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Revenue sharing activates at Milestone 1. Bonus allocation at Milestones 2 and 3.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 6.3 Revenue Sharing\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Default: 50/50 split on cross-protocol fees generated by the partnership.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Partner-originated swaps (referred by partner UI or contracts) generate fees that are split: - 50% to VibeSwap Shapley pool - 50% to partner treasury\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This aligns incentives: both sides benefit from driving volume through the integration.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 7. Stage 6: Reporting\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 7.1 Dashboard Metrics\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Metric\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Update Frequency\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Total prospects in pipeline\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Real-time\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Prospects by stage\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Real-time\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Outreach response rate\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Weekly\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Active partnerships\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Real-time\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Partnership revenue (30d)\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Daily\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Integration uptime\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Real-time\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Partner-referred volume\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Daily\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 7.2 Weekly Report\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Generated automatically every Monday:\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 === Karma Weekly Partnership Report ===\line
+\line
+New Prospects: X discovered, Y evaluated\line
+Pipeline: A contacted, B responded, C meetings\line
+Active Partnerships: N (generating $X/month)\line
+Top Prospect: [Name] \u8212- [Score] \u8212- [Status]\line
+Action Items: [auto-generated from pipeline]\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 8. Karma for JARVIS\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 JARVIS can execute the Karma loop autonomously:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b Discovery}: Use web search tools to find prospects matching criteria\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b Evaluation}: Score using the matrix, classify into tiers\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b Outreach}: Draft personalized emails for human approval\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 4.\tx360\tab {\b Tracking}: Update CRM entries after each interaction\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 5.\tx360\tab {\b Reporting}: Generate weekly reports and surface action items\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Human involvement: Review outreach drafts, attend meetings, approve deal terms. Everything else is autonomous.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\i Partnerships should be autonomous. We don\u8217't chase \u8212- we attract through technical credibility and execute through structured process.}\par}

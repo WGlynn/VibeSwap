@@ -3,19 +3,23 @@
 // Extends tools-scanner.js and tools-security.js with:
 // 1. Composite risk scoring (0-100, higher = safer)
 // 2. New token hunting with auto-security-check
-// 3. Liquidity monitoring via DEXScreener
+// 3. Momentum + volume/liquidity ratio analysis
 // 4. Background monitor that auto-posts alerts to TG
 //
 // Commands:
 //   /hunt [chain]           — Scan new tokens, score them, show best candidates
-//   /score <address> [chain] — Deep risk score for a single token
-//   /monitor [chain]        — Start background memecoin monitor (posts alerts)
-//   /stopmonitor            — Stop background monitor
+//   /memescore <addr> [chain] — Deep risk score for a single token
+//   /mememonitor [chain]    — Start background memecoin monitor (posts alerts)
+//   /memestop              — Stop background monitor
+//   /memestatus            — Monitor status
 // ============
 
 const HTTP_TIMEOUT = 12000;
 
-// GoPlus chain IDs (same as tools-security.js)
+// Chains where GoPlus has GOOD coverage (EVM chains)
+const GOPLUS_SUPPORTED = new Set(['1', '56', '137', '42161', '10', '43114', '8453']);
+
+// GoPlus chain IDs
 const CHAIN_IDS = {
   eth: '1', ethereum: '1',
   bsc: '56', bnb: '56',
@@ -28,7 +32,7 @@ const CHAIN_IDS = {
 };
 
 function resolveChainId(input) {
-  if (!input) return '8453'; // Default Base
+  if (!input) return '8453';
   return CHAIN_IDS[input.toLowerCase()] || input;
 }
 
@@ -56,15 +60,15 @@ export async function huntMemecoins(chain) {
   const goplusChain = resolveChainId(chain);
 
   try {
-    // Step 1: Get new pairs from DEXScreener
+    // Step 1: Get new pairs from DEXScreener (multi-source)
     const pairs = await fetchNewPairs(dexChain);
 
     if (pairs.length === 0) {
       return `No new tokens found on ${dexChain}. Try: /hunt base, /hunt sol, /hunt eth`;
     }
 
-    // Step 2: Score each token in parallel (max 6 to stay within rate limits)
-    const candidates = pairs.slice(0, 6);
+    // Step 2: Score each token in parallel (max 8 for wider coverage)
+    const candidates = pairs.slice(0, 8);
     const scored = await Promise.allSettled(
       candidates.map(p => scoreToken(p, goplusChain))
     );
@@ -76,7 +80,7 @@ export async function huntMemecoins(chain) {
       .sort((a, b) => b.score - a.score);
 
     if (results.length === 0) {
-      return `Found ${pairs.length} new tokens on ${dexChain} but none passed security scoring. All likely rugs.`;
+      return `Found ${pairs.length} new tokens on ${dexChain} but none passed scoring. All likely rugs.`;
     }
 
     // Step 4: Format output
@@ -85,13 +89,20 @@ export async function huntMemecoins(chain) {
     for (const r of results) {
       const scoreEmoji = r.score >= 70 ? '🟢' : r.score >= 40 ? '🟡' : '🔴';
       const riskLabel = r.score >= 70 ? 'LOW RISK' : r.score >= 40 ? 'MODERATE' : 'HIGH RISK';
-      lines.push(`${scoreEmoji} ${r.name} (${r.symbol}) — ${r.score}/100 ${riskLabel}`);
+      const tags = [];
+      if (r.ageMs > 0 && r.ageMs < 7200000) tags.push('EARLY');
+      if (r.volLiqRatio >= 2) tags.push('HOT');
+      if (r.momentum > 0) tags.push('PUMPING');
+      else if (r.momentum < -20) tags.push('DUMPING');
+      const tagStr = tags.length > 0 ? ` [${tags.join(' ')}]` : '';
+
+      lines.push(`${scoreEmoji} ${r.name} (${r.symbol}) — ${r.score}/100 ${riskLabel}${tagStr}`);
       lines.push(`  Price: ${r.price} | Liq: ${r.liquidity} | Vol: ${r.volume}`);
-      lines.push(`  Age: ${r.age} | Buys/Sells: ${r.buys}/${r.sells}`);
+      lines.push(`  Age: ${r.age} | Buys/Sells: ${r.buys}/${r.sells} | V/L: ${r.volLiqRatio.toFixed(1)}x`);
       if (r.flags.length > 0) {
         lines.push(`  Flags: ${r.flags.join(', ')}`);
       }
-      lines.push(`  /score ${r.address} ${chain || 'base'}`);
+      lines.push(`  /memescore ${r.address} ${chain || 'base'}`);
       lines.push('');
     }
 
@@ -102,30 +113,31 @@ export async function huntMemecoins(chain) {
   }
 }
 
-// ============ /score — Deep Risk Score for Single Token ============
+// ============ /memescore — Deep Risk Score for Single Token ============
 
 export async function getMemeScore(address, chain) {
-  if (!address) return 'Usage: /score 0x... [chain]\n\nDeep risk analysis for a single token.\nDefault chain: base';
+  if (!address) return 'Usage: /memescore 0x... [chain]\n\nDeep risk analysis for a single token.\nDefault chain: base';
 
   const goplusChain = resolveChainId(chain);
   const dexChain = resolveDexChain(chain);
+  const hasGoPlus = GOPLUS_SUPPORTED.has(goplusChain);
 
   try {
     // Parallel fetch: GoPlus security + DEXScreener pair data
-    const [securityData, pairData] = await Promise.allSettled([
-      fetchGoPlus(address, goplusChain),
-      fetchDexPair(address),
-    ]);
+    const fetches = [fetchDexPair(address)];
+    if (hasGoPlus) fetches.push(fetchGoPlus(address, goplusChain));
 
-    const security = securityData.status === 'fulfilled' ? securityData.value : null;
-    const pair = pairData.status === 'fulfilled' ? pairData.value : null;
+    const results = await Promise.allSettled(fetches);
+
+    const pair = results[0].status === 'fulfilled' ? results[0].value : null;
+    const security = hasGoPlus && results[1]?.status === 'fulfilled' ? results[1].value : null;
 
     if (!security && !pair) {
       return `Token ${address.slice(0, 10)}... not found on ${chain || 'base'}. Check the address and chain.`;
     }
 
     // Calculate composite score
-    const { score, breakdown, flags } = calculateScore(security, pair);
+    const { score, breakdown, flags } = calculateScore(security, pair, goplusChain);
 
     const lines = [];
     const scoreEmoji = score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴';
@@ -136,12 +148,17 @@ export async function getMemeScore(address, chain) {
 
     lines.push(`${scoreEmoji} ${name} (${symbol}) — ${score}/100 ${riskLabel}\n`);
 
-    // Score breakdown
+    // Score breakdown — derive max from total (categories sum to 100)
+    const hasSec = security !== null;
     lines.push('  SCORE BREAKDOWN');
     for (const [category, points] of Object.entries(breakdown)) {
-      const bar = '█'.repeat(Math.round(points / 5)) + '░'.repeat(Math.round((20 - points) / 5));
-      lines.push(`    ${category.padEnd(14)} ${bar} ${points}/20`);
+      const filled = Math.max(0, Math.min(4, Math.round(points / Math.max(1, points + 5) * 4)));
+      // Simple proportional bar — 4 blocks
+      const pct = score > 0 ? (points / score * 100).toFixed(0) : 0;
+      const bar = '█'.repeat(filled) + '░'.repeat(4 - filled);
+      lines.push(`    ${category.padEnd(14)} ${bar} ${points} pts`);
     }
+    lines.push(`    ${''.padEnd(14)}      = ${score}/100`);
 
     // Pair data
     if (pair) {
@@ -151,18 +168,28 @@ export async function getMemeScore(address, chain) {
       const buys = pair.txns?.h24?.buys || 0;
       const sells = pair.txns?.h24?.sells || 0;
       const fdv = pair.fdv ? `$${formatNum(pair.fdv)}` : '?';
+      const volLiq = getVolLiqRatio(pair);
 
       lines.push('\n  MARKET DATA');
       lines.push(`    Price: ${price}`);
       lines.push(`    Liquidity: ${liq} | FDV: ${fdv}`);
-      lines.push(`    24h Volume: ${vol}`);
+      lines.push(`    24h Volume: ${vol} (${volLiq.toFixed(1)}x liquidity)`);
       lines.push(`    24h Txns: ${buys} buys / ${sells} sells`);
       if (pair.priceChange) {
         const changes = [];
         if (pair.priceChange.m5 != null) changes.push(`5m: ${fmtPct(pair.priceChange.m5)}`);
         if (pair.priceChange.h1 != null) changes.push(`1h: ${fmtPct(pair.priceChange.h1)}`);
+        if (pair.priceChange.h6 != null) changes.push(`6h: ${fmtPct(pair.priceChange.h6)}`);
         if (pair.priceChange.h24 != null) changes.push(`24h: ${fmtPct(pair.priceChange.h24)}`);
         if (changes.length) lines.push(`    Changes: ${changes.join(' | ')}`);
+      }
+
+      // Age
+      if (pair.pairCreatedAt) {
+        const ageMs = Date.now() - pair.pairCreatedAt;
+        const ageStr = formatAge(pair.pairCreatedAt);
+        const earlyTag = ageMs < 7200000 ? ' (EARLY — under 2h old)' : '';
+        lines.push(`    Age: ${ageStr}${earlyTag}`);
       }
     }
 
@@ -178,6 +205,9 @@ export async function getMemeScore(address, chain) {
       if (owner) {
         lines.push(`    Owner: ${owner === '0x0000000000000000000000000000000000000000' ? 'Renounced' : owner.slice(0, 10) + '...'}`);
       }
+    } else if (!hasGoPlus) {
+      lines.push(`\n  CONTRACT SECURITY`);
+      lines.push(`    GoPlus not available on this chain — scoring based on market data only`);
     }
 
     // Flags
@@ -200,14 +230,14 @@ export async function getMemeScore(address, chain) {
   }
 }
 
-// ============ /monitor — Background Memecoin Monitor ============
+// ============ /mememonitor — Background Memecoin Monitor ============
 
 let monitorInterval = null;
 let monitorState = { chain: 'base', seenTokens: new Set(), alertCount: 0, startedAt: null };
 
 export function startMemeMonitor(chain, postAlert) {
   if (monitorInterval) {
-    return 'Monitor already running. Use /stopmonitor to stop it first.';
+    return 'Monitor already running. Use /memestop to stop it first.';
   }
 
   const dexChain = resolveDexChain(chain);
@@ -231,13 +261,19 @@ export function startMemeMonitor(chain, postAlert) {
           if (scored && scored.score >= 40) {
             monitorState.alertCount++;
             const emoji = scored.score >= 70 ? '🟢' : '🟡';
+            const tags = [];
+            if (scored.ageMs > 0 && scored.ageMs < 7200000) tags.push('EARLY');
+            if (scored.volLiqRatio >= 2) tags.push('HOT');
+            if (scored.momentum > 0) tags.push('PUMPING');
+            const tagStr = tags.length > 0 ? ` [${tags.join(' ')}]` : '';
+
             const msg = [
-              `${emoji} NEW TOKEN ALERT (#${monitorState.alertCount})`,
+              `${emoji} NEW TOKEN ALERT (#${monitorState.alertCount})${tagStr}`,
               `${scored.name} (${scored.symbol}) — ${scored.score}/100`,
-              `Price: ${scored.price} | Liq: ${scored.liquidity}`,
+              `Price: ${scored.price} | Liq: ${scored.liquidity} | V/L: ${scored.volLiqRatio.toFixed(1)}x`,
               `Age: ${scored.age} | ${scored.buys} buys / ${scored.sells} sells`,
               scored.flags.length > 0 ? `Flags: ${scored.flags.join(', ')}` : '',
-              `/score ${scored.address} ${chain || 'base'}`,
+              `/memescore ${scored.address} ${chain || 'base'}`,
             ].filter(Boolean).join('\n');
 
             if (postAlert) postAlert(msg);
@@ -253,9 +289,9 @@ export function startMemeMonitor(chain, postAlert) {
     } catch (err) {
       console.error(`[memehunter] Monitor tick failed: ${err.message}`);
     }
-  }, 60_000); // Check every 60 seconds
+  }, 60_000);
 
-  return `Memecoin monitor started on ${dexChain.toUpperCase()}. Checking every 60s. Alerts for tokens scoring 40+. Use /stopmonitor to stop.`;
+  return `Memecoin monitor started on ${dexChain.toUpperCase()}. Checking every 60s. Alerts for tokens scoring 40+. Use /memestop to stop.`;
 }
 
 export function stopMemeMonitor() {
@@ -270,113 +306,200 @@ export function stopMemeMonitor() {
 }
 
 export function getMonitorStatus() {
-  if (!monitorInterval) return 'Monitor is not running. Start with /monitor [chain]';
+  if (!monitorInterval) return 'Monitor is not running. Start with /mememonitor [chain]';
   const duration = monitorState.startedAt ? formatAge(monitorState.startedAt) : '?';
   return `Monitor running on ${monitorState.chain.toUpperCase()} for ${duration}. ${monitorState.alertCount} alerts sent, ${monitorState.seenTokens.size} tokens scanned.`;
 }
 
 // ============ Scoring Engine ============
 
-function calculateScore(security, pair) {
-  const breakdown = {
-    'Honeypot':     20,  // Start at max, deduct for red flags
-    'Ownership':    20,
-    'Tokenomics':   20,
-    'Liquidity':    20,
-    'Activity':     20,
-  };
+function getVolLiqRatio(pair) {
+  const vol = pair?.volume?.h24 || 0;
+  const liq = pair?.liquidity?.usd || 1;
+  return vol / liq;
+}
+
+function getMomentum(pair) {
+  if (!pair?.priceChange) return 0;
+  // Weighted momentum: recent moves matter more
+  const m5 = pair.priceChange.m5 || 0;
+  const h1 = pair.priceChange.h1 || 0;
+  const h24 = pair.priceChange.h24 || 0;
+  return m5 * 0.5 + h1 * 0.3 + h24 * 0.2;
+}
+
+function calculateScore(security, pair, goplusChain) {
+  const hasGoPlus = security !== null;
+  const goplusSupported = GOPLUS_SUPPORTED.has(goplusChain);
+
+  // Dynamic weighting: if GoPlus unavailable, redistribute security points to market categories
+  // With GoPlus:    Honeypot(15) + Ownership(15) + Tokenomics(15) + Liquidity(25) + Activity(20) + Momentum(10) = 100
+  // Without GoPlus: Honeypot(0)  + Ownership(0)  + Tokenomics(0)  + Liquidity(40) + Activity(40) + Momentum(20) = 100
+  const secWeight = hasGoPlus ? 1.0 : 0.0;
+  const mktBoost = hasGoPlus ? 1.0 : (goplusSupported ? 0.5 : 2.0); // Penalize missing data on supported chains
+
+  const breakdown = {};
   const flags = [];
 
-  // ---- Honeypot (20 points) ----
-  if (security) {
-    if (security.is_honeypot === '1') { breakdown['Honeypot'] = 0; flags.push('❌ HONEYPOT'); }
-    else if (security.is_honeypot === '0') { /* keep 20 */ }
-    if (security.selfdestruct === '1') { breakdown['Honeypot'] -= 10; flags.push('❌ Selfdestruct'); }
-    if (security.external_call === '1') { breakdown['Honeypot'] -= 5; flags.push('⚠️ External call'); }
-    if (security.cannot_sell_all === '1') { breakdown['Honeypot'] -= 10; flags.push('❌ Cannot sell all'); }
-  } else {
-    breakdown['Honeypot'] = 5; // Unknown = assume risky
-    flags.push('⚠️ No security data');
+  // ---- Honeypot (max 15 pts with GoPlus) ----
+  if (hasGoPlus) {
+    let hp = 15;
+    if (security.is_honeypot === '1') { hp = 0; flags.push('❌ HONEYPOT'); }
+    if (security.selfdestruct === '1') { hp -= 8; flags.push('❌ Selfdestruct'); }
+    if (security.external_call === '1') { hp -= 3; flags.push('⚠️ External call'); }
+    if (security.cannot_sell_all === '1') { hp -= 8; flags.push('❌ Cannot sell all'); }
+    if (security.cannot_buy === '1') { hp -= 8; flags.push('❌ Cannot buy'); }
+    breakdown['Honeypot'] = Math.max(0, Math.min(15, hp));
+  } else if (goplusSupported) {
+    breakdown['Honeypot'] = 3; // Penalize — should have data but doesn't
+    flags.push('⚠️ No security data (suspicious)');
   }
+  // If GoPlus not supported for this chain, skip category entirely
 
-  // ---- Ownership (20 points) ----
-  if (security) {
-    if (security.hidden_owner === '1') { breakdown['Ownership'] -= 15; flags.push('❌ Hidden owner'); }
-    if (security.can_take_back_ownership === '1') { breakdown['Ownership'] -= 10; flags.push('❌ Can reclaim ownership'); }
-    if (security.owner_change_balance === '1') { breakdown['Ownership'] -= 15; flags.push('❌ Owner can change balances'); }
+  // ---- Ownership (max 15 pts with GoPlus) ----
+  if (hasGoPlus) {
+    let ow = 15;
+    if (security.hidden_owner === '1') { ow -= 10; flags.push('❌ Hidden owner'); }
+    if (security.can_take_back_ownership === '1') { ow -= 8; flags.push('❌ Can reclaim ownership'); }
+    if (security.owner_change_balance === '1') { ow -= 12; flags.push('❌ Owner can change balances'); }
     const owner = security.owner_address;
     if (owner === '0x0000000000000000000000000000000000000000') {
-      breakdown['Ownership'] = Math.max(breakdown['Ownership'], 18); // Renounced = good
+      ow = Math.max(ow, 14);
       flags.push('✅ Ownership renounced');
     }
-    if (security.is_proxy === '1') { breakdown['Ownership'] -= 5; flags.push('⚠️ Proxy (upgradeable)'); }
-  } else {
-    breakdown['Ownership'] = 5;
+    if (security.is_proxy === '1') { ow -= 4; flags.push('⚠️ Proxy (upgradeable)'); }
+    breakdown['Ownership'] = Math.max(0, Math.min(15, ow));
+  } else if (goplusSupported) {
+    breakdown['Ownership'] = 3;
   }
 
-  // ---- Tokenomics (20 points) ----
-  if (security) {
+  // ---- Tokenomics (max 15 pts with GoPlus) ----
+  if (hasGoPlus) {
+    let tk = 15;
     const buyTax = parseFloat(security.buy_tax || '0');
     const sellTax = parseFloat(security.sell_tax || '0');
-    if (buyTax > 0.1) { breakdown['Tokenomics'] -= 10; flags.push(`⚠️ High buy tax: ${(buyTax * 100).toFixed(1)}%`); }
-    else if (buyTax > 0.05) { breakdown['Tokenomics'] -= 5; }
-    if (sellTax > 0.1) { breakdown['Tokenomics'] -= 10; flags.push(`⚠️ High sell tax: ${(sellTax * 100).toFixed(1)}%`); }
-    else if (sellTax > 0.05) { breakdown['Tokenomics'] -= 5; }
-    if (security.is_mintable === '1') { breakdown['Tokenomics'] -= 5; flags.push('⚠️ Mintable'); }
-    if (security.slippage_modifiable === '1') { breakdown['Tokenomics'] -= 5; flags.push('⚠️ Slippage modifiable'); }
-    if (security.transfer_pausable === '1') { breakdown['Tokenomics'] -= 5; flags.push('⚠️ Transfers pausable'); }
-    if (security.is_blacklisted === '1') { breakdown['Tokenomics'] -= 5; flags.push('⚠️ Has blacklist'); }
+    if (buyTax > 0.1) { tk -= 7; flags.push(`⚠️ High buy tax: ${(buyTax * 100).toFixed(1)}%`); }
+    else if (buyTax > 0.05) { tk -= 3; }
+    if (sellTax > 0.1) { tk -= 7; flags.push(`⚠️ High sell tax: ${(sellTax * 100).toFixed(1)}%`); }
+    else if (sellTax > 0.05) { tk -= 3; }
+    if (security.is_mintable === '1') { tk -= 4; flags.push('⚠️ Mintable'); }
+    if (security.slippage_modifiable === '1') { tk -= 4; flags.push('⚠️ Slippage modifiable'); }
+    if (security.transfer_pausable === '1') { tk -= 4; flags.push('⚠️ Transfers pausable'); }
+    if (security.is_blacklisted === '1') { tk -= 3; flags.push('⚠️ Has blacklist'); }
     if (security.is_open_source === '1') { flags.push('✅ Open source'); }
-    else { breakdown['Tokenomics'] -= 5; flags.push('⚠️ Not open source'); }
-  } else {
-    breakdown['Tokenomics'] = 5;
+    else { tk -= 4; flags.push('⚠️ Not open source'); }
+    breakdown['Tokenomics'] = Math.max(0, Math.min(15, tk));
+  } else if (goplusSupported) {
+    breakdown['Tokenomics'] = 3;
   }
 
-  // ---- Liquidity (20 points) ----
+  // ---- Liquidity (max 25 or 40 pts) ----
+  const liqMax = hasGoPlus ? 25 : (goplusSupported ? 25 : 40);
   if (pair) {
     const liq = pair.liquidity?.usd || 0;
-    if (liq >= 100000) breakdown['Liquidity'] = 20;
-    else if (liq >= 50000) breakdown['Liquidity'] = 16;
-    else if (liq >= 10000) breakdown['Liquidity'] = 12;
-    else if (liq >= 5000) breakdown['Liquidity'] = 8;
-    else if (liq >= 1000) breakdown['Liquidity'] = 4;
-    else { breakdown['Liquidity'] = 2; flags.push('⚠️ Very low liquidity'); }
+    let liqScore;
+    if (liq >= 500000) liqScore = liqMax;
+    else if (liq >= 100000) liqScore = liqMax * 0.9;
+    else if (liq >= 50000) liqScore = liqMax * 0.75;
+    else if (liq >= 10000) liqScore = liqMax * 0.55;
+    else if (liq >= 5000) liqScore = liqMax * 0.35;
+    else if (liq >= 1000) liqScore = liqMax * 0.2;
+    else { liqScore = liqMax * 0.05; flags.push('⚠️ Very low liquidity'); }
 
-    // LP lock check via holder count
+    // Volume/Liquidity ratio bonus — high V/L = active market
+    const volLiq = getVolLiqRatio(pair);
+    if (volLiq >= 5) liqScore = Math.min(liqMax, liqScore + liqMax * 0.15);
+    else if (volLiq >= 2) liqScore = Math.min(liqMax, liqScore + liqMax * 0.1);
+    else if (volLiq < 0.1 && liq < 50000) { liqScore *= 0.8; flags.push('⚠️ Dead volume'); }
+
+    // LP holder check (from GoPlus if available)
     const lpHolders = parseInt(security?.lp_holder_count || '0');
-    if (lpHolders <= 1) { breakdown['Liquidity'] -= 5; flags.push('⚠️ Single LP holder'); }
+    if (hasGoPlus && lpHolders <= 1) { liqScore *= 0.75; flags.push('⚠️ Single LP holder'); }
+
+    // FDV/Liquidity sanity — absurd FDV with tiny liquidity = exit scam setup
+    const fdv = pair.fdv || 0;
+    if (fdv > 0 && liq > 0 && fdv / liq > 100) {
+      liqScore *= 0.7;
+      flags.push('⚠️ FDV/Liq ratio extreme');
+    }
+
+    breakdown['Liquidity'] = Math.max(0, Math.round(Math.min(liqMax, liqScore)));
   } else {
-    breakdown['Liquidity'] = 5;
+    breakdown['Liquidity'] = Math.round(liqMax * 0.15);
   }
 
-  // ---- Activity (20 points) ----
+  // ---- Activity (max 20 or 40 pts) ----
+  const actMax = hasGoPlus ? 20 : (goplusSupported ? 20 : 40);
   if (pair) {
     const buys = pair.txns?.h24?.buys || 0;
     const sells = pair.txns?.h24?.sells || 0;
     const total = buys + sells;
 
-    if (total >= 100) breakdown['Activity'] = 20;
-    else if (total >= 50) breakdown['Activity'] = 16;
-    else if (total >= 20) breakdown['Activity'] = 12;
-    else if (total >= 5) breakdown['Activity'] = 8;
-    else { breakdown['Activity'] = 3; flags.push('⚠️ Very low activity'); }
+    let actScore;
+    if (total >= 500) actScore = actMax;
+    else if (total >= 100) actScore = actMax * 0.85;
+    else if (total >= 50) actScore = actMax * 0.7;
+    else if (total >= 20) actScore = actMax * 0.55;
+    else if (total >= 5) actScore = actMax * 0.35;
+    else { actScore = actMax * 0.1; flags.push('⚠️ Very low activity'); }
 
-    // Buy/sell ratio — heavy sells = dumping
-    if (total > 10 && sells > buys * 2) {
-      breakdown['Activity'] -= 5;
-      flags.push('⚠️ Heavy selling pressure');
+    // Buy/sell ratio — healthy buying pressure = good
+    if (total > 10) {
+      if (sells > buys * 3) {
+        actScore *= 0.6;
+        flags.push('❌ Heavy dump — 3x more sells than buys');
+      } else if (sells > buys * 2) {
+        actScore *= 0.75;
+        flags.push('⚠️ Selling pressure');
+      } else if (buys > sells * 2 && total >= 20) {
+        actScore = Math.min(actMax, actScore * 1.1);
+        flags.push('✅ Strong buy pressure');
+      }
     }
 
-    // Holder concentration
+    // Holder count (from GoPlus)
     const holders = parseInt(security?.holder_count || '0');
-    if (holders > 0 && holders < 10) { breakdown['Activity'] -= 5; flags.push('⚠️ Very few holders'); }
+    if (hasGoPlus && holders > 0 && holders < 10) { actScore *= 0.7; flags.push('⚠️ Very few holders'); }
+    else if (hasGoPlus && holders >= 1000) { flags.push('✅ Wide distribution'); }
+
+    breakdown['Activity'] = Math.max(0, Math.round(Math.min(actMax, actScore)));
   } else {
-    breakdown['Activity'] = 5;
+    breakdown['Activity'] = Math.round(actMax * 0.15);
   }
 
-  // Clamp all categories
-  for (const key of Object.keys(breakdown)) {
-    breakdown[key] = Math.max(0, Math.min(20, breakdown[key]));
+  // ---- Momentum (max 10 or 20 pts) ----
+  const momMax = hasGoPlus ? 10 : (goplusSupported ? 10 : 20);
+  if (pair?.priceChange) {
+    const m5 = pair.priceChange.m5 || 0;
+    const h1 = pair.priceChange.h1 || 0;
+    const h6 = pair.priceChange.h6 || 0;
+    const h24 = pair.priceChange.h24 || 0;
+
+    let momScore = momMax * 0.5; // Start neutral
+
+    // Short-term momentum (5m, 1h) — most important for entry timing
+    if (m5 > 20) { momScore += momMax * 0.2; flags.push('🚀 5m pump >20%'); }
+    else if (m5 > 5) { momScore += momMax * 0.1; }
+    else if (m5 < -20) { momScore -= momMax * 0.3; flags.push('📉 5m dump >20%'); }
+    else if (m5 < -5) { momScore -= momMax * 0.1; }
+
+    if (h1 > 50) { momScore += momMax * 0.15; flags.push('🚀 1h pump >50%'); }
+    else if (h1 > 10) { momScore += momMax * 0.1; }
+    else if (h1 < -30) { momScore -= momMax * 0.2; }
+    else if (h1 < -10) { momScore -= momMax * 0.1; }
+
+    // 24h trend — sustaining gains = healthy
+    if (h24 > 100 && h1 > 0) { momScore += momMax * 0.1; }
+    else if (h24 < -50) { momScore -= momMax * 0.15; flags.push('📉 24h down >50%'); }
+
+    // Parabolic warning — up >200% in 24h often precedes crash
+    if (h24 > 200 && m5 < 0) {
+      flags.push('⚠️ Parabolic — may retrace');
+    }
+
+    breakdown['Momentum'] = Math.max(0, Math.round(Math.min(momMax, momScore)));
+  } else {
+    breakdown['Momentum'] = Math.round(momMax * 0.4);
   }
 
   const score = Object.values(breakdown).reduce((a, b) => a + b, 0);
@@ -387,12 +510,18 @@ async function scoreToken(pair, goplusChain) {
   const address = pair.baseToken?.address;
   if (!address) return null;
 
+  const hasGoPlusSupport = GOPLUS_SUPPORTED.has(goplusChain);
   let security = null;
-  try {
-    security = await fetchGoPlus(address, goplusChain);
-  } catch { /* proceed without security data */ }
+  if (hasGoPlusSupport) {
+    try {
+      security = await fetchGoPlus(address, goplusChain);
+    } catch { /* proceed without security data */ }
+  }
 
-  const { score, flags } = calculateScore(security, pair);
+  const { score, flags } = calculateScore(security, pair, goplusChain);
+  const volLiqRatio = getVolLiqRatio(pair);
+  const momentum = getMomentum(pair);
+  const ageMs = pair.pairCreatedAt ? Date.now() - pair.pairCreatedAt : -1;
 
   return {
     address,
@@ -404,32 +533,53 @@ async function scoreToken(pair, goplusChain) {
     liquidity: pair.liquidity?.usd ? `$${formatNum(pair.liquidity.usd)}` : '?',
     volume: pair.volume?.h24 ? `$${formatNum(pair.volume.h24)}` : '?',
     age: pair.pairCreatedAt ? formatAge(pair.pairCreatedAt) : '?',
+    ageMs,
     buys: pair.txns?.h24?.buys || 0,
     sells: pair.txns?.h24?.sells || 0,
+    volLiqRatio,
+    momentum,
   };
 }
 
 // ============ API Helpers ============
 
 async function fetchNewPairs(dexChain) {
-  // Strategy: fetch latest token profiles, filter by chain, then get pair data
-  const profileResp = await fetch(
-    'https://api.dexscreener.com/token-profiles/latest/v1',
-    { signal: AbortSignal.timeout(HTTP_TIMEOUT) }
-  );
-  if (!profileResp.ok) throw new Error(`DEXScreener profiles ${profileResp.status}`);
-  const profiles = await profileResp.json();
+  // Multi-source: token profiles + boosted tokens for wider coverage
+  const [profileResp, boostResp] = await Promise.allSettled([
+    fetch('https://api.dexscreener.com/token-profiles/latest/v1', { signal: AbortSignal.timeout(HTTP_TIMEOUT) }),
+    fetch('https://api.dexscreener.com/token-boosts/latest/v1', { signal: AbortSignal.timeout(HTTP_TIMEOUT) }),
+  ]);
 
-  // Filter profiles by chain
-  const chainProfiles = (Array.isArray(profiles) ? profiles : [])
-    .filter(p => p.chainId === dexChain && p.tokenAddress)
-    .slice(0, 10); // Limit to avoid rate limits
+  const seen = new Set();
+  const tokenAddresses = [];
 
-  if (chainProfiles.length === 0) return [];
+  // Source 1: Token profiles
+  if (profileResp.status === 'fulfilled' && profileResp.value.ok) {
+    const profiles = await profileResp.value.json();
+    for (const p of (Array.isArray(profiles) ? profiles : [])) {
+      if (p.chainId === dexChain && p.tokenAddress && !seen.has(p.tokenAddress)) {
+        seen.add(p.tokenAddress);
+        tokenAddresses.push(p.tokenAddress);
+      }
+    }
+  }
 
-  // Batch-fetch pair data for discovered tokens
+  // Source 2: Boosted tokens
+  if (boostResp.status === 'fulfilled' && boostResp.value.ok) {
+    const boosts = await boostResp.value.json();
+    for (const b of (Array.isArray(boosts) ? boosts : [])) {
+      if (b.chainId === dexChain && b.tokenAddress && !seen.has(b.tokenAddress)) {
+        seen.add(b.tokenAddress);
+        tokenAddresses.push(b.tokenAddress);
+      }
+    }
+  }
+
+  if (tokenAddresses.length === 0) return [];
+
+  // Batch-fetch pair data (limit 12 to stay within rate limits)
   const pairResults = await Promise.allSettled(
-    chainProfiles.map(p => fetchDexPair(p.tokenAddress))
+    tokenAddresses.slice(0, 12).map(addr => fetchDexPair(addr))
   );
 
   return pairResults

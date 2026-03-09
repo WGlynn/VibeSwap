@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://46-225-173-213.sslip.io'
 const POLL_INTERVAL = 30_000 // 30 seconds
 
 export function useMindMesh() {

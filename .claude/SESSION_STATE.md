@@ -8,16 +8,26 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
+- **SOVEREIGN AUTONOMY LAYER DEPLOYED** — wallet.js, social.js, proactive.js live on Fly.io
 - **Dr. Nadal Visit**: Psychiatrist + husband checking Vercel site. Chat is FREE, warm, no token gates.
 - **System prompt deployed**: JARVIS personality rewrite — warm, present, adaptive. Subtle work-curiosity nudge.
 - **Provider cascade live**: DeepSeek (cheap) → Anthropic Haiku (fallback) on Vercel `/api/chat`
 - **Prices oracle live**: `/api/prices` — CoinGecko + Chainlink cross-validation on Base mainnet
+- **Fly.io DEPLOYED** — task queue, access changes, AND autonomy layer all live
 
-## PENDING: Fly.io Redeploy
-**Status**: Code committed to git but NOT deployed to Fly.io. TG bot running stale code.
-**What needs deploying**:
-- `jarvis-bot/src/task-queue.js` — deferred execution engine (defer_task LLM tool)
-- `jarvis-bot/src/claude.js` — defer_task tool registered in TOOL_GROUPS
+## Autonomy Layer (DEPLOYED — Fly.io)
+**wallet.js**: EOA management, AES-256-GCM encryption, $50/day limit, whitelist-only, 4 chains (Base/ETH/Arb/OP)
+- `/wallet create <passphrase>` to generate — NO WALLET EXISTS YET (Will must create)
+- LLM tools: wallet_info, wallet_send, wallet_sign
+
+**social.js**: Outbound X/Twitter, Discord, GitHub presence
+- Credentials from env vars (TWITTER_BEARER_TOKEN, DISCORD_WEBHOOK_URL, GITHUB_TOKEN)
+- Currently: NONE configured — Will needs to set env vars on Fly.io
+- LLM tools: social_post, social_status, social_queue
+
+**proactive.js**: Autonomous scheduled actions — master switch OFF by default
+- Actions: market_pulse (6h), build_update (24h), thought_piece (12h), monitor_mentions (4h)
+- `/proactive enable` to activate — requires social credentials first
 - `jarvis-bot/src/index.js` — triggerednometry unlimited, tbhxnest REMOVED, task queue init/flush/stop
 - `jarvis-bot/src/memory.js` — Rule #10: never say "I'll check" without calling defer_task
 

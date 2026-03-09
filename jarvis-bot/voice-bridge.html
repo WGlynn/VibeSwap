@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jarvis Voice Bridge</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+  h1 { color: #00d4ff; margin-bottom: 10px; font-size: 24px; }
+  .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
+  .controls { display: flex; gap: 12px; margin-bottom: 20px; }
+  button { padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
+  #startBtn { background: #00d4ff; color: #000; }
+  #startBtn:hover { background: #00b8e0; }
+  #startBtn.active { background: #ff4444; }
+  #stopBtn { background: #333; color: #fff; }
+  #stopBtn:hover { background: #444; }
+  .status { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 14px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.listening { background: #00ff88; animation: pulse 1.5s infinite; }
+  .dot.thinking { background: #ffaa00; animation: pulse 0.5s infinite; }
+  .dot.speaking { background: #ff4444; animation: pulse 0.8s infinite; }
+  .dot.idle { background: #555; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .log { background: #111; border: 1px solid #222; border-radius: 8px; padding: 16px; height: 500px; overflow-y: auto; font-family: 'Cascadia Code', monospace; font-size: 13px; line-height: 1.6; }
+  .log-entry { margin-bottom: 8px; }
+  .log-entry.human { color: #00d4ff; }
+  .log-entry.jarvis { color: #00ff88; }
+  .log-entry.system { color: #888; }
+  .log-entry.error { color: #ff4444; }
+  .config { margin-bottom: 20px; display: flex; gap: 12px; align-items: center; }
+  .config label { color: #888; font-size: 13px; }
+  .config select { background: #222; color: #fff; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; }
+  .manual { display: flex; gap: 8px; margin-bottom: 20px; }
+  .manual input { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+  .manual button { background: #00d4ff; color: #000; padding: 10px 20px; }
+</style>
+</head>
+<body>
+
+<h1>JARVIS Voice Bridge</h1>
+<p class="subtitle">Routes Google Meet audio → Jarvis → back to Meet via VB-Cable</p>
+
+<div class="config">
+  <label>Input (from Meet):</label>
+  <select id="inputDevice"></select>
+  <label>Output (to Meet):</label>
+  <select id="outputDevice"></select>
+  <button onclick="loadDevices()" style="background:#333;color:#fff;padding:6px 12px;font-size:12px;">Refresh</button>
+</div>
+
+<div class="controls">
+  <button id="startBtn" onclick="toggleBridge()">Start Listening</button>
+  <button id="stopBtn" onclick="stopBridge()">Stop</button>
+  <label style="display:flex;align-items:center;gap:6px;color:#888;font-size:13px;">
+    <input type="checkbox" id="autoListen" checked> Auto-resume listening
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;color:#888;font-size:13px;">
+    <input type="checkbox" id="silenceFilter" checked> Filter silence/noise
+  </label>
+</div>
+
+<div class="status">
+  <div class="dot idle" id="statusDot"></div>
+  <span id="statusText">Idle — click Start to begin</span>
+</div>
+
+<div class="manual">
+  <input type="text" id="manualInput" placeholder="Type a message to Jarvis (bypasses voice)..." onkeydown="if(event.key==='Enter')sendManual()">
+  <button onclick="sendManual()">Send</button>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+const JARVIS_CHAT = 'https://jarvis-vibeswap.fly.dev/web/chat/stream';
+const JARVIS_TTS = 'https://jarvis-vibeswap.fly.dev/web/tts';
+
+let recognition = null;
+let isListening = false;
+let isSpeaking = false;
+let isProcessing = false;
+let audioContext = null;
+let currentAudio = null;
+let conversationId = 'voice-bridge-' + Date.now();
+let silenceTimeout = null;
+let transcript = '';
+
+// ============ Audio Device Setup ============
+
+async function loadDevices() {
+  try {
+    // Need permission first
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter(d => d.kind === 'audioinput');
+    const outputs = devices.filter(d => d.kind === 'audiooutput');
+
+    const inputSelect = document.getElementById('inputDevice');
+    const outputSelect = document.getElementById('outputDevice');
+    inputSelect.innerHTML = '';
+    outputSelect.innerHTML = '';
+
+    inputs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Mic ${inputSelect.options.length + 1}`;
+      // Auto-select VB-Cable output (what comes FROM Meet)
+      if (d.label.toLowerCase().includes('cable output') || d.label.toLowerCase().includes('vb-audio')) {
+        opt.selected = true;
+      }
+      inputSelect.appendChild(opt);
+    });
+
+    outputs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Speaker ${outputSelect.options.length + 1}`;
+      // Auto-select VB-Cable input (what goes TO Meet)
+      if (d.label.toLowerCase().includes('cable input') || d.label.toLowerCase().includes('vb-audio')) {
+        opt.selected = true;
+      }
+      outputSelect.appendChild(opt);
+    });
+
+    log('system', `Found ${inputs.length} inputs, ${outputs.length} outputs`);
+  } catch (e) {
+    log('error', 'Mic permission denied: ' + e.message);
+  }
+}
+
+// ============ Speech Recognition ============
+
+function createRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    log('error', 'Speech Recognition not supported — use Chrome');
+    return null;
+  }
+
+  const r = new SpeechRecognition();
+  r.continuous = true;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  r.maxAlternatives = 1;
+
+  r.onresult = (event) => {
+    let interim = '';
+    let finalText = '';
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalText += result[0].transcript;
+      } else {
+        interim += result[0].transcript;
+      }
+    }
+
+    if (interim) {
+      setStatus('listening', `Hearing: "${interim.trim()}"`);
+    }
+
+    if (finalText) {
+      const text = finalText.trim();
+      if (text && (!document.getElementById('silenceFilter').checked || text.length > 2)) {
+        // Accumulate transcript, wait for pause
+        transcript += (transcript ? ' ' : '') + text;
+        clearTimeout(silenceTimeout);
+        silenceTimeout = setTimeout(() => {
+          if (transcript.trim()) {
+            const full = transcript.trim();
+            transcript = '';
+            processInput(full);
+          }
+        }, 1500); // 1.5s pause = end of utterance
+      }
+    }
+  };
+
+  r.onerror = (event) => {
+    if (event.error === 'no-speech') return; // Normal
+    if (event.error === 'aborted') return;
+    log('error', `Speech error: ${event.error}`);
+  };
+
+  r.onend = () => {
+    if (isListening && document.getElementById('autoListen').checked && !isSpeaking) {
+      // Auto-restart
+      setTimeout(() => {
+        if (isListening && !isSpeaking) {
+          try { r.start(); } catch(e) {}
+        }
+      }, 300);
+    }
+  };
+
+  return r;
+}
+
+function toggleBridge() {
+  if (isListening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
+
+function startListening() {
+  if (!recognition) {
+    recognition = createRecognition();
+    if (!recognition) return;
+  }
+
+  try {
+    recognition.start();
+    isListening = true;
+    document.getElementById('startBtn').textContent = 'Listening...';
+    document.getElementById('startBtn').classList.add('active');
+    setStatus('listening', 'Listening for speech...');
+    log('system', 'Voice bridge active — listening for speech');
+  } catch (e) {
+    log('error', 'Failed to start: ' + e.message);
+  }
+}
+
+function stopListening() {
+  isListening = false;
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+  }
+  document.getElementById('startBtn').textContent = 'Start Listening';
+  document.getElementById('startBtn').classList.remove('active');
+  setStatus('idle', 'Stopped');
+}
+
+function stopBridge() {
+  stopListening();
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  isSpeaking = false;
+  isProcessing = false;
+  log('system', 'Bridge stopped');
+}
+
+// ============ Jarvis Communication ============
+
+async function processInput(text) {
+  if (isProcessing) {
+    log('system', `Queued (busy): "${text}"`);
+    return;
+  }
+
+  isProcessing = true;
+  log('human', text);
+
+  // Pause listening while Jarvis responds
+  if (recognition && isListening) {
+    try { recognition.stop(); } catch(e) {}
+  }
+
+  setStatus('thinking', 'Jarvis is thinking...');
+
+  try {
+    // Get Jarvis response via SSE
+    const response = await fetch(JARVIS_CHAT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        conversationId: conversationId,
+        platform: 'voice-bridge'
+      })
+    });
+
+    if (!response.ok) throw new Error(`Chat API ${response.status}`);
+
+    // Read SSE stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.token) fullResponse += data.token;
+            if (data.text) fullResponse = data.text;
+            if (data.response) fullResponse = data.response;
+          } catch(e) {
+            // Non-JSON data line
+            const text = line.slice(6).trim();
+            if (text && text !== '[DONE]') fullResponse += text;
+          }
+        }
+      }
+    }
+
+    if (!fullResponse.trim()) {
+      fullResponse = 'I received your message but had no response to give.';
+    }
+
+    log('jarvis', fullResponse.trim());
+
+    // Now speak the response
+    await speakResponse(fullResponse.trim());
+
+  } catch (e) {
+    log('error', `Chat error: ${e.message}`);
+    // Try speaking error via browser TTS
+    browserSpeak('Sorry, I had trouble processing that.');
+  }
+
+  isProcessing = false;
+
+  // Resume listening
+  if (isListening && document.getElementById('autoListen').checked) {
+    setTimeout(() => {
+      if (isListening && !isSpeaking) {
+        try {
+          recognition = createRecognition();
+          recognition.start();
+        } catch(e) {}
+        setStatus('listening', 'Listening for speech...');
+      }
+    }, 500);
+  }
+}
+
+async function speakResponse(text) {
+  isSpeaking = true;
+  setStatus('speaking', 'Jarvis is speaking...');
+
+  try {
+    // Try server TTS first
+    const ttsResponse = await fetch(JARVIS_TTS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 5000) })
+    });
+
+    if (ttsResponse.ok) {
+      const blob = await ttsResponse.blob();
+      if (blob.size > 0) {
+        await playAudioBlob(blob);
+        isSpeaking = false;
+        return;
+      }
+    }
+  } catch (e) {
+    log('system', 'Server TTS unavailable, using browser voice');
+  }
+
+  // Fallback: browser TTS
+  browserSpeak(text);
+}
+
+function playAudioBlob(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+
+    // Try to route to selected output device
+    const outputId = document.getElementById('outputDevice').value;
+    if (outputId && audio.setSinkId) {
+      audio.setSinkId(outputId).catch(() => {});
+    }
+
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      resolve();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      log('error', 'Audio playback failed');
+      resolve();
+    };
+    audio.play().catch(e => {
+      log('error', 'Playback blocked: ' + e.message);
+      resolve();
+    });
+  });
+}
+
+function browserSpeak(text) {
+  if (!window.speechSynthesis) {
+    isSpeaking = false;
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text.slice(0, 5000));
+  const voices = window.speechSynthesis.getVoices();
+  const british = voices.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('male'))
+    || voices.find(v => v.lang === 'en-GB')
+    || voices.find(v => v.lang.startsWith('en'));
+  if (british) utterance.voice = british;
+  utterance.rate = 1.05;
+  utterance.pitch = 0.95;
+  utterance.onend = () => { isSpeaking = false; };
+  utterance.onerror = () => { isSpeaking = false; };
+  window.speechSynthesis.speak(utterance);
+}
+
+// ============ Manual Input ============
+
+function sendManual() {
+  const input = document.getElementById('manualInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  processInput(text);
+}
+
+// ============ UI Helpers ============
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusText');
+  dot.className = 'dot ' + state;
+  label.textContent = text;
+}
+
+function log(type, text) {
+  const div = document.getElementById('log');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + type;
+  const time = new Date().toLocaleTimeString();
+  const prefix = type === 'human' ? '🗣️ Human' : type === 'jarvis' ? '🤖 Jarvis' : type === 'error' ? '❌ Error' : '⚙️ System';
+  entry.textContent = `[${time}] ${prefix}: ${text}`;
+  div.appendChild(entry);
+  div.scrollTop = div.scrollHeight;
+}
+
+// ============ Init ============
+
+window.addEventListener('load', () => {
+  loadDevices();
+  // Load voices (Chrome loads async)
+  if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => {};
+    window.speechSynthesis.getVoices();
+  }
+  log('system', 'Voice bridge ready. Select VB-Cable devices and click Start.');
+  log('system', 'Input = "CABLE Output" (audio FROM Meet) | Output = "CABLE Input" (audio TO Meet)');
+  log('system', 'Tip: In Google Meet settings, set Speaker → VB-Cable Input, Mic → VB-Cable Output');
+});
+</script>
+
+</body>
+</html>

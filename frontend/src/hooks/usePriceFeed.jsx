@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, PriceWebSocket } from '../services/api'
+import { api, getSharedWebSocket } from '../services/api'
 
 // ============ Price Feed — Backend API + WebSocket ============
 // Primary: Backend REST API (server-side CoinGecko cache, no CORS issues)
@@ -108,7 +108,6 @@ export function usePriceFeed(symbols = ['ETH', 'USDC', 'WBTC', 'ARB', 'OP']) {
   const [error, setError] = useState(null)
   const [source, setSource] = useState(null)
   const fetchRef = useRef(false)
-  const wsRef = useRef(null)
   const pricesRef = useRef(prices)
   pricesRef.current = prices
 
@@ -166,8 +165,10 @@ export function usePriceFeed(symbols = ['ETH', 'USDC', 'WBTC', 'ARB', 'OP']) {
 
   // ============ WebSocket for real-time price pushes ============
   useEffect(() => {
-    const ws = new PriceWebSocket((msg) => {
-      if (msg.type === 'prices' && msg.data?.prices) {
+    const ws = getSharedWebSocket()
+
+    const off = ws.on('prices', (msg) => {
+      if (msg.data?.prices) {
         const newPrices = {}
         const newChanges = {}
 
@@ -186,13 +187,7 @@ export function usePriceFeed(symbols = ['ETH', 'USDC', 'WBTC', 'ARB', 'OP']) {
       }
     })
 
-    ws.connect()
-    wsRef.current = ws
-
-    return () => {
-      ws.disconnect()
-      wsRef.current = null
-    }
+    return () => off()
   }, [])
 
   // ============ Polling fallback (if WebSocket disconnects) ============

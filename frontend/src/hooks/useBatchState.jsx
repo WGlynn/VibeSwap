@@ -4,6 +4,7 @@ import useContracts from './useContracts'
 import { useCKBWallet } from './useCKBWallet'
 import { useCKBContracts } from './useCKBContracts'
 import { isCKBChain, CKB_PHASES, CKB_BATCH_TIMING } from '../utils/ckb-constants'
+import { getSharedWebSocket } from '../services/api'
 
 // Batch phases match the smart contract
 const PHASES = {
@@ -338,92 +339,74 @@ export function BatchProvider({ children }) {
     }
   }, [isLive, contracts, userOrder.commitId, userOrder.batchId, userOrder.orderDetails])
 
-  // ============ SIMULATION MODE: Phase transition logic (EVM demo only) ============
+  // ============ WEBSOCKET MODE: Server-authoritative batch timer ============
+  // Replaces client-side simulation — backend broadcasts batch ticks/transitions
+  // to all clients, keeping everyone synchronized.
   useEffect(() => {
-    if (isLive || isCKB) return // Skip simulation when live or CKB (CKB has its own demo)
+    if (isLive || isCKB) return // EVM live uses contract polling, CKB uses indexer
 
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          // Phase transition
-          if (phase === PHASES.COMMIT) {
-            setPhase(PHASES.REVEAL)
+    const ws = getSharedWebSocket()
 
-            // If user has a committed order, update status
-            if (userOrder.status === ORDER_STATUS.COMMITTED) {
-              // In production, auto-reveal would happen here
-              setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.PENDING_REVEAL }))
-            }
+    // Handle batch ticks (every 1s from server)
+    const offTick = ws.on('batch_tick', (msg) => {
+      setPhase(msg.phase)
+      setTimeLeft(msg.timeLeft)
+      setBatchId(msg.batchId)
+      if (msg.queue) setBatchQueue(msg.queue)
+    })
 
-            return PHASE_DURATIONS[PHASES.REVEAL]
-          } else if (phase === PHASES.REVEAL) {
-            setPhase(PHASES.SETTLING)
+    // Handle phase transitions (server-authoritative)
+    const offTransition = ws.on('batch_transition', (msg) => {
+      const prevPhase = prevPhaseRef.current
+      const newPhase = msg.to
 
-            // Update user order status
-            if (userOrder.status === ORDER_STATUS.REVEALED ||
-                userOrder.status === ORDER_STATUS.PENDING_REVEAL) {
-              setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.SETTLING }))
-            } else if (userOrder.status === ORDER_STATUS.COMMITTED) {
-              // Didn't reveal in time
-              setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.FAILED }))
-            }
-
-            return PHASE_DURATIONS[PHASES.SETTLING]
-          } else {
-            // Settlement complete, start new batch
-            const newBatchId = batchId + 1
-            setBatchId(newBatchId)
-            setPhase(PHASES.COMMIT)
-
-            // Record settlement if user had an order
-            if (userOrder.status === ORDER_STATUS.SETTLING) {
-              const settlement = generateMockSettlement(userOrder.orderDetails)
-              setUserOrder(prev => ({
-                ...prev,
-                status: ORDER_STATUS.SETTLED,
-                settlement
-              }))
-
-              // Add to history
-              setRecentSettlements(prev => [{
-                batchId: batchId,
-                ...settlement,
-                timestamp: Date.now(),
-              }, ...prev.slice(0, 4)])
-            }
-
-            // Reset batch queue for new batch
-            setBatchQueue({
-              orderCount: Math.floor(Math.random() * 20) + 5,
-              totalValue: Math.floor(Math.random() * 500000) + 50000,
-              priorityOrders: Math.floor(Math.random() * 5),
-            })
-
-            return PHASE_DURATIONS[PHASES.COMMIT]
-          }
+      // User order state machine on phase transition
+      if (prevPhase === PHASES.COMMIT && newPhase === PHASES.REVEAL) {
+        if (userOrder.status === ORDER_STATUS.COMMITTED) {
+          setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.PENDING_REVEAL }))
         }
-        return prev - 1
-      })
-    }, 1000)
+      }
 
-    return () => clearInterval(interval)
-  }, [isLive, isCKB, phase, batchId, userOrder.status, userOrder.orderDetails])
+      if (prevPhase === PHASES.REVEAL && newPhase === PHASES.SETTLING) {
+        if (userOrder.status === ORDER_STATUS.REVEALED ||
+            userOrder.status === ORDER_STATUS.PENDING_REVEAL) {
+          setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.SETTLING }))
+        } else if (userOrder.status === ORDER_STATUS.COMMITTED) {
+          setUserOrder(prev => ({ ...prev, status: ORDER_STATUS.FAILED }))
+        }
+      }
 
-  // ============ SIMULATION MODE: Batch queue updates during commit (EVM demo only) ============
-  useEffect(() => {
-    if (isLive || isCKB) return // Skip simulation when live or CKB
-    if (phase !== PHASES.COMMIT) return
+      if (prevPhase === PHASES.SETTLING && newPhase === PHASES.COMMIT) {
+        if (userOrder.status === ORDER_STATUS.SETTLING) {
+          const settlement = generateMockSettlement(userOrder.orderDetails)
+          setUserOrder(prev => ({
+            ...prev,
+            status: ORDER_STATUS.SETTLED,
+            settlement,
+          }))
+          setRecentSettlements(prev => [{
+            batchId: msg.batchId - 1,
+            ...settlement,
+            timestamp: Date.now(),
+          }, ...prev.slice(0, 4)])
+        }
+      }
 
-    const interval = setInterval(() => {
-      setBatchQueue(prev => ({
-        orderCount: prev.orderCount + Math.floor(Math.random() * 3),
-        totalValue: prev.totalValue + Math.floor(Math.random() * 50000),
-        priorityOrders: prev.priorityOrders + (Math.random() > 0.7 ? 1 : 0),
-      }))
-    }, 2000)
+      prevPhaseRef.current = newPhase
+      setPhase(newPhase)
+      setTimeLeft(msg.timeLeft)
+      setBatchId(msg.batchId)
+      if (msg.queue) setBatchQueue(msg.queue)
+    })
 
-    return () => clearInterval(interval)
-  }, [isLive, isCKB, phase])
+    // Subscribe to batch channel (may already be subscribed via shared WS)
+    ws.subscribe('batch')
+
+    return () => {
+      offTick()
+      offTransition()
+    }
+  }, [isLive, isCKB, userOrder.status, userOrder.orderDetails])
 
   // ============ Commit an order (called from SwapPage) ============
   const commitOrder = useCallback(async (orderDetails) => {

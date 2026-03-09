@@ -653,10 +653,13 @@ function createOllamaProvider(providerConfig) {
         },
       };
 
+      // 120s timeout — Ollama cold-starts take 3-5s to load model into RAM.
+      // Default Node fetch has NO timeout, so stalled requests would hang forever.
       const response = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000),
       });
 
       if (!response.ok) {
@@ -704,6 +707,27 @@ function createOllamaProvider(providerConfig) {
 }
 
 registerProvider('ollama', createOllamaProvider);
+
+// Pre-warm Ollama model on startup — loads weights into RAM so first real message isn't slow
+async function warmOllama() {
+  try {
+    const url = process.env.OLLAMA_URL || 'http://localhost:11434';
+    const model = process.env.LLM_MODEL || 'qwen2.5:7b';
+    console.log(`[ollama] Pre-warming model ${model}...`);
+    const res = await fetch(`${url}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt: 'hi', stream: false, options: { num_predict: 1 } }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (res.ok) console.log(`[ollama] Model ${model} warm — ready for inference`);
+    else console.warn(`[ollama] Pre-warm failed: HTTP ${res.status}`);
+  } catch (e) {
+    console.warn(`[ollama] Pre-warm skipped: ${e.message}`);
+  }
+}
+// Fire and forget — don't block startup
+if (process.env.LLM_PROVIDER === 'ollama' || process.env.OLLAMA_URL) warmOllama();
 
 // ============ Gemini Provider ============
 

@@ -120,20 +120,16 @@ const features = [
   },
 ]
 
+// TODO: Fetch real protocol stats from on-chain data
 const stats = [
-  { label: 'exchanged', value: '$847M', change: '+12.4%' },
-  { label: 'saved', value: '$124.5M', change: '+5.2%' },
-  { label: 'kept by users', value: '$2.1M', change: 'vs banks' },
-  { label: 'people', value: '48.2K', change: '+892' },
+  { label: 'protocol', value: 'Live', change: 'Base mainnet' },
+  { label: 'MEV eliminated', value: '100%', change: 'by design' },
+  { label: 'protocol fees', value: '0%', change: 'forever' },
+  { label: 'open source', value: 'Yes', change: 'always' },
 ]
 
-// Live activity for social proof - simulated real-time feed
-const recentActivity = [
-  { action: 'exchanged', amount: '$420', from: 'ETH', to: 'USDC', time: '2s ago', location: 'Lagos' },
-  { action: 'sent', amount: '$1,200', to: 'family', time: '8s ago', location: 'Lima' },
-  { action: 'exchanged', amount: '$85', from: 'USDC', to: 'ETH', time: '12s ago', location: 'Mumbai' },
-  { action: 'saved', amount: '$15.40', note: 'vs bank fees', time: '15s ago', location: 'Manila' },
-]
+// No fake activity — show real transactions when available
+const recentActivity = []
 
 // Community contributors - human faces behind the protocol
 const communityHighlights = [

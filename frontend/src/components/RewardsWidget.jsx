@@ -85,7 +85,7 @@ function RewardsWidget() {
             </span>
             <span className="text-lg text-void-400">VIBE</span>
           </motion.div>
-          <div className="text-sm text-void-500 mt-1">≈ ${(claimable * 1.85).toFixed(2)}</div>
+          <div className="text-sm text-void-500 mt-1">{claimable > 0 ? `≈ $${(claimable * 1.85).toFixed(2)}` : ''}</div>
         </div>
 
         {/* Progress ring */}
@@ -120,7 +120,7 @@ function RewardsWidget() {
               </defs>
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-xs font-bold text-void-300">75%</span>
+              <span className="text-xs font-bold text-void-300">0%</span>
             </div>
           </div>
         </div>
@@ -178,16 +178,8 @@ function RewardsWidget() {
         </motion.button>
       </div>
 
-      {/* Streak Indicator */}
-      <div className="px-4 pb-4">
-        <div className="flex items-center justify-between p-2 rounded-lg bg-void-800/20">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm">🔥</span>
-            <span className="text-xs text-void-400">7 day streak!</span>
-          </div>
-          <span className="text-xs font-medium text-glow-500">+15% bonus</span>
-        </div>
-      </div>
+      {/* Streak Indicator — only show when user has real streak data */}
+      {/* TODO: Wire to real loyalty contract data */}
     </motion.div>
   )
 }

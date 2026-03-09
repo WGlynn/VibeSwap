@@ -44,3 +44,5 @@ jarvis-bot/data/*.json
 *.log
 __pycache__/
 *.egg-info/
+
+.vercel

@@ -25,6 +25,7 @@ import "../incentives/interfaces/IVolatilityOracle.sol";
 
 /**
  * @title VibeAMM
+ * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
  * @notice Constant product AMM with batch swap execution for MEV-resistant trading
  * @dev Implements x*y=k invariant with uniform clearing price for batches
  *      Includes comprehensive security measures against known DEX exploits

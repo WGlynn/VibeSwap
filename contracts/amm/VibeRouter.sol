@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VibeRouter
+ * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
  * @notice Multi-path trade aggregation router (Jupiter pattern) for optimal routing across pools
  * @dev Splits trades across multiple routes/pool types to minimize slippage.
  *      Supports ConstantProduct, StableSwap, and BatchAuction pool types.

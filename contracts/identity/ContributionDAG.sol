@@ -82,7 +82,21 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     // Authorized bridge contracts that can vouch on behalf of verified humans
     mapping(address => bool) public authorizedBridges;
 
+    // Timelock for founder changes (founders get 3.0x voting power — must be gated)
+    uint256 public constant FOUNDER_CHANGE_TIMELOCK = 7 days;
+    struct PendingFounderChange {
+        address founder;
+        bool isAddition; // true = add, false = remove
+        uint256 executeAfter;
+        bool executed;
+        bool cancelled;
+    }
+    mapping(uint256 => PendingFounderChange) public pendingFounderChanges;
+    uint256 public nextFounderChangeId;
+
     event AuthorizedBridgeUpdated(address indexed bridge, bool authorized);
+    event FounderChangeQueued(uint256 indexed changeId, address founder, bool isAddition, uint256 executeAfter);
+    event FounderChangeCancelled(uint256 indexed changeId);
 
     // ============ Constructor ============
 
@@ -540,25 +554,73 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
 
     // ============ Admin Functions ============
 
-    /// @notice Add a founder (root of trust DAG)
-    function addFounder(address founder) external onlyOwner {
+    /// @notice Queue a founder addition (7-day timelock — founders get 3.0x voting power)
+    function queueAddFounder(address founder) external onlyOwner returns (uint256 changeId) {
         if (_isFounder[founder]) revert AlreadyFounder();
         if (_founders.length >= MAX_FOUNDERS) revert MaxFoundersReached();
 
-        _isFounder[founder] = true;
-        _founders.push(founder);
+        changeId = nextFounderChangeId++;
+        uint256 executeAfter = block.timestamp + FOUNDER_CHANGE_TIMELOCK;
 
-        emit FounderAdded(founder);
+        pendingFounderChanges[changeId] = PendingFounderChange({
+            founder: founder,
+            isAddition: true,
+            executeAfter: executeAfter,
+            executed: false,
+            cancelled: false
+        });
+
+        emit FounderChangeQueued(changeId, founder, true, executeAfter);
     }
 
-    /// @notice Remove a founder
-    function removeFounder(address founder) external onlyOwner {
+    /// @notice Queue a founder removal (7-day timelock)
+    function queueRemoveFounder(address founder) external onlyOwner returns (uint256 changeId) {
         if (!_isFounder[founder]) revert NotFounder();
 
-        _isFounder[founder] = false;
-        _removeFromArray(_founders, founder);
+        changeId = nextFounderChangeId++;
+        uint256 executeAfter = block.timestamp + FOUNDER_CHANGE_TIMELOCK;
 
-        emit FounderRemoved(founder);
+        pendingFounderChanges[changeId] = PendingFounderChange({
+            founder: founder,
+            isAddition: false,
+            executeAfter: executeAfter,
+            executed: false,
+            cancelled: false
+        });
+
+        emit FounderChangeQueued(changeId, founder, false, executeAfter);
+    }
+
+    /// @notice Execute a queued founder change after timelock
+    function executeFounderChange(uint256 changeId) external onlyOwner {
+        PendingFounderChange storage change = pendingFounderChanges[changeId];
+        require(!change.executed, "Already executed");
+        require(!change.cancelled, "Cancelled");
+        require(block.timestamp >= change.executeAfter, "Timelock active");
+
+        change.executed = true;
+
+        if (change.isAddition) {
+            if (_isFounder[change.founder]) revert AlreadyFounder();
+            if (_founders.length >= MAX_FOUNDERS) revert MaxFoundersReached();
+            _isFounder[change.founder] = true;
+            _founders.push(change.founder);
+            emit FounderAdded(change.founder);
+        } else {
+            if (!_isFounder[change.founder]) revert NotFounder();
+            _isFounder[change.founder] = false;
+            _removeFromArray(_founders, change.founder);
+            emit FounderRemoved(change.founder);
+        }
+    }
+
+    /// @notice Cancel a pending founder change
+    function cancelFounderChange(uint256 changeId) external onlyOwner {
+        PendingFounderChange storage change = pendingFounderChanges[changeId];
+        require(!change.executed, "Already executed");
+        require(!change.cancelled, "Already cancelled");
+        change.cancelled = true;
+        emit FounderChangeCancelled(changeId);
     }
 
     /// @notice Set SoulboundIdentity contract (address(0) to disable check)

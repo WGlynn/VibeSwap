@@ -5052,6 +5052,12 @@ bot.on('text', async (ctx) => {
     }
   }
 
+  // Tag-only mode — in designated chats, Jarvis ONLY responds to @mention or reply-to-bot
+  const isTagOnlyChat = config.tagOnlyChatIds && config.tagOnlyChatIds.includes(ctx.chat.id);
+  if (isTagOnlyChat) {
+    isCalledByName = false; // Disable name triggers (jarvis, jar, j) in tag-only chats
+  }
+
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
     // In groups: buffer into conversation history for situational awareness
     const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
@@ -5069,8 +5075,8 @@ bot.on('text', async (ctx) => {
     const basicQuality = Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5);
     trackForThread(ctx.chat.id, ctx.from.id, userName, msgText, basicQuality, ctx.message.message_id);
 
-    // Check if thread is worth archiving
-    if (shouldSuggestArchival(ctx.chat.id)) {
+    // Check if thread is worth archiving (skip in tag-only chats — no unsolicited messages)
+    if (!isTagOnlyChat && shouldSuggestArchival(ctx.chat.id)) {
       ctx.reply('This conversation is getting good. Use /archive if you want to save it as a knowledge artifact.');
     }
 
@@ -5145,7 +5151,7 @@ bot.on('text', async (ctx) => {
     const shouldSkipProactive = (persona !== 'degen' && msgAddressesDiablo)
       || (persona === 'degen' && msgAddressesJarvis && !msgAddressesDiablo);
 
-    if (msgText.length >= 3 && !shouldSkipProactive) {
+    if (msgText.length >= 3 && !shouldSkipProactive && !isTagOnlyChat) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
         const recentCtx = getRecentContext(ctx.chat.id, 10);

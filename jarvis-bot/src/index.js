@@ -6955,8 +6955,8 @@ async function main() {
   // Heartbeat: update every 5 minutes to prove we're alive
   setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
 
-  // Status pulse DM to owner — every 30 minutes
-  const STATUS_PULSE_INTERVAL = 30 * 60 * 1000; // 30 min
+  // Status pulse DM to owner — every 3 minutes
+  const STATUS_PULSE_INTERVAL = 3 * 60 * 1000; // 3 min
   setInterval(async () => {
     try {
       const uptime = process.uptime();

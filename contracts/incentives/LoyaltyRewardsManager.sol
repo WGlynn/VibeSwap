@@ -10,6 +10,7 @@ import "./interfaces/ILoyaltyRewardsManager.sol";
 
 /**
  * @title LoyaltyRewardsManager
+ * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
  * @notice Time-weighted LP rewards with loyalty multipliers and early exit penalties
  * @dev Rewards long-term LPs and redistributes early exit penalties to remaining stakers
  */

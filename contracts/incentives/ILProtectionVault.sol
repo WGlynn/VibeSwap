@@ -11,6 +11,7 @@ import "./interfaces/IVolatilityOracle.sol";
 
 /**
  * @title ILProtectionVault
+ * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
  * @notice Provides impermanent loss protection for LPs with tiered coverage
  * @dev Tracks LP positions, calculates IL, and processes claims based on coverage tiers
  */

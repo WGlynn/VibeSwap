@@ -63,7 +63,12 @@ contract AgentRegistryFuzz is Test {
         uint256 agentId = registry.registerAgent("TransferTest", IAgentRegistry.AgentPlatform.CLAUDE, op1, bytes32(0));
 
         vm.prank(op1);
-        registry.transferOperator(agentId, op2);
+        registry.queueOperatorTransfer(agentId, op2);
+
+        vm.warp(block.timestamp + registry.OPERATOR_TRANSFER_TIMELOCK() + 1);
+
+        vm.prank(op1);
+        registry.executeOperatorTransfer(agentId);
 
         assertFalse(registry.isAgent(op1));
         assertTrue(registry.isAgent(op2));

@@ -12,12 +12,20 @@ contract ContributionDAGFuzzTest is Test {
     address public owner;
     address public alice;
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         owner = address(this);
         alice = makeAddr("alice");
 
         dag = new ContributionDAG(address(0)); // no soulbound check
-        dag.addFounder(alice);
+        _addFounderWithTimelock(alice);
     }
 
     // ============ Helpers ============
@@ -215,10 +223,10 @@ contract ContributionDAGFuzzTest is Test {
         for (uint256 i = 1; i < numFounders; i++) {
             address founder = address(uint160(9000 + i));
             if (i < 20) {
-                dag.addFounder(founder);
+                _addFounderWithTimelock(founder);
             } else {
                 vm.expectRevert(IContributionDAG.MaxFoundersReached.selector);
-                dag.addFounder(founder);
+                dag.queueAddFounder(founder);
             }
         }
 

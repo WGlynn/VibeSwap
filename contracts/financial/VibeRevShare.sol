@@ -146,11 +146,12 @@ contract VibeRevShare is ERC20, Ownable, ReentrancyGuard, IVibeRevShare {
         _totalRevenueDeposited += amount;
         revenueToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Update accumulator: if no one is staked, revenue stays in contract
-        // (will be distributed once someone stakes)
-        if (_totalStaked > 0) {
-            _rewardPerTokenStored += (amount * PRECISION) / _totalStaked;
-        }
+        // SECURITY: Require stakers to exist — revenue with zero stakers would be
+        // permanently locked (accumulator not updated, so future stakers can't claim it)
+        // SECURITY: Require stakers to exist — revenue with zero stakers would be
+        // permanently locked (accumulator not updated, so future stakers can't claim it)
+        require(_totalStaked > 0, "No stakers to distribute to");
+        _rewardPerTokenStored += (amount * PRECISION) / _totalStaked;
 
         emit RevenueDeposited(msg.sender, amount);
     }

@@ -510,6 +510,9 @@ contract DAOTreasury is
         emergencyId = nextEmergencyId++;
         uint256 executeAfter = block.timestamp + EMERGENCY_TIMELOCK;
 
+        // SECURITY: Guardian MUST be set for emergency withdrawals — no auto-approval
+        require(emergencyGuardian != address(0), "Emergency guardian required");
+
         emergencyRequests[emergencyId] = EmergencyRequest({
             token: token,
             recipient: recipient,
@@ -517,7 +520,7 @@ contract DAOTreasury is
             executeAfter: executeAfter,
             executed: false,
             cancelled: false,
-            guardianApproved: emergencyGuardian == address(0) // auto-approved if no guardian set
+            guardianApproved: false
         });
 
         emit EmergencyWithdrawalQueued(emergencyId, token, recipient, amount, executeAfter);

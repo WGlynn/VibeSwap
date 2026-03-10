@@ -43,6 +43,11 @@ export const config = {
   communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID, 10) || null : null,
   // The Ark — backup group. If main group dies, Jarvis DMs everyone an invite link here.
   arkGroupId: process.env.ARK_GROUP_ID ? parseInt(process.env.ARK_GROUP_ID, 10) || null : null,
+  // Tag-only chats — Jarvis ONLY responds when @mentioned or replied to (no proactive, no name triggers)
+  // Comma-separated chat IDs in env var, e.g. "-1001234567890,-1009876543210"
+  tagOnlyChatIds: process.env.TAG_ONLY_CHAT_IDS
+    ? process.env.TAG_ONLY_CHAT_IDS.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id))
+    : [],
   // Meeting transcript webhook — receives live transcripts from Fireflies.ai
   transcriptWebhookSecret: process.env.TRANSCRIPT_WEBHOOK_SECRET || null,
   transcriptChatId: process.env.TRANSCRIPT_CHAT_ID ? parseInt(process.env.TRANSCRIPT_CHAT_ID, 10) || null : null,

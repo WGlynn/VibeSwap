@@ -82,14 +82,22 @@ contract ContributionAttestorTest is Test {
     uint256 constant ACCEPTANCE_THRESHOLD = 2e18; // 2.0
     uint256 constant CLAIM_TTL = 7 days;
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         // Deploy ContributionDAG
         dag = new ContributionDAG(address(0)); // No soulbound check
 
         // Add founders
-        dag.addFounder(founder1);
-        dag.addFounder(founder2);
-        dag.addFounder(founder3);
+        _addFounderWithTimelock(founder1);
+        _addFounderWithTimelock(founder2);
+        _addFounderWithTimelock(founder3);
 
         // Create handshakes: founders <-> trusted users
         vm.prank(founder1);

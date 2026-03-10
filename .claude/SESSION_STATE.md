@@ -8,7 +8,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
-- **Will taking a break** — demoralized, needs space. Everything is deployed and running autonomously.
+- **Jan Xie (Nervos CKB chief architect) responded to our CKB DeFi Primitives paper** — impressed, caught missing `solver_lock_hash` in PoW challenge (Section 6.2). Paper updated, committed `387ccfb`, pushed to both remotes.
 - **SOVEREIGN AUTONOMY LAYER DEPLOYED** — wallet.js, social.js, proactive.js live on Fly.io
 - **LIGHT CONTEXT TIER DISABLED** — Jarvis was hallucinating in groups (JUL/JulSwap confusion). Now always sends full 75K context.
 - **Dr. Nadal Visit**: Vercel chat is FREE, warm, no token gates. DeepSeek primary, Anthropic fallback.

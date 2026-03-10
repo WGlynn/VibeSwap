@@ -174,7 +174,7 @@ Proposed by community member Matt, PoW-gated shared state uses a lock script tha
 VibeSwap's `pow-lock` script:
 - Accepts `pair_id` and `min_difficulty` as args
 - Verifies that the witness contains a valid PoW proof: `SHA-256(challenge || nonce)` must have `difficulty` leading zero bits
-- Challenge is derived from `SHA-256(pair_id || batch_id || prev_state_hash)` -- unique per cell state
+- Challenge is derived from `SHA-256(pair_id || batch_id || prev_state_hash || solver_lock_hash)` -- unique per cell state and bound to the solver's identity, preventing PoW solution theft via mempool observation (analogous to `coinbase` in mining or `recipient_lock_hash` in HTLC)
 - Difficulty adjusts every 10 transitions with a maximum 4x adjustment factor
 
 This creates a self-regulating market for write access. High-value trading pairs attract more miners, increasing difficulty. Low-value pairs have low difficulty, keeping participation costs minimal. The system self-scales without governance intervention.
@@ -183,7 +183,7 @@ This creates a self-regulating market for write access. High-value trading pairs
 
 EVM has no equivalent. Shared mutable state is freely accessible to anyone who pays gas. There is no way to make write access require computational proof. The closest analogue -- a contract that verifies a PoW submission -- would still be subject to gas-based ordering: a miner who finds the PoW can be front-run by a validator who sees the PoW submission in the mempool.
 
-**CKB advantage**: PoW-gated shared state is only possible on UTXO chains where cell consumption is atomic. The PoW proof and the state transition are a single atomic operation. There is no mempool window to front-run.
+**CKB advantage**: PoW-gated shared state is only possible on UTXO chains where cell consumption is atomic. The PoW proof and the state transition are a single atomic operation. By binding the challenge to the `solver_lock_hash`, the PoW solution is non-transferable -- an observer who sees a valid nonce in the mempool cannot replay it because the challenge hash changes with a different solver identity.
 
 ---
 
@@ -221,6 +221,12 @@ On Ethereum, LP tokens are ERC-20 balances in a contract's storage. The contract
 3. **Security surface comparison** showing that CKB eliminates entire attack categories (approval phishing, re-entrancy, gas-based front-running) through structural properties rather than defensive coding patterns.
 
 4. **Composability model** where type script validation is orthogonal to cell contents, enabling new token standards to work with existing DeFi protocols without integration work.
+
+---
+
+## Acknowledgments
+
+We thank Jan Xie for identifying the missing beneficiary binding in the PoW-gated shared state challenge (Section 6.2). The original challenge derivation did not include `solver_lock_hash`, which would have left PoW solutions vulnerable to mempool-based theft. This has been corrected.
 
 ---
 

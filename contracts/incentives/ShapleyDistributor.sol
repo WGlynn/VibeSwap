@@ -11,10 +11,11 @@ import "./IPriorityRegistry.sol";
 
 /**
  * @title ShapleyDistributor
+ * @author W. Glynn (Faraday1) & JARVIS — vibeswap.org
  * @notice Distributes rewards using Shapley value-based fair allocation
  * @dev Implements cooperative game theory for reward distribution where each
  *      economic event (batch settlement, fee distribution) is treated as an
- *      independent cooperative game.
+ *      independent cooperative game. P-000: Fairness Above All.
  *
  * Key Principles (from Glynn's Cooperative Reward System):
  * - Distribute only realized value (no inflation)

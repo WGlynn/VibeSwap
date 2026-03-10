@@ -33,8 +33,10 @@ interface IComplianceRegistry {
 
 /**
  * @title CommitRevealAuction
+ * @author W. Glynn (Faraday1) & JARVIS — vibeswap.org
  * @notice Implements commit-reveal mechanism with priority auction for MEV-resistant trading
- * @dev Uses 10-second batches with 8s commit + 2s reveal phases (PROTOCOL CONSTANTS)
+ * @dev Uses 10-second batches with 8s commit + 2s reveal phases (PROTOCOL CONSTANTS).
+ *      P-000: Fairness Above All. P-001: Temporal Decoupling Eliminates Information Advantage.
  */
 contract CommitRevealAuction is
     Initializable,

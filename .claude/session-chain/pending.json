@@ -14,5 +14,41 @@
     ],
     "status": "in_progress",
     "sub_hash": "f352d099d731e545ecd36aae905e24bdbeb36e21ebab090fb350e4d321f23f0b"
+  },
+  {
+    "sub_index": 1,
+    "timestamp": "2026-03-10T19:55:28.371838+00:00",
+    "parent_block": 9,
+    "parent_hash": "b4f16fd733b5339fdb74234fae91a8575e69408facfa718ced43de0b9b082c3b",
+    "prev_sub_hash": "f352d099d731e545ecd36aae905e24bdbeb36e21ebab090fb350e4d321f23f0b",
+    "task": "Context compression research",
+    "progress": "Identified 4 marginal improvements: semantic chain compression, priority tiering in MEMORY.md, diff-based session state, primitive deduplication. Awaiting Will's direction on which to implement.",
+    "files_touched": [],
+    "status": "in_progress",
+    "sub_hash": "b5292eb254900e84b00e963082fbb5fe41155532699454c98f371508a3217784"
+  },
+  {
+    "sub_index": 2,
+    "timestamp": "2026-03-10T20:32:50.800266+00:00",
+    "parent_block": 9,
+    "parent_hash": "b4f16fd733b5339fdb74234fae91a8575e69408facfa718ced43de0b9b082c3b",
+    "prev_sub_hash": "b5292eb254900e84b00e963082fbb5fe41155532699454c98f371508a3217784",
+    "task": "Will AFK directives",
+    "progress": "Processing 7 directives: P-0000 genesis primitive, Lawson Constant, context compression 2/3/4, test fixes, Jarvis bot proactivity",
+    "files_touched": [],
+    "status": "in_progress",
+    "sub_hash": "ae287b2a05d6eafb96592506519a2d8e7ebf3b09a14e5351ca8614c45ae1f88a"
+  },
+  {
+    "sub_index": 3,
+    "timestamp": "2026-03-10T20:40:47.142836+00:00",
+    "parent_block": 9,
+    "parent_hash": "b4f16fd733b5339fdb74234fae91a8575e69408facfa718ced43de0b9b082c3b",
+    "prev_sub_hash": "ae287b2a05d6eafb96592506519a2d8e7ebf3b09a14e5351ca8614c45ae1f88a",
+    "task": "Parallel background agents",
+    "progress": "3 agents running: (1) Jarvis bot proactivity tuning, (2) knowledge primitive dedup analysis, (3) author tags across 14 contracts. Build with via_ir also running.",
+    "files_touched": [],
+    "status": "in_progress",
+    "sub_hash": "bf579f8588a576436776bb3287936bd66a01c557174dce9e30e0be4ba179597c"
   }
 ]

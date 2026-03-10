@@ -43,6 +43,7 @@ try {
   getShardSyncStatus = () => ({ total: 0, own: 0, other: 0, last24h: 0, last7d: 0, shardCounts: {}, staleSec: -1 });
 }
 import { recoverRetryQueue, recoverCommittedIds } from './consensus.js';
+import { initReputation, flushReputation, validateProposalByReputation, rewardCommitParticipants, getViralMetrics, getReputationProfile } from './reputation-consensus.js';
 // MI Host SDK — graceful fallback if module fails to load
 let initMIHost, shutdownMIHost, getCellStats, getMIStatusString, getProviderHealthString_MI;
 let getMetricsText_MI, getSignalHistoryString_MI, pauseCell_MI, resumeCell_MI;
@@ -2322,6 +2323,46 @@ bot.command('directive', async (ctx) => {
   } else {
     ctx.reply('Usage:\n  /directive — show current mode\n  /directive list — all active directives\n  /directive normal|tag-only|quiet — set mode');
   }
+});
+
+// ============ Reputation & Flywheel Metrics ============
+
+bot.command('reputation', async (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'flywheel' || sub === 'viral') {
+    const metrics = getViralMetrics();
+    const lines = [
+      'Flywheel Metrics\n',
+      `  Stage: ${metrics.flywheelStage}`,
+      `  Participants: ${metrics.participants}`,
+      `  Avg Reputation: ${metrics.avgReputation}`,
+      `  Avg Difficulty: ${metrics.avgDifficultyMultiplier} (1.0 = full cost)`,
+      `  Avg Coop Multiplier: ${metrics.avgCoopMultiplier}x`,
+      `  Contribution Diversity: ${metrics.contributionDiversity} niches`,
+      `  Viral Threshold Estimate: ~${metrics.viralThresholdEstimate} participants`,
+      `  Total Slashes: ${metrics.totalSlashes}`,
+    ];
+    return ctx.reply(lines.join('\n'));
+  }
+
+  // Default: show caller's reputation profile
+  const userId = String(ctx.from.id);
+  const profile = getReputationProfile(userId);
+  if (!profile) {
+    return ctx.reply('No reputation data yet. Keep contributing — your score builds over time.');
+  }
+
+  const lines = [
+    `Reputation Profile\n`,
+    `  Score: ${profile.score}`,
+    `  Difficulty: ${profile.difficultyMultiplier} (${((1 - profile.difficultyMultiplier) * 100).toFixed(0)}% discount)`,
+    `  Coop Multiplier: ${profile.cooperationMultiplier}x (${profile.cooperationStreak} streak)`,
+    `  Slashes: ${profile.slashCount}`,
+    `  Last Update: ${profile.lastUpdate || 'never'}`,
+  ];
+  ctx.reply(lines.join('\n'));
 });
 
 // ============ Token Launch Scanner (DEXScreener) ============
@@ -5547,10 +5588,11 @@ async function main() {
     const shardResult = await initShard();
     console.log(`[jarvis] Shard: ${shardResult.id} (${shardResult.totalShards} total, mode: WORKER)`);
 
-    console.log('[jarvis] Step 5: Initializing consensus + CRPC...');
+    console.log('[jarvis] Step 5: Initializing consensus + CRPC + reputation...');
     initConsensus();
     await initCRPC();
     registerConsensusHandlers();
+    await initReputation();
 
     // Worker HTTP server — consensus, CRPC, knowledge chain, health, proxy processing
     const healthPort = parseInt(process.env.HEALTH_PORT, 10) || 8080;
@@ -5911,10 +5953,11 @@ async function main() {
   const shardResult = await initShard();
   console.log(`[jarvis] Shard: ${shardResult.id} (${shardResult.totalShards} total, ${isMultiShard() ? 'MULTI' : 'SINGLE'}-shard mode)`);
 
-  // Step 3.6: Initialize consensus + CRPC
+  // Step 3.6: Initialize consensus + CRPC + reputation
   initConsensus();
   await initCRPC();
   registerConsensusHandlers();
+  await initReputation();
 
   // Step 4: Context diagnosis
   const report = await diagnoseContext();
@@ -6894,6 +6937,21 @@ async function main() {
     }, config.autoBackupInterval);
   }
 
+  // Reputation: refresh scores from tracker data every 10 minutes
+  setInterval(async () => {
+    try {
+      const { updateScore } = await import('./reputation-consensus.js');
+      const allUsers = getAllUsers();
+      for (const [id, user] of Object.entries(allUsers)) {
+        const stats = getUserStats(user.telegramId);
+        if (stats && stats.contributions > 0) {
+          updateScore(id, stats);
+        }
+      }
+      await flushReputation();
+    } catch {}
+  }, 10 * 60 * 1000);
+
   // Heartbeat: update every 5 minutes to prove we're alive
   setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
 
@@ -6933,6 +6991,7 @@ async function main() {
       ['social', flushSocial],
       ['autonomous', flushAutonomous],
       ['directives', flushDirectives],
+      ['reputation', flushReputation],
       ['comms', saveComms],
       ['user-memory', flushUserMemory],
       ['timezones', flushTimezones],

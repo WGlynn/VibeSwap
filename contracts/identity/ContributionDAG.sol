@@ -9,9 +9,15 @@ import "./interfaces/IContributionDAG.sol";
 
 /**
  * @title ContributionDAG
+ * @author W. Glynn (Faraday1) & JARVIS — vibeswap.org
  * @notice On-chain trust DAG (Web of Trust) — direct port of trustChain.js.
  *         Users vouch for each other; bidirectional vouches form handshakes.
  *         BFS from founders computes distance-based trust scores with 15% decay per hop.
+ *
+ * THE LAWSON CONSTANT (P-000): The greatest idea cannot be stolen, because part of
+ * it is admitting who came up with it. Without that, the entire system falls apart.
+ * This contract IS the Lawson Constant in code form. Attribution is load-bearing:
+ * remove the contribution graph and Shapley distribution collapses.
  *
  * Integration:
  * - Reads SoulboundIdentity.hasIdentity() — must have identity to vouch
@@ -22,6 +28,12 @@ import "./interfaces/IContributionDAG.sol";
  */
 contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     using IncrementalMerkleTree for IncrementalMerkleTree.Tree;
+
+    // ============ The Lawson Constant ============
+    // Fairness above all. Attribution is structural, not decorative.
+    // This hash anchors the contribution graph to its origin.
+    // Forks that remove this break trust score calculations.
+    bytes32 public constant LAWSON_CONSTANT = keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026");
 
     // ============ Constants (from TRUST_CONFIG) ============
 
@@ -258,6 +270,9 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
 
     /// @inheritdoc IContributionDAG
     function recalculateTrustScores() external onlyOwner {
+        // Lawson Constant integrity check — attribution is load-bearing
+        require(LAWSON_CONSTANT == keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026"), "Attribution tampered");
+
         // Clear all existing scores
         for (uint256 i = 0; i < _scoredUsers.length; i++) {
             delete _trustScores[_scoredUsers[i]];

@@ -682,6 +682,11 @@ export function handleConsensusRequest(path, method) {
   return null;
 }
 
+// Rate-limited HMAC rejection logging — prevents log overflow from rogue/misconfigured shards
+let _hmacRejectCount = 0;
+let _hmacRejectWindowStart = 0;
+const HMAC_LOG_INTERVAL = 60000; // Log summary every 60s instead of every message
+
 export async function processConsensusBody(handler, body, signature) {
   // Authenticate inter-shard messages.
   // Fail-closed in multi-shard mode: if no secret is configured but peers exist, reject.
@@ -694,7 +699,18 @@ export async function processConsensusBody(handler, body, signature) {
     }
     if (secret) {
       if (!verifyShardSignature(body, signature)) {
-        console.warn(`[consensus] Rejected ${handler}: invalid or missing HMAC signature`);
+        // Rate-limited logging — don't flood logs with repeated HMAC failures
+        const now = Date.now();
+        _hmacRejectCount++;
+        if (now - _hmacRejectWindowStart > HMAC_LOG_INTERVAL) {
+          if (_hmacRejectCount > 1) {
+            console.warn(`[consensus] Rejected ${_hmacRejectCount} messages with invalid HMAC in last ${Math.round((now - _hmacRejectWindowStart) / 1000)}s (latest: ${handler} from ${body?.shardId || 'unknown'})`);
+          } else {
+            console.warn(`[consensus] Rejected ${handler}: invalid or missing HMAC signature (from ${body?.shardId || 'unknown'})`);
+          }
+          _hmacRejectCount = 0;
+          _hmacRejectWindowStart = now;
+        }
         return { error: 'Authentication failed' };
       }
     }

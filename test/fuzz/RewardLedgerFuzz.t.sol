@@ -26,6 +26,14 @@ contract RewardLedgerFuzzTest is Test {
     address public carol;
     address public authorized;
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         owner = address(this);
         alice = makeAddr("alice");
@@ -35,7 +43,7 @@ contract RewardLedgerFuzzTest is Test {
 
         token = new MockRLFToken();
         dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
+        _addFounderWithTimelock(alice);
 
         ledger = new RewardLedger(address(token), address(dag));
         ledger.setAuthorizedCaller(authorized, true);

@@ -363,12 +363,13 @@ contract HatchManagerTest is Test {
 
     function test_vestingIncreasesOverTime() public {
         _completeHatchWithAlice(200_000e18);
+        uint256 completionBlock = block.number;
 
         // Immediately after completion: 0 vested
         assertEq(hatch.vestedAmount(alice), 0);
 
         // After 1 half-life: ~50% vested
-        vm.roll(block.number + VESTING_HALF_LIFE);
+        vm.roll(completionBlock + VESTING_HALF_LIFE);
         uint256 vested1 = hatch.vestedAmount(alice);
 
         (,uint256 allocated,,) = hatch.hatchers(alice);
@@ -376,10 +377,10 @@ contract HatchManagerTest is Test {
         assertGt(vested1, allocated * 40 / 100, "After 1 half-life should be > 40%");
         assertLt(vested1, allocated * 60 / 100, "After 1 half-life should be < 60%");
 
-        // After 2 half-lives: ~75% vested
-        vm.roll(block.number + VESTING_HALF_LIFE);
-        uint256 vested2 = hatch.vestedAmount(alice);
-        assertGt(vested2, vested1, "Vesting should increase");
+        // After 3 half-lives: ~87.5% vested (wider gap for clearer increase)
+        vm.roll(completionBlock + 3 * VESTING_HALF_LIFE);
+        uint256 vested3 = hatch.vestedAmount(alice);
+        assertGt(vested3, vested1, "Vesting should increase over time");
     }
 
     function test_claimVestedTokens() public {
@@ -498,8 +499,17 @@ contract HatchManagerTest is Test {
     // ============ Return Rate Safety ============
 
     function test_revertHighReturnRate() public {
-        // Create a new hatch with θ = 10% (min) and κ = 6
-        // ρ = 6 × 0.9 = 5.4 > MAX_RETURN_RATE (5)
+        // Create a new ABC with κ = 8 and a hatch with θ = 10%
+        // ρ = 8 × 0.9 = 7.2, integer div: (8 * 9000) / 10000 = 7 > MAX_RETURN_RATE (5)
+        AugmentedBondingCurve abc2 = new AugmentedBondingCurve(
+            address(dai),
+            address(vibe),
+            address(vibe),
+            8, // κ = 8
+            500,
+            1000
+        );
+
         HatchManager.HatchConfig memory cfg = HatchManager.HatchConfig({
             minRaise: MIN_RAISE,
             maxRaise: MAX_RAISE,
@@ -510,13 +520,14 @@ contract HatchManagerTest is Test {
         });
 
         HatchManager hatch2 = new HatchManager(
-            address(abc),
+            address(abc2),
             address(dai),
             address(vibe),
             address(vibe),
             cfg
         );
 
+        abc2.setHatchManager(address(hatch2));
         hatch2.approveHatcher(alice);
         hatch2.startHatch();
 

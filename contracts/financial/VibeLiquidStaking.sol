@@ -56,6 +56,7 @@ contract VibeLiquidStaking is
     uint256 private constant MAX_OPERATORS = 128;
     uint256 private constant ORACLE_STALENESS = 1 days;
     uint256 private constant MAX_REWARD_INCREASE_BPS = 1_000; // 10% per report cap (sanity)
+    uint256 private constant MIN_STAKE_HOLD_PERIOD = 1 days; // Anti-MEV: must hold before instant unstake
 
     // ============ Errors ============
 
@@ -149,8 +150,11 @@ contract VibeLiquidStaking is
     // Fee accumulator for protocol treasury
     uint256 public accumulatedFees;
 
+    // Anti-MEV: track when each user last staked (must hold MIN_STAKE_HOLD_PERIOD before instant unstake)
+    mapping(address => uint256) public lastStakeTimestamp;
+
     /// @dev Gap for future upgrades
-    uint256[40] private __gap;
+    uint256[39] private __gap;
 
     // ============ Initializer ============
 
@@ -198,6 +202,7 @@ contract VibeLiquidStaking is
         if (shares == 0) revert ZeroAmount();
 
         totalPooledEther += msg.value;
+        lastStakeTimestamp[msg.sender] = block.timestamp;
         _mint(msg.sender, shares);
 
         emit Staked(msg.sender, msg.value, shares);
@@ -218,6 +223,7 @@ contract VibeLiquidStaking is
         vibeToken.safeTransferFrom(msg.sender, address(this), amount);
         totalPooledEther += amount; // treat VIBE 1:1 for share accounting
         totalVibeStaked += amount;
+        lastStakeTimestamp[msg.sender] = block.timestamp;
         _mint(msg.sender, shares);
 
         emit VibeStaked(msg.sender, amount, shares);
@@ -288,6 +294,12 @@ contract VibeLiquidStaking is
     {
         if (shares == 0) revert ZeroAmount();
         if (balanceOf(msg.sender) < shares) revert InsufficientShares();
+        // SECURITY: Anti-MEV — must hold stVIBE for minimum period before instant unstake
+        // Prevents stake-before-reward → instant-unstake-after-reward yield sniping
+        require(
+            block.timestamp >= lastStakeTimestamp[msg.sender] + MIN_STAKE_HOLD_PERIOD,
+            "Must hold stVIBE for 1 day before instant unstake"
+        );
 
         uint256 ethAmount = _getPooledEthByShares(shares);
         uint256 fee = (ethAmount * INSTANT_UNSTAKE_FEE_BPS) / BPS;

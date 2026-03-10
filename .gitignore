@@ -46,3 +46,6 @@ __pycache__/
 *.egg-info/
 
 .vercel
+
+# TLS certificates (NEVER commit)
+*.pem

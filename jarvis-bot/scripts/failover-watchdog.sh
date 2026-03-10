@@ -1,5 +1,9 @@
 #!/bin/bash
-# ============ JARVIS Failover Watchdog ============
+# ============ Cincinnatus Protocol — JARVIS Failover Watchdog ============
+#
+# Named for Cincinnatus: called to power only when needed, returns to the
+# farm the moment the crisis passes. The VPS shard rules only when Fly.io
+# cannot, and relinquishes control the instant it recovers.
 #
 # Monitors Fly.io primary. If it dies, activates VPS hot standby.
 # When Fly.io recovers, deactivates VPS shard (hands back to primary).
@@ -128,7 +132,7 @@ if check_flyio_health; then
       stop_vps_shard
       mode="standby"
       success_count=0
-      send_dm "[FAILOVER] Fly.io RECOVERED. VPS standby deactivated. Primary is back."
+      send_dm "[CINCINNATUS] Fly.io RECOVERED. VPS standby deactivated. Cincinnatus returns to the farm."
     else
       echo "[failover] $(date -Iseconds) Fly.io healthy but waiting for stability ($success_count/$RECOVERY_THRESHOLD)"
     fi
@@ -151,7 +155,7 @@ else
 
     mode="active"
     fail_count=0
-    send_dm "[FAILOVER] Fly.io DOWN for ${FAILOVER_THRESHOLD}+ minutes. VPS hot standby ACTIVATED. Jarvis is running from VPS."
+    send_dm "[CINCINNATUS] Fly.io DOWN for ${FAILOVER_THRESHOLD}+ minutes. VPS hot standby ACTIVATED. Jarvis is running from VPS."
   fi
 fi
 

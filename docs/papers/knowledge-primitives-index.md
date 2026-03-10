@@ -864,3 +864,171 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 > Authority nodes maintain BFT consensus (finite). Meta nodes distribute state (infinite). Anyone can connect directly to truth — no middlemen, no priesthood, no gatekeepers. Reads scale infinitely; writes remain constant-time.
 
 **Generalization**: Every scalability problem can be decomposed into "things that need agreement" and "things that need distribution." These are fundamentally different operations with different scaling properties. Mixing them (as most blockchains do) creates artificial bottlenecks. Separating them unlocks infinite horizontal scaling for the distribution layer while preserving consensus guarantees for the authority layer.
+
+---
+
+## Session 056 Primitives (March 10, 2026)
+
+### P-075: Capability Revocation — Remove the Ability, Not the Incentive
+
+**Source**: JARVIS Output Gate (index.js, Telegraf middleware)
+**Paper**: [Asymmetric Cost Consensus](asymmetric-cost-consensus.md)
+
+> Don't add a check that code must remember to call. Remove the capability at the binding level. `ctx.reply` becomes `() => {}` — application code can call it forever and nothing goes out. The permission model is not "may I send?" but "the send function no longer exists."
+
+**Generalization**: The weakest enforcement strategy is "every caller checks a flag." The strongest is "the dangerous operation is physically impossible." This applies universally: in security, revoke the key rather than adding access checks. In protocol design, make invalid states unrepresentable rather than validating at runtime. In economics, make attack unprofitable rather than punishing attackers after the fact. Systems that rely on participants remembering to do the right thing are fragile. Systems that make the wrong thing impossible are antifragile.
+
+### P-076: Firewall Principle — Enforce at the Layer Below
+
+**Source**: JARVIS Output Gate (Telegraf middleware layer)
+**Paper**: [Asymmetric Cost Consensus](asymmetric-cost-consensus.md)
+
+> Don't trust application code to be secure — enforce at the transport layer. A firewall doesn't ask each application to check its own traffic. It intercepts at the network boundary where no application can bypass it.
+
+**Generalization**: Every system has layers. Security enforced at layer N can always be bypassed by bugs at layer N. Security enforced at layer N-1 cannot. This is why hardware security modules beat software encryption, why kernel-level sandboxing beats application-level validation, and why protocol-level MEV resistance beats application-level slippage checks. The optimal enforcement point is always one layer below where the complexity lives. The further down the stack you enforce, the smaller the trusted computing base.
+
+### P-077: Assume Unpredictability — Design for Unknown Unknowns
+
+**Source**: JARVIS Output Gate architecture decision
+**Paper**: [Asymmetric Cost Consensus](asymmetric-cost-consensus.md)
+
+> The old approach assumed you could enumerate all output pathways and guard each one. That's fragile — every new feature is a potential leak. The new approach assumes you CAN'T predict future pathways and gates at the transport layer instead. Design for the code that hasn't been written yet.
+
+**Generalization**: Robust systems are not ones that handle every known failure mode — they're ones that handle failure modes that haven't been invented yet. Scattered validation ("check at every call site") scales linearly with complexity and has O(n) failure points. Centralized invariant enforcement ("gate at the boundary") is O(1) regardless of system complexity. This is why constitutions work better than case law, why type systems catch bugs that tests miss, and why "impossible by construction" beats "caught by testing." The question is never "did I check everywhere?" — it's "is there a layer where I only need to check once?"
+
+---
+
+## Session 056 Primitives — Deep Sweep (March 10, 2026)
+
+*Extracted via parallel codebase sweep: Solidity contracts, JARVIS bot, research papers, frontend/scripts, oracle.*
+
+### P-078: Attempted Fakery Converges to Honest Participation
+
+**Source**: ProofOfMind.sol, asymmetric-cost-consensus.md, omniscient-adversary-proof.md
+**Papers**: [Asymmetric Cost Consensus](asymmetric-cost-consensus.md), [Omniscient Adversary Proof](omniscient-adversary-proof.md)
+
+> When the cost of faking a credential equals or exceeds the cost of earning it honestly, gaming becomes indistinguishable from genuine contribution — and the system benefits either way. The inverse of Goodhart's Law: instead of the measure becoming meaningless when targeted, the measure is designed so that targeting it produces the desired behavior.
+
+**Generalization**: Design the earning mechanism so that the cheapest way to fake it IS to do it. Fraud becomes contribution. This applies to reputation systems, hiring processes, academic credentials, and certifications. If you want people to demonstrate competence, design a "shortcut" that requires actual competence. The system doesn't care about intent — only action. This is why PoM works: the only way to hack the system is to contribute to it.
+
+### P-079: Structural Immunity — Not Expensive, Impossible
+
+**Source**: OmniscientAdversaryDefense.sol, NakamotoConsensusInfinity.sol
+**Paper**: [Omniscient Adversary Proof](omniscient-adversary-proof.md)
+
+> A protocol is structurally immune to an attack when the attack is logically self-contradictory — not merely expensive, but impossible by the rules of the system itself. This is a fundamentally different security guarantee than computational infeasibility.
+
+**Generalization**: All of modern cryptography relies on computational infeasibility (factoring is hard). Structural immunity holds even against unbounded adversaries because the attack has no coherent meaning within the system's rules. Instead of "make ballot fraud expensive," design a voting system where the concept of fraud has no definition. Instead of "make front-running costly," design a market where information advantage doesn't exist (commit-reveal). The design question shifts from "how much does attack cost?" to "does the concept of attack have any meaning?"
+
+### P-080: The Payoff Identity — Attack and Contribution Are Indistinguishable
+
+**Source**: omniscient-adversary-proof.md (Section 2.5), siren-protocol.md, asymmetric-cost-consensus.md
+**Paper**: [Omniscient Adversary Proof](omniscient-adversary-proof.md)
+
+> In a well-designed system, the action space contains no distinguishable "attack" — there are only contributions (valued by consensus) and invalid inputs (rejected by consensus). Intent is irrelevant; only the action matters.
+
+**Generalization**: If no action produces a better payoff when performed with malicious intent than when performed with honest intent, then "attack" has no meaning within the system. This is the design criterion for any adversarial system. Applies to market design (front-running produces the same payoff as honest trading), governance (vote-buying produces the same outcome as genuine conviction), and moderation (spam produces zero engagement — same as if it wasn't sent). The system that achieves payoff identity has no enemies, only participants.
+
+### P-081: Shard-Local-First — Design for N=1, Scale to N
+
+**Source**: consensus.js, shard.js, knowledge-chain.js, crpc.js (all check `totalShards <= 1`)
+**Paper**: [Near-Zero Token Scaling](near-zero-token-scaling.md)
+
+> Design every module for single-node operation first, then add multi-node coordination as an opt-in layer. Every distributed system should degenerate gracefully to N=1 with zero coordination overhead.
+
+**Generalization**: The "single-node degenerate case" is both the development path and the deployment path. You can test, debug, and run a system on one machine with zero distributed complexity. Adding nodes is purely additive — it multiplies capacity without changing architecture. This is why Jarvis runs perfectly as a single bot AND as a 3-node BFT network from the same codebase. Applies to databases (single-node dev, clustered prod), microservices (monolith-first), and any system that might eventually be distributed but must work NOW on one machine. The cave philosophy made concrete in architecture.
+
+### P-082: Harmonic Tick — Coordination Without Communication
+
+**Source**: knowledge-chain.js (lines 908-928, `scheduleHarmonicTick`)
+
+> All nodes compute "next multiple of intervalMs from Unix epoch 0" and fire at that absolute wall-clock moment, regardless of boot time. This achieves coordinated pulsing without leader election, synchronization messages, or any communication.
+
+**Generalization**: Any distributed system that needs coordinated periodic behavior can use wall-clock alignment instead of coordination protocols. The only requirement is roughly synchronized clocks (NTP), which is already universal. This replaces leader election, heartbeat synchronization, and Paxos-based timing for the specific case of periodic coordination. Applies to cache invalidation, log rotation, metrics collection, batch processing windows, and any system where "everyone should do this at the same time" doesn't need to be exact to the millisecond.
+
+### P-083: Graduated Response — Continuous Deterrence Beats Binary Pause
+
+**Source**: CircuitBreaker.sol, autonomous-circuit-breakers.md
+**Paper**: [Autonomous Circuit Breakers](autonomous-circuit-breakers.md)
+
+> A 5-level graduated response (normal → fee surcharge → golden ratio damping → tightened bounds → breaker trip → global pause) prevents more harm than binary on/off, because it deters small attacks without shutting down legitimate activity during edge cases.
+
+**Generalization**: Most safety systems are binary: running or stopped. Graduated response introduces continuous cost between "fine" and "stopped," creating a smooth deterrence curve. A 5.5x fee surcharge makes attacks unprofitable without preventing urgent legitimate trades. This applies to traffic management (congestion pricing vs road closures), API rate limiting (progressive throttling vs hard blocks), content moderation (friction layers vs bans), and any system where the cure (full shutdown) is sometimes worse than the disease.
+
+### P-084: Positive-Sum Defense — Attacks Are Involuntary Donations
+
+**Source**: HoneypotDefense.sol, siren-protocol.md, autonomous-circuit-breakers.md
+**Paper**: [Siren Protocol](siren-protocol.md)
+
+> A defense mechanism is positive-sum when attacker resources are not merely destroyed but recycled into network value — 50% slashed stake to insurance, 50% to treasury, entropy harvested for RNG. The system is stronger after each attack than before.
+
+**Generalization**: Most security is zero-sum (defender spends to prevent attacker gain) or negative-sum (both sides incur costs). Positive-sum defense turns the attacker into an unwitting contributor. This applies to spam prevention (captchas that do useful computation), DDoS mitigation (attack traffic funding infrastructure scaling), and any adversarial system where the defender can capture and repurpose attacker energy. The system that feeds on its enemies has achieved antifragility.
+
+### P-085: Accumulation Pools — Incentive Waves From Stored Energy
+
+**Source**: cooperative-emission-design.md
+**Paper**: [Cooperative Emission Design](cooperative-emission-design.md)
+
+> Allowing rewards to accumulate during periods of low activity and distributing them in concentrated bursts creates natural incentive waves that attract participation exactly when the system needs it most.
+
+**Generalization**: Linear emission is predictable but creates no urgency. Accumulation pools create natural "harvest events" — large reward pools that become available, attracting waves of participation. This is controlled flooding in agriculture: store water during wet periods, release when needed. Applies to bug bounty programs (large accumulated bounties attract more attention), open-source incentives, prediction markets, and any reward system where punctuated participation matters more than constant participation.
+
+### P-086: Hybrid Escalation — Start Cheap, Level Up on Demand
+
+**Source**: llm-provider.js (Wardenclyffe v3 cascade architecture)
+**Paper**: [Wardenclyffe Inference Cascade](wardenclyffe-inference-cascade.md)
+
+> Route requests to the cheapest adequate provider first, then escalate tier by tier on quality or availability failure — rather than starting with the best and degrading.
+
+**Generalization**: This inverts the traditional cascade (start premium, fall back to cheap). ~70% of requests don't need the premium tier, so starting cheap saves 90% of costs. Applies to cloud computing (spot instances before on-demand), customer service (bot before human), medical triage (nurse before specialist), and any tiered resource allocation where most requests are simpler than assumed. The key insight: the default should be the cheapest option that might work, not the most expensive option that's guaranteed to work.
+
+### P-087: Ghost Variables — Independent Shadow Accounting
+
+**Source**: testing-as-proof-of-correctness.md (Section 4.2)
+**Paper**: [Testing as Proof of Correctness](testing-as-proof-of-correctness.md)
+
+> Maintain an independent parallel accounting of what a system's state "should" be. Compare the shadow against reality. Divergence proves one of them is wrong — both findings are actionable.
+
+**Generalization**: The dual-ledger approach catches bugs that no single-perspective test can find. Applies to financial auditing (independent reconciliation), distributed systems (vector clocks as shadow state), manufacturing (theoretical yield vs actual yield), and any system where the correct state can be independently computed from the history of operations. The shadow doesn't need to be as fast or as optimized as the real system — it just needs to be independently correct.
+
+### P-088: Context-Adaptive State Estimation — The Meta-Estimator
+
+**Source**: oracle/kalman/filter.py, oracle/kalman/covariance.py
+**Paper**: [Kalman Filter True Price Discovery](kalman-filter-true-price-discovery.md)
+
+> The Kalman filter's noise matrices are dynamically recomputed every cycle based on regime signals (stablecoin flows, leverage stress, cascade detection), making the filter automatically skeptical during manipulation and responsive during genuine trends.
+
+**Generalization**: Standard estimators use fixed confidence in their inputs. A meta-estimator modulates its own confidence based on contextual signals. The filter doesn't just estimate state — it estimates how much to trust its inputs. This applies to autonomous vehicles (trust sensors differently in rain vs clear), industrial process control (change model trust during equipment degradation), weather forecasting (trust different models in different regimes), and any state estimation where measurement quality varies with context.
+
+### P-089: Hysteresis State Machine — Dual Thresholds Prevent Flapping
+
+**Source**: scripts/failover-watchdog.sh (Cincinnatus Protocol)
+
+> Two independent counters (fail_count, success_count) with separate thresholds (3 failures to fail over, 3 successes to recover) prevent rapid oscillation between states by requiring sustained evidence for any transition.
+
+**Generalization**: A single threshold creates flapping: one failure triggers failover, one success triggers recovery, repeat forever. Dual thresholds with hysteresis require conviction — the system must be consistently down (or consistently up) before transitioning. This applies to load balancer health checks, database failover, IoT sensor alerting, and any state machine where transitions should require sustained evidence, not single observations. Named for Cincinnatus: called to power only when needed, returns to the farm the moment the crisis passes.
+
+### P-090: Trust Decays With Distance — Bidirectional Vouches and BFS
+
+**Source**: ContributionDAG.sol (lines 23-623)
+
+> Build trust as a directed acyclic graph where only bidirectional vouches (handshakes) count. Trust scores propagate via BFS from founder nodes with 15% decay per hop, capped at 6 hops. Anti-insularity penalty if 80%+ of your vouches are mutual within a clique.
+
+**Generalization**: Trust is transitive but decaying, and requires bidirectional confirmation to prevent spam. A one-way vouch creates an edge; a handshake creates a trust-bearing connection. The decay-per-hop formula creates natural concentric circles: 100% for founders, 85% at 1 hop, 72% at 2 hops. The anti-insularity check prevents closed cliques from self-reinforcing. Applies to social networks (trustworthy recommendations), supply chains (verified suppliers), academic citation (peer endorsement), and any web of trust. The logarithmic BFS is O(V+E), making it practical at scale.
+
+### P-091: Percentage-Based Parameters Self-Scale Without Oracles
+
+**Source**: cooperative-emission-design.md
+**Paper**: [Cooperative Emission Design](cooperative-emission-design.md)
+
+> Define protocol parameters as percentages of dynamic quantities rather than absolute values. A minimum withdrawal of "0.1% of pool balance" works whether the pool holds $1,000 or $1 billion without requiring governance votes or oracle updates.
+
+**Generalization**: An absolute minimum of "$100" works at $1B but blocks all participation when the pool holds $500. Percentage-based parameters self-adjust across orders of magnitude. This applies to tax brackets (percentages vs fixed amounts), performance thresholds (ratios vs absolutes), rate limits (percentage of capacity vs fixed requests/sec), and any system parameter that must remain meaningful across changing scales. The parameter becomes an invariant expressed as a ratio, immune to the underlying quantity's volatility.
+
+### P-092: Editorial Judgment — Probabilistic Self-Restraint
+
+**Source**: autonomous.js (lines 136-188)
+
+> Even when a trigger fires (market event, boredom threshold, interesting message), the system probabilistically skips the action (15-25% chance). This simulates the human behavior of "seeing something interesting but deciding not to comment."
+
+**Generalization**: Hard thresholds feel mechanical; probabilistic skipping feels natural. The key insight is that NOT acting is sometimes the right action, and randomized restraint prevents deterministic repetition. This applies to push notifications (sometimes skip even interesting content), social media curation (don't show every relevant post), recommendation engines (leave room for serendipity), and any proactive system where frequency matters as much as relevance. A system that always speaks when it has something to say is exhausting. A system that sometimes holds back feels like a person.

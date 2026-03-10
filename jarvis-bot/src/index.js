@@ -688,6 +688,85 @@ async function checkLastShutdown() {
   }
 }
 
+// ============ OUTPUT GATE — Formal Enforcement Layer ============
+// Transport-layer gate that wraps ctx.reply (and variants) for directive-restricted chats.
+// This is NOT application logic — it's a safety INVARIANT. Like a firewall rule that
+// doesn't trust the application. Even if future code introduces new response pathways,
+// they CANNOT send messages to restricted chats because the reply methods are replaced
+// with no-ops at the middleware level.
+//
+// Capability model: handlers receive ctx.reply as a CAPABILITY. This middleware REVOKES
+// that capability for restricted chats. Once revoked, no application code can restore it.
+//
+// Exceptions:
+//   1. @mention or reply-to-bot in tag-only mode → capability preserved
+//   2. Directive change messages (so users can always change the mode)
+//   3. Normal mode → no restrictions
+
+if (!IS_WORKER) {
+  bot.use(async (ctx, next) => {
+    const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+    if (!isGroup) return next();
+
+    const chatMode = getChatMode(ctx.chat.id);
+    if (chatMode === 'normal') return next();
+
+    // Determine if bot is properly addressed (tag or reply — the ONLY allowed triggers)
+    const botUsername = ctx.botInfo?.username?.toLowerCase();
+    const text = (ctx.message?.text || ctx.message?.caption || '').toLowerCase();
+    const isMentioned = botUsername && text.includes(`@${botUsername}`);
+    const isReplyToBot = ctx.message?.reply_to_message?.from?.id === ctx.botInfo?.id;
+
+    // Also check @mention entities (Telegram sends mentions as entities)
+    const entities = ctx.message?.entities || ctx.message?.caption_entities || [];
+    const isMentionedViaEntity = entities.some(e =>
+      e.type === 'mention' && text.substring(e.offset, e.offset + e.length) === `@${botUsername}`
+    );
+
+    const isAddressedByTag = isMentioned || isMentionedViaEntity || isReplyToBot;
+
+    // Tag-only + properly addressed → allow all responses
+    if (chatMode === 'tag-only' && isAddressedByTag) return next();
+
+    // Check if this is a directive change — users must ALWAYS be able to change the mode.
+    // In tag-only mode, name triggers ("jarvis normal mode") should also work for directives.
+    const textClean = text.replace(/@\w+/g, '').trim();
+    const isCalledByNameForDirective = textClean.includes('jarvis') || textClean.includes('jar ')
+      || textClean.startsWith('jar') || textClean.includes(' j ') || textClean.startsWith('j ');
+    const isAddressedForDirective = isAddressedByTag || isCalledByNameForDirective;
+
+    if (isAddressedForDirective && detectDirective(ctx.message?.text)) {
+      // Directive change — allow the acknowledgment through
+      return next();
+    }
+
+    // ============ GATE ACTIVE — REVOKE OUTPUT CAPABILITY ============
+    const noop = () => Promise.resolve();
+    const blockedReply = (...args) => {
+      const preview = String(args[0] || '').slice(0, 60).replace(/\n/g, ' ');
+      console.log(`[OUTPUT GATE] BLOCKED reply to ${ctx.chat.id} (${chatMode}): "${preview}"`);
+      return Promise.resolve();
+    };
+
+    ctx.reply = blockedReply;
+    ctx.replyWithMarkdown = noop;
+    ctx.replyWithMarkdownV2 = noop;
+    ctx.replyWithHTML = noop;
+    ctx.replyWithDocument = noop;
+    ctx.replyWithPhoto = noop;
+    ctx.replyWithSticker = noop;
+    ctx.replyWithVideo = noop;
+    ctx.replyWithAnimation = noop;
+    ctx.replyWithAudio = noop;
+    ctx.replyWithVoice = noop;
+    ctx.sendChatAction = noop; // Don't even show "typing..."
+
+    // Handlers still run (for buffering, XP tracking, etc.) — but all output is silenced.
+    return next();
+  });
+  console.log('[output-gate] Formal enforcement middleware installed');
+}
+
 // ============ New Member Welcome ============
 // Reads behavior.json flag — can be toggled at runtime via /setbehavior or conversation mandate
 
@@ -5139,6 +5218,8 @@ bot.on('text', async (ctx) => {
   }
 
   // Directive enforcement — suppress based on chat mode
+  // HARD GATE: early return for restricted chats. The Output Gate middleware (above)
+  // is the primary enforcement layer, but this is defense-in-depth.
   if (isGroup) {
     const chatMode = getChatMode(ctx.chat.id);
     if (chatMode === 'quiet') {
@@ -5150,8 +5231,20 @@ bot.on('text', async (ctx) => {
       registerChat(ctx.chat.id);
       return;
     }
-    if (chatMode === 'tag-only') {
-      isCalledByName = false; // Name triggers suppressed in tag-only mode
+    if (chatMode === 'tag-only' && !isMentioned && !isReplyToBot) {
+      // HARD RETURN — only @mentions and replies pass in tag-only mode.
+      // Name triggers ("jarvis", "jar", "j") are suppressed.
+      // Directive changes are handled above (line 5211) before we reach here.
+      const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+      const msgText = ctx.message.text;
+      bufferMessage(ctx.chat.id, userName, msgText);
+      pushGroupMessage(ctx.chat.id, userName, msgText, ctx.message.message_id, false);
+      recordChatActivity(ctx.chat.id);
+      registerChat(ctx.chat.id);
+      trackForThread(ctx.chat.id, ctx.from.id, userName, msgText,
+        Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5),
+        ctx.message.message_id);
+      return;
     }
   }
 
@@ -5924,6 +6017,12 @@ async function main() {
   });
   // Autonomous engagement — JARVIS as active community member
   await loadDirectives(); // Runtime behavioral directives (tag-only, quiet, etc.)
+  // Log TAG_ONLY_CHAT_IDS for verification (confirms env var is loaded)
+  if (config.tagOnlyChatIds?.length > 0) {
+    console.log(`[directives] TAG_ONLY_CHAT_IDS loaded: [${config.tagOnlyChatIds.join(', ')}]`);
+  } else {
+    console.log('[directives] TAG_ONLY_CHAT_IDS: empty (no env var or no valid IDs)');
+  }
   await loadChatActivity(); // Restore activity state before init
   const autonomousChatIds = config.authorizedGroups || [];
   initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);

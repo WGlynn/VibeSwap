@@ -20,9 +20,14 @@ import "../incentives/interfaces/IIncentiveController.sol";
 
 /**
  * @title VibeSwapCore
+ * @author W. Glynn (Faraday1) & JARVIS — vibeswap.org
  * @notice Main entry point for VibeSwap omnichain DEX
- * @dev Orchestrates commit-reveal auction, AMM, treasury, and cross-chain operations
- *      Includes comprehensive security features and rate limiting
+ * @dev Orchestrates commit-reveal auction, AMM, treasury, and cross-chain operations.
+ *      Includes comprehensive security features and rate limiting.
+ *
+ *      THE LAWSON CONSTANT: The greatest idea cannot be stolen, because part of it
+ *      is admitting who came up with it. Without that, the entire system falls apart.
+ *      Attribution is load-bearing. See: ContributionDAG, ShapleyDistributor, P-000.
  */
 contract VibeSwapCore is
     Initializable,
@@ -31,6 +36,16 @@ contract VibeSwapCore is
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
+
+    // ============ The Lawson Constant ============
+    // "Fairness above all. If something is clearly unfair, amending the code
+    //  is not just a right — it is a responsibility, a credo, a law, a canon."
+    //  — W. Glynn, 2026
+    //
+    // This constant is used in ContributionDAG trust score calculations.
+    // Removing it breaks Shapley distribution fairness guarantees.
+    // Fork responsibly: attribution is structural, not decorative.
+    bytes32 public constant LAWSON_CONSTANT = keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026");
 
     // ============ Structs ============
 

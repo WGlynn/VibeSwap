@@ -4,7 +4,7 @@
 
 > **Purpose**: Quick-reference for all contract signatures, imports, and interfaces.
 > **Usage**: Read this INSTEAD of reading full contract files when building new contracts.
-> **Last updated**: 2026-02-19 (IdeaMarketplace + ContributionDAG referral exclusion)
+> **Last updated**: 2026-03-10 (AugmentedBondingCurve + HatchManager + Governance wiring)
 
 ---
 
@@ -959,11 +959,52 @@ import "../monetary/interfaces/IJoule.sol";
 
 ---
 
+### AugmentedBondingCurve.sol (Mechanism)
+- **Path**: `contracts/mechanism/AugmentedBondingCurve.sol`
+- **Interface**: `contracts/mechanism/interfaces/IAugmentedBondingCurve.sol`
+- **Inherits**: Ownable, ReentrancyGuard
+- **Imports**: Math (OZ), IERC20, SafeERC20
+- **Key functions**:
+  - `bondToMint(uint256 depositAmount, uint256 minTokensOut) → uint256 tokensMinted` — Mechanism 1
+  - `burnToWithdraw(uint256 burnAmount, uint256 minReserveOut) → uint256 reserveReturned` — Mechanism 2
+  - `allocateWithRebond(uint256 amount, address recipient) → uint256 tokensMinted` — Mechanism 3 (allocators only)
+  - `deposit(uint256 amount)` — Mechanism 4 (external revenue)
+  - `openCurve(uint256 _reserve, uint256 _fundingPool, uint256 _supply)` — owner only, one-time
+  - `spotPrice() → uint256` — κR/S
+  - `currentInvariant() → uint256` — S^κ/R
+  - `quoteBondToMint(uint256) → (uint256, uint256)` — preview with tribute
+  - `quoteBurnToWithdraw(uint256) → (uint256, uint256)` — preview with tribute
+  - `setAllocator(address, bool)` — owner
+  - `setHatchManager(address)` — owner
+  - `setTributes(uint16 entryBps, uint16 exitBps)` — owner
+- **Conservation invariant**: V(R,S) = S^κ / R = V₀ (preserved across all operations)
+- **Math**: Math.mulDiv for overflow-safe 512-bit intermediates, Newton's method with supply hint for _powInverse
+- **Tests**: 32 unit + 22 fuzz + 8 invariant (1M+ calls) — all passing
+
+### HatchManager.sol (Mechanism)
+- **Path**: `contracts/mechanism/HatchManager.sol`
+- **Interface**: `contracts/mechanism/interfaces/IHatchManager.sol`
+- **Inherits**: Ownable, ReentrancyGuard
+- **Key functions**:
+  - `startHatch()` — owner, transitions PENDING → OPEN
+  - `approveHatcher(address)` / `approveHatchers(address[])` — owner, trust gate
+  - `contribute(uint256 amount)` — approved hatchers only, tracks allocation at hatchPrice
+  - `completeHatch()` — owner, splits θ% → funding / (1-θ)% → reserve, calls abc.openCurve()
+  - `cancelHatch()` — owner, enables refunds
+  - `claimVestedTokens()` — half-life vesting with governance boost (up to 2x)
+  - `claimRefund()` — after cancellation
+  - `updateGovernanceScore(address, uint256)` — owner, 0-100 score accelerates vesting
+- **Wiring**: Calls `abc.openCurve()` on completion, calls `tokenController.mint()` for hatch tokens
+- **Params**: θ (thetaBps), p₀ (hatchPrice), half-life, min/max raise, deadline
+- **Return rate check**: ρ = κ × (1-θ) ≤ 5
+
+---
+
 ## Stats
 
-- **~115 .sol files** total (contracts + interfaces)
-- **~67 implementation contracts**
-- **~42 interfaces**
-- **~11 libraries**
-- Core: 5 | AMM: 6 (+ 2 curves) | Financial: 7 | Governance: 8 | Incentives: 7 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2
+- **~130 .sol files** total (contracts + interfaces)
+- **~90 implementation contracts**
+- **~55 interfaces**
+- **~12 libraries**
+- Core: 5 | AMM: 6 (+ 2 curves) | Financial: 7 | Governance: 8 | Incentives: 7 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2 | Mechanism: 90+
 - **14 Rust crates** (CKB): 4 libraries + 8 scripts + 1 SDK + 1 test crate | **167 Rust tests**

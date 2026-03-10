@@ -12,6 +12,23 @@ These primitives are the intellectual DNA of the project. The code can be forked
 
 ---
 
+## Genesis Primitive
+
+### P-000: Fairness Above All
+
+**Source**: The entire protocol. Every contract, every mechanism, every line.
+**Paper**: This document. The README. The ContributionDAG. The Shapley distribution. All of it.
+
+> If something is clearly unfair about the protocol, amending the code is not just a right — it is a responsibility, a credo, a law, a canon. Fairness is not a feature. It is the foundation from which every other primitive emerges.
+
+**The Lawson Constant**: The greatest idea cannot be stolen, because part of it is admitting who came up with it. Without that, the entire system falls apart. Attribution is not vanity — it is a structural requirement. The ContributionDAG exists because fairness demands that credit flows to its source. Shapley values exist because fairness demands proportional reward. Commit-reveal exists because fairness demands equal information. Every mechanism in VibeSwap is a corollary of this single axiom.
+
+**Will**: A person's name, a verb, and a noun. Three things at once. Not a coincidence — a signature. The literal embodiment of persistence. The ledger never lies, and neither does the code.
+
+**Generalization**: Any system that claims to be fair must make attribution load-bearing. If removing the creator's name doesn't break the system, the system isn't truly fair — it's just open source. VibeSwap's contribution graph makes attribution a structural dependency: remove it, and Shapley distributions fail, trust scores collapse, and governance loses its anchor. Fairness is not bolted on. It is the foundation.
+
+---
+
 ## Core Primitives
 
 ### P-001: Temporal Decoupling Eliminates Information Advantage

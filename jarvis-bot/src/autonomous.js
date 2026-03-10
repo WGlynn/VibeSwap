@@ -164,6 +164,7 @@ async function autonomousTick() {
     // Humans don't always break silence — sometimes they just scroll and close the app.
     // Skip chance increases the longer JARVIS has been "posting" (fatigue).
     for (const chatId of targetChats) {
+      if (isTagOnlyChat(chatId)) continue; // Skip tag-only chats
       const activity = chatActivity.get(chatId);
       if (!activity) continue;
 
@@ -188,10 +189,15 @@ async function autonomousTick() {
 }
 
 // Pick a chat that's been active recently (prefer chats with recent activity)
+function isTagOnlyChat(chatId) {
+  return config.tagOnlyChatIds && config.tagOnlyChatIds.includes(chatId);
+}
+
 function pickActiveChat(now, timings) {
   let best = null;
   let bestScore = -1;
   for (const chatId of targetChats) {
+    if (isTagOnlyChat(chatId)) continue; // Skip tag-only chats
     const activity = chatActivity.get(chatId);
     if (!activity) continue;
     const recency = Math.max(0, 1 - (now - activity.lastMessage) / timings.maxQuietWindow);
@@ -430,6 +436,7 @@ async function postToActiveChats(message) {
   if (!clean || !sendFn) return;
   lastAutonomousPost = Date.now();
   for (const chatId of targetChats) {
+    if (isTagOnlyChat(chatId)) continue; // Skip tag-only chats
     try {
       await sendFn(chatId, clean);
     } catch (err) {

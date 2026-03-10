@@ -521,11 +521,14 @@ contract ShapleyDistributor is
         if (address(priorityRegistry) != address(0) && scopeId != bytes32(0)) {
             uint256 pioneerScore = priorityRegistry.getPioneerScore(p.participant, scopeId);
             if (pioneerScore > 0) {
+                // SECURITY: Cap pioneer score to prevent unbounded multiplier
+                // Max 2 * BPS_PRECISION (20000) → 2.0x multiplier cap
+                if (pioneerScore > 2 * BPS_PRECISION) pioneerScore = 2 * BPS_PRECISION;
                 // Linear scaling: score / (2 * BPS_PRECISION) gives bonus fraction
                 // score 5000  → 25% bonus (1.25x)
                 // score 10000 → 50% bonus (1.5x) — pool creator
                 // score 17500 → 87.5% bonus (1.875x) — pool creator + first LP
-                // score 27500 → 137.5% bonus (2.375x) — all 4 categories (extremely rare)
+                // score 20000 → 100% bonus (2.0x) — CAPPED
                 uint256 pioneerMultiplier = PRECISION + (pioneerScore * PRECISION) / (2 * BPS_PRECISION);
                 weighted = (weighted * pioneerMultiplier) / PRECISION;
             }

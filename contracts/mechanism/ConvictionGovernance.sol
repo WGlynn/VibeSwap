@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IConvictionGovernance.sol";
+import "./interfaces/IAugmentedBondingCurve.sol";
 import "../oracle/IReputationOracle.sol";
 
 /// @notice Minimal SoulboundIdentity interface for Sybil checks
@@ -56,8 +57,14 @@ contract ConvictionGovernance is Ownable, ReentrancyGuard, IConvictionGovernance
     /// @notice Minimum reputation tier to create proposals
     uint8 public minProposerTier;
 
+    /// @notice Augmented Bonding Curve for funding allocation (optional)
+    IAugmentedBondingCurve public bondingCurve;
+
     /// @notice Authorized resolvers who can execute passed proposals
     mapping(address => bool) public resolvers;
+
+    /// @notice Custom beneficiary per proposal (defaults to proposer if not set)
+    mapping(uint256 => address) public proposalBeneficiary;
 
     /// @notice Proposals by ID (1-indexed)
     mapping(uint256 => GovernanceProposal) internal _proposals;
@@ -198,13 +205,26 @@ contract ConvictionGovernance is Ownable, ReentrancyGuard, IConvictionGovernance
     }
 
     /// @inheritdoc IConvictionGovernance
-    function executeProposal(uint256 proposalId) external {
+    function executeProposal(uint256 proposalId) external nonReentrant {
         GovernanceProposal storage proposal = _proposals[proposalId];
         if (proposal.proposer == address(0)) revert ProposalNotFound();
         if (proposal.state != GovernanceProposalState.PASSED) revert ProposalNotPassed();
         if (!resolvers[msg.sender] && msg.sender != owner()) revert NotResolver();
 
         proposal.state = GovernanceProposalState.EXECUTED;
+
+        // If bonding curve is set, allocate funding via allocateWithRebond
+        if (address(bondingCurve) != address(0)) {
+            uint256 fundingAmount = proposal.requestedAmount;
+            if (bondingCurve.fundingPool() < fundingAmount) revert FundingInsufficient();
+
+            address beneficiary = proposalBeneficiary[proposalId];
+            if (beneficiary == address(0)) beneficiary = proposal.proposer;
+
+            uint256 tokensMinted = bondingCurve.allocateWithRebond(fundingAmount, beneficiary);
+
+            emit ProposalFunded(proposalId, fundingAmount, tokensMinted, beneficiary);
+        }
 
         emit ProposalExecuted(proposalId);
     }
@@ -310,5 +330,16 @@ contract ConvictionGovernance is Ownable, ReentrancyGuard, IConvictionGovernance
 
     function removeResolver(address resolver) external onlyOwner {
         resolvers[resolver] = false;
+    }
+
+    function setBondingCurve(address _abc) external onlyOwner {
+        bondingCurve = IAugmentedBondingCurve(_abc);
+    }
+
+    function setProposalBeneficiary(uint256 proposalId, address beneficiary) external {
+        GovernanceProposal storage proposal = _proposals[proposalId];
+        if (proposal.proposer == address(0)) revert ProposalNotFound();
+        require(msg.sender == proposal.proposer || msg.sender == owner(), "Not authorized");
+        proposalBeneficiary[proposalId] = beneficiary;
     }
 }

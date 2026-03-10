@@ -72,8 +72,11 @@ contract ContributionDAGHandler is Test {
 
     function addFounder(uint256 seed) public {
         address user = _getOrCreateUser(seed);
-        try dag.addFounder(user) {
-            ghost_foundersAdded++;
+        try dag.queueAddFounder(user) returns (uint256 changeId) {
+            vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+            try dag.executeFounderChange(changeId) {
+                ghost_foundersAdded++;
+            } catch {}
         } catch {}
     }
 
@@ -94,10 +97,18 @@ contract ContributionDAGInvariantTest is StdInvariant, Test {
 
     address public alice;
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         alice = makeAddr("alice");
         dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
+        _addFounderWithTimelock(alice);
 
         handler = new ContributionDAGHandler(dag, alice);
         targetContract(address(handler));

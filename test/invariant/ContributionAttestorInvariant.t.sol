@@ -121,11 +121,19 @@ contract ContributionAttestorInvariantTest is Test {
     address public claimant1 = address(0x4001);
     address public untrusted1 = address(0x5001);
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         dag = new ContributionDAG(address(0));
-        dag.addFounder(founder1);
-        dag.addFounder(founder2);
-        dag.addFounder(founder3);
+        _addFounderWithTimelock(founder1);
+        _addFounderWithTimelock(founder2);
+        _addFounderWithTimelock(founder3);
 
         // Handshakes
         vm.prank(founder1);

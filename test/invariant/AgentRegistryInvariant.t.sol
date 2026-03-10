@@ -56,10 +56,14 @@ contract AgentRegistryHandler is Test {
         if (agentId == 0) return;
 
         vm.prank(fromOp);
-        try registry.transferOperator(agentId, toOp) {
-            usedOperators[fromOp] = false;
-            usedOperators[toOp] = true;
-            operators[fromIdx] = toOp;
+        try registry.queueOperatorTransfer(agentId, toOp) {
+            vm.warp(block.timestamp + registry.OPERATOR_TRANSFER_TIMELOCK() + 1);
+            vm.prank(fromOp);
+            try registry.executeOperatorTransfer(agentId) {
+                usedOperators[fromOp] = false;
+                usedOperators[toOp] = true;
+                operators[fromIdx] = toOp;
+            } catch {}
         } catch {}
     }
 

@@ -1049,3 +1049,15 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 > Even when a trigger fires (market event, boredom threshold, interesting message), the system probabilistically skips the action (15-25% chance). This simulates the human behavior of "seeing something interesting but deciding not to comment."
 
 **Generalization**: Hard thresholds feel mechanical; probabilistic skipping feels natural. The key insight is that NOT acting is sometimes the right action, and randomized restraint prevents deterministic repetition. This applies to push notifications (sometimes skip even interesting content), social media curation (don't show every relevant post), recommendation engines (leave room for serendipity), and any proactive system where frequency matters as much as relevance. A system that always speaks when it has something to say is exhausting. A system that sometimes holds back feels like a person.
+
+### P-072: Mock Relayer Pattern
+
+Cross-chain message passing simulation within single-VM Foundry tests. Capture outbound messages in a mock endpoint's outbox array, then deliver them to the destination chain's router by pranking as the endpoint. Enables full end-to-end cross-chain testing without actual LayerZero infrastructure. Key: use incrementing nonce for unique GUIDs, not block.timestamp.
+
+### P-073: GUID Uniqueness via Monotonic Nonce
+
+For replay prevention in test harnesses and production systems, monotonically incrementing nonces produce unique identifiers more reliably than timestamp-based hashing. Timestamps can collide when multiple messages are processed in the same block. This is a specialization of P-017 (Deterministic Shuffling) applied to message identification.
+
+### P-074: Newton's Method with Supply Hint (_powInverse)
+
+When computing the inverse of a PRECISION-scaled power function (finding S such that _pow(S, κ) = target), starting Newton's method from the current supply provides quadratic convergence in 5-10 iterations. Blind initial guesses (bit-length heuristic) diverge catastrophically for high exponents (κ ≥ 6) because the function's extreme non-linearity means small guess errors produce massive Newton steps. The hint transforms an intractable numerical problem into a trivial one.

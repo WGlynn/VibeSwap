@@ -201,6 +201,8 @@ contract VibeCrossChainGovernance is
 
         CrossChainProposal storage p = _proposals[proposalId];
         if (p.executed) revert ProposalAlreadyExecuted();
+        // SECURITY: Votes must be submitted before deadline — prevents post-deadline manipulation
+        require(block.timestamp <= p.deadline, "Voting period ended");
         if (!_isChainInProposal(p, chainId)) revert ChainNotInProposal();
 
         ChainVoteAggregate storage agg = _chainVotes[proposalId][chainId];

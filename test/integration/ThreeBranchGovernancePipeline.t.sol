@@ -167,10 +167,18 @@ contract ThreeBranchGovernancePipelineTest is Test {
         attestor.setGovernance(address(governance));
     }
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function _setupTrustNetwork() internal {
         // Add founders (score = 1.0, multiplier = 3.0x)
-        dag.addFounder(founder1);
-        dag.addFounder(founder2);
+        _addFounderWithTimelock(founder1);
+        _addFounderWithTimelock(founder2);
 
         // Founders vouch for each other (handshake)
         vm.prank(founder1);

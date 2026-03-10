@@ -120,6 +120,14 @@ contract RewardLedgerInvariantTest is StdInvariant, Test {
     address public carol;
     address public authorized;
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         alice = makeAddr("alice");
         bob = makeAddr("bob");
@@ -128,7 +136,7 @@ contract RewardLedgerInvariantTest is StdInvariant, Test {
 
         token = new MockRLIToken();
         dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
+        _addFounderWithTimelock(alice);
 
         // Trust chain: alice <-> bob <-> carol
         vm.prank(alice);

@@ -28,6 +28,7 @@ contract VibeLiquidStaking is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public constant PROTOCOL_FEE_BPS = 1000; // 10% of rewards
     uint256 public constant MIN_STAKE = 0.01 ether;
     uint256 public constant BUFFER_TARGET_BPS = 500;  // 5% buffer target
+    uint256 public constant HOLD_PERIOD = 1 days;     // Anti-MEV hold before unstake
 
     uint256 public totalRewardsDistributed;
     uint256 public protocolFees;
@@ -82,9 +83,11 @@ contract VibeLiquidStaking is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     /// @notice Unstake vsETH, receive ETH
+    /// @dev 1-day hold period prevents sandwich attacks on reward distribution
     function unstake(uint256 vsEthAmount) external nonReentrant {
         require(vsEthAmount > 0, "Zero amount");
         require(vsEthBalance[msg.sender] >= vsEthAmount, "Insufficient vsETH");
+        require(block.timestamp >= stakedAt[msg.sender] + HOLD_PERIOD, "Hold period active");
 
         uint256 ethToReturn = (vsEthAmount * totalPooledEth) / totalVsEth;
         require(ethToReturn <= liquidityBuffer, "Insufficient liquidity");

@@ -132,6 +132,9 @@ contract DecentralizedTribunal is
     /// @notice Maximum appeal rounds
     uint256 public maxAppeals;
 
+    /// @notice Active trial per juror (one trial at a time — prevents jury-packing)
+    mapping(address => bytes32) public activeJurorTrial;
+
     /// @notice Quorum percentage (BPS, e.g., 6000 = 60%)
     uint256 public quorumBps;
 
@@ -248,6 +251,8 @@ contract DecentralizedTribunal is
         if (msg.value < trial.jurorStake) revert InsufficientStake();
         if (trialJurors[trialId].length >= trial.jurySize) revert JuryFull();
         if (jurors[trialId][msg.sender].summoned) revert AlreadyJuror();
+        // SECURITY: One trial at a time per juror — prevents coordinated jury-packing
+        require(activeJurorTrial[msg.sender] == bytes32(0), "Already serving on another trial");
 
         // SoulboundIdentity checks for sybil resistance
         if (soulboundIdentity != address(0)) {
@@ -268,6 +273,7 @@ contract DecentralizedTribunal is
         });
 
         trialJurors[trialId].push(msg.sender);
+        activeJurorTrial[msg.sender] = trialId;
         emit JurorSummoned(trialId, msg.sender);
 
         // Auto-advance to evidence phase when jury is full
@@ -417,6 +423,10 @@ contract DecentralizedTribunal is
 
         for (uint256 i = 0; i < jurorList.length; i++) {
             Juror storage juror = jurors[trialId][jurorList[i]];
+
+            // Release juror from active trial (allows serving on next trial)
+            delete activeJurorTrial[jurorList[i]];
+
             if (!juror.voted) continue;
 
             // Jurors who voted with majority get stake back + bonus from minority

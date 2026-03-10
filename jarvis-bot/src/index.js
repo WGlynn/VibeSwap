@@ -6955,6 +6955,32 @@ async function main() {
   // Heartbeat: update every 5 minutes to prove we're alive
   setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
 
+  // Status pulse DM to owner — every 30 minutes
+  const STATUS_PULSE_INTERVAL = 30 * 60 * 1000; // 30 min
+  setInterval(async () => {
+    try {
+      const uptime = process.uptime();
+      const uptimeStr = uptime > 3600
+        ? `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`
+        : `${Math.floor(uptime / 60)}m`;
+      const mem = process.memoryUsage();
+      const memMB = Math.round(mem.rss / 1024 / 1024);
+      const provider = getProviderName();
+      const model = getModelName();
+      const degradation = checkDegradation();
+      const shardInfo = getShardInfo();
+
+      const parts = [`JARVIS pulse | up ${uptimeStr} | ${memMB}MB | ${provider}/${model}`];
+      if (degradation?.degraded) {
+        parts.push(`DEGRADED: running on ${degradation.provider} (${degradation.quality}% quality)`);
+      }
+      if (shardInfo?.peers?.length > 0) {
+        parts.push(`peers: ${shardInfo.peers.length}`);
+      }
+      await bot.telegram.sendMessage(config.ownerUserId, parts.join('\n'));
+    } catch {}
+  }, STATUS_PULSE_INTERVAL);
+
   // Graceful shutdown — save everything + mark clean shutdown
   // Hard timeout: 20s max to prevent Fly.io forced kill (30s default)
   async function gracefulShutdown(signal) {

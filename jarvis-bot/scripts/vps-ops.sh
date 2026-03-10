@@ -87,6 +87,59 @@ case "$CMD" in
     bash scripts/vps-backup.sh
     ;;
 
+  failover)
+    SUBCMD="${2:-status}"
+    case "$SUBCMD" in
+      status)
+        if [ -f /tmp/jarvis-failover.state ]; then
+          IFS='|' read -r fc sc mode < /tmp/jarvis-failover.state
+          echo "Failover state: $mode (fails=$fc, successes=$sc)"
+        else
+          echo "Failover watchdog not initialized (no state file)"
+        fi
+        echo ""
+        echo "Fly.io health:"
+        curl -s --max-time 5 https://jarvis-vibeswap.fly.dev/health 2>/dev/null | jq . 2>/dev/null || echo "  UNREACHABLE"
+        echo ""
+        echo "VPS shard-0:"
+        docker inspect -f '{{.State.Status}}' jarvis-shard-0 2>/dev/null || echo "  NOT FOUND"
+        ;;
+      install)
+        echo "Installing failover watchdog cron..."
+        chmod +x /root/vibeswap/jarvis-bot/scripts/failover-watchdog.sh
+        # Add cron entry if not already present
+        (crontab -l 2>/dev/null | grep -v failover-watchdog; echo "* * * * * /root/vibeswap/jarvis-bot/scripts/failover-watchdog.sh >> /var/log/jarvis-failover.log 2>&1") | crontab -
+        echo "Installed. Watchdog runs every minute."
+        echo "Logs: /var/log/jarvis-failover.log"
+        # Ensure VPS shard is stopped (hot standby mode)
+        echo "Stopping VPS shard-0 (standby mode)..."
+        $COMPOSE stop shard-0 2>/dev/null || true
+        echo "Done. VPS shard will auto-activate if Fly.io goes down."
+        ;;
+      uninstall)
+        echo "Removing failover watchdog cron..."
+        (crontab -l 2>/dev/null | grep -v failover-watchdog) | crontab -
+        rm -f /tmp/jarvis-failover.state
+        echo "Removed."
+        ;;
+      force-activate)
+        echo "Force-activating VPS shard..."
+        echo "0|0|active" > /tmp/jarvis-failover.state
+        $COMPOSE up -d shard-0
+        echo "VPS shard-0 is now active."
+        ;;
+      force-deactivate)
+        echo "Force-deactivating VPS shard..."
+        echo "0|0|standby" > /tmp/jarvis-failover.state
+        $COMPOSE stop shard-0
+        echo "VPS shard-0 is now in standby."
+        ;;
+      *)
+        echo "Usage: vps-ops.sh failover [status|install|uninstall|force-activate|force-deactivate]"
+        ;;
+    esac
+    ;;
+
   help|*)
     echo "JARVIS VPS Operations"
     echo ""
@@ -100,6 +153,12 @@ case "$CMD" in
     echo "  ollama [list|pull|rm]  Manage Ollama models"
     echo "  shell [container]   Shell into container (default: shard-0)"
     echo "  backup              Run manual backup now"
+    echo "  failover [cmd]      Failover watchdog management"
+    echo "    status            Show failover state + Fly.io/VPS health"
+    echo "    install           Install cron watchdog (every minute)"
+    echo "    uninstall         Remove cron watchdog"
+    echo "    force-activate    Force VPS shard on"
+    echo "    force-deactivate  Force VPS shard off"
     echo ""
     ;;
 esac

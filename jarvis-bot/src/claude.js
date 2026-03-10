@@ -735,10 +735,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
   const hasMedia = latestMessage && Array.isArray(latestMessage.content) &&
     latestMessage.content.some(b => b.type === 'image' || b.type === 'document');
 
-  // Light context for simple/moderate messages — skip expensive context building
-  const isLightContext = (complexity === 'simple' || complexity === 'moderate')
-    && chatType !== 'private' // DMs always get full context (user expects depth)
-    && !hasMedia; // Multimodal always gets full context
+  // Light context DISABLED — Jarvis was hallucinating in groups without full docs.
+  // "You have the docs idk why you're asking me bro" — Will
+  // Better to be slow and correct than fast and wrong.
+  // TODO: Revisit when we have proper doc-aware light tier.
+  const isLightContext = false;
 
   if (isLightContext) {
     console.log(`[context-tier] LIGHT — "${messageText.slice(0, 40)}" (${complexity})`);

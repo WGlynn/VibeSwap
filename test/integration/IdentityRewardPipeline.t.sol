@@ -33,6 +33,14 @@ contract IdentityRewardPipelineTest is Test {
     address charlie = makeAddr("charlie");
     address dave = makeAddr("dave");
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         // 1. Deploy reward token
         rewardToken = new RewardToken();
@@ -68,8 +76,8 @@ contract IdentityRewardPipelineTest is Test {
         vibeCode.setAuthorizedSource(owner, true);
         shapley.setAuthorizedCreator(owner, true);
 
-        // Add alice as founder
-        dag.addFounder(alice);
+        // Add alice as founder (with timelock)
+        _addFounderWithTimelock(alice);
 
         // Fund the ledger with reward tokens for claim payouts
         rewardToken.mint(address(ledger), 10_000 ether);

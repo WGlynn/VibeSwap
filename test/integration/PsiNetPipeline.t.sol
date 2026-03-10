@@ -475,7 +475,12 @@ contract PsiNetPipelineTest is Test {
         address newOperator = makeAddr("newOperator");
 
         vm.prank(operator1);
-        agentRegistry.transferOperator(jarvisId, newOperator);
+        agentRegistry.queueOperatorTransfer(jarvisId, newOperator);
+
+        vm.warp(block.timestamp + agentRegistry.OPERATOR_TRANSFER_TIMELOCK() + 1);
+
+        vm.prank(operator1);
+        agentRegistry.executeOperatorTransfer(jarvisId);
 
         IAgentRegistry.AgentIdentity memory jarvis = agentRegistry.getAgent(jarvisId);
         assertEq(jarvis.operator, newOperator, "Operator should be transferred");

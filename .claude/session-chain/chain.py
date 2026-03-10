@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 """
-Session Blockchain — Jarvis × Will
+Session Blockchain — Jarvis x Will
 Hash-linked chain of every prompt-response pair across all code sessions.
 Each block is SHA-256 linked to the previous. Tamper-evident. Searchable. Permanent.
 
+Sub-blocks (checkpoints) capture work-in-progress so crashes don't lose context.
+They merge into the final block on finalize, but survive independently if interrupted.
+
 Usage:
     python chain.py append --session 053 --prompt "..." --response "..." [--artifacts "file1,file2"] [--tags "tag1,tag2"]
+    python chain.py checkpoint --task "refactoring VibeSwapCore" --progress "split _executeOrders into 8 functions" [--files "file1,file2"]
+    python chain.py finalize --prompt "..." --response "..." [--tags "tag1,tag2"]
+    python chain.py pending
     python chain.py verify
     python chain.py view [--last N]
     python chain.py search "keyword"
@@ -25,6 +31,7 @@ from datetime import datetime, timezone
 CHAIN_DIR = os.path.dirname(os.path.abspath(__file__))
 CHAIN_FILE = os.path.join(CHAIN_DIR, "chain.json")
 CHAIN_MD = os.path.join(CHAIN_DIR, "chain.md")
+PENDING_FILE = os.path.join(CHAIN_DIR, "pending.json")
 GENESIS_MESSAGE = "In the era before the Avatar, we bent not the elements, but the energy within ourselves."
 
 # ============ Block Operations ============
@@ -97,6 +104,98 @@ def save_chain(chain: list):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(chain, f, indent=2, ensure_ascii=False)
     os.replace(tmp, CHAIN_FILE)
+
+
+# ============ Sub-Block (Checkpoint) Operations ============
+
+def load_pending() -> list:
+    """Load pending sub-blocks. Returns empty list if none."""
+    if not os.path.exists(PENDING_FILE):
+        return []
+    with open(PENDING_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_pending(pending: list):
+    """Atomic write of pending sub-blocks."""
+    tmp = PENDING_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(pending, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, PENDING_FILE)
+
+
+def clear_pending():
+    """Remove pending file after finalization."""
+    if os.path.exists(PENDING_FILE):
+        os.remove(PENDING_FILE)
+
+
+def create_checkpoint(chain: list, pending: list, task: str, progress: str,
+                      files: list = None) -> dict:
+    """Create a sub-block checkpoint for work-in-progress.
+
+    Sub-blocks chain off the last main block's hash but also link to prior sub-blocks.
+    This creates a recoverable WAL (Write-Ahead Log) for cognitive state.
+    """
+    parent_hash = chain[-1]["hash"]
+    sub_index = len(pending)
+    prev_sub_hash = pending[-1]["sub_hash"] if pending else "0" * 64
+
+    sub_block = {
+        "sub_index": sub_index,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "parent_block": chain[-1]["index"],
+        "parent_hash": parent_hash,
+        "prev_sub_hash": prev_sub_hash,
+        "task": task,
+        "progress": progress,
+        "files_touched": files or [],
+        "status": "in_progress",
+    }
+
+    # Hash the sub-block
+    canonical = {
+        "sub_index": sub_block["sub_index"],
+        "timestamp": sub_block["timestamp"],
+        "parent_hash": sub_block["parent_hash"],
+        "prev_sub_hash": sub_block["prev_sub_hash"],
+        "task": sub_block["task"],
+        "progress": sub_block["progress"],
+        "files_touched": sub_block["files_touched"],
+    }
+    raw = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    sub_block["sub_hash"] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    return sub_block
+
+
+def finalize_pending(chain: list, pending: list, session_id: str,
+                     prompt: str, response: str, tags: list = None) -> dict:
+    """Merge all pending sub-blocks into a single main block.
+
+    The sub-block history is preserved in the block's 'checkpoints' field,
+    creating an audit trail of work-in-progress that led to this block.
+    """
+    # Collect all checkpoint data
+    checkpoint_summary = []
+    all_files = []
+    for sub in pending:
+        checkpoint_summary.append(f"[{sub['timestamp'][:19]}] {sub['task']}: {sub['progress']}")
+        all_files.extend(sub.get("files_touched", []))
+
+    # Deduplicate files
+    all_files = list(dict.fromkeys(all_files))
+
+    # Build the merged response
+    merged_response = response
+    if checkpoint_summary:
+        merged_response += "\n\n--- Checkpoints ---\n" + "\n".join(checkpoint_summary)
+
+    block = create_block(chain, session_id, prompt, merged_response, all_files, tags)
+    block["checkpoint_count"] = len(pending)
+    block["checkpoint_hashes"] = [s["sub_hash"][:16] for s in pending]
+
+    return block
 
 
 # ============ Verification ============
@@ -263,6 +362,88 @@ def main():
 
         print(f"Block {block['index']} appended. Hash: {block['hash'][:16]}...")
         print(f"Chain length: {len(chain)}")
+
+    elif cmd == "checkpoint":
+        args = {}
+        i = 2
+        while i < len(sys.argv):
+            if sys.argv[i].startswith("--") and i + 1 < len(sys.argv):
+                key = sys.argv[i][2:]
+                val = sys.argv[i + 1]
+                args[key] = val
+                i += 2
+            else:
+                i += 1
+
+        task = args.get("task", "")
+        progress = args.get("progress", "")
+        files = [f.strip() for f in args.get("files", "").split(",") if f.strip()]
+
+        if not task or not progress:
+            print("ERROR: --task and --progress are required")
+            sys.exit(1)
+
+        pending = load_pending()
+        sub = create_checkpoint(chain, pending, task, progress, files)
+        pending.append(sub)
+        save_pending(pending)
+
+        print(f"Checkpoint {sub['sub_index']} saved. Sub-hash: {sub['sub_hash'][:16]}...")
+        print(f"Parent block: {sub['parent_block']} | Pending checkpoints: {len(pending)}")
+
+    elif cmd == "finalize":
+        pending = load_pending()
+        if not pending:
+            print("No pending checkpoints to finalize. Use 'append' for direct blocks.")
+            sys.exit(0)
+
+        args = {}
+        i = 2
+        while i < len(sys.argv):
+            if sys.argv[i].startswith("--") and i + 1 < len(sys.argv):
+                key = sys.argv[i][2:]
+                val = sys.argv[i + 1]
+                args[key] = val
+                i += 2
+            else:
+                i += 1
+
+        session_id = args.get("session", "???")
+        prompt = args.get("prompt", "")
+        response = args.get("response", "")
+        tags = [t.strip() for t in args.get("tags", "").split(",") if t.strip()]
+
+        if not prompt or not response:
+            print("ERROR: --prompt and --response are required")
+            sys.exit(1)
+
+        block = finalize_pending(chain, pending, session_id, prompt, response, tags)
+        chain.append(block)
+        save_chain(chain)
+        clear_pending()
+
+        # Auto-export markdown
+        md = export_markdown(chain)
+        with open(CHAIN_MD, "w", encoding="utf-8") as f:
+            f.write(md)
+
+        print(f"Block {block['index']} finalized with {block['checkpoint_count']} checkpoints merged.")
+        print(f"Hash: {block['hash'][:16]}... | Chain length: {len(chain)}")
+
+    elif cmd == "pending":
+        pending = load_pending()
+        if not pending:
+            print("No pending checkpoints.")
+        else:
+            print(f"Pending checkpoints: {len(pending)} (parent block: {pending[0]['parent_block']})\n")
+            for sub in pending:
+                ts = sub["timestamp"][:19].replace("T", " ")
+                print(f"  [{sub['sub_index']}] {ts} | {sub['sub_hash'][:12]}...")
+                print(f"      Task: {sub['task']}")
+                print(f"      Progress: {sub['progress']}")
+                if sub.get("files_touched"):
+                    print(f"      Files: {', '.join(sub['files_touched'])}")
+                print()
 
     elif cmd == "verify":
         valid, msg = verify_chain(chain)

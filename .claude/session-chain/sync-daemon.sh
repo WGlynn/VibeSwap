@@ -34,7 +34,7 @@ sync_chain() {
     cd "$REPO_DIR" || return 1
 
     # Check if chain files have changed
-    if git diff --quiet .claude/session-chain/chain.json .claude/session-chain/chain.md 2>/dev/null; then
+    if git diff --quiet .claude/session-chain/chain.json .claude/session-chain/chain.md .claude/session-chain/pending.json 2>/dev/null; then
         # Also check untracked
         UNTRACKED=$(git ls-files --others --exclude-standard .claude/session-chain/ 2>/dev/null)
         if [ -z "$UNTRACKED" ]; then
@@ -42,8 +42,9 @@ sync_chain() {
         fi
     fi
 
-    # Stage chain files only
+    # Stage chain files + pending checkpoints
     git add .claude/session-chain/chain.json .claude/session-chain/chain.md 2>/dev/null
+    git add .claude/session-chain/pending.json 2>/dev/null  # May not exist — that's fine
 
     # Commit with block count
     BLOCK_COUNT=$(python .claude/session-chain/chain.py stats 2>/dev/null | head -1 | grep -o '[0-9]*' | head -1)

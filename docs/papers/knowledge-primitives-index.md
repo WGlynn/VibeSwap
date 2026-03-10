@@ -1061,3 +1061,11 @@ For replay prevention in test harnesses and production systems, monotonically in
 ### P-074: Newton's Method with Supply Hint (_powInverse)
 
 When computing the inverse of a PRECISION-scaled power function (finding S such that _pow(S, κ) = target), starting Newton's method from the current supply provides quadratic convergence in 5-10 iterations. Blind initial guesses (bit-length heuristic) diverge catastrophically for high exponents (κ ≥ 6) because the function's extreme non-linearity means small guess errors produce massive Newton steps. The hint transforms an intractable numerical problem into a trivial one.
+
+### P-075: Optional Wiring with Backwards Compatibility
+
+**Source**: ConvictionGovernance.sol (executeProposal)
+
+> When composing contracts (e.g., governance → bonding curve), make the integration optional: check `if (address(bondingCurve) != address(0))` before calling. This lets the contract function independently (just marks EXECUTED) or as part of the composed system (allocates from ABC funding pool). New features don't break existing deployments. The pattern generalizes to any "hook" point: optional external calls guarded by null-address checks, preserving the contract's standalone semantics.
+
+**Generalization**: Composition should be additive, not mandatory. A contract that only works when wired to three other contracts is fragile. A contract that works alone and gets enhanced when composed is robust. This is the Unix philosophy applied to smart contracts: do one thing well, compose optionally.

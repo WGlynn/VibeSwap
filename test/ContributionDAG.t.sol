@@ -47,11 +47,25 @@ contract ContributionDAGTest is Test {
         // Deploy without soulbound check (address(0) disables it)
         dag = new ContributionDAG(address(0));
 
-        // Add alice as founder
-        dag.addFounder(alice);
+        // Add alice as founder via timelock
+        _addFounder(alice);
     }
 
     // ============ Helpers ============
+
+    /// @dev Queue + warp + execute founder addition (bypasses 7-day timelock in tests)
+    function _addFounder(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
+    /// @dev Queue + warp + execute founder removal
+    function _removeFounder(address founder) internal {
+        uint256 changeId = dag.queueRemoveFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
 
     /// @dev Create a bidirectional handshake between two users
     function _handshake(address a, address b) internal {
@@ -74,7 +88,7 @@ contract ContributionDAGTest is Test {
     // ============ Founder Tests ============
 
     function test_addFounder_success() public {
-        dag.addFounder(bob);
+        _addFounder(bob);
         assertTrue(dag.isFounder(bob));
 
         address[] memory founders = dag.getFounders();
@@ -82,41 +96,66 @@ contract ContributionDAGTest is Test {
     }
 
     function test_addFounder_emitsEvent() public {
+        uint256 changeId = dag.queueAddFounder(bob);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
         vm.expectEmit(true, false, false, false);
         emit FounderAdded(bob);
-        dag.addFounder(bob);
+        dag.executeFounderChange(changeId);
     }
 
     function test_addFounder_duplicate_reverts() public {
+        // Queue adding alice again — she's already a founder
+        uint256 changeId = dag.queueAddFounder(alice);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
         vm.expectRevert(IContributionDAG.AlreadyFounder.selector);
-        dag.addFounder(alice); // already added in setUp
+        dag.executeFounderChange(changeId);
     }
 
     function test_addFounder_onlyOwner_reverts() public {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", alice));
-        dag.addFounder(bob);
+        dag.queueAddFounder(bob);
     }
 
     function test_removeFounder_success() public {
-        dag.removeFounder(alice);
+        _removeFounder(alice);
         assertFalse(dag.isFounder(alice));
         assertEq(dag.getFounders().length, 0);
     }
 
     function test_removeFounder_notFounder_reverts() public {
+        uint256 changeId = dag.queueRemoveFounder(bob);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
         vm.expectRevert(IContributionDAG.NotFounder.selector);
-        dag.removeFounder(bob);
+        dag.executeFounderChange(changeId);
     }
 
     function test_addFounder_maxFounders_reverts() public {
         // Add 19 more founders (alice is already 1)
         for (uint256 i = 1; i < 20; i++) {
-            dag.addFounder(address(uint160(1000 + i)));
+            _addFounder(address(uint160(1000 + i)));
         }
         // 21st should revert
+        uint256 changeId = dag.queueAddFounder(address(uint160(9999)));
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
         vm.expectRevert(IContributionDAG.MaxFoundersReached.selector);
-        dag.addFounder(address(uint160(9999)));
+        dag.executeFounderChange(changeId);
+    }
+
+    function test_founderChange_beforeTimelock_reverts() public {
+        uint256 changeId = dag.queueAddFounder(bob);
+        // Don't warp — try to execute immediately
+        vm.expectRevert("Timelock not expired");
+        dag.executeFounderChange(changeId);
+    }
+
+    function test_founderChange_cancel() public {
+        uint256 changeId = dag.queueAddFounder(bob);
+        dag.cancelFounderChange(changeId);
+        // After cancel, execution should revert
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        vm.expectRevert("Already executed or cancelled");
+        dag.executeFounderChange(changeId);
     }
 
     // ============ Vouch Tests ============
@@ -393,13 +432,13 @@ contract ContributionDAGTest is Test {
     }
 
     function test_referralQuality_withUntrustedReferrals() public {
-        // alice vouches for bob (no handshake, bob untrusted → score 0)
+        // alice vouches for bob (no handshake, bob untrusted -> score 0)
         vm.prank(alice);
         dag.addVouch(bob, bytes32(0));
         dag.recalculateTrustScores();
 
         (uint256 score, uint256 penalty) = dag.calculateReferralQuality(alice);
-        // bob has score 0 < 0.2, so 1/1 bad referrals → ratio=1.0 → penalty=0.5
+        // bob has score 0 < 0.2, so 1/1 bad referrals -> ratio=1.0 -> penalty=0.5
         assertEq(penalty, 5e17);
         assertEq(score, 5e17);
     }
@@ -417,7 +456,7 @@ contract ContributionDAGTest is Test {
         _handshake(alice, bob);
 
         (uint256 score, uint256 penalty) = dag.calculateDiversityScore(bob);
-        // Only 1 voucher (alice), and it's mutual → diversity=0, insularity=1.0
+        // Only 1 voucher (alice), and it's mutual -> diversity=0, insularity=1.0
         // penalty = (1.0 - 0.8) * 2 = 0.4
         assertEq(penalty, 4e17);
         assertEq(score, 6e17);
@@ -429,7 +468,7 @@ contract ContributionDAGTest is Test {
         dag.addVouch(bob, bytes32(0));
 
         (uint256 score, uint256 penalty) = dag.calculateDiversityScore(bob);
-        // 1 voucher, all inward → diversity = 1.0, insularity = 0 → no penalty
+        // 1 voucher, all inward -> diversity = 1.0, insularity = 0 -> no penalty
         assertEq(penalty, 0);
         assertEq(score, 1e18);
     }
@@ -440,7 +479,9 @@ contract ContributionDAGTest is Test {
         soulbound = new MockSoulbound();
 
         ContributionDAG dagWithSB = new ContributionDAG(address(soulbound));
-        dagWithSB.addFounder(alice);
+        uint256 changeId = dagWithSB.queueAddFounder(alice);
+        vm.warp(block.timestamp + dagWithSB.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dagWithSB.executeFounderChange(changeId);
 
         // alice has no identity
         vm.prank(alice);
@@ -453,7 +494,9 @@ contract ContributionDAGTest is Test {
         soulbound.setHasIdentity(alice, true);
 
         ContributionDAG dagWithSB = new ContributionDAG(address(soulbound));
-        dagWithSB.addFounder(alice);
+        uint256 changeId = dagWithSB.queueAddFounder(alice);
+        vm.warp(block.timestamp + dagWithSB.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dagWithSB.executeFounderChange(changeId);
 
         vm.prank(alice);
         dagWithSB.addVouch(bob, bytes32(0)); // should succeed

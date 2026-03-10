@@ -277,12 +277,19 @@ contract AgentRegistryTest is Test {
 
     // ============ Operator Transfer ============
 
+    function _queueAndExecuteTransfer(uint256 agentId, address fromOp, address newOp) internal {
+        vm.prank(fromOp);
+        registry.queueOperatorTransfer(agentId, newOp);
+        vm.warp(block.timestamp + registry.OPERATOR_TRANSFER_TIMELOCK() + 1);
+        vm.prank(fromOp);
+        registry.executeOperatorTransfer(agentId);
+    }
+
     function test_transferOperator_happyPath() public {
         uint256 agentId = _registerJarvis();
         address newOp = makeAddr("newOperator");
 
-        vm.prank(operator1);
-        registry.transferOperator(agentId, newOp);
+        _queueAndExecuteTransfer(agentId, operator1, newOp);
 
         IAgentRegistry.AgentIdentity memory agent = registry.getAgent(agentId);
         assertEq(agent.operator, newOp);
@@ -297,9 +304,13 @@ contract AgentRegistryTest is Test {
         address newOp = makeAddr("newOperator");
 
         vm.prank(operator1);
+        registry.queueOperatorTransfer(agentId, newOp);
+        vm.warp(block.timestamp + registry.OPERATOR_TRANSFER_TIMELOCK() + 1);
+
+        vm.prank(operator1);
         vm.expectEmit(true, true, true, true);
         emit AgentOperatorChanged(agentId, operator1, newOp);
-        registry.transferOperator(agentId, newOp);
+        registry.executeOperatorTransfer(agentId);
     }
 
     function test_transferOperator_setsStatusActive() public {
@@ -311,8 +322,7 @@ contract AgentRegistryTest is Test {
 
         // Transfer resets to ACTIVE
         address newOp = makeAddr("newOperator");
-        vm.prank(operator1);
-        registry.transferOperator(agentId, newOp);
+        _queueAndExecuteTransfer(agentId, operator1, newOp);
 
         IAgentRegistry.AgentIdentity memory agent = registry.getAgent(agentId);
         assertEq(uint256(agent.status), uint256(IAgentRegistry.AgentStatus.ACTIVE));
@@ -323,7 +333,7 @@ contract AgentRegistryTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(IAgentRegistry.NotAgentOperator.selector);
-        registry.transferOperator(agentId, alice);
+        registry.queueOperatorTransfer(agentId, alice);
     }
 
     function test_transferOperator_toExistingOperator_reverts() public {
@@ -332,7 +342,7 @@ contract AgentRegistryTest is Test {
 
         vm.prank(operator1);
         vm.expectRevert(IAgentRegistry.AgentAlreadyExists.selector);
-        registry.transferOperator(1, operator2);
+        registry.queueOperatorTransfer(1, operator2);
     }
 
     function test_transferOperator_toZeroAddress_reverts() public {
@@ -340,13 +350,13 @@ contract AgentRegistryTest is Test {
 
         vm.prank(operator1);
         vm.expectRevert(IAgentRegistry.ZeroAddress.selector);
-        registry.transferOperator(agentId, address(0));
+        registry.queueOperatorTransfer(agentId, address(0));
     }
 
     function test_transferOperator_nonExistentAgent_reverts() public {
         vm.prank(operator1);
         vm.expectRevert(IAgentRegistry.AgentNotFound.selector);
-        registry.transferOperator(999, operator2);
+        registry.queueOperatorTransfer(999, operator2);
     }
 
     // ============ Status Management ============
@@ -1310,8 +1320,7 @@ contract AgentRegistryTest is Test {
         uint256 agentId = _registerJarvis();
         address newOp = makeAddr("newOp");
 
-        vm.prank(operator1);
-        registry.transferOperator(agentId, newOp);
+        _queueAndExecuteTransfer(agentId, operator1, newOp);
 
         assertFalse(registry.isAgent(operator1));
         assertTrue(registry.isAgent(newOp));

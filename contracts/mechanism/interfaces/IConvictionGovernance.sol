@@ -65,6 +65,7 @@ interface IConvictionGovernance {
 
     event ProposalPassed(uint256 indexed proposalId, uint256 conviction, uint256 threshold);
     event ProposalExecuted(uint256 indexed proposalId);
+    event ProposalFunded(uint256 indexed proposalId, uint256 fundingAmount, uint256 tokensMinted, address beneficiary);
     event ProposalExpired(uint256 indexed proposalId);
     event ProposalRejected(uint256 indexed proposalId);
 
@@ -88,6 +89,8 @@ interface IConvictionGovernance {
     error ThresholdNotMet();
     error InsufficientBalance();
     error NotResolver();
+    error NoBondingCurve();
+    error FundingInsufficient();
 
     // ============ Core Functions ============
 

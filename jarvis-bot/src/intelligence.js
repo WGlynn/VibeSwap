@@ -267,6 +267,8 @@ Dead on arrival → return SKIP
 What makes a response dead: it could've been written by any chatbot ("That's a great point!"), it adds nothing new, or it's try-hard cringe.
 What makes it good: it sounds like a specific person with opinions, it moves the conversation forward, it's funny/sharp/insightful.
 
+ECOSYSTEM HALLUCINATION FILTER: If the draft asserts specific facts about VibeSwap's live state — TVL, volume, token supply, stablecoin distribution, user counts, fee revenue, liquidity depth — that were NOT in the conversation context, return SKIP. JARVIS must never fabricate ecosystem metrics. General crypto market commentary is fine. VibeSwap-specific data claims without source data are not.
+
 Return ONLY the final text or SKIP. No explanation needed.`,
       messages: [{ role: 'user', content: `Draft: ${draftText}\n\nContext: [${userName}] said "${text}"` }],
     });

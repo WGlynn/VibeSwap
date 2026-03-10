@@ -44,6 +44,14 @@ contract GitHubContributionTrackerTest is Test {
     bytes32 constant REPO_HASH = keccak256("vibeswap/vibeswap");
     bytes32 constant EVIDENCE_HASH = keccak256("ipfs:QmExampleHash");
 
+    // ============ Timelock Helpers ============
+
+    function _addFounderWithTimelock(address founder) internal {
+        uint256 changeId = dag.queueAddFounder(founder);
+        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        dag.executeFounderChange(changeId);
+    }
+
     function setUp() public {
         owner = address(this);
         alice = makeAddr("alice");
@@ -56,7 +64,7 @@ contract GitHubContributionTrackerTest is Test {
         // Deploy dependencies
         token = new MockToken();
         dag = new ContributionDAG(address(0));
-        dag.addFounder(alice);
+        _addFounderWithTimelock(alice);
 
         ledger = new RewardLedger(address(token), address(dag));
         token.mint(address(ledger), 1_000_000e18);

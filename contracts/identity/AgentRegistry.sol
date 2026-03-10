@@ -67,6 +67,14 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
     // Authorization
     mapping(address => bool) public authorizedRecorders;
 
+    // Timelock for operator transfers (prevents instant identity theft)
+    uint256 public constant OPERATOR_TRANSFER_TIMELOCK = 2 days;
+    struct PendingTransfer {
+        address newOperator;
+        uint256 executeAfter;
+    }
+    mapping(uint256 => PendingTransfer) public pendingOperatorTransfers;
+
     // ============ Initializer ============
 
     function initialize() external initializer {
@@ -131,19 +139,43 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
         emit AgentRegistered(agentId, name, platform, operator, msg.sender);
     }
 
-    /// @inheritdoc IAgentRegistry
-    function transferOperator(uint256 agentId, address newOperator) external onlyOperator(agentId) {
+    /// @notice Queue an operator transfer (2-day timelock for security)
+    function queueOperatorTransfer(uint256 agentId, address newOperator) external onlyOperator(agentId) {
         if (newOperator == address(0)) revert ZeroAddress();
         if (operatorToAgentId[newOperator] != 0) revert AgentAlreadyExists();
 
+        pendingOperatorTransfers[agentId] = PendingTransfer({
+            newOperator: newOperator,
+            executeAfter: block.timestamp + OPERATOR_TRANSFER_TIMELOCK
+        });
+
+        emit AgentOperatorTransferQueued(agentId, _agents[agentId].operator, newOperator, block.timestamp + OPERATOR_TRANSFER_TIMELOCK);
+    }
+
+    /// @notice Execute a queued operator transfer after timelock
+    function executeOperatorTransfer(uint256 agentId) external onlyOperator(agentId) {
+        PendingTransfer memory transfer = pendingOperatorTransfers[agentId];
+        require(transfer.newOperator != address(0), "No pending transfer");
+        require(block.timestamp >= transfer.executeAfter, "Timelock active");
+        if (operatorToAgentId[transfer.newOperator] != 0) revert AgentAlreadyExists();
+
         address oldOperator = _agents[agentId].operator;
         delete operatorToAgentId[oldOperator];
-        operatorToAgentId[newOperator] = agentId;
-        _agents[agentId].operator = newOperator;
+        operatorToAgentId[transfer.newOperator] = agentId;
+        _agents[agentId].operator = transfer.newOperator;
         _agents[agentId].status = AgentStatus.ACTIVE;
+        delete pendingOperatorTransfers[agentId];
 
-        emit AgentOperatorChanged(agentId, oldOperator, newOperator);
+        emit AgentOperatorChanged(agentId, oldOperator, transfer.newOperator);
     }
+
+    /// @notice Cancel a pending operator transfer
+    function cancelOperatorTransfer(uint256 agentId) external onlyOperator(agentId) {
+        require(pendingOperatorTransfers[agentId].newOperator != address(0), "No pending transfer");
+        delete pendingOperatorTransfers[agentId];
+    }
+
+    event AgentOperatorTransferQueued(uint256 indexed agentId, address oldOperator, address newOperator, uint256 executeAfter);
 
     /// @inheritdoc IAgentRegistry
     function setAgentStatus(uint256 agentId, AgentStatus status) external {

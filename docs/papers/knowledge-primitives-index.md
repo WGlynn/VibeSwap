@@ -1069,3 +1069,18 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 > When composing contracts (e.g., governance → bonding curve), make the integration optional: check `if (address(bondingCurve) != address(0))` before calling. This lets the contract function independently (just marks EXECUTED) or as part of the composed system (allocates from ABC funding pool). New features don't break existing deployments. The pattern generalizes to any "hook" point: optional external calls guarded by null-address checks, preserving the contract's standalone semantics.
 
 **Generalization**: Composition should be additive, not mandatory. A contract that only works when wired to three other contracts is fragile. A contract that works alone and gets enhanced when composed is robust. This is the Unix philosophy applied to smart contracts: do one thing well, compose optionally.
+
+### P-076: Liquid Derivatives of Locked Assets
+
+**Source**: VibeLiquidStaking.sol, ConvictionGovernance.sol, NervosDAO
+
+> Wherever capital gets locked — staking, governance voting, liquidity provision, unbonding queues — ask "can we issue a liquid derivative?" Stake ETH → get stVIBE. Lock JUL for conviction → get lsJUL. LP Token A+B → VibeLP. Every lock creates dead capital; every liquid derivative resurrects it. The derivative holder retains economic exposure to the locked position while regaining composability.
+
+**Instances**:
+- VibeLiquidStaking: ETH/VIBE → stVIBE (staking derivative)
+- VibeAMM: Token pairs → VibeLP (liquidity derivative)
+- NervosDAO: CKB → liquid NervosDAO receipts (CKB ecosystem precedent)
+- ConvictionGovernance: JUL locked for voting → lsJUL (proposed, not yet built)
+- Withdrawal queues: pending claims → transferable claim tokens (proposed)
+
+**Generalization**: Capital efficiency compounds. A liquid derivative lets the underlying earn in one context (staking rewards, governance weight) while the derivative earns in another (DeFi lending, collateral). The pattern is recursive — a liquid derivative can itself be locked and derivatized. The limit is trust: each layer adds a trust assumption about the derivative's backing.

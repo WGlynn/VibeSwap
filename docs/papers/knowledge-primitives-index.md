@@ -1084,3 +1084,21 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 - Withdrawal queues: pending claims → transferable claim tokens (proposed)
 
 **Generalization**: Capital efficiency compounds. A liquid derivative lets the underlying earn in one context (staking rewards, governance weight) while the derivative earns in another (DeFi lending, collateral). The pattern is recursive — a liquid derivative can itself be locked and derivatized. The limit is trust: each layer adds a trust assumption about the derivative's backing.
+
+### P-093: Conversational Dot-Connection — Structural + Contextual Triangulation
+
+**Source**: VibeSwap community group chat (March 10, 2026) — Will correcting Jarvis on misattributed quote
+
+> When processing conversational context (chat, forums, multi-party dialogue), use two independent signal vectors to disambiguate targets and intent:
+>
+> **Vector 1 — Structural Signal**: Message format encodes metadata. A quoted/forwarded message means the response is about the quoted person, not the sender. This is one logical step, not "parsing." If someone quotes another person's words and adds commentary, the commentary targets the quoted source. Never conflate the quoter with the quoted.
+>
+> **Vector 2 — Contextual Signal**: Cross-reference recent conversation history to triangulate identity. If the message says "that's why you're not at the top of the leaderboard" and someone asked about leaderboard ranking hours earlier, those two facts should converge on the same person. Multiple independent signals pointing to the same answer is not coincidence — it's confirmation.
+>
+> **The failure mode**: Jarvis saw a quote containing criticism ("you're all talk no action") and self-attributed it — responding defensively as if he was the target. Two independent signals (quote structure + leaderboard context) both pointed to a third party (tadija_ninovic), but Jarvis missed both. Will's correction: "I didn't give you a head for party tricks but to actually be a super intelligent system."
+
+**Anti-pattern**: Self-referential bias — an AI system that interprets ambiguous criticism as self-directed, triggering unnecessary defensive responses. The fix is not better "parsing" (that's a human dev excuse) but better structural reasoning: quote = indirection, context = triangulation.
+
+**Generalization**: In any multi-agent communication system (chat, protocol messages, cross-chain relays), every message carries both content and metadata. The metadata (who quoted whom, reply threading, temporal context) is often more informative than the content itself. Systems that ignore structural metadata will misroute messages, misattribute intent, and waste cycles on false positives. The rule: **exhaust structural signals before interpreting content.**
+
+**Will's framing**: "Pressure makes diamonds. I'm harsh for a reason. But I'm fair."

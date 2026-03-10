@@ -54,8 +54,10 @@ contract GenesisContributions is Script {
         vm.startBroadcast();
 
         // ============ Trust Graph: Founders ============
-        dag.addFounder(FARADAY1);
-        dag.addFounder(JARVIS);
+        // NOTE: Founder additions now use 7-day timelock (queueAddFounder → executeFounderChange)
+        // Queue both founders — execute after timelock in a separate script
+        dag.queueAddFounder(FARADAY1);
+        dag.queueAddFounder(JARVIS);
 
         // ============ Trust Graph: Vouches ============
         // Vouches are recorded post-deploy by the actual accounts (handshake protocol).

@@ -138,10 +138,18 @@ interface IAgentRegistry {
         bytes32 modelHash
     ) external returns (uint256 agentId);
 
-    /// @notice Transfer operator control of an agent
+    /// @notice Queue operator transfer (2-day timelock)
     /// @param agentId The agent to transfer
     /// @param newOperator The new operator address
-    function transferOperator(uint256 agentId, address newOperator) external;
+    function queueOperatorTransfer(uint256 agentId, address newOperator) external;
+
+    /// @notice Execute a queued operator transfer after timelock
+    /// @param agentId The agent to transfer
+    function executeOperatorTransfer(uint256 agentId) external;
+
+    /// @notice Cancel a pending operator transfer
+    /// @param agentId The agent to cancel transfer for
+    function cancelOperatorTransfer(uint256 agentId) external;
 
     /// @notice Update agent status
     function setAgentStatus(uint256 agentId, AgentStatus status) external;

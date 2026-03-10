@@ -199,6 +199,7 @@ try {
   getDominanceEdu = stubFn('dominance'); getBitcoinEpoch = stubFn('epoch');
 }
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
+import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -1086,7 +1087,10 @@ bot.command('whoami', (ctx) => {
   const blessingInfo = entry
     ? `\nBlessed by: ${entry.blessedBy === 'owner' ? 'Will (owner)' : entry.blessedBy}\nBlessing depth: ${entry.depth}`
     : '';
-  ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}${blessingInfo}`);
+  const chatInfo = ctx.chat.type !== 'private'
+    ? `\nChat ID: ${ctx.chat.id}\nChat: ${ctx.chat.title || 'unnamed'}\nDirective: ${getChatMode(ctx.chat.id)}`
+    : '';
+  ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}${blessingInfo}${chatInfo}`);
 });
 
 // /authorize — Owner or trusted authorizers can add a user (direct authority)
@@ -2291,6 +2295,32 @@ bot.command('proactive', async (ctx) => {
     const status = getProactiveStatus();
     const lines = status.activeActions.map(a => `  ${a.name}: last ${a.lastRun}, next ${a.nextRun}`);
     ctx.reply(`Proactive: ${status.enabled ? 'ON' : 'OFF'}\nActions:\n${lines.join('\n') || '  none'}\nTotal actions: ${status.totalActions}`);
+  }
+});
+
+// ============ Runtime Directives ============
+
+bot.command('directive', async (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (!sub || sub === 'status') {
+    const mode = getChatMode(ctx.chat.id);
+    const dir = getDirective(ctx.chat.id);
+    if (dir) {
+      ctx.reply(`This chat: ${mode}\nSet by: ${dir.setBy.username}\nAt: ${dir.setAt}\nReason: "${dir.reason}"`);
+    } else if (mode !== 'normal') {
+      ctx.reply(`This chat: ${mode} (set via environment config)`);
+    } else {
+      ctx.reply('This chat: normal (full engagement)');
+    }
+  } else if (sub === 'list') {
+    ctx.reply(listDirectives());
+  } else if (['normal', 'tag-only', 'quiet'].includes(sub)) {
+    setDirective(ctx.chat.id, sub, ctx.from, `/directive ${sub}`);
+    ctx.reply(getAcknowledgment(sub));
+  } else {
+    ctx.reply('Usage:\n  /directive — show current mode\n  /directive list — all active directives\n  /directive normal|tag-only|quiet — set mode');
   }
 });
 
@@ -4927,10 +4957,10 @@ bot.on('text', async (ctx) => {
   const xpResult = awardXP(ctx.from.id, msgUserName, xpAction);
   // Only announce significant level-ups (every 5 levels) and non-trivial achievements
   const SILENT_ACHIEVEMENTS = new Set(['first_message', 'xp_1000']); // Too easy / spammy
-  if (xpResult.leveledUp && xpResult.newLevel % 5 === 0) {
+  if (xpResult.leveledUp && xpResult.newLevel % 5 === 0 && !shouldSuppress(ctx.chat.id, 'xp')) {
     ctx.reply(`${msgUserName} hit Level ${xpResult.newLevel}!`).catch(() => {});
   }
-  if (xpResult.newAchievements?.length > 0) {
+  if (xpResult.newAchievements?.length > 0 && !shouldSuppress(ctx.chat.id, 'xp')) {
     for (const ach of xpResult.newAchievements) {
       if (!SILENT_ACHIEVEMENTS.has(ach.id)) {
         ctx.reply(`${msgUserName} unlocked: ${ach.name} — ${ach.desc}`).catch(() => {});
@@ -5052,10 +5082,36 @@ bot.on('text', async (ctx) => {
     }
   }
 
-  // Tag-only mode — in designated chats, Jarvis ONLY responds to @mention or reply-to-bot
-  const isTagOnlyChat = config.tagOnlyChatIds && config.tagOnlyChatIds.includes(ctx.chat.id);
-  if (isTagOnlyChat) {
-    isCalledByName = false; // Disable name triggers (jarvis, jar, j) in tag-only chats
+  // ============ Runtime Directive System ============
+  // Jarvis follows behavioral directives from team members.
+  // Detection runs BEFORE enforcement so users can always change the mode.
+  const isAddressed = isMentioned || isReplyToBot || isCalledByName;
+
+  // Directive detection — check if this is a behavioral instruction
+  if (isGroup && isAddressed) {
+    const directive = detectDirective(ctx.message.text);
+    if (directive) {
+      setDirective(ctx.chat.id, directive.mode, ctx.from, ctx.message.text);
+      await ctx.reply(getAcknowledgment(directive.mode));
+      return;
+    }
+  }
+
+  // Directive enforcement — suppress based on chat mode
+  if (isGroup) {
+    const chatMode = getChatMode(ctx.chat.id);
+    if (chatMode === 'quiet') {
+      // Complete silence — buffer message, skip everything (directives already handled above)
+      const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+      bufferMessage(ctx.chat.id, userName, ctx.message.text);
+      pushGroupMessage(ctx.chat.id, userName, ctx.message.text, ctx.message.message_id, false);
+      recordChatActivity(ctx.chat.id);
+      registerChat(ctx.chat.id);
+      return;
+    }
+    if (chatMode === 'tag-only') {
+      isCalledByName = false; // Name triggers suppressed in tag-only mode
+    }
   }
 
   if (isGroup && !isMentioned && !isReplyToBot && !isCalledByName) {
@@ -5075,8 +5131,8 @@ bot.on('text', async (ctx) => {
     const basicQuality = Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5);
     trackForThread(ctx.chat.id, ctx.from.id, userName, msgText, basicQuality, ctx.message.message_id);
 
-    // Check if thread is worth archiving (skip in tag-only chats — no unsolicited messages)
-    if (!isTagOnlyChat && shouldSuggestArchival(ctx.chat.id)) {
+    // Check if thread is worth archiving (skip in directive-restricted chats)
+    if (!shouldSuppress(ctx.chat.id, 'archive') && shouldSuggestArchival(ctx.chat.id)) {
       ctx.reply('This conversation is getting good. Use /archive if you want to save it as a knowledge artifact.');
     }
 
@@ -5151,7 +5207,7 @@ bot.on('text', async (ctx) => {
     const shouldSkipProactive = (persona !== 'degen' && msgAddressesDiablo)
       || (persona === 'degen' && msgAddressesJarvis && !msgAddressesDiablo);
 
-    if (msgText.length >= 3 && !shouldSkipProactive && !isTagOnlyChat) {
+    if (msgText.length >= 3 && !shouldSkipProactive && !shouldSuppress(ctx.chat.id, 'proactive')) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
         const recentCtx = getRecentContext(ctx.chat.id, 10);
@@ -5825,6 +5881,7 @@ async function main() {
     social: { processQueue: processSocialQueue },
   });
   // Autonomous engagement — JARVIS as active community member
+  await loadDirectives(); // Runtime behavioral directives (tag-only, quiet, etc.)
   await loadChatActivity(); // Restore activity state before init
   const autonomousChatIds = config.authorizedGroups || [];
   initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
@@ -6779,6 +6836,7 @@ async function main() {
     await flushPredictions();
     await flushSocial();
     await flushAutonomous();
+    await flushDirectives();
     // CKB compression: compress high-utilization CKBs periodically
     try {
       await compressCKB(config.ownerUserId);
@@ -6874,6 +6932,7 @@ async function main() {
       ['predictions', flushPredictions],
       ['social', flushSocial],
       ['autonomous', flushAutonomous],
+      ['directives', flushDirectives],
       ['comms', saveComms],
       ['user-memory', flushUserMemory],
       ['timezones', flushTimezones],

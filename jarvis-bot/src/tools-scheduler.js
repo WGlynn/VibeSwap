@@ -14,6 +14,7 @@
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
+import { shouldSuppress } from './directives.js';
 import { getMorningBriefing } from './tools-engagement.js';
 
 const DATA_DIR = config.dataDir;
@@ -159,6 +160,7 @@ async function checkMorningSchedule(schedule, currentTime) {
   const lastRunDate = schedule.lastRun ? new Date(schedule.lastRun).toDateString() : '';
   if (lastRunDate === new Date().toDateString()) return;
 
+  if (shouldSuppress(schedule.chatId, 'scheduler')) return;
   const briefing = await getMorningBriefing();
   try {
     await sendFn(schedule.chatId, briefing);
@@ -188,6 +190,7 @@ async function checkPriceSchedule(schedule) {
     if (change1h == null) return;
 
     if (Math.abs(change1h) >= threshold) {
+      if (shouldSuppress(schedule.chatId, 'scheduler')) return;
       const direction = change1h > 0 ? 'UP' : 'DOWN';
       const msg = `Price Alert: ${token.toUpperCase()} ${direction} ${Math.abs(change1h).toFixed(1)}% in 1h\n\nPrice: $${info.usd.toLocaleString()}`;
       await sendFn(schedule.chatId, msg);
@@ -215,6 +218,7 @@ async function checkGasSchedule(schedule) {
     if (isNaN(gas)) return;
 
     if (gas <= schedule.params.gwei) {
+      if (shouldSuppress(schedule.chatId, 'scheduler')) return;
       const msg = `Gas Alert: ETH gas at ${gas} gwei (below your ${schedule.params.gwei} threshold)\n\nGood time for on-chain activity!`;
       await sendFn(schedule.chatId, msg);
       schedule.lastRun = Date.now();

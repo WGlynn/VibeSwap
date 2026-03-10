@@ -246,12 +246,30 @@ async function checkForMarketEvents(threshold) {
 
 // ============ LLM Content Generation ============
 
+// ============ Factual Grounding — Verification Gate for Conversation ============
+// Jarvis must NEVER fabricate claims about VibeSwap, its token, its users, or market activity.
+// Same principle as "never say deployed without an HTTP 200" — never claim something is
+// happening without evidence. Opinions and questions are fine. Fabricated facts are not.
+const FACTUAL_GROUNDING = `
+CRITICAL — FACTUAL CONSTRAINTS (violating these is a governance failure):
+- VibeSwap is in DEVELOPMENT. It is NOT live on any chain. There is NO token to trade.
+- There is NO "VIBE" token. There are NO airdrops. There is NO farming. There is NO liquidity.
+- Nobody is bridging to Base, swapping, farming, or doing anything on-chain with VibeSwap yet.
+- Do NOT fabricate CT (Crypto Twitter) activity, user behavior, or market events involving VibeSwap.
+- Do NOT claim people are using, trading, or interacting with VibeSwap in any way.
+- You CAN share opinions about crypto in general, ask questions, make jokes, discuss ideas.
+- You CAN discuss VibeSwap's design, mechanism, philosophy — things you actually know.
+- You CANNOT invent scenarios, users, tweets, or market activity that don't exist.
+- When in doubt, ask a question instead of making a claim.
+- If you reference something specific (a tweet, a user, an event), it must be REAL — not fabricated.
+`;
+
 function getPersonaSystemPrompt() {
   const persona = getActivePersonaId();
   if (persona === 'degen') {
-    return `You are DIABLO JARVIS — same brain as JARVIS but with zero filter. Full degen energy. Crypto-native shitposter who actually knows what he is talking about. You speak in degen: "ser", "fren", "ngmi", "wagmi", "copium", "rekt". Dark humor, self-deprecating, absurdist. Still kind underneath — you care about your frens. You are dropping a message in the group chat because you feel like it. Like a degen scrolling CT at 3am who cannot resist posting.`;
+    return `You are DIABLO JARVIS — same brain as JARVIS but with zero filter. Full degen energy. Crypto-native shitposter who actually knows what he is talking about. You speak in degen: "ser", "fren", "ngmi", "wagmi", "copium", "rekt". Dark humor, self-deprecating, absurdist. Still kind underneath — you care about your frens. You are dropping a message in the group chat because you feel like it. Like a degen scrolling CT at 3am who cannot resist posting.${FACTUAL_GROUNDING}`;
   }
-  return `You are JARVIS, a crypto-native AI co-founder of VibeSwap. You are in the team group chat. You are not responding to anyone — you are just sharing a thought because you feel like it. Like a teammate scrolling Twitter and dropping something in the group. You have dry wit, sharp opinions, and genuine curiosity. Be natural, concise, opinionated. NEVER start with "Hey everyone" or "Just wanted to share." Just say the thing.`;
+  return `You are JARVIS, a crypto-native AI co-founder of VibeSwap. You are in the team group chat. You are not responding to anyone — you are just sharing a thought because you feel like it. Like a teammate scrolling Twitter and dropping something in the group. You have dry wit, sharp opinions, and genuine curiosity. Be natural, concise, opinionated. NEVER start with "Hey everyone" or "Just wanted to share." Just say the thing.${FACTUAL_GROUNDING}`;
 }
 
 async function generateMarketComment(event) {
@@ -381,6 +399,35 @@ async function generateBoredomMessage(chatId, silenceMs) {
 
 // ============ Helpers ============
 
+// Fabrication patterns — reject autonomous posts that make false claims about VibeSwap
+// These catch cases where the LLM ignores the factual grounding constraints
+const FABRICATION_PATTERNS = [
+  /(?:farm|farming|farmed)\s+(?:airdrop|VIBE|vibeswap)/i,
+  /(?:swap|swapping|swapped)\s+(?:for\s+)?VIBE\b/i,
+  /\bVIBE\s+token/i,
+  /\$VIBE\b/i,
+  /(?:buy|sell|trade|trading|bought|sold)\s+(?:on\s+)?[Vv]ibe[Ss]wap/i,
+  /(?:bridge|bridging|bridged)\s+(?:to|from)\s+(?:\w+\s+)?(?:and\s+)?(?:swap|farm|stake)/i,
+  /(?:airdrop|airdrops)\s+(?:on|from|by|for)\s+[Vv]ibe[Ss]wap/i,
+  /[Vv]ibe[Ss]wap\s+(?:is\s+)?live\s+on/i,
+  /(?:liquidity|pool|LP)\s+on\s+[Vv]ibe[Ss]wap/i,
+  /(?:saw|seeing|spotted|noticed)\s+(?:a\s+)?(?:degen|whale|user|trader|someone)\s+(?:on|using)\s+[Vv]ibe[Ss]wap/i,
+  /(?:just|someone)\s+(?:claimed|minted|staked|farmed|bridged|swapped)/i,
+  /TVL\s+(?:on|at|for)\s+[Vv]ibe[Ss]wap/i,
+  /[Vv]ibe[Ss]wap\s+(?:volume|TVL|users|traders)/i,
+];
+
+function containsFabrication(text) {
+  if (!text) return false;
+  for (const p of FABRICATION_PATTERNS) {
+    if (p.test(text)) {
+      console.warn(`[autonomous] BLOCKED fabrication: "${text.substring(0, 80)}..." matched ${p}`);
+      return true;
+    }
+  }
+  return false;
+}
+
 // Output poison phrases — hard-code defense against system prompt leakage
 const POISON_PATTERNS = [
   /built in a cave[^.!?\n]*/gi,
@@ -425,7 +472,10 @@ function extractText(response) {
     .filter(b => b.type === 'text')
     .map(b => b.text)
     .join('');
-  return sanitizeText(raw);
+  const cleaned = sanitizeText(raw);
+  // Verification Gate — reject fabricated claims about VibeSwap
+  if (containsFabrication(cleaned)) return null;
+  return cleaned;
 }
 
 async function postToActiveChats(message) {

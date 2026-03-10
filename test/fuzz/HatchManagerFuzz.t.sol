@@ -58,7 +58,7 @@ contract HatchManagerFuzzTest is Test {
     function testFuzz_contributionTrackingAccurate(uint256 amount) public {
         amount = bound(amount, 1e18, 500_000e18);
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -80,7 +80,7 @@ contract HatchManagerFuzzTest is Test {
 
         uint256 contribution = 500_000e18;
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, thetaBps);
+        (HatchManager hatch, AugmentedBondingCurve freshAbc) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, thetaBps);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -93,8 +93,8 @@ contract HatchManagerFuzzTest is Test {
         uint256 expectedFunding = (contribution * thetaBps) / 10000;
         uint256 expectedReserve = contribution - expectedFunding;
 
-        assertEq(abc.fundingPool(), expectedFunding, "Funding split incorrect");
-        assertEq(abc.reserve(), expectedReserve, "Reserve split incorrect");
+        assertEq(freshAbc.fundingPool(), expectedFunding, "Funding split incorrect");
+        assertEq(freshAbc.reserve(), expectedReserve, "Reserve split incorrect");
         assertEq(expectedFunding + expectedReserve, contribution, "Split doesn't sum to total");
     }
 
@@ -105,7 +105,7 @@ contract HatchManagerFuzzTest is Test {
 
         uint256 contribution = 200_000e18;
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, price, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, price, 4000);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -126,7 +126,7 @@ contract HatchManagerFuzzTest is Test {
         // Ensure total doesn't exceed max
         if (a1 + a2 > 800_000e18) a2 = 800_000e18 - a1;
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
         address alice = address(0xA1);
         address bob = address(0xB0);
 
@@ -156,7 +156,7 @@ contract HatchManagerFuzzTest is Test {
     function testFuzz_refundReturnsExact(uint256 amount) public {
         amount = bound(amount, 1e18, 50_000e18); // Below min raise to allow cancellation
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -181,7 +181,7 @@ contract HatchManagerFuzzTest is Test {
         // ρ = κ × (1-θ) = 6 × (10000 - thetaBps) / 10000
         uint256 returnRate = (KAPPA * (10000 - uint256(thetaBps))) / 10000;
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, thetaBps);
+        (HatchManager hatch, AugmentedBondingCurve freshAbc) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, thetaBps);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -195,7 +195,7 @@ contract HatchManagerFuzzTest is Test {
             hatch.completeHatch();
         } else {
             hatch.completeHatch();
-            assertTrue(abc.isOpen(), "Curve should be open after valid hatch");
+            assertTrue(freshAbc.isOpen(), "Curve should be open after valid hatch");
         }
     }
 
@@ -207,7 +207,7 @@ contract HatchManagerFuzzTest is Test {
         // Ensure blocks2 > blocks1
         if (blocks2 <= blocks1) blocks2 = blocks1 + 1;
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -233,7 +233,7 @@ contract HatchManagerFuzzTest is Test {
     function testFuzz_governanceBoostAcceleratesVesting(uint256 score) public {
         score = bound(score, 1, 100);
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -259,7 +259,7 @@ contract HatchManagerFuzzTest is Test {
     function testFuzz_vestedNeverExceedsAllocation(uint256 blocks) public {
         blocks = bound(blocks, 0, 100_000);
 
-        HatchManager hatch = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
+        (HatchManager hatch,) = _createHatch(100_000e18, 1_000_000e18, 0.01e18, 4000);
         hatch.approveHatcher(address(this));
         hatch.startHatch();
 
@@ -287,7 +287,7 @@ contract HatchManagerFuzzTest is Test {
         uint256 maxRaise,
         uint256 hatchPrice,
         uint16 thetaBps
-    ) internal returns (HatchManager) {
+    ) internal returns (HatchManager, AugmentedBondingCurve) {
         // Need a fresh ABC for each test since openCurve is one-time
         AugmentedBondingCurve freshAbc = new AugmentedBondingCurve(
             address(dai),
@@ -316,6 +316,6 @@ contract HatchManagerFuzzTest is Test {
         );
 
         freshAbc.setHatchManager(address(h));
-        return h;
+        return (h, freshAbc);
     }
 }

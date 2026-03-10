@@ -219,6 +219,13 @@ contract VibeRevShare is ERC20, Ownable, ReentrancyGuard, IVibeRevShare {
         uint256 amount = _unstakeRequestAmount[msg.sender];
         if (amount == 0) revert NoUnstakeRequest();
 
+        // SECURITY: Anti-MEV — cannot cancel unstake and re-request within same day
+        // Prevents: requestUnstake → see rewards → cancelUnstake → claim → requestUnstake
+        require(
+            block.timestamp >= uint256(_unstakeRequestTime[msg.sender]) + 1 days,
+            "Must wait 1 day before cancelling unstake"
+        );
+
         _unstakeRequestTime[msg.sender] = 0;
         _unstakeRequestAmount[msg.sender] = 0;
 

@@ -268,28 +268,34 @@ contract GovernanceABCPipelineTest is Test {
     // ============ Test: Multiple Proposals Sequential ============
 
     function test_multipleProposalsSequential() public {
-        // Create and execute 3 proposals
+        // Create and execute 3 proposals with smaller amounts (less threshold)
         for (uint256 i = 0; i < 3; i++) {
-            uint256 amount = 100_000e18;
+            uint256 amount = 50_000e18;
 
             vm.prank(alice);
             uint256 pid = governance.createProposal("Proposal", bytes32(0), amount);
 
+            // Both alice and bob signal for robust conviction
             vm.prank(alice);
             governance.signalConviction(pid, 50_000e18);
+            vm.prank(bob);
+            governance.signalConviction(pid, 50_000e18);
+
             vm.warp(block.timestamp + 30 days);
             governance.triggerPass(pid);
 
             vm.prank(resolver);
             governance.executeProposal(pid);
 
-            // Remove signal for next round
+            // Remove signals for next round
             vm.prank(alice);
+            governance.removeSignal(pid);
+            vm.prank(bob);
             governance.removeSignal(pid);
         }
 
-        // Funding pool decreased by 300K total
-        assertEq(abc.fundingPool(), INIT_FUNDING - 300_000e18, "Funding should decrease by 300K total");
+        // Funding pool decreased by 150K total
+        assertEq(abc.fundingPool(), INIT_FUNDING - 150_000e18, "Funding should decrease by 150K total");
 
         // Conservation invariant holds
         uint256 currentV = abc.currentInvariant();

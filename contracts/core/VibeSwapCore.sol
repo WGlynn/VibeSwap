@@ -648,36 +648,56 @@ contract VibeSwapCore is
     // ============ Internal Functions ============
 
     /**
-     * @notice Execute orders in batch
+     * @notice Execute orders in batch — orchestrates validation, execution, and settlement
      */
     function _executeOrders(
         uint64 batchId,
         ICommitRevealAuction.RevealedOrder[] memory orders,
         uint256[] memory executionOrder
     ) internal {
-        uint256 totalVolume = 0;
-        uint256 lastClearingPrice = 0;
+        // Phase 1: Validate deposits and group orders by pool
+        (
+            bytes32[] memory poolIds,
+            uint256 uniquePoolCount,
+            bytes32[] memory orderPoolIds,
+            bool[] memory orderValid
+        ) = _validateAndGroupOrders(batchId, orders, executionOrder);
 
-        // ============ Phase 1: Validate deposits and group by pool ============
-        // We aggregate all orders for the same pool into a single executeBatchSwap call
-        // so the AMM computes one uniform clearing price per pool (not per order).
+        // Phase 2: Execute per-pool batch swaps + Phase 3: Post-execution accounting
+        (uint256 totalVolume, uint256 lastClearingPrice) = _executePoolBatches(
+            batchId, orders, executionOrder, poolIds, uniquePoolCount, orderPoolIds, orderValid
+        );
 
-        // Track pool IDs seen and their order indices
-        bytes32[] memory poolIds = new bytes32[](executionOrder.length);
-        uint256 uniquePoolCount = 0;
+        // Phase 4: Forward priority bids to treasury
+        _forwardPriorityBids(batchId);
 
-        // Map: execution index -> poolId (for grouping)
-        bytes32[] memory orderPoolIds = new bytes32[](executionOrder.length);
-        // Track which orders are valid (have sufficient deposits)
-        bool[] memory orderValid = new bool[](executionOrder.length);
+        emit BatchProcessed(batchId, orders.length, totalVolume, lastClearingPrice);
+    }
+
+    /**
+     * @notice Phase 1: Validate deposits and group orders by pool ID
+     * @dev Aggregates all orders for the same pool so the AMM computes one uniform clearing price
+     */
+    function _validateAndGroupOrders(
+        uint64 batchId,
+        ICommitRevealAuction.RevealedOrder[] memory orders,
+        uint256[] memory executionOrder
+    ) internal returns (
+        bytes32[] memory poolIds,
+        uint256 uniquePoolCount,
+        bytes32[] memory orderPoolIds,
+        bool[] memory orderValid
+    ) {
+        poolIds = new bytes32[](executionOrder.length);
+        orderPoolIds = new bytes32[](executionOrder.length);
+        orderValid = new bool[](executionOrder.length);
 
         for (uint256 i = 0; i < executionOrder.length; i++) {
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
             // Verify deposit
-            uint256 userDeposit = deposits[order.trader][order.tokenIn];
-            if (userDeposit < order.amountIn) {
+            if (deposits[order.trader][order.tokenIn] < order.amountIn) {
                 emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Insufficient deposit");
                 continue;
             }
@@ -696,138 +716,199 @@ contract VibeSwapCore is
                 uniquePoolCount++;
             }
         }
+    }
 
-        // ============ Phase 2: Execute per-pool batch swaps ============
-        // For each unique pool, collect all valid orders and execute in one call.
-        // This gives a TRUE uniform clearing price across all orders in the pool.
-
+    /**
+     * @notice Phase 2+3: Execute swaps per pool and settle each order
+     */
+    function _executePoolBatches(
+        uint64 batchId,
+        ICommitRevealAuction.RevealedOrder[] memory orders,
+        uint256[] memory executionOrder,
+        bytes32[] memory poolIds,
+        uint256 uniquePoolCount,
+        bytes32[] memory orderPoolIds,
+        bool[] memory orderValid
+    ) internal returns (uint256 totalVolume, uint256 lastClearingPrice) {
         for (uint256 p = 0; p < uniquePoolCount; p++) {
             bytes32 poolId = poolIds[p];
 
-            // Count valid orders for this pool
-            uint256 count = 0;
-            for (uint256 i = 0; i < executionOrder.length; i++) {
-                if (orderValid[i] && orderPoolIds[i] == poolId) count++;
-            }
+            // Build SwapOrder array and collect original indices
+            (
+                IVibeAMM.SwapOrder[] memory swapOrders,
+                uint256[] memory originalIndices,
+                uint256 count
+            ) = _buildPoolSwapOrders(batchId, orders, executionOrder, orderPoolIds, orderValid, poolId);
+
             if (count == 0) continue;
 
-            // Build SwapOrder array and transfer tokens to AMM
-            IVibeAMM.SwapOrder[] memory swapOrders = new IVibeAMM.SwapOrder[](count);
-            // Track original order indices for post-execution accounting
-            uint256[] memory originalIndices = new uint256[](count);
-            uint256 cursor = 0;
+            // Execute ALL orders for this pool in one batch -> one uniform clearing price
+            IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, batchId, swapOrders);
 
-            for (uint256 i = 0; i < executionOrder.length; i++) {
-                if (!orderValid[i] || orderPoolIds[i] != poolId) continue;
-
-                uint256 idx = executionOrder[i];
-                ICommitRevealAuction.RevealedOrder memory order = orders[idx];
-
-                // Determine recipient (wBAR routing)
-                address recipient = order.trader;
-                if (address(wbar) != address(0)) {
-                    bytes32 traderCommitId = batchTraderCommitId[batchId][order.trader];
-                    if (traderCommitId != bytes32(0)) {
-                        address wbarHolder = wbar.holderOf(traderCommitId);
-                        if (wbarHolder != order.trader) {
-                            recipient = address(wbar);
-                        }
-                    }
-                }
-
-                // Transfer tokens to AMM
-                IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
-
-                swapOrders[cursor] = IVibeAMM.SwapOrder({
-                    trader: recipient,
-                    tokenIn: order.tokenIn,
-                    tokenOut: order.tokenOut,
-                    amountIn: order.amountIn,
-                    minAmountOut: order.minAmountOut,
-                    isPriority: order.priorityBid > 0
-                });
-                originalIndices[cursor] = idx;
-                cursor++;
-            }
-
-            // Execute ALL orders for this pool in one batch → one uniform clearing price
-            IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(
-                poolId,
-                batchId,
-                swapOrders
-            );
-
-            // ============ Phase 3: Per-order post-execution accounting ============
+            // Post-execution accounting
             if (result.totalTokenInSwapped > 0) {
                 totalVolume += result.totalTokenInSwapped;
                 lastClearingPrice = result.clearingPrice;
-
-                for (uint256 k = 0; k < count; k++) {
-                    uint256 idx = originalIndices[k];
-                    ICommitRevealAuction.RevealedOrder memory order = orders[idx];
-
-                    // Clear deposit
-                    deposits[order.trader][order.tokenIn] -= order.amountIn;
-
-                    // Compute per-order output from uniform clearing price
-                    // AMM uses: amountOut = amountIn * clearingPrice / 1e18 (or inverse) minus fees
-                    // For post-settlement tracking, use the clearing price ratio
-                    uint256 estimatedOut = 0;
-                    if (result.clearingPrice > 0 && result.totalTokenInSwapped > 0) {
-                        // Pro-rata share of total output based on input contribution
-                        estimatedOut = (order.amountIn * result.totalTokenOutSwapped) / result.totalTokenInSwapped;
-                    }
-
-                    // Settle wBAR position
-                    if (address(wbar) != address(0)) {
-                        bytes32 traderCommitId = batchTraderCommitId[batchId][order.trader];
-                        if (traderCommitId != bytes32(0)) {
-                            wbar.settle(traderCommitId, estimatedOut);
-                        }
-                    }
-
-                    // Record execution for slippage tracking
-                    if (address(incentiveController) != address(0)) {
-                        try incentiveController.recordExecution(
-                            poolId,
-                            order.trader,
-                            order.amountIn,
-                            estimatedOut,
-                            order.minAmountOut
-                        ) {} catch (bytes memory reason) {
-                            emit ExecutionTrackingFailed(poolId, order.trader, reason);
-                        }
-                    }
-
-                    // Record transaction for clawback taint tracking
-                    if (address(clawbackRegistry) != address(0)) {
-                        try clawbackRegistry.recordTransaction(
-                            order.trader,
-                            address(amm),
-                            order.amountIn,
-                            order.tokenIn
-                        ) {} catch (bytes memory reason) {
-                            emit ComplianceCheckFailed(poolId, order.trader, reason);
-                        }
-                    }
-                }
+                _settleExecutedOrders(batchId, orders, originalIndices, count, poolId, result);
             } else {
-                // Batch execution failed — all tokens returned to Core
-                for (uint256 k = 0; k < count; k++) {
-                    uint256 idx = originalIndices[k];
-                    ICommitRevealAuction.RevealedOrder memory order = orders[idx];
-                    emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Swap execution failed");
-                }
+                _emitFailedOrders(batchId, orders, originalIndices, count);
+            }
+        }
+    }
+
+    /**
+     * @notice Build SwapOrder array for a single pool, transferring tokens to AMM
+     */
+    function _buildPoolSwapOrders(
+        uint64 batchId,
+        ICommitRevealAuction.RevealedOrder[] memory orders,
+        uint256[] memory executionOrder,
+        bytes32[] memory orderPoolIds,
+        bool[] memory orderValid,
+        bytes32 poolId
+    ) internal returns (
+        IVibeAMM.SwapOrder[] memory swapOrders,
+        uint256[] memory originalIndices,
+        uint256 count
+    ) {
+        // Count valid orders for this pool
+        for (uint256 i = 0; i < executionOrder.length; i++) {
+            if (orderValid[i] && orderPoolIds[i] == poolId) count++;
+        }
+        if (count == 0) return (swapOrders, originalIndices, 0);
+
+        swapOrders = new IVibeAMM.SwapOrder[](count);
+        originalIndices = new uint256[](count);
+        uint256 cursor = 0;
+
+        for (uint256 i = 0; i < executionOrder.length; i++) {
+            if (!orderValid[i] || orderPoolIds[i] != poolId) continue;
+
+            uint256 idx = executionOrder[i];
+            ICommitRevealAuction.RevealedOrder memory order = orders[idx];
+            address recipient = _resolveRecipient(batchId, order.trader);
+
+            IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
+
+            swapOrders[cursor] = IVibeAMM.SwapOrder({
+                trader: recipient,
+                tokenIn: order.tokenIn,
+                tokenOut: order.tokenOut,
+                amountIn: order.amountIn,
+                minAmountOut: order.minAmountOut,
+                isPriority: order.priorityBid > 0
+            });
+            originalIndices[cursor] = idx;
+            cursor++;
+        }
+    }
+
+    /**
+     * @notice Resolve recipient for an order — routes to wBAR if receipt was transferred
+     */
+    function _resolveRecipient(uint64 batchId, address trader) internal view returns (address) {
+        if (address(wbar) == address(0)) return trader;
+
+        bytes32 traderCommitId = batchTraderCommitId[batchId][trader];
+        if (traderCommitId == bytes32(0)) return trader;
+
+        address wbarHolder = wbar.holderOf(traderCommitId);
+        return (wbarHolder != trader) ? address(wbar) : trader;
+    }
+
+    /**
+     * @notice Settle individual orders after successful batch execution
+     */
+    function _settleExecutedOrders(
+        uint64 batchId,
+        ICommitRevealAuction.RevealedOrder[] memory orders,
+        uint256[] memory originalIndices,
+        uint256 count,
+        bytes32 poolId,
+        IVibeAMM.BatchSwapResult memory result
+    ) internal {
+        for (uint256 k = 0; k < count; k++) {
+            uint256 idx = originalIndices[k];
+            ICommitRevealAuction.RevealedOrder memory order = orders[idx];
+
+            // Clear deposit
+            deposits[order.trader][order.tokenIn] -= order.amountIn;
+
+            // Pro-rata share of total output based on input contribution
+            uint256 estimatedOut = 0;
+            if (result.clearingPrice > 0 && result.totalTokenInSwapped > 0) {
+                estimatedOut = (order.amountIn * result.totalTokenOutSwapped) / result.totalTokenInSwapped;
+            }
+
+            // Settle wBAR position
+            _settleWBAR(batchId, order.trader, estimatedOut);
+
+            // Record execution + compliance
+            _recordExecution(poolId, order, estimatedOut);
+        }
+    }
+
+    /**
+     * @notice Settle wBAR receipt position if applicable
+     */
+    function _settleWBAR(uint64 batchId, address trader, uint256 amountOut) internal {
+        if (address(wbar) == address(0)) return;
+
+        bytes32 traderCommitId = batchTraderCommitId[batchId][trader];
+        if (traderCommitId != bytes32(0)) {
+            wbar.settle(traderCommitId, amountOut);
+        }
+    }
+
+    /**
+     * @notice Record execution in incentive controller and compliance registry
+     */
+    function _recordExecution(
+        bytes32 poolId,
+        ICommitRevealAuction.RevealedOrder memory order,
+        uint256 estimatedOut
+    ) internal {
+        if (address(incentiveController) != address(0)) {
+            try incentiveController.recordExecution(
+                poolId, order.trader, order.amountIn, estimatedOut, order.minAmountOut
+            ) {} catch (bytes memory reason) {
+                emit ExecutionTrackingFailed(poolId, order.trader, reason);
             }
         }
 
-        // Send priority bids to treasury (only what we actually have)
+        if (address(clawbackRegistry) != address(0)) {
+            try clawbackRegistry.recordTransaction(
+                order.trader, address(amm), order.amountIn, order.tokenIn
+            ) {} catch (bytes memory reason) {
+                emit ComplianceCheckFailed(poolId, order.trader, reason);
+            }
+        }
+    }
+
+    /**
+     * @notice Emit failure events for orders in a failed batch execution
+     */
+    function _emitFailedOrders(
+        uint64 batchId,
+        ICommitRevealAuction.RevealedOrder[] memory orders,
+        uint256[] memory originalIndices,
+        uint256 count
+    ) internal {
+        for (uint256 k = 0; k < count; k++) {
+            uint256 idx = originalIndices[k];
+            ICommitRevealAuction.RevealedOrder memory order = orders[idx];
+            emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Swap execution failed");
+        }
+    }
+
+    /**
+     * @notice Forward priority bids to DAO treasury
+     */
+    function _forwardPriorityBids(uint64 batchId) internal {
         ICommitRevealAuction.Batch memory batch = auction.getBatch(batchId);
         if (batch.totalPriorityBids > 0 && address(this).balance >= batch.totalPriorityBids) {
             treasury.receiveAuctionProceeds{value: batch.totalPriorityBids}(batchId);
         }
-
-        emit BatchProcessed(batchId, orders.length, totalVolume, lastClearingPrice);
     }
 
     /**

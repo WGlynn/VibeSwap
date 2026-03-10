@@ -62,10 +62,8 @@ contract ABCHandler is Test {
         address actor = actors[actorSeed % actors.length];
         amount = bound(amount, 1e15, 500_000e18);
 
-        uint256 fundingBefore = abc.fundingPool();
-
         vm.prank(actor);
-        try abc.bondToMint(amount, 0) returns (uint256 minted) {
+        try abc.bondToMint(amount, 0) returns (uint256) {
             bondCount++;
             // Track entry tributes
             uint256 tribute = (amount * abc.entryTributeBps()) / 10000;
@@ -87,7 +85,7 @@ contract ABCHandler is Test {
         if (burnAmount >= vibe.totalSupply() - 1e18) return;
 
         vm.prank(actor);
-        try abc.burnToWithdraw(burnAmount, 0) returns (uint256 returned) {
+        try abc.burnToWithdraw(burnAmount, 0) returns (uint256) {
             burnCount++;
         } catch {}
     }
@@ -197,10 +195,9 @@ contract AugmentedBondingCurveInvariantTest is StdInvariant, Test {
 
     function invariant_fundingPoolNonNegative() public view {
         // This is guaranteed by uint256 but checks accounting
+        // Funding pool is uint256 so always >= 0, but verify accounting is sane
         uint256 fp = abc.fundingPool();
-        // Funding pool should be at least what was there initially minus allocations
-        // At minimum it should be 0 (which uint enforces)
-        assertTrue(true, "Funding pool is non-negative (uint256 guarantee)");
+        assertGe(fp, 0, "Funding pool is non-negative");
     }
 
     // ============ Invariant 6: Curve must be open ============

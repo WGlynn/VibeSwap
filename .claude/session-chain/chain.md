@@ -1,6 +1,6 @@
 # Session Blockchain — Jarvis × Will
 
-> Chain length: 4 blocks | Last verified: 2026-03-10 19:04 UTC
+> Chain length: 5 blocks | Last verified: 2026-03-10 19:06 UTC
 
 ---
 
@@ -49,5 +49,17 @@
 
 **Artifacts**: .claude/session-chain/chain.py, .claude/session-chain/sync-daemon.sh, .claude/session-chain/chain.json, .claude/session-chain/chain.md
 **Tags**: `session-blockchain`, `infrastructure`, `persistence`, `hash-chain`
+
+---
+
+## Block 4 `e3d4b25dc5ee...`
+**Session**: 053 | **Time**: 2026-03-10 19:06:52 UTC | **Prev**: `0b5897e7abca...`
+
+**Prompt**: Discovered shards-over-swarms.md survived the PC crash — written to disk but never committed
+
+**Response**: Full 347-line paper intact: Shards Over Swarms formalization with math (cost model, fault tolerance, cognitive diversity), Skippy Principle (Section 5), JARVIS Mind Network production metrics, swarm vs shard decision framework. Recoverable because the file was saved locally before the crash.
+
+**Artifacts**: docs/papers/shards-over-swarms.md
+**Tags**: `recovery`, `shards-over-swarms`, `paper`, `skippy`, `survived-crash`
 
 ---

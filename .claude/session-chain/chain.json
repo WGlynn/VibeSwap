@@ -67,5 +67,24 @@
       "hash-chain"
     ],
     "hash": "0b5897e7abca689e8e51dbd2ada7f07909abaef3bc0485b233e0e6859fa7109b"
+  },
+  {
+    "index": 4,
+    "timestamp": "2026-03-10T19:06:52.097660+00:00",
+    "prev_hash": "0b5897e7abca689e8e51dbd2ada7f07909abaef3bc0485b233e0e6859fa7109b",
+    "session_id": "053",
+    "prompt": "Discovered shards-over-swarms.md survived the PC crash — written to disk but never committed",
+    "response": "Full 347-line paper intact: Shards Over Swarms formalization with math (cost model, fault tolerance, cognitive diversity), Skippy Principle (Section 5), JARVIS Mind Network production metrics, swarm vs shard decision framework. Recoverable because the file was saved locally before the crash.",
+    "artifacts": [
+      "docs/papers/shards-over-swarms.md"
+    ],
+    "tags": [
+      "recovery",
+      "shards-over-swarms",
+      "paper",
+      "skippy",
+      "survived-crash"
+    ],
+    "hash": "e3d4b25dc5eef1a471fba102260061c9088ac2881d7effe51f373807316a4b7c"
   }
 ]

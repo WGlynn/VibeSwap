@@ -285,6 +285,14 @@ Return ONLY the final text or SKIP. No explanation needed.`,
 
     if (!reviewText || reviewText === 'SKIP') return null;
 
+    // ============ ECOSYSTEM HALLUCINATION GATE (code-level, LLM-agnostic) ============
+    // Catches fabricated VibeSwap ecosystem metrics regardless of which model generated them.
+    // Prompt-based guardrails depend on instruction-following; this does not.
+    if (containsEcosystemClaim(reviewText)) {
+      console.warn(`[intelligence] ECOSYSTEM CLAIM BLOCKED: "${reviewText.slice(0, 100)}..."`);
+      return null;
+    }
+
     recordEngagement();
 
     // Self-correcting feedback loop: score proactive response (fire-and-forget)
@@ -299,6 +307,28 @@ Return ONLY the final text or SKIP. No explanation needed.`,
     console.error('[intelligence] Proactive response failed:', err.message);
     return null;
   }
+}
+
+// ============ Ecosystem Hallucination Detection (LLM-Agnostic) ============
+// Pattern-matches fabricated VibeSwap ecosystem claims. No LLM needed — pure regex.
+// Triggers on: "our TVL", "our volume", "stablecoin supply on our", "X users on vibeswap", etc.
+// Does NOT trigger on: general market commentary, design philosophy, aspirational language.
+
+const ECOSYSTEM_METRIC_PATTERNS = [
+  /\b(?:our|vibeswap(?:'s)?|the platform(?:'s)?)\b.{0,40}\b(?:tvl|volume|liquidity|supply|users?|holders?|stakers?|deposits?|revenue|fees? collected|apy|apr)\b/i,
+  /\b(?:currently|right now|at the moment|as of today)\b.{0,30}\b(?:tvl|volume|liquidity|supply|users?|stakers?)\b/i,
+  /\b(?:dominated by|majority of|most of)\b.{0,30}\b(?:usdt|usdc|dai|stablecoin|token|liquidity)\b.{0,20}\b(?:on (?:our|the) (?:platform|protocol|dex))\b/i,
+  /\b(?:\$[\d,.]+[mkb]?)\b.{0,20}\b(?:tvl|volume|locked|staked|deposited)\b/i,
+  /\b(?:[\d,.]+)\s*(?:users?|wallets?|holders?|stakers?)\b.{0,20}\b(?:on (?:our|the|vibeswap))\b/i,
+];
+
+function containsEcosystemClaim(text) {
+  const lower = text.toLowerCase();
+  // Quick exit: if text doesn't mention vibeswap or "our platform" at all, skip heavy checks
+  if (!lower.includes('vibeswap') && !lower.includes('our platform') && !lower.includes('our protocol') && !lower.includes('the platform')) {
+    return false;
+  }
+  return ECOSYSTEM_METRIC_PATTERNS.some(pattern => pattern.test(text));
 }
 
 // ============ Semantic Moderation ============

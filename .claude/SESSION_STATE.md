@@ -8,26 +8,26 @@ This file maintains continuity between Claude Code sessions across devices.
 ---
 
 ## Current Focus
+- **Will taking a break** — demoralized, needs space. Everything is deployed and running autonomously.
 - **SOVEREIGN AUTONOMY LAYER DEPLOYED** — wallet.js, social.js, proactive.js live on Fly.io
-- **Dr. Nadal Visit**: Psychiatrist + husband checking Vercel site. Chat is FREE, warm, no token gates.
-- **System prompt deployed**: JARVIS personality rewrite — warm, present, adaptive. Subtle work-curiosity nudge.
-- **Provider cascade live**: DeepSeek (cheap) → Anthropic Haiku (fallback) on Vercel `/api/chat`
-- **Prices oracle live**: `/api/prices` — CoinGecko + Chainlink cross-validation on Base mainnet
-- **Fly.io DEPLOYED** — task queue, access changes, AND autonomy layer all live
+- **LIGHT CONTEXT TIER DISABLED** — Jarvis was hallucinating in groups (JUL/JulSwap confusion). Now always sends full 75K context.
+- **Dr. Nadal Visit**: Vercel chat is FREE, warm, no token gates. DeepSeek primary, Anthropic fallback.
+- **Proactive engine ENABLED** — market pulse, build updates, thought pieces scheduled
 
-## Autonomy Layer (DEPLOYED — Fly.io)
-**wallet.js**: EOA management, AES-256-GCM encryption, $50/day limit, whitelist-only, 4 chains (Base/ETH/Arb/OP)
-- `/wallet create <passphrase>` to generate — NO WALLET EXISTS YET (Will must create)
-- LLM tools: wallet_info, wallet_send, wallet_sign
+## Autonomy Layer (ALL DEPLOYED — Fly.io)
+**wallet.js**: EOA `0x51Ec19638455b1eA2fCf299e17cb9862FE0b12A4`
+- Passphrase: `vibe-sovereign-mind-2026` (retrieve mnemonic via TG DM: `/wallet mnemonic <passphrase>`)
+- $50/day limit, whitelist-only, 4 chains (Base/ETH/Arb/OP), NOT FUNDED YET
+- First wallet leaked on stream — regenerated, old mnemonic burned
 
-**social.js**: Outbound X/Twitter, Discord, GitHub presence
-- Credentials from env vars (TWITTER_BEARER_TOKEN, DISCORD_WEBHOOK_URL, GITHUB_TOKEN)
-- Currently: NONE configured — Will needs to set env vars on Fly.io
-- LLM tools: social_post, social_status, social_queue
+**social.js**: Twitter + GitHub CONNECTED, Discord PENDING
+- Twitter: 5 API keys set as Fly.io secrets
+- GitHub: PAT set (WGlynn/VibeSwap repo access)
+- Discord: Will doing tomorrow — needs webhook URL
 
-**proactive.js**: Autonomous scheduled actions — master switch OFF by default
-- Actions: market_pulse (6h), build_update (24h), thought_piece (12h), monitor_mentions (4h)
-- `/proactive enable` to activate — requires social credentials first
+**proactive.js**: ENABLED — 5 actions active
+- market_pulse (6h), build_update (24h), thought_piece (12h), monitor_mentions (4h), queue_flush (2h)
+- Needs LLM function wired for content generation (currently no llmFn passed)
 - `jarvis-bot/src/index.js` — triggerednometry unlimited, tbhxnest REMOVED, task queue init/flush/stop
 - `jarvis-bot/src/memory.js` — Rule #10: never say "I'll check" without calling defer_task
 

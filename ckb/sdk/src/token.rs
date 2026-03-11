@@ -1674,4 +1674,224 @@ mod tests {
         let recipient_amount = parse_token_amount(&tx.outputs[0].data).unwrap();
         assert_eq!(recipient_amount, u128::MAX);
     }
+
+    // ============ New Tests: Coverage Expansion (Batch 4) ============
+
+    #[test]
+    fn test_hash_script_deterministic() {
+        // Same script must always produce the same hash
+        let script = test_lock(0x42);
+        let h1 = hash_script(&script);
+        let h2 = hash_script(&script);
+        assert_eq!(h1, h2, "hash_script must be deterministic");
+        assert_ne!(h1, [0u8; 32], "Hash of non-trivial script should not be all zeros");
+    }
+
+    #[test]
+    fn test_hash_script_different_args_different_hash() {
+        let mut script1 = test_lock(0x01);
+        let mut script2 = test_lock(0x01);
+        script2.args = vec![0x02; 20]; // Different args
+
+        let h1 = hash_script(&script1);
+        let h2 = hash_script(&script2);
+        assert_ne!(h1, h2, "Different args must produce different script hash");
+    }
+
+    #[test]
+    fn test_transfer_to_self_sender_equals_recipient() {
+        // Transfer tokens to yourself — should work, creates recipient + change cells
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let self_lock = test_lock(0x01);
+
+        let tx = transfer_token(
+            &config,
+            type_script,
+            self_lock.clone(),
+            self_lock.clone(),
+            300,
+            vec![(test_input(0x50), 1000)],
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 2); // recipient (self) + change (self)
+        let recipient_amount = parse_token_amount(&tx.outputs[0].data).unwrap();
+        let change_amount = parse_token_amount(&tx.outputs[1].data).unwrap();
+        assert_eq!(recipient_amount, 300);
+        assert_eq!(change_amount, 700);
+        // Both outputs have same lock script
+        assert_eq!(tx.outputs[0].lock_script.args, self_lock.args);
+        assert_eq!(tx.outputs[1].lock_script.args, self_lock.args);
+    }
+
+    #[test]
+    fn test_burn_u128_max_amount() {
+        // Burn u128::MAX tokens — should succeed if inputs match exactly
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        let tx = burn_token(
+            &config,
+            type_script,
+            u128::MAX,
+            test_lock(0x01),
+            vec![(test_input(0x50), u128::MAX)],
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 0, "Burning u128::MAX should leave no outputs");
+        assert_eq!(tx.inputs.len(), 1);
+    }
+
+    #[test]
+    fn test_transfer_witnesses_count_matches_inputs() {
+        // Verify witness count always matches input count
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        for num_inputs in [1, 2, 3, 5] {
+            let inputs: Vec<(super::super::CellInput, u128)> = (0..num_inputs)
+                .map(|i| (test_input(0x50 + i as u8), 1000))
+                .collect();
+
+            let tx = transfer_token(
+                &config,
+                type_script.clone(),
+                test_lock(0x01),
+                test_lock(0x02),
+                100,
+                inputs,
+            ).unwrap();
+
+            assert_eq!(tx.witnesses.len(), tx.inputs.len(),
+                "Witness count must match input count for {} inputs", num_inputs);
+        }
+    }
+
+    #[test]
+    fn test_create_token_info_issuer_lock_on_output() {
+        // Verify the info cell output uses the issuer's lock script
+        let config = test_xudt_config();
+        let issuer = test_lock(0x55);
+        let info = TokenInfo {
+            name: "Test".to_string(),
+            symbol: "T".to_string(),
+            decimals: 8,
+            description: "".to_string(),
+            max_supply: 0,
+        };
+
+        let tx = create_token_info(
+            &config,
+            [0x42; 32],
+            &info,
+            issuer.clone(),
+            test_input(0x50),
+        );
+
+        assert_eq!(tx.outputs[0].lock_script.code_hash, issuer.code_hash);
+        assert_eq!(tx.outputs[0].lock_script.args, issuer.args);
+        assert_eq!(tx.outputs[0].capacity, TOKEN_INFO_CELL_CAPACITY);
+    }
+
+    #[test]
+    fn test_compute_token_type_hash_all_zero_inputs() {
+        // All-zero inputs should still produce a valid non-zero hash
+        let h = compute_token_type_hash(
+            &[0u8; 32],
+            &super::super::HashType::Data,
+            &[0u8; 32],
+        );
+        assert_ne!(h, [0u8; 32], "Hash of all-zero inputs should not be all zeros");
+    }
+
+    #[test]
+    fn test_token_info_deserialize_invalid_utf8_name() {
+        // Create data where the name bytes are invalid UTF-8
+        let mut data = vec![18u8]; // decimals
+        data.extend_from_slice(&(4u16).to_le_bytes()); // name_len = 4
+        data.extend_from_slice(&[0xFF, 0xFE, 0x80, 0x90]); // invalid UTF-8
+        data.extend_from_slice(&(2u16).to_le_bytes()); // symbol_len = 2
+        data.extend_from_slice(b"OK"); // valid symbol
+        data.extend_from_slice(&(0u16).to_le_bytes()); // desc_len = 0
+        data.extend_from_slice(&0u128.to_le_bytes()); // max_supply
+        assert!(TokenInfo::deserialize(&data).is_none(),
+            "Invalid UTF-8 in name should cause deserialization to fail");
+    }
+
+    #[test]
+    fn test_token_info_deserialize_invalid_utf8_symbol() {
+        // Valid name but invalid UTF-8 in symbol
+        let mut data = vec![18u8]; // decimals
+        data.extend_from_slice(&(2u16).to_le_bytes()); // name_len = 2
+        data.extend_from_slice(b"OK"); // valid name
+        data.extend_from_slice(&(3u16).to_le_bytes()); // symbol_len = 3
+        data.extend_from_slice(&[0xFF, 0xFE, 0x80]); // invalid UTF-8 symbol
+        data.extend_from_slice(&(0u16).to_le_bytes()); // desc_len = 0
+        data.extend_from_slice(&0u128.to_le_bytes()); // max_supply
+        assert!(TokenInfo::deserialize(&data).is_none(),
+            "Invalid UTF-8 in symbol should cause deserialization to fail");
+    }
+
+    #[test]
+    fn test_parse_token_amount_single_byte_returns_none() {
+        // Various sizes below 16 bytes should all return None
+        for len in 0..16 {
+            let data = vec![0xAA; len];
+            assert_eq!(parse_token_amount(&data), None,
+                "Data of {} bytes should return None", len);
+        }
+    }
+
+    #[test]
+    fn test_mint_batch_all_outputs_capacity_is_token_cell_capacity() {
+        // Every output in a batch mint should have TOKEN_CELL_CAPACITY
+        let config = test_xudt_config();
+        let recipients = vec![
+            (test_lock(0x02), 100_u128),
+            (test_lock(0x03), 200),
+            (test_lock(0x04), 300),
+        ];
+
+        let (tx, _) = mint_batch(&config, test_lock(0x01), &recipients, test_input(0x50));
+
+        for (i, output) in tx.outputs.iter().enumerate() {
+            assert_eq!(output.capacity, TOKEN_CELL_CAPACITY,
+                "Output {} should have TOKEN_CELL_CAPACITY", i);
+        }
+    }
+
+    #[test]
+    fn test_burn_cell_dep_matches_config() {
+        // Verify burn transaction cell_deps come from the xudt config
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        let tx = burn_token(
+            &config,
+            type_script,
+            500,
+            test_lock(0x01),
+            vec![(test_input(0x50), 1000)],
+        ).unwrap();
+
+        assert_eq!(tx.cell_deps.len(), 1);
+        assert_eq!(tx.cell_deps[0].tx_hash, config.xudt_cell_dep_tx_hash);
+        assert_eq!(tx.cell_deps[0].index, config.xudt_cell_dep_index);
+    }
 }

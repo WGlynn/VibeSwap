@@ -1,0 +1,16 @@
+[package]
+name = "lending-pool-type"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+ckb = ["ckb-std"]
+
+[dependencies]
+ckb-std = { workspace = true, optional = true }
+vibeswap-types = { path = "../../lib/types", default-features = false }
+ckb-lending-math = { path = "../../lib/lending-math", default-features = false }
+vibeswap-pow = { path = "../../lib/pow", default-features = false }
+sha2 = { version = "0.10", default-features = false }

@@ -145,6 +145,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckb-lending-math"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "sha2",
+]
+
+[[package]]
 name = "ckb-std"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -377,6 +385,17 @@ name = "leb128fmt"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
+
+[[package]]
+name = "lending-pool-type"
+version = "0.1.0"
+dependencies = [
+ "ckb-lending-math",
+ "ckb-std",
+ "sha2",
+ "vibeswap-pow",
+ "vibeswap-types",
+]
 
 [[package]]
 name = "libc"
@@ -742,6 +761,16 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
+name = "vault-type"
+version = "0.1.0"
+dependencies = [
+ "ckb-lending-math",
+ "ckb-std",
+ "sha2",
+ "vibeswap-types",
+]
 
 [[package]]
 name = "version_check"

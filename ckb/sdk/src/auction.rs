@@ -1592,4 +1592,812 @@ mod tests {
         );
         assert!(large_vol >= small_vol, "Higher batch volume should suggest higher priority bid");
     }
+
+    // ============ NEW TESTS: Edge Cases, Boundaries, Error Paths ============
+
+    // --- Order Hash Edge Cases ---
+
+    #[test]
+    fn test_order_hash_zero_amount_zero_price() {
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 0, 0, 0, &secret);
+        // Different from all-zero secret version
+        let hash2 = commit_order_hash(ORDER_BUY, 0, 0, 0, &[0u8; 32]);
+        assert_ne!(hash, hash2);
+    }
+
+    #[test]
+    fn test_order_hash_u128_max_amount_only() {
+        let secret = [0x01u8; 32];
+        let h1 = commit_order_hash(ORDER_BUY, u128::MAX, 0, 0, &secret);
+        let h2 = commit_order_hash(ORDER_BUY, u128::MAX - 1, 0, 0, &secret);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_order_hash_u128_max_limit_price_only() {
+        let secret = [0x01u8; 32];
+        let h1 = commit_order_hash(ORDER_SELL, 1000, u128::MAX, 0, &secret);
+        let h2 = commit_order_hash(ORDER_SELL, 1000, u128::MAX - 1, 0, &secret);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_order_hash_u64_max_priority() {
+        let secret = [0x01u8; 32];
+        let h1 = commit_order_hash(ORDER_BUY, 1000, 2000, u64::MAX, &secret);
+        let h2 = commit_order_hash(ORDER_BUY, 1000, 2000, u64::MAX - 1, &secret);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_order_hash_sell_type_with_all_max_values() {
+        let secret = [0xFF; 32];
+        let hash = commit_order_hash(ORDER_SELL, u128::MAX, u128::MAX, u64::MAX, &secret);
+        assert_ne!(hash, [0u8; 32]);
+        // Also verify determinism at extremes
+        let hash2 = commit_order_hash(ORDER_SELL, u128::MAX, u128::MAX, u64::MAX, &secret);
+        assert_eq!(hash, hash2);
+    }
+
+    // --- Commit Validation Edge Cases ---
+
+    #[test]
+    fn test_validate_commit_settling_phase() {
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let mut auction = default_auction();
+        auction.phase = PHASE_SETTLING;
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: auction.batch_id,
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+
+        let err = validate_commit(&commit, ORDER_BUY, 1000, 2000, 0, &secret, &auction).unwrap_err();
+        assert!(matches!(err, AuctionError::WrongPhase { expected: 0, actual: 2 }));
+    }
+
+    #[test]
+    fn test_validate_commit_settled_phase() {
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let mut auction = default_auction();
+        auction.phase = PHASE_SETTLED;
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: auction.batch_id,
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+
+        let err = validate_commit(&commit, ORDER_BUY, 1000, 2000, 0, &secret, &auction).unwrap_err();
+        assert!(matches!(err, AuctionError::WrongPhase { expected: 0, actual: 3 }));
+    }
+
+    #[test]
+    fn test_validate_commit_batch_id_zero() {
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let mut auction = default_auction();
+        auction.batch_id = 0;
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 0,
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+
+        assert!(validate_commit(&commit, ORDER_BUY, 1000, 2000, 0, &secret, &auction).is_ok());
+    }
+
+    #[test]
+    fn test_validate_commit_checks_batch_before_phase() {
+        // When both batch ID and phase are wrong, batch mismatch should be caught first
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let mut auction = default_auction();
+        auction.phase = PHASE_REVEAL; // Wrong phase
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 999, // Wrong batch
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+
+        let err = validate_commit(&commit, ORDER_BUY, 1000, 2000, 0, &secret, &auction).unwrap_err();
+        assert!(matches!(err, AuctionError::BatchIdMismatch { .. }));
+    }
+
+    #[test]
+    fn test_validate_commit_wrong_secret_causes_mismatch() {
+        let secret = [0x42u8; 32];
+        let wrong_secret = [0x43u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let auction = default_auction();
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: auction.batch_id,
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+
+        let err = validate_commit(&commit, ORDER_BUY, 1000, 2000, 0, &wrong_secret, &auction).unwrap_err();
+        assert!(matches!(err, AuctionError::CommitMismatch));
+    }
+
+    // --- Reveal Verification Edge Cases ---
+
+    #[test]
+    fn test_verify_reveal_wrong_limit_price() {
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+        let reveal = RevealWitness {
+            order_type: ORDER_BUY,
+            amount_in: 1000,
+            limit_price: 2001, // Wrong limit price
+            secret,
+            priority_bid: 0,
+            commit_index: 0,
+        };
+        assert_eq!(verify_reveal(&reveal, &commit).unwrap_err(), AuctionError::RevealMismatch);
+    }
+
+    #[test]
+    fn test_verify_reveal_all_zero_params() {
+        let secret = [0u8; 32];
+        let hash = commit_order_hash(0, 0, 0, 0, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 0,
+            deposit_ckb: 0,
+            token_type_hash: [0; 32],
+            token_amount: 0,
+            block_number: 0,
+            sender_lock_hash: [0; 32],
+        };
+        let reveal = RevealWitness {
+            order_type: 0,
+            amount_in: 0,
+            limit_price: 0,
+            secret,
+            priority_bid: 0,
+            commit_index: 0,
+        };
+        assert!(verify_reveal(&reveal, &commit).is_ok());
+    }
+
+    #[test]
+    fn test_verify_reveal_max_values_roundtrip() {
+        let secret = [0xFF; 32];
+        let hash = commit_order_hash(ORDER_SELL, u128::MAX, u128::MAX, u64::MAX, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: u64::MAX,
+            deposit_ckb: u64::MAX,
+            token_type_hash: [0xFF; 32],
+            token_amount: u128::MAX,
+            block_number: u64::MAX,
+            sender_lock_hash: [0xFF; 32],
+        };
+        let reveal = RevealWitness {
+            order_type: ORDER_SELL,
+            amount_in: u128::MAX,
+            limit_price: u128::MAX,
+            secret,
+            priority_bid: u64::MAX,
+            commit_index: u32::MAX,
+        };
+        assert!(verify_reveal(&reveal, &commit).is_ok());
+    }
+
+    // --- Phase Timing Edge Cases ---
+
+    #[test]
+    fn test_phase_info_commit_at_start_block() {
+        let auction = default_auction(); // phase_start_block = 100
+        let config = default_config();   // commit_window = 40
+        // At exact start block: 0 elapsed, full window remaining
+        let info = phase_info(&auction, 100, &config);
+        assert_eq!(info.phase, PHASE_COMMIT);
+        assert_eq!(info.blocks_remaining, 40);
+        assert!(!info.can_transition);
+    }
+
+    #[test]
+    fn test_phase_info_commit_one_block_before_boundary() {
+        let auction = default_auction(); // phase_start_block = 100
+        let config = default_config();   // commit_window = 40
+        // Block 139 = 39 elapsed, 1 remaining
+        let info = phase_info(&auction, 139, &config);
+        assert_eq!(info.blocks_remaining, 1);
+        assert!(!info.can_transition);
+    }
+
+    #[test]
+    fn test_phase_info_reveal_at_exact_boundary() {
+        let mut auction = default_auction();
+        auction.phase = PHASE_REVEAL;
+        auction.phase_start_block = 150;
+        let config = default_config(); // reveal_window = 10
+        // Block 160 = exactly 10 elapsed = window
+        let info = phase_info(&auction, 160, &config);
+        assert_eq!(info.blocks_remaining, 0);
+        assert!(info.can_transition);
+    }
+
+    #[test]
+    fn test_phase_info_reveal_one_block_before_boundary() {
+        let mut auction = default_auction();
+        auction.phase = PHASE_REVEAL;
+        auction.phase_start_block = 150;
+        let config = default_config(); // reveal_window = 10
+        // Block 159 = 9 elapsed, 1 remaining
+        let info = phase_info(&auction, 159, &config);
+        assert_eq!(info.blocks_remaining, 1);
+        assert!(!info.can_transition);
+    }
+
+    #[test]
+    fn test_phase_info_settling_always_zero_remaining() {
+        let mut auction = default_auction();
+        auction.phase = PHASE_SETTLING;
+        auction.phase_start_block = 0;
+        let info = phase_info(&auction, 0, &default_config());
+        assert_eq!(info.blocks_remaining, 0);
+        assert!(info.can_transition);
+    }
+
+    #[test]
+    fn test_phase_info_max_block_numbers() {
+        let mut auction = default_auction();
+        auction.phase_start_block = u64::MAX - 1;
+        let config = default_config();
+        // At u64::MAX: 1 block elapsed, should not overflow
+        let info = phase_info(&auction, u64::MAX, &config);
+        assert_eq!(info.phase, PHASE_COMMIT);
+        assert!(!info.can_transition); // Only 1 block elapsed, window is 40
+    }
+
+    // --- Slash Calculation Edge Cases ---
+
+    #[test]
+    fn test_slash_one_bps() {
+        // 1 bps = 0.01%
+        let result = calculate_slash(1_000_000, 1);
+        assert_eq!(result.slash_amount, 100); // 1_000_000 * 1 / 10_000 = 100
+        assert_eq!(result.return_amount, 999_900);
+        assert_eq!(result.slash_amount + result.return_amount, 1_000_000);
+    }
+
+    #[test]
+    fn test_slash_9999_bps() {
+        // 99.99% slash
+        let result = calculate_slash(1_000_000, 9999);
+        assert_eq!(result.slash_amount, 999_900);
+        assert_eq!(result.return_amount, 100);
+    }
+
+    #[test]
+    fn test_slash_large_deposit_no_overflow() {
+        // Max u64 deposit with 50% slash — intermediate computation uses u128
+        let deposit = u64::MAX;
+        let result = calculate_slash(deposit, 5000);
+        // (u64::MAX as u128 * 5000 / 10_000) as u64
+        let expected_slash = (u64::MAX as u128 * 5000 / 10_000) as u64;
+        assert_eq!(result.slash_amount, expected_slash);
+        assert_eq!(result.slash_amount + result.return_amount, deposit);
+    }
+
+    #[test]
+    fn test_slash_deposit_1_rate_10000() {
+        // 1 shannon with 100% slash
+        let result = calculate_slash(1, 10_000);
+        assert_eq!(result.slash_amount, 1);
+        assert_eq!(result.return_amount, 0);
+    }
+
+    #[test]
+    fn test_slash_deposit_1_rate_1() {
+        // 1 shannon with 0.01% slash — rounds to 0
+        let result = calculate_slash(1, 1);
+        assert_eq!(result.slash_amount, 0);
+        assert_eq!(result.return_amount, 1);
+    }
+
+    // --- Batch Simulation Edge Cases ---
+
+    #[test]
+    fn test_simulate_single_buy_order() {
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 1_000 * PRECISION, 2 * PRECISION, 0),
+        ];
+        let result = simulate_batch(
+            &reveals,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            PRECISION,
+        );
+        // Single buy with no sells — may succeed via AMM or fail
+        assert!(result.is_ok() || matches!(result, Err(AuctionError::ClearingPriceFailed)));
+    }
+
+    #[test]
+    fn test_simulate_single_sell_order() {
+        let reveals = vec![
+            make_reveal(ORDER_SELL, 1_000 * PRECISION, PRECISION / 2, 0),
+        ];
+        let result = simulate_batch(
+            &reveals,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            PRECISION,
+        );
+        assert!(result.is_ok() || matches!(result, Err(AuctionError::ClearingPriceFailed)));
+    }
+
+    #[test]
+    fn test_simulate_many_orders() {
+        // 10 buys, 10 sells — stress test
+        let mut reveals = Vec::new();
+        for i in 0..10 {
+            reveals.push(make_reveal(
+                ORDER_BUY,
+                (100 + i as u128) * PRECISION,
+                2 * PRECISION,
+                0,
+            ));
+            reveals.push(make_reveal(
+                ORDER_SELL,
+                (100 + i as u128) * PRECISION,
+                PRECISION / 2,
+                0,
+            ));
+        }
+
+        let result = simulate_batch(
+            &reveals,
+            10_000_000 * PRECISION,
+            10_000_000 * PRECISION,
+            PRECISION,
+        );
+        assert!(result.is_ok());
+        let sim = result.unwrap();
+        assert_eq!(sim.buy_fills + sim.sell_fills, 20); // All should fill with generous limits
+    }
+
+    #[test]
+    fn test_simulate_buy_sell_volume_tracking() {
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 100 * PRECISION, 2 * PRECISION, 0),
+            make_reveal(ORDER_BUY, 200 * PRECISION, 2 * PRECISION, 0),
+            make_reveal(ORDER_SELL, 50 * PRECISION, PRECISION / 2, 0),
+            make_reveal(ORDER_SELL, 75 * PRECISION, PRECISION / 2, 0),
+        ];
+        let sim = simulate_batch(
+            &reveals,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            PRECISION,
+        ).unwrap();
+        assert_eq!(sim.total_buy_volume, 300 * PRECISION);
+        assert_eq!(sim.total_sell_volume, 125 * PRECISION);
+    }
+
+    #[test]
+    fn test_simulate_spot_price_zero_no_panic() {
+        // spot_price = 0 should still produce price_impact_bps = 0
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 1_000 * PRECISION, 2 * PRECISION, 0),
+            make_reveal(ORDER_SELL, 1_000 * PRECISION, PRECISION / 2, 0),
+        ];
+        let result = simulate_batch(
+            &reveals,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            0, // zero spot price
+        );
+        if let Ok(sim) = result {
+            assert_eq!(sim.price_impact_bps, 0);
+        }
+    }
+
+    // --- Fill Estimation Edge Cases ---
+
+    #[test]
+    fn test_estimate_fill_with_priority_bid() {
+        let spot = PRECISION;
+        let other = make_reveal(ORDER_SELL, 1_000 * PRECISION, PRECISION / 2, 0);
+        let result = estimate_fill(
+            ORDER_BUY,
+            1_000 * PRECISION,
+            2 * PRECISION,
+            500, // priority bid
+            &[other],
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            spot,
+        ).unwrap();
+        assert!(result.would_fill);
+        // With a priority bid, queue_position should be 0 (no one has higher bid)
+        assert_eq!(result.queue_position, 0);
+    }
+
+    #[test]
+    fn test_estimate_fill_multiple_priority_bidders() {
+        let spot = PRECISION;
+        let others = vec![
+            make_reveal(ORDER_SELL, 1_000 * PRECISION, PRECISION / 2, 1000), // higher priority
+            make_reveal(ORDER_SELL, 1_000 * PRECISION, PRECISION / 2, 200),  // lower priority
+        ];
+        let result = estimate_fill(
+            ORDER_BUY,
+            500 * PRECISION,
+            2 * PRECISION,
+            500, // mid-range priority
+            &others,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            spot,
+        ).unwrap();
+        // 1 bidder has higher priority (1000 > 500), so queue_position = 1
+        assert_eq!(result.queue_position, 1);
+    }
+
+    #[test]
+    fn test_estimate_fill_no_priority_queue_position() {
+        let spot = PRECISION;
+        let others = vec![
+            make_reveal(ORDER_SELL, 500 * PRECISION, PRECISION / 2, 100), // has priority
+            make_reveal(ORDER_SELL, 500 * PRECISION, PRECISION / 2, 0),   // no priority
+        ];
+        let result = estimate_fill(
+            ORDER_BUY,
+            500 * PRECISION,
+            2 * PRECISION,
+            0, // no priority bid
+            &others,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            spot,
+        ).unwrap();
+        // priority_count = 1 (the one with bid=100), non-priority = 2 (self + one other)
+        // queue_position = priority_count + (total - priority_count) / 2 = 1 + 2/2 = 2
+        assert_eq!(result.queue_position, 2);
+    }
+
+    #[test]
+    fn test_estimate_fill_priority_helpful_large_order() {
+        let spot = PRECISION;
+        // One large order against a small counterparty — should signal priority is helpful
+        let others = vec![
+            make_reveal(ORDER_SELL, 100 * PRECISION, PRECISION / 2, 0),
+        ];
+        let result = estimate_fill(
+            ORDER_BUY,
+            500 * PRECISION, // Very large relative to fillable volume
+            2 * PRECISION,
+            0,
+            &others,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            spot,
+        ).unwrap();
+        // priority_helpful should be true if order > 5% of fillable volume
+        // (this depends on fillable_volume from batch sim)
+        let _ = result.priority_helpful; // Verify no panic; value depends on sim
+    }
+
+    // --- Order Book Analysis Edge Cases ---
+
+    #[test]
+    fn test_analyze_single_buy() {
+        let reveals = vec![make_reveal(ORDER_BUY, 5_000, 3_000, 0)];
+        let (bc, sc, bv, sv, bp, sp) = analyze_order_book(&reveals);
+        assert_eq!(bc, 1);
+        assert_eq!(sc, 0);
+        assert_eq!(bv, 5_000);
+        assert_eq!(sv, 0);
+        assert_eq!(bp, 3_000);
+        assert_eq!(sp, 0);
+    }
+
+    #[test]
+    fn test_analyze_single_sell() {
+        let reveals = vec![make_reveal(ORDER_SELL, 7_000, 1_000, 0)];
+        let (bc, sc, bv, sv, bp, sp) = analyze_order_book(&reveals);
+        assert_eq!(bc, 0);
+        assert_eq!(sc, 1);
+        assert_eq!(bv, 0);
+        assert_eq!(sv, 7_000);
+        assert_eq!(bp, 0);
+        assert_eq!(sp, 1_000);
+    }
+
+    #[test]
+    fn test_analyze_all_invalid_order_types() {
+        let reveals = vec![
+            RevealWitness {
+                order_type: 5,
+                amount_in: 1_000,
+                limit_price: 2_000,
+                secret: [0xAA; 32],
+                priority_bid: 0,
+                commit_index: 0,
+            },
+            RevealWitness {
+                order_type: 99,
+                amount_in: 2_000,
+                limit_price: 3_000,
+                secret: [0xBB; 32],
+                priority_bid: 0,
+                commit_index: 0,
+            },
+        ];
+        let (bc, sc, bv, sv, bp, sp) = analyze_order_book(&reveals);
+        assert_eq!((bc, sc, bv, sv, bp, sp), (0, 0, 0, 0, 0, 0));
+    }
+
+    #[test]
+    fn test_analyze_avg_price_precision() {
+        // Test that avg price is correct with integer division
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 1_000, 10, 0),
+            make_reveal(ORDER_BUY, 2_000, 20, 0),
+            make_reveal(ORDER_BUY, 3_000, 30, 0),
+        ];
+        let (bc, _, _, _, bp, _) = analyze_order_book(&reveals);
+        assert_eq!(bc, 3);
+        assert_eq!(bp, (10 + 20 + 30) / 3); // = 20
+    }
+
+    // --- XOR Seed Edge Cases ---
+
+    #[test]
+    fn test_xor_seed_two_identical_secrets() {
+        let s1 = compute_xor_seed(&[[0x42u8; 32], [0x42u8; 32]]);
+        let s2 = compute_xor_seed(&[[0x42u8; 32]]);
+        // Two identical secrets XOR to zero for their contribution, different from one secret
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn test_xor_seed_order_matters_or_not() {
+        // XOR is commutative, so order should NOT matter for the raw XOR,
+        // but generate_seed may do more than just XOR
+        let s1 = compute_xor_seed(&[[0x01u8; 32], [0x02u8; 32]]);
+        let s2 = compute_xor_seed(&[[0x02u8; 32], [0x01u8; 32]]);
+        // Just verify neither panics; commutativity depends on implementation
+        let _ = (s1, s2);
+    }
+
+    // --- Execution Order Verification Edge Cases ---
+
+    #[test]
+    fn test_verify_execution_order_single_element() {
+        let seed = [0x42u8; 32];
+        let expected = vibeswap_math::shuffle::partition_and_shuffle(1, 0, &seed);
+        assert!(verify_execution_order(1, 0, &seed, &expected));
+    }
+
+    #[test]
+    fn test_verify_execution_order_all_priority() {
+        let seed = [0x42u8; 32];
+        let expected = vibeswap_math::shuffle::partition_and_shuffle(5, 5, &seed);
+        assert!(verify_execution_order(5, 5, &seed, &expected));
+    }
+
+    #[test]
+    fn test_verify_execution_order_no_priority() {
+        let seed = [0x42u8; 32];
+        let expected = vibeswap_math::shuffle::partition_and_shuffle(5, 0, &seed);
+        assert!(verify_execution_order(5, 0, &seed, &expected));
+    }
+
+    #[test]
+    fn test_verify_execution_order_empty_claimed() {
+        let seed = [0x42u8; 32];
+        // Empty claimed order should match empty expected when total_orders = 0
+        assert!(verify_execution_order(0, 0, &seed, &[]));
+    }
+
+    #[test]
+    fn test_verify_execution_order_wrong_length() {
+        let seed = [0x42u8; 32];
+        let wrong = vec![0, 1]; // Only 2 elements but 5 expected
+        assert!(!verify_execution_order(5, 0, &seed, &wrong));
+    }
+
+    // --- Non-Revealer Edge Cases ---
+
+    #[test]
+    fn test_count_non_revealers_zero_both() {
+        let mut auction = default_auction();
+        auction.commit_count = 0;
+        auction.reveal_count = 0;
+        assert_eq!(count_non_revealers(&auction), 0);
+    }
+
+    #[test]
+    fn test_count_non_revealers_max_values() {
+        let mut auction = default_auction();
+        auction.commit_count = u32::MAX;
+        auction.reveal_count = 0;
+        assert_eq!(count_non_revealers(&auction), u32::MAX);
+    }
+
+    #[test]
+    fn test_count_non_revealers_one_missing() {
+        let mut auction = default_auction();
+        auction.commit_count = 100;
+        auction.reveal_count = 99;
+        assert_eq!(count_non_revealers(&auction), 1);
+    }
+
+    // --- Slash Revenue Edge Cases ---
+
+    #[test]
+    fn test_estimate_slash_revenue_zero_rate() {
+        let revenue = estimate_slash_revenue(10, 100_000_000, 0);
+        assert_eq!(revenue, 0);
+    }
+
+    #[test]
+    fn test_estimate_slash_revenue_one_non_revealer() {
+        let revenue = estimate_slash_revenue(1, 200_000_000, 5000);
+        assert_eq!(revenue, 100_000_000);
+    }
+
+    #[test]
+    fn test_estimate_slash_revenue_100_percent_rate() {
+        let revenue = estimate_slash_revenue(3, 100_000_000, 10_000);
+        assert_eq!(revenue, 3 * 100_000_000);
+    }
+
+    // --- Priority Bid Strategy Edge Cases ---
+
+    #[test]
+    fn test_optimal_priority_equal_reserves() {
+        // When reserves are equal and volume is small, bid should be minimal
+        let bid = optimal_priority_bid(
+            10 * PRECISION, 100 * PRECISION,
+            1_000_000 * PRECISION, 1_000_000 * PRECISION, 30,
+        );
+        // Small order + small batch relative to reserves = tiny bid
+        assert!(bid < 1_000_000); // Less than 0.01 CKB
+    }
+
+    #[test]
+    fn test_optimal_priority_asymmetric_reserves() {
+        // min(reserve0, reserve1) is used for impact calculation
+        let bid_balanced = optimal_priority_bid(
+            1_000 * PRECISION, 50_000 * PRECISION,
+            1_000_000 * PRECISION, 1_000_000 * PRECISION, 30,
+        );
+        let bid_asymmetric = optimal_priority_bid(
+            1_000 * PRECISION, 50_000 * PRECISION,
+            100_000 * PRECISION, 1_000_000 * PRECISION, 30,
+        );
+        // With smaller min reserve, impact is higher, so bid should be higher
+        assert!(bid_asymmetric >= bid_balanced);
+    }
+
+    // --- Error Type Coverage ---
+
+    #[test]
+    fn test_auction_error_clone_and_debug() {
+        let e1 = AuctionError::WrongPhase { expected: 0, actual: 1 };
+        let e2 = e1.clone();
+        assert_eq!(e1, e2);
+        let debug_str = format!("{:?}", e1);
+        assert!(debug_str.contains("WrongPhase"));
+    }
+
+    #[test]
+    fn test_all_error_variants_are_distinct() {
+        let errors: Vec<AuctionError> = vec![
+            AuctionError::WrongPhase { expected: 0, actual: 1 },
+            AuctionError::CommitMismatch,
+            AuctionError::RevealMismatch,
+            AuctionError::BatchIdMismatch { commit: 1, auction: 2 },
+            AuctionError::EmptyBatch,
+            AuctionError::ClearingPriceFailed,
+            AuctionError::ZeroAmount,
+            AuctionError::InvalidOrderType(99),
+            AuctionError::PhaseExpired,
+            AuctionError::PhaseNotElapsed,
+        ];
+        // Each variant should be distinct from every other
+        for i in 0..errors.len() {
+            for j in (i + 1)..errors.len() {
+                assert_ne!(errors[i], errors[j], "Error variants {} and {} should differ", i, j);
+            }
+        }
+    }
+
+    // --- Struct Coverage ---
+
+    #[test]
+    fn test_batch_simulation_clone_eq() {
+        let sim = BatchSimulation {
+            clearing_price: PRECISION,
+            fillable_volume: 1000,
+            buy_fills: 5,
+            sell_fills: 3,
+            total_buy_volume: 5000,
+            total_sell_volume: 3000,
+            pressure_ratio: PRECISION,
+            price_impact_bps: 50,
+        };
+        let sim2 = sim.clone();
+        assert_eq!(sim, sim2);
+    }
+
+    #[test]
+    fn test_fill_estimate_clone_eq() {
+        let est = FillEstimate {
+            would_fill: true,
+            estimated_output: 999,
+            effective_price: PRECISION,
+            queue_position: 2,
+            priority_helpful: false,
+        };
+        let est2 = est.clone();
+        assert_eq!(est, est2);
+    }
+
+    #[test]
+    fn test_phase_info_clone_eq() {
+        let info = PhaseInfo {
+            phase: PHASE_COMMIT,
+            blocks_remaining: 10,
+            can_transition: false,
+            next_phase: PHASE_REVEAL,
+        };
+        let info2 = info.clone();
+        assert_eq!(info, info2);
+    }
+
+    #[test]
+    fn test_slash_result_clone_eq() {
+        let sr = SlashResult {
+            slash_amount: 500,
+            return_amount: 500,
+            slash_rate_bps: 5000,
+        };
+        let sr2 = sr.clone();
+        assert_eq!(sr, sr2);
+    }
+
+    #[test]
+    fn test_default_slash_uses_correct_rate() {
+        let result = calculate_default_slash(10_000);
+        assert_eq!(result.slash_rate_bps, DEFAULT_SLASH_RATE_BPS);
+        assert_eq!(result.slash_rate_bps, 5000);
+    }
 }

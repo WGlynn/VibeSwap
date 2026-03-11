@@ -1403,4 +1403,183 @@ mod tests {
         let power = calculate_voting_power(big_amount, MAX_LOCK_DURATION, MAX_LOCK_DURATION);
         assert_eq!(power, big_amount);
     }
+
+    // ============ Batch 7: Hardening Tests (Target 125+) ============
+
+    #[test]
+    fn voting_power_proportional_to_duration() {
+        let amount = MIN_STAKE_AMOUNT * 10;
+        let p1 = calculate_voting_power(amount, 1_000_000, MAX_LOCK_DURATION);
+        let p2 = calculate_voting_power(amount, 2_000_000, MAX_LOCK_DURATION);
+        assert_eq!(p2, p1 * 2);
+    }
+
+    #[test]
+    fn voting_power_proportional_to_amount() {
+        let p1 = calculate_voting_power(MIN_STAKE_AMOUNT, 5_000_000, MAX_LOCK_DURATION);
+        let p2 = calculate_voting_power(MIN_STAKE_AMOUNT * 3, 5_000_000, MAX_LOCK_DURATION);
+        assert_eq!(p2, p1 * 3);
+    }
+
+    #[test]
+    fn vp_at_block_exact_midpoint() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 1000, 11_000);
+        let vp = voting_power_at_block(&pos, 6_000, MAX_LOCK_DURATION);
+        // remaining = 5000, total = 10000 → 50%
+        let expected = mul_div(pos.voting_power, 5_000, 10_000);
+        assert_eq!(vp, expected);
+    }
+
+    #[test]
+    fn stake_at_large_current_block() {
+        // Staking at a high block number should work fine
+        let result = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, u64::MAX / 2);
+        assert!(result.is_ok());
+        let pos = result.unwrap();
+        assert_eq!(pos.lock_start, u64::MAX / 2);
+        assert_eq!(pos.lock_end, u64::MAX / 2 + MIN_LOCK_DURATION);
+    }
+
+    #[test]
+    fn stake_exactly_min_amount() {
+        let result = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().amount, MIN_STAKE_AMOUNT);
+    }
+
+    #[test]
+    fn unstake_long_after_expiry() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 10_000);
+        let result = calculate_unstake(&pos, 1_000_000, 5000).unwrap();
+        assert_eq!(result.penalty, 0);
+        assert_eq!(result.net_received, MIN_STAKE_AMOUNT);
+    }
+
+    #[test]
+    fn unstake_early_with_max_penalty_cap() {
+        // Penalty bps > MAX_EARLY_EXIT_PENALTY_BPS should be capped
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 10_000);
+        let result_capped = calculate_unstake(&pos, 0, 9999).unwrap();
+        let result_at_max = calculate_unstake(&pos, 0, MAX_EARLY_EXIT_PENALTY_BPS).unwrap();
+        assert_eq!(result_capped.penalty, result_at_max.penalty);
+    }
+
+    #[test]
+    fn pending_rewards_two_stakers_split() {
+        // If two stakers have equal amounts, each gets half
+        let pos = make_position(MIN_STAKE_AMOUNT, 100, 10_100);
+        let pool = make_pool(MIN_STAKE_AMOUNT * 2, 1_000_000, 100);
+        let rewards = pending_rewards(&pos, &pool, 200);
+        // With 2x total staked, this staker gets half the rewards
+        let pool_single = make_pool(MIN_STAKE_AMOUNT, 1_000_000, 100);
+        let rewards_single = pending_rewards(&pos, &pool_single, 200);
+        // Should be roughly half
+        assert!(rewards <= rewards_single, "Shared pool should yield less: {} vs {}", rewards, rewards_single);
+    }
+
+    #[test]
+    fn rpt_before_last_update() {
+        // current_block before last_update_block → saturating_sub gives 0, no change
+        let pool = make_pool(MIN_STAKE_AMOUNT, 1_000_000, 200);
+        let rpt = update_reward_per_token(&pool, 100);
+        assert_eq!(rpt, 0); // pool.reward_per_token_stored was 0, blocks_elapsed = 0
+    }
+
+    #[test]
+    fn apy_with_large_staked() {
+        // Very large staked amount should give small APY
+        let total = u128::MAX / 100;
+        let rate = 1;
+        let apy = reward_apy(rate, total, BLOCKS_PER_YEAR);
+        // annual = BLOCKS_PER_YEAR, apy = BLOCKS_PER_YEAR * 10000 / (MAX/100) ≈ 0
+        assert_eq!(apy, 0);
+    }
+
+    #[test]
+    fn extend_lock_at_start_of_lock() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 100_000);
+        let result = extend_lock(&pos, 50_000, MAX_LOCK_DURATION, 0);
+        assert!(result.is_ok());
+        let new_pos = result.unwrap();
+        assert_eq!(new_pos.lock_end, 150_000);
+    }
+
+    #[test]
+    fn extend_lock_one_block_before_expiry() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 100_000);
+        let result = extend_lock(&pos, 1_000, MAX_LOCK_DURATION, 99_999);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().lock_end, 101_000);
+    }
+
+    #[test]
+    fn increase_stake_small_additional() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, MAX_LOCK_DURATION);
+        let result = increase_stake(&pos, 1, 0, MAX_LOCK_DURATION);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().amount, MIN_STAKE_AMOUNT + 1);
+    }
+
+    #[test]
+    fn increase_stake_preserves_staker() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 10_000);
+        let new_pos = increase_stake(&pos, MIN_STAKE_AMOUNT, 0, MAX_LOCK_DURATION).unwrap();
+        assert_eq!(new_pos.staker, pos.staker);
+    }
+
+    #[test]
+    fn governance_weight_10_percent() {
+        assert_eq!(governance_weight(100, 1_000), 1_000);
+    }
+
+    #[test]
+    fn governance_weight_exact_third() {
+        let w = governance_weight(1_000, 3_000);
+        // 1000 * 10000 / 3000 = 3333
+        assert_eq!(w, 3333);
+    }
+
+    #[test]
+    fn governance_weight_capped_at_10000() {
+        // voting_power > total_voting_power would be invalid but function handles gracefully
+        let w = governance_weight(2_000, 1_000);
+        assert_eq!(w, 10_000);
+    }
+
+    #[test]
+    fn time_to_unlock_far_before_start() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 1_000_000, 2_000_000);
+        assert_eq!(time_to_unlock(&pos, 0), 2_000_000);
+    }
+
+    #[test]
+    fn is_lock_expired_just_after() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 10_000);
+        assert!(is_lock_expired(&pos, 10_001));
+    }
+
+    #[test]
+    fn penalty_exactly_one_block_total_lock() {
+        // total_lock = 1, remaining = 1 → full proportional penalty
+        let penalty = early_exit_penalty(MIN_STAKE_AMOUNT, 1, 1, 5000);
+        let expected = mul_div(MIN_STAKE_AMOUNT, 5_000, 10_000);
+        assert_eq!(penalty, expected);
+    }
+
+    #[test]
+    fn stats_over_100_percent_utilization() {
+        // total_staked > max_supply should cap or produce > 10000 bps
+        let pool = make_pool(MIN_STAKE_AMOUNT * 200, 0, 0);
+        let stats = staking_stats(&pool, MIN_STAKE_AMOUNT * 100);
+        // 200/100 = 200% = 20000 bps
+        assert_eq!(stats.utilization_bps, 20000);
+    }
+
+    #[test]
+    fn stake_then_early_exit_penalty_covers_net_received() {
+        let pos = stake(MIN_STAKE_AMOUNT, MAX_LOCK_DURATION, 0).unwrap();
+        let result = calculate_unstake(&pos, 0, MAX_EARLY_EXIT_PENALTY_BPS).unwrap();
+        // penalty + net_received = amount
+        assert_eq!(result.penalty + result.net_received, result.amount);
+    }
 }

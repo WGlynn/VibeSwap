@@ -9,6 +9,7 @@ pub mod collector;
 pub mod consensus;
 pub mod fees;
 pub mod governance;
+pub mod insurance;
 pub mod keeper;
 pub mod knowledge;
 pub mod liquidity;

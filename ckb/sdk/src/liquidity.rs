@@ -1734,4 +1734,304 @@ mod tests {
             "Zero fee output {} should exceed 0.3% fee output {}",
             zap.swap_output, zap_std.swap_output);
     }
+
+    // ============ Batch 2: Additional Hardening Tests ============
+
+    #[test]
+    fn test_position_value_one_lp_token() {
+        // Smallest meaningful LP position: 1 unit
+        let pool = balanced_pool();
+        let val = position_value(1, &pool, PRECISION, PRECISION).unwrap();
+        // With 1M LP supply and 1M reserves, 1 LP = 1 of each token
+        assert_eq!(val.amount0, 1);
+        assert_eq!(val.amount1, 1);
+        assert_eq!(val.pool_share_bps, 0); // 1/1M < 1 bps
+    }
+
+    #[test]
+    fn test_position_value_zero_lp_yields_zero_values() {
+        // 0 LP tokens should give zero values (not error)
+        let pool = balanced_pool();
+        let val = position_value(0, &pool, PRECISION, PRECISION).unwrap();
+        assert_eq!(val.amount0, 0);
+        assert_eq!(val.amount1, 0);
+        assert_eq!(val.total_value, 0);
+        assert_eq!(val.pool_share_bps, 0);
+    }
+
+    #[test]
+    fn test_position_value_very_high_prices() {
+        // Prices at 1M per token
+        let pool = balanced_pool();
+        let high_price = 1_000_000 * PRECISION;
+        let val = position_value(
+            pool.total_lp_supply / 10,
+            &pool,
+            high_price,
+            high_price,
+        ).unwrap();
+
+        assert!(val.total_value > 0);
+        assert_eq!(val.pool_share_bps, 1000); // 10%
+    }
+
+    #[test]
+    fn test_impermanent_loss_at_entry_price_is_zero() {
+        // When current_price == entry_price, IL should be 0
+        let il = impermanent_loss(PRECISION, PRECISION, 100_000 * PRECISION).unwrap();
+        assert_eq!(il.il_bps, 0, "No price change = no IL");
+        assert_eq!(il.loss_amount, 0);
+    }
+
+    #[test]
+    fn test_impermanent_loss_price_halved() {
+        // Price halves (r = 0.5): IL ≈ 5.72%
+        let il = impermanent_loss(PRECISION, PRECISION / 2, 100_000 * PRECISION).unwrap();
+        assert!(il.il_bps > 0, "50% price drop should produce IL");
+        assert!(il.il_bps < 1000, "IL for 50% drop should be < 10%");
+        assert!(il.loss_amount > 0);
+    }
+
+    #[test]
+    fn test_impermanent_loss_zero_entry_price() {
+        let result = impermanent_loss(0, PRECISION, 100_000 * PRECISION);
+        assert_eq!(result.unwrap_err(), LiquidityError::ZeroPrice);
+    }
+
+    #[test]
+    fn test_impermanent_loss_zero_initial_value() {
+        // Zero initial value — IL amounts should all be 0
+        let il = impermanent_loss(PRECISION, 2 * PRECISION, 0).unwrap();
+        assert_eq!(il.lp_value, 0);
+        assert_eq!(il.hodl_value, 0);
+        assert_eq!(il.loss_amount, 0);
+        assert_eq!(il.il_bps, 0);
+    }
+
+    #[test]
+    fn test_estimate_withdrawal_zero_amount() {
+        let pool = balanced_pool();
+        let result = estimate_withdrawal(0, &pool);
+        assert_eq!(result.unwrap_err(), LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_estimate_withdrawal_zero_lp_supply() {
+        let mut pool = balanced_pool();
+        pool.total_lp_supply = 0;
+        let result = estimate_withdrawal(1000, &pool);
+        assert_eq!(result.unwrap_err(), LiquidityError::ZeroLPSupply);
+    }
+
+    #[test]
+    fn test_estimate_withdrawal_full_supply() {
+        // Burning all LP should return all reserves
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(pool.total_lp_supply, &pool).unwrap();
+        assert_eq!(est.amount0, pool.reserve0);
+        assert_eq!(est.amount1, pool.reserve1);
+    }
+
+    #[test]
+    fn test_estimate_withdrawal_below_minimum() {
+        // Burning enough to go below minimum_liquidity should flag below_minimum
+        let pool = make_pool(10_000, 10_000, 2000, 30);
+        let est = estimate_withdrawal(1500, &pool).unwrap();
+        // remaining = 2000 - 1500 = 500 < MINIMUM_LIQUIDITY (1000)
+        assert!(est.below_minimum, "500 remaining LP < MINIMUM_LIQUIDITY should flag below_minimum");
+    }
+
+    #[test]
+    fn test_estimate_withdrawal_at_minimum() {
+        // Remaining LP exactly equals minimum_liquidity → not below minimum
+        let pool = make_pool(10_000, 10_000, 2000, 30);
+        let est = estimate_withdrawal(1000, &pool).unwrap();
+        // remaining = 2000 - 1000 = 1000 = MINIMUM_LIQUIDITY
+        assert!(!est.below_minimum, "Exactly at minimum should not be below");
+    }
+
+    #[test]
+    fn test_optimal_deposit_empty_pool_zero_amount_error() {
+        let pool = make_pool(0, 0, 0, 30);
+        let result = optimal_deposit(0, 100 * PRECISION, &pool);
+        assert_eq!(result.unwrap_err(), LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_optimal_deposit_existing_pool_matching_ratio() {
+        // Deposit in exact pool ratio should use all tokens
+        let pool = balanced_pool(); // 1:1
+        let dep = optimal_deposit(1000 * PRECISION, 1000 * PRECISION, &pool).unwrap();
+        assert_eq!(dep.amount0, 1000 * PRECISION);
+        assert_eq!(dep.amount1, 1000 * PRECISION);
+        assert_eq!(dep.leftover0, 0);
+        assert_eq!(dep.leftover1, 0);
+        assert!(dep.expected_lp > 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_surplus_token0_leftover() {
+        // More token0 than pool ratio requires — leftover0 > 0
+        let pool = balanced_pool(); // 1:1
+        let dep = optimal_deposit(2000 * PRECISION, 1000 * PRECISION, &pool).unwrap();
+        // Pool is 1:1, so optimal is 1000:1000
+        assert_eq!(dep.amount0, 1000 * PRECISION);
+        assert_eq!(dep.amount1, 1000 * PRECISION);
+        assert_eq!(dep.leftover0, 1000 * PRECISION);
+        assert_eq!(dep.leftover1, 0);
+    }
+
+    #[test]
+    fn test_zap_in_empty_pool_error() {
+        let pool = make_pool(0, 0, 0, 30);
+        let result = zap_in_estimate(1000 * PRECISION, true, &pool);
+        assert_eq!(result.unwrap_err(), LiquidityError::EmptyPool);
+    }
+
+    #[test]
+    fn test_zap_in_zero_amount_error() {
+        let pool = balanced_pool();
+        let result = zap_in_estimate(0, true, &pool);
+        assert_eq!(result.unwrap_err(), LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_zap_in_via_token1_side() {
+        // Zap in with token1 (is_token0 = false)
+        let pool = balanced_pool();
+        let zap = zap_in_estimate(10_000 * PRECISION, false, &pool).unwrap();
+        assert!(zap.swap_amount > 0);
+        assert!(zap.swap_output > 0);
+        assert!(zap.expected_lp > 0);
+        assert_eq!(zap.swap_amount + zap.deposit_amount_in, 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_pool_analytics_empty_pool_error() {
+        let pool = make_pool(0, 0, 0, 30);
+        let result = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000);
+        assert_eq!(result.unwrap_err(), LiquidityError::EmptyPool);
+    }
+
+    #[test]
+    fn test_pool_analytics_no_volume_zero_apr() {
+        // No volume — fee_apr and utilization should be 0
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap();
+        assert_eq!(analytics.fee_apr_bps, 0);
+        assert_eq!(analytics.utilization_bps, 0);
+        assert!(analytics.tvl > 0);
+    }
+
+    #[test]
+    fn test_spot_price_balanced_is_precision() {
+        let pool = balanced_pool();
+        let price = spot_price(&pool).unwrap();
+        assert_eq!(price, PRECISION); // 1:1
+    }
+
+    #[test]
+    fn test_spot_price_imbalanced_is_4x() {
+        let pool = imbalanced_pool(); // 500K:2M → price = 2M/500K = 4
+        let price = spot_price(&pool).unwrap();
+        assert_eq!(price, 4 * PRECISION);
+    }
+
+    #[test]
+    fn test_spot_price_zero_reserve0_error() {
+        let pool = make_pool(0, 1000, 1000, 30);
+        let result = spot_price(&pool);
+        assert_eq!(result.unwrap_err(), LiquidityError::EmptyPool);
+    }
+
+    #[test]
+    fn test_k_invariant_balanced() {
+        let pool = balanced_pool();
+        let (hi, lo) = k_invariant(&pool);
+        // 1M*P * 1M*P is very large, hi should be > 0
+        assert!(hi > 0 || lo > 0, "k should be non-zero for non-empty pool");
+    }
+
+    #[test]
+    fn test_available_lp_to_burn_balanced() {
+        let pool = balanced_pool();
+        let available = available_lp_to_burn(&pool);
+        assert_eq!(available, pool.total_lp_supply - MINIMUM_LIQUIDITY);
+    }
+
+    #[test]
+    fn test_available_lp_to_burn_at_minimum() {
+        // Pool with LP supply exactly at minimum → 0 available
+        let pool = make_pool(1000, 1000, MINIMUM_LIQUIDITY, 30);
+        assert_eq!(available_lp_to_burn(&pool), 0);
+    }
+
+    #[test]
+    fn test_available_lp_below_minimum_is_zero() {
+        // Pool with LP supply below minimum → 0 (saturating_sub)
+        let pool = make_pool(1000, 1000, MINIMUM_LIQUIDITY - 1, 30);
+        assert_eq!(available_lp_to_burn(&pool), 0);
+    }
+
+    #[test]
+    fn test_liquidity_error_clone_debug_eq() {
+        let e1 = LiquidityError::EmptyPool;
+        let e2 = e1.clone();
+        assert_eq!(e1, e2);
+        assert_ne!(e1, LiquidityError::ZeroAmount);
+        let _debug = format!("{:?}", e1);
+    }
+
+    #[test]
+    fn test_position_value_clone_debug_eq() {
+        let pool = balanced_pool();
+        let val = position_value(1000, &pool, PRECISION, PRECISION).unwrap();
+        let cloned = val.clone();
+        assert_eq!(val, cloned);
+        let _debug = format!("{:?}", val);
+    }
+
+    #[test]
+    fn test_withdrawal_estimate_clone_debug_eq() {
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(1000, &pool).unwrap();
+        let cloned = est.clone();
+        assert_eq!(est, cloned);
+        let _debug = format!("{:?}", est);
+    }
+
+    #[test]
+    fn test_optimal_deposit_clone_debug_eq() {
+        let pool = balanced_pool();
+        let dep = optimal_deposit(1000 * PRECISION, 1000 * PRECISION, &pool).unwrap();
+        let cloned = dep.clone();
+        assert_eq!(dep, cloned);
+        let _debug = format!("{:?}", dep);
+    }
+
+    #[test]
+    fn test_zap_estimate_clone_debug_eq() {
+        let pool = balanced_pool();
+        let zap = zap_in_estimate(10_000 * PRECISION, true, &pool).unwrap();
+        let cloned = zap.clone();
+        assert_eq!(zap, cloned);
+        let _debug = format!("{:?}", zap);
+    }
+
+    #[test]
+    fn test_pool_analytics_clone_debug_eq() {
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap();
+        let cloned = analytics.clone();
+        assert_eq!(analytics, cloned);
+        let _debug = format!("{:?}", analytics);
+    }
+
+    #[test]
+    fn test_impermanent_loss_clone_debug_eq() {
+        let il = impermanent_loss(PRECISION, 2 * PRECISION, 100_000 * PRECISION).unwrap();
+        let cloned = il.clone();
+        assert_eq!(il, cloned);
+        let _debug = format!("{:?}", il);
+    }
 }

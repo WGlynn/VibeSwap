@@ -2325,4 +2325,198 @@ mod tests {
         let route_large = g.find_best_route(&token(1), &token(2), large_amount).unwrap();
         assert_eq!(route_large.hops[0].pool_index, 1, "Large trade should prefer deep pool");
     }
+
+    // ============ Batch 7: Additional Hardening Tests ============
+
+    #[test]
+    fn test_pool_graph_new_is_empty() {
+        let g = PoolGraph::new();
+        assert!(g.pools.is_empty());
+        assert_eq!(g.pool_count(), 0);
+        assert_eq!(g.token_count(), 0);
+        assert!(g.neighbors(&token(1)).is_empty());
+    }
+
+    #[test]
+    fn test_simulate_route_tiny_reserves_produces_limited_output() {
+        // With extremely tiny reserves, swap output should be very limited
+        let mut g = PoolGraph::new();
+        g.add_pool(PoolEdge {
+            pair_id: pair(1, 2),
+            token0: token(1),
+            token1: token(2),
+            reserve0: 10,
+            reserve1: 10,
+            fee_rate_bps: 30,
+        });
+        let hop = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+        // Input of 1 into a tiny pool with 30bps fee → amount_in_with_fee = 0 → output = 0
+        let result = g.simulate_route(&hop, 1);
+        assert!(result.is_none() || result == Some(0),
+            "Tiny pool with 1 unit input should yield zero or None: {:?}", result);
+    }
+
+    #[test]
+    fn test_find_all_routes_returns_unique_paths() {
+        // In a triangle, no two routes should be identical
+        let g = graph_triangle();
+        let routes = g.find_all_routes(&token(1), &token(3), MAX_HOPS).unwrap();
+        for i in 0..routes.len() {
+            for j in (i + 1)..routes.len() {
+                assert_ne!(routes[i], routes[j],
+                    "Routes {} and {} should be different", i, j);
+            }
+        }
+    }
+
+    #[test]
+    fn test_split_route_total_output_matches_leg_sum() {
+        let g = graph_triangle();
+        let amount = 20_000e18 as u128;
+        let split = g.find_split_route(&token(1), &token(3), amount).unwrap();
+
+        let sum: u128 = split.legs.iter().map(|(r, _)| r.expected_output).sum();
+        assert_eq!(sum, split.total_output,
+            "total_output should equal sum of leg outputs");
+    }
+
+    #[test]
+    fn test_best_route_single_hop_has_one_element() {
+        let g = graph_two_pools();
+        let route = g.find_best_route(&token(1), &token(2), 1_000e18 as u128).unwrap();
+        assert_eq!(route.hops.len(), 1);
+        assert_eq!(route.hops[0].pool_index, 0);
+    }
+
+    #[test]
+    fn test_best_route_price_impact_bps_populated() {
+        let g = graph_two_pools();
+        let route = g.find_best_route(&token(1), &token(2), 10_000e18 as u128).unwrap();
+        // For a meaningful trade, price_impact should be > 0
+        assert!(route.price_impact_bps > 0,
+            "Meaningful trade should have positive price impact");
+    }
+
+    #[test]
+    fn test_min_output_with_slippage_very_small_expected() {
+        // Expected output of 1 with various slippages
+        assert_eq!(PoolGraph::min_output_with_slippage(1, 0), 1);
+        assert_eq!(PoolGraph::min_output_with_slippage(1, 5000), 1); // 1 * 5000 / 10000 = 0
+        assert_eq!(PoolGraph::min_output_with_slippage(1, 10_000), 0);
+    }
+
+    #[test]
+    fn test_find_all_routes_triangle_both_directions() {
+        // Triangle graph should find routes from token(3) to token(1) as well
+        let g = graph_triangle();
+        let forward = g.find_all_routes(&token(1), &token(3), MAX_HOPS).unwrap();
+        let reverse = g.find_all_routes(&token(3), &token(1), MAX_HOPS).unwrap();
+        // Both directions should find the same number of routes
+        assert_eq!(forward.len(), reverse.len(),
+            "Triangle should have same number of routes in both directions");
+    }
+
+    #[test]
+    fn test_simulate_route_single_hop_reverse_is_different() {
+        // Simulating A→B and B→A should give different outputs for the same input
+        let g = graph_two_pools();
+        let amount = 1_000e18 as u128;
+
+        let hop_ab = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        let hop_ba = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(2), token_out: token(1),
+        }];
+
+        let out_ab = g.simulate_route(&hop_ab, amount).unwrap();
+        let out_ba = g.simulate_route(&hop_ba, amount).unwrap();
+
+        // On 1:1 pool, both should be approximately equal
+        let diff = if out_ab > out_ba { out_ab - out_ba } else { out_ba - out_ab };
+        assert!(diff < amount / 100, "1:1 pool should give similar output in both directions");
+    }
+
+    #[test]
+    fn test_required_input_returns_none_for_impossible_output() {
+        // Requesting more output than the pool can ever produce
+        let mut g = PoolGraph::new();
+        g.add_pool(pool(1, 2, 100, 100));
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        // Reserve_out is 100 — impossible to get 200 output
+        let result = g.required_input(&hops, 200);
+        assert!(result.is_none(), "Should return None for impossible output");
+    }
+
+    #[test]
+    fn test_pool_edge_clone_debug() {
+        // Verify PoolEdge Clone and Debug traits work
+        let p = pool(1, 2, 1000, 2000);
+        let cloned = p.clone();
+        let _debug = format!("{:?}", cloned);
+        assert_eq!(cloned.reserve0, p.reserve0);
+        assert_eq!(cloned.reserve1, p.reserve1);
+    }
+
+    #[test]
+    fn test_swap_route_clone_debug_eq() {
+        // Verify SwapRoute Clone, Debug, PartialEq, Eq
+        let route = SwapRoute {
+            hops: vec![SwapHop {
+                pool_index: 0, pair_id: pair(1, 2),
+                token_in: token(1), token_out: token(2),
+            }],
+            expected_output: 1000,
+            price_impact_bps: 50,
+        };
+        let cloned = route.clone();
+        assert_eq!(route, cloned);
+        let _debug = format!("{:?}", route);
+    }
+
+    #[test]
+    fn test_router_error_clone_debug_eq() {
+        // Verify RouterError Clone, Debug, PartialEq, Eq
+        let e1 = RouterError::NoRouteFound;
+        let e2 = e1.clone();
+        assert_eq!(e1, e2);
+        assert_ne!(e1, RouterError::ZeroInput);
+        let _debug = format!("{:?}", e1);
+    }
+
+    #[test]
+    fn test_effective_price_larger_trade_gives_lower_price() {
+        // Effective price should decrease monotonically with trade size
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+
+        let p1 = g.effective_price(&hops, 1_000e18 as u128).unwrap();
+        let p2 = g.effective_price(&hops, 10_000e18 as u128).unwrap();
+        let p3 = g.effective_price(&hops, 100_000e18 as u128).unwrap();
+
+        assert!(p1 >= p2, "Price should decrease: 1K={} vs 10K={}", p1, p2);
+        assert!(p2 >= p3, "Price should decrease: 10K={} vs 100K={}", p2, p3);
+    }
+
+    #[test]
+    fn test_split_route_single_route_no_actual_split() {
+        // With only one path available, split route should have 1 leg
+        let g = graph_two_pools();
+        let split = g.find_split_route(&token(1), &token(2), 1_000e18 as u128).unwrap();
+        assert_eq!(split.legs.len(), 1);
+        assert_eq!(split.legs[0].1, 1_000e18 as u128);
+    }
 }

@@ -30,7 +30,6 @@
 
 use std::collections::BTreeMap;
 
-use vibeswap_types::*;
 use vibeswap_math::PRECISION;
 
 // ============ Constants ============
@@ -441,7 +440,7 @@ pub fn calculate_lending_reserve_income(
 
 /// Calculate prediction market fee from settlement
 pub fn calculate_prediction_fee(
-    winning_pool: u128,
+    _winning_pool: u128,
     total_pool: u128,
     fee_rate_bps: u16,
 ) -> u128 {

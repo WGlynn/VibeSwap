@@ -5,10 +5,10 @@
 
 ---
 
-## CURRENT (Session 063 — Mar 11, 2026)
+## CURRENT (Session 063 continued — Mar 11, 2026)
 
 ### Delta from Session 062
-**DEX Router + Portfolio Analytics + Integration Hardening**
+**DEX Router + Portfolio Analytics + Fee Distributor + Integration Hardening**
 
 **Created:**
 - `sdk/src/router.rs` — **NEW** DEX router module (43 tests)
@@ -23,6 +23,15 @@
   - Cross-denomination valuation via oracle PriceMap
   - Impermanent loss tracking, health factor computation
   - PortfolioSummary: total value, concentration, worst HF, APY estimate
+- `sdk/src/fees.rs` — **NEW** Fee distributor with Shapley-depth LP allocation (42 tests)
+  - Shapley-depth-weighted LP fee distribution (per Will's directive)
+    - weight = depth × (1 + utilization_bonus) × (1 + connectivity_bonus)
+    - depth = sqrt(r0 × r1), utilization = volume/depth, connectivity = route_count/max_routes
+  - Epoch-based fee collection across AMM, lending, insurance, prediction, priority
+  - Protocol fee split: treasury (50%) / stakers (30%) / insurance (20%)
+  - Both simple per-pool and Shapley-weighted distribution modes
+  - Revenue analytics: annualize, yield bps
+  - Overflow-safe arithmetic via mul_div throughout
 
 **Hardened:**
 - `tests/src/risk.rs`: 10 → 23 tests (+13)
@@ -37,11 +46,12 @@
   - Config change full lifecycle, circuit breaker detection
   - 20-voter weighted, timelock boundary precision
   - Emergency + normal coexistence, analytics edge cases
+- consensus, collector, miner — hardening in progress (agents running)
 
 **Verified:**
-- CKB workspace: 1145/1145 tests passing (1051 → 1145, +94)
+- CKB workspace: 1187/1187 tests passing (1051 → 1187, +136)
 - All existing tests still pass (no regressions)
-- SDK now has 15 modules (was 13): +router, +portfolio
+- SDK now has 16 modules (was 13): +router, +portfolio, +fees
 
 **Commits this session:**
 1. `b27dddc` — DEX router module (43 tests)
@@ -49,11 +59,12 @@
 3. `4ce07ee` — Token integration hardening (12→21, +9)
 4. `26f2417` — Portfolio analytics module (23 tests)
 5. `4bb7ef0` — Governance integration hardening (14→24, +10)
+6. `ed1a849` — Fee distributor with Shapley-depth LP allocation (42 tests)
 
 **Pending:**
+- Consensus, collector, miner hardening (agents running)
 - Continue CKB ecosystem development (autopilot loop)
 - Next BIG rotation candidate: new on-chain capability or cross-chain
-- Next SMALL rotation candidate: consensus (17 tests), insurance (17 tests)
 
 ---
 

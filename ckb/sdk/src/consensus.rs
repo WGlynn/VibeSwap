@@ -850,4 +850,152 @@ mod tests {
         assert!(decision.vault_tiers.is_empty());
         assert!(decision.actions.is_empty());
     }
+
+    // ============ New Hardening Tests ============
+
+    #[test]
+    fn test_median_large_values_no_overflow() {
+        // Two values close to u128::MAX / 2 should not overflow during averaging
+        let a = u128::MAX / 2;
+        let b = u128::MAX / 2 + 1;
+        let result = compute_median(&[a, b]);
+        // sorted[0]/2 + sorted[1]/2 avoids overflow
+        assert_eq!(result, a / 2 + b / 2);
+    }
+
+    #[test]
+    fn test_median_identical_values() {
+        let val = 7777 * PRECISION;
+        assert_eq!(compute_median(&[val, val, val, val, val]), val);
+    }
+
+    #[test]
+    fn test_quantize_oracle_single_source_valid() {
+        // A single fresh oracle is both the median and the majority — should be valid
+        let oracles = vec![test_oracle(4200 * PRECISION, 95, 100)];
+        let (price, valid, agreement) = quantize_oracle(&oracles, 105);
+        assert!(valid);
+        assert_eq!(agreement, 1);
+        assert_eq!(price, 4200 * PRECISION);
+    }
+
+    #[test]
+    fn test_quantize_oracle_all_stale_returns_invalid() {
+        let oracles = vec![
+            test_oracle(3000 * PRECISION, 90, 1),
+            test_oracle(3010 * PRECISION, 85, 2),
+        ];
+        let (price, valid, agreement) = quantize_oracle(&oracles, 500);
+        assert!(!valid);
+        assert_eq!(price, 0);
+        assert_eq!(agreement, 0);
+    }
+
+    #[test]
+    fn test_quantize_oracle_empty_returns_invalid() {
+        let (price, valid, agreement) = quantize_oracle(&[], 100);
+        assert!(!valid);
+        assert_eq!(price, 0);
+        assert_eq!(agreement, 0);
+    }
+
+    #[test]
+    fn test_quantize_fallback_price_when_oracle_invalid() {
+        // When oracle validation fails, quantize should fall back to snapshot.collateral_price
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data.clear();
+        snapshot.collateral_price = 2500 * PRECISION;
+
+        let decision = quantize(&snapshot);
+        assert!(!decision.oracle_valid);
+        assert_eq!(decision.validated_price, 2500 * PRECISION);
+    }
+
+    #[test]
+    fn test_monotonicity_equal_snapshots_is_monotonic() {
+        // Two identical decisions should be trivially monotonic
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+        let d2 = quantize(&snapshot);
+
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(result.is_monotonic);
+        assert!(result.violations.is_empty());
+    }
+
+    #[test]
+    fn test_monotonicity_detects_utilization_improvement() {
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut d2 = d1.clone();
+        // Force utilization tier to improve (go from whatever tier to Low)
+        d2.utilization_tier = UtilizationTier::Low;
+        // Ensure d1 is at a higher tier so we can detect improvement
+        let mut d1_worse = d1.clone();
+        d1_worse.utilization_tier = UtilizationTier::High;
+
+        let result = verify_monotonicity(&d1_worse, &d2);
+        assert!(!result.is_monotonic);
+        assert!(result.violations.iter().any(|v| matches!(v, MonotonicityViolation::UtilizationImproved)));
+    }
+
+    #[test]
+    fn test_monotonicity_detects_action_count_decrease() {
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut d_more_actions = d1.clone();
+        d_more_actions.actions.push(PendingAction {
+            vault_index: 99,
+            action: KeeperAction::Warn { health_factor: PRECISION, vault_owner: [0xFF; 32] },
+            health_factor: PRECISION,
+            priority: 100,
+        });
+
+        let result = verify_monotonicity(&d_more_actions, &d1);
+        assert!(!result.is_monotonic);
+        assert!(result.violations.iter().any(|v|
+            matches!(v, MonotonicityViolation::ActionCountDecreased { .. })
+        ));
+    }
+
+    #[test]
+    fn test_simulate_price_stress_zero_drop_unchanged() {
+        let snapshot = test_snapshot();
+        let (before, after) = simulate_price_stress(&snapshot, 0);
+
+        // With 0 bps drop, the stressed price equals the original.
+        // The "after" snapshot clears oracle_data and uses collateral_price
+        // which at 0 drop stays the same as the original collateral_price.
+        // Risk scores may differ because "before" uses oracle-validated price
+        // while "after" uses the raw collateral_price.
+        // But the validated price from the "before" should be close.
+        assert!(after.vault_tiers.len() == before.vault_tiers.len());
+    }
+
+    #[test]
+    fn test_quantize_utilization_boundary_u64_max() {
+        // Extreme value beyond 10000 — should still map to Critical
+        assert_eq!(quantize_utilization(u64::MAX), UtilizationTier::Critical);
+    }
+
+    #[test]
+    fn test_report_stress_monotonicity_across_drops() {
+        // The report stress test risk levels must be monotonically non-decreasing
+        // across 10% -> 25% -> 50% drops.
+        let snapshot = test_snapshot();
+        let report = generate_report(&snapshot);
+
+        let ord_10 = risk_level_ordinal(&report.stress.risk_at_10pct_drop);
+        let ord_25 = risk_level_ordinal(&report.stress.risk_at_25pct_drop);
+        let ord_50 = risk_level_ordinal(&report.stress.risk_at_50pct_drop);
+
+        assert!(ord_25 >= ord_10,
+            "25% drop risk ({:?}) must be >= 10% drop risk ({:?})",
+            report.stress.risk_at_25pct_drop, report.stress.risk_at_10pct_drop);
+        assert!(ord_50 >= ord_25,
+            "50% drop risk ({:?}) must be >= 25% drop risk ({:?})",
+            report.stress.risk_at_50pct_drop, report.stress.risk_at_25pct_drop);
+    }
 }

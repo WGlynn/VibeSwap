@@ -8,6 +8,7 @@ vibeswap-math = { path = "../lib/vibeswap-math" }
 vibeswap-mmr = { path = "../lib/mmr" }
 vibeswap-pow = { path = "../lib/pow" }
 vibeswap-types = { path = "../lib/types" }
+ckb-lending-math = { path = "../lib/lending-math" }
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

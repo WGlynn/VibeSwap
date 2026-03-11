@@ -18,6 +18,7 @@ use vault_type::{
     verify_creation as verify_vault_creation,
     verify_update as verify_vault_update,
     verify_destruction as verify_vault_destruction,
+    verify_liquidation as verify_vault_liquidation,
 };
 
 // ============ Helpers ============
@@ -635,4 +636,282 @@ fn test_multiple_deposits_fair_share() {
     assert!(alice_gets > bob_gets);
     assert!(alice_gets > 1050 * PRECISION); // Alice: ~1100 of 2100
     assert!(bob_gets < 1010 * PRECISION);   // Bob: ~1000 of 2100
+}
+
+// ============ Vault Liquidation Validation Tests ============
+
+#[test]
+fn test_verify_liquidation_valid() {
+    let old = VaultCellData {
+        owner_lock_hash: [0xA1; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 10 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 12_000 * PRECISION,
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 500 * PRECISION,
+        last_update_block: 100,
+    };
+
+    let new = VaultCellData {
+        collateral_amount: 4 * PRECISION,    // Seized 6 collateral
+        debt_shares: 6_000 * PRECISION,      // Repaid 6000 debt
+        borrow_index_snapshot: PRECISION + PRECISION / 100, // Index went up
+        last_update_block: 200,
+        ..old.clone()
+    };
+
+    assert!(verify_vault_liquidation(&old, &new).is_ok());
+}
+
+#[test]
+fn test_verify_liquidation_owner_change_rejected() {
+    let old = VaultCellData {
+        owner_lock_hash: [0xA1; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 10 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 12_000 * PRECISION,
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 0,
+        last_update_block: 100,
+    };
+
+    let new = VaultCellData {
+        owner_lock_hash: [0xEE; 32], // Changed — reject
+        collateral_amount: 4 * PRECISION,
+        debt_shares: 6_000 * PRECISION,
+        last_update_block: 200,
+        ..old.clone()
+    };
+
+    assert!(verify_vault_liquidation(&old, &new).is_err());
+}
+
+#[test]
+fn test_verify_liquidation_debt_increase_rejected() {
+    let old = VaultCellData {
+        owner_lock_hash: [0xA1; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 10 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 12_000 * PRECISION,
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 0,
+        last_update_block: 100,
+    };
+
+    let new = VaultCellData {
+        debt_shares: 15_000 * PRECISION, // Debt INCREASED — reject
+        collateral_amount: 4 * PRECISION,
+        last_update_block: 200,
+        ..old.clone()
+    };
+
+    assert!(verify_vault_liquidation(&old, &new).is_err());
+}
+
+#[test]
+fn test_verify_liquidation_collateral_increase_rejected() {
+    let old = VaultCellData {
+        owner_lock_hash: [0xA1; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 10 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 12_000 * PRECISION,
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 0,
+        last_update_block: 100,
+    };
+
+    let new = VaultCellData {
+        collateral_amount: 15 * PRECISION, // Collateral INCREASED — reject
+        debt_shares: 6_000 * PRECISION,
+        last_update_block: 200,
+        ..old.clone()
+    };
+
+    assert!(verify_vault_liquidation(&old, &new).is_err());
+}
+
+#[test]
+fn test_verify_liquidation_deposit_shares_changed_rejected() {
+    let old = VaultCellData {
+        owner_lock_hash: [0xA1; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 10 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 12_000 * PRECISION,
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 500 * PRECISION,
+        last_update_block: 100,
+    };
+
+    let new = VaultCellData {
+        deposit_shares: 1000 * PRECISION, // Changed — reject
+        collateral_amount: 4 * PRECISION,
+        debt_shares: 6_000 * PRECISION,
+        last_update_block: 200,
+        ..old.clone()
+    };
+
+    assert!(verify_vault_liquidation(&old, &new).is_err());
+}
+
+// ============ SDK Liquidation Builder Tests ============
+
+#[test]
+fn test_sdk_liquidation_builds_valid_transaction() {
+    use vibeswap_sdk::{
+        VibeSwapSDK, DeploymentInfo, CellInput, Script, HashType,
+    };
+
+    let sdk = VibeSwapSDK::new(DeploymentInfo {
+        pow_lock_code_hash: [0x01; 32],
+        batch_auction_type_code_hash: [0x02; 32],
+        commit_type_code_hash: [0x03; 32],
+        amm_pool_type_code_hash: [0x04; 32],
+        lp_position_type_code_hash: [0x05; 32],
+        compliance_type_code_hash: [0x06; 32],
+        config_type_code_hash: [0x07; 32],
+        oracle_type_code_hash: [0x08; 32],
+        knowledge_type_code_hash: [0x09; 32],
+        lending_pool_type_code_hash: [0x0A; 32],
+        vault_type_code_hash: [0x0B; 32],
+        script_dep_tx_hash: [0x10; 32],
+        script_dep_index: 0,
+    });
+
+    // Pool with active borrows
+    let pool = LendingPoolCellData {
+        total_deposits: 100_000 * PRECISION,
+        total_borrows: 50_000 * PRECISION,
+        total_shares: 100_000 * PRECISION,
+        total_reserves: 0,
+        borrow_index: PRECISION,
+        last_accrual_block: 100,
+        asset_type_hash: [0xAA; 32],
+        pool_id: [0xBB; 32],
+        base_rate: DEFAULT_BASE_RATE,
+        slope1: DEFAULT_SLOPE1,
+        slope2: DEFAULT_SLOPE2,
+        optimal_utilization: DEFAULT_OPTIMAL_UTILIZATION,
+        reserve_factor: DEFAULT_RESERVE_FACTOR,
+        collateral_factor: DEFAULT_COLLATERAL_FACTOR,
+        liquidation_threshold: DEFAULT_LIQUIDATION_THRESHOLD,
+        liquidation_incentive: DEFAULT_LIQUIDATION_INCENTIVE,
+    };
+
+    // Borrower's underwater vault (price crashed)
+    let vault = VaultCellData {
+        owner_lock_hash: [0xB0; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 10 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 20_000 * PRECISION, // Big debt relative to collateral
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 0,
+        last_update_block: 100,
+    };
+
+    let liquidator_lock = Script {
+        code_hash: [0xC3; 32],
+        hash_type: HashType::Type,
+        args: vec![0xC3; 20],
+    };
+
+    let result = sdk.liquidate(
+        CellInput { tx_hash: [0x01; 32], index: 0, since: 0 }, // pool
+        &pool,
+        CellInput { tx_hash: [0x02; 32], index: 0, since: 0 }, // vault
+        &vault,
+        1000 * PRECISION, // collateral price (crashed)
+        PRECISION,        // debt price ($1 stablecoin)
+        5_000 * PRECISION, // repay amount
+        liquidator_lock,
+        vec![CellInput { tx_hash: [0x03; 32], index: 0, since: 0 }],
+        200,
+    );
+
+    assert!(result.is_ok(), "Liquidation should succeed: {:?}", result.err());
+    let tx = result.unwrap();
+
+    // 3 inputs: pool + vault + liquidator
+    assert_eq!(tx.inputs.len(), 3);
+    // 3 outputs: updated pool + updated vault + collateral to liquidator
+    assert_eq!(tx.outputs.len(), 3);
+    // Witness per input
+    assert_eq!(tx.witnesses.len(), 3);
+
+    // Verify pool output
+    let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+    assert!(new_pool.total_borrows < pool.total_borrows, "Borrows should decrease");
+    assert_eq!(new_pool.last_accrual_block, 200);
+    assert!(new_pool.borrow_index >= pool.borrow_index, "Index should not decrease");
+
+    // Verify vault output
+    let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+    assert!(new_vault.debt_shares < vault.debt_shares, "Debt shares should decrease");
+    assert!(new_vault.collateral_amount < vault.collateral_amount, "Collateral should decrease");
+    assert_eq!(new_vault.owner_lock_hash, vault.owner_lock_hash, "Owner must not change");
+    assert_eq!(new_vault.pool_id, vault.pool_id, "Pool ID must not change");
+
+    // Vault transition should pass liquidation validation
+    assert!(verify_vault_liquidation(&vault, &new_vault).is_ok() ||
+            verify_vault_update(&vault, &new_vault).is_ok());
+
+    // Verify liquidator receives collateral
+    let seized = u128::from_le_bytes(tx.outputs[2].data[..16].try_into().unwrap());
+    assert!(seized > 0, "Liquidator must receive collateral");
+}
+
+#[test]
+fn test_sdk_liquidation_rejects_overcollateralized() {
+    use vibeswap_sdk::{
+        VibeSwapSDK, DeploymentInfo, CellInput, Script, HashType,
+    };
+
+    let sdk = VibeSwapSDK::new(DeploymentInfo {
+        pow_lock_code_hash: [0x01; 32],
+        batch_auction_type_code_hash: [0x02; 32],
+        commit_type_code_hash: [0x03; 32],
+        amm_pool_type_code_hash: [0x04; 32],
+        lp_position_type_code_hash: [0x05; 32],
+        compliance_type_code_hash: [0x06; 32],
+        config_type_code_hash: [0x07; 32],
+        oracle_type_code_hash: [0x08; 32],
+        knowledge_type_code_hash: [0x09; 32],
+        lending_pool_type_code_hash: [0x0A; 32],
+        vault_type_code_hash: [0x0B; 32],
+        script_dep_tx_hash: [0x10; 32],
+        script_dep_index: 0,
+    });
+
+    let pool = default_pool_cell();
+    let vault = VaultCellData {
+        owner_lock_hash: [0xB0; 32],
+        pool_id: pool.pool_id,
+        collateral_amount: 100 * PRECISION,    // Lots of collateral
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 100 * PRECISION,           // Small debt
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 0,
+        last_update_block: 0,
+    };
+
+    let result = sdk.liquidate(
+        CellInput { tx_hash: [0x01; 32], index: 0, since: 0 },
+        &pool,
+        CellInput { tx_hash: [0x02; 32], index: 0, since: 0 },
+        &vault,
+        10_000 * PRECISION, // High collateral price
+        PRECISION,
+        50 * PRECISION,
+        Script { code_hash: [0xC3; 32], hash_type: HashType::Type, args: vec![0xC3; 20] },
+        vec![],
+        100,
+    );
+
+    // Should fail — position is overcollateralized
+    assert!(result.is_err(), "Cannot liquidate a safe position");
 }

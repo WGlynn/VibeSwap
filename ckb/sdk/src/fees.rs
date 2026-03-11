@@ -1181,4 +1181,134 @@ mod tests {
         assert_eq!(simple.staker_amount, shapley.staker_amount);
         assert_eq!(simple.insurance_amount, shapley.insurance_amount);
     }
+
+    // ============ Additional Edge Case & Hardening Tests ============
+
+    #[test]
+    fn test_fee_epoch_new_preserves_fields() {
+        let epoch = FeeEpoch::new(42, 1000, 2000);
+        assert_eq!(epoch.epoch_id, 42);
+        assert_eq!(epoch.start_block, 1000);
+        assert_eq!(epoch.end_block, 2000);
+        assert_eq!(epoch.priority_fees, 0);
+        assert!(epoch.amm_fees.is_empty());
+        assert!(epoch.lending_fees.is_empty());
+    }
+
+    #[test]
+    fn test_fee_breakdown_total_consistency() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100);
+        epoch.record_lending_fee(pair(2), 200);
+        epoch.record_insurance_fee(pair(3), 300);
+        epoch.record_prediction_fee(pair(4), 400);
+        epoch.record_priority_fee(500);
+
+        let breakdown = epoch.fees_by_source();
+        assert_eq!(breakdown.total(), epoch.total_fees(),
+            "FeeBreakdown.total() must equal FeeEpoch.total_fees()");
+    }
+
+    #[test]
+    fn test_swap_fee_high_fee_rate() {
+        // 100% fee rate — entire input is fee, no output
+        let amount = 1_000 * PRECISION;
+        let (fee, output) = calculate_swap_fee(amount, 1_000_000 * PRECISION, 1_000_000 * PRECISION, 10_000);
+        assert_eq!(fee, amount, "100% fee rate should take entire input as fee");
+        assert_eq!(output, 0, "No remaining amount should produce zero output");
+    }
+
+    #[test]
+    fn test_swap_fee_one_bps() {
+        // Minimum meaningful fee rate: 1 bps (0.01%)
+        let amount = 1_000_000 * PRECISION;
+        let (fee, output) = calculate_swap_fee(
+            amount,
+            10_000_000 * PRECISION,
+            10_000_000 * PRECISION,
+            1,
+        );
+        assert_eq!(fee, amount / 10_000, "1 bps fee should be input/10000");
+        assert!(output > 0);
+        assert!(output < amount);
+    }
+
+    #[test]
+    fn test_lending_reserve_income_zero_rate() {
+        // Zero interest rate produces zero income regardless of borrows
+        let income = calculate_lending_reserve_income(
+            1_000_000 * PRECISION,
+            0,     // 0% rate
+            2000,
+            7_884_000,
+        );
+        assert_eq!(income, 0);
+    }
+
+    #[test]
+    fn test_lending_reserve_income_zero_reserve_factor() {
+        // Zero reserve factor means protocol keeps nothing
+        let income = calculate_lending_reserve_income(
+            1_000_000 * PRECISION,
+            500,
+            0,     // 0% reserve factor
+            7_884_000,
+        );
+        assert_eq!(income, 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_reverse_block_range() {
+        // end_block < start_block should return 0
+        let epoch = FeeEpoch::new(1, 2000, 1000);
+        assert_eq!(annualize_revenue(&epoch), 0);
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_zero_revenue() {
+        // Zero revenue on any TVL should give 0 bps
+        assert_eq!(revenue_yield_bps(0, 10_000_000 * PRECISION), 0);
+    }
+
+    #[test]
+    fn test_shapley_weights_all_zero_depth() {
+        // All pools have zero depth — all weights should be 0
+        let pools = vec![
+            make_pool(1, 0, 500_000 * PRECISION, 5),
+            make_pool(2, 0, 300_000 * PRECISION, 3),
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        assert_eq!(weights[&pair(1)], 0);
+        assert_eq!(weights[&pair(2)], 0);
+    }
+
+    #[test]
+    fn test_shapley_distribution_no_amm_fees() {
+        // No AMM fees but has lending/priority fees
+        let mut epoch = default_epoch();
+        epoch.record_lending_fee(pair(10), 5_000 * PRECISION);
+        epoch.record_priority_fee(1_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let pools = vec![
+            make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 3),
+        ];
+
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+
+        // No AMM fees means no LP distributions
+        assert!(dist.lp_distributions.is_empty() || dist.lp_distributions.values().sum::<u128>() == 0,
+            "No AMM fees should produce no LP distributions");
+        // But protocol fees should still be distributed
+        assert!(dist.treasury_amount > 0);
+        assert!(dist.staker_amount > 0);
+        assert!(dist.insurance_amount > 0);
+    }
+
+    #[test]
+    fn test_prediction_fee_zero_total_pool() {
+        // Zero total pool should produce zero fee
+        let fee = calculate_prediction_fee(0, 0, 200);
+        assert_eq!(fee, 0);
+    }
 }

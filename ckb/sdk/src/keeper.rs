@@ -1189,4 +1189,163 @@ mod tests {
             prev_hf = result.health_factor;
         }
     }
+
+    // ============ Additional Edge Case & Hardening Tests ============
+
+    #[test]
+    fn test_assess_very_high_collateral_price() {
+        // Extremely high collateral price should result in very high HF
+        let vault = test_vault(10_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(
+            &vault, &pool, None,
+            1_000_000 * PRECISION, // $1M per unit
+            PRECISION,
+        );
+
+        assert_eq!(result.risk_tier, RiskTier::Safe);
+        assert!(result.health_factor > 100 * PRECISION, "Should have extremely high HF");
+        assert!(matches!(result.action, KeeperAction::Safe { .. }));
+    }
+
+    #[test]
+    fn test_assess_debt_price_higher_than_one() {
+        // Debt token worth $2 (e.g., wrapped token)
+        // 10 ETH at $2000, 5000 shares debt, debt_price = $2
+        // current_debt = 5000, debt_value = 5000 * 2 = 10000
+        // col_value = 10 * 2000 = 20000
+        // HF = (10 * 2000 * 0.8) / (5000 * 2) = 16000 / 10000 = 1.6
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let result_1x = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let result_2x = assess_vault(&vault, &pool, None, 2000 * PRECISION, 2 * PRECISION);
+
+        // Higher debt price should reduce HF
+        assert!(result_2x.health_factor < result_1x.health_factor,
+            "Higher debt price should lower HF: 1x={}, 2x={}", result_1x.health_factor, result_2x.health_factor);
+        assert!(result_2x.debt_value > result_1x.debt_value);
+    }
+
+    #[test]
+    fn test_assess_both_prices_zero() {
+        // Both collateral and debt price are zero
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 0, 0);
+
+        // HF should be 0 due to zero collateral price
+        assert_eq!(result.health_factor, 0);
+        assert_eq!(result.risk_tier, RiskTier::HardLiquidation);
+    }
+
+    #[test]
+    fn test_stress_test_full_drop() {
+        // 100% price drop (BPS_DENOMINATOR) — stressed_price goes to 0
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(5_000 * PRECISION, 10 * PRECISION), test_cell_input(1)),
+        ];
+
+        let at_risk = stress_test_vaults(
+            &vaults, &pool,
+            2000 * PRECISION, PRECISION,
+            10_000, // 100% drop
+        );
+
+        // Even the safest vault with debt should be at risk at 100% drop
+        assert!(!at_risk.is_empty(), "100% price drop should make all debt vaults at risk");
+        assert!(at_risk[0].1 < PRECISION, "Stressed HF should be below 1.0");
+    }
+
+    #[test]
+    fn test_batch_assess_all_no_debt() {
+        // All vaults have zero debt — all should be safe with u128::MAX HF
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(0, 10 * PRECISION), test_cell_input(1)),
+            (test_vault(0, 5 * PRECISION), test_cell_input(2)),
+            (test_vault(0, 100 * PRECISION), test_cell_input(3)),
+        ];
+
+        let results = assess_vaults(&vaults, &pool, None, 2000 * PRECISION, PRECISION);
+
+        assert_eq!(results.len(), 3);
+        for (assessment, _) in &results {
+            assert_eq!(assessment.health_factor, u128::MAX);
+            assert_eq!(assessment.risk_tier, RiskTier::Safe);
+            assert!(matches!(assessment.action, KeeperAction::Safe { .. }));
+        }
+    }
+
+    #[test]
+    fn test_premium_accrual_large_block_gap() {
+        // Very large block gap should produce a proportionally large premium
+        let ins = test_insurance_pool();
+        let pool = test_lending_pool();
+
+        let small_gap = check_premium_accrual(&ins, &pool, 200_000, 10_000);
+        let large_gap = check_premium_accrual(&ins, &pool, 2_000_000, 10_000);
+
+        assert!(large_gap > small_gap,
+            "Larger block gap should produce larger premium: small={}, large={}", small_gap, large_gap);
+    }
+
+    #[test]
+    fn test_stress_test_empty_vaults() {
+        let pool = test_lending_pool();
+        let at_risk = stress_test_vaults(&[], &pool, 2000 * PRECISION, PRECISION, 5000);
+        assert!(at_risk.is_empty(), "Empty vault list should return empty results");
+    }
+
+    #[test]
+    fn test_hard_liquidation_max_seized_bounded_by_collateral() {
+        // Verify max_seized never exceeds the vault's total collateral
+        let vault = test_vault(50_000 * PRECISION, 5 * PRECISION); // 5 ETH collateral, huge debt
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 500 * PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::HardLiquidation);
+        if let KeeperAction::HardLiquidate { max_seized, .. } = result.action {
+            assert!(max_seized <= vault.collateral_amount,
+                "Seized ({}) cannot exceed collateral ({})", max_seized, vault.collateral_amount);
+        } else {
+            panic!("Expected HardLiquidate action");
+        }
+    }
+
+    #[test]
+    fn test_assess_vault_preserves_current_debt() {
+        // current_debt should equal debt_shares when borrow_index matches snapshot
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool(); // borrow_index = PRECISION, snapshot = PRECISION
+
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+
+        assert_eq!(result.current_debt, 5_000 * PRECISION,
+            "With matching borrow indices, current_debt should equal debt_shares");
+    }
+
+    #[test]
+    fn test_soft_liquidation_step_values_nonzero() {
+        // At soft liquidation tier, both debt_to_repay and collateral_to_release should be nonzero
+        let vault = test_vault(9_500 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        // 10 ETH at $1200, 80% LT → HF = (10*1200*0.8)/9500 ≈ 1.01
+        let result = assess_vault(&vault, &pool, None, 1200 * PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::SoftLiquidation);
+        if let KeeperAction::SoftLiquidate { debt_to_repay, collateral_to_release, .. } = result.action {
+            assert!(debt_to_repay > 0, "Soft liquidation should repay some debt");
+            assert!(collateral_to_release > 0, "Soft liquidation should release some collateral");
+            assert!(collateral_to_release <= vault.collateral_amount,
+                "Released collateral should not exceed total");
+        } else {
+            panic!("Expected SoftLiquidate action at HF ≈ 1.01");
+        }
+    }
 }

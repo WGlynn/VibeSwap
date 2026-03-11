@@ -44,8 +44,20 @@ Problems I encountered that Will might want to solve or optimize.
 
 ---
 
+## Problem 7: Cache Deletion Is Catastrophic (Updated)
+**What happened**: `rm -rf out/cache` destroyed compilation artifacts that took HOURS to build incrementally across sessions. Now rebuilding 404+ source files from scratch with via_ir takes 30+ minutes.
+**Severity**: CRITICAL. This is the #1 self-inflicted wound of the session.
+**Root cause**: I thought the cache was stale/corrupt. It wasn't. The compilation error was in the SOURCE CODE, not the cache.
+**Rule**: NEVER delete `out/` or `out/cache`. Fix the source. The cache is innocent. Always.
+**Additional discovery**: Two zombie forge processes (from earlier failed attempts) were fighting over the compilation, likely causing further delays.
+
+## Problem 8: Zombie Processes
+**What happened**: `TaskStop` on a forge process doesn't always kill the child solc process. Found two forge processes running simultaneously (PIDs 74706 and 79189). Had to `kill -9` manually.
+**What would fix it**: Check for zombie processes before starting new builds. `ps aux | grep forge` first.
+
 ## Summary for Will
-- **Urgent**: via_ir compilation speed is the #1 bottleneck right now
-- **Quick win**: Never `rm -rf out/cache` — always fix source, not cache
+- **CRITICAL**: Never `rm -rf out/cache` — the cache took hours to build incrementally, destroying it costs 30+ min rebuild
+- **Urgent**: via_ir compilation speed is the #1 bottleneck right now (404 files × IR optimizer)
+- **Quick win**: Always `kill -9` old forge processes before starting new ones
 - **Medium term**: Refactor inline assembly contracts for fast-profile compatibility
 - **Long term**: Your game theory solution for Problem #3 in compute-problems.md

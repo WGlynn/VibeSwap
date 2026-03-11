@@ -1347,3 +1347,57 @@ The process:
 **Generalization**: When your signing model operates at the lock-group level rather than the input level, you get natural batching — a wallet consolidating 50 UTXOs pays the same signature cost as spending 1. This eliminates the "dust problem" at the cryptographic level, not just the economic level.
 
 **Cross-references**: P-101 (Consensus Determinism — all hashing/serialization is deterministic), P-102 (UTXO-Native Lending — lending transactions use the same assembler), P-103 (Token Identity — token transfers through the same signing pipeline)
+
+### P-105: Mutualist Liquidation Prevention (March 2026)
+
+**Source**: Will's directive — "mutualism to try to stop liquidations before they even happen because cascading liqs is a net negative"
+
+**Insight**: Traditional DeFi liquidation is adversarial: liquidators profit from borrowers' distress, and cascading liquidations create death spirals that harm the entire ecosystem. The mutualist alternative prevents liquidation rather than rewarding it.
+
+**The Problem**: Liquidation cascades are positive-feedback loops:
+1. Price drops → positions become underwater
+2. Liquidators seize collateral and sell it
+3. Selling pressure drops price further
+4. More positions become underwater → goto 2
+
+This is a *coordination failure* — individually rational liquidation is collectively destructive. The 5% liquidation incentive literally pays people to accelerate crashes.
+
+**Mutualist Design Principles**:
+
+1. **Pre-emptive De-risking (Graduated Warning)**
+   - HF < 1.5 → notify user (on-chain event)
+   - HF < 1.3 → auto-reduce borrow (if user has deposit shares, convert to repay)
+   - HF < 1.1 → soft liquidation begins (incremental collateral release)
+   - HF < 1.0 → hard liquidation (last resort only)
+
+2. **Insurance Pool Buffer**
+   - Funded by a fraction of the reserve factor (already collected)
+   - Absorbs first-loss before liquidation triggers
+   - Socializes risk across all participants (mutualized)
+   - Reduces the need for liquidation incentive entirely
+
+3. **Soft Liquidation (Continuous De-risking)**
+   - Instead of a single large liquidation (50% close factor = catastrophic for the borrower)
+   - Protocol does incremental collateral release over N blocks
+   - Spreads selling pressure, prevents cascade
+   - Borrower keeps more collateral, market absorbs less impact
+
+4. **Cooperative Recollateralization**
+   - Other vault holders can contribute to a distressed vault's collateral
+   - In return, they receive a share of the vault's future yield
+   - This is literally insurance — mutualized risk, cooperative benefit
+
+**Comparison**:
+
+| Feature | Traditional (Aave/Compound) | Mutualist (VibeSwap) |
+|---|---|---|
+| Liquidation trigger | Binary (HF < 1.0) | Graduated (HF < 1.5 → 1.3 → 1.1 → 1.0) |
+| Who profits | Liquidator bots | Nobody (prevention > profit) |
+| Impact on market | Selling pressure cascade | Incremental, time-spread |
+| Insurance | None (borrower eats all loss) | Insurance pool + mutual aid |
+| Close factor | 50% of debt at once | Incremental over blocks |
+| Philosophy | Adversarial (exploit distress) | Cooperative (prevent distress) |
+
+**Generalization**: In any system where individual rational action creates collective harm (tragedy of the commons), the solution is to make prevention cheaper than cure. Paying liquidators 5% to crash the market is more expensive than spending 0.5% on an insurance pool that prevents the crash entirely.
+
+**Cross-references**: P-000 (Fairness Above All — liquidation cascades are structurally unfair), P-102 (UTXO-Native Lending — the lending protocol this applies to), P-104 (UTXO Transaction Signing — liquidation transactions use the assembler)

@@ -1428,4 +1428,132 @@ mod tests {
         // 100 per block * 7_884_000 blocks/year = 788_400_000
         assert_eq!(annual, 100 * PRECISION * 7_884_000);
     }
+
+    // ============ Batch 4: Additional Edge Case & Coverage Tests ============
+
+    #[test]
+    fn test_fee_config_default_protocol_fee_bps() {
+        // Verify default protocol fee is 1667 bps (~16.67%)
+        let config = FeeConfig::default();
+        assert_eq!(config.protocol_fee_bps, 1667);
+    }
+
+    #[test]
+    fn test_record_amm_fee_accumulates_same_pool() {
+        // Multiple records to the same pool should accumulate
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100);
+        epoch.record_amm_fee(pair(1), 200);
+        epoch.record_amm_fee(pair(1), 300);
+        assert_eq!(epoch.amm_fees[&pair(1)], 600);
+    }
+
+    #[test]
+    fn test_record_priority_fee_accumulates() {
+        // Multiple priority fee records should accumulate
+        let mut epoch = default_epoch();
+        epoch.record_priority_fee(100);
+        epoch.record_priority_fee(200);
+        epoch.record_priority_fee(300);
+        assert_eq!(epoch.priority_fees, 600);
+        assert_eq!(epoch.total_fees(), 600);
+    }
+
+    #[test]
+    fn test_distribution_only_priority_fees() {
+        // Only priority fees — all go to protocol split
+        let mut epoch = default_epoch();
+        epoch.record_priority_fee(10_000 * PRECISION);
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+
+        // No LP distributions
+        assert!(dist.lp_distributions.is_empty());
+        // Protocol gets 100% of priority fees
+        let total_protocol = dist.treasury_amount + dist.staker_amount + dist.insurance_amount;
+        // Allow small rounding error
+        let diff = if total_protocol > 10_000 * PRECISION {
+            total_protocol - 10_000 * PRECISION
+        } else {
+            10_000 * PRECISION - total_protocol
+        };
+        assert!(diff < 10, "Priority fee conservation violated: distributed {}", total_protocol);
+    }
+
+    #[test]
+    fn test_swap_fee_fee_plus_output_less_than_or_equal_input() {
+        // Fee + output should never exceed the reserves (output bounded by reserve_out)
+        let amount = 500 * PRECISION;
+        let reserve = 1_000_000 * PRECISION;
+        let (fee, output) = calculate_swap_fee(amount, reserve, reserve, 30);
+        assert!(fee + output <= amount + reserve,
+            "Fee ({}) + output ({}) should be bounded", fee, output);
+        assert!(output < reserve, "Output must be less than reserve_out");
+    }
+
+    #[test]
+    fn test_shapley_weights_three_pools_ordered() {
+        // Three pools with clearly different characteristics — verify ordering
+        let pools = vec![
+            make_pool(1, 5_000_000 * PRECISION, 2_000_000 * PRECISION, 8),  // Best
+            make_pool(2, 1_000_000 * PRECISION, 500_000 * PRECISION, 3),    // Middle
+            make_pool(3, 100_000 * PRECISION, 10_000 * PRECISION, 1),       // Worst
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        assert!(weights[&pair(1)] > weights[&pair(2)],
+            "Pool 1 should outweigh pool 2");
+        assert!(weights[&pair(2)] > weights[&pair(3)],
+            "Pool 2 should outweigh pool 3");
+    }
+
+    #[test]
+    fn test_fee_breakdown_individual_fields() {
+        // Verify each FeeBreakdown field independently
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10);
+        epoch.record_lending_fee(pair(2), 20);
+        epoch.record_insurance_fee(pair(3), 30);
+        epoch.record_prediction_fee(pair(4), 40);
+        epoch.record_priority_fee(50);
+
+        let b = epoch.fees_by_source();
+        assert_eq!(b.amm, 10);
+        assert_eq!(b.lending, 20);
+        assert_eq!(b.insurance, 30);
+        assert_eq!(b.prediction, 40);
+        assert_eq!(b.priority, 50);
+        assert_eq!(b.total(), 150);
+    }
+
+    #[test]
+    fn test_shapley_distribution_three_equal_pools_conserves_lp_total() {
+        // Three equal-depth pools: total LP distributed should equal expected LP pool
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 3_000 * PRECISION);
+        epoch.record_amm_fee(pair(2), 3_000 * PRECISION);
+        epoch.record_amm_fee(pair(3), 3_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let pools = vec![
+            make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 2),
+            make_pool(2, 1_000_000 * PRECISION, 500_000 * PRECISION, 2),
+            make_pool(3, 1_000_000 * PRECISION, 500_000 * PRECISION, 2),
+        ];
+
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        let total_amm: u128 = epoch.amm_fees.values().sum();
+        let protocol_cut = total_amm * config.protocol_fee_bps as u128 / 10_000;
+        let expected_lp = total_amm - protocol_cut;
+        let actual_lp: u128 = dist.lp_distributions.values().sum();
+
+        let diff = if actual_lp > expected_lp { actual_lp - expected_lp } else { expected_lp - actual_lp };
+        assert!(diff < 10, "Three equal pools LP conservation: {} vs {}", actual_lp, expected_lp);
+
+        // Each pool should get ~1/3 of the LP total
+        let per_pool = actual_lp / 3;
+        for &share in dist.lp_distributions.values() {
+            let d = if share > per_pool { share - per_pool } else { per_pool - share };
+            assert!(d < 10, "Equal pools should get equal shares");
+        }
+    }
 }

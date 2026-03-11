@@ -1133,4 +1133,101 @@ mod tests {
             assert_eq!(ts.args, expected_type.args);
         }
     }
+
+    // ============ Batch 4: Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_select_capacity_largest_first_single_cell_sufficient() {
+        // LargestFirst with a single cell that exceeds the target
+        let cells = vec![plain_cell(1000)];
+        let result = select_capacity_cells(&cells, 500, &SelectionStrategy::LargestFirst).unwrap();
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_capacity, 1000);
+        assert_eq!(result.capacity_change, 500);
+    }
+
+    #[test]
+    fn test_select_token_cells_multiple_different_types_filtered() {
+        // Multiple token types with different code_hashes — only matching cells selected
+        let cell_match = token_cell(1000, 300, 0x01);
+        let cell_other = LiveCell {
+            tx_hash: [0xEE; 32],
+            index: 0,
+            capacity: 5000,
+            data: 9999u128.to_le_bytes().to_vec(),
+            lock_script: test_lock(0x01),
+            type_script: Some(super::super::Script {
+                code_hash: [0xAA; 32], // Different code_hash from 0xDD
+                hash_type: super::super::HashType::Data1,
+                args: vec![0x01; 36],
+            }),
+        };
+        let cells = vec![cell_match, cell_other];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 200,
+            &SelectionStrategy::SmallestFirst,
+        ).unwrap();
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_token_amount, 300);
+    }
+
+    #[test]
+    fn test_merge_two_token_cells_sums_amounts() {
+        // Verify token amounts are correctly summed during merge
+        let cells = vec![
+            token_cell(10_000_000_000, 777, 0x01),
+            token_cell(10_000_000_000, 333, 0x01),
+        ];
+        let tx = merge_cells(&cells, test_lock(0x02)).unwrap();
+        let merged = super::super::token::parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(merged, 1110);
+    }
+
+    #[test]
+    fn test_split_cell_all_outputs_use_recipient_lock() {
+        // Every split output should have the recipient's lock script
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 10, 9000, 0x01);
+        let tx = split_cell(&cell, &[3000, 3000], test_lock(0x05)).unwrap();
+        for output in &tx.outputs {
+            assert_eq!(output.lock_script.args, vec![0x05; 20]);
+        }
+    }
+
+    #[test]
+    fn test_split_cell_capacity_per_output_equals_min_token_capacity() {
+        // Each split output should have exactly min_token_cell_capacity
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 10, 6000, 0x01);
+        let tx = split_cell(&cell, &[2000, 2000], test_lock(0x02)).unwrap();
+        // First two outputs (non-change) should each have cap
+        assert_eq!(tx.outputs[0].capacity, cap);
+        assert_eq!(tx.outputs[1].capacity, cap);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_both_lock_and_type_zero_args() {
+        // Lock with 0 args and type with 0 args
+        // 8 (capacity) + 32+1+4+0 (lock) + 32+1+4+0 (type) + 0 (data) = 82
+        let cap = calculate_cell_capacity(0, 0, Some(0));
+        assert_eq!(cap, 82 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_merge_plain_cells_cell_deps_empty() {
+        // Merged transaction should have empty cell_deps (caller adds them)
+        let cells = vec![plain_cell(1000), plain_cell(2000)];
+        let tx = merge_cells(&cells, test_lock(0x02)).unwrap();
+        assert!(tx.cell_deps.is_empty());
+    }
+
+    #[test]
+    fn test_split_cell_witnesses_single_entry() {
+        // Split transaction should have exactly 1 witness (1 input)
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 10, 5000, 0x01);
+        let tx = split_cell(&cell, &[2000, 3000], test_lock(0x02)).unwrap();
+        assert_eq!(tx.witnesses.len(), 1);
+        assert_eq!(tx.inputs.len(), 1);
+    }
 }

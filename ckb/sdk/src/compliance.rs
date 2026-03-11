@@ -1319,4 +1319,384 @@ mod tests {
         // Should get points from large amounts factor
         assert!(score >= 2500, "Large amounts should raise risk, got {}", score);
     }
+
+    // ============ Additional Edge Case Tests ============
+
+    #[test]
+    fn test_limits_daily_volume_saturating_add_overflow() {
+        // daily_volume near u128::MAX — saturating_add should not panic
+        let limits = make_limits(u128::MAX, u128::MAX, u128::MAX, 0);
+        let result = check_limits(1, u128::MAX, &limits);
+        // saturating_add(u128::MAX, 1) = u128::MAX, which equals daily_max
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn test_limits_amount_equals_daily_max_zero_prior() {
+        // Single tx that exactly fills the daily limit
+        let limits = make_limits(5000, 5000, 100_000, 10);
+        assert_eq!(check_limits(5000, 0, &limits), Ok(()));
+    }
+
+    #[test]
+    fn test_limits_zero_per_tx_max_rejects_any_amount() {
+        // KYC None scenario: all limits are 0, any positive amount fails
+        let limits = make_limits(0, 0, 0, 0);
+        assert_eq!(
+            check_limits(1, 0, &limits),
+            Err(ComplianceError::TransactionLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn test_limits_max_u128_amount() {
+        // Extreme amount against finite limits
+        let limits = make_limits(1000, 5000, 100_000, 10);
+        assert_eq!(
+            check_limits(u128::MAX, 0, &limits),
+            Err(ComplianceError::TransactionLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn test_risk_frequency_boundary_exactly_10() {
+        // frequency = tx_count * 1000 / age_blocks
+        // 10 * 1000 / 1000 = 10, which is NOT > 10 so no frequency penalty
+        let score = address_risk_score(10, 10, 100 * PRECISION, 1_000);
+        // frequency == 10, not > 10 => no frequency score
+        // diversity = 10 * 10000 / 10 = 10000 => no diversity penalty
+        // avg < 1M => no amount penalty
+        // age 1000 < 10000 => +1500
+        assert_eq!(score, 1500, "Frequency at boundary 10 should not add penalty, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_frequency_boundary_exactly_11() {
+        // 11 * 1000 / 1000 = 11, which IS > 10 so +1000 frequency penalty
+        let score = address_risk_score(11, 11, 100 * PRECISION, 1_000);
+        // frequency = 11, > 10 => +1000
+        // diversity = 11 * 10000 / 11 = 10000 => no diversity penalty
+        // avg < 1M => no amount penalty
+        // age 1000 < 10000 => +1500
+        assert_eq!(score, 2500, "Frequency at 11 should add 1000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_frequency_boundary_exactly_50() {
+        // 50 * 1000 / 1000 = 50, NOT > 50 => still 1000 bracket
+        let score = address_risk_score(50, 50, 100 * PRECISION, 1_000);
+        // frequency = 50, > 10 but not > 50 => +1000
+        // diversity = 50*10000/50 = 10000 => no penalty
+        // age < 10000 => +1500
+        assert_eq!(score, 2500, "Frequency at boundary 50 should be 1000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_frequency_boundary_exactly_51() {
+        // 51 * 1000 / 1000 = 51, > 50 => +2000
+        let score = address_risk_score(51, 51, 100 * PRECISION, 1_000);
+        // frequency = 51, > 50 => +2000
+        // diversity = 51*10000/51 = 10000 => no penalty
+        // age < 10000 => +1500
+        assert_eq!(score, 3500, "Frequency at 51 should add 2000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_frequency_boundary_exactly_101() {
+        // 101 * 1000 / 1000 = 101, > 100 => +3000
+        let score = address_risk_score(101, 101, 100 * PRECISION, 1_000);
+        // frequency = 101, > 100 => +3000
+        // diversity = 101*10000/101 = 10000 => no penalty
+        // age < 10000 => +1500
+        assert_eq!(score, 4500, "Frequency at 101 should add 3000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_diversity_boundary_below_500() {
+        // diversity_ratio = unique * 10000 / tx_count
+        // 4 * 10000 / 100 = 400 < 500 => +3000 diversity penalty
+        let score = address_risk_score(100, 4, 100 * PRECISION, 1_000_000);
+        // frequency = 100 * 1000 / 1_000_000 = 0 => no freq penalty
+        // diversity = 400 < 500 => +3000
+        // avg < 1M => no amount
+        // age > 100_000 => no age penalty
+        assert_eq!(score, 3000, "Low diversity <500 should add 3000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_diversity_boundary_at_500() {
+        // 5 * 10000 / 100 = 500, NOT < 500, IS < 2000 => +2000
+        let score = address_risk_score(100, 5, 100 * PRECISION, 1_000_000);
+        // diversity = 500, not < 500 but < 2000 => +2000
+        assert_eq!(score, 2000, "Diversity at 500 should add 2000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_diversity_boundary_at_2000() {
+        // 20 * 10000 / 100 = 2000, NOT < 2000, IS < 5000 => +1000
+        let score = address_risk_score(100, 20, 100 * PRECISION, 1_000_000);
+        // diversity = 2000, not < 2000 but < 5000 => +1000
+        assert_eq!(score, 1000, "Diversity at 2000 should add 1000, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_diversity_boundary_at_5000() {
+        // 50 * 10000 / 100 = 5000, NOT < 5000 => no diversity penalty
+        let score = address_risk_score(100, 50, 100 * PRECISION, 1_000_000);
+        // diversity = 5000 => no penalty
+        assert_eq!(score, 0, "Diversity at 5000 should add 0, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_age_boundary_at_10000() {
+        // age_blocks = 10_000, NOT < 10_000, IS < 100_000 => +500
+        let score = address_risk_score(1, 1, 100 * PRECISION, 10_000);
+        // frequency = 1 * 1000 / 10000 = 0 => no freq
+        // diversity = 1*10000/1 = 10000 => no diversity
+        // avg < 1M => no amount
+        // age = 10000, >= 10000 but < 100000 => +500
+        assert_eq!(score, 500, "Age at 10000 should add 500, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_age_boundary_at_9999() {
+        // age_blocks = 9_999, < 10_000 => +1500
+        let score = address_risk_score(1, 1, 100 * PRECISION, 9_999);
+        // frequency = 1*1000/9999 = 0 => no freq
+        // diversity = 10000 => no diversity
+        // avg < 1M => no amount
+        // age < 10000 => +1500
+        assert_eq!(score, 1500, "Age at 9999 should add 1500, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_age_boundary_at_100000() {
+        // age_blocks = 100_000, >= 100_000 => no age penalty
+        let score = address_risk_score(1, 1, 100 * PRECISION, 100_000);
+        // frequency = 1*1000/100000 = 0 => no freq
+        // diversity = 10000 => no diversity
+        // avg < 1M => no amount
+        // age >= 100000 => no age penalty
+        assert_eq!(score, 0, "Age at 100000 should add 0, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_avg_amount_at_large_threshold() {
+        // avg_amount exactly at 1M * PRECISION => NOT > large_threshold => no penalty
+        let score = address_risk_score(1, 1, 1_000_000 * PRECISION, 1_000_000);
+        // freq = 0, diversity = 10000, age > 100000 => all zero
+        // avg = 1M*PRECISION = large_threshold, NOT > large => no penalty
+        assert_eq!(score, 0, "Avg at exactly 1M threshold should not add penalty, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_avg_amount_just_above_large_threshold() {
+        // avg_amount = 1M*PRECISION + 1 => > large_threshold => +1500
+        let score = address_risk_score(1, 1, 1_000_000 * PRECISION + 1, 1_000_000);
+        assert_eq!(score, 1500, "Avg just above 1M should add 1500, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_avg_amount_at_huge_threshold() {
+        // avg_amount exactly at 10M * PRECISION => NOT > huge_threshold => +1500
+        let score = address_risk_score(1, 1, 10_000_000 * PRECISION, 1_000_000);
+        // 10M = huge_threshold, NOT > huge => but IS > large => +1500
+        assert_eq!(score, 1500, "Avg at exactly 10M threshold should add 1500, got {}", score);
+    }
+
+    #[test]
+    fn test_risk_avg_amount_just_above_huge_threshold() {
+        // avg_amount = 10M*PRECISION + 1 => > huge_threshold => +2500
+        let score = address_risk_score(1, 1, 10_000_000 * PRECISION + 1, 1_000_000);
+        assert_eq!(score, 2500, "Avg just above 10M should add 2500, got {}", score);
+    }
+
+    #[test]
+    fn test_kyc_renewal_warning_blocks_larger_than_expires_at() {
+        // warning_blocks > expires_at: saturating_sub should produce 0
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 100);
+        // warning_blocks = 500, expires_at = 100, warning_start = 100 - 500 = 0 (saturating)
+        // current_block 50 >= 0 => true, and not expired (50 < 100) => renewal needed
+        assert!(kyc_renewal_needed(&kyc, 50, 500));
+    }
+
+    #[test]
+    fn test_kyc_renewal_warning_blocks_zero() {
+        // warning_blocks = 0: warning_start = expires_at, only exact block before expiry triggers
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 10_000);
+        // warning_start = 10000 - 0 = 10000, current = 9999 < 10000 => false
+        assert!(!kyc_renewal_needed(&kyc, 9999, 0));
+        // current = 10000 >= 10000, but also expired at 10000 => false (already expired)
+        assert!(!kyc_renewal_needed(&kyc, 10_000, 0));
+    }
+
+    #[test]
+    fn test_kyc_expired_at_block_zero_expires_zero() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 0);
+        // current_block 0 >= expires_at 0 => expired
+        assert!(is_kyc_expired(&kyc, 0));
+    }
+
+    #[test]
+    fn test_kyc_expired_at_u64_max() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, u64::MAX);
+        // Just before max => not expired
+        assert!(!is_kyc_expired(&kyc, u64::MAX - 1));
+        // At max => expired
+        assert!(is_kyc_expired(&kyc, u64::MAX));
+    }
+
+    #[test]
+    fn test_compliance_sanctions_priority_over_expired_kyc() {
+        // Both sanctioned and expired — sanctions is first failure reason
+        let kyc = make_kyc_with_expiry(KycLevel::Enhanced, 1000);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let amount = 100 * PRECISION;
+        let sanctioned = vec![[0xAA; 32]]; // matches kyc.address
+
+        let result = check_compliance(&kyc, &rule, amount, 0, 2000, &sanctioned);
+        assert!(!result.passed);
+        assert!(!result.sanctions_ok);
+        assert!(!result.kyc_ok);
+        // Sanctions checked first, so reason should be SanctionedAddress
+        assert_eq!(result.reason, Some(ComplianceError::SanctionedAddress));
+    }
+
+    #[test]
+    fn test_compliance_different_address_not_sanctioned() {
+        // KYC address is 0xAA, sanctions list has 0xBB => passes sanctions
+        let kyc = make_kyc(KycLevel::Enhanced, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let amount = 100 * PRECISION;
+        let sanctioned = vec![[0xBB; 32]]; // does NOT match kyc.address 0xAA
+
+        let result = check_compliance(&kyc, &rule, amount, 0, 500, &sanctioned);
+        assert!(result.passed);
+        assert!(result.sanctions_ok);
+    }
+
+    #[test]
+    fn test_compliance_report_single_pass() {
+        let checks = vec![ComplianceCheck {
+            passed: true,
+            kyc_ok: true,
+            limits_ok: true,
+            sanctions_ok: true,
+            jurisdiction_ok: true,
+            reason: None,
+        }];
+        let report = compliance_report(&checks);
+        assert_eq!(report.total_checked, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.kyc_failures, 0);
+        assert_eq!(report.limit_failures, 0);
+        assert_eq!(report.sanction_hits, 0);
+    }
+
+    #[test]
+    fn test_compliance_report_single_fail_jurisdiction() {
+        // Jurisdiction failure only — not tracked as kyc/limit/sanction
+        let checks = vec![ComplianceCheck {
+            passed: false,
+            kyc_ok: true,
+            limits_ok: true,
+            sanctions_ok: true,
+            jurisdiction_ok: false,
+            reason: Some(ComplianceError::InvalidJurisdiction),
+        }];
+        let report = compliance_report(&checks);
+        assert_eq!(report.total_checked, 1);
+        assert_eq!(report.passed, 0);
+        assert_eq!(report.failed, 1);
+        // Jurisdiction failures are not tracked in dedicated counters
+        assert_eq!(report.kyc_failures, 0);
+        assert_eq!(report.limit_failures, 0);
+        assert_eq!(report.sanction_hits, 0);
+    }
+
+    #[test]
+    fn test_remaining_daily_limit_u128_max() {
+        let limits = make_limits(u128::MAX, u128::MAX, u128::MAX, 0);
+        assert_eq!(remaining_daily_limit(&limits, 0), u128::MAX);
+        assert_eq!(remaining_daily_limit(&limits, u128::MAX), 0);
+        assert_eq!(remaining_daily_limit(&limits, 1), u128::MAX - 1);
+    }
+
+    #[test]
+    fn test_address_hash_commutative_check() {
+        // Verify hash(addr, salt) != hash(salt, addr) — i.e. argument order matters
+        let a = [0xAA; 32];
+        let b = [0xBB; 32];
+        let h1 = address_hash(&a, &b);
+        let h2 = address_hash(&b, &a);
+        assert_ne!(h1, h2, "address_hash should not be commutative");
+    }
+
+    #[test]
+    fn test_limits_for_kyc_none_min_amount_zero() {
+        let limits = limits_for_kyc_level(&KycLevel::None);
+        assert_eq!(limits.min_amount, 0);
+    }
+
+    #[test]
+    fn test_limits_for_kyc_monthly_is_30x_daily() {
+        for level in &[KycLevel::Basic, KycLevel::Enhanced, KycLevel::Institutional] {
+            let limits = limits_for_kyc_level(level);
+            assert_eq!(
+                limits.monthly_max,
+                limits.daily_max * 30,
+                "Monthly should be 30x daily for {:?}",
+                level
+            );
+        }
+    }
+
+    #[test]
+    fn test_compliance_all_four_failures_simultaneously() {
+        // Sanctioned + expired + insufficient KYC + restricted jurisdiction + over limits
+        let mut kyc = make_kyc_with_expiry(KycLevel::None, 500); // expires at block 500
+        kyc.jurisdiction = 408; // restricted
+        let rule = make_rule(KycLevel::Institutional, vec![408]);
+        let amount = u128::MAX; // way over limits
+        let sanctioned = vec![[0xAA; 32]]; // matches
+
+        let result = check_compliance(&kyc, &rule, amount, 0, 1000, &sanctioned);
+        assert!(!result.passed);
+        assert!(!result.sanctions_ok);
+        assert!(!result.kyc_ok);
+        assert!(!result.jurisdiction_ok);
+        assert!(!result.limits_ok);
+        // First failure should be sanctions (highest priority)
+        assert_eq!(result.reason, Some(ComplianceError::SanctionedAddress));
+    }
+
+    #[test]
+    fn test_sanctioned_first_in_list() {
+        let address = [0xAA; 32];
+        let sanctioned = vec![[0xAA; 32], [0xBB; 32], [0xCC; 32]];
+        assert!(is_sanctioned(&address, &sanctioned));
+    }
+
+    #[test]
+    fn test_jurisdiction_max_u16_value() {
+        // Edge case: u16::MAX as jurisdiction code
+        assert!(is_restricted_jurisdiction(u16::MAX, &[u16::MAX]));
+        assert!(!is_restricted_jurisdiction(u16::MAX, &[0, 1, 2]));
+    }
+
+    #[test]
+    fn test_kyc_status_clone_and_eq() {
+        let kyc1 = make_kyc(KycLevel::Basic, 840);
+        let kyc2 = kyc1.clone();
+        assert_eq!(kyc1, kyc2);
+    }
+
+    #[test]
+    fn test_compliance_error_clone_and_eq() {
+        let e1 = ComplianceError::KycRequired;
+        let e2 = e1.clone();
+        assert_eq!(e1, e2);
+        assert_ne!(ComplianceError::KycRequired, ComplianceError::SanctionedAddress);
+    }
 }

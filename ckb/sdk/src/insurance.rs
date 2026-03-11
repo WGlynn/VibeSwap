@@ -1621,4 +1621,696 @@ mod tests {
         assert!(diff <= 2, "IL asymmetry too large: up={}, down={}, diff={}",
             claim_up.actual_il_bps, claim_down.actual_il_bps, diff);
     }
+
+    // ============ Additional Edge Case Tests ============
+
+    // --- Premium calculation edge cases ---
+
+    #[test]
+    fn test_premium_zero_cooldown_pool() {
+        // Pool with cooldown_blocks = 0 should use reference_blocks = 1
+        let mut pool = make_pool(1_000_000 * PRECISION, 0);
+        pool.cooldown_blocks = 0;
+        let tier = make_tier(0, 2000, 10_000);
+        let quote = calculate_premium(&pool, 100_000 * PRECISION, 10_000, &tier).unwrap();
+        assert!(quote.premium_amount > 0);
+    }
+
+    #[test]
+    fn test_premium_exact_min_duration_boundary() {
+        // Duration exactly equal to min_duration_blocks should succeed
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(0, 2000, 10_000); // min_duration_blocks = 100
+        let result = calculate_premium(&pool, 100_000 * PRECISION, 100, &tier);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_premium_one_below_min_duration() {
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(0, 2000, 10_000); // min_duration_blocks = 100
+        let result = calculate_premium(&pool, 100_000 * PRECISION, 99, &tier);
+        assert_eq!(result, Err(InsuranceError::InvalidPremium));
+    }
+
+    #[test]
+    fn test_premium_effective_rate_clamped_to_min() {
+        // Very low base rate + very low multiplier should clamp to MIN_PREMIUM_RATE_BPS
+        let mut pool = make_pool(1_000_000 * PRECISION, 0);
+        pool.premium_rate_bps = 1; // 0.01% base
+        let tier = make_tier(0, 2000, 1_000); // 0.1x multiplier
+        let quote = calculate_premium(&pool, 100_000 * PRECISION, 10_000, &tier).unwrap();
+        assert!(quote.effective_rate_bps >= MIN_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_premium_effective_rate_clamped_to_max() {
+        // High base rate + high multiplier + high utilization should clamp to MAX
+        let pool = make_pool(1_000_000 * PRECISION, 700_000 * PRECISION);
+        let tier = make_tier(0, 2000, 50_000); // 5x multiplier
+        let quote = calculate_premium(&pool, 10_000 * PRECISION, 10_000, &tier).unwrap();
+        assert!(quote.effective_rate_bps <= MAX_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_premium_coverage_exactly_fills_pool() {
+        // Request exactly the remaining available coverage
+        let pool = make_pool(1_000_000 * PRECISION, 700_000 * PRECISION);
+        let avail = available_coverage(&pool);
+        let tier = make_tier(0, 2000, 10_000);
+        let result = calculate_premium(&pool, avail, 10_000, &tier);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_premium_coverage_one_over_capacity() {
+        // Request one unit more than available
+        let pool = make_pool(1_000_000 * PRECISION, 700_000 * PRECISION);
+        let avail = available_coverage(&pool);
+        let tier = make_tier(0, 2000, 10_000);
+        let result = calculate_premium(&pool, avail + 1, 10_000, &tier);
+        assert_eq!(result, Err(InsuranceError::PoolFull));
+    }
+
+    #[test]
+    fn test_premium_tier_id_at_max_boundary() {
+        // tier_id = MAX_TIERS - 1 = 4 should succeed
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(4, 2000, 10_000);
+        let result = calculate_premium(&pool, 100_000 * PRECISION, 10_000, &tier);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_premium_tier_id_just_over_max() {
+        // tier_id = MAX_TIERS = 5 should fail
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(5, 2000, 10_000);
+        let result = calculate_premium(&pool, 100_000 * PRECISION, 10_000, &tier);
+        assert_eq!(result, Err(InsuranceError::InvalidTier));
+
+        // tier_id = 6 should also fail
+        let tier6 = make_tier(6, 2000, 10_000);
+        let result6 = calculate_premium(&pool, 100_000 * PRECISION, 10_000, &tier6);
+        assert_eq!(result6, Err(InsuranceError::InvalidTier));
+    }
+
+    // --- IL Claim edge cases ---
+
+    #[test]
+    fn test_il_claim_both_prices_zero() {
+        let position = make_position(1_000_000 * PRECISION, 100, 100_000, 0);
+        let tier = make_tier(0, 2000, 10_000);
+        let result = calculate_il_claim(&position, 0, 0, &tier);
+        assert_eq!(result, Err(InsuranceError::NoActiveCoverage));
+    }
+
+    #[test]
+    fn test_il_claim_very_small_price_ratio() {
+        // entry = 1000000, current = 999999 — nearly identical
+        let position = make_position(1_000_000 * PRECISION, 100, 100_000, 0);
+        let tier = make_tier(0, 2000, 10_000);
+        let claim = calculate_il_claim(
+            &position,
+            1_000_000 * PRECISION,
+            999_999 * PRECISION,
+            &tier,
+        ).unwrap();
+        // IL should be essentially zero for a 0.0001% change
+        assert!(claim.actual_il_bps <= 1);
+    }
+
+    #[test]
+    fn test_il_claim_price_ratio_100x_down() {
+        // price drops 100x
+        let position = make_position(1_000_000 * PRECISION, 100, 100_000, 0);
+        let tier = make_tier(0, 9000, 10_000);
+        let claim = calculate_il_claim(
+            &position,
+            100 * PRECISION,
+            1 * PRECISION,
+            &tier,
+        ).unwrap();
+        // IL for 1/100 ratio should be same as 100x up ≈ 81.8%
+        assert!(claim.actual_il_bps > 8000);
+        assert!(claim.actual_il_bps <= 8500);
+    }
+
+    #[test]
+    fn test_il_claim_covered_amount_zero() {
+        let position = make_position(0, 100, 100_000, 0);
+        let tier = make_tier(0, 2000, 10_000);
+        let claim = calculate_il_claim(
+            &position,
+            1000 * PRECISION,
+            2000 * PRECISION,
+            &tier,
+        ).unwrap();
+        // Zero covered amount means zero payout regardless of IL
+        assert_eq!(claim.claimable_amount, 0);
+        assert_eq!(claim.payout_ratio_bps, 0);
+    }
+
+    #[test]
+    fn test_il_claim_max_payout_bps_zero() {
+        // Tier with 0 max payout should always yield 0 claimable
+        let position = make_position(1_000_000 * PRECISION, 100, 100_000, 0);
+        let tier = make_tier(0, 0, 10_000);
+        let claim = calculate_il_claim(
+            &position,
+            1000 * PRECISION,
+            4000 * PRECISION,
+            &tier,
+        ).unwrap();
+        assert_eq!(claim.claimable_amount, 0);
+    }
+
+    #[test]
+    fn test_il_claim_payout_exactly_at_tier_cap() {
+        // When IL bps exactly equals tier max_payout_bps, payout should equal max
+        let position = make_position(1_000_000 * PRECISION, 100, 100_000, 0);
+        // Use a tier cap of 572 bps (roughly the IL for 2x price)
+        let tier = make_tier(0, 572, 10_000);
+        let claim = calculate_il_claim(
+            &position,
+            1000 * PRECISION,
+            2000 * PRECISION,
+            &tier,
+        ).unwrap();
+        let max_payout = mul_div(position.covered_amount, 572, 10_000);
+        assert!(claim.claimable_amount <= max_payout);
+    }
+
+    // --- Validate claim edge cases ---
+
+    #[test]
+    fn test_validate_claim_one_block_before_cooldown_end() {
+        let position = make_position(1_000_000 * PRECISION, 1000, 50_000, 0);
+        // cooldown_end = 1000 + 1000 = 2000, check at 1999
+        let result = validate_claim(&position, 1999, DEFAULT_COOLDOWN_BLOCKS);
+        assert_eq!(result, Err(InsuranceError::CooldownActive));
+    }
+
+    #[test]
+    fn test_validate_claim_one_block_after_expiry() {
+        let position = make_position(1_000_000 * PRECISION, 1000, 50_000, 0);
+        let result = validate_claim(&position, 50_001, DEFAULT_COOLDOWN_BLOCKS);
+        assert_eq!(result, Err(InsuranceError::ClaimExpired));
+    }
+
+    #[test]
+    fn test_validate_claim_start_block_overflow_saturates() {
+        // start_block near u64::MAX, cooldown should saturate
+        let position = make_position(1_000_000 * PRECISION, u64::MAX - 500, u64::MAX, 0);
+        // cooldown_end = saturating_add(u64::MAX - 500, 1000) = u64::MAX
+        // current_block = u64::MAX should be ok (>= u64::MAX)
+        let result = validate_claim(&position, u64::MAX, DEFAULT_COOLDOWN_BLOCKS);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn test_validate_claim_expired_and_cooldown_both_fail() {
+        // Position that is both expired and still in cooldown
+        // start_block=1000, expiry=1500, cooldown=1000 -> cooldown_end=2000
+        // At block 1600: expired (1600 > 1500)
+        let position = make_position(1_000_000 * PRECISION, 1000, 1500, 0);
+        let result = validate_claim(&position, 1600, DEFAULT_COOLDOWN_BLOCKS);
+        // Should hit expired check first
+        assert_eq!(result, Err(InsuranceError::ClaimExpired));
+    }
+
+    #[test]
+    fn test_validate_claim_large_cooldown() {
+        let position = make_position(1_000_000 * PRECISION, 0, u64::MAX, 0);
+        // Very large cooldown
+        let result = validate_claim(&position, 999_999, 1_000_000);
+        assert_eq!(result, Err(InsuranceError::CooldownActive));
+        // Exactly at cooldown end
+        let result2 = validate_claim(&position, 1_000_000, 1_000_000);
+        assert_eq!(result2, Ok(()));
+    }
+
+    // --- Pool health edge cases ---
+
+    #[test]
+    fn test_pool_health_exactly_60_percent() {
+        // 60% utilization is the boundary for accelerated risk scoring
+        let pool = make_pool(1_000_000 * PRECISION, 600_000 * PRECISION);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 6000);
+        // At exactly 6000, should use linear scoring (score = 6000)
+        assert_eq!(health.risk_score, 6000);
+        assert!(health.sustainable);
+    }
+
+    #[test]
+    fn test_pool_health_exactly_100_percent() {
+        let pool = make_pool(1_000_000 * PRECISION, 1_000_000 * PRECISION);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 10_000);
+        assert_eq!(health.reserve_ratio_bps, 0);
+        assert_eq!(health.risk_score, 10_000);
+        assert!(!health.sustainable);
+    }
+
+    #[test]
+    fn test_pool_health_just_above_60_percent() {
+        // 61% should trigger accelerated scoring
+        let pool = make_pool(10_000 * PRECISION, 6_100 * PRECISION);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 6100);
+        // Accelerated: 6000 + (100 * 125 / 100) = 6000 + 125 = 6125
+        assert_eq!(health.risk_score, 6125);
+    }
+
+    #[test]
+    fn test_pool_health_at_80_percent_boundary() {
+        // Exactly 80% is the start of the critical zone
+        // 8000 bps, but it's >= 8000 so it goes into the else branch
+        let pool = make_pool(1_000_000 * PRECISION, 800_000 * PRECISION);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 8000);
+        // 8000 is in range >8000? No, it's <=8000, so it uses the 6000-8000 branch
+        // excess = 8000 - 6000 = 2000, penalty = 2000*125/100 = 2500
+        // risk_score = 6000 + 2500 = 8500
+        assert_eq!(health.risk_score, 8500);
+    }
+
+    #[test]
+    fn test_pool_health_at_81_percent() {
+        // 8100 bps is in the critical zone (>8000)
+        let pool = make_pool(10_000 * PRECISION, 8_100 * PRECISION);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 8100);
+        // Critical: excess = 8100-8000 = 100, penalty = 100*75/100 = 75
+        // risk_score = 8500 + 75 = 8575
+        assert_eq!(health.risk_score, 8575);
+    }
+
+    #[test]
+    fn test_pool_health_reserve_ratio_matches_utilization() {
+        // reserve_ratio + utilization should always equal 10000 (when util <= 10000)
+        for util_pct in (0..=100).step_by(5) {
+            let coverage = (util_pct as u128) * 10_000 * PRECISION;
+            let pool = make_pool(1_000_000 * PRECISION, coverage);
+            let health = pool_health(&pool);
+            if health.utilization_bps <= 10_000 {
+                assert_eq!(
+                    health.utilization_bps as u32 + health.reserve_ratio_bps as u32,
+                    10_000,
+                    "reserve + util != 10000 at {}%", util_pct
+                );
+            }
+        }
+    }
+
+    // --- Available coverage edge cases ---
+
+    #[test]
+    fn test_available_coverage_custom_max_ratio() {
+        let mut pool = make_pool(1_000_000 * PRECISION, 0);
+        pool.max_coverage_ratio_bps = 5000; // 50% max
+        let avail = available_coverage(&pool);
+        assert_eq!(avail, 500_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_available_coverage_zero_max_ratio() {
+        let mut pool = make_pool(1_000_000 * PRECISION, 0);
+        pool.max_coverage_ratio_bps = 0;
+        let avail = available_coverage(&pool);
+        assert_eq!(avail, 0);
+    }
+
+    // --- Dynamic premium rate edge cases ---
+
+    #[test]
+    fn test_dynamic_premium_base_at_min() {
+        let rate = dynamic_premium_rate(MIN_PREMIUM_RATE_BPS, 0);
+        assert_eq!(rate, MIN_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_dynamic_premium_base_at_max() {
+        let rate = dynamic_premium_rate(MAX_PREMIUM_RATE_BPS, 0);
+        assert_eq!(rate, MAX_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_dynamic_premium_over_100_percent_utilization() {
+        // Edge case: utilization > 10000 bps (shouldn't happen but test robustness)
+        let rate = dynamic_premium_rate(100, 15_000);
+        // rate = 100 + 100*2*15000/10000 = 100 + 300 = 400
+        assert_eq!(rate, 400);
+    }
+
+    // --- Estimate payout edge cases ---
+
+    #[test]
+    fn test_estimate_payout_max_payout_bps_zero() {
+        let tier = make_tier(0, 0, 10_000);
+        let payout = estimate_payout(1_000_000 * PRECISION, 500, &tier);
+        assert_eq!(payout, 0);
+    }
+
+    #[test]
+    fn test_estimate_payout_il_bps_max() {
+        // 100% IL (theoretical max)
+        let tier = make_tier(0, 10_000, 10_000);
+        let coverage = 1_000_000 * PRECISION;
+        let payout = estimate_payout(coverage, 10_000, &tier);
+        assert_eq!(payout, coverage);
+    }
+
+    #[test]
+    fn test_estimate_payout_one_wei_coverage() {
+        let tier = make_tier(0, 5000, 10_000);
+        let payout = estimate_payout(1, 5000, &tier);
+        // 1 * 5000 / 10000 = 0 (integer division)
+        assert_eq!(payout, 0);
+    }
+
+    // --- Coverage expiry edge cases ---
+
+    #[test]
+    fn test_coverage_status_current_block_zero() {
+        let position = make_position(1_000_000 * PRECISION, 0, 100_000, 0);
+        let status = coverage_expiry_status(&position, 0);
+        // 100000 - 0 = 100000 > EXPIRY_WARNING_BLOCKS (5000), so Active
+        assert_eq!(status, CoverageStatus::Active);
+    }
+
+    #[test]
+    fn test_coverage_status_expiry_block_zero() {
+        let position = make_position(1_000_000 * PRECISION, 0, 0, 0);
+        // current_block=0: not expired (0 > 0 is false)
+        // 0.saturating_sub(0) = 0 <= 5000, so Expiring
+        let status = coverage_expiry_status(&position, 0);
+        assert_eq!(status, CoverageStatus::Expiring);
+    }
+
+    #[test]
+    fn test_coverage_status_immediately_expired() {
+        let position = make_position(1_000_000 * PRECISION, 0, 0, 0);
+        // current_block=1 > expiry_block=0
+        let status = coverage_expiry_status(&position, 1);
+        assert_eq!(status, CoverageStatus::Expired);
+    }
+
+    // --- Sustainability edge cases ---
+
+    #[test]
+    fn test_sustainability_claim_exactly_half_deposits() {
+        // Claim exactly at 50% of deposits — should pass (> not >=)
+        let pool = make_pool(1_000_000 * PRECISION, 300_000 * PRECISION);
+        let half = pool.total_deposits / 2;
+        let claims = vec![(half, 1000)];
+        let premium_income = half + 1;
+        assert!(pool_sustainability_check(&pool, &claims, premium_income));
+    }
+
+    #[test]
+    fn test_sustainability_claim_one_over_half_deposits() {
+        let pool = make_pool(1_000_000 * PRECISION, 300_000 * PRECISION);
+        let half = pool.total_deposits / 2;
+        let claims = vec![(half + 1, 1000)];
+        let premium_income = half + 2;
+        assert!(!pool_sustainability_check(&pool, &claims, premium_income));
+    }
+
+    #[test]
+    fn test_sustainability_many_small_claims() {
+        let pool = make_pool(1_000_000 * PRECISION, 300_000 * PRECISION);
+        // 100 small claims, none exceeding 50%
+        let claims: Vec<(u128, u64)> = (0..100).map(|i| (100 * PRECISION, i as u64)).collect();
+        // Total claims = 10000 * PRECISION
+        let premium_income = 10_000 * PRECISION;
+        assert!(pool_sustainability_check(&pool, &claims, premium_income));
+    }
+
+    #[test]
+    fn test_sustainability_zero_income_zero_claims() {
+        let pool = make_pool(1_000_000 * PRECISION, 300_000 * PRECISION);
+        let claims: Vec<(u128, u64)> = vec![];
+        let premium_income = 0;
+        // No claims, no income, but pool is healthy -> sustainable
+        assert!(pool_sustainability_check(&pool, &claims, premium_income));
+    }
+
+    #[test]
+    fn test_sustainability_at_max_coverage_ratio() {
+        // Pool at exactly max coverage ratio: utilization = 8000, NOT sustainable
+        let pool = make_pool(1_000_000 * PRECISION, 800_000 * PRECISION);
+        let claims: Vec<(u128, u64)> = vec![];
+        let premium_income = 100_000 * PRECISION;
+        assert!(!pool_sustainability_check(&pool, &claims, premium_income));
+    }
+
+    // --- Optimal coverage edge cases ---
+
+    #[test]
+    fn test_optimal_coverage_lp_value_zero() {
+        let tier = make_tier(0, 2000, 10_000);
+        let optimal = optimal_coverage_amount(0, 500, &tier);
+        assert_eq!(optimal, 0);
+    }
+
+    #[test]
+    fn test_optimal_coverage_tolerance_one_below_max() {
+        let tier = make_tier(0, 2000, 10_000);
+        let lp_value = 1_000_000 * PRECISION;
+        let optimal = optimal_coverage_amount(lp_value, 1999, &tier);
+        // (2000 - 1999) / 2000 * 1M = 0.05% = 500
+        assert_eq!(optimal, mul_div(lp_value, 1, 2000));
+    }
+
+    // --- Aggregate stats edge cases ---
+
+    #[test]
+    fn test_aggregate_mixed_empty_and_full_pools() {
+        let pools = vec![
+            make_pool(0, 0),
+            make_pool(1_000_000 * PRECISION, 500_000 * PRECISION),
+            make_pool(0, 0),
+        ];
+        let (d, c, u) = aggregate_pool_stats(&pools);
+        assert_eq!(d, 1_000_000 * PRECISION);
+        assert_eq!(c, 500_000 * PRECISION);
+        assert_eq!(u, 5000); // 50%
+    }
+
+    #[test]
+    fn test_aggregate_all_full_pools() {
+        let pools = vec![
+            make_pool(100 * PRECISION, 100 * PRECISION),
+            make_pool(200 * PRECISION, 200 * PRECISION),
+        ];
+        let (d, c, u) = aggregate_pool_stats(&pools);
+        assert_eq!(d, 300 * PRECISION);
+        assert_eq!(c, 300 * PRECISION);
+        assert_eq!(u, 10_000); // 100%
+    }
+
+    // --- Claim priority score edge cases ---
+
+    #[test]
+    fn test_claim_priority_critical_pool_risk_score_10000() {
+        let claim = ILClaim {
+            position: make_position(100_000 * PRECISION, 1000, 50_000, 0),
+            actual_il_bps: 2000,
+            claimable_amount: 20_000 * PRECISION,
+            payout_ratio_bps: 2000,
+        };
+        let health = PoolHealth {
+            total_deposits: 1_000_000 * PRECISION,
+            total_coverage: 1_000_000 * PRECISION,
+            utilization_bps: 10_000,
+            reserve_ratio_bps: 0,
+            risk_score: 10_000,
+            sustainable: false,
+        };
+        let score = claim_priority_score(&claim, &health);
+        assert!(score > 0);
+        // urgency should be at max 3000
+    }
+
+    #[test]
+    fn test_claim_priority_risk_score_exactly_5000() {
+        let claim = ILClaim {
+            position: make_position(100_000 * PRECISION, 1000, 50_000, 0),
+            actual_il_bps: 500,
+            claimable_amount: 5_000 * PRECISION,
+            payout_ratio_bps: 500,
+        };
+        let health = PoolHealth {
+            total_deposits: 10_000_000 * PRECISION,
+            total_coverage: 5_000_000 * PRECISION,
+            utilization_bps: 5000,
+            reserve_ratio_bps: 5000,
+            risk_score: 5000,
+            sustainable: true,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // risk_score = 5000, NOT > 5000, so urgency_weight = 1000 (healthy)
+        // il_severity = 500 * 4000 / 10000 = 200
+        // efficiency: small claim relative to large pool, should be near 3000
+        assert!(score > 0);
+    }
+
+    #[test]
+    fn test_claim_priority_risk_score_exactly_8000() {
+        let claim = ILClaim {
+            position: make_position(100_000 * PRECISION, 1000, 50_000, 0),
+            actual_il_bps: 1000,
+            claimable_amount: 10_000 * PRECISION,
+            payout_ratio_bps: 1000,
+        };
+        let health = PoolHealth {
+            total_deposits: 10_000_000 * PRECISION,
+            total_coverage: 8_000_000 * PRECISION,
+            utilization_bps: 8000,
+            reserve_ratio_bps: 2000,
+            risk_score: 8000,
+            sustainable: false,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // risk_score = 8000, NOT > 8000, but > 5000 -> moderate stress
+        // stress_factor = (8000-5000)*1500/3000 = 1500
+        assert!(score > 0);
+    }
+
+    #[test]
+    fn test_claim_priority_zero_deposits_pool() {
+        let claim = ILClaim {
+            position: make_position(100_000 * PRECISION, 1000, 50_000, 0),
+            actual_il_bps: 500,
+            claimable_amount: 5_000 * PRECISION,
+            payout_ratio_bps: 500,
+        };
+        let health = PoolHealth {
+            total_deposits: 0,
+            total_coverage: 0,
+            utilization_bps: 0,
+            reserve_ratio_bps: 10_000,
+            risk_score: 0,
+            sustainable: true,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // efficiency_weight = 1500 (neutral for zero deposits)
+        // urgency_weight = 1000 (healthy)
+        // il_severity = 500*4000/10000 = 200
+        assert_eq!(score, 200 + 1500 + 1000);
+    }
+
+    #[test]
+    fn test_claim_priority_zero_claimable_amount() {
+        let claim = ILClaim {
+            position: make_position(100_000 * PRECISION, 1000, 50_000, 0),
+            actual_il_bps: 0,
+            claimable_amount: 0,
+            payout_ratio_bps: 0,
+        };
+        let health = PoolHealth {
+            total_deposits: 10_000_000 * PRECISION,
+            total_coverage: 2_000_000 * PRECISION,
+            utilization_bps: 2000,
+            reserve_ratio_bps: 8000,
+            risk_score: 2000,
+            sustainable: true,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // il_severity = 0, but efficiency should be 1500 (neutral for zero claimable)
+        // urgency = 1000
+        assert_eq!(score, 0 + 1500 + 1000);
+    }
+
+    #[test]
+    fn test_claim_priority_claim_larger_than_pool() {
+        // Edge: claim_ratio >= 10000
+        let claim = ILClaim {
+            position: make_position(100_000 * PRECISION, 1000, 50_000, 0),
+            actual_il_bps: 5000,
+            claimable_amount: 20_000_000 * PRECISION, // larger than deposits
+            payout_ratio_bps: 5000,
+        };
+        let health = PoolHealth {
+            total_deposits: 10_000_000 * PRECISION,
+            total_coverage: 9_000_000 * PRECISION,
+            utilization_bps: 9000,
+            reserve_ratio_bps: 1000,
+            risk_score: 9200,
+            sustainable: false,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // efficiency_weight = 0 (claim_ratio >= 10000)
+        assert!(score > 0);
+    }
+
+    // --- Constants verification ---
+
+    #[test]
+    fn test_constants_sanity() {
+        assert!(MIN_PREMIUM_RATE_BPS < MAX_PREMIUM_RATE_BPS);
+        assert!(MAX_COVERAGE_RATIO_BPS <= 10_000);
+        assert!(MAX_TIERS > 0);
+        assert!(UTILIZATION_PREMIUM_FACTOR > 1);
+        assert!(EXPIRY_WARNING_BLOCKS > 0);
+        assert!(DEFAULT_COOLDOWN_BLOCKS > 0);
+    }
+
+    // --- Error type tests ---
+
+    #[test]
+    fn test_error_clone_and_debug() {
+        let err = InsuranceError::InsufficientCoverage;
+        let cloned = err.clone();
+        assert_eq!(err, cloned);
+        // Ensure Debug is implemented
+        let debug_str = format!("{:?}", err);
+        assert!(!debug_str.is_empty());
+    }
+
+    #[test]
+    fn test_all_error_variants_distinct() {
+        let errors = vec![
+            InsuranceError::InsufficientCoverage,
+            InsuranceError::PoolDepleted,
+            InsuranceError::InvalidPremium,
+            InsuranceError::ClaimTooEarly,
+            InsuranceError::ClaimExpired,
+            InsuranceError::NoActiveCoverage,
+            InsuranceError::ExcessiveClaim,
+            InsuranceError::InvalidTier,
+            InsuranceError::CooldownActive,
+            InsuranceError::PoolFull,
+        ];
+        for i in 0..errors.len() {
+            for j in (i + 1)..errors.len() {
+                assert_ne!(errors[i], errors[j], "errors at {} and {} should differ", i, j);
+            }
+        }
+    }
+
+    // --- Data type tests ---
+
+    #[test]
+    fn test_coverage_status_equality() {
+        assert_eq!(CoverageStatus::Active, CoverageStatus::Active);
+        assert_eq!(CoverageStatus::Expiring, CoverageStatus::Expiring);
+        assert_eq!(CoverageStatus::Expired, CoverageStatus::Expired);
+        assert_ne!(CoverageStatus::Active, CoverageStatus::Expired);
+        assert_ne!(CoverageStatus::Expiring, CoverageStatus::Active);
+    }
+
+    #[test]
+    fn test_premium_quote_fields() {
+        let pool = make_pool(1_000_000 * PRECISION, 100_000 * PRECISION);
+        let tier = make_tier(1, 3000, 15_000);
+        let quote = calculate_premium(&pool, 200_000 * PRECISION, 5_000, &tier).unwrap();
+        assert_eq!(quote.coverage_amount, 200_000 * PRECISION);
+        assert_eq!(quote.duration_blocks, 5_000);
+        assert_eq!(quote.tier, 1);
+        assert!(quote.effective_rate_bps >= MIN_PREMIUM_RATE_BPS);
+        assert!(quote.effective_rate_bps <= MAX_PREMIUM_RATE_BPS);
+    }
 }

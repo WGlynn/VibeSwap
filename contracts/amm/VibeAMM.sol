@@ -595,10 +595,12 @@ contract VibeAMM is
         if (amount1 < amount1Min) revert InsufficientToken1();
 
         // Check withdrawal circuit breaker (percentage of TVL)
-        uint256 withdrawalValueBps = pool.totalLiquidity > 0
-            ? (liquidity * 10000) / pool.totalLiquidity
-            : 0;
-        _updateBreaker(WITHDRAWAL_BREAKER, withdrawalValueBps);
+        {
+            uint256 withdrawalValueBps = pool.totalLiquidity > 0
+                ? (liquidity * 10000) / pool.totalLiquidity
+                : 0;
+            _updateBreaker(WITHDRAWAL_BREAKER, withdrawalValueBps);
+        }
 
         // Update state before external calls (CEI pattern)
         // Use unchecked - amounts verified above, can't underflow
@@ -617,9 +619,11 @@ contract VibeAMM is
         }
 
         // Update internal tracking (use min to prevent underflow if LP was transferred)
-        uint256 tracked = liquidityBalance[poolId][msg.sender];
-        unchecked {
-            liquidityBalance[poolId][msg.sender] = tracked >= liquidity ? tracked - liquidity : 0;
+        {
+            uint256 tracked = liquidityBalance[poolId][msg.sender];
+            unchecked {
+                liquidityBalance[poolId][msg.sender] = tracked >= liquidity ? tracked - liquidity : 0;
+            }
         }
 
         // Notify IncentiveController for loyalty tracking (before burn)

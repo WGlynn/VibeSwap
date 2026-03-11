@@ -888,6 +888,98 @@ impl VaultCellData {
     }
 }
 
+// ============ Insurance Pool Cell Data ============
+
+/// Insurance pool cell — mutualized protection fund that prevents liquidations.
+/// Funded by premiums from lending operations. Absorbs first-loss when vaults
+/// enter distress, paying to de-risk positions before liquidation occurs.
+/// Philosophy: prevention > punishment, mutualism > predation (P-105).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct InsurancePoolCellData {
+    pub pool_id: [u8; 32],            // Unique identifier
+    pub asset_type_hash: [u8; 32],    // Which token this pool covers
+    pub total_deposits: u128,         // Total insurance deposits (in underlying tokens)
+    pub total_shares: u128,           // Share accounting (like cTokens)
+    pub total_premiums_earned: u128,  // Accumulated premiums from lending pools
+    pub total_claims_paid: u128,      // Total payouts for de-risk events
+    pub premium_rate_bps: u64,        // Annual premium rate (bps of lending pool borrows)
+    pub max_coverage_bps: u64,        // Max % of deposits usable per single claim (bps)
+    pub cooldown_blocks: u64,         // Withdrawal cooldown period (prevents bank runs)
+    pub last_premium_block: u64,      // Last premium accrual block
+}
+
+impl InsurancePoolCellData {
+    // 32*2 + 16*4 + 8*4 = 64 + 64 + 32 = 160
+    pub const SERIALIZED_SIZE: usize = 160;
+
+    pub fn serialize(&self) -> [u8; Self::SERIALIZED_SIZE] {
+        let mut buf = [0u8; Self::SERIALIZED_SIZE];
+        let mut offset = 0;
+
+        buf[offset..offset + 32].copy_from_slice(&self.pool_id);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.asset_type_hash);
+        offset += 32;
+
+        buf[offset..offset + 16].copy_from_slice(&self.total_deposits.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 16].copy_from_slice(&self.total_shares.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 16].copy_from_slice(&self.total_premiums_earned.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 16].copy_from_slice(&self.total_claims_paid.to_le_bytes());
+        offset += 16;
+
+        buf[offset..offset + 8].copy_from_slice(&self.premium_rate_bps.to_le_bytes());
+        offset += 8;
+        buf[offset..offset + 8].copy_from_slice(&self.max_coverage_bps.to_le_bytes());
+        offset += 8;
+        buf[offset..offset + 8].copy_from_slice(&self.cooldown_blocks.to_le_bytes());
+        offset += 8;
+        buf[offset..offset + 8].copy_from_slice(&self.last_premium_block.to_le_bytes());
+
+        buf
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SERIALIZED_SIZE {
+            return None;
+        }
+        let mut offset = 0;
+        let mut result = Self::default();
+
+        result.pool_id.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.asset_type_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.total_deposits = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.total_shares = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.total_premiums_earned = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.total_claims_paid = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+
+        result.premium_rate_bps = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+        result.max_coverage_bps = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+        result.cooldown_blocks = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+        result.last_premium_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+
+        Some(result)
+    }
+}
+
+// ============ Insurance Pool Constants ============
+
+pub const DEFAULT_PREMIUM_RATE_BPS: u64 = 50;         // 0.5% annual premium
+pub const DEFAULT_MAX_COVERAGE_BPS: u64 = 2000;        // 20% max per claim
+pub const DEFAULT_COOLDOWN_BLOCKS: u64 = 43800;        // ~6 days at 12s blocks
+
 // ============ Lending Constants ============
 
 pub const DEFAULT_BASE_RATE: u128 = 20_000_000_000_000_000;           // 2%
@@ -1103,6 +1195,37 @@ mod tests {
     fn test_vault_cell_deserialize_too_short() {
         let short = [0u8; 50];
         assert!(VaultCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_insurance_pool_roundtrip() {
+        let data = InsurancePoolCellData {
+            pool_id: [0xAA; 32],
+            asset_type_hash: [0xBB; 32],
+            total_deposits: 500_000 * PRECISION,
+            total_shares: 500_000 * PRECISION,
+            total_premiums_earned: 2_500 * PRECISION,
+            total_claims_paid: 1_000 * PRECISION,
+            premium_rate_bps: DEFAULT_PREMIUM_RATE_BPS,
+            max_coverage_bps: DEFAULT_MAX_COVERAGE_BPS,
+            cooldown_blocks: DEFAULT_COOLDOWN_BLOCKS,
+            last_premium_block: 100_000,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), InsurancePoolCellData::SERIALIZED_SIZE);
+        let decoded = InsurancePoolCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_insurance_pool_deserialize_too_short() {
+        let short = [0u8; 100];
+        assert!(InsurancePoolCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_insurance_pool_serialized_size() {
+        assert_eq!(InsurancePoolCellData::SERIALIZED_SIZE, 160);
     }
 
     #[test]

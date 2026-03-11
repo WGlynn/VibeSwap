@@ -801,6 +801,219 @@ pub mod prevention {
     }
 }
 
+// ============ Insurance Pool Math (P-105 Implementation) ============
+//
+// The insurance pool is the mechanism that makes mutualist liquidation prevention
+// economically viable. Instead of relying on liquidators (who profit from others'
+// distress), the pool aggregates premiums from normal lending operations and uses
+// them to de-risk positions before liquidation becomes necessary.
+//
+// Key operations:
+//   - Premium accrual: lending pools pay a fraction of interest to insurance
+//   - Share accounting: depositors earn premiums proportional to their share
+//   - Coverage calculation: how much can be claimed for a distressed vault
+//   - Claim execution: actually paying out to prevent liquidation
+
+pub mod insurance {
+    use super::*;
+
+    /// Calculate premium owed by a lending pool to insurance for a period.
+    ///
+    /// Premium = total_borrows * premium_rate_bps / BPS_DENOMINATOR / BLOCKS_PER_YEAR * blocks
+    /// This is a linear approximation — fine for short periods between accruals.
+    ///
+    /// Returns: premium amount in underlying token units
+    pub fn calculate_premium(
+        total_borrows: u128,
+        premium_rate_bps: u64,
+        blocks_elapsed: u64,
+    ) -> u128 {
+        if total_borrows == 0 || premium_rate_bps == 0 || blocks_elapsed == 0 {
+            return 0;
+        }
+        // annual_premium = borrows * rate / 10000
+        // per_block = annual / BLOCKS_PER_YEAR
+        // total = per_block * blocks
+        let annual_premium = mul_div(
+            total_borrows,
+            premium_rate_bps as u128,
+            BPS_DENOMINATOR,
+        );
+        mul_div(annual_premium, blocks_elapsed as u128, BLOCKS_PER_YEAR)
+    }
+
+    /// Calculate insurance shares for a new deposit.
+    ///
+    /// First deposit: 1:1 shares. Subsequent: proportional to existing pool.
+    /// Same mechanics as cToken/aToken deposit shares.
+    pub fn deposit_to_shares(
+        deposit_amount: u128,
+        total_shares: u128,
+        total_deposits: u128,
+    ) -> Result<u128, LendingError> {
+        if deposit_amount == 0 {
+            return Ok(0);
+        }
+        if total_shares == 0 || total_deposits == 0 {
+            return Ok(deposit_amount); // First depositor gets 1:1
+        }
+        Ok(mul_div(deposit_amount, total_shares, total_deposits))
+    }
+
+    /// Calculate underlying tokens for a share redemption.
+    pub fn shares_to_underlying(
+        shares_amount: u128,
+        total_shares: u128,
+        total_deposits: u128,
+    ) -> Result<u128, LendingError> {
+        if shares_amount == 0 {
+            return Ok(0);
+        }
+        if total_shares == 0 {
+            return Err(LendingError::ZeroDeposits);
+        }
+        Ok(mul_div(shares_amount, total_deposits, total_shares))
+    }
+
+    /// Calculate available coverage for a single claim.
+    ///
+    /// Coverage is capped at max_coverage_bps of total_deposits.
+    /// This prevents a single large claim from draining the entire pool.
+    pub fn available_coverage(
+        total_deposits: u128,
+        max_coverage_bps: u64,
+    ) -> u128 {
+        mul_div(total_deposits, max_coverage_bps as u128, BPS_DENOMINATOR)
+    }
+
+    /// Calculate the actual claim amount for a distressed vault.
+    ///
+    /// The claim covers the shortfall needed to bring HF above the target threshold.
+    /// Capped by: (1) available coverage, (2) actual shortfall needed.
+    ///
+    /// Returns: (claim_amount, new_hf_estimate)
+    /// claim_amount = 0 if vault doesn't need insurance or pool can't help
+    pub fn calculate_claim(
+        collateral_amount: u128,
+        collateral_price: u128,
+        debt_amount: u128,
+        debt_price: u128,
+        liquidation_threshold: u128,
+        target_hf: u128,
+        pool_total_deposits: u128,
+        max_coverage_bps: u64,
+    ) -> (u128, u128) {
+        // How much insurance is needed?
+        let needed = prevention::insurance_needed(
+            collateral_amount,
+            collateral_price,
+            debt_amount,
+            debt_price,
+            liquidation_threshold,
+            target_hf,
+        );
+
+        if needed == 0 {
+            // Already safe or no debt
+            let hf = match collateral::health_factor(
+                collateral_amount, collateral_price,
+                debt_amount, debt_price,
+                liquidation_threshold,
+            ) {
+                Ok(h) => h,
+                Err(_) => u128::MAX,
+            };
+            return (0, hf);
+        }
+
+        // Cap by pool capacity
+        let max_claim = available_coverage(pool_total_deposits, max_coverage_bps);
+        let actual_claim = needed.min(max_claim);
+
+        // Estimate new HF after claim (claim repays debt)
+        let new_debt = if actual_claim >= debt_amount {
+            0
+        } else {
+            debt_amount - actual_claim
+        };
+
+        let new_hf = if new_debt == 0 {
+            u128::MAX
+        } else {
+            match collateral::health_factor(
+                collateral_amount, collateral_price,
+                new_debt, debt_price,
+                liquidation_threshold,
+            ) {
+                Ok(h) => h,
+                Err(_) => u128::MAX,
+            }
+        };
+
+        (actual_claim, new_hf)
+    }
+
+    /// Calculate the exchange rate for insurance pool shares.
+    ///
+    /// After premiums accrue, each share is worth more underlying.
+    /// rate = (total_deposits + pending_premiums) / total_shares
+    pub fn exchange_rate(
+        total_shares: u128,
+        total_deposits: u128,
+    ) -> u128 {
+        if total_shares == 0 {
+            return PRECISION; // Initial 1:1
+        }
+        mul_div(total_deposits, PRECISION, total_shares)
+    }
+
+    /// Check if a withdrawal respects the cooldown period.
+    ///
+    /// Returns true if withdrawal is allowed (enough blocks have passed).
+    pub fn cooldown_satisfied(
+        deposit_block: u64,
+        current_block: u64,
+        cooldown_blocks: u64,
+    ) -> bool {
+        if cooldown_blocks == 0 {
+            return true;
+        }
+        current_block >= deposit_block + cooldown_blocks
+    }
+
+    /// Calculate the insurance pool's "coverage ratio" — how much of the
+    /// linked lending pool's total borrows are covered by insurance.
+    ///
+    /// A higher ratio means better protection for borrowers.
+    /// Returns: ratio scaled by PRECISION (e.g., 0.2e18 = 20% coverage)
+    pub fn coverage_ratio(
+        insurance_deposits: u128,
+        lending_total_borrows: u128,
+    ) -> u128 {
+        if lending_total_borrows == 0 {
+            return PRECISION; // Fully covered if nothing to cover
+        }
+        if insurance_deposits == 0 {
+            return 0;
+        }
+        mul_div(insurance_deposits, PRECISION, lending_total_borrows).min(PRECISION)
+    }
+
+    /// Calculate the insurance pool's yield (APY for depositors).
+    ///
+    /// yield = total_premiums_earned_per_year / total_deposits
+    /// This is the incentive for people to deposit into insurance.
+    pub fn insurance_apy(
+        annual_premiums: u128,
+        total_deposits: u128,
+    ) -> u128 {
+        if total_deposits == 0 {
+            return 0;
+        }
+        mul_div(annual_premiums, PRECISION, total_deposits)
+    }
+}
+
 // ============ Integer Math Helpers ============
 
 /// Compute (a * b) / c using 256-bit intermediate to avoid overflow.
@@ -1636,5 +1849,279 @@ mod tests {
         let remaining_debt = debt - repay;
         assert!(remaining_collateral > 0);
         assert!(remaining_debt > 0);
+    }
+
+    // ============ Insurance Pool Tests ============
+
+    #[test]
+    fn test_insurance_premium_calculation() {
+        use super::insurance::*;
+        // 1M borrowed, 50 bps annual rate, 1 year
+        let premium = calculate_premium(
+            1_000_000 * PRECISION,
+            50, // 0.5%
+            BLOCKS_PER_YEAR as u64,
+        );
+        // Expected: 1M * 0.005 = 5000 tokens
+        assert_eq!(premium, 5_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_premium_partial_year() {
+        use super::insurance::*;
+        // 1M borrowed, 50 bps, half year
+        let premium = calculate_premium(
+            1_000_000 * PRECISION,
+            50,
+            BLOCKS_PER_YEAR as u64 / 2,
+        );
+        // Expected: ~2500 tokens
+        assert_eq!(premium, 2_500 * PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_premium_zero_borrows() {
+        use super::insurance::*;
+        let premium = calculate_premium(0, 50, BLOCKS_PER_YEAR as u64);
+        assert_eq!(premium, 0);
+    }
+
+    #[test]
+    fn test_insurance_premium_zero_rate() {
+        use super::insurance::*;
+        let premium = calculate_premium(1_000_000 * PRECISION, 0, BLOCKS_PER_YEAR as u64);
+        assert_eq!(premium, 0);
+    }
+
+    #[test]
+    fn test_insurance_premium_zero_blocks() {
+        use super::insurance::*;
+        let premium = calculate_premium(1_000_000 * PRECISION, 50, 0);
+        assert_eq!(premium, 0);
+    }
+
+    #[test]
+    fn test_insurance_deposit_first() {
+        use super::insurance::*;
+        let shares = deposit_to_shares(1000 * PRECISION, 0, 0).unwrap();
+        assert_eq!(shares, 1000 * PRECISION); // 1:1
+    }
+
+    #[test]
+    fn test_insurance_deposit_proportional() {
+        use super::insurance::*;
+        // Pool has 1000 shares for 1100 deposits (premiums accrued)
+        let shares = deposit_to_shares(
+            100 * PRECISION,
+            1000 * PRECISION,
+            1100 * PRECISION,
+        ).unwrap();
+        // 100 * 1000 / 1100 ≈ 90.9
+        let expected = mul_div(100 * PRECISION, 1000 * PRECISION, 1100 * PRECISION);
+        assert_eq!(shares, expected);
+    }
+
+    #[test]
+    fn test_insurance_redeem_shares() {
+        use super::insurance::*;
+        // 90.9 shares, pool has 1000 shares for 1100 deposits
+        let shares_amount = mul_div(100 * PRECISION, 1000 * PRECISION, 1100 * PRECISION);
+        let underlying = shares_to_underlying(
+            shares_amount,
+            1000 * PRECISION,
+            1100 * PRECISION,
+        ).unwrap();
+        assert!(underlying >= 99 * PRECISION);
+        assert!(underlying <= 100 * PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_redeem_zero_shares_pool() {
+        use super::insurance::*;
+        let result = shares_to_underlying(100 * PRECISION, 0, 100 * PRECISION);
+        assert_eq!(result, Err(LendingError::ZeroDeposits));
+    }
+
+    #[test]
+    fn test_insurance_available_coverage() {
+        use super::insurance::*;
+        // 500K deposits, 20% max per claim = 100K max
+        let coverage = available_coverage(500_000 * PRECISION, 2000);
+        assert_eq!(coverage, 100_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_claim_distressed_vault() {
+        use super::insurance::*;
+        // 10 ETH at $1000, 8000 USDC debt, 80% LT
+        // HF = (10*1000*0.8)/8000 = 1.0 — at liquidation threshold
+        // Target HF: 1.1
+        let (claim, new_hf) = calculate_claim(
+            10 * PRECISION, 1000 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000, // 80% LT
+            super::prevention::HF_SOFT_LIQUIDATION, // target 1.1
+            500_000 * PRECISION, // insurance pool deposits
+            2000, // 20% max coverage
+        );
+        assert!(claim > 0, "Should claim insurance");
+        assert!(new_hf > PRECISION, "New HF should be above 1.0");
+    }
+
+    #[test]
+    fn test_insurance_claim_safe_vault() {
+        use super::insurance::*;
+        // HF = 3.2 — safe, no claim needed
+        let (claim, _hf) = calculate_claim(
+            10 * PRECISION, 2000 * PRECISION,
+            5000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            super::prevention::HF_SOFT_LIQUIDATION,
+            500_000 * PRECISION,
+            2000,
+        );
+        assert_eq!(claim, 0);
+    }
+
+    #[test]
+    fn test_insurance_claim_capped_by_coverage() {
+        use super::insurance::*;
+        // Very small insurance pool (100 tokens), large shortfall
+        // 10 ETH at $500, 8000 USDC debt, 80% LT
+        // HF = (10*500*0.8)/8000 = 0.5
+        let (claim, new_hf) = calculate_claim(
+            10 * PRECISION, 500 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            super::prevention::HF_SOFT_LIQUIDATION,
+            100 * PRECISION, // tiny pool
+            2000, // 20% max = 20 tokens
+        );
+        // Claim should be capped at available coverage (20 tokens)
+        let max = available_coverage(100 * PRECISION, 2000);
+        assert_eq!(claim, max);
+        // New HF won't reach target but should be better than before
+        assert!(new_hf > 500_000_000_000_000_000); // > 0.5
+    }
+
+    #[test]
+    fn test_insurance_exchange_rate_initial() {
+        use super::insurance::*;
+        assert_eq!(exchange_rate(0, 0), PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_exchange_rate_after_premiums() {
+        use super::insurance::*;
+        // 1000 shares, 1050 deposits (premiums accrued 5%)
+        let rate = exchange_rate(1000 * PRECISION, 1050 * PRECISION);
+        assert_eq!(rate, 1_050_000_000_000_000_000); // 1.05e18
+    }
+
+    #[test]
+    fn test_insurance_cooldown_satisfied() {
+        use super::insurance::*;
+        // Deposit at block 100, cooldown 1000 blocks
+        assert!(!cooldown_satisfied(100, 500, 1000));  // 500 < 100+1000
+        assert!(cooldown_satisfied(100, 1100, 1000));  // 1100 >= 100+1000
+        assert!(cooldown_satisfied(100, 1100, 0));     // No cooldown
+    }
+
+    #[test]
+    fn test_insurance_coverage_ratio() {
+        use super::insurance::*;
+        // 100K insurance, 500K borrows = 20% coverage
+        let ratio = coverage_ratio(100_000 * PRECISION, 500_000 * PRECISION);
+        assert_eq!(ratio, 200_000_000_000_000_000); // 0.2e18 = 20%
+    }
+
+    #[test]
+    fn test_insurance_coverage_ratio_full() {
+        use super::insurance::*;
+        // Insurance >= borrows — capped at 100%
+        let ratio = coverage_ratio(600_000 * PRECISION, 500_000 * PRECISION);
+        assert_eq!(ratio, PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_coverage_ratio_no_borrows() {
+        use super::insurance::*;
+        let ratio = coverage_ratio(100_000 * PRECISION, 0);
+        assert_eq!(ratio, PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_apy() {
+        use super::insurance::*;
+        // 5000 tokens annual premiums, 100K deposits = 5% APY
+        let apy = insurance_apy(5_000 * PRECISION, 100_000 * PRECISION);
+        assert_eq!(apy, 50_000_000_000_000_000); // 0.05e18 = 5%
+    }
+
+    #[test]
+    fn test_insurance_apy_zero_deposits() {
+        use super::insurance::*;
+        assert_eq!(insurance_apy(5_000 * PRECISION, 0), 0);
+    }
+
+    // ============ Insurance Integration Test ============
+
+    #[test]
+    fn test_insurance_full_lifecycle() {
+        use super::insurance::*;
+        use super::prevention;
+
+        // 1. Create insurance pool with 100K USDC
+        let mut total_deposits = 100_000 * PRECISION;
+        let mut total_shares = 100_000 * PRECISION;
+
+        // 2. Lending pool has 1M borrows, premium rate 50 bps
+        let lending_borrows = 1_000_000 * PRECISION;
+        let premium_rate = 50u64; // 0.5%
+
+        // 3. After 1 year, premiums accrue
+        let premium = calculate_premium(lending_borrows, premium_rate, BLOCKS_PER_YEAR as u64);
+        assert_eq!(premium, 5_000 * PRECISION); // 5K USDC
+        total_deposits += premium;
+
+        // 4. Exchange rate increased — depositors earned yield
+        let rate = exchange_rate(total_shares, total_deposits);
+        assert!(rate > PRECISION); // Shares worth more
+
+        // 5. APY check
+        let apy = insurance_apy(premium, 100_000 * PRECISION);
+        assert_eq!(apy, 50_000_000_000_000_000); // 5%
+
+        // 6. Vault enters distress — need insurance
+        // 10 ETH at $1000, 8000 USDC debt, 80% LT → HF = 1.0
+        let (claim, new_hf) = calculate_claim(
+            10 * PRECISION, 1000 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            prevention::HF_SOFT_LIQUIDATION,
+            total_deposits,
+            2000,
+        );
+        assert!(claim > 0);
+        assert!(new_hf >= prevention::HF_SOFT_LIQUIDATION - PRECISION / 100);
+
+        // 7. After claim, pool deposits decrease
+        total_deposits -= claim;
+        assert!(total_deposits > 0);
+
+        // 8. Coverage ratio check
+        let coverage = coverage_ratio(total_deposits, lending_borrows);
+        assert!(coverage > 0);
+
+        // 9. New depositor joins after premium accrual — gets fewer shares
+        let new_deposit = 1000 * PRECISION;
+        let new_shares = deposit_to_shares(
+            new_deposit,
+            total_shares,
+            total_deposits,
+        ).unwrap();
+        // Should get fewer shares since pool has accrued value (minus claim)
+        // But pool was depleted by claim so could be close to 1:1
+        assert!(new_shares > 0);
     }
 }

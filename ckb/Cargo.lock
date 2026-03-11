@@ -352,6 +352,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "insurance-pool-type"
+version = "0.1.0"
+dependencies = [
+ "ckb-lending-math",
+ "ckb-std",
+ "vibeswap-types",
+]
+
+[[package]]
 name = "int-enum"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

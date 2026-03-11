@@ -23,7 +23,7 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
 // ============ Script Definitions ============
 
-/// All 11 VibeSwap CKB scripts in deployment order
+/// All 12 VibeSwap CKB scripts in deployment order
 const SCRIPTS: &[(&str, &str)] = &[
     ("pow-lock",            "Lock script: PoW-gated shared cell access"),
     ("batch-auction-type",  "Type script: commit-reveal batch auction state machine"),
@@ -36,6 +36,7 @@ const SCRIPTS: &[(&str, &str)] = &[
     ("knowledge-type",      "Type script: PoW-gated knowledge cell state transitions"),
     ("lending-pool-type",   "Type script: lending pool shared state validation"),
     ("vault-type",          "Type script: per-user lending vault validation"),
+    ("insurance-pool-type", "Type script: mutualist insurance pool (P-105)"),
 ];
 
 // ============ Deployment Config ============

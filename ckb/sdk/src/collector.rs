@@ -1687,4 +1687,264 @@ mod tests {
         let tx = split_cell(&cell, &[2000, 3000], test_lock(0x02)).unwrap();
         assert!(tx.cell_deps.is_empty());
     }
+
+    // ============ Batch 6: Hardening to 120+ Tests ============
+
+    #[test]
+    fn test_select_capacity_empty_cells() {
+        // Empty cell list with zero target should succeed with empty selection
+        let cells: Vec<LiveCell> = vec![];
+        let result = select_capacity_cells(&cells, 0, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.selected.len(), 0);
+        assert_eq!(result.total_capacity, 0);
+    }
+
+    #[test]
+    fn test_select_capacity_empty_cells_nonzero_target() {
+        // Empty cell list with nonzero target should fail
+        let cells: Vec<LiveCell> = vec![];
+        let result = select_capacity_cells(&cells, 100, &SelectionStrategy::SmallestFirst);
+        assert!(matches!(result, Err(CollectorError::InsufficientCapacity { .. })));
+    }
+
+    #[test]
+    fn test_select_capacity_best_fit_preserves_order() {
+        // BestFit should not re-sort, preserving insertion order
+        let cells = vec![plain_cell(300), plain_cell(100), plain_cell(500)];
+        let result = select_capacity_cells(&cells, 350, &SelectionStrategy::BestFit).unwrap();
+        // BestFit keeps original order: 300+100=400 >= 350
+        assert_eq!(result.selected.len(), 2);
+        assert_eq!(result.total_capacity, 400);
+        assert_eq!(result.capacity_change, 50);
+    }
+
+    #[test]
+    fn test_select_capacity_smallest_first_picks_smallest_cells() {
+        // SmallestFirst should pick the smallest cells first
+        let cells = vec![plain_cell(500), plain_cell(100), plain_cell(300)];
+        let result = select_capacity_cells(&cells, 350, &SelectionStrategy::SmallestFirst).unwrap();
+        // Sorted: 100, 300, 500 → 100+300=400 >= 350
+        assert_eq!(result.selected.len(), 2);
+        assert_eq!(result.selected[0].capacity, 100);
+        assert_eq!(result.selected[1].capacity, 300);
+    }
+
+    #[test]
+    fn test_select_token_cells_largest_first() {
+        // LargestFirst strategy for token cells
+        let cells = vec![
+            token_cell(1000, 100, 0x01),
+            token_cell(1000, 500, 0x01),
+            token_cell(1000, 300, 0x01),
+        ];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 400,
+            &SelectionStrategy::LargestFirst,
+        ).unwrap();
+        // Sorted by amount desc: 500, 300, 100 → picks 500 first (>= 400)
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_token_amount, 500);
+        assert_eq!(result.token_change, 100);
+    }
+
+    #[test]
+    fn test_select_token_cells_empty_list_zero_target() {
+        // Empty cell list with zero target should succeed
+        let cells: Vec<LiveCell> = vec![];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 0,
+            &SelectionStrategy::SmallestFirst,
+        ).unwrap();
+        assert_eq!(result.selected.len(), 0);
+        assert_eq!(result.total_token_amount, 0);
+    }
+
+    #[test]
+    fn test_select_token_cells_empty_list_nonzero_target() {
+        // Empty cell list with nonzero target should fail
+        let cells: Vec<LiveCell> = vec![];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 100,
+            &SelectionStrategy::SmallestFirst,
+        );
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { .. })));
+    }
+
+    #[test]
+    fn test_merge_single_plain_cell() {
+        // Merging a single plain cell is degenerate but valid
+        let cells = vec![plain_cell(5000)];
+        let tx = merge_cells(&cells, test_lock(0x03)).unwrap();
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].capacity, 5000);
+        assert!(tx.outputs[0].data.is_empty());
+        assert!(tx.outputs[0].type_script.is_none());
+    }
+
+    #[test]
+    fn test_merge_preserves_type_script() {
+        // Merged output should preserve the type script from input cells
+        let cells = vec![
+            token_cell(10_000_000_000, 100, 0x01),
+            token_cell(10_000_000_000, 200, 0x01),
+        ];
+        let tx = merge_cells(&cells, test_lock(0x02)).unwrap();
+        let ts = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0xDD; 32]);
+        assert_eq!(ts.args, vec![0x01; 36]);
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_no_type_script() {
+        // Cell without type script should return false
+        let cell = plain_cell(1000);
+        assert!(!cell.has_type_code_hash(&[0xDD; 32]));
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_match() {
+        let cell = token_cell(1000, 100, 0x01);
+        assert!(cell.has_type_code_hash(&[0xDD; 32]));
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_mismatch() {
+        let cell = token_cell(1000, 100, 0x01);
+        assert!(!cell.has_type_code_hash(&[0xAA; 32]));
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_large_data_size() {
+        // Very large data size (e.g., 1000 bytes)
+        let cap = calculate_cell_capacity(1000, 20, None);
+        // 8 (capacity) + 32+1+4+20 (lock=57) + 1000 (data) = 1065 bytes
+        assert_eq!(cap, 1065 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_large_type_args_100_bytes() {
+        // Large type script args (e.g., 100 bytes)
+        let cap = calculate_cell_capacity(0, 20, Some(100));
+        // 8 (capacity) + 32+1+4+20 (lock=57) + 32+1+4+100 (type=137) + 0 (data) = 202 bytes
+        assert_eq!(cap, 202 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_min_plain_cell_capacity_typical_secp256k1() {
+        // Typical secp256k1 lock: 20-byte args
+        let cap = min_plain_cell_capacity(20);
+        // 8 + 32+1+4+20 = 65 bytes
+        assert_eq!(cap, 65 * CAPACITY_PER_BYTE);
+        assert_eq!(cap, 6_500_000_000); // 65 CKB
+    }
+
+    #[test]
+    fn test_split_cell_token_sum_exceeds_available() {
+        // Split amounts sum > cell token amount
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 10, 100, 0x01);
+        let result = split_cell(&cell, &[60, 60], test_lock(0x02));
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { needed: 120, available: 100 })));
+    }
+
+    #[test]
+    fn test_split_cell_empty_amounts_returns_error() {
+        // Empty split_amounts should return NoCells error
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 10, 5000, 0x01);
+        let result = split_cell(&cell, &[], test_lock(0x02));
+        assert_eq!(result.unwrap_err(), CollectorError::NoCells);
+    }
+
+    #[test]
+    fn test_merge_empty_cells_returns_error() {
+        // Merging zero cells should return NoCells error
+        let result = merge_cells(&[], test_lock(0x02));
+        assert_eq!(result.unwrap_err(), CollectorError::NoCells);
+    }
+
+    #[test]
+    fn test_live_cell_as_input_zero_since() {
+        // as_input should always set since to 0
+        let cell = LiveCell {
+            tx_hash: [0xFF; 32],
+            index: 999,
+            capacity: 5000,
+            data: vec![1, 2, 3],
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        let input = cell.as_input();
+        assert_eq!(input.since, 0);
+        assert_eq!(input.tx_hash, [0xFF; 32]);
+        assert_eq!(input.index, 999);
+    }
+
+    #[test]
+    fn test_select_capacity_token_amount_always_zero() {
+        // Capacity selection should always have total_token_amount = 0
+        let cells = vec![plain_cell(500), plain_cell(300)];
+        let result = select_capacity_cells(&cells, 400, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.total_token_amount, 0);
+        assert_eq!(result.token_change, 0);
+    }
+
+    #[test]
+    fn test_select_token_cells_capacity_change_always_zero() {
+        // Token selection should always have capacity_change = 0
+        let cells = vec![token_cell(1000, 500, 0x01)];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 400,
+            &SelectionStrategy::SmallestFirst,
+        ).unwrap();
+        assert_eq!(result.capacity_change, 0);
+    }
+
+    #[test]
+    fn test_merge_different_token_code_hashes_fails() {
+        // Two cells with same args but different code hashes should fail
+        let cell1 = token_cell(10_000_000_000, 100, 0x01);
+        let cell2 = LiveCell {
+            tx_hash: [0x02; 32],
+            index: 0,
+            capacity: 10_000_000_000,
+            data: 200u128.to_le_bytes().to_vec(),
+            lock_script: test_lock(0x01),
+            type_script: Some(super::super::Script {
+                code_hash: [0xAA; 32], // Different code_hash
+                hash_type: super::super::HashType::Data1,
+                args: vec![0x01; 36],
+            }),
+        };
+        let cells = vec![cell1, cell2];
+        let result = merge_cells(&cells, test_lock(0x02));
+        assert_eq!(result.unwrap_err(), CollectorError::MixedCellTypes);
+    }
+
+    #[test]
+    fn test_merge_token_cells_insufficient_capacity_for_output() {
+        // Token cells with very small capacity that can't hold the output cell
+        let min_cap = min_token_cell_capacity(20);
+        let cells = vec![
+            token_cell(1, 100, 0x01), // 1 shannon — way too small
+            token_cell(1, 200, 0x01), // 1 shannon
+        ];
+        let result = merge_cells(&cells, test_lock(0x01)); // 20-byte lock args
+        assert!(matches!(result, Err(CollectorError::InsufficientCapacity { .. })));
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_1_byte_data() {
+        // 1 byte data (less than 16) should return None
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: vec![0x42],
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), None);
+    }
 }

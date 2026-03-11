@@ -1910,4 +1910,219 @@ mod tests {
         let new_auction = AuctionCellData::deserialize(&tx.outputs[0].data).unwrap();
         assert_eq!(new_auction.commit_count, 255);
     }
+
+    // ============ Batch 6: Hardening to 120+ Tests ============
+
+    #[test]
+    fn test_mine_difficulty_two_succeeds_within_many_iterations() {
+        // Difficulty 2 means 25% chance per hash — should succeed within 1000
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 2, 1000);
+        assert!(proof.is_some(), "Difficulty 2 should succeed within 1000 iterations");
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 2));
+    }
+
+    #[test]
+    fn test_mine_u64_max_batch_id() {
+        // Extreme batch_id value should still produce a valid challenge
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+        let proof = mine_for_cell(&pair_id, u64::MAX, &prev_hash, 4, 100_000);
+        assert!(proof.is_some(), "u64::MAX batch_id should still allow mining");
+    }
+
+    #[test]
+    fn test_mine_zero_batch_id() {
+        // batch_id = 0 should work normally
+        let pair_id = [0x42; 32];
+        let prev_hash = [0xCC; 32];
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000);
+        assert!(proof.is_some());
+    }
+
+    #[test]
+    fn test_aggregation_output_data_is_serializable() {
+        // The output data should always be deserializable back to AuctionCellData
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let commits: Vec<PendingCommit> = (1..=7).map(|i| make_commit(i)).collect();
+
+        let tx = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let parsed = AuctionCellData::deserialize(&tx.outputs[0].data);
+        assert!(parsed.is_some(), "Output data must be valid AuctionCellData");
+    }
+
+    #[test]
+    fn test_aggregation_empty_commits_zero_mmr_root_is_consistent() {
+        // Two builds with empty commits should produce identical output
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx1 = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let tx2 = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert_eq!(tx1.outputs[0].data, tx2.outputs[0].data,
+            "Same inputs must produce identical output data");
+    }
+
+    #[test]
+    fn test_aggregation_different_commits_different_mmr() {
+        // Different commit sets should produce different MMR roots
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx1 = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let tx2 = build_aggregation_tx(
+            &auction, &[make_commit(2)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let a1 = AuctionCellData::deserialize(&tx1.outputs[0].data).unwrap();
+        let a2 = AuctionCellData::deserialize(&tx2.outputs[0].data).unwrap();
+        assert_ne!(a1.commit_mmr_root, a2.commit_mmr_root,
+            "Different commits must produce different MMR roots");
+    }
+
+    #[test]
+    fn test_profitability_zero_commits() {
+        // Zero pending commits → zero reward
+        let estimate = estimate_profitability(8, 0, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, 0);
+        assert!(!estimate.is_profitable);
+    }
+
+    #[test]
+    fn test_profitability_difficulty_two() {
+        // Difficulty 2 → 4 expected hashes
+        let estimate = estimate_profitability(2, 10, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_hashes, 4);
+    }
+
+    #[test]
+    fn test_profitability_difficulty_eight() {
+        // Difficulty 8 → 256 expected hashes
+        let estimate = estimate_profitability(8, 10, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_hashes, 256);
+    }
+
+    #[test]
+    fn test_track_difficulty_no_transitions_returns_current() {
+        // Empty transitions list → return current difficulty unchanged
+        let new_diff = track_difficulty(16, &[], 5);
+        assert_eq!(new_diff, 16);
+    }
+
+    #[test]
+    fn test_track_difficulty_one_transition_returns_current() {
+        // Single transition → return current difficulty unchanged (need >= 2)
+        let new_diff = track_difficulty(16, &[100], 5);
+        assert_eq!(new_diff, 16);
+    }
+
+    #[test]
+    fn test_compute_auction_hash_deterministic() {
+        let auction = test_auction();
+        let hash1 = compute_auction_hash(&auction);
+        let hash2 = compute_auction_hash(&auction);
+        assert_eq!(hash1, hash2, "Hash must be deterministic");
+    }
+
+    #[test]
+    fn test_compute_auction_hash_batch_id_change() {
+        let mut auction1 = test_auction();
+        auction1.batch_id = 0;
+        let mut auction2 = test_auction();
+        auction2.batch_id = 1;
+
+        let hash1 = compute_auction_hash(&auction1);
+        let hash2 = compute_auction_hash(&auction2);
+        assert_ne!(hash1, hash2, "Different batch_id must produce different hash");
+    }
+
+    #[test]
+    fn test_compute_auction_hash_commit_count_change() {
+        let mut auction1 = test_auction();
+        auction1.commit_count = 0;
+        let mut auction2 = test_auction();
+        auction2.commit_count = 100;
+
+        let hash1 = compute_auction_hash(&auction1);
+        let hash2 = compute_auction_hash(&auction2);
+        assert_ne!(hash1, hash2, "Different commit_count must produce different hash");
+    }
+
+    #[test]
+    fn test_aggregation_input_since_all_zero() {
+        // All inputs (auction + commits) should have since=0
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let commits: Vec<PendingCommit> = (1..=3).map(|i| make_commit(i)).collect();
+
+        let tx = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        for (i, input) in tx.inputs.iter().enumerate() {
+            assert_eq!(input.since, 0, "Input {} since must be 0", i);
+        }
+    }
+
+    #[test]
+    fn test_miner_state_empty_fields() {
+        let state = MinerState {
+            difficulties: vec![],
+            pending_commits: vec![],
+            auction_states: vec![],
+            stats: MiningStats::default(),
+        };
+        assert!(state.difficulties.is_empty());
+        assert!(state.pending_commits.is_empty());
+        assert!(state.auction_states.is_empty());
+    }
+
+    #[test]
+    fn test_miner_config_empty_pair_ids() {
+        let config = MinerConfig {
+            max_iterations: 1000,
+            ckb_rpc_url: String::new(),
+            indexer_rpc_url: String::new(),
+            miner_lock: test_miner_lock(),
+            pair_ids: vec![],
+            min_reward_ckb: 0,
+        };
+        assert!(config.pair_ids.is_empty());
+        assert_eq!(config.min_reward_ckb, 0);
+    }
+
+    #[test]
+    fn test_aggregation_pair_id_in_lock_args() {
+        // Verify the PoW lock args contain the correct pair_id
+        let mut auction = test_auction();
+        auction.pair_id = [0xAB; 32];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let args = PoWLockArgs::deserialize(&tx.outputs[0].lock_script.args).unwrap();
+        assert_eq!(args.pair_id, [0xAB; 32],
+            "Lock args must contain the auction's pair_id");
+    }
 }

@@ -1321,4 +1321,245 @@ mod tests {
         let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
         assert_eq!(price, 1);
     }
+
+    // ============ Batch 4: Hardening to 120+ Tests ============
+
+    #[test]
+    fn test_freshness_oracle_block_higher_than_current() {
+        // Oracle block_number > current_block (e.g., during reorg). Should not be stale.
+        let oracle = fresh_oracle(1000 * PRECISION, 500);
+        assert!(validate_freshness(&oracle, 200).is_ok());
+    }
+
+    #[test]
+    fn test_freshness_large_gap_u64_overflow_protection() {
+        // current_block far above oracle block — subtraction is safe due to the > check
+        let oracle = fresh_oracle(1000 * PRECISION, 0);
+        let result = validate_freshness(&oracle, u64::MAX);
+        assert!(matches!(result, Err(SDKError::StaleOracleData)));
+    }
+
+    #[test]
+    fn test_confidence_lending_exactly_one_below() {
+        // MIN_CONFIDENCE_LENDING - 1 = 49 should fail
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, MIN_CONFIDENCE_LENDING - 1);
+        assert!(matches!(
+            validate_confidence_lending(&oracle),
+            Err(SDKError::LowOracleConfidence)
+        ));
+    }
+
+    #[test]
+    fn test_confidence_lending_exactly_one_above() {
+        // MIN_CONFIDENCE_LENDING + 1 = 51 should pass
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, MIN_CONFIDENCE_LENDING + 1);
+        assert!(validate_confidence_lending(&oracle).is_ok());
+    }
+
+    #[test]
+    fn test_confidence_liquidation_exactly_one_above() {
+        // MIN_CONFIDENCE_LIQUIDATION + 1 = 26 should pass
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, MIN_CONFIDENCE_LIQUIDATION + 1);
+        assert!(validate_confidence_liquidation(&oracle).is_ok());
+    }
+
+    #[test]
+    fn test_validate_for_lending_passes_all_checks() {
+        // Oracle that passes every check — price, freshness, confidence, pair_id
+        let oracle = oracle_with_confidence(5000 * PRECISION, 140, 90);
+        assert!(validate_for_lending(&oracle, &test_pair_id(), 150).is_ok());
+    }
+
+    #[test]
+    fn test_validate_for_liquidation_passes_all_checks() {
+        // Oracle that passes every liquidation check — lower confidence bar
+        let oracle = oracle_with_confidence(5000 * PRECISION, 140, 30);
+        assert!(validate_for_liquidation(&oracle, &test_pair_id(), 150).is_ok());
+    }
+
+    #[test]
+    fn test_aggregate_seven_oracles_odd_median() {
+        // 7 oracles: median is the 4th sorted value
+        let oracles = vec![
+            fresh_oracle(1070 * PRECISION, 100),
+            fresh_oracle(1000 * PRECISION, 101),
+            fresh_oracle(1020 * PRECISION, 102),
+            fresh_oracle(1050 * PRECISION, 103),
+            fresh_oracle(1030 * PRECISION, 104),
+            fresh_oracle(1010 * PRECISION, 105),
+            fresh_oracle(1060 * PRECISION, 106),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        // Sorted: 1000,1010,1020,1030,1050,1060,1070 → median index 3 = 1030
+        assert_eq!(price, 1030 * PRECISION);
+    }
+
+    #[test]
+    fn test_aggregate_deviation_exactly_at_threshold() {
+        // 10% deviation = 1000 bps exactly = MAX_ORACLE_DEVIATION_BPS => passes
+        let oracles = vec![
+            fresh_oracle(10000 * PRECISION, 100),
+            fresh_oracle(11000 * PRECISION, 101), // exactly 10%
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 10500 * PRECISION);
+    }
+
+    #[test]
+    fn test_weighted_price_all_max_confidence() {
+        // All oracles at confidence=255 → equal weighting → simple average
+        let oracles = vec![
+            oracle_with_confidence(2000 * PRECISION, 100, 255),
+            oracle_with_confidence(4000 * PRECISION, 101, 255),
+        ];
+        let price = weighted_price(&oracles, &test_pair_id(), 150).unwrap();
+        // 2000*255/510 + 4000*255/510 = 1000 + 2000 = 3000
+        assert_eq!(price, 3000 * PRECISION);
+    }
+
+    #[test]
+    fn test_exchange_rate_very_large_collateral_small_debt() {
+        // Large collateral price with tiny debt price
+        let rate = exchange_rate(u128::MAX / PRECISION, 1).unwrap();
+        assert!(rate > 0);
+    }
+
+    #[test]
+    fn test_exchange_rate_both_zero_collateral() {
+        // Zero collateral, non-zero debt → rate = 0
+        let rate = exchange_rate(0, 5000 * PRECISION).unwrap();
+        assert_eq!(rate, 0);
+    }
+
+    #[test]
+    fn test_price_change_bps_half() {
+        // 50% decrease: 100→50 = 5000 bps
+        assert_eq!(price_change_bps(100 * PRECISION, 50 * PRECISION), 5000);
+    }
+
+    #[test]
+    fn test_price_change_bps_triple() {
+        // 200% increase: 100→300 = 20000 bps
+        assert_eq!(price_change_bps(100 * PRECISION, 300 * PRECISION), 20_000);
+    }
+
+    #[test]
+    fn test_price_change_bps_one_wei_difference() {
+        // 1 wei difference on a small price
+        let bps = price_change_bps(2, 3);
+        // diff=1, 1*10000/2 = 5000
+        assert_eq!(bps, 5000);
+    }
+
+    #[test]
+    fn test_oracle_price_struct_clone() {
+        let op = OraclePrice {
+            data: fresh_oracle(3000 * PRECISION, 100),
+            cell_dep: build_oracle_cell_dep([0x01; 32], 0),
+        };
+        let cloned = op.clone();
+        assert_eq!(cloned.data.price, op.data.price);
+        assert_eq!(cloned.cell_dep.tx_hash, op.cell_dep.tx_hash);
+    }
+
+    #[test]
+    fn test_price_pair_struct_clone() {
+        let pair = PricePair {
+            collateral: OraclePrice {
+                data: fresh_oracle(3000 * PRECISION, 100),
+                cell_dep: build_oracle_cell_dep([0x01; 32], 0),
+            },
+            debt: OraclePrice {
+                data: fresh_oracle(1 * PRECISION, 100),
+                cell_dep: build_oracle_cell_dep([0x02; 32], 1),
+            },
+        };
+        let cloned = pair.clone();
+        assert_eq!(cloned.collateral.data.price, pair.collateral.data.price);
+        assert_eq!(cloned.debt.data.price, pair.debt.data.price);
+    }
+
+    #[test]
+    fn test_aggregate_all_stale_rejected() {
+        // All oracles stale → first one triggers StaleOracleData
+        let oracles = vec![
+            fresh_oracle(3000 * PRECISION, 10),
+            fresh_oracle(3000 * PRECISION, 20),
+        ];
+        let result = aggregate_prices(&oracles, &test_pair_id(), 200);
+        assert!(matches!(result, Err(SDKError::StaleOracleData)));
+    }
+
+    #[test]
+    fn test_weighted_price_four_sources_computation() {
+        // 4 sources with known weights → verify exact computation
+        let oracles = vec![
+            oracle_with_confidence(1000 * PRECISION, 100, 10),
+            oracle_with_confidence(2000 * PRECISION, 101, 20),
+            oracle_with_confidence(3000 * PRECISION, 102, 30),
+            oracle_with_confidence(4000 * PRECISION, 103, 40),
+        ];
+        // total_weight = 100
+        // weighted = 1000*10/100 + 2000*20/100 + 3000*30/100 + 4000*40/100
+        //          = 100 + 400 + 900 + 1600 = 3000
+        let price = weighted_price(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 3000 * PRECISION);
+    }
+
+    #[test]
+    fn test_constants_values() {
+        // Verify constant values are what we expect (regression test)
+        assert_eq!(MAX_STALENESS_BLOCKS, 100);
+        assert_eq!(MIN_CONFIDENCE_LENDING, 50);
+        assert_eq!(MIN_CONFIDENCE_LIQUIDATION, 25);
+        assert_eq!(MAX_ORACLE_DEVIATION_BPS, 1000);
+    }
+
+    #[test]
+    fn test_build_oracle_cell_dep_preserves_fields() {
+        let dep = build_oracle_cell_dep([0x42; 32], 17);
+        assert_eq!(dep.tx_hash, [0x42; 32]);
+        assert_eq!(dep.index, 17);
+        assert!(matches!(dep.dep_type, DepType::Code));
+    }
+
+    #[test]
+    fn test_exchange_rate_precision_scaling() {
+        // rate = collateral / debt * PRECISION
+        // 10 / 5 = 2.0 → 2 * PRECISION
+        let rate = exchange_rate(10 * PRECISION, 5 * PRECISION).unwrap();
+        assert_eq!(rate, 2 * PRECISION);
+    }
+
+    #[test]
+    fn test_price_change_bps_old_one_new_zero() {
+        // old=1, new=0 → diff=1, 1*10000/1 = 10000 bps
+        assert_eq!(price_change_bps(1, 0), 10_000);
+    }
+
+    #[test]
+    fn test_validate_for_lending_confidence_exactly_at_threshold() {
+        // confidence = 50 (exactly MIN_CONFIDENCE_LENDING) should pass
+        let oracle = oracle_with_confidence(2000 * PRECISION, 100, 50);
+        assert!(validate_for_lending(&oracle, &test_pair_id(), 150).is_ok());
+    }
+
+    #[test]
+    fn test_validate_for_liquidation_confidence_exactly_at_threshold() {
+        // confidence = 25 (exactly MIN_CONFIDENCE_LIQUIDATION) should pass
+        let oracle = oracle_with_confidence(2000 * PRECISION, 100, 25);
+        assert!(validate_for_liquidation(&oracle, &test_pair_id(), 150).is_ok());
+    }
+
+    #[test]
+    fn test_aggregate_deviation_bps_with_identical_prices() {
+        // All identical prices → deviation = 0 bps → always passes
+        let oracles = vec![
+            fresh_oracle(42 * PRECISION, 100),
+            fresh_oracle(42 * PRECISION, 101),
+            fresh_oracle(42 * PRECISION, 102),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 42 * PRECISION);
+    }
 }

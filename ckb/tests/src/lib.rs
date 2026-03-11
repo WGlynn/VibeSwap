@@ -34,3 +34,6 @@ mod insurance;
 
 #[cfg(test)]
 mod oracle;
+
+#[cfg(test)]
+mod governance;

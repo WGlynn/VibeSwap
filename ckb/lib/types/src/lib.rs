@@ -1472,4 +1472,235 @@ mod tests {
         let decoded = RevealWitness::deserialize(&bytes).unwrap();
         assert_eq!(data, decoded);
     }
+
+    // ============ Missing Roundtrip Tests ============
+
+    #[test]
+    fn test_lp_position_roundtrip() {
+        let data = LPPositionCellData {
+            lp_amount: 1_414_213 * PRECISION,
+            entry_price: 2 * PRECISION,
+            pool_id: [0xAA; 32],
+            deposit_block: 100_000,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), LPPositionCellData::SERIALIZED_SIZE);
+        let decoded = LPPositionCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_lp_position_deserialize_too_short() {
+        let short = [0u8; 50];
+        assert!(LPPositionCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_compliance_cell_roundtrip() {
+        let data = ComplianceCellData {
+            blocked_merkle_root: [0xAA; 32],
+            tier_merkle_root: [0xBB; 32],
+            jurisdiction_root: [0xCC; 32],
+            last_updated: 500_000,
+            version: 42,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), ComplianceCellData::SERIALIZED_SIZE);
+        let decoded = ComplianceCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_compliance_cell_deserialize_too_short() {
+        let short = [0u8; 50];
+        assert!(ComplianceCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_config_cell_roundtrip() {
+        let data = ConfigCellData {
+            commit_window_blocks: 60,
+            reveal_window_blocks: 15,
+            slash_rate_bps: 6000,
+            max_price_deviation: 300,
+            max_trade_size_bps: 800,
+            rate_limit_amount: 2_000_000 * PRECISION,
+            rate_limit_window: 7200,
+            volume_breaker_limit: 20_000_000 * PRECISION,
+            price_breaker_bps: 800,
+            withdrawal_breaker_bps: 1500,
+            min_pow_difficulty: 18,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), ConfigCellData::SERIALIZED_SIZE);
+        let decoded = ConfigCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_config_cell_deserialize_too_short() {
+        let short = [0u8; 30];
+        assert!(ConfigCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_oracle_cell_roundtrip() {
+        let data = OracleCellData {
+            price: 3000 * PRECISION,
+            block_number: 1_000_000,
+            confidence: 95,
+            source_hash: [0xAA; 32],
+            pair_id: [0xBB; 32],
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), OracleCellData::SERIALIZED_SIZE);
+        let decoded = OracleCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_oracle_cell_deserialize_too_short() {
+        let short = [0u8; 50];
+        assert!(OracleCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_pow_lock_args_roundtrip() {
+        let data = PoWLockArgs {
+            pair_id: [0xAA; 32],
+            min_difficulty: 16,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), PoWLockArgs::SERIALIZED_SIZE);
+        let decoded = PoWLockArgs::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_pow_lock_args_deserialize_too_short() {
+        let short = [0u8; 10];
+        assert!(PoWLockArgs::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_prediction_market_roundtrip() {
+        let mut data = PredictionMarketCellData {
+            market_id: [0x11; 32],
+            question_hash: [0x22; 32],
+            creator_lock_hash: [0x33; 32],
+            oracle_pair_id: [0x44; 32],
+            status: MARKET_RESOLVED,
+            num_tiers: 5,
+            settlement_mode: SETTLEMENT_PROPORTIONAL,
+            resolved_tier: 2,
+            total_liquidity: 500_000 * PRECISION,
+            resolved_value: PRECISION / 3,
+            tier_pools: [0u128; MAX_OUTCOME_TIERS],
+            created_block: 1000,
+            resolution_block: 5000,
+            dispute_end_block: 6200,
+            fee_rate_bps: 150,
+        };
+        data.tier_pools[0] = 100_000 * PRECISION;
+        data.tier_pools[1] = 80_000 * PRECISION;
+        data.tier_pools[2] = 150_000 * PRECISION;
+        data.tier_pools[3] = 120_000 * PRECISION;
+        data.tier_pools[4] = 50_000 * PRECISION;
+
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), PredictionMarketCellData::SERIALIZED_SIZE);
+        let decoded = PredictionMarketCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_prediction_market_deserialize_too_short() {
+        let short = [0u8; 200];
+        assert!(PredictionMarketCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_prediction_market_serialized_size() {
+        assert_eq!(PredictionMarketCellData::SERIALIZED_SIZE, 318);
+    }
+
+    #[test]
+    fn test_prediction_position_roundtrip() {
+        let data = PredictionPositionCellData {
+            market_id: [0xAA; 32],
+            owner_lock_hash: [0xBB; 32],
+            tier_index: 3,
+            amount: 10_000 * PRECISION,
+            created_block: 2000,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), PredictionPositionCellData::SERIALIZED_SIZE);
+        let decoded = PredictionPositionCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_prediction_position_deserialize_too_short() {
+        let short = [0u8; 50];
+        assert!(PredictionPositionCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_prediction_position_serialized_size() {
+        assert_eq!(PredictionPositionCellData::SERIALIZED_SIZE, 89);
+    }
+
+    // ============ Serialization Size Consistency ============
+
+    #[test]
+    fn test_all_serialized_sizes() {
+        assert_eq!(AuctionCellData::SERIALIZED_SIZE, 217);
+        assert_eq!(CommitCellData::SERIALIZED_SIZE, 136);
+        assert_eq!(RevealWitness::SERIALIZED_SIZE, 77);
+        assert_eq!(PoolCellData::SERIALIZED_SIZE, 218);
+        assert_eq!(LPPositionCellData::SERIALIZED_SIZE, 72);
+        assert_eq!(ComplianceCellData::SERIALIZED_SIZE, 108);
+        assert_eq!(ConfigCellData::SERIALIZED_SIZE, 67);
+        assert_eq!(OracleCellData::SERIALIZED_SIZE, 89);
+        assert_eq!(PoWLockArgs::SERIALIZED_SIZE, 33);
+        assert_eq!(KnowledgeCellData::SERIALIZED_SIZE, 181);
+        assert_eq!(LendingPoolCellData::SERIALIZED_SIZE, 280);
+        assert_eq!(VaultCellData::SERIALIZED_SIZE, 168);
+        assert_eq!(InsurancePoolCellData::SERIALIZED_SIZE, 160);
+        assert_eq!(PredictionMarketCellData::SERIALIZED_SIZE, 318);
+        assert_eq!(PredictionPositionCellData::SERIALIZED_SIZE, 89);
+    }
+
+    // ============ Default Value Tests ============
+
+    #[test]
+    fn test_prediction_market_default() {
+        let market = PredictionMarketCellData::default();
+        assert_eq!(market.status, MARKET_ACTIVE);
+        assert_eq!(market.num_tiers, 2);
+        assert_eq!(market.settlement_mode, SETTLEMENT_WINNER_TAKES_ALL);
+        assert_eq!(market.fee_rate_bps, DEFAULT_MARKET_FEE_BPS);
+        assert_eq!(market.total_liquidity, 0);
+        for pool in &market.tier_pools {
+            assert_eq!(*pool, 0);
+        }
+    }
+
+    #[test]
+    fn test_max_values_roundtrip() {
+        // Test u128::MAX doesn't break serialization
+        let data = VaultCellData {
+            owner_lock_hash: [0xFF; 32],
+            pool_id: [0xFF; 32],
+            collateral_amount: u128::MAX,
+            collateral_type_hash: [0xFF; 32],
+            debt_shares: u128::MAX,
+            borrow_index_snapshot: u128::MAX,
+            deposit_shares: u128::MAX,
+            last_update_block: u64::MAX,
+        };
+        let bytes = data.serialize();
+        let decoded = VaultCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
 }

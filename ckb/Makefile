@@ -14,10 +14,11 @@ TARGET := riscv64imac-unknown-none-elf
 BUILD_DIR := target/$(TARGET)/release
 OUT_DIR := build
 
-# All 12 CKB scripts
+# All 13 CKB scripts
 SCRIPTS := pow-lock batch-auction-type commit-type amm-pool-type \
            lp-position-type compliance-type config-type oracle-type \
-           knowledge-type lending-pool-type vault-type insurance-pool-type
+           knowledge-type lending-pool-type vault-type insurance-pool-type \
+           prediction-market-type
 
 # Binary names (Cargo replaces hyphens with underscores)
 BINARIES := $(patsubst %,$(OUT_DIR)/%, $(SCRIPTS))

@@ -1277,4 +1277,144 @@ mod tests {
         };
         assert!(is_safe_config_change(&old, &new));
     }
+
+    // ============ New Tests: Additional Edge Cases & Coverage ============
+
+    #[test]
+    fn test_has_quorum_exact_threshold() {
+        // Exactly at quorum threshold (4% of 100M = 4M tokens)
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        let quorum_amount = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        cast_vote(&mut proposal, test_voter(0x01), quorum_amount, true, 2000).unwrap();
+        assert!(has_quorum(&proposal, TOTAL_SUPPLY),
+            "Exactly at quorum threshold should pass");
+    }
+
+    #[test]
+    fn test_has_quorum_one_below_threshold() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        let quorum_amount = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        cast_vote(&mut proposal, test_voter(0x01), quorum_amount - 1, true, 2000).unwrap();
+        assert!(!has_quorum(&proposal, TOTAL_SUPPLY),
+            "One below quorum threshold should not pass");
+    }
+
+    #[test]
+    fn test_has_passed_tie_does_not_pass() {
+        // Equal votes for and against: votes_for is NOT > votes_against
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 5_000_000 * PRECISION, false, 3000).unwrap();
+
+        // Quorum met (10M > 4M) but tied — should NOT pass
+        assert!(has_quorum(&proposal, TOTAL_SUPPLY));
+        assert!(!has_passed(&proposal, TOTAL_SUPPLY),
+            "A tied vote should not pass (need strict majority)");
+    }
+
+    #[test]
+    fn test_finalize_tied_vote_is_defeated() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 5_000_000 * PRECISION, false, 3000).unwrap();
+
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+        assert_eq!(proposal.status, ProposalStatus::Defeated,
+            "Tied vote should finalize as Defeated");
+    }
+
+    #[test]
+    fn test_votes_needed_tie_requires_one_more() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // 5M for, 5M against — tied. Need 1 more for vote to beat against.
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 5_000_000 * PRECISION, false, 3000).unwrap();
+
+        let needed = votes_needed_to_pass(&proposal, TOTAL_SUPPLY);
+        // votes_for_majority = votes_against - votes_for + 1 = 0 + 1 = 1
+        // votes_for_quorum = 0 (already above 4M)
+        assert_eq!(needed, 1, "Tied vote needs exactly 1 more token to pass");
+    }
+
+    #[test]
+    fn test_votes_needed_emergency_higher_quorum() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, MIN_VOTING_PERIOD_BLOCKS, true, // emergency
+        ).unwrap();
+
+        // No votes yet — emergency needs 10% = 10M tokens
+        let needed = votes_needed_to_pass(&proposal, TOTAL_SUPPLY);
+        let emergency_quorum = TOTAL_SUPPLY * EMERGENCY_QUORUM_BPS as u128 / 10_000;
+        assert_eq!(needed, emergency_quorum,
+            "Emergency proposal with no votes needs full emergency quorum");
+    }
+
+    #[test]
+    fn test_unsafe_config_price_breaker_disabled() {
+        let old = test_config();
+        let new = ConfigCellData {
+            price_breaker_bps: 0, // Disabled
+            ..old.clone()
+        };
+        assert!(!is_safe_config_change(&old, &new),
+            "Disabling price breaker should be unsafe");
+    }
+
+    #[test]
+    fn test_unsafe_config_withdrawal_breaker_disabled() {
+        let old = test_config();
+        let new = ConfigCellData {
+            withdrawal_breaker_bps: 0, // Disabled
+            ..old.clone()
+        };
+        assert!(!is_safe_config_change(&old, &new),
+            "Disabling withdrawal breaker should be unsafe");
+    }
+
+    #[test]
+    fn test_safe_config_change_halving_windows() {
+        // Exactly halving commit and reveal windows should be safe (within 2x bound)
+        let old = test_config();
+        let new = ConfigCellData {
+            commit_window_blocks: old.commit_window_blocks / 2,
+            reveal_window_blocks: old.reveal_window_blocks / 2,
+            ..old.clone()
+        };
+        assert!(is_safe_config_change(&old, &new),
+            "Halving windows should be within safe 2x bounds");
+    }
+
+    #[test]
+    fn test_approval_rate_all_against() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 10_000_000 * PRECISION, false, 2000).unwrap();
+        assert_eq!(approval_rate_bps(&proposal), 0,
+            "All votes against should yield 0% approval");
+    }
 }

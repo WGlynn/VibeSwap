@@ -16,6 +16,7 @@ pub mod keeper;
 pub mod knowledge;
 pub mod lending;
 pub mod liquidity;
+pub mod migration;
 pub mod miner;
 pub mod orderbook;
 pub mod oracle;

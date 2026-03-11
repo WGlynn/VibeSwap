@@ -832,10 +832,13 @@ version = "0.1.0"
 dependencies = [
  "amm-pool-type",
  "batch-auction-type",
+ "ckb-lending-math",
  "commit-type",
  "config-type",
+ "lending-pool-type",
  "oracle-type",
  "sha2",
+ "vault-type",
  "vibeswap-math",
  "vibeswap-mmr",
  "vibeswap-pow",

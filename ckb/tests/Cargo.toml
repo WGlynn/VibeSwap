@@ -9,6 +9,7 @@ vibeswap-mmr = { path = "../lib/mmr" }
 vibeswap-pow = { path = "../lib/pow" }
 vibeswap-types = { path = "../lib/types" }
 vibeswap-sdk = { path = "../sdk" }
+ckb-lending-math = { path = "../lib/lending-math" }
 sha2 = "0.10"
 
 # Scripts (for their validation functions)
@@ -17,3 +18,5 @@ amm-pool-type = { path = "../scripts/amm-pool-type" }
 batch-auction-type = { path = "../scripts/batch-auction-type" }
 oracle-type = { path = "../scripts/oracle-type" }
 config-type = { path = "../scripts/config-type" }
+lending-pool-type = { path = "../scripts/lending-pool-type" }
+vault-type = { path = "../scripts/vault-type" }

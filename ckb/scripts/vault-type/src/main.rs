@@ -1,11 +1,4 @@
-// ============ Vault Type Script ============
-// Validates state transitions for per-user lending vault cells.
-// No contention — each user owns their own vault cell.
-//
-// Operations:
-//   Creation  (None → Some) — Open new lending position
-//   Update    (Some → Some) — Add/remove collateral, borrow, repay
-//   Destruction (Some → None) — Close position (requires zero debt)
+// ============ Vault Type Script — CKB Entry Point ============
 
 #![cfg_attr(feature = "ckb", no_std)]
 #![cfg_attr(feature = "ckb", no_main)]
@@ -36,6 +29,7 @@ fn main() -> i8 {
 fn entry_main() -> Result<(), i8> {
     use ckb_std::high_level::load_cell_data as lcd;
     use ckb_std::ckb_constants::Source;
+    use vault_type::{verify_creation, verify_update, verify_destruction};
 
     let script = load_script().map_err(|_| -1i8)?;
     let _args = script.args().raw_data();
@@ -68,105 +62,11 @@ fn entry_main() -> Result<(), i8> {
 #[cfg(not(feature = "ckb"))]
 fn main() {}
 
-// ============ Verification Logic ============
-
-use vibeswap_types::{VaultCellData, PRECISION};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum VaultError {
-    InvalidOwner,
-    InvalidPoolId,
-    InvalidCollateralType,
-    InvalidBorrowIndex,
-    OwnerChanged,
-    PoolChanged,
-    CollateralTypeChanged,
-    DebtNotZero,
-    BlockRegression,
-    IndexRegression,
-    InvalidDebtShares,
-}
-
-/// Verify creation of a new vault
-pub fn verify_creation(vault: &VaultCellData) -> Result<(), VaultError> {
-    // Owner must be set
-    if vault.owner_lock_hash == [0u8; 32] {
-        return Err(VaultError::InvalidOwner);
-    }
-
-    // Pool must be set
-    if vault.pool_id == [0u8; 32] {
-        return Err(VaultError::InvalidPoolId);
-    }
-
-    // If collateral is deposited, type hash must be set
-    if vault.collateral_amount > 0 && vault.collateral_type_hash == [0u8; 32] {
-        return Err(VaultError::InvalidCollateralType);
-    }
-
-    // If borrowing, index snapshot must be valid
-    if vault.debt_shares > 0 && vault.borrow_index_snapshot == 0 {
-        return Err(VaultError::InvalidBorrowIndex);
-    }
-
-    Ok(())
-}
-
-/// Verify update of existing vault
-pub fn verify_update(
-    old: &VaultCellData,
-    new: &VaultCellData,
-) -> Result<(), VaultError> {
-    // Immutable fields
-    if old.owner_lock_hash != new.owner_lock_hash {
-        return Err(VaultError::OwnerChanged);
-    }
-    if old.pool_id != new.pool_id {
-        return Err(VaultError::PoolChanged);
-    }
-
-    // Collateral type cannot change once set
-    if old.collateral_type_hash != [0u8; 32]
-        && new.collateral_type_hash != [0u8; 32]
-        && old.collateral_type_hash != new.collateral_type_hash
-    {
-        return Err(VaultError::CollateralTypeChanged);
-    }
-
-    // Block must not go backwards
-    if new.last_update_block < old.last_update_block {
-        return Err(VaultError::BlockRegression);
-    }
-
-    // If borrowing, index must be valid
-    if new.debt_shares > 0 && new.borrow_index_snapshot == 0 {
-        return Err(VaultError::InvalidBorrowIndex);
-    }
-
-    // Index snapshot should not decrease (can increase when debt is updated)
-    if new.borrow_index_snapshot < old.borrow_index_snapshot
-        && new.debt_shares > 0
-    {
-        return Err(VaultError::IndexRegression);
-    }
-
-    Ok(())
-}
-
-/// Verify destruction of vault (position closure)
-pub fn verify_destruction(vault: &VaultCellData) -> Result<(), VaultError> {
-    // Cannot destroy vault with outstanding debt
-    if vault.debt_shares > 0 {
-        return Err(VaultError::DebtNotZero);
-    }
-    Ok(())
-}
-
-// ============ Tests ============
+// ============ Tests (use lib functions) ============
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use vault_type::*;
     use vibeswap_types::*;
 
     fn default_vault() -> VaultCellData {
@@ -182,8 +82,6 @@ mod tests {
         }
     }
 
-    // ============ Creation Tests ============
-
     #[test]
     fn test_valid_creation_empty() {
         assert!(verify_creation(&default_vault()).is_ok());
@@ -191,50 +89,47 @@ mod tests {
 
     #[test]
     fn test_valid_creation_with_collateral() {
-        let mut vault = default_vault();
-        vault.collateral_amount = 10 * PRECISION;
-        vault.collateral_type_hash = [0xAA; 32];
-        assert!(verify_creation(&vault).is_ok());
+        let mut v = default_vault();
+        v.collateral_amount = 10 * PRECISION;
+        v.collateral_type_hash = [0xAA; 32];
+        assert!(verify_creation(&v).is_ok());
     }
 
     #[test]
     fn test_valid_creation_with_deposit() {
-        let mut vault = default_vault();
-        vault.deposit_shares = 1000 * PRECISION;
-        assert!(verify_creation(&vault).is_ok());
+        let mut v = default_vault();
+        v.deposit_shares = 1000 * PRECISION;
+        assert!(verify_creation(&v).is_ok());
     }
 
     #[test]
     fn test_creation_zero_owner() {
-        let mut vault = default_vault();
-        vault.owner_lock_hash = [0u8; 32];
-        assert_eq!(verify_creation(&vault), Err(VaultError::InvalidOwner));
+        let mut v = default_vault();
+        v.owner_lock_hash = [0u8; 32];
+        assert_eq!(verify_creation(&v), Err(VaultError::InvalidOwner));
     }
 
     #[test]
     fn test_creation_zero_pool() {
-        let mut vault = default_vault();
-        vault.pool_id = [0u8; 32];
-        assert_eq!(verify_creation(&vault), Err(VaultError::InvalidPoolId));
+        let mut v = default_vault();
+        v.pool_id = [0u8; 32];
+        assert_eq!(verify_creation(&v), Err(VaultError::InvalidPoolId));
     }
 
     #[test]
     fn test_creation_collateral_without_type() {
-        let mut vault = default_vault();
-        vault.collateral_amount = 10 * PRECISION;
-        // collateral_type_hash remains zero
-        assert_eq!(verify_creation(&vault), Err(VaultError::InvalidCollateralType));
+        let mut v = default_vault();
+        v.collateral_amount = 10 * PRECISION;
+        assert_eq!(verify_creation(&v), Err(VaultError::InvalidCollateralType));
     }
 
     #[test]
     fn test_creation_debt_without_index() {
-        let mut vault = default_vault();
-        vault.debt_shares = 100 * PRECISION;
-        vault.borrow_index_snapshot = 0;
-        assert_eq!(verify_creation(&vault), Err(VaultError::InvalidBorrowIndex));
+        let mut v = default_vault();
+        v.debt_shares = 100 * PRECISION;
+        v.borrow_index_snapshot = 0;
+        assert_eq!(verify_creation(&v), Err(VaultError::InvalidBorrowIndex));
     }
-
-    // ============ Update Tests ============
 
     #[test]
     fn test_valid_add_collateral() {
@@ -251,7 +146,6 @@ mod tests {
         let mut old = default_vault();
         old.collateral_amount = 10 * PRECISION;
         old.collateral_type_hash = [0xAA; 32];
-
         let mut new = old.clone();
         new.debt_shares = 5000 * PRECISION;
         new.borrow_index_snapshot = PRECISION;
@@ -266,10 +160,9 @@ mod tests {
         old.collateral_type_hash = [0xAA; 32];
         old.debt_shares = 5000 * PRECISION;
         old.borrow_index_snapshot = PRECISION;
-
         let mut new = old.clone();
-        new.debt_shares = 2000 * PRECISION; // Partial repay
-        new.borrow_index_snapshot = PRECISION + 1000; // Index updated
+        new.debt_shares = 2000 * PRECISION;
+        new.borrow_index_snapshot = PRECISION + 1000;
         new.last_update_block = 100;
         assert!(verify_update(&old, &new).is_ok());
     }
@@ -313,26 +206,23 @@ mod tests {
         let mut old = default_vault();
         old.debt_shares = 100 * PRECISION;
         old.borrow_index_snapshot = PRECISION + 1000;
-
         let mut new = old.clone();
-        new.borrow_index_snapshot = PRECISION; // Decreased
+        new.borrow_index_snapshot = PRECISION;
         assert_eq!(verify_update(&old, &new), Err(VaultError::IndexRegression));
     }
 
-    // ============ Destruction Tests ============
-
     #[test]
     fn test_valid_destruction_no_debt() {
-        let mut vault = default_vault();
-        vault.collateral_amount = 10 * PRECISION; // Collateral returned is handled by lock script
-        assert!(verify_destruction(&vault).is_ok());
+        let mut v = default_vault();
+        v.collateral_amount = 10 * PRECISION;
+        assert!(verify_destruction(&v).is_ok());
     }
 
     #[test]
     fn test_destruction_with_debt() {
-        let mut vault = default_vault();
-        vault.debt_shares = 100 * PRECISION;
-        assert_eq!(verify_destruction(&vault), Err(VaultError::DebtNotZero));
+        let mut v = default_vault();
+        v.debt_shares = 100 * PRECISION;
+        assert_eq!(verify_destruction(&v), Err(VaultError::DebtNotZero));
     }
 
     #[test]
@@ -340,24 +230,11 @@ mod tests {
         assert!(verify_destruction(&default_vault()).is_ok());
     }
 
-    // ============ Integration-style Tests ============
-
     #[test]
     fn test_full_lifecycle() {
-        // 1. Create vault
-        let vault = VaultCellData {
-            owner_lock_hash: [0x11; 32],
-            pool_id: [0x22; 32],
-            collateral_amount: 0,
-            collateral_type_hash: [0u8; 32],
-            debt_shares: 0,
-            borrow_index_snapshot: PRECISION,
-            deposit_shares: 0,
-            last_update_block: 0,
-        };
+        let vault = default_vault();
         assert!(verify_creation(&vault).is_ok());
 
-        // 2. Add collateral
         let v2 = VaultCellData {
             collateral_amount: 10 * PRECISION,
             collateral_type_hash: [0xAA; 32],
@@ -366,7 +243,6 @@ mod tests {
         };
         assert!(verify_update(&vault, &v2).is_ok());
 
-        // 3. Borrow
         let v3 = VaultCellData {
             debt_shares: 5000 * PRECISION,
             borrow_index_snapshot: PRECISION,
@@ -375,16 +251,13 @@ mod tests {
         };
         assert!(verify_update(&v2, &v3).is_ok());
 
-        // 4. Repay fully
         let v4 = VaultCellData {
             debt_shares: 0,
-            borrow_index_snapshot: PRECISION + 50_000_000_000_000_000, // 5% accrued
+            borrow_index_snapshot: PRECISION + 50_000_000_000_000_000,
             last_update_block: 300,
             ..v3.clone()
         };
         assert!(verify_update(&v3, &v4).is_ok());
-
-        // 5. Withdraw collateral + destroy
         assert!(verify_destruction(&v4).is_ok());
     }
 }

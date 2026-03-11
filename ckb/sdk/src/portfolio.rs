@@ -1927,4 +1927,196 @@ mod tests {
         let il = calculate_il(current_price, &pool, 3_000 * PRECISION, PRECISION);
         assert_eq!(il, 0, "No price change should produce 0 IL");
     }
+
+    // ============ Batch 4: Additional Coverage Tests ============
+
+    #[test]
+    fn test_lending_interest_accrual_doubles_debt() {
+        // borrow_index doubled since snapshot → debt should double
+        let prices = make_prices();
+        let vault = VaultCellData {
+            borrow_index_snapshot: PRECISION,
+            debt_shares: 10_000 * PRECISION,
+            ..make_vault(100 * PRECISION, 10_000 * PRECISION)
+        };
+        let pool = LendingPoolCellData {
+            borrow_index: 2 * PRECISION, // Index doubled
+            ..make_lending_pool()
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lending_positions[0];
+        assert_eq!(pos.debt_amount, 20_000 * PRECISION,
+            "Debt should double when borrow_index doubles");
+    }
+
+    #[test]
+    fn test_concentration_with_one_dominant_position() {
+        // 90% of value in one position → concentration = 9000 bps
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_token(token(1), 30 * PRECISION); // 30 ETH = $90,000
+        builder.add_token(token(2), 10_000 * PRECISION); // 10K USDC = $10,000
+        let portfolio = builder.build();
+
+        // Total = $100K, max position = $90K → 90% = 9000 bps
+        assert_eq!(portfolio.summary.concentration_bps, 9000);
+    }
+
+    #[test]
+    fn test_prediction_cancelled_market_is_settled() {
+        // MARKET_CANCELLED status should also count as settled (>= MARKET_SETTLED)
+        let market = PredictionMarketCellData {
+            market_id: [0xCC; 32],
+            num_tiers: 2,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 50_000 * PRECISION;
+                t[1] = 50_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_CANCELLED,
+            ..Default::default()
+        };
+
+        let position = PredictionPositionCellData {
+            market_id: [0xCC; 32],
+            tier_index: 0,
+            amount: 5_000 * PRECISION,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(market, position);
+        let portfolio = builder.build();
+
+        assert!(portfolio.prediction_positions[0].is_settled,
+            "Cancelled market should be treated as settled");
+    }
+
+    #[test]
+    fn test_lp_full_pool_share() {
+        // User owns 100% of pool → should get all reserves' value
+        let prices = make_prices();
+        let pool = make_pool(1, 2, 50 * PRECISION, 150_000 * PRECISION);
+        let lp = make_lp(pool.total_lp_supply, 3_000 * PRECISION); // All LP tokens
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, pool.clone());
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lp_positions[0];
+        // 50 ETH @ $3000 = $150,000
+        assert_eq!(pos.token0_value, 150_000 * PRECISION);
+        // 150,000 USDC @ $1 = $150,000
+        assert_eq!(pos.token1_value, 150_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_portfolio_total_collateral_and_debt_sums() {
+        // Multiple vaults: total_collateral and total_debt should sum correctly
+        let prices = make_prices();
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(make_vault(10 * PRECISION, 5_000 * PRECISION), pool.clone());
+        builder.add_vault(make_vault(20 * PRECISION, 8_000 * PRECISION), pool);
+        let portfolio = builder.build();
+
+        let expected_collateral = (10 * 3_000 + 20 * 3_000) * PRECISION; // $30K + $60K
+        let expected_debt = (5_000 + 8_000) * PRECISION; // $5K + $8K
+        assert_eq!(portfolio.summary.total_collateral, expected_collateral);
+        assert_eq!(portfolio.summary.total_debt, expected_debt);
+    }
+
+    #[test]
+    fn test_insurance_large_premiums_yield_calculation() {
+        // Premium yield = (premiums - claims) * 10000 / deposits
+        let ins = InsurancePoolCellData {
+            total_premiums_earned: 20_000 * PRECISION,
+            total_claims_paid: 5_000 * PRECISION,
+            total_deposits: 100_000 * PRECISION,
+            total_shares: 100_000 * PRECISION,
+            ..make_insurance()
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_insurance(ins, 10_000 * PRECISION);
+        let portfolio = builder.build();
+
+        // yield_bps = (20K - 5K) * 10000 / 100K = 1500 bps = 15%
+        assert_eq!(portfolio.insurance_positions[0].premium_yield_bps, 1500);
+    }
+
+    #[test]
+    fn test_il_reserve0_zero() {
+        // reserve0 = 0 should return IL = 0 (guard clause)
+        let pool = PoolCellData {
+            reserve0: 0,
+            reserve1: 100_000 * PRECISION,
+            ..make_pool(1, 2, 0, 100_000 * PRECISION)
+        };
+
+        let il = calculate_il(3_000 * PRECISION, &pool, 3_000 * PRECISION, PRECISION);
+        assert_eq!(il, 0, "Zero reserve0 should return 0 IL");
+    }
+
+    #[test]
+    fn test_prediction_single_tier_payout_equals_total() {
+        // With 1 tier, payout = total_pool (all money in one tier)
+        let market = PredictionMarketCellData {
+            market_id: [0xDD; 32],
+            num_tiers: 1,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 100_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_ACTIVE,
+            ..Default::default()
+        };
+
+        let position = PredictionPositionCellData {
+            market_id: [0xDD; 32],
+            tier_index: 0,
+            amount: 50_000 * PRECISION,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(market, position);
+        let portfolio = builder.build();
+
+        // 50K * 100K / 100K = 50K (payout = amount when single tier)
+        assert_eq!(portfolio.prediction_positions[0].potential_payout, 50_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_lending_deposit_only_no_borrowing() {
+        // User has deposits but no collateral or debt → pure earning position
+        let prices = make_prices();
+        let vault = VaultCellData {
+            collateral_amount: 0,
+            debt_shares: 0,
+            deposit_shares: 500_000 * PRECISION, // Half of total
+            ..make_vault(0, 0)
+        };
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lending_positions[0];
+        // 500K / 1M total_shares * 1M total_deposits = 500K underlying @ $1 = 500K
+        assert_eq!(pos.deposit_value, 500_000 * PRECISION);
+        assert_eq!(pos.collateral_value, 0);
+        assert_eq!(pos.debt_value, 0);
+        assert_eq!(pos.net_value, 500_000 * PRECISION);
+        assert_eq!(pos.health_factor, u128::MAX);
+    }
 }

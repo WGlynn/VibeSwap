@@ -76,6 +76,8 @@ pub struct DeploymentInfo {
     pub config_type_code_hash: [u8; 32],
     pub oracle_type_code_hash: [u8; 32],
     pub knowledge_type_code_hash: [u8; 32],
+    pub lending_pool_type_code_hash: [u8; 32],
+    pub vault_type_code_hash: [u8; 32],
     pub script_dep_tx_hash: [u8; 32],
     pub script_dep_index: u32,
 }
@@ -842,6 +844,134 @@ impl VibeSwapSDK {
             witnesses: vec![vec![]], // Admin signs
         })
     }
+
+    // ============ Lending Operations ============
+
+    /// Build a transaction to create a new lending pool
+    pub fn create_lending_pool(
+        &self,
+        pool_id: [u8; 32],
+        asset_type_hash: [u8; 32],
+        initial_deposit: u128,
+        user_lock: Script,
+        user_input: CellInput,
+        block_number: u64,
+    ) -> UnsignedTransaction {
+        let pool_data = LendingPoolCellData {
+            total_deposits: initial_deposit,
+            total_borrows: 0,
+            total_shares: initial_deposit, // 1:1 for first depositor
+            total_reserves: 0,
+            borrow_index: PRECISION,
+            last_accrual_block: block_number,
+            asset_type_hash,
+            pool_id,
+            base_rate: DEFAULT_BASE_RATE,
+            slope1: DEFAULT_SLOPE1,
+            slope2: DEFAULT_SLOPE2,
+            optimal_utilization: DEFAULT_OPTIMAL_UTILIZATION,
+            reserve_factor: DEFAULT_RESERVE_FACTOR,
+            collateral_factor: DEFAULT_COLLATERAL_FACTOR,
+            liquidation_threshold: DEFAULT_LIQUIDATION_THRESHOLD,
+            liquidation_incentive: DEFAULT_LIQUIDATION_INCENTIVE,
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.lending_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_id.to_vec(),
+            }),
+            data: pool_data.serialize().to_vec(),
+        };
+
+        // Vault for the initial depositor
+        let vault_data = VaultCellData {
+            owner_lock_hash: hash_script(&user_lock),
+            pool_id,
+            collateral_amount: 0,
+            collateral_type_hash: [0u8; 32],
+            debt_shares: 0,
+            borrow_index_snapshot: PRECISION,
+            deposit_shares: initial_deposit,
+            last_update_block: block_number,
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: user_lock,
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_id.to_vec(),
+            }),
+            data: vault_data.serialize().to_vec(),
+        };
+
+        UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![user_input],
+            outputs: vec![pool_output, vault_output],
+            witnesses: vec![vec![]],
+        }
+    }
+
+    /// Build a transaction to open a vault and deposit collateral
+    pub fn open_vault(
+        &self,
+        pool_id: [u8; 32],
+        collateral_amount: u128,
+        collateral_type_hash: [u8; 32],
+        user_lock: Script,
+        user_input: CellInput,
+        block_number: u64,
+    ) -> UnsignedTransaction {
+        let vault_data = VaultCellData {
+            owner_lock_hash: hash_script(&user_lock),
+            pool_id,
+            collateral_amount,
+            collateral_type_hash,
+            debt_shares: 0,
+            borrow_index_snapshot: PRECISION,
+            deposit_shares: 0,
+            last_update_block: block_number,
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: user_lock,
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_id.to_vec(),
+            }),
+            data: vault_data.serialize().to_vec(),
+        };
+
+        UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![user_input],
+            outputs: vec![vault_output],
+            witnesses: vec![vec![]],
+        }
+    }
 }
 
 // ============ Order Type ============
@@ -910,6 +1040,8 @@ mod tests {
             config_type_code_hash: [0x07; 32],
             oracle_type_code_hash: [0x08; 32],
             knowledge_type_code_hash: [0x09; 32],
+            lending_pool_type_code_hash: [0x0A; 32],
+            vault_type_code_hash: [0x0B; 32],
             script_dep_tx_hash: [0x10; 32],
             script_dep_index: 0,
         }

@@ -1,0 +1,994 @@
+// ============ Governance Module — DAO Parameter Management ============
+// Token-weighted governance for updating protocol parameters on CKB.
+//
+// Flow:
+// 1. PROPOSE: Create proposal cell with new parameters + description
+// 2. VOTE: Token holders create vote cells (for/against, weighted by balance)
+// 3. QUEUE: After voting period + quorum met, proposal enters timelock
+// 4. EXECUTE: After timelock expires, anyone can execute (consumes proposal + old config)
+// 5. CANCEL: Proposer or guardian can cancel during voting/timelock
+//
+// Emergency path: Guardian can execute with shorter timelock + lower quorum
+// for circuit-breaker-level actions (pause, rate limit adjustments).
+//
+// All state is represented as cells — no global mutable state, pure UTXO.
+
+use vibeswap_types::ConfigCellData;
+use vibeswap_math::PRECISION;
+
+// ============ Constants ============
+
+/// Minimum voting period in blocks (≈ 3 days at ~6 sec/block)
+pub const MIN_VOTING_PERIOD_BLOCKS: u64 = 43_200;
+
+/// Default voting period (≈ 7 days)
+pub const DEFAULT_VOTING_PERIOD_BLOCKS: u64 = 100_800;
+
+/// Timelock delay after passing (≈ 2 days)
+pub const TIMELOCK_DELAY_BLOCKS: u64 = 28_800;
+
+/// Emergency timelock (≈ 6 hours)
+pub const EMERGENCY_TIMELOCK_BLOCKS: u64 = 3_600;
+
+/// Quorum: minimum % of total supply that must vote (4%)
+pub const QUORUM_BPS: u64 = 400;
+
+/// Emergency quorum: higher threshold for bypassing timelock (10%)
+pub const EMERGENCY_QUORUM_BPS: u64 = 1000;
+
+/// Proposal threshold: minimum token balance to create proposal (0.1% of supply)
+pub const PROPOSAL_THRESHOLD_BPS: u64 = 10;
+
+/// Maximum active proposals at once
+pub const MAX_ACTIVE_PROPOSALS: usize = 10;
+
+// ============ Types ============
+
+/// Proposal status lifecycle
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProposalStatus {
+    /// Voting is open
+    Active {
+        start_block: u64,
+        end_block: u64,
+    },
+    /// Voting passed, in timelock
+    Queued {
+        execute_after_block: u64,
+    },
+    /// Executed successfully
+    Executed {
+        executed_at_block: u64,
+    },
+    /// Cancelled by proposer or guardian
+    Cancelled,
+    /// Voting ended without quorum or majority
+    Defeated,
+    /// Timelock expired without execution
+    Expired,
+}
+
+/// A governance proposal
+#[derive(Debug, Clone)]
+pub struct Proposal {
+    /// Unique proposal ID
+    pub id: u64,
+    /// Proposer's lock hash
+    pub proposer: [u8; 32],
+    /// Block when voting started
+    pub start_block: u64,
+    /// Block when voting ends
+    pub end_block: u64,
+    /// Proposed new configuration
+    pub new_config: ConfigCellData,
+    /// Description hash (SHA-256 of off-chain description text)
+    pub description_hash: [u8; 32],
+    /// Total votes FOR (token-weighted)
+    pub votes_for: u128,
+    /// Total votes AGAINST (token-weighted)
+    pub votes_against: u128,
+    /// Is this an emergency proposal (shorter timelock)?
+    pub is_emergency: bool,
+    /// Current status
+    pub status: ProposalStatus,
+}
+
+/// A vote on a proposal
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Vote {
+    /// Voter's lock hash
+    pub voter: [u8; 32],
+    /// Proposal being voted on
+    pub proposal_id: u64,
+    /// Token balance at vote time (weight)
+    pub weight: u128,
+    /// Support: true = for, false = against
+    pub support: bool,
+}
+
+/// Result of a governance check
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GovernanceError {
+    /// Proposer doesn't have enough tokens
+    InsufficientProposalThreshold,
+    /// Voting period has ended
+    VotingEnded,
+    /// Voting period hasn't ended yet
+    VotingNotEnded,
+    /// Quorum not reached
+    QuorumNotReached,
+    /// Proposal was defeated (more against than for)
+    ProposalDefeated,
+    /// Timelock hasn't expired yet
+    TimelockNotExpired,
+    /// Proposal already cancelled/executed/defeated
+    ProposalNotActive,
+    /// Too many active proposals
+    TooManyActiveProposals,
+    /// Not authorized (not proposer or guardian)
+    Unauthorized,
+    /// Duplicate vote
+    AlreadyVoted,
+    /// Invalid voting period
+    InvalidVotingPeriod,
+}
+
+// ============ Proposal Lifecycle ============
+
+/// Check if an address has enough tokens to create a proposal
+pub fn can_propose(
+    voter_balance: u128,
+    total_supply: u128,
+) -> Result<(), GovernanceError> {
+    if total_supply == 0 {
+        return Err(GovernanceError::InsufficientProposalThreshold);
+    }
+    let threshold = total_supply * PROPOSAL_THRESHOLD_BPS as u128 / 10_000;
+    if voter_balance < threshold {
+        Err(GovernanceError::InsufficientProposalThreshold)
+    } else {
+        Ok(())
+    }
+}
+
+/// Create a new proposal
+pub fn create_proposal(
+    id: u64,
+    proposer: [u8; 32],
+    new_config: ConfigCellData,
+    description_hash: [u8; 32],
+    current_block: u64,
+    voting_period: u64,
+    is_emergency: bool,
+) -> Result<Proposal, GovernanceError> {
+    if voting_period < MIN_VOTING_PERIOD_BLOCKS {
+        return Err(GovernanceError::InvalidVotingPeriod);
+    }
+
+    Ok(Proposal {
+        id,
+        proposer,
+        start_block: current_block,
+        end_block: current_block + voting_period,
+        new_config,
+        description_hash,
+        votes_for: 0,
+        votes_against: 0,
+        is_emergency,
+        status: ProposalStatus::Active {
+            start_block: current_block,
+            end_block: current_block + voting_period,
+        },
+    })
+}
+
+/// Cast a vote on an active proposal
+pub fn cast_vote(
+    proposal: &mut Proposal,
+    voter: [u8; 32],
+    weight: u128,
+    support: bool,
+    current_block: u64,
+) -> Result<Vote, GovernanceError> {
+    // Must be active
+    match &proposal.status {
+        ProposalStatus::Active { end_block, .. } => {
+            if current_block > *end_block {
+                return Err(GovernanceError::VotingEnded);
+            }
+        }
+        _ => return Err(GovernanceError::ProposalNotActive),
+    }
+
+    // Apply vote
+    if support {
+        proposal.votes_for += weight;
+    } else {
+        proposal.votes_against += weight;
+    }
+
+    Ok(Vote {
+        voter,
+        proposal_id: proposal.id,
+        weight,
+        support,
+    })
+}
+
+/// Check if a proposal has reached quorum
+pub fn has_quorum(
+    proposal: &Proposal,
+    total_supply: u128,
+) -> bool {
+    let total_votes = proposal.votes_for + proposal.votes_against;
+    let quorum_bps = if proposal.is_emergency {
+        EMERGENCY_QUORUM_BPS
+    } else {
+        QUORUM_BPS
+    };
+    let required = total_supply * quorum_bps as u128 / 10_000;
+    total_votes >= required
+}
+
+/// Check if a proposal has passed (majority + quorum)
+pub fn has_passed(
+    proposal: &Proposal,
+    total_supply: u128,
+) -> bool {
+    has_quorum(proposal, total_supply) && proposal.votes_for > proposal.votes_against
+}
+
+/// Finalize voting and transition to Queued or Defeated
+pub fn finalize_voting(
+    proposal: &mut Proposal,
+    total_supply: u128,
+    current_block: u64,
+) -> Result<(), GovernanceError> {
+    match &proposal.status {
+        ProposalStatus::Active { end_block, .. } => {
+            if current_block <= *end_block {
+                return Err(GovernanceError::VotingNotEnded);
+            }
+        }
+        _ => return Err(GovernanceError::ProposalNotActive),
+    }
+
+    if has_passed(proposal, total_supply) {
+        let delay = if proposal.is_emergency {
+            EMERGENCY_TIMELOCK_BLOCKS
+        } else {
+            TIMELOCK_DELAY_BLOCKS
+        };
+        proposal.status = ProposalStatus::Queued {
+            execute_after_block: current_block + delay,
+        };
+    } else {
+        proposal.status = ProposalStatus::Defeated;
+    }
+
+    Ok(())
+}
+
+/// Execute a queued proposal (apply the config change)
+///
+/// Returns the new ConfigCellData to be written on-chain.
+pub fn execute_proposal(
+    proposal: &mut Proposal,
+    current_block: u64,
+) -> Result<ConfigCellData, GovernanceError> {
+    match &proposal.status {
+        ProposalStatus::Queued { execute_after_block } => {
+            if current_block < *execute_after_block {
+                return Err(GovernanceError::TimelockNotExpired);
+            }
+        }
+        _ => return Err(GovernanceError::ProposalNotActive),
+    }
+
+    proposal.status = ProposalStatus::Executed {
+        executed_at_block: current_block,
+    };
+
+    Ok(proposal.new_config.clone())
+}
+
+/// Cancel a proposal (only proposer or guardian)
+pub fn cancel_proposal(
+    proposal: &mut Proposal,
+    canceller: &[u8; 32],
+    guardian: &[u8; 32],
+) -> Result<(), GovernanceError> {
+    // Only proposer or guardian can cancel
+    if canceller != &proposal.proposer && canceller != guardian {
+        return Err(GovernanceError::Unauthorized);
+    }
+
+    match &proposal.status {
+        ProposalStatus::Active { .. } | ProposalStatus::Queued { .. } => {
+            proposal.status = ProposalStatus::Cancelled;
+            Ok(())
+        }
+        _ => Err(GovernanceError::ProposalNotActive),
+    }
+}
+
+// ============ Governance Analytics ============
+
+/// Calculate participation rate in basis points
+pub fn participation_rate_bps(
+    proposal: &Proposal,
+    total_supply: u128,
+) -> u64 {
+    if total_supply == 0 {
+        return 0;
+    }
+    let total_votes = proposal.votes_for + proposal.votes_against;
+    ((total_votes * 10_000) / total_supply).min(10_000) as u64
+}
+
+/// Calculate approval rate in basis points (of votes cast, not total supply)
+pub fn approval_rate_bps(proposal: &Proposal) -> u64 {
+    let total = proposal.votes_for + proposal.votes_against;
+    if total == 0 {
+        return 0;
+    }
+    ((proposal.votes_for * 10_000) / total) as u64
+}
+
+/// Check if a config change is "safe" (within reasonable bounds)
+///
+/// Returns true if all parameters are within safe ranges.
+/// This is a soft check — governance can override, but keepers should flag unsafe proposals.
+pub fn is_safe_config_change(
+    old_config: &ConfigCellData,
+    new_config: &ConfigCellData,
+) -> bool {
+    // Commit window: can't change by more than 2x in either direction
+    let commit_ratio_ok = new_config.commit_window_blocks <= old_config.commit_window_blocks * 2
+        && new_config.commit_window_blocks >= old_config.commit_window_blocks / 2;
+
+    // Reveal window: same 2x bound
+    let reveal_ratio_ok = new_config.reveal_window_blocks <= old_config.reveal_window_blocks * 2
+        && new_config.reveal_window_blocks >= old_config.reveal_window_blocks / 2;
+
+    // Slash rate: can't exceed 50%
+    let slash_ok = new_config.slash_rate_bps <= 5000;
+
+    // PoW difficulty: can't drop below 1
+    let pow_ok = new_config.min_pow_difficulty >= 1;
+
+    // Circuit breakers: can't be disabled (set to 0)
+    let breakers_ok = new_config.volume_breaker_limit > 0
+        && new_config.price_breaker_bps > 0
+        && new_config.withdrawal_breaker_bps > 0;
+
+    commit_ratio_ok && reveal_ratio_ok && slash_ok && pow_ok && breakers_ok
+}
+
+/// Estimate voting power needed to pass a proposal
+pub fn votes_needed_to_pass(
+    proposal: &Proposal,
+    total_supply: u128,
+) -> u128 {
+    let quorum_bps = if proposal.is_emergency {
+        EMERGENCY_QUORUM_BPS
+    } else {
+        QUORUM_BPS
+    };
+    let quorum_threshold = total_supply * quorum_bps as u128 / 10_000;
+
+    let total_votes = proposal.votes_for + proposal.votes_against;
+    let votes_for_quorum = if total_votes >= quorum_threshold {
+        0
+    } else {
+        quorum_threshold - total_votes
+    };
+
+    // Also need majority
+    let votes_for_majority = if proposal.votes_for > proposal.votes_against {
+        0
+    } else {
+        proposal.votes_against - proposal.votes_for + 1
+    };
+
+    // Need whichever is greater (for votes must beat both thresholds)
+    votes_for_quorum.max(votes_for_majority)
+}
+
+// ============ Tests ============
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_config() -> ConfigCellData {
+        ConfigCellData {
+            commit_window_blocks: 40,
+            reveal_window_blocks: 10,
+            slash_rate_bps: 5000,
+            max_price_deviation: 500,
+            max_trade_size_bps: 1000,
+            rate_limit_amount: 1_000_000 * PRECISION,
+            rate_limit_window: 3600,
+            volume_breaker_limit: 10_000_000 * PRECISION,
+            price_breaker_bps: 1000,
+            withdrawal_breaker_bps: 2000,
+            min_pow_difficulty: 10,
+        }
+    }
+
+    fn test_proposer() -> [u8; 32] { [0xA1; 32] }
+    fn test_guardian() -> [u8; 32] { [0xFF; 32] }
+    fn test_voter(id: u8) -> [u8; 32] { [id; 32] }
+    fn test_desc_hash() -> [u8; 32] { [0xDD; 32] }
+
+    const TOTAL_SUPPLY: u128 = 100_000_000 * PRECISION; // 100M tokens
+
+    // ============ Proposal Threshold ============
+
+    #[test]
+    fn test_can_propose_above_threshold() {
+        // 0.1% of 100M = 100K tokens
+        let balance = 100_001 * PRECISION;
+        assert!(can_propose(balance, TOTAL_SUPPLY).is_ok());
+    }
+
+    #[test]
+    fn test_can_propose_below_threshold() {
+        let balance = 99_000 * PRECISION;
+        assert!(matches!(
+            can_propose(balance, TOTAL_SUPPLY),
+            Err(GovernanceError::InsufficientProposalThreshold)
+        ));
+    }
+
+    #[test]
+    fn test_can_propose_zero_supply() {
+        assert!(can_propose(1000, 0).is_err());
+    }
+
+    // ============ Proposal Creation ============
+
+    #[test]
+    fn test_create_proposal() {
+        let proposal = create_proposal(
+            1,
+            test_proposer(),
+            test_config(),
+            test_desc_hash(),
+            1000,
+            DEFAULT_VOTING_PERIOD_BLOCKS,
+            false,
+        ).unwrap();
+
+        assert_eq!(proposal.id, 1);
+        assert_eq!(proposal.start_block, 1000);
+        assert_eq!(proposal.end_block, 1000 + DEFAULT_VOTING_PERIOD_BLOCKS);
+        assert_eq!(proposal.votes_for, 0);
+        assert_eq!(proposal.votes_against, 0);
+        assert!(!proposal.is_emergency);
+        assert!(matches!(proposal.status, ProposalStatus::Active { .. }));
+    }
+
+    #[test]
+    fn test_create_proposal_too_short_voting_period() {
+        let result = create_proposal(
+            1,
+            test_proposer(),
+            test_config(),
+            test_desc_hash(),
+            1000,
+            MIN_VOTING_PERIOD_BLOCKS - 1, // Too short
+            false,
+        );
+        assert!(matches!(result, Err(GovernanceError::InvalidVotingPeriod)));
+    }
+
+    #[test]
+    fn test_create_emergency_proposal() {
+        let proposal = create_proposal(
+            2,
+            test_proposer(),
+            test_config(),
+            test_desc_hash(),
+            1000,
+            MIN_VOTING_PERIOD_BLOCKS,
+            true,
+        ).unwrap();
+
+        assert!(proposal.is_emergency);
+    }
+
+    // ============ Voting ============
+
+    #[test]
+    fn test_cast_vote_for() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        let vote = cast_vote(
+            &mut proposal,
+            test_voter(0x01),
+            5_000_000 * PRECISION,
+            true,
+            2000,
+        ).unwrap();
+
+        assert!(vote.support);
+        assert_eq!(vote.weight, 5_000_000 * PRECISION);
+        assert_eq!(proposal.votes_for, 5_000_000 * PRECISION);
+        assert_eq!(proposal.votes_against, 0);
+    }
+
+    #[test]
+    fn test_cast_vote_against() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 3_000_000 * PRECISION, false, 2000).unwrap();
+
+        assert_eq!(proposal.votes_for, 0);
+        assert_eq!(proposal.votes_against, 3_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_cast_vote_after_voting_ended() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Vote after end_block
+        let result = cast_vote(
+            &mut proposal,
+            test_voter(0x01),
+            1_000_000 * PRECISION,
+            true,
+            1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1,
+        );
+        assert!(matches!(result, Err(GovernanceError::VotingEnded)));
+    }
+
+    #[test]
+    fn test_multiple_voters() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 2_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 1_500_000 * PRECISION, true, 3000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x03), 1_000_000 * PRECISION, false, 4000).unwrap();
+
+        assert_eq!(proposal.votes_for, 3_500_000 * PRECISION);
+        assert_eq!(proposal.votes_against, 1_000_000 * PRECISION);
+    }
+
+    // ============ Quorum & Passing ============
+
+    #[test]
+    fn test_has_quorum_met() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // 4% of 100M = 4M tokens needed
+        cast_vote(&mut proposal, test_voter(0x01), 4_000_001 * PRECISION, true, 2000).unwrap();
+        assert!(has_quorum(&proposal, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_has_quorum_not_met() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Just under 4%
+        cast_vote(&mut proposal, test_voter(0x01), 3_999_999 * PRECISION, true, 2000).unwrap();
+        assert!(!has_quorum(&proposal, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_emergency_quorum_higher() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, MIN_VOTING_PERIOD_BLOCKS, true,
+        ).unwrap();
+
+        // 4M = 4% — enough for normal quorum, not for emergency (10%)
+        cast_vote(&mut proposal, test_voter(0x01), 4_000_000 * PRECISION, true, 2000).unwrap();
+        assert!(!has_quorum(&proposal, TOTAL_SUPPLY));
+
+        // Add more to reach 10%
+        cast_vote(&mut proposal, test_voter(0x02), 6_000_001 * PRECISION, true, 3000).unwrap();
+        assert!(has_quorum(&proposal, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_has_passed() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // 5M for, 1M against → quorum met (6M > 4M threshold) + majority
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 1_000_000 * PRECISION, false, 3000).unwrap();
+
+        assert!(has_passed(&proposal, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_defeated_by_majority() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Quorum met but against wins
+        cast_vote(&mut proposal, test_voter(0x01), 2_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 3_000_000 * PRECISION, false, 3000).unwrap();
+
+        assert!(has_quorum(&proposal, TOTAL_SUPPLY));
+        assert!(!has_passed(&proposal, TOTAL_SUPPLY));
+    }
+
+    // ============ Finalize Voting ============
+
+    #[test]
+    fn test_finalize_voting_passed() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+
+        match &proposal.status {
+            ProposalStatus::Queued { execute_after_block } => {
+                assert_eq!(*execute_after_block, end_block + TIMELOCK_DELAY_BLOCKS);
+            }
+            _ => panic!("Expected Queued status"),
+        }
+    }
+
+    #[test]
+    fn test_finalize_voting_defeated() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Only 1M votes — quorum not met (need 4M)
+        cast_vote(&mut proposal, test_voter(0x01), 1_000_000 * PRECISION, true, 2000).unwrap();
+
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+
+        assert_eq!(proposal.status, ProposalStatus::Defeated);
+    }
+
+    #[test]
+    fn test_finalize_voting_too_early() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        let result = finalize_voting(&mut proposal, TOTAL_SUPPLY, 1000 + 100); // Too early
+        assert!(matches!(result, Err(GovernanceError::VotingNotEnded)));
+    }
+
+    #[test]
+    fn test_finalize_emergency_shorter_timelock() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, MIN_VOTING_PERIOD_BLOCKS, true,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 10_000_001 * PRECISION, true, 2000).unwrap();
+
+        let end_block = 1000 + MIN_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+
+        match &proposal.status {
+            ProposalStatus::Queued { execute_after_block } => {
+                // Emergency: shorter timelock
+                assert_eq!(*execute_after_block, end_block + EMERGENCY_TIMELOCK_BLOCKS);
+            }
+            _ => panic!("Expected Queued status"),
+        }
+    }
+
+    // ============ Execute ============
+
+    #[test]
+    fn test_execute_proposal() {
+        let new_config = ConfigCellData {
+            commit_window_blocks: 50, // Changed from 40
+            ..test_config()
+        };
+
+        let mut proposal = create_proposal(
+            1, test_proposer(), new_config.clone(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+
+        let execute_block = end_block + TIMELOCK_DELAY_BLOCKS + 1;
+        let result_config = execute_proposal(&mut proposal, execute_block).unwrap();
+
+        assert_eq!(result_config.commit_window_blocks, 50);
+        assert!(matches!(proposal.status, ProposalStatus::Executed { .. }));
+    }
+
+    #[test]
+    fn test_execute_too_early() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+
+        // Try to execute before timelock
+        let result = execute_proposal(&mut proposal, end_block + 100);
+        assert!(matches!(result, Err(GovernanceError::TimelockNotExpired)));
+    }
+
+    // ============ Cancel ============
+
+    #[test]
+    fn test_cancel_by_proposer() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cancel_proposal(&mut proposal, &test_proposer(), &test_guardian()).unwrap();
+        assert_eq!(proposal.status, ProposalStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_cancel_by_guardian() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cancel_proposal(&mut proposal, &test_guardian(), &test_guardian()).unwrap();
+        assert_eq!(proposal.status, ProposalStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_cancel_by_random_rejected() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        let random = [0x99; 32];
+        let result = cancel_proposal(&mut proposal, &random, &test_guardian());
+        assert!(matches!(result, Err(GovernanceError::Unauthorized)));
+    }
+
+    #[test]
+    fn test_cancel_queued_proposal() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1).unwrap();
+
+        // Guardian can cancel even during timelock
+        cancel_proposal(&mut proposal, &test_guardian(), &test_guardian()).unwrap();
+        assert_eq!(proposal.status, ProposalStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_cancel_executed_rejected() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, TOTAL_SUPPLY, end_block).unwrap();
+        execute_proposal(&mut proposal, end_block + TIMELOCK_DELAY_BLOCKS + 1).unwrap();
+
+        // Can't cancel what's already executed
+        let result = cancel_proposal(&mut proposal, &test_proposer(), &test_guardian());
+        assert!(matches!(result, Err(GovernanceError::ProposalNotActive)));
+    }
+
+    // ============ Analytics ============
+
+    #[test]
+    fn test_participation_rate() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 10_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 5_000_000 * PRECISION, false, 3000).unwrap();
+
+        // 15M / 100M = 15% = 1500 bps
+        let rate = participation_rate_bps(&proposal, TOTAL_SUPPLY);
+        assert_eq!(rate, 1500);
+    }
+
+    #[test]
+    fn test_approval_rate() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        cast_vote(&mut proposal, test_voter(0x01), 8_000_000 * PRECISION, true, 2000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 2_000_000 * PRECISION, false, 3000).unwrap();
+
+        // 8M / 10M = 80% = 8000 bps
+        let rate = approval_rate_bps(&proposal);
+        assert_eq!(rate, 8000);
+    }
+
+    #[test]
+    fn test_votes_needed_quorum() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Need 4M for quorum, 0 votes so far
+        let needed = votes_needed_to_pass(&proposal, TOTAL_SUPPLY);
+        assert_eq!(needed, 4_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_votes_needed_majority() {
+        let mut proposal = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // 10M against — quorum met, need majority
+        cast_vote(&mut proposal, test_voter(0x01), 10_000_000 * PRECISION, false, 2000).unwrap();
+
+        let needed = votes_needed_to_pass(&proposal, TOTAL_SUPPLY);
+        // Need 10M+1 for votes to be > 10M against
+        assert_eq!(needed, 10_000_000 * PRECISION + 1);
+    }
+
+    // ============ Safe Config Change ============
+
+    #[test]
+    fn test_safe_config_change() {
+        let old = test_config();
+        let new = ConfigCellData {
+            commit_window_blocks: 50, // 40→50 (within 2x)
+            ..old.clone()
+        };
+        assert!(is_safe_config_change(&old, &new));
+    }
+
+    #[test]
+    fn test_unsafe_config_change_commit_too_large() {
+        let old = test_config();
+        let new = ConfigCellData {
+            commit_window_blocks: 81, // 40→81 (>2x)
+            ..old.clone()
+        };
+        assert!(!is_safe_config_change(&old, &new));
+    }
+
+    #[test]
+    fn test_unsafe_config_disabled_breaker() {
+        let old = test_config();
+        let new = ConfigCellData {
+            volume_breaker_limit: 0, // Disabled!
+            ..old.clone()
+        };
+        assert!(!is_safe_config_change(&old, &new));
+    }
+
+    #[test]
+    fn test_unsafe_config_zero_pow() {
+        let old = test_config();
+        let new = ConfigCellData {
+            min_pow_difficulty: 0, // Disabled!
+            ..old.clone()
+        };
+        assert!(!is_safe_config_change(&old, &new));
+    }
+
+    // ============ Full Lifecycle ============
+
+    #[test]
+    fn test_governance_full_lifecycle() {
+        let total_supply = TOTAL_SUPPLY;
+
+        // 1. Propose: increase commit window from 40 to 60 blocks
+        let new_config = ConfigCellData {
+            commit_window_blocks: 60,
+            ..test_config()
+        };
+
+        let mut proposal = create_proposal(
+            42, test_proposer(), new_config.clone(), test_desc_hash(),
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // 2. Vote: 3 voters, 2 for, 1 against
+        cast_vote(&mut proposal, test_voter(0x01), 3_000_000 * PRECISION, true, 5000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x02), 2_000_000 * PRECISION, true, 6000).unwrap();
+        cast_vote(&mut proposal, test_voter(0x03), 1_000_000 * PRECISION, false, 7000).unwrap();
+
+        // Verify analytics
+        assert_eq!(participation_rate_bps(&proposal, total_supply), 600); // 6%
+        assert_eq!(approval_rate_bps(&proposal), 8333); // 83.33%
+
+        // 3. Finalize: voting period ended
+        let end_block = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, total_supply, end_block).unwrap();
+        assert!(matches!(proposal.status, ProposalStatus::Queued { .. }));
+
+        // 4. Execute: timelock expired
+        let execute_block = end_block + TIMELOCK_DELAY_BLOCKS + 1;
+        let result_config = execute_proposal(&mut proposal, execute_block).unwrap();
+
+        assert_eq!(result_config.commit_window_blocks, 60);
+        assert!(matches!(proposal.status, ProposalStatus::Executed { .. }));
+    }
+
+    #[test]
+    fn test_emergency_governance_lifecycle() {
+        let total_supply = TOTAL_SUPPLY;
+
+        // Emergency: disable trading by maxing out slash rate
+        let emergency_config = ConfigCellData {
+            slash_rate_bps: 5000,
+            ..test_config()
+        };
+
+        let mut proposal = create_proposal(
+            99, test_proposer(), emergency_config.clone(), test_desc_hash(),
+            1000, MIN_VOTING_PERIOD_BLOCKS, true,
+        ).unwrap();
+
+        // Emergency needs 10% quorum — 10M tokens
+        cast_vote(&mut proposal, test_voter(0x01), 10_000_001 * PRECISION, true, 2000).unwrap();
+
+        let end_block = 1000 + MIN_VOTING_PERIOD_BLOCKS + 1;
+        finalize_voting(&mut proposal, total_supply, end_block).unwrap();
+
+        // Emergency timelock is shorter
+        if let ProposalStatus::Queued { execute_after_block } = proposal.status {
+            assert_eq!(execute_after_block, end_block + EMERGENCY_TIMELOCK_BLOCKS);
+
+            let result = execute_proposal(&mut proposal, execute_after_block + 1).unwrap();
+            assert_eq!(result.slash_rate_bps, 5000);
+        } else {
+            panic!("Expected Queued status");
+        }
+    }
+}

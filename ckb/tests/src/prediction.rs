@@ -344,3 +344,265 @@ fn test_cancel_and_recreate() {
     assert_ne!(id1, id2);
     assert_eq!(market2.status, MARKET_ACTIVE);
 }
+
+// ============ Transaction Builder Integration Tests ============
+// These test the full SDK → transaction pipeline via VibeSwapSDK methods.
+
+use vibeswap_sdk::{VibeSwapSDK, DeploymentInfo};
+
+fn test_sdk() -> VibeSwapSDK {
+    VibeSwapSDK::new(DeploymentInfo {
+        pow_lock_code_hash: [0x01; 32],
+        batch_auction_type_code_hash: [0x02; 32],
+        commit_type_code_hash: [0x03; 32],
+        amm_pool_type_code_hash: [0x04; 32],
+        lp_position_type_code_hash: [0x05; 32],
+        compliance_type_code_hash: [0x06; 32],
+        config_type_code_hash: [0x07; 32],
+        oracle_type_code_hash: [0x08; 32],
+        knowledge_type_code_hash: [0x09; 32],
+        lending_pool_type_code_hash: [0x0A; 32],
+        vault_type_code_hash: [0x0B; 32],
+        insurance_pool_type_code_hash: [0x0C; 32],
+        prediction_market_type_code_hash: [0x0D; 32],
+        prediction_position_type_code_hash: [0x0E; 32],
+        script_dep_tx_hash: [0x10; 32],
+        script_dep_index: 0,
+    })
+}
+
+fn tx_input(b: u8) -> CellInput {
+    CellInput { tx_hash: [b; 32], index: 0, since: 0 }
+}
+
+#[test]
+fn test_tx_create_market_outputs_correct_type_script() {
+    let sdk = test_sdk();
+    let params = create_params(4, SETTLEMENT_SCALAR);
+
+    let tx = sdk.create_market_tx(&params).unwrap();
+    assert_eq!(tx.outputs.len(), 1);
+
+    let market = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+    assert_eq!(market.num_tiers, 4);
+    assert_eq!(market.settlement_mode, SETTLEMENT_SCALAR);
+
+    // Type script args = market_id
+    let ts = tx.outputs[0].type_script.as_ref().unwrap();
+    assert_eq!(ts.code_hash, [0x0D; 32]);
+    assert_eq!(ts.args, market.market_id.to_vec());
+}
+
+#[test]
+fn test_tx_place_bet_creates_position_cell() {
+    let sdk = test_sdk();
+    let params = create_params(3, SETTLEMENT_WINNER_TAKES_ALL);
+    let (market, _) = create_market(&params).unwrap();
+
+    let tx = sdk.place_bet_tx(
+        tx_input(0x60), &market,
+        2, 10 * MINIMUM_BET_AMOUNT,
+        lock(0xBB), tx_input(0x61), 200,
+    ).unwrap();
+
+    assert_eq!(tx.outputs.len(), 2);
+
+    // Output 0: updated market
+    let updated = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+    assert_eq!(updated.tier_pools[2], 10 * MINIMUM_BET_AMOUNT);
+    assert_eq!(updated.total_liquidity, 10 * MINIMUM_BET_AMOUNT);
+
+    // Output 1: position cell
+    let pos = PredictionPositionCellData::deserialize(&tx.outputs[1].data).unwrap();
+    assert_eq!(pos.tier_index, 2);
+    assert_eq!(pos.amount, 10 * MINIMUM_BET_AMOUNT);
+    assert_eq!(pos.market_id, market.market_id);
+
+    // Position type script args = market_id
+    let pts = tx.outputs[1].type_script.as_ref().unwrap();
+    assert_eq!(pts.code_hash, [0x0E; 32]);
+    assert_eq!(pts.args, market.market_id.to_vec());
+}
+
+#[test]
+fn test_tx_resolve_market_preserves_pools() {
+    let sdk = test_sdk();
+    let params = create_params(3, SETTLEMENT_PROPORTIONAL);
+    let (mut market, _) = create_market(&params).unwrap();
+
+    // Add bets
+    let (m, _) = place_bet(&market, 0, 10 * MINIMUM_BET_AMOUNT, [0x01; 32], 200).unwrap();
+    market = m;
+    let (m, _) = place_bet(&market, 1, 5 * MINIMUM_BET_AMOUNT, [0x02; 32], 201).unwrap();
+    market = m;
+
+    let tx = sdk.resolve_market_tx(
+        tx_input(0x60), &market,
+        PRECISION / 6, // Tier 0
+        lock(0xCC), 1000,
+    ).unwrap();
+
+    let resolved = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+    assert_eq!(resolved.status, MARKET_RESOLVED);
+    assert_eq!(resolved.resolved_tier, 0);
+    // Pools must be unchanged after resolution
+    assert_eq!(resolved.tier_pools[0], 10 * MINIMUM_BET_AMOUNT);
+    assert_eq!(resolved.tier_pools[1], 5 * MINIMUM_BET_AMOUNT);
+    assert_eq!(resolved.total_liquidity, 15 * MINIMUM_BET_AMOUNT);
+}
+
+#[test]
+fn test_tx_settle_position_payout_correct() {
+    let sdk = test_sdk();
+    let params = create_params(2, SETTLEMENT_WINNER_TAKES_ALL);
+    let (mut market, _) = create_market(&params).unwrap();
+
+    // Two bets: 10 on tier 0, 5 on tier 1
+    let (m, pos_win) = place_bet(&market, 0, 10 * MINIMUM_BET_AMOUNT, [0x01; 32], 200).unwrap();
+    market = m;
+    let (m, pos_lose) = place_bet(&market, 1, 5 * MINIMUM_BET_AMOUNT, [0x02; 32], 201).unwrap();
+    market = m;
+
+    let resolved = resolve_market(&market, PRECISION / 4, 1000).unwrap();
+
+    // Winner settles: should get ~15 * MIN_BET * 99% (1% fee)
+    let tx = sdk.settle_position_tx(
+        &resolved, tx_input(0x70), &pos_win, lock(0x01),
+    ).unwrap();
+
+    let payout = u128::from_le_bytes(tx.outputs[0].data[..16].try_into().unwrap());
+    let total = 15 * MINIMUM_BET_AMOUNT;
+    let expected_net = total - total * DEFAULT_MARKET_FEE_BPS as u128 / BPS_DENOMINATOR;
+    assert_eq!(payout, expected_net);
+
+    // Loser settles: should fail (0 payout)
+    let result = sdk.settle_position_tx(
+        &resolved, tx_input(0x71), &pos_lose, lock(0x02),
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_tx_cancel_market_transitions_status() {
+    let sdk = test_sdk();
+    let params = create_params(2, SETTLEMENT_WINNER_TAKES_ALL);
+    let (market, _) = create_market(&params).unwrap();
+
+    let tx = sdk.cancel_market_tx(
+        tx_input(0x60), &market, lock(0xAA), // Same lock as creator
+    ).unwrap();
+
+    let cancelled = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+    assert_eq!(cancelled.status, MARKET_CANCELLED);
+    assert_eq!(cancelled.market_id, market.market_id);
+}
+
+#[test]
+fn test_tx_full_pipeline_proportional_settlement() {
+    let sdk = test_sdk();
+    let params = create_params(4, SETTLEMENT_PROPORTIONAL);
+
+    // Create
+    let create_tx = sdk.create_market_tx(&params).unwrap();
+    let mut market = PredictionMarketCellData::deserialize(&create_tx.outputs[0].data).unwrap();
+
+    // Bets on tiers 0-3
+    for (tier, amount_mul) in [(0u8, 10u128), (1, 8), (2, 5), (3, 3)] {
+        let (m, _) = place_bet(&market, tier, amount_mul * MINIMUM_BET_AMOUNT, [tier + 1; 32], 200 + tier as u64).unwrap();
+        market = m;
+    }
+    assert_eq!(market.total_liquidity, 26 * MINIMUM_BET_AMOUNT);
+
+    // Resolve: tier 1 wins
+    let resolve_tx = sdk.resolve_market_tx(
+        tx_input(0x60), &market,
+        PRECISION / 4 + PRECISION / 8, // Middle of tier 1
+        lock(0xCC), 1000,
+    ).unwrap();
+    let resolved = PredictionMarketCellData::deserialize(&resolve_tx.outputs[0].data).unwrap();
+    assert_eq!(resolved.resolved_tier, 1);
+
+    // Settle tier 1 (winner) — should get majority of pool
+    let pos_win = PredictionPositionCellData {
+        market_id: market.market_id,
+        owner_lock_hash: [0x02; 32],
+        tier_index: 1,
+        amount: 8 * MINIMUM_BET_AMOUNT,
+        created_block: 201,
+    };
+    let tx = sdk.settle_position_tx(
+        &resolved, tx_input(0x70), &pos_win, lock(0x02),
+    ).unwrap();
+    let payout = u128::from_le_bytes(tx.outputs[0].data[..16].try_into().unwrap());
+    assert!(payout > 8 * MINIMUM_BET_AMOUNT, "Winner should profit");
+
+    // Settle tier 0 (adjacent) — should get partial payout
+    let pos_adj = PredictionPositionCellData {
+        market_id: market.market_id,
+        owner_lock_hash: [0x01; 32],
+        tier_index: 0,
+        amount: 10 * MINIMUM_BET_AMOUNT,
+        created_block: 200,
+    };
+    let tx2 = sdk.settle_position_tx(
+        &resolved, tx_input(0x71), &pos_adj, lock(0x01),
+    ).unwrap();
+    let adj_payout = u128::from_le_bytes(tx2.outputs[0].data[..16].try_into().unwrap());
+    assert!(adj_payout > 0, "Adjacent tier should get partial payout");
+    assert!(adj_payout < payout, "Adjacent should get less than winner");
+}
+
+#[test]
+fn test_tx_full_pipeline_scalar_settlement() {
+    let sdk = test_sdk();
+    let params = create_params(5, SETTLEMENT_SCALAR);
+
+    let create_tx = sdk.create_market_tx(&params).unwrap();
+    let mut market = PredictionMarketCellData::deserialize(&create_tx.outputs[0].data).unwrap();
+
+    // Equal bets on all 5 tiers
+    for tier in 0..5u8 {
+        let (m, _) = place_bet(&market, tier, 10 * MINIMUM_BET_AMOUNT, [tier + 1; 32], 200 + tier as u64).unwrap();
+        market = m;
+    }
+    assert_eq!(market.total_liquidity, 50 * MINIMUM_BET_AMOUNT);
+
+    // Resolve: middle tier (tier 2)
+    let resolve_tx = sdk.resolve_market_tx(
+        tx_input(0x60), &market,
+        PRECISION / 2, // Middle → tier 2
+        lock(0xCC), 1000,
+    ).unwrap();
+    let resolved = PredictionMarketCellData::deserialize(&resolve_tx.outputs[0].data).unwrap();
+    assert_eq!(resolved.resolved_tier, 2);
+
+    // Settle all tiers — every tier should get some payout in scalar mode
+    let mut payouts = Vec::new();
+    for tier in 0..5u8 {
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [tier + 1; 32],
+            tier_index: tier,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200 + tier as u64,
+        };
+        let tx = sdk.settle_position_tx(
+            &resolved, tx_input(0x70 + tier), &pos, lock(tier + 1),
+        ).unwrap();
+        let payout = u128::from_le_bytes(tx.outputs[0].data[..16].try_into().unwrap());
+        payouts.push(payout);
+    }
+
+    // Tier 2 (winning) should get the most
+    assert!(payouts[2] > payouts[0]);
+    assert!(payouts[2] > payouts[4]);
+
+    // Adjacent tiers (1, 3) should get more than distant tiers (0, 4)
+    assert!(payouts[1] > payouts[0]);
+    assert!(payouts[3] > payouts[4]);
+
+    // All payouts positive in scalar mode
+    for (i, p) in payouts.iter().enumerate() {
+        assert!(*p > 0, "Tier {} should have positive payout in scalar mode", i);
+    }
+}

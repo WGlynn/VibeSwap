@@ -10,6 +10,7 @@ pub mod keeper;
 pub mod knowledge;
 pub mod miner;
 pub mod oracle;
+pub mod portfolio;
 pub mod prediction;
 pub mod risk;
 pub mod router;

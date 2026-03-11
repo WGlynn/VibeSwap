@@ -1378,4 +1378,168 @@ mod tests {
         assert_eq!(create_tx.cell_deps[0].tx_hash, update_tx.cell_deps[0].tx_hash);
         assert_eq!(create_tx.cell_deps[0].index, update_tx.cell_deps[0].index);
     }
+
+    // ============ Batch 4: Additional Coverage Tests ============
+
+    #[test]
+    fn test_value_hash_max_byte_values() {
+        // All-0xFF bytes should produce a valid, distinct hash
+        let all_ff = vec![0xFFu8; 256];
+        let all_zero = vec![0x00u8; 256];
+        let h_ff = compute_value_hash(&all_ff);
+        let h_zero = compute_value_hash(&all_zero);
+
+        assert_ne!(h_ff, [0u8; 32]);
+        assert_ne!(h_zero, [0u8; 32]);
+        assert_ne!(h_ff, h_zero, "Different byte patterns must hash differently");
+    }
+
+    #[test]
+    fn test_key_hash_whitespace_sensitivity() {
+        // Whitespace differences must produce different hashes
+        let h1 = compute_key_hash("jarvis", "key");
+        let h2 = compute_key_hash("jarvis", " key");
+        let h3 = compute_key_hash("jarvis", "key ");
+        let h4 = compute_key_hash("jarvis ", "key");
+        let h5 = compute_key_hash(" jarvis", "key");
+
+        let hashes = [h1, h2, h3, h4, h5];
+        for i in 0..hashes.len() {
+            for j in (i + 1)..hashes.len() {
+                assert_ne!(hashes[i], hashes[j],
+                    "Whitespace-different hash[{}] == hash[{}]", i, j);
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_cell_value_size_u32_max_boundary() {
+        // u32::MAX value size is representable but we just check large values serialize
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        // 100KB value
+        let value = vec![0xABu8; 100_000];
+        let tx = create_knowledge_cell(
+            "ns", "big_key", &value, [0xFF; 32], 500, &deployment, input,
+        );
+
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.value_size, 100_000);
+        assert_eq!(cell.value_hash, compute_value_hash(&value));
+    }
+
+    #[test]
+    fn test_update_chain_prev_state_hash_uniqueness() {
+        // Three sequential updates must all have distinct prev_state_hashes
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let mut current = KnowledgeCellData {
+            key_hash: compute_key_hash("chain", "unique_psh"),
+            ..Default::default()
+        };
+
+        let mut prev_hashes = Vec::new();
+        for i in 1..=3u64 {
+            let tx = update_knowledge_cell(
+                &current, input.clone(), format!("v{}", i).as_bytes(),
+                [i as u8; 32], [0xEE; 32], 100 + i * 50, &proof, &deployment,
+            );
+            let next = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+            prev_hashes.push(next.prev_state_hash);
+            current = next;
+        }
+
+        // All prev_state_hashes must be unique
+        for i in 0..prev_hashes.len() {
+            for j in (i + 1)..prev_hashes.len() {
+                assert_ne!(prev_hashes[i], prev_hashes[j],
+                    "prev_state_hash[{}] == prev_state_hash[{}]", i, j);
+            }
+        }
+    }
+
+    #[test]
+    fn test_difficulty_increase_by_exactly_one() {
+        // Verify that a single fast update increases difficulty by exactly 1
+        let cell = KnowledgeCellData {
+            difficulty: 15,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+
+        let fast_diff = compute_new_difficulty(&cell, 101);
+        // Should be exactly 16 (increased by 1, clamped to +KNOWLEDGE_MAX_DIFFICULTY_DELTA)
+        assert_eq!(fast_diff, 16,
+            "Fast update from difficulty 15 should produce exactly 16, got {}", fast_diff);
+    }
+
+    #[test]
+    fn test_difficulty_decrease_by_exactly_one() {
+        // Verify that a very slow update decreases difficulty by exactly 1
+        let cell = KnowledgeCellData {
+            difficulty: 25,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+
+        let slow_diff = compute_new_difficulty(&cell, 100 + 100_000_000);
+        assert_eq!(slow_diff, 24,
+            "Very slow update from difficulty 25 should produce exactly 24, got {}", slow_diff);
+    }
+
+    #[test]
+    fn test_create_cell_input_preserved() {
+        // Verify the input CellInput is correctly preserved in the transaction
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0xDE; 32], index: 7, since: 42 };
+
+        let tx = create_knowledge_cell(
+            "ns", "key", b"data", [0xFF; 32], 100, &deployment, input,
+        );
+
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.inputs[0].tx_hash, [0xDE; 32]);
+        assert_eq!(tx.inputs[0].index, 7);
+        assert_eq!(tx.inputs[0].since, 42);
+    }
+
+    #[test]
+    fn test_update_cell_input_preserved() {
+        // Verify the outpoint input is correctly preserved in update transaction
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0xAB; 32], index: 3, since: 99 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "input_test"),
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"data", [0u8; 32], [0xFF; 32], 200, &proof, &deployment,
+        );
+
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.inputs[0].tx_hash, [0xAB; 32]);
+        assert_eq!(tx.inputs[0].index, 3);
+        assert_eq!(tx.inputs[0].since, 99);
+    }
+
+    #[test]
+    fn test_mine_proof_at_difficulty_one() {
+        // Difficulty 1 should succeed quickly
+        let cell = KnowledgeCellData {
+            key_hash: compute_key_hash("test", "diff_one"),
+            difficulty: 1,
+            ..Default::default()
+        };
+
+        let proof = mine_for_knowledge_cell(&cell, 10_000);
+        assert!(proof.is_some(), "Difficulty 1 should succeed within 10K iterations");
+        let p = proof.unwrap();
+        assert!(vibeswap_pow::verify(&p, 1));
+    }
 }

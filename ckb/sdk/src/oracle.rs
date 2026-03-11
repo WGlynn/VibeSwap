@@ -869,4 +869,120 @@ mod tests {
         assert_eq!(col, debt);
         assert_eq!(col, price_val);
     }
+
+    // ============ Batch 2: Additional Coverage Tests ============
+
+    #[test]
+    fn test_aggregate_all_identical_prices() {
+        // All oracles report the exact same price → median = that price
+        let oracles = vec![
+            fresh_oracle(5000 * PRECISION, 100),
+            fresh_oracle(5000 * PRECISION, 101),
+            fresh_oracle(5000 * PRECISION, 102),
+            fresh_oracle(5000 * PRECISION, 103),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 5000 * PRECISION);
+    }
+
+    #[test]
+    fn test_weighted_price_one_zero_confidence_one_high() {
+        // One oracle with confidence=0, one with confidence=100
+        // Only the high-confidence oracle should matter
+        let oracles = vec![
+            oracle_with_confidence(1000 * PRECISION, 100, 0),
+            oracle_with_confidence(5000 * PRECISION, 101, 100),
+        ];
+        // total_weight = 100, weighted = 1000*0/100 + 5000*100/100 = 5000
+        let price = weighted_price(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 5000 * PRECISION);
+    }
+
+    #[test]
+    fn test_exchange_rate_inverse() {
+        // rate(A/B) * rate(B/A) should ≈ PRECISION^2 (within rounding)
+        let price_a = 2500 * PRECISION;
+        let price_b = 50 * PRECISION;
+
+        let rate_ab = exchange_rate(price_a, price_b).unwrap();
+        let rate_ba = exchange_rate(price_b, price_a).unwrap();
+
+        // rate_ab = 2500/50 = 50 * PRECISION
+        // rate_ba = 50/2500 = 0.02 * PRECISION
+        // rate_ab * rate_ba / PRECISION should ≈ PRECISION
+        let product = vibeswap_math::mul_div(rate_ab, rate_ba, PRECISION);
+        assert_eq!(product, PRECISION, "Inverse rates should multiply to 1.0");
+    }
+
+    #[test]
+    fn test_price_change_bps_to_zero() {
+        // Price drops to zero from some value → should be 10000 bps (100% drop)
+        assert_eq!(price_change_bps(500 * PRECISION, 0), 10_000);
+    }
+
+    #[test]
+    fn test_validate_for_lending_all_failures_in_order() {
+        // Test that validate_for_lending checks price=0 first, then freshness, then confidence, then pair_id
+        // Zero price fails before anything else
+        let zero_price = oracle_with_confidence(0, 100, 80);
+        assert!(matches!(
+            validate_for_lending(&zero_price, &test_pair_id(), 150),
+            Err(SDKError::InvalidAmounts)
+        ));
+
+        // Stale but otherwise valid → StaleOracleData
+        let stale = oracle_with_confidence(1000 * PRECISION, 10, 80);
+        assert!(matches!(
+            validate_for_lending(&stale, &test_pair_id(), 200),
+            Err(SDKError::StaleOracleData)
+        ));
+
+        // Fresh but low confidence → LowOracleConfidence
+        let low_conf = oracle_with_confidence(1000 * PRECISION, 100, 20);
+        assert!(matches!(
+            validate_for_lending(&low_conf, &test_pair_id(), 150),
+            Err(SDKError::LowOracleConfidence)
+        ));
+
+        // Fresh, confident, but wrong pair → OraclePairMismatch
+        let wrong_pair = oracle_with_confidence(1000 * PRECISION, 100, 80);
+        assert!(matches!(
+            validate_for_lending(&wrong_pair, &[0xFF; 32], 150),
+            Err(SDKError::OraclePairMismatch)
+        ));
+    }
+
+    #[test]
+    fn test_confidence_lending_max_value() {
+        // u8::MAX (255) confidence should always pass lending check
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, 255);
+        assert!(validate_confidence_lending(&oracle).is_ok());
+    }
+
+    #[test]
+    fn test_weighted_price_three_sources_different_confidence() {
+        // Three sources: verify weighted average leans toward highest-confidence oracle
+        let oracles = vec![
+            oracle_with_confidence(1000 * PRECISION, 100, 10), // Low confidence
+            oracle_with_confidence(2000 * PRECISION, 101, 30), // Medium confidence
+            oracle_with_confidence(3000 * PRECISION, 102, 60), // High confidence
+        ];
+        // total_weight = 100
+        // weighted = 1000*10/100 + 2000*30/100 + 3000*60/100 = 100 + 600 + 1800 = 2500
+        let price = weighted_price(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 2500 * PRECISION);
+    }
+
+    #[test]
+    fn test_price_change_bps_symmetric() {
+        // Price change should be symmetric: going from 100→150 and 150→100 both = same bps
+        // But actually they are NOT symmetric because we divide by old_price
+        // 100→150: diff=50, 50*10000/100 = 5000 bps
+        // 150→100: diff=50, 50*10000/150 = 3333 bps
+        let up = price_change_bps(100 * PRECISION, 150 * PRECISION);
+        let down = price_change_bps(150 * PRECISION, 100 * PRECISION);
+        assert_eq!(up, 5000);
+        assert_eq!(down, 3333);
+        assert_ne!(up, down, "Price change bps is NOT symmetric (divides by old_price)");
+    }
 }

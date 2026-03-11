@@ -1388,4 +1388,148 @@ mod tests {
         assert_eq!(signal.rebalanced_value, signal.position_value + 15_000 * PRECISION,
             "Rebalanced value should be LP value + accrued fees");
     }
+
+    // ============ Batch 4: Additional Coverage Tests ============
+
+    #[test]
+    fn test_arb_fees_exactly_equal_spread() {
+        // Spread exactly matches combined fees → no profit → no arb
+        // Pool A: 1:1 ratio, Pool B: slightly higher, but 30bps each = 60bps total
+        // Need spread = exactly 60bps → 0.6%
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 30);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_006_000 * PRECISION, 30); // 0.6% spread
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty(),
+            "Spread exactly equal to fees should produce no arb opportunity");
+    }
+
+    #[test]
+    fn test_arb_optimal_size_limited_by_smaller_pool() {
+        // One pool much larger than the other → optimal_size limited by smaller pool
+        let pool_a = make_pool_data(10_000 * PRECISION, 10_000 * PRECISION, 5);
+        let pool_b = make_pool_data(10_000_000 * PRECISION, 11_000_000 * PRECISION, 5); // 10% spread
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+
+        let arbs = find_arbitrage(&pools, 10);
+        assert_eq!(arbs.len(), 1);
+        // Optimal size should be limited by pool_a (1% of 10K = 100)
+        assert!(arbs[0].optimal_size <= 100 * PRECISION,
+            "Optimal size {} should be limited by smaller pool", arbs[0].optimal_size);
+    }
+
+    #[test]
+    fn test_rebalance_entry_equals_current_price() {
+        // Same price → 0 IL → AddLiquidity (if fees > 0)
+        let signal = check_rebalance(
+            5_000 * PRECISION,
+            5_000 * PRECISION,
+            200_000 * PRECISION,
+            500 * PRECISION,
+            500,
+            2000,
+        ).unwrap();
+
+        assert_eq!(signal.current_il_bps, 0);
+        assert!(!signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::AddLiquidity);
+    }
+
+    #[test]
+    fn test_rebalance_price_halved() {
+        // Price halved: entry=100, current=50 → ~5.7% IL
+        let signal = check_rebalance(
+            100 * PRECISION,
+            50 * PRECISION,      // Price halved
+            200_000 * PRECISION,
+            0,                   // No fees
+            500,
+            2000,
+        ).unwrap();
+
+        assert!(signal.current_il_bps > 500, "Halved price should exceed 5% IL: got {}", signal.current_il_bps);
+        assert!(signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::ReenterAtCurrentPrice);
+    }
+
+    #[test]
+    fn test_yield_all_same_risk_sorted_by_apy() {
+        // Equal risk scores → sorted purely by APY descending
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 300, tvl: 1_000_000, risk_score: 20 },
+            YieldSource { source_id: id(2), source_type: YieldType::LendingDeposit, apy_bps: 700, tvl: 1_000_000, risk_score: 20 },
+            YieldSource { source_id: id(3), source_type: YieldType::StakingRewards, apy_bps: 500, tvl: 1_000_000, risk_score: 20 },
+        ];
+
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(2), "Highest APY should win when risk is equal");
+        assert_eq!(rec.best_apy_bps, 700);
+        // Verify ranking order: 700, 500, 300
+        assert_eq!(rec.ranked_sources[0].1, 700);
+        assert_eq!(rec.ranked_sources[1].1, 500);
+        assert_eq!(rec.ranked_sources[2].1, 300);
+    }
+
+    #[test]
+    fn test_yield_max_risk_score_100() {
+        // Source with risk_score = 100 should still work (not divide by zero)
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::InsurancePremium, apy_bps: 2000, tvl: 500_000, risk_score: 100 },
+        ];
+
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(1));
+        // risk_penalty = 2 * PRECISION, adjusted = 2000 * PRECISION / 2 = 1000 * PRECISION
+        assert!(rec.risk_adjusted_score > 0);
+    }
+
+    #[test]
+    fn test_liquidation_multiple_vaults_sorted_by_profit() {
+        // Varying underwater vaults → results sorted by profit descending
+        let vaults = vec![
+            (80_000 * PRECISION, 100_000 * PRECISION, 8000u128),  // HF=0.64, moderate profit
+            (40_000 * PRECISION, 100_000 * PRECISION, 8000u128),  // HF=0.32, more collateral seized
+            (90_000 * PRECISION, 100_000 * PRECISION, 8000u128),  // HF=0.72, least profit
+        ];
+
+        let opps = find_liquidations(&vaults, 500, 10 * PRECISION);
+        assert!(opps.len() >= 2);
+        // Verify sorted by profit descending
+        for w in opps.windows(2) {
+            assert!(w[0].estimated_profit >= w[1].estimated_profit,
+                "Liquidations should be sorted by profit descending");
+        }
+    }
+
+    #[test]
+    fn test_liquidation_zero_incentive() {
+        // With 0% incentive, profit = 0 → no opportunities (profit must be > 0)
+        let vaults = vec![
+            (50_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+        ];
+
+        let opps = find_liquidations(&vaults, 0, 0);
+        assert!(opps.is_empty(), "Zero incentive should produce zero profit → no opportunities");
+    }
+
+    #[test]
+    fn test_alerts_descending_severity_order() {
+        // Verify that alerts are always sorted by severity descending
+        let positions = vec![
+            (id(1), 3500u64, AlertReason::HighUtilization),    // Watch
+            (id(2), 9900u64, AlertReason::LowHealthFactor),    // Critical
+            (id(3), 7000u64, AlertReason::HighImpermanentLoss), // Warning
+            (id(4), 4000u64, AlertReason::HighConcentration),   // Watch
+        ];
+
+        let alerts = check_risk_alerts(&positions, 3000, 6000, 9000);
+        assert_eq!(alerts.len(), 4);
+
+        // Verify descending order: Critical, Warning, Watch, Watch
+        assert_eq!(alerts[0].level, AlertLevel::Critical);
+        assert_eq!(alerts[1].level, AlertLevel::Warning);
+        assert!(alerts[2].level <= AlertLevel::Watch);
+        assert!(alerts[3].level <= AlertLevel::Watch);
+    }
 }

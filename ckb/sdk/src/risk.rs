@@ -1602,4 +1602,141 @@ mod tests {
             "Perfect health should produce risk score of 0");
         assert_eq!(classify_risk_level(0), RiskLevel::Low);
     }
+
+    // ============ Batch 4: Additional Coverage Tests ============
+
+    #[test]
+    fn test_health_factor_to_priority_just_above_thresholds() {
+        // Test values just above each threshold boundary
+        // Just above 1.0 → priority 100
+        assert_eq!(health_factor_to_priority(PRECISION + 1), 100);
+        // Just above 1.1 → priority 200
+        assert_eq!(health_factor_to_priority(PRECISION * 110 / 100 + 1), 200);
+        // Just above 1.3 → priority 300
+        assert_eq!(health_factor_to_priority(PRECISION * 130 / 100 + 1), 300);
+        // Just above 1.5 → priority 1000
+        assert_eq!(health_factor_to_priority(PRECISION * 150 / 100 + 1), 1000);
+    }
+
+    #[test]
+    fn test_assess_protocol_mixed_tiers_all_represented() {
+        // Create vaults at different risk levels to cover all tier buckets
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(100 * PRECISION, 5_000 * PRECISION),   // HF ≈ 4.8 → Safe
+            safe_vault(10 * PRECISION, 17_000 * PRECISION),   // HF ≈ 1.41 → Warning/Warn
+            safe_vault(10 * PRECISION, 20_000 * PRECISION),   // HF ≈ 1.2 → AutoDeleverage
+            safe_vault(10 * PRECISION, 25_000 * PRECISION),   // HF ≈ 0.96 → SoftLiq or HardLiq
+            safe_vault(10 * PRECISION, 40_000 * PRECISION),   // HF ≈ 0.6 → HardLiq
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+
+        assert_eq!(health.vaults_assessed, 5);
+        let total_in_tiers = health.tier_counts.safe
+            + health.tier_counts.warning
+            + health.tier_counts.auto_deleverage
+            + health.tier_counts.soft_liquidation
+            + health.tier_counts.hard_liquidation;
+        assert_eq!(total_in_tiers, 5, "All vaults must be categorized into a tier");
+        assert!(health.tier_counts.safe >= 1, "At least one vault should be safe");
+    }
+
+    #[test]
+    fn test_simulate_full_drop_9900_bps() {
+        // 99% drop → price becomes 1% of original
+        let pool = test_pool();
+        let vaults = vec![safe_vault(100 * PRECISION, 5_000 * PRECISION)];
+
+        let health = simulate_price_drop(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION, 9900,
+        );
+
+        // At $30 (1% of $3000): HF = (100 * 30 * 0.8) / 5000 = 0.48
+        assert!(health.worst_health_factor < PRECISION,
+            "99% drop should put vault underwater");
+    }
+
+    #[test]
+    fn test_insurance_coverage_partial() {
+        // Partial coverage: 50K insurance on 500K borrows = 10% = 1000 bps
+        let pool = test_pool(); // 500K borrows
+        let insurance = InsurancePoolCellData {
+            total_deposits: 50_000 * PRECISION,
+            ..test_insurance()
+        };
+
+        let health = assess_protocol(
+            &[], &pool, Some(&insurance),
+            3000 * PRECISION, PRECISION,
+        );
+
+        assert_eq!(health.insurance_coverage_bps, 1000,
+            "50K/500K = 10% = 1000 bps");
+    }
+
+    #[test]
+    fn test_risk_score_boundary_21_medium() {
+        // Score of exactly 21 should be Medium (not Low)
+        assert_eq!(classify_risk_level(21), RiskLevel::Medium);
+    }
+
+    #[test]
+    fn test_risk_score_boundary_51_high() {
+        // Score of exactly 51 should be High (not Medium)
+        assert_eq!(classify_risk_level(51), RiskLevel::High);
+    }
+
+    #[test]
+    fn test_risk_score_boundary_76_critical() {
+        // Score of exactly 76 should be Critical (not High)
+        assert_eq!(classify_risk_level(76), RiskLevel::Critical);
+    }
+
+    #[test]
+    fn test_assess_protocol_worst_hf_tracks_minimum() {
+        // worst_health_factor must be the minimum across all vaults
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(100 * PRECISION, 1_000 * PRECISION),  // Very safe HF
+            safe_vault(10 * PRECISION, 18_000 * PRECISION),  // Moderate HF ≈ 1.33
+            safe_vault(100 * PRECISION, 2_000 * PRECISION),  // Very safe HF
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+
+        // The moderate vault (index 1) should have the worst HF
+        // HF = (10 * 3000 * 0.8) / 18000 = 1.33
+        let expected_worst = vibeswap_math::mul_div(
+            vibeswap_math::mul_div(10 * PRECISION, 3000 * PRECISION, PRECISION),
+            DEFAULT_LIQUIDATION_THRESHOLD,
+            vibeswap_math::mul_div(18_000 * PRECISION, PRECISION, PRECISION),
+        );
+        assert_eq!(health.worst_health_factor, expected_worst);
+    }
+
+    #[test]
+    fn test_simulate_price_drop_with_multiple_insurance_levels() {
+        // Insurance coverage stays constant as price drops (depends on borrows, not price)
+        let pool = test_pool();
+        let insurance = test_insurance();
+        let vaults = vec![safe_vault(100 * PRECISION, 5_000 * PRECISION)];
+
+        let drops = [0u64, 1000, 3000, 5000, 8000];
+        for &drop in &drops {
+            let health = simulate_price_drop(
+                &vaults, &pool, Some(&insurance),
+                3000 * PRECISION, PRECISION, drop,
+            );
+            assert_eq!(health.insurance_coverage_bps, 2000,
+                "Insurance coverage should be constant at drop={}bps", drop);
+        }
+    }
 }

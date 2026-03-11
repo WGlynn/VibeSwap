@@ -845,6 +845,7 @@ dependencies = [
  "ckb-lending-math",
  "commit-type",
  "config-type",
+ "insurance-pool-type",
  "lending-pool-type",
  "oracle-type",
  "sha2",

@@ -1765,3 +1765,145 @@ fn test_fuzz_oracle_freshness_monotonic() {
         }
     }
 }
+
+// ============ Test 22: Governance Quorum Monotonic ============
+
+/// Property: if a proposal has quorum with N total votes, adding more votes
+/// cannot cause it to lose quorum.
+#[test]
+fn test_fuzz_governance_quorum_monotonic() {
+    use vibeswap_sdk::governance::{self, *};
+
+    let mut rng = TestRng::new(0x60AE_0001_0001_0001);
+    let total_supply = 100_000_000 * PRECISION;
+
+    for _ in 0..500 {
+        let config = vibeswap_types::ConfigCellData {
+            commit_window_blocks: 40,
+            reveal_window_blocks: 10,
+            slash_rate_bps: 5000,
+            max_price_deviation: 500,
+            max_trade_size_bps: 1000,
+            rate_limit_amount: 1_000_000 * PRECISION,
+            rate_limit_window: 3600,
+            volume_breaker_limit: 10_000_000 * PRECISION,
+            price_breaker_bps: 1000,
+            withdrawal_breaker_bps: 2000,
+            min_pow_difficulty: 10,
+        };
+
+        let mut proposal = create_proposal(
+            1, [0xA1; 32], config, [0xDD; 32],
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Cast random votes
+        let num_voters = rng.range_u64(1, 10) as usize;
+        let mut had_quorum = false;
+
+        for i in 0..num_voters {
+            let weight = rng.range_u128(1, 20_000_000 * PRECISION);
+            let support = rng.next_u64() % 2 == 0;
+            let voter_id = [i as u8 + 1; 32];
+            let block = 1000 + (i as u64 + 1) * 100;
+            cast_vote(&mut proposal, voter_id, weight, support, block).unwrap();
+
+            let now_has_quorum = has_quorum(&proposal, total_supply);
+            if had_quorum {
+                assert!(now_has_quorum,
+                    "Quorum lost after adding more votes! for={}, against={}",
+                    proposal.votes_for, proposal.votes_against);
+            }
+            had_quorum = now_has_quorum;
+        }
+    }
+}
+
+// ============ Test 23: Governance Approval Rate Bounded ============
+
+/// Property: approval_rate_bps is always [0, 10000]
+#[test]
+fn test_fuzz_governance_approval_rate_bounded() {
+    use vibeswap_sdk::governance::{self, *};
+
+    let mut rng = TestRng::new(0x60AE_0002_0001_0001);
+
+    for _ in 0..500 {
+        let config = vibeswap_types::ConfigCellData {
+            commit_window_blocks: 40,
+            reveal_window_blocks: 10,
+            slash_rate_bps: 5000,
+            max_price_deviation: 500,
+            max_trade_size_bps: 1000,
+            rate_limit_amount: 1_000_000 * PRECISION,
+            rate_limit_window: 3600,
+            volume_breaker_limit: 10_000_000 * PRECISION,
+            price_breaker_bps: 1000,
+            withdrawal_breaker_bps: 2000,
+            min_pow_difficulty: 10,
+        };
+
+        let mut proposal = create_proposal(
+            1, [0xA1; 32], config, [0xDD; 32],
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        // Cast 1-5 random votes
+        let num_voters = rng.range_u64(1, 6) as usize;
+        for i in 0..num_voters {
+            let weight = rng.range_u128(1, 50_000_000 * PRECISION);
+            let support = rng.next_u64() % 2 == 0;
+            cast_vote(&mut proposal, [i as u8 + 1; 32], weight, support,
+                1000 + (i as u64 + 1) * 100).unwrap();
+        }
+
+        let rate = approval_rate_bps(&proposal);
+        assert!(rate <= 10_000,
+            "Approval rate {} exceeds 100%", rate);
+    }
+}
+
+// ============ Test 24: Governance Voting Conservation ============
+
+/// Property: votes_for + votes_against == sum of all individual vote weights
+#[test]
+fn test_fuzz_governance_vote_conservation() {
+    use vibeswap_sdk::governance::{self, *};
+
+    let mut rng = TestRng::new(0x60AE_0003_0001_0001);
+
+    for _ in 0..500 {
+        let config = vibeswap_types::ConfigCellData {
+            commit_window_blocks: 40,
+            reveal_window_blocks: 10,
+            slash_rate_bps: 5000,
+            max_price_deviation: 500,
+            max_trade_size_bps: 1000,
+            rate_limit_amount: 1_000_000 * PRECISION,
+            rate_limit_window: 3600,
+            volume_breaker_limit: 10_000_000 * PRECISION,
+            price_breaker_bps: 1000,
+            withdrawal_breaker_bps: 2000,
+            min_pow_difficulty: 10,
+        };
+
+        let mut proposal = create_proposal(
+            1, [0xA1; 32], config, [0xDD; 32],
+            1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+        ).unwrap();
+
+        let mut total_weight = 0u128;
+        let num_voters = rng.range_u64(1, 8) as usize;
+
+        for i in 0..num_voters {
+            let weight = rng.range_u128(1, 10_000_000 * PRECISION);
+            let support = rng.next_u64() % 2 == 0;
+            cast_vote(&mut proposal, [i as u8 + 1; 32], weight, support,
+                1000 + (i as u64 + 1) * 100).unwrap();
+            total_weight += weight;
+        }
+
+        assert_eq!(proposal.votes_for + proposal.votes_against, total_weight,
+            "Vote weights not conserved");
+    }
+}

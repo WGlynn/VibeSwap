@@ -1441,4 +1441,194 @@ mod tests {
         assert!(threshold.is_none(),
             "No vaults means no tier transitions possible");
     }
+
+    // ============ New Tests: 67-78 (Edge Cases & Boundary Hardening) ============
+
+    #[test]
+    fn test_median_u128_max_single_value() {
+        // Single u128::MAX should return itself with no overflow
+        assert_eq!(compute_median(&[u128::MAX]), u128::MAX);
+    }
+
+    #[test]
+    fn test_median_even_count_rounding_loss() {
+        // Two odd numbers: sorted[0]/2 + sorted[1]/2 = 1/2 + 3/2 = 0 + 1 = 1
+        // Integer division truncates, so we lose 0.5 from each half
+        assert_eq!(compute_median(&[1, 3]), 1);
+        // Two values that lose a bit: (101/2 + 103/2) = 50 + 51 = 101
+        assert_eq!(compute_median(&[101, 103]), 101);
+        // Both odd, differ by 1: (99/2 + 101/2) = 49 + 50 = 99
+        assert_eq!(compute_median(&[99, 101]), 99);
+    }
+
+    #[test]
+    fn test_median_seven_values() {
+        // Odd count with 7 values — median is the 4th element
+        let values = [10, 20, 30, 40, 50, 60, 70];
+        assert_eq!(compute_median(&values), 40);
+        // Reversed input should still work
+        let reversed = [70, 60, 50, 40, 30, 20, 10];
+        assert_eq!(compute_median(&reversed), 40);
+    }
+
+    #[test]
+    fn test_oracle_at_exact_staleness_boundary() {
+        // Oracle at block N, current = N + MAX_STALENESS_BLOCKS (exactly at boundary).
+        // validate_freshness checks: (current - oracle.block_number) > MAX_STALENESS_BLOCKS
+        // So at exactly MAX_STALENESS_BLOCKS, it should still be fresh (not strictly greater).
+        let oracle_block = 100;
+        let current = oracle_block + oracle::MAX_STALENESS_BLOCKS;
+        let oracles = vec![test_oracle(5000 * PRECISION, 90, oracle_block)];
+
+        let (price, valid, agreement) = quantize_oracle(&oracles, current);
+        assert!(valid, "Oracle exactly at staleness boundary should be fresh");
+        assert_eq!(agreement, 1);
+        assert_eq!(price, 5000 * PRECISION);
+    }
+
+    #[test]
+    fn test_oracle_one_past_staleness_boundary() {
+        // One block past the staleness boundary should be stale
+        let oracle_block = 100;
+        let current = oracle_block + oracle::MAX_STALENESS_BLOCKS + 1;
+        let oracles = vec![test_oracle(5000 * PRECISION, 90, oracle_block)];
+
+        let (price, valid, agreement) = quantize_oracle(&oracles, current);
+        assert!(!valid, "Oracle one block past staleness boundary should be stale");
+        assert_eq!(agreement, 0);
+        assert_eq!(price, 0);
+    }
+
+    #[test]
+    fn test_oracle_future_block_number_is_fresh() {
+        // Oracle from the "future" (block_number > current_block)
+        // validate_freshness only triggers if current_block > oracle.block_number
+        // So a future oracle should pass freshness check
+        let oracles = vec![test_oracle(2000 * PRECISION, 90, 200)];
+        let (price, valid, agreement) = quantize_oracle(&oracles, 50);
+        assert!(valid, "Future oracle should pass freshness check");
+        assert_eq!(agreement, 1);
+        assert_eq!(price, 2000 * PRECISION);
+    }
+
+    #[test]
+    fn test_quantize_with_nonunit_debt_price() {
+        // debt_price != PRECISION (non-stablecoin debt)
+        let mut snapshot = test_snapshot();
+        snapshot.debt_price = 2 * PRECISION; // debt token worth $2 each
+        snapshot.oracle_data.clear();
+        snapshot.collateral_price = 3000 * PRECISION;
+
+        let decision = quantize(&snapshot);
+        // Should still produce valid output with all vaults assessed
+        assert_eq!(decision.vault_tiers.len(), snapshot.vaults.len());
+    }
+
+    #[test]
+    fn test_utilization_tier_ordering_is_monotonic() {
+        // Verify PartialOrd derives correct ordering: Low < Moderate < High < Critical
+        assert!(UtilizationTier::Low < UtilizationTier::Moderate);
+        assert!(UtilizationTier::Moderate < UtilizationTier::High);
+        assert!(UtilizationTier::High < UtilizationTier::Critical);
+        assert!(UtilizationTier::Low < UtilizationTier::Critical);
+    }
+
+    #[test]
+    fn test_coverage_tier_ordering_is_monotonic() {
+        // Verify PartialOrd derives correct ordering: None < Minimal < ... < Strong
+        assert!(CoverageTier::None < CoverageTier::Minimal);
+        assert!(CoverageTier::Minimal < CoverageTier::Partial);
+        assert!(CoverageTier::Partial < CoverageTier::Adequate);
+        assert!(CoverageTier::Adequate < CoverageTier::Strong);
+        assert!(CoverageTier::None < CoverageTier::Strong);
+    }
+
+    #[test]
+    fn test_monotonicity_with_zero_risk_scores() {
+        // Both decisions with risk_score = 0 — trivially monotonic
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut d_zero_a = d1.clone();
+        d_zero_a.risk_score = 0;
+        let mut d_zero_b = d1.clone();
+        d_zero_b.risk_score = 0;
+
+        let result = verify_monotonicity(&d_zero_a, &d_zero_b);
+        // Equal scores should not trigger RiskScoreDecreased
+        assert!(result.violations.iter().all(|v|
+            !matches!(v, MonotonicityViolation::RiskScoreDecreased { .. })
+        ));
+    }
+
+    #[test]
+    fn test_monotonicity_with_empty_actions_both_sides() {
+        // Both decisions with zero actions — should be monotonic for action count
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut d_no_actions_a = d1.clone();
+        d_no_actions_a.actions.clear();
+        let mut d_no_actions_b = d1.clone();
+        d_no_actions_b.actions.clear();
+
+        let result = verify_monotonicity(&d_no_actions_a, &d_no_actions_b);
+        assert!(result.violations.iter().all(|v|
+            !matches!(v, MonotonicityViolation::ActionCountDecreased { .. })
+        ));
+    }
+
+    #[test]
+    fn test_report_with_zero_price_oracle_spread() {
+        // Oracle with price = 0 → spread computation should handle min=0
+        // In generate_report: if min > 0, compute spread; else spread = 0
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data = vec![
+            test_oracle(0, 90, 100),
+            test_oracle(3000 * PRECISION, 85, 99),
+        ];
+
+        let report = generate_report(&snapshot);
+        // min price is 0, so spread formula has a guard: min > 0
+        assert_eq!(report.observation.price_spread_bps, 0,
+            "Zero min price should produce 0 spread (guard clause)");
+    }
+
+    #[test]
+    fn test_report_all_stale_oracles_stress_still_works() {
+        // All oracles stale — report should still produce valid stress data
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data = vec![
+            test_oracle(3000 * PRECISION, 90, 1),
+            test_oracle(3010 * PRECISION, 85, 2),
+        ];
+        snapshot.current_block = 500;
+
+        let report = generate_report(&snapshot);
+        assert!(!report.decision.oracle_valid);
+        assert_eq!(report.observation.fresh_source_count, 0);
+        // Stress tests should still complete (using fallback price)
+        let _ = report.stress.risk_at_10pct_drop;
+        let _ = report.stress.risk_at_50pct_drop;
+    }
+
+    #[test]
+    fn test_quantize_all_vaults_in_hard_liquidation() {
+        // All vaults with massive debt relative to collateral
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data.clear();
+        snapshot.collateral_price = 100 * PRECISION; // Very low price
+        snapshot.vaults = vec![
+            vault(0x01, 1 * PRECISION, 500_000 * PRECISION),
+            vault(0x02, 1 * PRECISION, 500_000 * PRECISION),
+        ];
+
+        let decision = quantize(&snapshot);
+        assert_eq!(decision.vault_tiers.len(), 2);
+        // Both vaults should be in a severe tier (not Safe)
+        for vt in &decision.vault_tiers {
+            assert_ne!(vt.tier, RiskTier::Safe,
+                "Massively undercollateralized vault must not be Safe");
+        }
+    }
 }

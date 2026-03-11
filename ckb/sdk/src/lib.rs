@@ -7,6 +7,7 @@ pub mod collector;
 pub mod keeper;
 pub mod knowledge;
 pub mod miner;
+pub mod oracle;
 pub mod token;
 
 use vibeswap_types::*;
@@ -2137,6 +2138,9 @@ pub enum SDKError {
     Overflow,
     MiningFailed,
     StaleOracleData,
+    LowOracleConfidence,
+    OraclePairMismatch,
+    OracleDeviationTooHigh,
     ComplianceVersionNotIncremented,
     NoOrders,
     InvalidPhase,

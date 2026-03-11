@@ -88,6 +88,7 @@ pub struct DeploymentInfo {
     pub lending_pool_type_code_hash: [u8; 32],
     pub vault_type_code_hash: [u8; 32],
     pub insurance_pool_type_code_hash: [u8; 32],
+    pub prediction_market_type_code_hash: [u8; 32],
     pub script_dep_tx_hash: [u8; 32],
     pub script_dep_index: u32,
 }
@@ -2170,6 +2171,7 @@ mod tests {
             lending_pool_type_code_hash: [0x0A; 32],
             vault_type_code_hash: [0x0B; 32],
             insurance_pool_type_code_hash: [0x0C; 32],
+            prediction_market_type_code_hash: [0x0D; 32],
             script_dep_tx_hash: [0x10; 32],
             script_dep_index: 0,
         }

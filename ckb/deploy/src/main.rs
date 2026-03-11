@@ -23,20 +23,21 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
 // ============ Script Definitions ============
 
-/// All 12 VibeSwap CKB scripts in deployment order
+/// All 13 VibeSwap CKB scripts in deployment order
 const SCRIPTS: &[(&str, &str)] = &[
-    ("pow-lock",            "Lock script: PoW-gated shared cell access"),
-    ("batch-auction-type",  "Type script: commit-reveal batch auction state machine"),
-    ("commit-type",         "Type script: commit cell format validation"),
-    ("amm-pool-type",       "Type script: constant product AMM pool validation"),
-    ("lp-position-type",    "Type script: LP position cell tracking"),
-    ("compliance-type",     "Type script: compliance registry management"),
-    ("config-type",         "Type script: protocol configuration singleton"),
-    ("oracle-type",         "Type script: oracle price feed validation"),
-    ("knowledge-type",      "Type script: PoW-gated knowledge cell state transitions"),
-    ("lending-pool-type",   "Type script: lending pool shared state validation"),
-    ("vault-type",          "Type script: per-user lending vault validation"),
-    ("insurance-pool-type", "Type script: mutualist insurance pool (P-105)"),
+    ("pow-lock",                 "Lock script: PoW-gated shared cell access"),
+    ("batch-auction-type",       "Type script: commit-reveal batch auction state machine"),
+    ("commit-type",              "Type script: commit cell format validation"),
+    ("amm-pool-type",            "Type script: constant product AMM pool validation"),
+    ("lp-position-type",         "Type script: LP position cell tracking"),
+    ("compliance-type",          "Type script: compliance registry management"),
+    ("config-type",              "Type script: protocol configuration singleton"),
+    ("oracle-type",              "Type script: oracle price feed validation"),
+    ("knowledge-type",           "Type script: PoW-gated knowledge cell state transitions"),
+    ("lending-pool-type",        "Type script: lending pool shared state validation"),
+    ("vault-type",               "Type script: per-user lending vault validation"),
+    ("insurance-pool-type",      "Type script: mutualist insurance pool (P-105)"),
+    ("prediction-market-type",   "Type script: parimutuel prediction market (2-8 tiers)"),
 ];
 
 // ============ Deployment Config ============

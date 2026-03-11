@@ -17,6 +17,7 @@ pub mod miner;
 pub mod oracle;
 pub mod portfolio;
 pub mod prediction;
+pub mod rewards;
 pub mod risk;
 pub mod router;
 pub mod strategy;

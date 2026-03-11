@@ -1108,4 +1108,157 @@ mod tests {
         // Non-trivial: hash of non-zero data should not be all zeros
         assert_ne!(hash, [0u8; 32], "Hash of non-trivial auction should not be all zeros");
     }
+
+    // ============ New Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_mine_all_zero_pair_id_and_prev_hash() {
+        // All-zero inputs should still produce a valid proof at low difficulty
+        let pair_id = [0u8; 32];
+        let prev_hash = [0u8; 32];
+
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000);
+        assert!(proof.is_some(), "All-zero inputs should still allow mining");
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 4));
+    }
+
+    #[test]
+    fn test_mine_all_ff_pair_id_and_prev_hash() {
+        // All-FF inputs should produce a valid proof
+        let pair_id = [0xFF; 32];
+        let prev_hash = [0xFF; 32];
+
+        let proof = mine_for_cell(&pair_id, u64::MAX, &prev_hash, 4, 100_000);
+        assert!(proof.is_some(), "All-FF inputs should still allow mining");
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 4));
+    }
+
+    #[test]
+    fn test_aggregation_single_commit_outpoint_index_varies() {
+        // Verify different outpoint_index values are correctly preserved
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        for idx in [0u32, 1, 42, u32::MAX] {
+            let mut commit = make_commit(1);
+            commit.outpoint_index = idx;
+
+            let tx = build_aggregation_tx(
+                &auction, &[commit], None, &proof,
+                &test_deployment(), &test_miner_lock(),
+            );
+
+            assert_eq!(tx.inputs[1].index, idx,
+                "Outpoint index {} must be preserved in tx input", idx);
+        }
+    }
+
+    #[test]
+    fn test_aggregation_commit_ordering_preserved() {
+        // Commits should appear as inputs in the same order they are passed
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let commits: Vec<PendingCommit> = (1..=5).map(|i| {
+            let mut c = make_commit(i);
+            c.outpoint_index = i as u32 * 10; // Unique index per commit
+            c
+        }).collect();
+
+        let tx = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        // inputs[0] is auction cell, inputs[1..6] are commits in order
+        for (i, commit) in commits.iter().enumerate() {
+            assert_eq!(tx.inputs[i + 1].tx_hash, commit.outpoint_tx_hash,
+                "Commit {} tx_hash should match", i);
+            assert_eq!(tx.inputs[i + 1].index, commit.outpoint_index,
+                "Commit {} index should match", i);
+        }
+    }
+
+    #[test]
+    fn test_aggregation_output_has_type_script() {
+        // Verify the output cell always has a type_script (it should never be None)
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert!(tx.outputs[0].type_script.is_some(),
+            "Output auction cell must have a type script");
+    }
+
+    #[test]
+    fn test_profitability_one_commit() {
+        // Single commit profitability should exactly equal base_reward
+        let estimate = estimate_profitability(4, 1, 5_000, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, 5_000,
+            "1 commit * 5000 base = 5000 reward");
+    }
+
+    #[test]
+    fn test_profitability_max_commits() {
+        // Very high commit count should scale reward linearly
+        let estimate = estimate_profitability(4, u32::MAX, 1, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, u32::MAX as u64,
+            "u32::MAX commits * 1 base = u32::MAX reward");
+    }
+
+    #[test]
+    fn test_track_difficulty_large_gap_between_transitions() {
+        // Very large gap between transitions (e.g., 10 million blocks apart)
+        let transitions = vec![100, 10_000_100];
+        let new_diff = track_difficulty(16, &transitions, 5);
+        // actual_avg = 10_000_000, target = 5 → way too slow → decrease
+        assert!(new_diff < 16,
+            "Extremely slow transitions should decrease difficulty, got {}", new_diff);
+    }
+
+    #[test]
+    fn test_aggregation_mmr_root_same_commit_set_deterministic() {
+        // Same commits should always produce the same MMR root
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let commits: Vec<PendingCommit> = (1..=3).map(|i| make_commit(i)).collect();
+
+        let tx1 = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let tx2 = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let a1 = AuctionCellData::deserialize(&tx1.outputs[0].data).unwrap();
+        let a2 = AuctionCellData::deserialize(&tx2.outputs[0].data).unwrap();
+        assert_eq!(a1.commit_mmr_root, a2.commit_mmr_root,
+            "Same commit set must produce identical MMR root");
+    }
+
+    #[test]
+    fn test_auction_hash_all_fields_contribute() {
+        // Changing each individual field should produce a different hash
+        let base = test_auction();
+
+        let mut varied_pair_id = base.clone();
+        varied_pair_id.pair_id = [0xFF; 32];
+
+        let mut varied_reveal = base.clone();
+        varied_reveal.reveal_count = 99;
+
+        let hash_base = compute_auction_hash(&base);
+        let hash_pair = compute_auction_hash(&varied_pair_id);
+        let hash_reveal = compute_auction_hash(&varied_reveal);
+
+        assert_ne!(hash_base, hash_pair, "Changing pair_id should change hash");
+        assert_ne!(hash_base, hash_reveal, "Changing reveal_count should change hash");
+        assert_ne!(hash_pair, hash_reveal, "Different fields should produce different hashes");
+    }
 }

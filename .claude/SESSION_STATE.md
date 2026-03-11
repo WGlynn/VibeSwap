@@ -5,7 +5,34 @@
 
 ---
 
-## CURRENT (Session 063 continued³ — Mar 11, 2026)
+## CURRENT (Session 063 continued⁴ — Mar 11, 2026)
+
+### Delta from Session 063 continued³
+**Staking + Treasury Modules + Continued Hardening**
+
+**Created (2 new modules this continuation):**
+- `sdk/src/staking.rs` — veVIBE voting power, rewards, lock management (112 tests)
+- `sdk/src/treasury.rs` — DAOTreasury, stabilization, vesting, health reporting (144 tests)
+
+**Hardened:**
+- assembler: 65 → 102 (+37)
+- consensus: 66 → 80 (+14)
+- governance: 66 → 100 (+34)
+- collector/fees/keeper: hardening in progress (targeting 80+)
+
+**Verified:**
+- CKB SDK: **2710 tests passing** across 30 modules
+- All tests pass, no regressions
+- Module floor: 69 tests (6 modules at floor, being hardened)
+
+**Commits:**
+- `307a7d7` — staking module (112 tests)
+- `d371f1f` — treasury module (144 tests)
+- `6257c6d` — assembler/consensus/governance hardening
+
+---
+
+## PREVIOUS (Session 063 continued³ — Mar 11, 2026)
 
 ### Delta from Session 063 continued²
 **11 New SDK Modules + Massive Hardening + VIBE Emission Primitives**
@@ -31,12 +58,10 @@
 **Hardened (all 28 modules, multiple passes):**
 - All modules brought from starting levels to ≥61 tests
 - Most modules now ≥69 tests
-- Full per-module counts in final breakdown below
 
 **Verified:**
 - CKB workspace: **3062/3062 tests passing** (1403 → 3062, +1659 this continuation)
 - **28 SDK modules** (was 17 at continuation start)
-- All existing tests still pass (no regressions)
 - Broke 3000 tests milestone
 
 **Memory directives saved:**

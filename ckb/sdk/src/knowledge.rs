@@ -1183,4 +1183,199 @@ mod tests {
             script_dep_index: 0,
         }
     }
+
+    // ============ New Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_create_and_update_same_key_different_values_distinct_hashes() {
+        // Two creates with same key but different values must produce different value_hashes
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        let tx_a = create_knowledge_cell(
+            "ns", "key", b"value_a", [0xFF; 32], 100, &deployment, input.clone(),
+        );
+        let tx_b = create_knowledge_cell(
+            "ns", "key", b"value_b", [0xFF; 32], 100, &deployment, input,
+        );
+
+        let cell_a = KnowledgeCellData::deserialize(&tx_a.outputs[0].data).unwrap();
+        let cell_b = KnowledgeCellData::deserialize(&tx_b.outputs[0].data).unwrap();
+
+        assert_eq!(cell_a.key_hash, cell_b.key_hash, "Same ns/key must produce same key_hash");
+        assert_ne!(cell_a.value_hash, cell_b.value_hash, "Different values must produce different value_hashes");
+    }
+
+    #[test]
+    fn test_key_hash_special_characters() {
+        // Keys with special chars (slashes, dots, nulls) should still be unique
+        let h1 = compute_key_hash("path/to", "file.txt");
+        let h2 = compute_key_hash("path/to/file", "txt");
+        let h3 = compute_key_hash("path", "to/file.txt");
+        let h_null = compute_key_hash("ns\0ns", "key\0key");
+
+        assert_ne!(h1, h2);
+        assert_ne!(h1, h3);
+        assert_ne!(h2, h3);
+        assert_ne!(h_null, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_mine_proof_challenge_differs_between_different_cells() {
+        // Two cells with different key_hashes should produce different challenges
+        let cell_a = KnowledgeCellData {
+            key_hash: compute_key_hash("jarvis", "state_a"),
+            difficulty: 4,
+            ..Default::default()
+        };
+        let cell_b = KnowledgeCellData {
+            key_hash: compute_key_hash("jarvis", "state_b"),
+            difficulty: 4,
+            ..Default::default()
+        };
+
+        let proof_a = mine_for_knowledge_cell(&cell_a, 100_000).unwrap();
+        let proof_b = mine_for_knowledge_cell(&cell_b, 100_000).unwrap();
+
+        assert_ne!(proof_a.challenge, proof_b.challenge,
+            "Cells with different key_hashes must generate different challenges");
+    }
+
+    #[test]
+    fn test_update_at_max_block_number() {
+        // Using u64::MAX as current_block should not panic
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "max_block"),
+            timestamp_block: u64::MAX - 1,
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"data", [0u8; 32], [0xFF; 32], u64::MAX, &proof, &deployment,
+        );
+
+        let new_data = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_data.timestamp_block, u64::MAX);
+        assert_eq!(new_data.update_count, 1);
+    }
+
+    #[test]
+    fn test_update_preserves_lock_script_structure() {
+        // Verify lock script code_hash and hash_type match deployment info
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "lock_test"),
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"val", [0u8; 32], [0xFF; 32], 200, &proof, &deployment,
+        );
+
+        let lock = &tx.outputs[0].lock_script;
+        assert_eq!(lock.code_hash, deployment.pow_lock_code_hash);
+        assert!(matches!(lock.hash_type, super::super::HashType::Data1));
+    }
+
+    #[test]
+    fn test_create_cell_different_authors_different_cells() {
+        // Same key/value but different authors should produce cells with different author_lock_hash
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        let tx_a = create_knowledge_cell(
+            "ns", "key", b"value", [0xAA; 32], 100, &deployment, input.clone(),
+        );
+        let tx_b = create_knowledge_cell(
+            "ns", "key", b"value", [0xBB; 32], 100, &deployment, input,
+        );
+
+        let cell_a = KnowledgeCellData::deserialize(&tx_a.outputs[0].data).unwrap();
+        let cell_b = KnowledgeCellData::deserialize(&tx_b.outputs[0].data).unwrap();
+
+        assert_ne!(cell_a.author_lock_hash, cell_b.author_lock_hash,
+            "Different authors should produce different author_lock_hash");
+        assert_eq!(cell_a.key_hash, cell_b.key_hash, "Key hash should be same");
+        assert_eq!(cell_a.value_hash, cell_b.value_hash, "Value hash should be same");
+    }
+
+    #[test]
+    fn test_difficulty_clamping_prevents_large_jumps() {
+        // Even with extreme timing, difficulty can only change by +-KNOWLEDGE_MAX_DIFFICULTY_DELTA
+        let cell = KnowledgeCellData {
+            difficulty: 50,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+
+        // Instant update (blocks_elapsed = 0) → wants to increase massively
+        let fast = compute_new_difficulty(&cell, 100);
+        assert!(fast <= 50 + KNOWLEDGE_MAX_DIFFICULTY_DELTA,
+            "Fast update clamped: got {}, expected <= {}", fast, 50 + KNOWLEDGE_MAX_DIFFICULTY_DELTA);
+        assert!(fast >= 50,
+            "Fast update should not decrease: got {}", fast);
+
+        // Extremely slow update
+        let slow = compute_new_difficulty(&cell, 100 + u64::MAX / 4);
+        assert!(slow >= 50u8.saturating_sub(KNOWLEDGE_MAX_DIFFICULTY_DELTA),
+            "Slow update clamped: got {}, expected >= {}", slow, 50u8.saturating_sub(KNOWLEDGE_MAX_DIFFICULTY_DELTA));
+        assert!(slow <= 50,
+            "Slow update should not increase: got {}", slow);
+    }
+
+    #[test]
+    fn test_mine_zero_iterations_returns_none() {
+        // Zero iterations should always fail, even at difficulty 0
+        let cell = KnowledgeCellData {
+            key_hash: compute_key_hash("test", "zero_iter"),
+            difficulty: 0,
+            ..Default::default()
+        };
+
+        let proof = mine_for_knowledge_cell(&cell, 0);
+        assert!(proof.is_none(), "Zero iterations must return None");
+    }
+
+    #[test]
+    fn test_sha256_data_different_inputs_different_outputs() {
+        // Verify sha256_data produces different outputs for different inputs
+        let h1 = sha256_data(b"input_one");
+        let h2 = sha256_data(b"input_two");
+        let h3 = sha256_data(b"input_one"); // same as h1
+
+        assert_ne!(h1, h2);
+        assert_eq!(h1, h3, "Same input must produce same hash");
+    }
+
+    #[test]
+    fn test_update_cell_deps_match_deployment() {
+        // Verify that update_knowledge_cell uses the same cell_deps as create
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let create_tx = create_knowledge_cell(
+            "ns", "key", b"val", [0xFF; 32], 100, &deployment, input.clone(),
+        );
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "key"),
+            ..Default::default()
+        };
+        let update_tx = update_knowledge_cell(
+            &old, input, b"new_val", [0u8; 32], [0xFF; 32], 200, &proof, &deployment,
+        );
+
+        assert_eq!(create_tx.cell_deps.len(), update_tx.cell_deps.len(),
+            "Create and update should have same number of cell_deps");
+        assert_eq!(create_tx.cell_deps[0].tx_hash, update_tx.cell_deps[0].tx_hash);
+        assert_eq!(create_tx.cell_deps[0].index, update_tx.cell_deps[0].index);
+    }
 }

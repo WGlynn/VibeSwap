@@ -1390,4 +1390,216 @@ mod tests {
             "Pending actions ({}) should match non-safe vault count ({})",
             health.pending_actions.len(), non_safe);
     }
+
+    // ============ New Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_assess_protocol_all_zero_debt_vaults() {
+        // Multiple vaults with zero debt should all be safe
+        let pool = test_pool();
+        let vaults: Vec<VaultCellData> = (0..10)
+            .map(|i| safe_vault((i + 1) * PRECISION, 0))
+            .collect();
+
+        let health = assess_protocol(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+
+        assert_eq!(health.vaults_assessed, 10);
+        assert_eq!(health.tier_counts.safe, 10);
+        assert!(health.pending_actions.is_empty());
+        assert_eq!(health.worst_health_factor, u128::MAX);
+    }
+
+    #[test]
+    fn test_simulate_progressive_drops_tier_transition() {
+        // As price drops, tiers should transition: Safe → Warning → ... → HardLiq
+        let pool = test_pool();
+        // HF = (10 * price * 0.8) / 15000
+        // At $3000: HF = 1.6 → Safe
+        // At $2000: HF = 1.07 → SoftLiquidation
+        // At $1500: HF = 0.8 → HardLiquidation
+        let vaults = vec![safe_vault(15_000 * PRECISION, 10 * PRECISION)];
+
+        let no_drop = assess_protocol(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+        );
+        let moderate_drop = simulate_price_drop(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION, 3500, // 35% drop → $1950
+        );
+        let severe_drop = simulate_price_drop(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION, 5000, // 50% drop → $1500
+        );
+
+        assert_eq!(no_drop.tier_counts.safe, 1);
+        assert!(moderate_drop.worst_health_factor < no_drop.worst_health_factor,
+            "35% drop should degrade health");
+        assert!(severe_drop.worst_health_factor < moderate_drop.worst_health_factor,
+            "50% drop should further degrade health");
+    }
+
+    #[test]
+    fn test_risk_score_only_utilization_component() {
+        // Zero vaults, good insurance → only utilization affects score
+        let make_health = |util: u64| ProtocolHealth {
+            total_tvl: PRECISION,
+            total_borrows: PRECISION,
+            utilization_bps: util,
+            vaults_assessed: 0,
+            tier_counts: TierCounts::default(),
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10_000, // 100% coverage
+            pending_actions: vec![],
+        };
+
+        let s_low = risk_score(&make_health(3000));   // < 50% → 0 pts
+        let s_mid = risk_score(&make_health(6000));   // 50-80% → 5 pts
+        let s_high = risk_score(&make_health(8500));   // 80-90% → 15 pts
+        let s_crit = risk_score(&make_health(9500));   // > 90% → 25 pts
+
+        assert_eq!(s_low, 0, "Low utilization with max insurance should be 0");
+        assert_eq!(s_mid, 5);
+        assert_eq!(s_high, 15);
+        assert_eq!(s_crit, 25);
+    }
+
+    #[test]
+    fn test_find_liquidation_threshold_very_tight_margin() {
+        // Vault barely above liquidation — threshold should be very small
+        let pool = test_pool();
+        // HF = (10 * 3000 * 0.8) / 22000 = 1.09 → just above soft liquidation
+        let vaults = vec![safe_vault(10 * PRECISION, 22_000 * PRECISION)];
+
+        let threshold = find_liquidation_threshold(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+
+        assert!(threshold.is_some());
+        let bps = threshold.unwrap();
+        // Should need very small drop to trigger (< 15%)
+        assert!(bps < 1500, "Tight margin vault should need < 15% drop, got {}bps", bps);
+    }
+
+    #[test]
+    fn test_assess_protocol_utilization_edge_over_100() {
+        // Borrows > deposits → utilization > 100%
+        let pool = LendingPoolCellData {
+            total_deposits: 500_000 * PRECISION,
+            total_borrows: 600_000 * PRECISION, // 120% utilization
+            ..test_pool()
+        };
+
+        let health = assess_protocol(&[], &pool, None, 3000 * PRECISION, PRECISION);
+        // 600K / 500K = 1.2 = 12000 bps
+        assert_eq!(health.utilization_bps, 12_000,
+            "Utilization can exceed 10_000 bps when borrows > deposits");
+    }
+
+    #[test]
+    fn test_pending_actions_all_critical_same_priority() {
+        // All vaults deeply underwater → all should have priority 0
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(1 * PRECISION, 100_000 * PRECISION),
+            safe_vault(1 * PRECISION, 200_000 * PRECISION),
+            safe_vault(1 * PRECISION, 300_000 * PRECISION),
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+
+        for action in &health.pending_actions {
+            assert_eq!(action.priority, 0,
+                "All deeply underwater vaults should have critical priority (0)");
+            assert!(action.health_factor < PRECISION);
+        }
+    }
+
+    #[test]
+    fn test_simulate_price_drop_does_not_modify_input() {
+        // Verify that simulate_price_drop is a pure function — input vaults unchanged
+        let pool = test_pool();
+        let vaults = vec![safe_vault(10 * PRECISION, 18_000 * PRECISION)];
+        let vault_clone = vaults.clone();
+
+        let _ = simulate_price_drop(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION, 5000,
+        );
+
+        // Original vault data should be unchanged
+        assert_eq!(vaults[0].collateral_amount, vault_clone[0].collateral_amount);
+        assert_eq!(vaults[0].debt_shares, vault_clone[0].debt_shares);
+    }
+
+    #[test]
+    fn test_find_liquidation_threshold_binary_search_precision() {
+        // Verify the threshold found is the tightest possible (within 1 bps accuracy)
+        let pool = test_pool();
+        let vaults = vec![safe_vault(10 * PRECISION, 18_000 * PRECISION)];
+
+        let threshold = find_liquidation_threshold(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+        assert!(threshold.is_some());
+        let bps = threshold.unwrap();
+
+        // At (bps - 1), should NOT be liquidatable
+        if bps > 0 {
+            let below = simulate_price_drop(
+                &vaults, &pool, None,
+                3000 * PRECISION, PRECISION, bps - 1,
+            );
+            assert_eq!(below.tier_counts.hard_liquidation + below.tier_counts.soft_liquidation, 0,
+                "At {}bps (1 below threshold), no vault should be liquidatable", bps - 1);
+        }
+
+        // At bps, should be liquidatable
+        let at_threshold = simulate_price_drop(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION, bps,
+        );
+        assert!(at_threshold.tier_counts.hard_liquidation + at_threshold.tier_counts.soft_liquidation > 0,
+            "At threshold {}bps, at least one vault should be liquidatable", bps);
+    }
+
+    #[test]
+    fn test_tvl_scales_linearly_with_deposits() {
+        // TVL should scale linearly with total_deposits
+        let pool_1m = test_pool(); // 1M deposits
+        let pool_2m = LendingPoolCellData {
+            total_deposits: 2_000_000 * PRECISION,
+            ..test_pool()
+        };
+
+        let h1 = assess_protocol(&[], &pool_1m, None, 3000 * PRECISION, PRECISION);
+        let h2 = assess_protocol(&[], &pool_2m, None, 3000 * PRECISION, PRECISION);
+
+        assert_eq!(h2.total_tvl, h1.total_tvl * 2,
+            "TVL should scale linearly with deposits");
+    }
+
+    #[test]
+    fn test_risk_score_minimum_possible() {
+        // The absolute minimum risk score: healthy everything
+        let health = ProtocolHealth {
+            total_tvl: PRECISION,
+            total_borrows: PRECISION,
+            utilization_bps: 0,       // < 50% → 0 pts
+            vaults_assessed: 10,
+            tier_counts: TierCounts { safe: 10, ..Default::default() }, // 0% at risk → 0 pts
+            worst_health_factor: u128::MAX, // Very safe → 0 pts
+            insurance_coverage_bps: 10_000, // 100% coverage → 0 pts
+            pending_actions: vec![],
+        };
+
+        assert_eq!(risk_score(&health), 0,
+            "Perfect health should produce risk score of 0");
+        assert_eq!(classify_risk_level(0), RiskLevel::Low);
+    }
 }

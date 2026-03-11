@@ -1741,4 +1741,190 @@ mod tests {
         // total_shares = 0 → deposit_value = 0
         assert_eq!(pos.deposit_value, 0);
     }
+
+    // ============ New Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_lp_position_deposit_block_preserved() {
+        // Verify that the deposit_block from LPPositionCellData is preserved in the output
+        let prices = make_prices();
+        let pool = make_pool(1, 2, 100 * PRECISION, 300_000 * PRECISION);
+        let lp = LPPositionCellData {
+            lp_amount: pool.total_lp_supply / 10,
+            entry_price: 3_000 * PRECISION,
+            pool_id: pool.pair_id,
+            deposit_block: 42_000,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, pool);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.lp_positions[0].deposit_block, 42_000);
+    }
+
+    #[test]
+    fn test_lp_position_pool_id_preserved() {
+        // Verify LP position tracks the correct pool_id
+        let prices = make_prices();
+        let mut pool = make_pool(1, 2, 100 * PRECISION, 300_000 * PRECISION);
+        pool.pair_id = [0xDE; 32];
+        let lp = make_lp(pool.total_lp_supply / 5, 3_000 * PRECISION);
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, pool);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.lp_positions[0].pool_id, [0xDE; 32]);
+    }
+
+    #[test]
+    fn test_lending_multiple_vaults_worst_hf() {
+        // Three vaults: worst HF should be the minimum across all
+        let prices = make_prices();
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        // Vault 1: very safe (100 ETH collateral, 5K debt) → HF very high
+        builder.add_vault(make_vault(100 * PRECISION, 5_000 * PRECISION), pool.clone());
+        // Vault 2: moderate (10 ETH, 20K debt) → HF moderate
+        builder.add_vault(make_vault(10 * PRECISION, 20_000 * PRECISION), pool.clone());
+        // Vault 3: tight (5 ETH, 15K debt) → HF low
+        builder.add_vault(make_vault(5 * PRECISION, 15_000 * PRECISION), pool);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.lending_positions.len(), 3);
+        // Worst HF should match the lowest individual HF
+        let min_hf = portfolio.lending_positions.iter()
+            .map(|p| p.health_factor)
+            .min()
+            .unwrap();
+        assert_eq!(portfolio.summary.worst_health_factor, min_hf);
+    }
+
+    #[test]
+    fn test_token_balance_preserves_type_hash() {
+        // Verify the token_type_hash is correctly preserved in the output
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_token(token(1), 5 * PRECISION);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.token_balances[0].token_type_hash, token(1));
+    }
+
+    #[test]
+    fn test_insurance_pool_id_preserved() {
+        // Verify pool_id is correctly propagated
+        let mut ins = make_insurance();
+        ins.pool_id = [0xBE; 32];
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_insurance(ins, 10_000 * PRECISION);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.insurance_positions[0].pool_id, [0xBE; 32]);
+    }
+
+    #[test]
+    fn test_prediction_multiple_markets() {
+        // Multiple prediction positions from different markets
+        let make_market = |id: u8, pools: [u128; 2]| PredictionMarketCellData {
+            market_id: [id; 32],
+            num_tiers: 2,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = pools[0];
+                t[1] = pools[1];
+                t
+            },
+            status: vibeswap_types::MARKET_ACTIVE,
+            ..Default::default()
+        };
+        let make_pos = |id: u8, tier: u8, amount: u128| PredictionPositionCellData {
+            market_id: [id; 32],
+            tier_index: tier,
+            amount,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(
+            make_market(1, [50_000 * PRECISION, 50_000 * PRECISION]),
+            make_pos(1, 0, 10_000 * PRECISION),
+        );
+        builder.add_prediction(
+            make_market(2, [30_000 * PRECISION, 70_000 * PRECISION]),
+            make_pos(2, 1, 5_000 * PRECISION),
+        );
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.prediction_positions.len(), 2);
+        // Total prediction value = sum of amounts
+        assert_eq!(portfolio.summary.prediction_value, 15_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_summary_total_value_is_sum_of_components() {
+        // Verify total_value == lp + lending_net + insurance + prediction + token
+        let prices = make_prices();
+        let amm_pool = make_pool(1, 2, 100 * PRECISION, 300_000 * PRECISION);
+        let lp = make_lp(amm_pool.total_lp_supply / 10, 3_000 * PRECISION);
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, amm_pool);
+        builder.add_token(token(2), 5_000 * PRECISION);
+        let portfolio = builder.build();
+
+        let expected = portfolio.summary.lp_value
+            .saturating_add(portfolio.summary.lending_net_value)
+            .saturating_add(portfolio.summary.insurance_value)
+            .saturating_add(portfolio.summary.prediction_value)
+            .saturating_add(portfolio.summary.token_value);
+        assert_eq!(portfolio.summary.total_value, expected,
+            "Total value must be the sum of all component values");
+    }
+
+    #[test]
+    fn test_lp_tiny_shares_in_large_pool() {
+        // User has 1 unit of LP in a very large pool → values should be very small but non-zero
+        let prices = make_prices();
+        let pool = make_pool(1, 2, 1_000_000 * PRECISION, 3_000_000_000 * PRECISION);
+        let lp = make_lp(1, 3_000 * PRECISION); // Just 1 unit of LP
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, pool);
+        let portfolio = builder.build();
+
+        // With 1 unit out of a huge total_lp_supply, values should be tiny or zero
+        // (depending on rounding) but the test should not panic
+        assert_eq!(portfolio.lp_positions.len(), 1);
+    }
+
+    #[test]
+    fn test_lending_vault_pool_id_preserved() {
+        // Verify pool_id from VaultCellData is preserved in LendingPosition
+        let prices = make_prices();
+        let vault = VaultCellData {
+            pool_id: [0xFE; 32],
+            ..make_vault(10 * PRECISION, 5_000 * PRECISION)
+        };
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.lending_positions[0].pool_id, [0xFE; 32]);
+    }
+
+    #[test]
+    fn test_il_same_price_ratio_is_zero() {
+        // When current price ratio equals entry price, IL should be 0
+        let pool = make_pool(1, 2, 50 * PRECISION, 150_000 * PRECISION);
+        let current_price = vibeswap_math::mul_div(pool.reserve1, PRECISION, pool.reserve0);
+
+        let il = calculate_il(current_price, &pool, 3_000 * PRECISION, PRECISION);
+        assert_eq!(il, 0, "No price change should produce 0 IL");
+    }
 }

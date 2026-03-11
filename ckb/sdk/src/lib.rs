@@ -2,6 +2,7 @@
 // Transaction builder for VibeSwap operations on Nervos CKB
 // Builds unsigned transactions that can be signed by any CKB wallet
 
+pub mod collector;
 pub mod knowledge;
 pub mod miner;
 pub mod token;

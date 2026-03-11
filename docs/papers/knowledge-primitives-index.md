@@ -1241,6 +1241,8 @@ If two nodes can disagree about the value, they will eventually fork. The constr
 
 **Licho's correction**: "My Man, it has to be an integer. It's Bitcoin. Satoshis are integers. It is super important." — Sometimes the simplest statement contains the deepest constraint.
 
+**Future consideration (Will's insight)**: This constraint is absolute within the current paradigm of deterministic replayable consensus. But consensus models evolve. Probabilistic finality (Avalanche-style), optimistic execution (fraud proofs), and zero-knowledge verification each redefine what "agreement" means. In a ZK world, the prover could theoretically use floats internally — only the proof must be verifiable, not the computation reproducible. The real constraint is: **computation must be reproducible by any verifier**. Today's verifiers are full nodes recomputing everything → integers mandatory. Tomorrow's verifiers may be ZK circuits or probabilistic samplers → the constraint may transform. Don't let this primitive calcify into dogma. Re-derive it when the consensus model changes.
+
 **Cross-references**: P-098 (As Above, So Below — Bitcoin's integer determinism IS its architecture at every level), P-099 (Yul Function Density Threshold — another case of platform constraints that aren't obvious until you hit them), P-100 (The Crossover Protocol — this exact mistake is why crossover requires re-deriving constraints)
 
 ---

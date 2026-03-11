@@ -17,6 +17,7 @@ pub mod portfolio;
 pub mod prediction;
 pub mod risk;
 pub mod router;
+pub mod strategy;
 pub mod token;
 
 use vibeswap_types::*;

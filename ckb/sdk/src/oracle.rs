@@ -985,4 +985,340 @@ mod tests {
         assert_eq!(down, 3333);
         assert_ne!(up, down, "Price change bps is NOT symmetric (divides by old_price)");
     }
+
+    // ============ Batch 3: Edge Cases, Boundaries, Overflow, Error Paths ============
+
+    #[test]
+    fn test_freshness_u64_max_block_number() {
+        // Oracle at u64::MAX block, current also u64::MAX — not stale
+        let oracle = fresh_oracle(1000 * PRECISION, u64::MAX);
+        assert!(validate_freshness(&oracle, u64::MAX).is_ok());
+    }
+
+    #[test]
+    fn test_freshness_oracle_at_block_zero_current_at_max_staleness() {
+        // Oracle at block 0, current at exactly MAX_STALENESS_BLOCKS — not stale
+        let oracle = fresh_oracle(1000 * PRECISION, 0);
+        assert!(validate_freshness(&oracle, MAX_STALENESS_BLOCKS).is_ok());
+    }
+
+    #[test]
+    fn test_freshness_oracle_at_block_zero_current_just_past() {
+        // Oracle at block 0, current at MAX_STALENESS_BLOCKS + 1 — stale
+        let oracle = fresh_oracle(1000 * PRECISION, 0);
+        let result = validate_freshness(&oracle, MAX_STALENESS_BLOCKS + 1);
+        assert!(matches!(result, Err(SDKError::StaleOracleData)));
+    }
+
+    #[test]
+    fn test_confidence_lending_one_below_max_u8() {
+        // 254 is well above threshold
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, 254);
+        assert!(validate_confidence_lending(&oracle).is_ok());
+    }
+
+    #[test]
+    fn test_confidence_liquidation_one_below_boundary() {
+        // Exactly MIN_CONFIDENCE_LIQUIDATION - 1 = 24
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, MIN_CONFIDENCE_LIQUIDATION - 1);
+        assert!(matches!(
+            validate_confidence_liquidation(&oracle),
+            Err(SDKError::LowOracleConfidence)
+        ));
+    }
+
+    #[test]
+    fn test_confidence_liquidation_max_u8() {
+        let oracle = oracle_with_confidence(1000 * PRECISION, 100, 255);
+        assert!(validate_confidence_liquidation(&oracle).is_ok());
+    }
+
+    #[test]
+    fn test_pair_id_all_zeros() {
+        let oracle = OracleCellData {
+            price: 1000 * PRECISION,
+            block_number: 100,
+            confidence: 80,
+            source_hash: test_source_hash(),
+            pair_id: [0u8; 32],
+        };
+        assert!(validate_pair_id(&oracle, &[0u8; 32]).is_ok());
+    }
+
+    #[test]
+    fn test_pair_id_single_byte_difference() {
+        let oracle = fresh_oracle(1000 * PRECISION, 100);
+        let mut almost_right = test_pair_id();
+        almost_right[31] = 0xFF; // Differ in last byte only
+        assert!(matches!(
+            validate_pair_id(&oracle, &almost_right),
+            Err(SDKError::OraclePairMismatch)
+        ));
+    }
+
+    #[test]
+    fn test_validate_for_lending_price_one_wei() {
+        // Smallest valid price (1 wei) should pass
+        let oracle = oracle_with_confidence(1, 100, 80);
+        assert!(validate_for_lending(&oracle, &test_pair_id(), 150).is_ok());
+    }
+
+    #[test]
+    fn test_validate_for_liquidation_wrong_pair_id() {
+        let oracle = fresh_oracle(2000 * PRECISION, 100);
+        let wrong_pair = [0xBB; 32];
+        let result = validate_for_liquidation(&oracle, &wrong_pair, 150);
+        assert!(matches!(result, Err(SDKError::OraclePairMismatch)));
+    }
+
+    #[test]
+    fn test_validate_for_liquidation_low_confidence_below_25() {
+        let oracle = oracle_with_confidence(2000 * PRECISION, 100, 24);
+        let result = validate_for_liquidation(&oracle, &test_pair_id(), 150);
+        assert!(matches!(result, Err(SDKError::LowOracleConfidence)));
+    }
+
+    #[test]
+    fn test_validate_for_liquidation_exactly_at_liquidation_confidence() {
+        let oracle = oracle_with_confidence(2000 * PRECISION, 100, MIN_CONFIDENCE_LIQUIDATION);
+        assert!(validate_for_liquidation(&oracle, &test_pair_id(), 150).is_ok());
+    }
+
+    #[test]
+    fn test_aggregate_deviation_just_over_threshold() {
+        // 10.01% deviation should be rejected: 1000 * 1001 / 10000 = 100.1
+        // We need min=10000, max=11001 → deviation = 1001*10000/10000 = 1001 bps > 1000
+        let oracles = vec![
+            fresh_oracle(10000 * PRECISION, 100),
+            fresh_oracle(11001 * PRECISION, 101),
+        ];
+        let result = aggregate_prices(&oracles, &test_pair_id(), 150);
+        assert!(matches!(result, Err(SDKError::OracleDeviationTooHigh)));
+    }
+
+    #[test]
+    fn test_aggregate_two_identical_prices() {
+        let oracles = vec![
+            fresh_oracle(7777 * PRECISION, 100),
+            fresh_oracle(7777 * PRECISION, 101),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 7777 * PRECISION);
+    }
+
+    #[test]
+    fn test_aggregate_six_oracles_even_median() {
+        // 6 oracles: median = average of 3rd and 4th sorted values
+        let oracles = vec![
+            fresh_oracle(1000 * PRECISION, 100),
+            fresh_oracle(1010 * PRECISION, 101),
+            fresh_oracle(1020 * PRECISION, 102),
+            fresh_oracle(1030 * PRECISION, 103),
+            fresh_oracle(1040 * PRECISION, 104),
+            fresh_oracle(1050 * PRECISION, 105),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        // Sorted: 1000,1010,1020,1030,1040,1050 → mid=3 → (prices[2]+prices[3])/2 = (1020+1030)/2 = 1025
+        assert_eq!(price, 1025 * PRECISION);
+    }
+
+    #[test]
+    fn test_aggregate_unsorted_input_still_correct() {
+        // Verify that internal sorting produces correct median regardless of input order
+        let oracles = vec![
+            fresh_oracle(1050 * PRECISION, 100),
+            fresh_oracle(1000 * PRECISION, 101),
+            fresh_oracle(1030 * PRECISION, 102),
+            fresh_oracle(1010 * PRECISION, 103),
+            fresh_oracle(1040 * PRECISION, 104),
+            fresh_oracle(1020 * PRECISION, 105),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 1025 * PRECISION);
+    }
+
+    #[test]
+    fn test_weighted_price_empty_rejected() {
+        let result = weighted_price(&[], &test_pair_id(), 150);
+        assert!(matches!(result, Err(SDKError::InvalidAmounts)));
+    }
+
+    #[test]
+    fn test_weighted_price_wrong_pair_id_rejected() {
+        let wrong_pair_oracle = OracleCellData {
+            price: 3000 * PRECISION,
+            block_number: 100,
+            confidence: 80,
+            source_hash: test_source_hash(),
+            pair_id: [0xDD; 32],
+        };
+        let oracles = vec![wrong_pair_oracle];
+        let result = weighted_price(&oracles, &test_pair_id(), 150);
+        assert!(matches!(result, Err(SDKError::OraclePairMismatch)));
+    }
+
+    #[test]
+    fn test_weighted_single_oracle_ignores_confidence() {
+        // With a single oracle, weighted_price returns the price directly regardless of confidence
+        let oracles = vec![oracle_with_confidence(9999 * PRECISION, 100, 1)];
+        let price = weighted_price(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 9999 * PRECISION);
+    }
+
+    #[test]
+    fn test_exchange_rate_collateral_zero() {
+        // Zero collateral price, non-zero debt — should return 0
+        let rate = exchange_rate(0, 1000 * PRECISION).unwrap();
+        assert_eq!(rate, 0);
+    }
+
+    #[test]
+    fn test_exchange_rate_both_one_precision() {
+        let rate = exchange_rate(PRECISION, PRECISION).unwrap();
+        assert_eq!(rate, PRECISION);
+    }
+
+    #[test]
+    fn test_exchange_rate_large_values() {
+        // Very large prices — exercises wide_mul in mul_div
+        let large = u128::MAX / PRECISION; // Avoid overflow in mul_div
+        let rate = exchange_rate(large, large).unwrap();
+        assert_eq!(rate, PRECISION); // Same price → 1:1
+    }
+
+    #[test]
+    fn test_price_change_bps_very_small_old_price() {
+        // old_price = 1, new_price = 2 → diff=1, 1*10000/1 = 10000 bps
+        assert_eq!(price_change_bps(1, 2), 10_000);
+    }
+
+    #[test]
+    fn test_price_change_bps_new_equals_old() {
+        // Same value expressed differently (not using PRECISION multiples)
+        assert_eq!(price_change_bps(42, 42), 0);
+    }
+
+    #[test]
+    fn test_price_change_bps_200_percent_increase() {
+        // 100→300 = 200% increase = 20000 bps
+        assert_eq!(price_change_bps(100 * PRECISION, 300 * PRECISION), 20_000);
+    }
+
+    #[test]
+    fn test_build_oracle_cell_dep_max_index() {
+        let dep = build_oracle_cell_dep([0xFF; 32], u32::MAX);
+        assert_eq!(dep.index, u32::MAX);
+        assert!(matches!(dep.dep_type, DepType::Code));
+    }
+
+    #[test]
+    fn test_build_price_pair_deps_preserves_order() {
+        // Verify the first dep is collateral, second is debt
+        let pair = PricePair {
+            collateral: OraclePrice {
+                data: fresh_oracle(3000 * PRECISION, 100),
+                cell_dep: build_oracle_cell_dep([0xAA; 32], 5),
+            },
+            debt: OraclePrice {
+                data: fresh_oracle(1 * PRECISION, 100),
+                cell_dep: build_oracle_cell_dep([0xBB; 32], 7),
+            },
+        };
+        let deps = build_price_pair_deps(&pair);
+        assert_eq!(deps[0].tx_hash, [0xAA; 32]);
+        assert_eq!(deps[0].index, 5);
+        assert_eq!(deps[1].tx_hash, [0xBB; 32]);
+        assert_eq!(deps[1].index, 7);
+    }
+
+    #[test]
+    fn test_extract_prices_zero_values() {
+        // Extract should work even with zero prices (extraction doesn't validate)
+        let pair = PricePair {
+            collateral: OraclePrice {
+                data: fresh_oracle(0, 100),
+                cell_dep: build_oracle_cell_dep([0x01; 32], 0),
+            },
+            debt: OraclePrice {
+                data: fresh_oracle(0, 100),
+                cell_dep: build_oracle_cell_dep([0x02; 32], 1),
+            },
+        };
+        let (col, debt) = extract_prices(&pair);
+        assert_eq!(col, 0);
+        assert_eq!(debt, 0);
+    }
+
+    #[test]
+    fn test_validate_for_liquidation_all_failures_in_order() {
+        // Mirrors test_validate_for_lending_all_failures_in_order but for liquidation
+        // Zero price → InvalidAmounts
+        let zero_price = oracle_with_confidence(0, 100, 80);
+        assert!(matches!(
+            validate_for_liquidation(&zero_price, &test_pair_id(), 150),
+            Err(SDKError::InvalidAmounts)
+        ));
+
+        // Stale → StaleOracleData
+        let stale = oracle_with_confidence(1000 * PRECISION, 10, 80);
+        assert!(matches!(
+            validate_for_liquidation(&stale, &test_pair_id(), 200),
+            Err(SDKError::StaleOracleData)
+        ));
+
+        // Low confidence (below liquidation threshold of 25) → LowOracleConfidence
+        let low_conf = oracle_with_confidence(1000 * PRECISION, 100, 10);
+        assert!(matches!(
+            validate_for_liquidation(&low_conf, &test_pair_id(), 150),
+            Err(SDKError::LowOracleConfidence)
+        ));
+
+        // Wrong pair → OraclePairMismatch
+        let wrong_pair = oracle_with_confidence(1000 * PRECISION, 100, 80);
+        assert!(matches!(
+            validate_for_liquidation(&wrong_pair, &[0xCC; 32], 150),
+            Err(SDKError::OraclePairMismatch)
+        ));
+    }
+
+    #[test]
+    fn test_aggregate_single_oracle_no_deviation_check() {
+        // Single oracle bypasses deviation check — just returns the price
+        let oracles = vec![fresh_oracle(1 * PRECISION, 100)];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 1 * PRECISION);
+    }
+
+    #[test]
+    fn test_weighted_price_heavily_skewed() {
+        // One oracle with confidence=1, another with confidence=255
+        let oracles = vec![
+            oracle_with_confidence(1000 * PRECISION, 100, 1),
+            oracle_with_confidence(2000 * PRECISION, 101, 255),
+        ];
+        // total_weight = 256
+        // weighted = 1000*1/256 + 2000*255/256
+        // = 3 + 1992 (integer math) — should be very close to 2000
+        let price = weighted_price(&oracles, &test_pair_id(), 150).unwrap();
+        assert!(price > 1990 * PRECISION, "Should lean heavily toward 2000");
+        assert!(price < 2000 * PRECISION, "Slight pull from low-confidence oracle");
+    }
+
+    #[test]
+    fn test_price_change_bps_u128_max_prices() {
+        // Both at u128::MAX → no change → 0 bps
+        assert_eq!(price_change_bps(u128::MAX, u128::MAX), 0);
+    }
+
+    #[test]
+    fn test_aggregate_with_minimum_price_values() {
+        // All oracles at price = 1 (smallest non-zero)
+        let oracles = vec![
+            fresh_oracle(1, 100),
+            fresh_oracle(1, 101),
+            fresh_oracle(1, 102),
+        ];
+        let price = aggregate_prices(&oracles, &test_pair_id(), 150).unwrap();
+        assert_eq!(price, 1);
+    }
 }

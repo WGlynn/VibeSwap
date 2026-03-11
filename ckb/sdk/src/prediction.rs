@@ -515,7 +515,7 @@ fn mul_div(a: u128, b: u128, c: u128) -> u128 {
     result
 }
 
-fn hash_script(script: &Script) -> [u8; 32] {
+pub fn hash_script(script: &Script) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(&script.code_hash);
     hasher.update(&[match script.hash_type {

@@ -1,0 +1,13 @@
+[package]
+name = "prediction-position-type"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+ckb = ["ckb-std"]
+
+[dependencies]
+ckb-std = { workspace = true, optional = true }
+vibeswap-types = { path = "../../lib/types" }

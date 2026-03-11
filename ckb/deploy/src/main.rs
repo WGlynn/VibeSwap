@@ -38,6 +38,7 @@ const SCRIPTS: &[(&str, &str)] = &[
     ("vault-type",               "Type script: per-user lending vault validation"),
     ("insurance-pool-type",      "Type script: mutualist insurance pool (P-105)"),
     ("prediction-market-type",   "Type script: parimutuel prediction market (2-8 tiers)"),
+    ("prediction-position-type", "Type script: immutable prediction position (per-user bet)"),
 ];
 
 // ============ Deployment Config ============

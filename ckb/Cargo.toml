@@ -19,6 +19,7 @@ members = [
     "scripts/vault-type",
     "scripts/insurance-pool-type",
     "scripts/prediction-market-type",
+    "scripts/prediction-position-type",
     "sdk",
     "deploy",
     "tests",

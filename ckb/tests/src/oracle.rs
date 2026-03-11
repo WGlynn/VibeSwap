@@ -29,6 +29,7 @@ fn test_sdk() -> VibeSwapSDK {
         vault_type_code_hash: [0x0B; 32],
         insurance_pool_type_code_hash: [0x0C; 32],
         prediction_market_type_code_hash: [0x0D; 32],
+            prediction_position_type_code_hash: [0x0E; 32],
         script_dep_tx_hash: [0x10; 32],
         script_dep_index: 0,
     })

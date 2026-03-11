@@ -31,3 +31,6 @@ mod assembler;
 
 #[cfg(test)]
 mod insurance;
+
+#[cfg(test)]
+mod oracle;

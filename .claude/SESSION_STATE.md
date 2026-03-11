@@ -42,9 +42,33 @@
 - CKB workspace: 525/525 tests passing (477 prior + 48 new)
 - All existing tests still pass (no regressions)
 
+**Insurance Integration Tests (continued Session 060):**
+- `ckb/tests/src/insurance.rs` — **NEW** 17 integration tests
+  - Full lifecycle: create → deposit → premium → claim → withdraw → destroy
+  - Multiple depositors with proportional yield
+  - Coverage cap enforcement
+  - Premium yield/APY verification
+  - Prevention integration (claim → HF improvement)
+  - Repeated claims with cumulative tracking
+
+**Insurance Fuzz Tests (continued Session 060):**
+- `ckb/tests/src/fuzz.rs` — 5 new property-based tests (2800+ random iterations)
+  - Share deposit/redeem conservation (rounding loss < 0.00001%)
+  - Premium monotonicity, claim caps, exchange rate growth
+  - Coverage ratio bounded [0, 100%]
+
+**Keeper Module (continued Session 060):**
+- `ckb/sdk/src/keeper.rs` — **NEW** Off-chain monitoring engine (15 tests)
+  - `assess_vault()` — full vault assessment + recommended action
+  - `assess_vaults()` — batch assessment sorted by urgency
+  - `check_premium_accrual()` — detect when premiums are due
+  - `stress_test_vaults()` — scenario analysis for price drops
+  - Mutualist priority: auto-deleverage > insurance > soft liq > hard liq
+  - KeeperAction enum: Safe, Warn, AutoDeleverage, InsuranceClaim, SoftLiquidate, HardLiquidate
+
 **Pending:**
 - Continue CKB ecosystem development (autopilot loop)
-- Integration tests for insurance SDK builders
+- Governance module (parameter updates via DAO)
 
 ---
 
@@ -168,7 +192,7 @@
 - P-105 enshrined: prevention > punishment, mutualism > predation
 
 ### Running Test Count
-- **CKB tests**: 525 passing (was 477 at session 059 end, +48)
+- **CKB tests**: 562 passing (was 477 at session 059 end, +85)
 - **Solidity tests**: 393 passing (from Session 058)
 - **Total knowledge primitives**: 78 (P-000 through P-106, some gaps)
 

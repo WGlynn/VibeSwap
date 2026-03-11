@@ -12,6 +12,7 @@ pub mod miner;
 pub mod oracle;
 pub mod prediction;
 pub mod risk;
+pub mod router;
 pub mod token;
 
 use vibeswap_types::*;

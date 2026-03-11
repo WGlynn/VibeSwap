@@ -1299,4 +1299,203 @@ mod tests {
         let size = signed.estimated_size();
         assert!(size > 100, "Signed tx size should be > 100 bytes, got {}", size);
     }
+
+    // ============ Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_witness_args_serialize_deterministic() {
+        // Same WitnessArgs should always serialize to the same bytes
+        let wa = WitnessArgs {
+            lock: Some(vec![0x11; 65]),
+            input_type: Some(vec![0x22; 10]),
+            output_type: None,
+        };
+        let b1 = wa.serialize();
+        let b2 = wa.serialize();
+        assert_eq!(b1, b2);
+    }
+
+    #[test]
+    fn test_witness_args_empty_vec_lock_roundtrip() {
+        // A lock field that is Some but zero-length
+        let wa = WitnessArgs {
+            lock: Some(vec![]),
+            input_type: None,
+            output_type: None,
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.lock, Some(vec![]));
+        assert!(decoded.input_type.is_none());
+        assert!(decoded.output_type.is_none());
+    }
+
+    #[test]
+    fn test_witness_args_single_byte_fields_roundtrip() {
+        // Minimum non-empty data in all three fields
+        let wa = WitnessArgs {
+            lock: Some(vec![0x01]),
+            input_type: Some(vec![0x02]),
+            output_type: Some(vec![0x03]),
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.lock.unwrap(), vec![0x01]);
+        assert_eq!(decoded.input_type.unwrap(), vec![0x02]);
+        assert_eq!(decoded.output_type.unwrap(), vec![0x03]);
+    }
+
+    #[test]
+    fn test_witness_args_deserialize_total_size_mismatch() {
+        // total_size says 100 but we only provide 20 bytes — should error
+        let mut data = vec![0u8; 20];
+        // Set total_size to 100
+        data[0..4].copy_from_slice(&100u32.to_le_bytes());
+        // Set three offsets to 16 (header end) so fields are "empty"
+        data[4..8].copy_from_slice(&16u32.to_le_bytes());
+        data[8..12].copy_from_slice(&16u32.to_le_bytes());
+        data[12..16].copy_from_slice(&16u32.to_le_bytes());
+        assert!(WitnessArgs::deserialize(&data).is_err());
+    }
+
+    #[test]
+    fn test_tx_hash_nonzero() {
+        // Even a minimal transaction should produce a non-zero hash
+        let tx = test_unsigned(1);
+        let hash = hash_raw_transaction(&tx.cell_deps, &tx.inputs, &tx.outputs);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_tx_hash_changes_with_output_data() {
+        let mut tx1 = test_unsigned(1);
+        let tx2 = test_unsigned(1);
+        tx1.outputs[0].data = vec![0xAA, 0xBB, 0xCC];
+        let h1 = hash_raw_transaction(&tx1.cell_deps, &tx1.inputs, &tx1.outputs);
+        let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_tx_hash_changes_with_since() {
+        let mut tx1 = test_unsigned(1);
+        let tx2 = test_unsigned(1);
+        tx1.inputs[0].since = 12345;
+        let h1 = hash_raw_transaction(&tx1.cell_deps, &tx1.inputs, &tx1.outputs);
+        let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_signing_message_changes_with_witness_args() {
+        let tx_hash = [0x42; 32];
+        let wa1 = WitnessArgs::new_with_empty_lock();
+        let wa2 = WitnessArgs {
+            lock: Some(vec![0xFF; 65]),
+            input_type: None,
+            output_type: None,
+        };
+        let m1 = compute_signing_message(&tx_hash, &wa1, &[]);
+        let m2 = compute_signing_message(&tx_hash, &wa2, &[]);
+        assert_ne!(m1, m2);
+    }
+
+    #[test]
+    fn test_signing_message_nonzero() {
+        let tx_hash = [0x00; 32];
+        let wa = WitnessArgs::new_with_empty_lock();
+        let msg = compute_signing_message(&tx_hash, &wa, &[]);
+        assert_ne!(msg, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_mock_signer_different_locks_different_sigs() {
+        let signer_a = MockSigner::new(test_script(0x01));
+        let signer_b = MockSigner::new(test_script(0x02));
+        assert_ne!(signer_a.signature, signer_b.signature);
+    }
+
+    #[test]
+    fn test_mock_signer_lock_script_matches() {
+        let lock = test_script(0x42);
+        let signer = MockSigner::new(lock.clone());
+        let returned = signer.lock_script();
+        assert_eq!(returned.code_hash, lock.code_hash);
+        assert_eq!(returned.args, lock.args);
+    }
+
+    #[test]
+    fn test_estimate_tx_size_empty_transaction() {
+        // A transaction with no deps, inputs, outputs, or witnesses
+        let size = estimate_tx_size(&[], &[], &[], &[]);
+        // Should just be the header: 4 + 4 + 4 + 4 + 4 = 20 bytes
+        assert_eq!(size, 20);
+    }
+
+    #[test]
+    fn test_estimate_tx_size_with_witnesses() {
+        let tx = test_unsigned(1);
+        let small_witnesses: Vec<Vec<u8>> = vec![vec![0u8; 10]];
+        let large_witnesses: Vec<Vec<u8>> = vec![vec![0u8; 200]];
+        let s1 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &small_witnesses);
+        let s2 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &large_witnesses);
+        assert_eq!(s2 - s1, 190); // 200 - 10 = 190 extra bytes
+    }
+
+    #[test]
+    fn test_validate_many_unique_inputs() {
+        // 10 unique inputs should pass validation
+        let tx = test_unsigned(10);
+        assert!(validate_unsigned(&tx).is_ok());
+    }
+
+    #[test]
+    fn test_assemble_preserves_cell_deps() {
+        let tx = test_unsigned(1);
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.cell_deps.len(), tx.cell_deps.len());
+        assert_eq!(signed.cell_deps[0].tx_hash, tx.cell_deps[0].tx_hash);
+    }
+
+    #[test]
+    fn test_assemble_preserves_outputs() {
+        let tx = test_unsigned(2);
+        let signer = MockSigner::new(test_script(0x01));
+        let signed = assemble_single_signer(&tx, &signer).unwrap();
+        assert_eq!(signed.outputs.len(), 2);
+        assert_eq!(signed.outputs[0].capacity, tx.outputs[0].capacity);
+        assert_eq!(signed.outputs[1].capacity, tx.outputs[1].capacity);
+    }
+
+    #[test]
+    fn test_assemble_with_fee_exact_capacity() {
+        // Output capacity exactly equals the fee — should result in zero capacity
+        let mut tx = test_unsigned(1);
+        // First assemble to find out what the fee would be
+        let mut tx_probe = tx.clone();
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+        // Estimate the fee
+        let estimated_witness_size = tx.inputs.len() * (WitnessArgs::new_with_empty_lock().serialize().len() + 4);
+        let base_size = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        let fee = calculate_fee(base_size + estimated_witness_size, DEFAULT_FEE_RATE);
+        // Set capacity to exactly the fee
+        tx_probe.outputs[0].capacity = fee;
+        let result = assemble_with_fee(&mut tx_probe, &[&signer], &locks, DEFAULT_FEE_RATE);
+        // Should succeed with 0 remaining capacity
+        let signed = result.unwrap();
+        assert_eq!(signed.outputs[0].capacity, 0);
+    }
+
+    #[test]
+    fn test_signed_tx_hash_deterministic() {
+        let tx = test_unsigned(2);
+        let signer = MockSigner::new(test_script(0x01));
+        let signed = assemble_single_signer(&tx, &signer).unwrap();
+        let h1 = signed.tx_hash();
+        let h2 = signed.tx_hash();
+        assert_eq!(h1, h2);
+    }
 }

@@ -816,6 +816,7 @@ dependencies = [
 name = "vibeswap-sdk"
 version = "0.1.0"
 dependencies = [
+ "ckb-lending-math",
  "hex",
  "serde",
  "serde_json",

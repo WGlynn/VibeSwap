@@ -1008,7 +1008,7 @@ impl VibeSwapSDK {
     ) -> Result<UnsignedTransaction, SDKError> {
         use ckb_lending_math::{
             collateral::{self, CollateralParams},
-            interest, shares,
+            interest,
         };
 
         // Build rate model from pool params

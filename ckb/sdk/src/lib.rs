@@ -977,6 +977,538 @@ impl VibeSwapSDK {
             witnesses: vec![vec![]],
         }
     }
+    // ============ Core Lending Operations ============
+
+    /// Deposit tokens into a lending pool for yield.
+    ///
+    /// The depositor receives pool shares (like cTokens) proportional to their
+    /// deposit. As interest accrues from borrowers, each share becomes worth
+    /// more underlying tokens.
+    pub fn deposit_to_lending_pool(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &LendingPoolCellData,
+        vault_outpoint: CellInput,
+        vault_data: &VaultCellData,
+        deposit_amount: u128,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if deposit_amount == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Accrue interest first
+        let model = ckb_lending_math::interest::RateModel {
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+        };
+        let pool_state = ckb_lending_math::pool::PoolState {
+            total_deposits: pool_data.total_deposits,
+            total_borrows: pool_data.total_borrows,
+            total_shares: pool_data.total_shares,
+            total_reserves: pool_data.total_reserves,
+            last_accrual_block: pool_data.last_accrual_block,
+            borrow_index: pool_data.borrow_index,
+        };
+        let accrued = ckb_lending_math::pool::accrue(
+            &pool_state,
+            block_number,
+            &model,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        // Calculate shares for deposit
+        let new_shares = ckb_lending_math::shares::deposit_to_shares(
+            deposit_amount,
+            accrued.total_shares,
+            accrued.total_underlying(),
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        let new_pool = LendingPoolCellData {
+            total_deposits: accrued.total_deposits + deposit_amount,
+            total_borrows: accrued.total_borrows,
+            total_shares: accrued.total_shares + new_shares,
+            total_reserves: accrued.total_reserves,
+            borrow_index: accrued.borrow_index,
+            last_accrual_block: block_number,
+            // Immutable fields
+            asset_type_hash: pool_data.asset_type_hash,
+            pool_id: pool_data.pool_id,
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+            collateral_factor: pool_data.collateral_factor,
+            liquidation_threshold: pool_data.liquidation_threshold,
+            liquidation_incentive: pool_data.liquidation_incentive,
+        };
+
+        let new_vault = VaultCellData {
+            deposit_shares: vault_data.deposit_shares + new_shares,
+            last_update_block: block_number,
+            ..*vault_data
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.lending_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: vault_data.owner_lock_hash,
+                hash_type: HashType::Type,
+                args: vec![],
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_vault.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![pool_outpoint, vault_outpoint],
+            outputs: vec![pool_output, vault_output],
+            witnesses: vec![vec![]; 2],
+        })
+    }
+
+    /// Withdraw tokens from a lending pool by burning deposit shares.
+    ///
+    /// The withdrawer burns their pool shares and receives underlying tokens
+    /// proportional to the current exchange rate (including accrued interest).
+    pub fn withdraw_from_lending_pool(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &LendingPoolCellData,
+        vault_outpoint: CellInput,
+        vault_data: &VaultCellData,
+        shares_to_burn: u128,
+        withdrawer_lock: Script,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if shares_to_burn == 0 || shares_to_burn > vault_data.deposit_shares {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Accrue interest first
+        let model = ckb_lending_math::interest::RateModel {
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+        };
+        let pool_state = ckb_lending_math::pool::PoolState {
+            total_deposits: pool_data.total_deposits,
+            total_borrows: pool_data.total_borrows,
+            total_shares: pool_data.total_shares,
+            total_reserves: pool_data.total_reserves,
+            last_accrual_block: pool_data.last_accrual_block,
+            borrow_index: pool_data.borrow_index,
+        };
+        let accrued = ckb_lending_math::pool::accrue(
+            &pool_state,
+            block_number,
+            &model,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        // Calculate underlying for shares
+        let underlying = ckb_lending_math::shares::shares_to_underlying(
+            shares_to_burn,
+            accrued.total_shares,
+            accrued.total_underlying(),
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        // Check liquidity
+        if underlying > accrued.available_liquidity() {
+            return Err(SDKError::InsufficientLiquidity);
+        }
+
+        let new_pool = LendingPoolCellData {
+            total_deposits: accrued.total_deposits - underlying,
+            total_borrows: accrued.total_borrows,
+            total_shares: accrued.total_shares - shares_to_burn,
+            total_reserves: accrued.total_reserves,
+            borrow_index: accrued.borrow_index,
+            last_accrual_block: block_number,
+            asset_type_hash: pool_data.asset_type_hash,
+            pool_id: pool_data.pool_id,
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+            collateral_factor: pool_data.collateral_factor,
+            liquidation_threshold: pool_data.liquidation_threshold,
+            liquidation_incentive: pool_data.liquidation_incentive,
+        };
+
+        let new_vault = VaultCellData {
+            deposit_shares: vault_data.deposit_shares - shares_to_burn,
+            last_update_block: block_number,
+            ..*vault_data
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.lending_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: vault_data.owner_lock_hash,
+                hash_type: HashType::Type,
+                args: vec![],
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_vault.serialize().to_vec(),
+        };
+
+        let withdraw_output = CellOutput {
+            capacity: 0,
+            lock_script: withdrawer_lock,
+            type_script: None,
+            data: underlying.to_le_bytes().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![pool_outpoint, vault_outpoint],
+            outputs: vec![pool_output, vault_output, withdraw_output],
+            witnesses: vec![vec![]; 2],
+        })
+    }
+
+    /// Borrow tokens from a lending pool against vault collateral.
+    ///
+    /// The borrower takes a loan from the pool, increasing their debt shares.
+    /// The vault must have sufficient collateral to satisfy the health factor.
+    pub fn borrow_from_lending_pool(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &LendingPoolCellData,
+        vault_outpoint: CellInput,
+        vault_data: &VaultCellData,
+        borrow_amount: u128,
+        collateral_price: u128,
+        debt_price: u128,
+        borrower_lock: Script,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if borrow_amount == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Accrue interest first
+        let model = ckb_lending_math::interest::RateModel {
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+        };
+        let pool_state = ckb_lending_math::pool::PoolState {
+            total_deposits: pool_data.total_deposits,
+            total_borrows: pool_data.total_borrows,
+            total_shares: pool_data.total_shares,
+            total_reserves: pool_data.total_reserves,
+            last_accrual_block: pool_data.last_accrual_block,
+            borrow_index: pool_data.borrow_index,
+        };
+        let accrued = ckb_lending_math::pool::accrue(
+            &pool_state,
+            block_number,
+            &model,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        // Check liquidity
+        if borrow_amount > accrued.available_liquidity() {
+            return Err(SDKError::InsufficientLiquidity);
+        }
+
+        // Calculate debt shares for this borrow
+        let new_debt_shares = vibeswap_math::mul_div(
+            borrow_amount,
+            PRECISION,
+            accrued.borrow_index,
+        );
+
+        // Check that post-borrow health factor is safe
+        let current_debt = ckb_lending_math::pool::current_debt(
+            vault_data.debt_shares,
+            vault_data.borrow_index_snapshot,
+            accrued.borrow_index,
+        );
+        let total_debt_after = current_debt + borrow_amount;
+
+        let max_borrow = ckb_lending_math::collateral::max_borrow(
+            vault_data.collateral_amount,
+            collateral_price,
+            pool_data.collateral_factor,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        let total_debt_value = vibeswap_math::mul_div(total_debt_after, debt_price, PRECISION);
+        if total_debt_value > max_borrow {
+            return Err(SDKError::InvalidAmounts); // Would exceed max LTV
+        }
+
+        let new_pool = LendingPoolCellData {
+            total_deposits: accrued.total_deposits,
+            total_borrows: accrued.total_borrows + borrow_amount,
+            total_shares: accrued.total_shares,
+            total_reserves: accrued.total_reserves,
+            borrow_index: accrued.borrow_index,
+            last_accrual_block: block_number,
+            asset_type_hash: pool_data.asset_type_hash,
+            pool_id: pool_data.pool_id,
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+            collateral_factor: pool_data.collateral_factor,
+            liquidation_threshold: pool_data.liquidation_threshold,
+            liquidation_incentive: pool_data.liquidation_incentive,
+        };
+
+        let new_vault = VaultCellData {
+            debt_shares: vault_data.debt_shares + new_debt_shares,
+            borrow_index_snapshot: accrued.borrow_index,
+            last_update_block: block_number,
+            ..*vault_data
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.lending_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: vault_data.owner_lock_hash,
+                hash_type: HashType::Type,
+                args: vec![],
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_vault.serialize().to_vec(),
+        };
+
+        // Borrowed tokens go to borrower
+        let borrow_output = CellOutput {
+            capacity: 0,
+            lock_script: borrower_lock,
+            type_script: None,
+            data: borrow_amount.to_le_bytes().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![pool_outpoint, vault_outpoint],
+            outputs: vec![pool_output, vault_output, borrow_output],
+            witnesses: vec![vec![]; 2],
+        })
+    }
+
+    /// Repay borrowed tokens to a lending pool.
+    ///
+    /// The borrower repays some or all of their debt, reducing their vault's
+    /// debt shares. Excess repayment is returned as change.
+    pub fn repay_to_lending_pool(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &LendingPoolCellData,
+        vault_outpoint: CellInput,
+        vault_data: &VaultCellData,
+        repay_amount: u128,
+        repayer_input: CellInput,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if repay_amount == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Accrue interest first
+        let model = ckb_lending_math::interest::RateModel {
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+        };
+        let pool_state = ckb_lending_math::pool::PoolState {
+            total_deposits: pool_data.total_deposits,
+            total_borrows: pool_data.total_borrows,
+            total_shares: pool_data.total_shares,
+            total_reserves: pool_data.total_reserves,
+            last_accrual_block: pool_data.last_accrual_block,
+            borrow_index: pool_data.borrow_index,
+        };
+        let accrued = ckb_lending_math::pool::accrue(
+            &pool_state,
+            block_number,
+            &model,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        // Calculate current debt
+        let current_debt = ckb_lending_math::pool::current_debt(
+            vault_data.debt_shares,
+            vault_data.borrow_index_snapshot,
+            accrued.borrow_index,
+        );
+
+        // Cap repayment at current debt
+        let actual_repay = repay_amount.min(current_debt);
+        if actual_repay == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Convert repay amount to debt shares retired
+        let retired_shares = vibeswap_math::mul_div(
+            actual_repay,
+            PRECISION,
+            accrued.borrow_index,
+        );
+
+        let new_pool = LendingPoolCellData {
+            total_deposits: accrued.total_deposits,
+            total_borrows: accrued.total_borrows.saturating_sub(actual_repay),
+            total_shares: accrued.total_shares,
+            total_reserves: accrued.total_reserves,
+            borrow_index: accrued.borrow_index,
+            last_accrual_block: block_number,
+            asset_type_hash: pool_data.asset_type_hash,
+            pool_id: pool_data.pool_id,
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+            collateral_factor: pool_data.collateral_factor,
+            liquidation_threshold: pool_data.liquidation_threshold,
+            liquidation_incentive: pool_data.liquidation_incentive,
+        };
+
+        let new_vault = VaultCellData {
+            debt_shares: vault_data.debt_shares.saturating_sub(retired_shares),
+            borrow_index_snapshot: accrued.borrow_index,
+            last_update_block: block_number,
+            ..*vault_data
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.lending_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: vault_data.owner_lock_hash,
+                hash_type: HashType::Type,
+                args: vec![],
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_vault.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![pool_outpoint, vault_outpoint, repayer_input],
+            outputs: vec![pool_output, vault_output],
+            witnesses: vec![vec![]; 3],
+        })
+    }
+
     // ============ Liquidation ============
 
     /// Build a transaction to liquidate an underwater vault position

@@ -917,3 +917,429 @@ fn test_sdk_liquidation_rejects_overcollateralized() {
     // Should fail — position is overcollateralized
     assert!(result.is_err(), "Cannot liquidate a safe position");
 }
+
+// ============ Core Lending SDK Builder Tests ============
+
+fn test_sdk() -> vibeswap_sdk::VibeSwapSDK {
+    use vibeswap_sdk::{VibeSwapSDK, DeploymentInfo};
+    VibeSwapSDK::new(DeploymentInfo {
+        pow_lock_code_hash: [0x01; 32],
+        batch_auction_type_code_hash: [0x02; 32],
+        commit_type_code_hash: [0x03; 32],
+        amm_pool_type_code_hash: [0x04; 32],
+        lp_position_type_code_hash: [0x05; 32],
+        compliance_type_code_hash: [0x06; 32],
+        config_type_code_hash: [0x07; 32],
+        oracle_type_code_hash: [0x08; 32],
+        knowledge_type_code_hash: [0x09; 32],
+        lending_pool_type_code_hash: [0x0A; 32],
+        vault_type_code_hash: [0x0B; 32],
+        insurance_pool_type_code_hash: [0x0C; 32],
+        script_dep_tx_hash: [0x10; 32],
+        script_dep_index: 0,
+    })
+}
+
+fn test_input(id: u8) -> vibeswap_sdk::CellInput {
+    vibeswap_sdk::CellInput { tx_hash: [id; 32], index: 0, since: 0 }
+}
+
+fn test_lock(id: u8) -> vibeswap_sdk::Script {
+    vibeswap_sdk::Script {
+        code_hash: [id; 32],
+        hash_type: vibeswap_sdk::HashType::Type,
+        args: vec![id; 20],
+    }
+}
+
+fn active_pool() -> LendingPoolCellData {
+    LendingPoolCellData {
+        total_deposits: 1_000_000 * PRECISION,
+        total_borrows: 500_000 * PRECISION,
+        total_shares: 1_000_000 * PRECISION,
+        total_reserves: 0,
+        borrow_index: PRECISION,
+        last_accrual_block: 100,
+        asset_type_hash: [0xAA; 32],
+        pool_id: [0xBB; 32],
+        base_rate: DEFAULT_BASE_RATE,
+        slope1: DEFAULT_SLOPE1,
+        slope2: DEFAULT_SLOPE2,
+        optimal_utilization: DEFAULT_OPTIMAL_UTILIZATION,
+        reserve_factor: DEFAULT_RESERVE_FACTOR,
+        collateral_factor: DEFAULT_COLLATERAL_FACTOR,
+        liquidation_threshold: DEFAULT_LIQUIDATION_THRESHOLD,
+        liquidation_incentive: DEFAULT_LIQUIDATION_INCENTIVE,
+    }
+}
+
+fn active_vault() -> VaultCellData {
+    VaultCellData {
+        owner_lock_hash: [0x11; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 100 * PRECISION,
+        collateral_type_hash: [0xCC; 32],
+        debt_shares: 0,
+        borrow_index_snapshot: PRECISION,
+        deposit_shares: 50_000 * PRECISION,
+        last_update_block: 100,
+    }
+}
+
+#[test]
+fn test_deposit_to_lending_pool() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = active_vault();
+
+    let tx = sdk.deposit_to_lending_pool(
+        test_input(0x01),
+        &pool,
+        test_input(0x02),
+        &vault,
+        100_000 * PRECISION,
+        200,
+    ).unwrap();
+
+    assert_eq!(tx.inputs.len(), 2);
+    assert_eq!(tx.outputs.len(), 2);
+
+    let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+    let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+
+    // Pool deposits increased
+    assert!(new_pool.total_deposits > pool.total_deposits);
+    // Pool shares increased
+    assert!(new_pool.total_shares > pool.total_shares);
+    // Vault deposit shares increased
+    assert!(new_vault.deposit_shares > vault.deposit_shares);
+    // Pool validation
+    assert!(verify_update(&pool, &new_pool).is_ok());
+}
+
+#[test]
+fn test_deposit_zero_rejected() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = active_vault();
+
+    let result = sdk.deposit_to_lending_pool(
+        test_input(0x01), &pool,
+        test_input(0x02), &vault,
+        0, 200,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_withdraw_from_lending_pool() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = active_vault();
+
+    let tx = sdk.withdraw_from_lending_pool(
+        test_input(0x01),
+        &pool,
+        test_input(0x02),
+        &vault,
+        25_000 * PRECISION, // burn 25K shares
+        test_lock(0x03),
+        200,
+    ).unwrap();
+
+    assert_eq!(tx.inputs.len(), 2);
+    assert_eq!(tx.outputs.len(), 3); // pool + vault + withdrawal
+
+    let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+    let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+
+    // Pool deposits decreased
+    assert!(new_pool.total_deposits < pool.total_deposits);
+    // Pool shares decreased
+    assert!(new_pool.total_shares < pool.total_shares);
+    // Vault deposit shares decreased
+    assert_eq!(new_vault.deposit_shares, vault.deposit_shares - 25_000 * PRECISION);
+    // Withdrawal output
+    let withdrawn = u128::from_le_bytes(tx.outputs[2].data[0..16].try_into().unwrap());
+    assert!(withdrawn > 0);
+
+    assert!(verify_update(&pool, &new_pool).is_ok());
+}
+
+#[test]
+fn test_withdraw_excess_shares_rejected() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = active_vault();
+
+    let result = sdk.withdraw_from_lending_pool(
+        test_input(0x01), &pool,
+        test_input(0x02), &vault,
+        vault.deposit_shares + 1, // more than vault has
+        test_lock(0x03),
+        200,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_borrow_from_lending_pool() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = VaultCellData {
+        collateral_amount: 100 * PRECISION, // 100 ETH collateral
+        debt_shares: 0,
+        deposit_shares: 0,
+        ..active_vault()
+    };
+
+    // Borrow 10K USDC with 100 ETH collateral at $2000
+    // Max borrow = 100 * 2000 * 0.75 = 150K — 10K is well within
+    let tx = sdk.borrow_from_lending_pool(
+        test_input(0x01),
+        &pool,
+        test_input(0x02),
+        &vault,
+        10_000 * PRECISION,
+        2000 * PRECISION, // ETH price
+        PRECISION,        // USDC price
+        test_lock(0x03),
+        200,
+    ).unwrap();
+
+    assert_eq!(tx.inputs.len(), 2);
+    assert_eq!(tx.outputs.len(), 3); // pool + vault + borrowed tokens
+
+    let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+    let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+
+    // Pool borrows increased (includes accrued interest + new borrow)
+    assert!(new_pool.total_borrows > pool.total_borrows + 10_000 * PRECISION - PRECISION);
+    // Vault has debt now
+    assert!(new_vault.debt_shares > 0);
+    // Borrowed amount in output
+    let borrowed = u128::from_le_bytes(tx.outputs[2].data[0..16].try_into().unwrap());
+    assert_eq!(borrowed, 10_000 * PRECISION);
+
+    assert!(verify_update(&pool, &new_pool).is_ok());
+}
+
+#[test]
+fn test_borrow_exceeds_max_ltv_rejected() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = VaultCellData {
+        collateral_amount: 1 * PRECISION, // only 1 ETH
+        debt_shares: 0,
+        deposit_shares: 0,
+        ..active_vault()
+    };
+
+    // Try to borrow 2000 USDC with 1 ETH at $2000
+    // Max borrow = 1 * 2000 * 0.75 = 1500 — 2000 exceeds
+    let result = sdk.borrow_from_lending_pool(
+        test_input(0x01), &pool,
+        test_input(0x02), &vault,
+        2_000 * PRECISION,
+        2000 * PRECISION,
+        PRECISION,
+        test_lock(0x03),
+        200,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_borrow_exceeds_liquidity_rejected() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = VaultCellData {
+        collateral_amount: 10_000 * PRECISION, // massive collateral
+        debt_shares: 0,
+        deposit_shares: 0,
+        ..active_vault()
+    };
+
+    // Pool has 500K available (1M deposits - 500K borrows)
+    // Try to borrow 600K — exceeds available liquidity
+    let result = sdk.borrow_from_lending_pool(
+        test_input(0x01), &pool,
+        test_input(0x02), &vault,
+        600_000 * PRECISION,
+        2000 * PRECISION,
+        PRECISION,
+        test_lock(0x03),
+        200,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_repay_to_lending_pool() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = VaultCellData {
+        collateral_amount: 100 * PRECISION,
+        debt_shares: 10_000 * PRECISION, // has 10K debt
+        deposit_shares: 0,
+        ..active_vault()
+    };
+
+    let tx = sdk.repay_to_lending_pool(
+        test_input(0x01),
+        &pool,
+        test_input(0x02),
+        &vault,
+        5_000 * PRECISION, // repay half
+        test_input(0x03),
+        200,
+    ).unwrap();
+
+    assert_eq!(tx.inputs.len(), 3); // pool + vault + repayer
+    assert_eq!(tx.outputs.len(), 2); // pool + vault
+
+    let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+    let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+
+    // Pool borrows decreased
+    assert!(new_pool.total_borrows < pool.total_borrows);
+    // Vault debt decreased
+    assert!(new_vault.debt_shares < vault.debt_shares);
+
+    assert!(verify_update(&pool, &new_pool).is_ok());
+}
+
+#[test]
+fn test_repay_full_debt() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = VaultCellData {
+        collateral_amount: 100 * PRECISION,
+        debt_shares: 10_000 * PRECISION,
+        deposit_shares: 0,
+        ..active_vault()
+    };
+
+    // Repay more than owed — should cap at actual debt
+    let tx = sdk.repay_to_lending_pool(
+        test_input(0x01),
+        &pool,
+        test_input(0x02),
+        &vault,
+        50_000 * PRECISION, // more than owed
+        test_input(0x03),
+        200,
+    ).unwrap();
+
+    let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+    // Debt should be fully repaid (or very close to 0 due to rounding)
+    assert!(new_vault.debt_shares < PRECISION); // effectively zero
+}
+
+#[test]
+fn test_repay_zero_rejected() {
+    let sdk = test_sdk();
+    let pool = active_pool();
+    let vault = VaultCellData {
+        debt_shares: 10_000 * PRECISION,
+        ..active_vault()
+    };
+
+    let result = sdk.repay_to_lending_pool(
+        test_input(0x01), &pool,
+        test_input(0x02), &vault,
+        0, test_input(0x03), 200,
+    );
+    assert!(result.is_err());
+}
+
+// ============ Full Lending Lifecycle Test ============
+
+#[test]
+fn test_lending_full_lifecycle_sdk() {
+    let sdk = test_sdk();
+
+    // 1. Alice creates lending pool with 1M USDC
+    let create_tx = sdk.create_lending_pool(
+        [0xBB; 32], [0xAA; 32],
+        1_000_000 * PRECISION,
+        test_lock(0x01),
+        test_input(0x01),
+        100,
+    );
+    let pool = LendingPoolCellData::deserialize(&create_tx.outputs[0].data).unwrap();
+    assert!(verify_creation(&pool).is_ok());
+    assert_eq!(pool.total_deposits, 1_000_000 * PRECISION);
+
+    // 2. Bob opens vault with 100 ETH collateral
+    let bob_vault_tx = sdk.open_vault(
+        [0xBB; 32],
+        100 * PRECISION,
+        [0xCC; 32],
+        test_lock(0x02),
+        test_input(0x02),
+        101,
+    );
+    let bob_vault = VaultCellData::deserialize(&bob_vault_tx.outputs[0].data).unwrap();
+    assert!(verify_vault_creation(&bob_vault).is_ok());
+
+    // 3. Bob borrows 50K USDC (well within 75% LTV at $2000/ETH)
+    let borrow_tx = sdk.borrow_from_lending_pool(
+        test_input(0x03), &pool,
+        test_input(0x04), &bob_vault,
+        50_000 * PRECISION,
+        2000 * PRECISION, PRECISION,
+        test_lock(0x02),
+        200,
+    ).unwrap();
+    let pool_after_borrow = LendingPoolCellData::deserialize(&borrow_tx.outputs[0].data).unwrap();
+    let vault_after_borrow = VaultCellData::deserialize(&borrow_tx.outputs[1].data).unwrap();
+    assert!(vault_after_borrow.debt_shares > 0);
+
+    // 4. Carol deposits 200K USDC to earn yield
+    let carol_vault = VaultCellData {
+        owner_lock_hash: [0x33; 32],
+        pool_id: [0xBB; 32],
+        collateral_amount: 0,
+        collateral_type_hash: [0u8; 32],
+        debt_shares: 0,
+        borrow_index_snapshot: pool_after_borrow.borrow_index,
+        deposit_shares: 0,
+        last_update_block: 200,
+    };
+
+    let deposit_tx = sdk.deposit_to_lending_pool(
+        test_input(0x05), &pool_after_borrow,
+        test_input(0x06), &carol_vault,
+        200_000 * PRECISION,
+        300,
+    ).unwrap();
+    let pool_after_deposit = LendingPoolCellData::deserialize(&deposit_tx.outputs[0].data).unwrap();
+    let carol_vault_after = VaultCellData::deserialize(&deposit_tx.outputs[1].data).unwrap();
+    assert!(carol_vault_after.deposit_shares > 0);
+    assert!(pool_after_deposit.total_deposits > pool_after_borrow.total_deposits);
+
+    // 5. Bob repays 25K of his debt
+    let repay_tx = sdk.repay_to_lending_pool(
+        test_input(0x07), &pool_after_deposit,
+        test_input(0x08), &vault_after_borrow,
+        25_000 * PRECISION,
+        test_input(0x09),
+        400,
+    ).unwrap();
+    let pool_after_repay = LendingPoolCellData::deserialize(&repay_tx.outputs[0].data).unwrap();
+    let vault_after_repay = VaultCellData::deserialize(&repay_tx.outputs[1].data).unwrap();
+    assert!(vault_after_repay.debt_shares < vault_after_borrow.debt_shares);
+
+    // 6. Carol withdraws her shares (should get more than deposited due to interest)
+    let withdraw_tx = sdk.withdraw_from_lending_pool(
+        test_input(0x0A), &pool_after_repay,
+        test_input(0x0B), &carol_vault_after,
+        carol_vault_after.deposit_shares,
+        test_lock(0x03),
+        500,
+    ).unwrap();
+    let withdrawn = u128::from_le_bytes(withdraw_tx.outputs[2].data[0..16].try_into().unwrap());
+    // Carol should get at least what she deposited (interest may be tiny over few blocks)
+    assert!(withdrawn >= 199_999 * PRECISION, "Carol should get back ~200K");
+}

@@ -20,6 +20,10 @@ use ckb_lending_math::{
     interest::{self, RateModel},
     collateral,
     shares,
+    insurance,
+    prevention,
+    BLOCKS_PER_YEAR,
+    BPS_DENOMINATOR,
 };
 use core::cmp::Ordering;
 
@@ -1429,5 +1433,130 @@ fn test_fuzz_borrow_rate_kink_continuity() {
             // Just above should be >= rate at kink
             assert!(ra >= rate_below, "Rate must not decrease above kink");
         }
+    }
+}
+
+// ============ Insurance Pool Fuzz Tests ============
+
+/// Property: insurance share deposit/redeem conserves value.
+/// deposit_to_shares(X) then shares_to_underlying(shares) ≈ X (within rounding).
+#[test]
+fn test_fuzz_insurance_share_conservation() {
+    let mut rng = TestRng::new(0x1A5C_0001_0001_0001);
+
+    for _ in 0..500 {
+        let total_shares = rng.range_u128(PRECISION, 1_000_000 * PRECISION);
+        let total_deposits = rng.range_u128(PRECISION, 2_000_000 * PRECISION);
+        let deposit = rng.range_u128(1, total_deposits);
+
+        let shares = insurance::deposit_to_shares(deposit, total_shares, total_deposits).unwrap();
+        if shares == 0 { continue; }
+
+        let new_total_shares = total_shares + shares;
+        let new_total_deposits = total_deposits + deposit;
+
+        let redeemed = insurance::shares_to_underlying(
+            shares, new_total_shares, new_total_deposits,
+        ).unwrap();
+
+        // Two mul_div operations accumulate rounding error.
+        // The property we verify: redeemed ≈ deposit within tiny relative error.
+        // redeemed should never exceed deposit (floor rounding).
+        assert!(redeemed <= deposit + 1,
+            "Redeemed {} exceeds deposit {} (should never overpay)", redeemed, deposit);
+        // Loss should be negligible relative to deposit (< 0.00001%)
+        let diff = deposit - redeemed;
+        assert!(diff <= deposit / 1_000_000_000 + 10,
+            "Share conservation loss too large: deposited {} got {} diff {}",
+            deposit, redeemed, diff);
+    }
+}
+
+/// Property: insurance premium is monotonically increasing with borrows, rate, and time.
+#[test]
+fn test_fuzz_insurance_premium_monotonicity() {
+    let mut rng = TestRng::new(0x1A5C_0001_0001_0002);
+
+    for _ in 0..500 {
+        let borrows = rng.range_u128(PRECISION, 10_000_000 * PRECISION);
+        let rate = rng.next_u64() % 1000 + 1; // 1-1000 bps
+        let blocks = rng.next_u64() % (BLOCKS_PER_YEAR as u64 * 2) + 1;
+
+        let premium = insurance::calculate_premium(borrows, rate, blocks);
+
+        // More borrows → more premium
+        let premium_2x_borrows = insurance::calculate_premium(borrows * 2, rate, blocks);
+        assert!(premium_2x_borrows >= premium, "Premium should increase with borrows");
+
+        // More time → more premium
+        if blocks < u64::MAX / 2 {
+            let premium_2x_time = insurance::calculate_premium(borrows, rate, blocks * 2);
+            assert!(premium_2x_time >= premium, "Premium should increase with time");
+        }
+    }
+}
+
+/// Property: insurance claim never exceeds available coverage.
+#[test]
+fn test_fuzz_insurance_claim_capped() {
+    let mut rng = TestRng::new(0x1A5C_0001_0001_0003);
+
+    for _ in 0..300 {
+        let pool_deposits = rng.range_u128(100 * PRECISION, 10_000_000 * PRECISION);
+        let max_coverage_bps = (rng.next_u64() % 5000 + 100) as u64; // 1-50%
+
+        let collateral = rng.range_u128(PRECISION, 100 * PRECISION);
+        let col_price = rng.range_u128(100 * PRECISION, 5000 * PRECISION);
+        let debt = rng.range_u128(PRECISION, 100_000 * PRECISION);
+        let debt_price = PRECISION;
+        let lt = rng.range_u128(PRECISION / 2, PRECISION);
+
+        let (claim, _hf) = insurance::calculate_claim(
+            collateral, col_price,
+            debt, debt_price,
+            lt,
+            prevention::HF_SOFT_LIQUIDATION,
+            pool_deposits,
+            max_coverage_bps,
+        );
+
+        let max_coverage = insurance::available_coverage(pool_deposits, max_coverage_bps);
+        assert!(claim <= max_coverage,
+            "Claim {} exceeds max coverage {}", claim, max_coverage);
+        assert!(claim <= pool_deposits,
+            "Claim {} exceeds pool deposits {}", claim, pool_deposits);
+    }
+}
+
+/// Property: insurance exchange rate is monotonically increasing with premium accrual.
+#[test]
+fn test_fuzz_insurance_exchange_rate_growth() {
+    let mut rng = TestRng::new(0x1A5C_0001_0001_0004);
+
+    for _ in 0..500 {
+        let shares = rng.range_u128(PRECISION, 1_000_000 * PRECISION);
+        let deposits = rng.range_u128(PRECISION, 2_000_000 * PRECISION);
+        let premium = rng.range_u128(1, deposits / 10 + 1);
+
+        let rate_before = insurance::exchange_rate(shares, deposits);
+        let rate_after = insurance::exchange_rate(shares, deposits + premium);
+
+        assert!(rate_after >= rate_before,
+            "Exchange rate must not decrease: {} -> {}", rate_before, rate_after);
+    }
+}
+
+/// Property: insurance coverage ratio is bounded [0, PRECISION].
+#[test]
+fn test_fuzz_insurance_coverage_ratio_bounded() {
+    let mut rng = TestRng::new(0x1A5C_0001_0001_0005);
+
+    for _ in 0..500 {
+        let insurance_deposits = rng.range_u128(0, 10_000_000 * PRECISION);
+        let lending_borrows = rng.range_u128(0, 10_000_000 * PRECISION);
+
+        let ratio = insurance::coverage_ratio(insurance_deposits, lending_borrows);
+        assert!(ratio <= PRECISION,
+            "Coverage ratio {} exceeds 100%", ratio);
     }
 }

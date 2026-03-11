@@ -1119,4 +1119,108 @@ mod tests {
         assert_eq!(hi, bhi);
         assert_eq!(lo, blo);
     }
+
+    // ============ New Edge Case & Coverage Tests (Batch 3) ============
+
+    #[test]
+    fn test_position_value_zero_lp_amount() {
+        // Zero LP amount should give zero amounts but no error
+        let pool = balanced_pool();
+        let val = position_value(0, &pool, PRECISION, PRECISION).unwrap();
+        assert_eq!(val.amount0, 0);
+        assert_eq!(val.amount1, 0);
+        assert_eq!(val.total_value, 0);
+        assert_eq!(val.pool_share_bps, 0);
+    }
+
+    #[test]
+    fn test_il_very_small_price_change() {
+        // Price moves by only 0.1% — IL should be essentially zero
+        let il = impermanent_loss(
+            PRECISION,
+            PRECISION * 1001 / 1000, // +0.1%
+            100_000 * PRECISION,
+        ).unwrap();
+        // IL for 0.1% move should be < 1 bps
+        assert!(il.il_bps < 1, "Tiny price move should produce negligible IL: {}", il.il_bps);
+    }
+
+    #[test]
+    fn test_withdrawal_exactly_minimum_liquidity() {
+        // Burning exactly enough to bring pool to minimum_liquidity
+        let pool = make_pool(
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            10_000,
+            30,
+        );
+        let burn_amount = 10_000 - MINIMUM_LIQUIDITY;
+        let est = estimate_withdrawal(burn_amount, &pool).unwrap();
+        // After burning, remaining = MINIMUM_LIQUIDITY exactly
+        assert!(!est.below_minimum, "Remaining at exactly minimum should not be below_minimum");
+    }
+
+    #[test]
+    fn test_optimal_deposit_very_small_amounts() {
+        // Very small deposit into a large pool
+        let pool = balanced_pool();
+        let dep = optimal_deposit(1, 1, &pool).unwrap();
+        assert_eq!(dep.amount0, 1);
+        assert_eq!(dep.amount1, 1);
+        assert_eq!(dep.leftover0, 0);
+        assert_eq!(dep.leftover1, 0);
+        // LP might be 0 due to rounding, but should not panic
+    }
+
+    #[test]
+    fn test_zap_in_imbalanced_pool_token1() {
+        // Zap token1 into an imbalanced pool
+        let pool = imbalanced_pool(); // 500K:2M
+        let zap = zap_in_estimate(10_000 * PRECISION, false, &pool).unwrap();
+        assert_eq!(zap.swap_amount, 5_000 * PRECISION);
+        assert!(zap.swap_output > 0);
+        assert!(zap.expected_lp > 0);
+    }
+
+    #[test]
+    fn test_pool_analytics_high_volume() {
+        // Volume much higher than TVL — high utilization
+        let pool = balanced_pool();
+        let analytics = pool_analytics(
+            &pool,
+            PRECISION,
+            PRECISION,
+            20_000_000 * PRECISION, // 20M volume vs 2M TVL
+            788_400,
+        ).unwrap();
+        // Utilization = volume/tvl * 10000 = 20M/2M * 10000 = 100000 bps
+        assert!(analytics.utilization_bps > 10_000,
+            "Volume >> TVL should produce utilization > 100%: {}", analytics.utilization_bps);
+    }
+
+    #[test]
+    fn test_spot_price_reserves_1_to_1000() {
+        // Very imbalanced pool: 1:1000 ratio
+        let pool = make_pool(
+            1 * PRECISION,
+            1000 * PRECISION,
+            1000 * PRECISION,
+            30,
+        );
+        let price = spot_price(&pool).unwrap();
+        assert_eq!(price, 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_available_lp_to_burn_large_supply() {
+        // Very large LP supply — should saturate correctly
+        let pool = make_pool(
+            u128::MAX / 4,
+            u128::MAX / 4,
+            u128::MAX / 2,
+            30,
+        );
+        let available = available_lp_to_burn(&pool);
+        assert_eq!(available, u128::MAX / 2 - MINIMUM_LIQUIDITY);
+    }
 }

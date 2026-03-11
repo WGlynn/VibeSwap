@@ -1514,4 +1514,164 @@ mod tests {
         data.extend_from_slice(&[0u8; 10]); // insufficient data
         assert!(TokenInfo::deserialize(&data).is_none());
     }
+
+    // ============ New Edge Case & Coverage Tests (Batch 3) ============
+
+    #[test]
+    fn test_mint_batch_large_recipient_list() {
+        // Batch mint to 10 recipients — verify all outputs are correct
+        let config = test_xudt_config();
+        let recipients: Vec<(super::super::Script, u128)> = (0..10u8)
+            .map(|i| (test_lock(0x10 + i), (i as u128 + 1) * 1000))
+            .collect();
+
+        let (tx, _) = mint_batch(&config, test_lock(0x01), &recipients, test_input(0x50));
+        assert_eq!(tx.outputs.len(), 10);
+        assert_eq!(tx.witnesses.len(), 10);
+
+        for (i, (_, expected_amount)) in recipients.iter().enumerate() {
+            let parsed = parse_token_amount(&tx.outputs[i].data).unwrap();
+            assert_eq!(parsed, *expected_amount, "Output {} amount mismatch", i);
+        }
+    }
+
+    #[test]
+    fn test_transfer_empty_inputs_fails() {
+        // Transfer with no input cells — should fail because total_input (0) < transfer_amount
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        let result = transfer_token(
+            &config,
+            type_script,
+            test_lock(0x01),
+            test_lock(0x02),
+            100,
+            vec![], // No inputs
+        );
+
+        assert_eq!(result.unwrap_err(), super::super::SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_burn_empty_inputs_fails() {
+        // Burn with no input cells — should fail
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        let result = burn_token(
+            &config,
+            type_script,
+            100,
+            test_lock(0x01),
+            vec![], // No inputs
+        );
+
+        assert_eq!(result.unwrap_err(), super::super::SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_hash_type_byte_all_variants() {
+        // Verify hash_type_byte maps all variants to distinct values
+        let data = hash_type_byte(&super::super::HashType::Data);
+        let type_ = hash_type_byte(&super::super::HashType::Type);
+        let data1 = hash_type_byte(&super::super::HashType::Data1);
+        let data2 = hash_type_byte(&super::super::HashType::Data2);
+
+        assert_eq!(data, 0);
+        assert_eq!(type_, 1);
+        assert_eq!(data1, 2);
+        assert_eq!(data2, 4);
+        // All must be distinct
+        let set: std::collections::HashSet<u8> = [data, type_, data1, data2].iter().copied().collect();
+        assert_eq!(set.len(), 4, "All hash type bytes must be distinct");
+    }
+
+    #[test]
+    fn test_token_info_serialize_deterministic() {
+        // Same input should always produce identical serialized bytes
+        let info = TokenInfo {
+            name: "Token".to_string(),
+            symbol: "TKN".to_string(),
+            decimals: 8,
+            description: "A test token".to_string(),
+            max_supply: 1_000_000,
+        };
+
+        let bytes1 = info.serialize();
+        let bytes2 = info.serialize();
+        assert_eq!(bytes1, bytes2, "Serialization must be deterministic");
+    }
+
+    #[test]
+    fn test_create_token_info_links_to_token_type_hash() {
+        // Verify the info cell's type script args contain the token_type_hash
+        let config = test_xudt_config();
+        let token_type_hash = [0x99; 32];
+        let info = TokenInfo {
+            name: "Linked".to_string(),
+            symbol: "LNK".to_string(),
+            decimals: 18,
+            description: "Linked to token via type args".to_string(),
+            max_supply: 0,
+        };
+
+        let tx = create_token_info(&config, token_type_hash, &info, test_lock(0x01), test_input(0x50));
+
+        let output_type = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(output_type.args, token_type_hash.to_vec(),
+            "Info cell type script args must contain the token_type_hash");
+        assert_eq!(output_type.code_hash, config.xudt_code_hash);
+    }
+
+    #[test]
+    fn test_mint_token_same_issuer_and_recipient() {
+        // Issuer can mint to themselves
+        let config = test_xudt_config();
+        let self_lock = test_lock(0x01);
+        let (tx, token_type_hash) = mint_token(
+            &config,
+            self_lock.clone(),
+            self_lock.clone(),
+            5000,
+            test_input(0x50),
+        );
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(parse_token_amount(&tx.outputs[0].data).unwrap(), 5000);
+        assert_eq!(tx.outputs[0].lock_script.args, self_lock.args);
+        assert_ne!(token_type_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_transfer_u128_max_amount() {
+        // Transfer u128::MAX tokens — should succeed if inputs have enough
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        let tx = transfer_token(
+            &config,
+            type_script,
+            test_lock(0x01),
+            test_lock(0x02),
+            u128::MAX,
+            vec![(test_input(0x50), u128::MAX)],
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1); // No change
+        let recipient_amount = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(recipient_amount, u128::MAX);
+    }
 }

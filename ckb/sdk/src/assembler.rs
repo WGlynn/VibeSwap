@@ -2002,4 +2002,168 @@ mod tests {
         let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
         assert_ne!(h1, h2);
     }
+
+    // ============ Hardening Tests: 103-116 ============
+
+    #[test]
+    fn test_witness_args_large_lock_field_roundtrip() {
+        // Lock field much larger than SECP256K1_SIGNATURE_SIZE
+        let wa = WitnessArgs {
+            lock: Some(vec![0xAB; 256]),
+            input_type: None,
+            output_type: None,
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.lock.unwrap().len(), 256);
+    }
+
+    #[test]
+    fn test_witness_args_all_empty_vecs_roundtrip() {
+        // All fields are Some but with zero-length data
+        let wa = WitnessArgs {
+            lock: Some(vec![]),
+            input_type: Some(vec![]),
+            output_type: Some(vec![]),
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.lock, Some(vec![]));
+        assert_eq!(decoded.input_type, Some(vec![]));
+        assert_eq!(decoded.output_type, Some(vec![]));
+    }
+
+    #[test]
+    fn test_compute_signing_message_is_32_bytes() {
+        let tx_hash = [0x01; 32];
+        let wa = WitnessArgs::new_with_empty_lock();
+        let msg = compute_signing_message(&tx_hash, &wa, &[]);
+        assert_eq!(msg.len(), 32);
+    }
+
+    #[test]
+    fn test_hash_script_bytes_deterministic() {
+        let script = test_script(0x42);
+        let h1 = hash_script_bytes(&script);
+        let h2 = hash_script_bytes(&script);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_script_bytes_different_for_different_scripts() {
+        let h1 = hash_script_bytes(&test_script(0x01));
+        let h2 = hash_script_bytes(&test_script(0x02));
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_script_bytes_different_hash_types() {
+        let mut s1 = test_script(0x01);
+        let mut s2 = test_script(0x01);
+        s1.hash_type = HashType::Data;
+        s2.hash_type = HashType::Type;
+        assert_ne!(hash_script_bytes(&s1), hash_script_bytes(&s2));
+    }
+
+    #[test]
+    fn test_hash_script_bytes_different_args() {
+        let mut s1 = test_script(0x01);
+        let mut s2 = test_script(0x01);
+        s1.args = vec![0x01; 20];
+        s2.args = vec![0x02; 20];
+        assert_ne!(hash_script_bytes(&s1), hash_script_bytes(&s2));
+    }
+
+    #[test]
+    fn test_assemble_preserves_input_tx_hashes() {
+        let tx = test_unsigned(3);
+        let signer = MockSigner::new(test_script(0x01));
+        let signed = assemble_single_signer(&tx, &signer).unwrap();
+        for (i, input) in signed.inputs.iter().enumerate() {
+            assert_eq!(input.tx_hash, tx.inputs[i].tx_hash);
+            assert_eq!(input.index, tx.inputs[i].index);
+        }
+    }
+
+    #[test]
+    fn test_assemble_with_fee_multiple_outputs() {
+        // Fee deducted from last output, earlier outputs untouched
+        let mut tx = test_unsigned(3);
+        tx.outputs[0].capacity = 50_000_000_000;
+        tx.outputs[1].capacity = 50_000_000_000;
+        tx.outputs[2].capacity = 50_000_000_000;
+        let original_first = tx.outputs[0].capacity;
+        let original_second = tx.outputs[1].capacity;
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01); 3];
+
+        let signed = assemble_with_fee(&mut tx, &[&signer], &locks, DEFAULT_FEE_RATE).unwrap();
+        assert_eq!(signed.outputs[0].capacity, original_first);
+        assert_eq!(signed.outputs[1].capacity, original_second);
+        assert!(signed.outputs[2].capacity < 50_000_000_000);
+    }
+
+    #[test]
+    fn test_validate_unsigned_preserves_cell_deps() {
+        // validate_unsigned should not modify the transaction
+        let tx = test_unsigned(2);
+        let deps_before = tx.cell_deps.len();
+        validate_unsigned(&tx).unwrap();
+        assert_eq!(tx.cell_deps.len(), deps_before);
+    }
+
+    #[test]
+    fn test_signed_tx_hash_is_32_bytes() {
+        let tx = test_unsigned(1);
+        let signer = MockSigner::new(test_script(0x01));
+        let signed = assemble_single_signer(&tx, &signer).unwrap();
+        let hash = signed.tx_hash();
+        assert_eq!(hash.len(), 32);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_estimate_tx_size_output_with_long_args() {
+        let mut tx = test_unsigned(1);
+        let s1 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        // Extend lock_script args by 100 bytes
+        tx.outputs[0].lock_script.args = vec![0xAB; 120]; // was 20 bytes
+        let s2 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        assert_eq!(s2 - s1, 100, "100 extra args bytes should add exactly 100 to size");
+    }
+
+    #[test]
+    fn test_assemble_output_type_script_preserved() {
+        // Ensure type_script on outputs is preserved through assembly
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].type_script = Some(Script {
+            code_hash: [0xCC; 32],
+            hash_type: HashType::Data1,
+            args: vec![0xDD; 10],
+        });
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        let ts = signed.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0xCC; 32]);
+        assert_eq!(ts.args, vec![0xDD; 10]);
+    }
+
+    #[test]
+    fn test_tx_hash_different_dep_types() {
+        // DepType::Code vs DepType::DepGroup should produce different hashes
+        let mut tx1 = test_unsigned(1);
+        let mut tx2 = test_unsigned(1);
+        tx1.cell_deps[0].dep_type = DepType::Code;
+        tx2.cell_deps[0].dep_type = DepType::DepGroup;
+        let h1 = hash_raw_transaction(&tx1.cell_deps, &tx1.inputs, &tx1.outputs);
+        let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_mock_signer_signature_is_65_bytes() {
+        let signer = MockSigner::new(test_script(0x42));
+        assert_eq!(signer.signature.len(), SECP256K1_SIGNATURE_SIZE);
+    }
 }

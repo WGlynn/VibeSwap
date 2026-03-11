@@ -2669,4 +2669,673 @@ mod tests {
         let result = sdk.update_compliance(bad_outpoint, bad_compliance, bad_lock);
         assert_eq!(result.unwrap_err(), SDKError::ComplianceVersionNotIncremented);
     }
+
+    // ============ Add Liquidity Tests ============
+
+    fn make_pool(reserve0: u128, reserve1: u128) -> PoolCellData {
+        PoolCellData {
+            reserve0,
+            reserve1,
+            total_lp_supply: vibeswap_math::sqrt_product(reserve0, reserve1),
+            fee_rate_bps: DEFAULT_FEE_RATE_BPS,
+            twap_price_cum: 0,
+            twap_last_block: 90,
+            k_last: [0u8; 32],
+            minimum_liquidity: MINIMUM_LIQUIDITY,
+            pair_id: [0xAA; 32],
+            token0_type_hash: [0xBB; 32],
+            token1_type_hash: [0xCC; 32],
+        }
+    }
+
+    fn make_lock() -> Script {
+        Script {
+            code_hash: [0x99; 32],
+            hash_type: HashType::Type,
+            args: vec![0x01; 20],
+        }
+    }
+
+    fn make_input(byte: u8) -> CellInput {
+        CellInput { tx_hash: [byte; 32], index: 0, since: 0 }
+    }
+
+    #[test]
+    fn test_add_liquidity() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_pool(1_000 * PRECISION, 2_000 * PRECISION);
+
+        let tx = sdk.add_liquidity(
+            make_input(0x60), &pool,
+            500 * PRECISION, 1_000 * PRECISION,
+            make_lock(), vec![make_input(0x61)], 100,
+        ).unwrap();
+
+        // 2 outputs: pool + LP position
+        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.inputs.len(), 2); // pool + user input
+
+        let new_pool = PoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert!(new_pool.reserve0 > pool.reserve0);
+        assert!(new_pool.reserve1 > pool.reserve1);
+        assert!(new_pool.total_lp_supply > pool.total_lp_supply);
+
+        let lp = LPPositionCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert!(lp.lp_amount > 0);
+        assert_eq!(lp.pool_id, pool.pair_id);
+        assert_eq!(lp.deposit_block, 100);
+    }
+
+    #[test]
+    fn test_add_liquidity_twap_updated() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_pool(1_000 * PRECISION, 2_000 * PRECISION);
+
+        let tx = sdk.add_liquidity(
+            make_input(0x60), &pool,
+            100 * PRECISION, 200 * PRECISION,
+            make_lock(), vec![make_input(0x61)], 100,
+        ).unwrap();
+
+        let new_pool = PoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_pool.twap_last_block, 100);
+        assert!(new_pool.twap_price_cum > pool.twap_price_cum);
+    }
+
+    #[test]
+    fn test_remove_liquidity() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_pool(1_000 * PRECISION, 2_000 * PRECISION);
+        let lp = LPPositionCellData {
+            lp_amount: pool.total_lp_supply / 10, // 10% of pool
+            entry_price: 2 * PRECISION,
+            pool_id: pool.pair_id,
+            deposit_block: 50,
+        };
+
+        let tx = sdk.remove_liquidity(
+            make_input(0x60), &pool,
+            make_input(0x61), &lp,
+            make_lock(), 100,
+        ).unwrap();
+
+        // Only 1 output (pool) — LP cell burned
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.inputs.len(), 2); // pool + LP
+
+        let new_pool = PoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert!(new_pool.reserve0 < pool.reserve0);
+        assert!(new_pool.reserve1 < pool.reserve1);
+        assert_eq!(new_pool.total_lp_supply, pool.total_lp_supply - lp.lp_amount);
+    }
+
+    // ============ Pool Creation Edge Cases ============
+
+    #[test]
+    fn test_create_pool_insufficient_liquidity() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        // Very small amounts → sqrt(a*b) <= MINIMUM_LIQUIDITY
+        let result = sdk.create_pool(
+            [0xAA; 32], [0xBB; 32], [0xCC; 32],
+            1, 1, // 1 * 1 = 1, sqrt(1) = 1 <= MINIMUM_LIQUIDITY
+            make_lock(), vec![make_input(0x50)], 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InsufficientLiquidity);
+    }
+
+    #[test]
+    fn test_create_pool_k_last_set() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let amount0 = 1_000 * PRECISION;
+        let amount1 = 2_000 * PRECISION;
+
+        let tx = sdk.create_pool(
+            [0xAA; 32], [0xBB; 32], [0xCC; 32],
+            amount0, amount1,
+            make_lock(), vec![make_input(0x50)], 100,
+        ).unwrap();
+
+        let pool = PoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        // k_last should be non-zero (product of reserves)
+        assert_ne!(pool.k_last, [0u8; 32]);
+    }
+
+    // ============ Lending Pool Tests ============
+
+    #[test]
+    fn test_create_lending_pool() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool_id = [0xAA; 32];
+        let asset = [0xBB; 32];
+        let deposit = 10_000 * PRECISION;
+
+        let tx = sdk.create_lending_pool(
+            pool_id, asset, deposit,
+            make_lock(), make_input(0x50), 100,
+        );
+
+        // 2 outputs: pool + initial vault
+        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.inputs.len(), 1);
+
+        let pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(pool.total_deposits, deposit);
+        assert_eq!(pool.total_borrows, 0);
+        assert_eq!(pool.total_shares, deposit); // 1:1 for first depositor
+        assert_eq!(pool.pool_id, pool_id);
+        assert_eq!(pool.asset_type_hash, asset);
+        assert_eq!(pool.borrow_index, PRECISION);
+        assert_eq!(pool.last_accrual_block, 100);
+
+        // Type script uses lending_pool code hash
+        let ts = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0x0A; 32]);
+
+        let vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert_eq!(vault.pool_id, pool_id);
+        assert_eq!(vault.deposit_shares, deposit);
+        assert_eq!(vault.debt_shares, 0);
+        assert_eq!(vault.collateral_amount, 0);
+    }
+
+    #[test]
+    fn test_open_vault() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool_id = [0xAA; 32];
+        let collateral = 5_000 * PRECISION;
+        let col_type = [0xDD; 32];
+
+        let tx = sdk.open_vault(
+            pool_id, collateral, col_type,
+            make_lock(), make_input(0x50), 100,
+        );
+
+        assert_eq!(tx.outputs.len(), 1);
+
+        let vault = VaultCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(vault.pool_id, pool_id);
+        assert_eq!(vault.collateral_amount, collateral);
+        assert_eq!(vault.collateral_type_hash, col_type);
+        assert_eq!(vault.debt_shares, 0);
+        assert_eq!(vault.deposit_shares, 0);
+        assert_eq!(vault.last_update_block, 100);
+
+        // Type script uses vault code hash
+        let ts = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0x0B; 32]);
+    }
+
+    // ============ Deposit/Withdraw Lending Tests ============
+
+    fn make_lending_pool() -> LendingPoolCellData {
+        LendingPoolCellData {
+            total_deposits: 100_000 * PRECISION,
+            total_borrows: 0,
+            total_shares: 100_000 * PRECISION,
+            total_reserves: 0,
+            borrow_index: PRECISION,
+            last_accrual_block: 100,
+            asset_type_hash: [0xBB; 32],
+            pool_id: [0xAA; 32],
+            base_rate: DEFAULT_BASE_RATE,
+            slope1: DEFAULT_SLOPE1,
+            slope2: DEFAULT_SLOPE2,
+            optimal_utilization: DEFAULT_OPTIMAL_UTILIZATION,
+            reserve_factor: DEFAULT_RESERVE_FACTOR,
+            collateral_factor: DEFAULT_COLLATERAL_FACTOR,
+            liquidation_threshold: DEFAULT_LIQUIDATION_THRESHOLD,
+            liquidation_incentive: DEFAULT_LIQUIDATION_INCENTIVE,
+        }
+    }
+
+    fn make_vault(pool_id: [u8; 32]) -> VaultCellData {
+        VaultCellData {
+            owner_lock_hash: [0x99; 32],
+            pool_id,
+            collateral_amount: 50_000 * PRECISION,
+            collateral_type_hash: [0xDD; 32],
+            debt_shares: 0,
+            borrow_index_snapshot: PRECISION,
+            deposit_shares: 10_000 * PRECISION,
+            last_update_block: 100,
+        }
+    }
+
+    #[test]
+    fn test_deposit_to_lending_pool() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+        let deposit = 5_000 * PRECISION;
+
+        let tx = sdk.deposit_to_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            deposit, 100, // same block = no accrual
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 2); // pool + vault
+
+        let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_pool.total_deposits, pool.total_deposits + deposit);
+        assert!(new_pool.total_shares > pool.total_shares);
+
+        let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert!(new_vault.deposit_shares > vault.deposit_shares);
+    }
+
+    #[test]
+    fn test_deposit_to_lending_pool_zero_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+
+        let result = sdk.deposit_to_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            0, 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_withdraw_from_lending_pool() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+        let shares_to_burn = 5_000 * PRECISION;
+
+        let tx = sdk.withdraw_from_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            shares_to_burn, make_lock(), 100,
+        ).unwrap();
+
+        // 3 outputs: pool + vault + withdraw tokens
+        assert_eq!(tx.outputs.len(), 3);
+
+        let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert!(new_pool.total_deposits < pool.total_deposits);
+        assert_eq!(new_pool.total_shares, pool.total_shares - shares_to_burn);
+
+        let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert_eq!(new_vault.deposit_shares, vault.deposit_shares - shares_to_burn);
+
+        // Withdraw output has underlying amount
+        assert!(!tx.outputs[2].data.is_empty());
+    }
+
+    #[test]
+    fn test_withdraw_from_lending_pool_zero_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+
+        let result = sdk.withdraw_from_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            0, make_lock(), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_withdraw_from_lending_pool_too_many_shares() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+
+        let result = sdk.withdraw_from_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            vault.deposit_shares + 1, make_lock(), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    // ============ Borrow/Repay Tests ============
+
+    #[test]
+    fn test_borrow_from_lending_pool() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+        let borrow = 1_000 * PRECISION;
+        let col_price = 2 * PRECISION; // $2 per collateral token
+        let debt_price = PRECISION;    // $1 per debt token
+
+        let tx = sdk.borrow_from_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            borrow, col_price, debt_price,
+            make_lock(), 100,
+        ).unwrap();
+
+        // 3 outputs: pool + vault + borrowed tokens
+        assert_eq!(tx.outputs.len(), 3);
+
+        let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_pool.total_borrows, pool.total_borrows + borrow);
+
+        let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert!(new_vault.debt_shares > vault.debt_shares);
+
+        // Borrow output has amount
+        let borrowed_data = &tx.outputs[2].data;
+        let borrowed = u128::from_le_bytes(borrowed_data[..16].try_into().unwrap());
+        assert_eq!(borrowed, borrow);
+    }
+
+    #[test]
+    fn test_borrow_zero_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_lending_pool();
+        let vault = make_vault(pool.pool_id);
+
+        let result = sdk.borrow_from_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            0, 2 * PRECISION, PRECISION,
+            make_lock(), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_repay_to_lending_pool() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let mut pool = make_lending_pool();
+        pool.total_borrows = 10_000 * PRECISION;
+
+        let mut vault = make_vault(pool.pool_id);
+        vault.debt_shares = 10_000 * PRECISION;
+
+        let repay = 5_000 * PRECISION;
+
+        let tx = sdk.repay_to_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            repay, make_input(0x62), 100,
+        ).unwrap();
+
+        // 2 outputs: pool + vault (no withdraw cell for repay)
+        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.inputs.len(), 3); // pool + vault + repayer
+
+        let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert!(new_pool.total_borrows < pool.total_borrows);
+
+        let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert!(new_vault.debt_shares < vault.debt_shares);
+    }
+
+    #[test]
+    fn test_repay_zero_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let mut pool = make_lending_pool();
+        pool.total_borrows = 10_000 * PRECISION;
+        let mut vault = make_vault(pool.pool_id);
+        vault.debt_shares = 10_000 * PRECISION;
+
+        let result = sdk.repay_to_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            0, make_input(0x62), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_repay_caps_at_debt() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let mut pool = make_lending_pool();
+        pool.total_borrows = 1_000 * PRECISION;
+
+        let mut vault = make_vault(pool.pool_id);
+        vault.debt_shares = 1_000 * PRECISION;
+
+        // Repay more than current debt — should be capped
+        let tx = sdk.repay_to_lending_pool(
+            make_input(0x60), &pool,
+            make_input(0x61), &vault,
+            100_000 * PRECISION, // Way more than debt
+            make_input(0x62), 100,
+        ).unwrap();
+
+        let new_pool = LendingPoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        // Borrows should be close to zero (actual_repay capped at current_debt)
+        assert!(new_pool.total_borrows < pool.total_borrows);
+
+        let new_vault = VaultCellData::deserialize(&tx.outputs[1].data).unwrap();
+        // Debt shares should be reduced (possibly zero with saturating_sub)
+        assert!(new_vault.debt_shares <= vault.debt_shares);
+    }
+
+    // ============ Insurance Pool Tests ============
+
+    #[test]
+    fn test_create_insurance_pool() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool_id = [0xAA; 32];
+
+        let tx = sdk.create_insurance_pool(
+            pool_id, [0xBB; 32],
+            300,  // 3% premium rate
+            5000, // 50% max coverage
+            100,  // 100 block cooldown
+            make_lock(), make_input(0x50),
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+
+        let pool = InsurancePoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(pool.pool_id, pool_id);
+        assert_eq!(pool.total_deposits, 0);
+        assert_eq!(pool.total_shares, 0);
+        assert_eq!(pool.premium_rate_bps, 300);
+        assert_eq!(pool.max_coverage_bps, 5000);
+        assert_eq!(pool.cooldown_blocks, 100);
+
+        // Type script uses insurance code hash
+        let ts = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0x0C; 32]);
+    }
+
+    fn make_insurance_pool() -> InsurancePoolCellData {
+        InsurancePoolCellData {
+            pool_id: [0xAA; 32],
+            asset_type_hash: [0xBB; 32],
+            total_deposits: 50_000 * PRECISION,
+            total_shares: 50_000 * PRECISION,
+            total_premiums_earned: 0,
+            total_claims_paid: 0,
+            premium_rate_bps: 300,
+            max_coverage_bps: 5000,
+            cooldown_blocks: 100,
+            last_premium_block: 90,
+        }
+    }
+
+    #[test]
+    fn test_deposit_insurance() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+        let deposit = 10_000 * PRECISION;
+
+        let tx = sdk.deposit_insurance(
+            make_input(0x60), &pool,
+            deposit, make_lock(), make_input(0x61), 100,
+        ).unwrap();
+
+        // 2 outputs: pool + change
+        assert_eq!(tx.outputs.len(), 2);
+
+        let new_pool = InsurancePoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_pool.total_deposits, pool.total_deposits + deposit);
+        assert!(new_pool.total_shares > pool.total_shares);
+    }
+
+    #[test]
+    fn test_deposit_insurance_zero_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+
+        let result = sdk.deposit_insurance(
+            make_input(0x60), &pool,
+            0, make_lock(), make_input(0x61), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_withdraw_insurance() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+        let shares = 10_000 * PRECISION;
+
+        let tx = sdk.withdraw_insurance(
+            make_input(0x60), &pool,
+            shares, make_lock(), 100,
+        ).unwrap();
+
+        // 2 outputs: pool + withdrawal
+        assert_eq!(tx.outputs.len(), 2);
+
+        let new_pool = InsurancePoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert!(new_pool.total_deposits < pool.total_deposits);
+        assert_eq!(new_pool.total_shares, pool.total_shares - shares);
+
+        // Withdrawal output has underlying amount
+        assert!(!tx.outputs[1].data.is_empty());
+    }
+
+    #[test]
+    fn test_withdraw_insurance_zero_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+
+        let result = sdk.withdraw_insurance(
+            make_input(0x60), &pool,
+            0, make_lock(), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_withdraw_insurance_too_many_shares() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+
+        let result = sdk.withdraw_insurance(
+            make_input(0x60), &pool,
+            pool.total_shares + 1, make_lock(), 100,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_accrue_insurance_premium() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+        let borrows = 100_000 * PRECISION;
+
+        let tx = sdk.accrue_insurance_premium(
+            make_input(0x60), &pool,
+            borrows, 200, // 110 blocks since last premium
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+
+        let new_pool = InsurancePoolCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert!(new_pool.total_deposits > pool.total_deposits);
+        assert!(new_pool.total_premiums_earned > pool.total_premiums_earned);
+        assert_eq!(new_pool.last_premium_block, 200);
+    }
+
+    #[test]
+    fn test_accrue_insurance_premium_stale_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let pool = make_insurance_pool();
+
+        // Same block as last premium
+        let result = sdk.accrue_insurance_premium(
+            make_input(0x60), &pool,
+            100_000 * PRECISION, pool.last_premium_block,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::StaleOracleData);
+
+        // Earlier block
+        let result = sdk.accrue_insurance_premium(
+            make_input(0x60), &pool,
+            100_000 * PRECISION, pool.last_premium_block - 1,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::StaleOracleData);
+    }
+
+    // ============ Commit/Reveal Edge Cases ============
+
+    #[test]
+    fn test_create_commit_sell_order() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let order = Order {
+            order_type: ORDER_SELL,
+            amount_in: 500 * PRECISION,
+            limit_price: 1800 * PRECISION,
+            priority_bid: 100_000_000,
+        };
+        let secret = [0xFF; 32];
+
+        let tx = sdk.create_commit(
+            &order, &secret,
+            100_000_000_000, order.amount_in,
+            [0x02; 32], [0x01; 32], 7,
+            make_lock(), make_input(0x50),
+        );
+
+        let commit = CommitCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(commit.batch_id, 7);
+        // Order hash includes sell type
+        let expected_hash = compute_order_hash(&order, &secret);
+        assert_eq!(commit.order_hash, expected_hash);
+    }
+
+    #[test]
+    fn test_order_hash_different_types() {
+        let secret = [0xAB; 32];
+        let buy = Order {
+            order_type: ORDER_BUY,
+            amount_in: 1000 * PRECISION,
+            limit_price: 2000 * PRECISION,
+            priority_bid: 0,
+        };
+        let sell = Order {
+            order_type: ORDER_SELL,
+            amount_in: 1000 * PRECISION,
+            limit_price: 2000 * PRECISION,
+            priority_bid: 0,
+        };
+        // Same amounts, different type → different hash
+        assert_ne!(
+            compute_order_hash(&buy, &secret),
+            compute_order_hash(&sell, &secret),
+        );
+    }
+
+    #[test]
+    fn test_reveal_preserves_priority_bid() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let order = Order {
+            order_type: ORDER_BUY,
+            amount_in: 1000 * PRECISION,
+            limit_price: 2000 * PRECISION,
+            priority_bid: 999_999_999,
+        };
+        let secret = [0xCD; 32];
+
+        let witness = sdk.create_reveal(&order, &secret, 5);
+        let reveal = RevealWitness::deserialize(&witness).unwrap();
+
+        assert_eq!(reveal.priority_bid, 999_999_999);
+        assert_eq!(reveal.commit_index, 5);
+    }
 }

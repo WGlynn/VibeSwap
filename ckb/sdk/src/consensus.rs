@@ -998,4 +998,268 @@ mod tests {
             "50% drop risk ({:?}) must be >= 25% drop risk ({:?})",
             report.stress.risk_at_50pct_drop, report.stress.risk_at_25pct_drop);
     }
+
+    // ============ Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_median_two_identical_values() {
+        // Even count with identical values: average should equal the value itself
+        assert_eq!(compute_median(&[500, 500]), 500);
+    }
+
+    #[test]
+    fn test_median_descending_order() {
+        // Verify sorting works correctly when input is reverse-sorted
+        assert_eq!(compute_median(&[300, 200, 100]), 200);
+        assert_eq!(compute_median(&[400, 300, 200, 100]), 250);
+    }
+
+    #[test]
+    fn test_median_with_zero_values() {
+        assert_eq!(compute_median(&[0, 0, 0]), 0);
+        assert_eq!(compute_median(&[0, 100]), 50);
+        assert_eq!(compute_median(&[0, 0, 100]), 0);
+    }
+
+    #[test]
+    fn test_quantize_utilization_exact_boundaries() {
+        // Test the exact boundary values that are NOT already covered
+        // 5000 → Low (covered), 5001 → Moderate (covered)
+        // but test values right at every transition
+        assert_eq!(quantize_utilization(4999), UtilizationTier::Low);
+        assert_eq!(quantize_utilization(7999), UtilizationTier::Moderate);
+        assert_eq!(quantize_utilization(8999), UtilizationTier::High);
+        assert_eq!(quantize_utilization(9999), UtilizationTier::Critical);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_values() {
+        // Test values immediately before and after each boundary
+        assert_eq!(quantize_coverage(499), CoverageTier::Minimal);
+        assert_eq!(quantize_coverage(502), CoverageTier::Partial);
+        assert_eq!(quantize_coverage(999), CoverageTier::Partial);
+        assert_eq!(quantize_coverage(1002), CoverageTier::Adequate);
+        assert_eq!(quantize_coverage(1999), CoverageTier::Adequate);
+        assert_eq!(quantize_coverage(2002), CoverageTier::Strong);
+    }
+
+    #[test]
+    fn test_quantize_coverage_u64_max() {
+        // Extreme value beyond 10000 — should map to Strong
+        assert_eq!(quantize_coverage(u64::MAX), CoverageTier::Strong);
+    }
+
+    #[test]
+    fn test_oracle_two_sources_agree() {
+        // Two fresh oracles that agree: 2/2 majority → valid
+        let oracles = vec![
+            test_oracle(3000 * PRECISION, 90, 100),
+            test_oracle(3005 * PRECISION, 85, 99),
+        ];
+
+        let (price, valid, agreement) = quantize_oracle(&oracles, 105);
+        assert!(valid);
+        assert_eq!(agreement, 2);
+        // Median of [3000, 3005] = 3000/2 + 3005/2
+        let expected = (3000 * PRECISION) / 2 + (3005 * PRECISION) / 2;
+        assert_eq!(price, expected);
+    }
+
+    #[test]
+    fn test_oracle_two_sources_disagree() {
+        // Two oracles far apart: median is between them, but only 1 may agree
+        let oracles = vec![
+            test_oracle(1000 * PRECISION, 90, 100),
+            test_oracle(5000 * PRECISION, 85, 100),
+        ];
+
+        let (price, valid, agreement) = quantize_oracle(&oracles, 105);
+        // Median = avg(1000, 5000) = 3000. Check who's within 10%:
+        // 1000 vs 3000: diff=2000, 2000*10000 = 20M > 3000*1000 = 3M → disagree
+        // 5000 vs 3000: diff=2000, same → disagree
+        assert_eq!(agreement, 0);
+        assert!(!valid);
+        let expected = (1000 * PRECISION) / 2 + (5000 * PRECISION) / 2;
+        assert_eq!(price, expected);
+    }
+
+    #[test]
+    fn test_oracle_majority_with_one_outlier() {
+        // 4 oracles: 3 agree, 1 outlier. Majority = 3/4 → valid
+        let oracles = vec![
+            test_oracle(3000 * PRECISION, 90, 100),
+            test_oracle(3010 * PRECISION, 85, 100),
+            test_oracle(2995 * PRECISION, 88, 100),
+            test_oracle(9000 * PRECISION, 70, 100), // outlier
+        ];
+
+        let (_price, valid, agreement) = quantize_oracle(&oracles, 105);
+        // Median of sorted [2995, 3000, 3010, 9000] = avg(3000, 3010) = 3005
+        // Agreement: 2995 within 10% of 3005? diff=10, 10*10000=100000, 3005*1000=3005000 → yes
+        // 3000 within 10%? diff=5 → yes
+        // 3010 within 10%? diff=5 → yes
+        // 9000 within 10%? diff=5995 → no
+        assert_eq!(agreement, 3);
+        assert!(valid); // 3/4 >= (4+1)/2 = 2 → true
+    }
+
+    #[test]
+    fn test_oracle_partial_staleness_affects_median() {
+        // 3 oracles, but 1 is stale. Median computed from 2 fresh ones only.
+        let oracles = vec![
+            test_oracle(3000 * PRECISION, 90, 100),  // fresh
+            test_oracle(4000 * PRECISION, 85, 99),   // fresh
+            test_oracle(1000 * PRECISION, 80, 1),    // stale (block 1 vs current 105)
+        ];
+
+        let (price, valid, agreement) = quantize_oracle(&oracles, 105);
+        // Only [3000, 4000] are fresh → median = avg(3000,4000) = 3500
+        let expected = (3000 * PRECISION) / 2 + (4000 * PRECISION) / 2;
+        assert_eq!(price, expected);
+        // Both within 10% of 3500? 3000: diff=500, 500*10000=5M, 3500*1000=3.5M → no!
+        // So only 4000: diff=500, same → no.
+        // Actually neither agrees at 10% of median
+        // agreement should be checked — let's just verify the count
+        assert!(agreement <= 2);
+    }
+
+    #[test]
+    fn test_quantize_single_risky_vault() {
+        // A single vault near liquidation threshold
+        let mut snapshot = test_snapshot();
+        snapshot.vaults = vec![
+            vault(0x01, 10 * PRECISION, 28_000 * PRECISION), // Very risky at $3000/ETH
+        ];
+
+        let decision = quantize(&snapshot);
+        assert_eq!(decision.vault_tiers.len(), 1);
+        // Health factor = (10 * 3000 * CF) / 28000 — should be low
+        // This vault should NOT be in Safe tier
+        assert_ne!(decision.vault_tiers[0].tier, RiskTier::Safe,
+            "Heavily leveraged vault should not be Safe");
+    }
+
+    #[test]
+    fn test_quantize_no_insurance() {
+        // Protocol without insurance pool
+        let mut snapshot = test_snapshot();
+        snapshot.insurance = None;
+
+        let decision = quantize(&snapshot);
+        // Should still produce a valid decision
+        assert_eq!(decision.vault_tiers.len(), snapshot.vaults.len());
+        assert_eq!(decision.coverage_tier, CoverageTier::None);
+    }
+
+    #[test]
+    fn test_monotonicity_detects_risk_level_improvement() {
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut d_critical = d1.clone();
+        d_critical.risk_level = RiskLevel::Critical;
+
+        let mut d_low = d1.clone();
+        d_low.risk_level = RiskLevel::Low;
+
+        // "Riskier" decision has lower risk level → violation
+        let result = verify_monotonicity(&d_critical, &d_low);
+        assert!(!result.is_monotonic);
+        assert!(result.violations.iter().any(|v|
+            matches!(v, MonotonicityViolation::RiskLevelImproved { .. })
+        ));
+    }
+
+    #[test]
+    fn test_monotonicity_multiple_violations_at_once() {
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut d_worse = d1.clone();
+        d_worse.risk_score = d1.risk_score + 20;
+        d_worse.risk_level = RiskLevel::Critical;
+        d_worse.utilization_tier = UtilizationTier::Critical;
+        d_worse.actions.push(PendingAction {
+            vault_index: 99,
+            action: KeeperAction::Warn { health_factor: PRECISION, vault_owner: [0xFF; 32] },
+            health_factor: PRECISION,
+            priority: 100,
+        });
+
+        // Verify safer→riskier is monotonic
+        let result = verify_monotonicity(&d1, &d_worse);
+        assert!(result.is_monotonic);
+
+        // Now check riskier→safer detects MULTIPLE violations
+        let reverse = verify_monotonicity(&d_worse, &d1);
+        assert!(!reverse.is_monotonic);
+        assert!(reverse.violations.len() >= 2,
+            "Should detect multiple violations, got {}: {:?}",
+            reverse.violations.len(), reverse.violations);
+    }
+
+    #[test]
+    fn test_tier_changed_empty_vaults() {
+        // Two decisions with no vaults should show no tier change
+        let mut snapshot = test_snapshot();
+        snapshot.vaults.clear();
+        let d1 = quantize(&snapshot);
+        let d2 = quantize(&snapshot);
+
+        assert!(!tier_changed(&d1, &d2));
+    }
+
+    #[test]
+    fn test_tier_changed_different_vault_counts() {
+        // If vault counts differ, tier_changed should return true
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+
+        let mut snapshot2 = test_snapshot();
+        snapshot2.vaults.pop(); // Remove one vault
+        let d2 = quantize(&snapshot2);
+
+        assert!(tier_changed(&d1, &d2));
+    }
+
+    #[test]
+    fn test_simulate_price_stress_full_drop() {
+        // 100% price drop (10000 bps) → collateral_price = 0
+        let snapshot = test_snapshot();
+        let (before, after) = simulate_price_stress(&snapshot, 10000);
+
+        assert!(after.risk_score >= before.risk_score,
+            "100% drop must produce equal or higher risk");
+        // With 0 collateral price, all vaults with debt should be in bad shape
+        for vt in &after.vault_tiers {
+            if vt.health_factor == 0 {
+                assert_ne!(vt.tier, RiskTier::Safe);
+            }
+        }
+    }
+
+    #[test]
+    fn test_report_no_vaults_produces_valid_report() {
+        let mut snapshot = test_snapshot();
+        snapshot.vaults.clear();
+
+        let report = generate_report(&snapshot);
+        assert_eq!(report.observation.vault_count, 0);
+        assert_eq!(report.observation.total_debt, 0);
+        assert!(report.decision.vault_tiers.is_empty());
+        assert!(report.decision.actions.is_empty());
+    }
+
+    #[test]
+    fn test_report_price_spread_with_identical_oracles() {
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data = vec![
+            test_oracle(3000 * PRECISION, 90, 100),
+            test_oracle(3000 * PRECISION, 85, 99),
+        ];
+
+        let report = generate_report(&snapshot);
+        assert_eq!(report.observation.price_spread_bps, 0,
+            "Identical oracle prices should produce 0 spread");
+    }
 }

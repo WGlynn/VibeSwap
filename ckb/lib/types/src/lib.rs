@@ -999,6 +999,236 @@ pub const KNOWLEDGE_MIN_DIFFICULTY: u8 = 8;
 /// Maximum allowed difficulty adjustment per update (±1)
 pub const KNOWLEDGE_MAX_DIFFICULTY_DELTA: u8 = 1;
 
+// ============ Prediction Market Constants ============
+
+/// Market status values
+pub const MARKET_ACTIVE: u8 = 0;
+pub const MARKET_RESOLVING: u8 = 1;
+pub const MARKET_RESOLVED: u8 = 2;
+pub const MARKET_SETTLED: u8 = 3;
+pub const MARKET_CANCELLED: u8 = 4;
+
+/// Settlement mode values
+pub const SETTLEMENT_WINNER_TAKES_ALL: u8 = 0;
+pub const SETTLEMENT_PROPORTIONAL: u8 = 1;
+pub const SETTLEMENT_SCALAR: u8 = 2;
+
+/// Maximum number of outcome tiers per market
+pub const MAX_OUTCOME_TIERS: usize = 8;
+
+/// Default market fee rate (1% = 100 bps)
+pub const DEFAULT_MARKET_FEE_BPS: u16 = 100;
+
+/// Default dispute window (~4 hours at 12s blocks)
+pub const DEFAULT_DISPUTE_WINDOW_BLOCKS: u64 = 1200;
+
+/// Minimum bet amount (prevents dust)
+pub const MINIMUM_BET_AMOUNT: u128 = 1_000_000_000_000_000; // 0.001 in 1e18
+
+// ============ Prediction Market Cell Data ============
+
+/// Prediction market state — supports 2-8 outcome tiers
+/// Binary markets use num_tiers=2, non-binary use 3-8.
+/// Settlement can be winner-takes-all, proportional, or scalar.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PredictionMarketCellData {
+    /// Unique market identifier
+    pub market_id: [u8; 32],
+    /// SHA-256 hash of the question text (stored off-chain)
+    pub question_hash: [u8; 32],
+    /// Market creator's lock script hash
+    pub creator_lock_hash: [u8; 32],
+    /// Oracle pair_id for resolution (price-based markets)
+    pub oracle_pair_id: [u8; 32],
+    /// Current market status
+    pub status: u8,
+    /// Number of outcome tiers (2-8)
+    pub num_tiers: u8,
+    /// How payouts are distributed
+    pub settlement_mode: u8,
+    /// Which tier won (set on resolution)
+    pub resolved_tier: u8,
+    /// Total liquidity in the pool (sum of all bets)
+    pub total_liquidity: u128,
+    /// Oracle value at resolution
+    pub resolved_value: u128,
+    /// Bets per outcome tier (parimutuel pools)
+    pub tier_pools: [u128; MAX_OUTCOME_TIERS],
+    /// Block when market was created
+    pub created_block: u64,
+    /// Block when market resolves (betting closes)
+    pub resolution_block: u64,
+    /// Block when dispute window ends (settlement opens)
+    pub dispute_end_block: u64,
+    /// Fee rate in basis points
+    pub fee_rate_bps: u16,
+}
+
+impl Default for PredictionMarketCellData {
+    fn default() -> Self {
+        Self {
+            market_id: [0u8; 32],
+            question_hash: [0u8; 32],
+            creator_lock_hash: [0u8; 32],
+            oracle_pair_id: [0u8; 32],
+            status: MARKET_ACTIVE,
+            num_tiers: 2,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolved_tier: 0,
+            total_liquidity: 0,
+            resolved_value: 0,
+            tier_pools: [0u128; MAX_OUTCOME_TIERS],
+            created_block: 0,
+            resolution_block: 0,
+            dispute_end_block: 0,
+            fee_rate_bps: DEFAULT_MARKET_FEE_BPS,
+        }
+    }
+}
+
+impl PredictionMarketCellData {
+    // 32*4 + 1*4 + 16*2 + 16*8 + 8*3 + 2 = 128+4+32+128+24+2 = 318
+    pub const SERIALIZED_SIZE: usize = 32 + 32 + 32 + 32 + 1 + 1 + 1 + 1
+        + 16 + 16 + (16 * MAX_OUTCOME_TIERS) + 8 + 8 + 8 + 2; // 318
+
+    pub fn serialize(&self) -> [u8; Self::SERIALIZED_SIZE] {
+        let mut buf = [0u8; Self::SERIALIZED_SIZE];
+        let mut offset = 0;
+
+        buf[offset..offset + 32].copy_from_slice(&self.market_id);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.question_hash);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.creator_lock_hash);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.oracle_pair_id);
+        offset += 32;
+        buf[offset] = self.status;
+        offset += 1;
+        buf[offset] = self.num_tiers;
+        offset += 1;
+        buf[offset] = self.settlement_mode;
+        offset += 1;
+        buf[offset] = self.resolved_tier;
+        offset += 1;
+        buf[offset..offset + 16].copy_from_slice(&self.total_liquidity.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 16].copy_from_slice(&self.resolved_value.to_le_bytes());
+        offset += 16;
+        for i in 0..MAX_OUTCOME_TIERS {
+            buf[offset..offset + 16].copy_from_slice(&self.tier_pools[i].to_le_bytes());
+            offset += 16;
+        }
+        buf[offset..offset + 8].copy_from_slice(&self.created_block.to_le_bytes());
+        offset += 8;
+        buf[offset..offset + 8].copy_from_slice(&self.resolution_block.to_le_bytes());
+        offset += 8;
+        buf[offset..offset + 8].copy_from_slice(&self.dispute_end_block.to_le_bytes());
+        offset += 8;
+        buf[offset..offset + 2].copy_from_slice(&self.fee_rate_bps.to_le_bytes());
+
+        buf
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SERIALIZED_SIZE {
+            return None;
+        }
+        let mut offset = 0;
+        let mut result = Self::default();
+
+        result.market_id.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.question_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.creator_lock_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.oracle_pair_id.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.status = data[offset];
+        offset += 1;
+        result.num_tiers = data[offset];
+        offset += 1;
+        result.settlement_mode = data[offset];
+        offset += 1;
+        result.resolved_tier = data[offset];
+        offset += 1;
+        result.total_liquidity = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.resolved_value = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        for i in 0..MAX_OUTCOME_TIERS {
+            result.tier_pools[i] = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+            offset += 16;
+        }
+        result.created_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+        result.resolution_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+        result.dispute_end_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+        result.fee_rate_bps = u16::from_le_bytes(data[offset..offset + 2].try_into().ok()?);
+
+        Some(result)
+    }
+}
+
+/// Individual prediction position — per-user, per-tier
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PredictionPositionCellData {
+    /// Market this position belongs to
+    pub market_id: [u8; 32],
+    /// Owner's lock script hash
+    pub owner_lock_hash: [u8; 32],
+    /// Which outcome tier (0-7)
+    pub tier_index: u8,
+    /// Amount bet on this tier
+    pub amount: u128,
+    /// Block when position was created
+    pub created_block: u64,
+}
+
+impl PredictionPositionCellData {
+    pub const SERIALIZED_SIZE: usize = 32 + 32 + 1 + 16 + 8; // 89
+
+    pub fn serialize(&self) -> [u8; Self::SERIALIZED_SIZE] {
+        let mut buf = [0u8; Self::SERIALIZED_SIZE];
+        let mut offset = 0;
+
+        buf[offset..offset + 32].copy_from_slice(&self.market_id);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.owner_lock_hash);
+        offset += 32;
+        buf[offset] = self.tier_index;
+        offset += 1;
+        buf[offset..offset + 16].copy_from_slice(&self.amount.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 8].copy_from_slice(&self.created_block.to_le_bytes());
+
+        buf
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SERIALIZED_SIZE {
+            return None;
+        }
+        let mut offset = 0;
+        let mut result = Self::default();
+
+        result.market_id.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.owner_lock_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.tier_index = data[offset];
+        offset += 1;
+        result.amount = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.created_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+
+        Some(result)
+    }
+}
+
 // ============ Merkle Proof ============
 
 /// Merkle proof for compliance verification

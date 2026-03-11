@@ -31,6 +31,7 @@ pub mod simulator;
 pub mod staking;
 pub mod strategy;
 pub mod token;
+pub mod treasury;
 
 use vibeswap_types::*;
 use vibeswap_math::PRECISION;

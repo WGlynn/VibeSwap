@@ -128,6 +128,8 @@ fn make_deployment() -> DeploymentInfo {
         config_type_code_hash: [0x07; 32],
         oracle_type_code_hash: [0x08; 32],
         knowledge_type_code_hash: [0x09; 32],
+        lending_pool_type_code_hash: [0x0A; 32],
+        vault_type_code_hash: [0x0B; 32],
         script_dep_tx_hash: [0x10; 32],
         script_dep_index: 0,
     }

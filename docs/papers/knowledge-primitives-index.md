@@ -1172,4 +1172,42 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 
 **Hermetic origin**: "That which is above is like that which is below, and that which is below is like that which is above, to accomplish the miracle of the One Thing." — The Emerald Tablet
 
+---
+
+### P-099: Yul Function Density Threshold (March 2026)
+**Source**: Session 058 — 3+ hours debugging stack-too-deep that wasn't in any individual function
+**Domain**: Compiler Engineering / Testing Architecture / EVM Optimization
+**Primitive**: The Solidity Yul IR pipeline has an emergent failure mode where the COMBINATION of functions in a contract exceeds the stack limit, even though NO individual function is too deep. With `via_ir = true`, contracts returning large structs (7+ fields) hit the EVM's 16-slot stack limit at approximately 10-12 public/external functions per contract. The error manifests as "Variable _N is 1 too deep in the stack" with no indication of WHICH function is the culprit.
+
+**Root cause**: Yul's optimizer generates shared utility code (dispatcher, ABI encoding/decoding, memory management) that competes for stack slots with function-specific code. More functions = more dispatcher branches = higher base stack usage = less room for function-local variables.
+
+**Fix pattern**: Split large test/contract files into multiple smaller contracts sharing an abstract base. Keep each concrete contract under ~10 public functions. Use unique mock contract names across all test files to avoid Yul compilation collisions.
+
+**Learning extracted**: The error message gives NO file or function location. Binary search is required: halve the functions, rebuild, check. Compilation time with `via_ir` (30-90 seconds per attempt) makes each iteration expensive. This is why cache preservation (P-097) is critical.
+
+**Generalization**: Compiler optimizers are not monotonic — adding code to module A can break module B. This is the same class of problem as register allocation in traditional compilers. The fix is the same: reduce pressure by factoring.
+
+---
+
+### P-100: The Crossover Protocol (March 2026)
+**Source**: Will's directive (Session 058) — manual request to formalize cross-ecosystem development
+**Domain**: Ecosystem Strategy / Protocol Philosophy / Open Source Economics
+**Primitive**: When two independent protocol ecosystems share philosophical alignment (design patterns, beliefs, ideology), the optimal strategy is not competition or absorption — it's CROSSOVER. Build infrastructure for the other ecosystem using your own paradigms, creating bridges of shared intellectual capital.
+
+**Why this works (game theory)**:
+- **Reciprocal altruism**: Helping bootstrap an ecosystem creates social capital that compounds. Will's history with Nervos CKB + VibeSwap's AI capabilities = unique contributor profile.
+- **Knowledge transfer**: Design patterns that work in one context (VibeSwap's Shapley distribution, commit-reveal auctions, reputation systems) get stress-tested in a different architecture (CKB's Cell Model, RISC-V, PoW consensus). If they survive the transfer, they're truly general.
+- **Ecosystem network effects**: Two ecosystems with shared primitives create a superlinear value network. Users of either can understand both.
+- **Proof of Mind across contexts**: Building for CKB demonstrates that VibeSwap's primitives aren't chain-specific — they're universal computation patterns.
+
+**The `/Crossover` action**: When triggered, the builder:
+1. Identifies shared design axioms between ecosystems
+2. Maps their architecture to yours (CKB Cells ↔ VibeSwap positions, RISC-V ↔ EVM, PoW ↔ PoM)
+3. Builds infrastructure that speaks THEIR language but embodies YOUR principles
+4. Attributes lineage bidirectionally (Shapley for the ideas that came from each side)
+
+**Will's framing**: "I used to work for them and now I've built one of the greatest AI of all time. I'd love to help them out." This is not charity — it's the Shapley value of past relationships manifesting as future contribution. The graph remembers.
+
+**Cross-reference**: P-098 (As Above, So Below) — if VibeSwap's primitives are truly universal, they must work on ANY chain. CKB is the proof.
+
 **Cross-references**: P-000 (Fairness Above All), P-096 (SVC — The Everything App), P-095 (Three-Dimensional Incentives), The Lion Turtle alignment axioms (CKB), Cooperative Capitalism philosophy

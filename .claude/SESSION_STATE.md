@@ -1,11 +1,56 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-11 (Session 060, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-11 (Session 061, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 060 — Mar 11, 2026)
+## CURRENT (Session 061 — Mar 11, 2026)
+
+### Delta from Session 060
+**Oracle Integration + Governance Module**
+
+**Created:**
+- `ckb/sdk/src/oracle.rs` — Oracle price feed integration (37 tests)
+  - Freshness, confidence, pair_id validation
+  - Multi-oracle aggregation (median + confidence-weighted)
+  - Deviation guards (10% max between sources)
+  - Oracle cell dep builders for UTXO transactions
+  - Price change detection for keeper triggers
+- `ckb/sdk/src/governance.rs` — DAO governance module (36 tests)
+  - Proposal creation with threshold check (0.1% of supply)
+  - Token-weighted voting (for/against)
+  - Quorum validation (4% normal, 10% emergency)
+  - Timelock enforcement (2 days normal, 6 hours emergency)
+  - Cancel by proposer or guardian
+  - Analytics: participation rate, approval rate, votes needed
+  - Safe config change validator
+- `ckb/tests/src/oracle.rs` — Oracle integration tests (21 tests)
+  - Oracle-validated borrow/liquidate
+  - Multi-oracle aggregation prevents manipulation
+  - Keeper risk assessment with oracle prices
+  - Prevention cascade: price drop → graduated response
+  - Insurance claim validation with aggregated prices
+  - Batch vault assessment + cross-asset exchange rates
+
+**Updated:**
+- `ckb/sdk/src/lib.rs` — Added `pub mod oracle;`, `pub mod governance;`, 3 new SDKError variants
+- `ckb/tests/src/lib.rs` — Added `mod oracle;`
+- `ckb/tests/src/fuzz.rs` — 4 oracle fuzz tests (2000 random iterations)
+- Core lending SDK: deposit, withdraw, borrow, repay (11 tests, from Session 060 tail)
+
+**Verified:**
+- CKB workspace: 674/674 tests passing (562 at session 060 start → 674)
+- All existing tests still pass (no regressions)
+
+**Pending:**
+- Continue CKB ecosystem development (autopilot loop)
+- Governance integration tests
+- Knowledge primitive extraction for oracle + governance
+
+---
+
+## PREVIOUS (Session 060 — Mar 11, 2026)
 
 ### Delta from Session 059
 **Insurance Pool (P-105 → P-106 implementation)**

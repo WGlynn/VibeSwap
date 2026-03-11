@@ -852,4 +852,248 @@ mod tests {
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].level, AlertLevel::Warning);
     }
+
+    // ============ Edge Case: Single Pool Arb Scan ============
+
+    #[test]
+    fn test_arb_single_pool_no_arb() {
+        // With only one pool, no pair comparison is possible → no arb
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 2_000_000 * PRECISION, 30);
+        let pools = vec![(id(1), &pool_a)];
+
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty(), "Single pool cannot produce arbitrage");
+    }
+
+    #[test]
+    fn test_arb_extreme_price_ratio() {
+        // Pool A: 1:1, Pool B: 1:100 (10000% spread)
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 10);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 100_000_000 * PRECISION, 10);
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+
+        let arbs = find_arbitrage(&pools, 10);
+        assert_eq!(arbs.len(), 1);
+        // Spread should be enormous (close to 9900 bps = 99x / 1x)
+        assert!(arbs[0].spread_bps > 5000, "Extreme ratio should produce large spread");
+        assert_eq!(arbs[0].buy_pool_id, id(1));
+        assert_eq!(arbs[0].sell_pool_id, id(2));
+    }
+
+    #[test]
+    fn test_arb_one_pool_empty_reserves() {
+        // Pool A has zero reserve0, Pool B is normal
+        let pool_a = make_pool_data(0, 1_000_000 * PRECISION, 30);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_500_000 * PRECISION, 30);
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty(), "Pool with zero reserves should be skipped");
+    }
+
+    // ============ Yield Optimization Boundary Conditions ============
+
+    #[test]
+    fn test_yield_equal_apy_prefers_lower_risk() {
+        // Two sources with identical APY but different risk
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 500, tvl: 1_000_000, risk_score: 30 },
+            YieldSource { source_id: id(2), source_type: YieldType::StakingRewards, apy_bps: 500, tvl: 1_000_000, risk_score: 10 },
+        ];
+
+        let rec = optimize_yield(&sources, 100).unwrap();
+        // Same APY → lower risk should win on risk-adjusted basis
+        assert_eq!(rec.best_source, id(2), "Equal APY should favor lower risk");
+    }
+
+    #[test]
+    fn test_yield_equal_risk_prefers_higher_apy() {
+        // Two sources with identical risk but different APY
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 300, tvl: 1_000_000, risk_score: 20 },
+            YieldSource { source_id: id(2), source_type: YieldType::LendingDeposit, apy_bps: 700, tvl: 1_000_000, risk_score: 20 },
+        ];
+
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(2), "Equal risk should favor higher APY");
+        assert_eq!(rec.best_apy_bps, 700);
+    }
+
+    #[test]
+    fn test_yield_all_filtered_by_risk_cap() {
+        // All sources exceed the risk cap
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 800, tvl: 1_000_000, risk_score: 60 },
+            YieldSource { source_id: id(2), source_type: YieldType::InsurancePremium, apy_bps: 1200, tvl: 500_000, risk_score: 90 },
+        ];
+
+        let err = optimize_yield(&sources, 50).unwrap_err();
+        assert_eq!(err, StrategyError::NoPositions, "All sources above risk cap");
+    }
+
+    // ============ Rebalance Edge Cases ============
+
+    #[test]
+    fn test_rebalance_price_unchanged_with_fees() {
+        // Price hasn't moved at all → IL should be 0
+        let signal = check_rebalance(
+            PRECISION,
+            PRECISION,          // Same price
+            100_000 * PRECISION,
+            10_000 * PRECISION, // Earned 10K in fees
+            500,
+            2000,
+        ).unwrap();
+
+        assert_eq!(signal.current_il_bps, 0, "No price change → zero IL");
+        assert!(!signal.should_rebalance);
+        // Zero IL + fees earned → AddLiquidity
+        assert_eq!(signal.action, RebalanceAction::AddLiquidity);
+    }
+
+    #[test]
+    fn test_rebalance_extreme_il_price_100x() {
+        // Price 100x → extreme IL, should recommend exit
+        let signal = check_rebalance(
+            PRECISION,
+            100 * PRECISION,     // 100x price move
+            100_000 * PRECISION,
+            0,                   // No fees earned
+            500,
+            2000,                // 20% exit threshold
+        ).unwrap();
+
+        assert!(signal.current_il_bps > 2000, "100x price should produce >20% IL");
+        assert!(signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::ExitPosition);
+    }
+
+    #[test]
+    fn test_rebalance_both_prices_zero() {
+        // Both entry and current are zero → error
+        let err = check_rebalance(0, 0, 100_000 * PRECISION, 0, 500, 2000).unwrap_err();
+        assert_eq!(err, StrategyError::InsufficientData);
+    }
+
+    // ============ Liquidation Edge Cases ============
+
+    #[test]
+    fn test_liquidation_all_vaults_healthy() {
+        // All vaults well-collateralized
+        let vaults = vec![
+            (200_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+            (300_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+            (500_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+        ];
+
+        let opps = find_liquidations(&vaults, 500, 100 * PRECISION);
+        assert!(opps.is_empty(), "All healthy vaults should produce no liquidations");
+    }
+
+    #[test]
+    fn test_liquidation_all_underwater() {
+        // Multiple vaults all underwater → should find all of them
+        let vaults = vec![
+            (70_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+            (60_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+            (50_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+        ];
+
+        let opps = find_liquidations(&vaults, 500, 10 * PRECISION);
+        assert_eq!(opps.len(), 3, "All three underwater vaults should be liquidatable");
+        // Should be sorted by profit descending
+        for w in opps.windows(2) {
+            assert!(w[0].estimated_profit >= w[1].estimated_profit);
+        }
+    }
+
+    #[test]
+    fn test_liquidation_zero_collateral_skipped() {
+        // Zero collateral vault should be skipped (collateral == 0 guard)
+        let vaults = vec![(0u128, 100_000 * PRECISION, 8000u128)];
+        let opps = find_liquidations(&vaults, 500, 0);
+        assert!(opps.is_empty(), "Zero collateral vault should be skipped");
+    }
+
+    // ============ Alert System Edge Cases ============
+
+    #[test]
+    fn test_alerts_exactly_at_thresholds() {
+        // Metric exactly equals each threshold boundary
+        let positions = vec![
+            (id(1), 3000u64, AlertReason::HighImpermanentLoss), // Exactly at watch
+            (id(2), 6000u64, AlertReason::LowHealthFactor),     // Exactly at warning
+            (id(3), 9000u64, AlertReason::HighConcentration),    // Exactly at critical
+            (id(4), 2999u64, AlertReason::HighUtilization),      // Just below watch
+        ];
+
+        let alerts = check_risk_alerts(&positions, 3000, 6000, 9000);
+        // id(4) at 2999 should be filtered out (below watch)
+        assert_eq!(alerts.len(), 3, "Exactly-at-threshold values should trigger alerts");
+
+        // Critical first
+        assert_eq!(alerts[0].position_id, id(3));
+        assert_eq!(alerts[0].level, AlertLevel::Critical);
+        assert_eq!(alerts[0].threshold, 9000);
+
+        // Warning second
+        assert_eq!(alerts[1].position_id, id(2));
+        assert_eq!(alerts[1].level, AlertLevel::Warning);
+        assert_eq!(alerts[1].threshold, 6000);
+
+        // Watch third
+        assert_eq!(alerts[2].position_id, id(1));
+        assert_eq!(alerts[2].level, AlertLevel::Watch);
+        assert_eq!(alerts[2].threshold, 3000);
+    }
+
+    // ============ Integration: Multi-Module Combinations ============
+
+    #[test]
+    fn test_liquidation_feeds_yield_decision() {
+        // Find liquidation profits, then decide if yield farming is better
+        let vaults = vec![
+            (70_000 * PRECISION, 100_000 * PRECISION, 8000u128),
+        ];
+        let liq_opps = find_liquidations(&vaults, 500, 100 * PRECISION);
+        assert_eq!(liq_opps.len(), 1);
+        let liq_profit = liq_opps[0].estimated_profit;
+
+        // Compare to yield source
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::StakingRewards, apy_bps: 1200, tvl: 10_000_000, risk_score: 5 },
+            YieldSource { source_id: id(2), source_type: YieldType::InsurancePremium, apy_bps: 2000, tvl: 2_000_000, risk_score: 40 },
+        ];
+        let yield_rec = optimize_yield(&sources, 100).unwrap();
+
+        // Both strategies should be valid
+        assert!(liq_profit > 0, "Liquidation should be profitable");
+        assert!(yield_rec.best_apy_bps > 0, "Yield source should have positive APY");
+        assert_eq!(yield_rec.ranked_sources.len(), 2);
+    }
+
+    #[test]
+    fn test_rebalance_triggers_risk_alert() {
+        // High IL should also trigger a risk alert at the appropriate level
+        let signal = check_rebalance(
+            PRECISION,
+            5 * PRECISION,       // 5x price move
+            100_000 * PRECISION,
+            0,
+            500,
+            2000,
+        ).unwrap();
+
+        // Build an alert from the rebalance signal's IL
+        let positions = vec![
+            (id(1), signal.current_il_bps, AlertReason::HighImpermanentLoss),
+        ];
+        let alerts = check_risk_alerts(&positions, 500, 1500, 3000);
+
+        // IL from 5x price move is significant → should trigger at least Warning
+        assert!(!alerts.is_empty(), "High IL should generate an alert");
+        assert!(signal.current_il_bps >= 1500, "5x price move should exceed warning threshold");
+        assert!(alerts[0].level >= AlertLevel::Warning);
+        assert_eq!(alerts[0].metric_value, signal.current_il_bps);
+    }
 }

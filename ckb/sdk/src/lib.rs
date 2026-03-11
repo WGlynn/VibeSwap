@@ -3,6 +3,7 @@
 // Builds unsigned transactions that can be signed by any CKB wallet
 
 pub mod assembler;
+pub mod auction;
 pub mod collector;
 pub mod consensus;
 pub mod fees;

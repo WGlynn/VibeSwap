@@ -17,6 +17,7 @@ pub mod knowledge;
 pub mod lending;
 pub mod liquidity;
 pub mod miner;
+pub mod orderbook;
 pub mod oracle;
 pub mod portfolio;
 pub mod prediction;

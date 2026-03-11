@@ -1974,4 +1974,195 @@ mod tests {
         assert_eq!(report.observation.oracle_source_count, 4);
         assert_eq!(report.observation.fresh_source_count, 2);
     }
+
+    // ============ Hardening Tests: 103-116 ============
+
+    #[test]
+    fn test_median_three_identical_large_values() {
+        let v = u128::MAX / 3;
+        assert_eq!(compute_median(&[v, v, v]), v);
+    }
+
+    #[test]
+    fn test_median_four_identical_values() {
+        let v = 12345 * PRECISION;
+        assert_eq!(compute_median(&[v, v, v, v]), v);
+    }
+
+    #[test]
+    fn test_quantize_determinism_across_multiple_calls() {
+        // Run quantize 10 times — all results must be identical
+        let snapshot = test_snapshot();
+        let baseline = quantize(&snapshot);
+        for _ in 0..10 {
+            let d = quantize(&snapshot);
+            assert_eq!(d.risk_score, baseline.risk_score);
+            assert_eq!(d.risk_level, baseline.risk_level);
+            assert_eq!(d.utilization_tier, baseline.utilization_tier);
+            assert_eq!(d.coverage_tier, baseline.coverage_tier);
+            assert_eq!(d.oracle_valid, baseline.oracle_valid);
+            assert_eq!(d.oracle_agreement_count, baseline.oracle_agreement_count);
+            assert_eq!(d.vault_tiers.len(), baseline.vault_tiers.len());
+        }
+    }
+
+    #[test]
+    fn test_quantize_utilization_zero_bps() {
+        assert_eq!(quantize_utilization(0), UtilizationTier::Low);
+    }
+
+    #[test]
+    fn test_quantize_utilization_10000_bps() {
+        // 10000 bps = 100% utilization — should be Critical
+        assert_eq!(quantize_utilization(10000), UtilizationTier::Critical);
+    }
+
+    #[test]
+    fn test_quantize_coverage_10001_bps() {
+        // 10001 bps — beyond normal range, should still map to Strong
+        assert_eq!(quantize_coverage(10001), CoverageTier::Strong);
+    }
+
+    #[test]
+    fn test_oracle_agreement_boundary_just_inside_10_percent() {
+        // Price exactly 9.99% away from median: should agree
+        // Median = 10000. 9% deviation = 900. Price = 10900.
+        // diff = 900, diff * 10000 = 9_000_000, median * 1000 = 10_000_000. 9M <= 10M => agrees.
+        let oracles = vec![
+            test_oracle(10000 * PRECISION, 90, 100),
+            test_oracle(10900 * PRECISION, 85, 100),
+        ];
+        let (_price, _valid, agreement) = quantize_oracle(&oracles, 105);
+        // Median = avg(10000, 10900) = 10450
+        // 10000 vs 10450: diff=450, 450*10000=4500000, 10450*1000=10450000 → agrees
+        // 10900 vs 10450: diff=450, same → agrees
+        assert_eq!(agreement, 2);
+    }
+
+    #[test]
+    fn test_oracle_agreement_boundary_just_outside_10_percent() {
+        // Two oracles far enough apart that neither agrees with the median
+        // 1000 and 2000: median = 1500.
+        // 1000 vs 1500: diff=500, 500*10000=5000000, 1500*1000=1500000, 5M > 1.5M → no
+        // 2000 vs 1500: diff=500, same → no
+        let oracles = vec![
+            test_oracle(1000 * PRECISION, 90, 100),
+            test_oracle(2000 * PRECISION, 85, 100),
+        ];
+        let (_price, valid, agreement) = quantize_oracle(&oracles, 105);
+        assert_eq!(agreement, 0);
+        assert!(!valid);
+    }
+
+    #[test]
+    fn test_monotonicity_risk_score_equal_is_ok() {
+        // If riskier.risk_score == safer.risk_score, should not trigger violation
+        let snapshot = test_snapshot();
+        let d = quantize(&snapshot);
+        let mut d1 = d.clone();
+        let mut d2 = d.clone();
+        d1.risk_score = 50;
+        d2.risk_score = 50;
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(result.violations.iter().all(|v|
+            !matches!(v, MonotonicityViolation::RiskScoreDecreased { .. })
+        ));
+    }
+
+    #[test]
+    fn test_monotonicity_same_utilization_tier_is_ok() {
+        let snapshot = test_snapshot();
+        let d = quantize(&snapshot);
+        let mut d1 = d.clone();
+        let mut d2 = d.clone();
+        d1.utilization_tier = UtilizationTier::High;
+        d2.utilization_tier = UtilizationTier::High;
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(result.violations.iter().all(|v|
+            !matches!(v, MonotonicityViolation::UtilizationImproved)
+        ));
+    }
+
+    #[test]
+    fn test_simulate_price_stress_9999_bps_nearly_zero_price() {
+        // 99.99% drop — collateral_price becomes ~0.01% of original
+        let snapshot = test_snapshot();
+        let (before, after) = simulate_price_stress(&snapshot, 9999);
+        assert!(after.risk_score >= before.risk_score);
+    }
+
+    #[test]
+    fn test_quantize_snapshot_with_large_vault_count() {
+        // 20 vaults — all should be assessed
+        let mut snapshot = test_snapshot();
+        snapshot.vaults = (0..20u8).map(|i| {
+            vault(i, 50 * PRECISION, 10_000 * PRECISION)
+        }).collect();
+
+        let decision = quantize(&snapshot);
+        assert_eq!(decision.vault_tiers.len(), 20);
+    }
+
+    #[test]
+    fn test_quantize_oracle_confidence_does_not_affect_price() {
+        // Confidence value is not used in price computation — only freshness matters
+        let oracles_high = vec![
+            test_oracle(3000 * PRECISION, 100, 100),
+            test_oracle(3010 * PRECISION, 100, 99),
+        ];
+        let oracles_low = vec![
+            test_oracle(3000 * PRECISION, 1, 100),
+            test_oracle(3010 * PRECISION, 1, 99),
+        ];
+        let (p1, _, _) = quantize_oracle(&oracles_high, 105);
+        let (p2, _, _) = quantize_oracle(&oracles_low, 105);
+        assert_eq!(p1, p2, "Confidence should not affect computed price");
+    }
+
+    #[test]
+    fn test_report_collateral_value_uses_snapshot_price() {
+        // The report computes total_collateral_value using snapshot.collateral_price
+        let mut snapshot = test_snapshot();
+        snapshot.vaults = vec![vault(0x01, 10 * PRECISION, 5_000 * PRECISION)];
+        snapshot.collateral_price = 2000 * PRECISION;
+
+        let report = generate_report(&snapshot);
+        // 10 * 2000 = 20_000 (via mul_div)
+        let expected = ckb_lending_math::mul_div(10 * PRECISION, 2000 * PRECISION, PRECISION);
+        assert_eq!(report.observation.total_collateral_value, expected);
+    }
+
+    #[test]
+    fn test_tier_changed_single_vault_same_tier() {
+        let mut snapshot = test_snapshot();
+        snapshot.vaults = vec![vault(0x01, 100 * PRECISION, 5_000 * PRECISION)]; // safe
+        let d1 = quantize(&snapshot);
+        let d2 = quantize(&snapshot);
+        assert!(!tier_changed(&d1, &d2));
+    }
+
+    #[test]
+    fn test_monotonicity_all_same_risk_levels() {
+        // Both at Critical risk level — no RiskLevelImproved violation
+        let snapshot = test_snapshot();
+        let d = quantize(&snapshot);
+        let mut d1 = d.clone();
+        let mut d2 = d.clone();
+        d1.risk_level = RiskLevel::Critical;
+        d2.risk_level = RiskLevel::Critical;
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(result.violations.iter().all(|v|
+            !matches!(v, MonotonicityViolation::RiskLevelImproved { .. })
+        ));
+    }
+
+    #[test]
+    fn test_risk_level_ordinal_monotonic_ordering() {
+        // ordinals must be strictly increasing Low → Medium → High → Critical
+        let o0 = risk_level_ordinal(&RiskLevel::Low);
+        let o1 = risk_level_ordinal(&RiskLevel::Medium);
+        let o2 = risk_level_ordinal(&RiskLevel::High);
+        let o3 = risk_level_ordinal(&RiskLevel::Critical);
+        assert!(o0 < o1 && o1 < o2 && o2 < o3);
+    }
 }

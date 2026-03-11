@@ -1242,3 +1242,38 @@ If two nodes can disagree about the value, they will eventually fork. The constr
 **Licho's correction**: "My Man, it has to be an integer. It's Bitcoin. Satoshis are integers. It is super important." — Sometimes the simplest statement contains the deepest constraint.
 
 **Cross-references**: P-098 (As Above, So Below — Bitcoin's integer determinism IS its architecture at every level), P-099 (Yul Function Density Threshold — another case of platform constraints that aren't obvious until you hit them), P-100 (The Crossover Protocol — this exact mistake is why crossover requires re-deriving constraints)
+
+---
+
+### P-102: UTXO-Native Lending Architecture (March 2026)
+**Source**: CKB lending protocol design — `ckb/lib/lending-math/`, `ckb/scripts/lending-pool-type/`, `ckb/scripts/vault-type/`
+**Domain**: DeFi Architecture / UTXO State Management / Cell Model Design
+
+**Primitive**: Lending on UTXO/Cell-based blockchains requires a fundamentally different architecture than account-model lending (Aave/Compound). The core challenge is **state contention** — shared pool state that all users must update. The solution separates concerns into two cell types with different contention profiles.
+
+**The Two-Cell Pattern**:
+1. **Pool Cells** (shared, PoW-gated): Aggregate market state — total deposits, borrows, interest index, rate model. Contention resolved by proof-of-work priority (whoever mines a valid PoW nonce first gets to update). Updated infrequently (batch accruals).
+2. **Vault Cells** (per-user, no contention): Individual positions — collateral, debt shares, index snapshots. Each user owns their cell outright. No contention by design.
+
+**Interest Accrual Without Per-Block Updates**: Unlike account-model chains where interest accrues in `accrueInterest()` on every interaction, UTXO lending uses an **index-based approach**:
+- Pool maintains a monotonically-increasing `borrow_index` (starts at 1e18)
+- Each vault records `borrow_index_snapshot` at time of borrowing
+- Current debt = `principal × current_index / snapshot_index`
+- Interest accrues lazily — only when someone updates the pool cell
+
+**Why This Works on CKB**: CKB's Cell Model is a generalized UTXO where each cell has `data` (state) and `type` (validation logic). Type scripts validate ALL state transitions, making the two-cell pattern naturally enforceable:
+- Pool type script ensures index never decreases, borrows ≤ deposits, rate params immutable
+- Vault type script ensures owner/pool immutable, debt repaid before destruction
+
+**Kinked Utilization Curve (Integer-Only)**:
+```
+if U ≤ U_opt:  R = base + U × slope1 / U_opt
+if U > U_opt:  R = base + slope1 + (U - U_opt) × slope2 / (1 - U_opt)
+```
+All divisions use `mul_div(a, b, c)` with 256-bit intermediate to prevent overflow. No floats. No approximations. P-101 fully respected.
+
+**Liquidation on UTXO**: Permissionless — anyone can consume an underwater vault cell and replace it with a liquidated version, seizing collateral at a discount. The vault type script validates that health factor < 1.0 and close factor is respected.
+
+**Generalization**: Any DeFi primitive that requires shared state on UTXO chains should follow this pattern: minimize shared state (pool cells updated rarely) and maximize per-user state (vault/position cells with no contention). This is the UTXO equivalent of account-model's "read from storage, write to storage" — except reads are free (cell_deps) and writes require consuming + recreating cells.
+
+**Cross-references**: P-100 (The Crossover Protocol — lending IS the crossover, building what CKB needs with VibeSwap patterns), P-101 (Consensus Determinism — all lending math is pure integer), P-098 (As Above, So Below — the two-cell pattern mirrors CKB's own architecture of lock scripts vs type scripts)

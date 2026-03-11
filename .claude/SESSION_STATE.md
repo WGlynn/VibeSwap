@@ -1,42 +1,52 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-10 (Session 058 continued, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-11 (Session 059, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 058 continued — Mar 10-11, 2026)
+## CURRENT (Session 059 — Mar 11, 2026)
 
-### Delta from Session 058 initial
-**Verified & Passing:**
-- VibeOptions unit tests: 31/31 passing (split across 3 files to avoid Yul stack overflow)
-- VibeSynth unit tests: 51/51 passing
-- Total new verified tests this session: 82
-
-**Fixed:**
-- VibeOptions stack-too-deep ROOT CAUSE FOUND: via_ir Yul optimizer overflows at ~10-12 public functions per contract when returning large structs (IVibeAMM.Pool = 7 fields). Fix: split tests into VibeOptionsTest (12), VibeOptionsExerciseTest (12), VibeOptionsRevertTest (9) with shared abstract base.
-- Duplicate contract names across test files (test/VibeOptions.t.sol vs test/unit/VibeOptionsTest.t.sol) caused Yul compilation collisions. Removed root-level duplicates.
-- Added `_storeOption` and `_emitWritten` helper functions to VibeOptions.sol to reduce stack pressure
+### Delta from Session 058
+**CKB Lending Protocol (NEW — Ecosystem infrastructure for Nervos)**
 
 **Created:**
-- `test/unit/helpers/VibeOptionsTestBase.sol` — shared abstract base with mocks + setup
-- `test/unit/VibeOptionsExerciseTest.t.sol` — exercise, cancel, reclaim tests (12)
-- `test/unit/VibeOptionsRevertTest.t.sol` — revert tests + put lifecycle (9)
-- P-099: Yul Function Density Threshold (knowledge primitive)
-- P-100: The Crossover Protocol (knowledge primitive for CKB development)
+- `ckb/lib/lending-math/` — Integer-only lending math library (43 tests)
+  - Interest rate models (kinked utilization curve)
+  - Collateral/health factor calculations
+  - Liquidation math with close factor + incentives
+  - Deposit share accounting (cToken-style)
+  - Pool state accrual with borrow index tracking
+  - Compound interest via exp-by-squaring
+  - Bad debt socialization calculations
+- `ckb/scripts/lending-pool-type/` — Shared pool cell type script (21 tests)
+  - Creation, update, destruction validation
+  - Immutable fields enforcement (asset, pool_id, rate params)
+  - Borrow index monotonicity, accrual block monotonicity
+- `ckb/scripts/vault-type/` — Per-user vault cell type script (19 tests)
+  - Creation, update, destruction validation
+  - Owner/pool immutability, debt-free destruction
+  - Full lifecycle test (create → collateral → borrow → repay → destroy)
+- P-102: UTXO-Native Lending Architecture (knowledge primitive)
 
-**Deleted:**
-- `test/VibeOptions.t.sol` — duplicate root-level test (caused name collision)
-- `test/VibeSynth.t.sol` — duplicate root-level test (caused name collision)
+**Updated:**
+- `ckb/lib/types/src/lib.rs` — LendingPoolCellData (280 bytes) + VaultCellData (168 bytes)
+- `ckb/schemas/cells.mol` — Molecule definitions for lending cells
+- `ckb/Cargo.toml` — 3 new workspace members
 
-**Pending (Will's requests):**
-- Nervos CKB development — transition to building for their ecosystem (Will: "I just think they need some help bootstrapping their ecosystem")
-- Learning primitives auto-extrapolation — self-reinforcing pattern
+**Verified:**
+- CKB workspace: 315/315 tests passing (228 prior + 87 new)
+- All existing tests still pass (no regressions)
+
+**Pending:**
+- Continue CKB ecosystem development (more infrastructure)
+- Learning primitives auto-extrapolation
 - Continue autopilot loop
 
 ### Running Test Count
-- **Verified passing this session**: 311 (prior) + 82 (Options + Synth) = 393
-- **Total knowledge primitives**: 73 (P-000 through P-100, some gaps)
+- **CKB tests**: 315 passing
+- **Solidity tests**: 393 passing (from Session 058)
+- **Total knowledge primitives**: 74 (P-000 through P-102, some gaps)
 
 ---
 

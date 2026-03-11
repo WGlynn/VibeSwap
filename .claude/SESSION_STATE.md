@@ -1,11 +1,111 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-11 (Session 061, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-11 (Session 063, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 062 — Mar 11, 2026)
+## CURRENT (Session 063 — Mar 11, 2026)
+
+### Delta from Session 062
+**DEX Router + Portfolio Analytics + Integration Hardening**
+
+**Created:**
+- `sdk/src/router.rs` — **NEW** DEX router module (43 tests)
+  - PoolGraph: build routing graph from AMM pool state
+  - DFS path discovery (up to 4 intermediate hops)
+  - Best-route selection via get_amount_out simulation
+  - Split routing: greedy chunk allocation across parallel paths
+  - Price impact estimation, effective price, required input
+  - Slippage-aware minimum output calculation
+- `sdk/src/portfolio.rs` — **NEW** Portfolio analytics module (23 tests)
+  - PortfolioBuilder: aggregates LP, lending, insurance, prediction, token positions
+  - Cross-denomination valuation via oracle PriceMap
+  - Impermanent loss tracking, health factor computation
+  - PortfolioSummary: total value, concentration, worst HF, APY estimate
+
+**Hardened:**
+- `tests/src/risk.rs`: 10 → 23 tests (+13)
+  - Keeper integration (batch assess, premium accrual, stress testing)
+  - Insurance prevents hard liquidation, borrow index accrual
+  - Flash crash recovery, 20-vault risk distribution
+- `tests/src/token.rs`: 12 → 21 tests (+9)
+  - Transfer errors, exact amounts, multi-input consolidation
+  - Token → lending → insurance pipeline, token → router multi-hop
+  - TokenInfo edge cases, amount precision
+- `tests/src/governance.rs`: 14 → 24 tests (+10)
+  - Config change full lifecycle, circuit breaker detection
+  - 20-voter weighted, timelock boundary precision
+  - Emergency + normal coexistence, analytics edge cases
+
+**Verified:**
+- CKB workspace: 1145/1145 tests passing (1051 → 1145, +94)
+- All existing tests still pass (no regressions)
+- SDK now has 15 modules (was 13): +router, +portfolio
+
+**Commits this session:**
+1. `b27dddc` — DEX router module (43 tests)
+2. `e209b7b` — Risk integration hardening (10→23, +13)
+3. `4ce07ee` — Token integration hardening (12→21, +9)
+4. `26f2417` — Portfolio analytics module (23 tests)
+5. `4bb7ef0` — Governance integration hardening (14→24, +10)
+
+**Pending:**
+- Continue CKB ecosystem development (autopilot loop)
+- Next BIG rotation candidate: new on-chain capability or cross-chain
+- Next SMALL rotation candidate: consensus (17 tests), insurance (17 tests)
+
+---
+
+## PREVIOUS (Session 062 continued — Mar 11, 2026)
+
+### Delta from Session 062 (context continuation)
+**Prediction Market TX Builders + Broad Hardening Pass**
+
+**Created/Added:**
+- `sdk/src/lib.rs` — 5 prediction market transaction builders:
+  - `create_market_tx()`, `place_bet_tx()`, `resolve_market_tx()`
+  - `settle_position_tx()`, `cancel_market_tx()`
+  - Fixed `hash_script` inconsistency (prediction.rs includes hash_type byte)
+- `sdk/src/prediction.rs` — Made `hash_script` public for cross-module use
+
+**Hardened:**
+- `sdk/src/lib.rs` (core tests): 9 → 47 tests (+38)
+  - +24 tests covering all untested builders (add/remove liquidity, lending ops, insurance ops)
+  - +14 prediction market tx builder tests (create, bet, resolve, settle, cancel, lifecycle)
+- `lib/types/src/lib.rs`: 16 → 35 tests (+19)
+  - Missing roundtrips: LP position, compliance, config, oracle, PoW args, prediction market/position
+  - All 15 serialized sizes in one assertion, default tests, u128::MAX boundary
+- `tests/src/prediction.rs`: 16 → 23 tests (+7)
+  - TX builder integration: type script verification, pool preservation, payout correctness
+  - Full pipeline proportional (4-tier) and scalar (5-tier) through transaction builders
+- `tests/src/assembler.rs`: 19 → 23 tests (+4)
+  - Prediction market through signing pipeline: create, bet, full cycle, cancel
+- `deploy/src/main.rs` — Fixed field_map (9 → 14 entries), comment (13 → 14 scripts)
+
+**Verified:**
+- CKB workspace: 1051/1051 tests passing (979 at session 062 start → 1051, +72)
+- All existing tests still pass (no regressions)
+
+**Commits this continuation:**
+1. `97ee526` — SDK core builder hardening (9→33 tests)
+2. `4e1877b` — Prediction market TX builders (5 builders, 14 tests)
+3. `5331a0f` — Types serialization hardening (16→35 tests)
+4. `54ef6fe` — Prediction integration TX tests (+7)
+5. `4da0966` — Deploy tool field_map fix (14 scripts)
+6. `e024387` — Assembler prediction market integration (+4)
+
+**Session 062 totals (both halves):**
+- 979 → 1051 tests (+72 in continuation, +182 total from session start at 797)
+- 19 commits pushed to both remotes
+- 2 new CKB scripts (14 total)
+- 2 new SDK modules (prediction, consensus)
+- 5 prediction market TX builders
+- Broad hardening: 6 modules strengthened
+
+---
+
+## PREVIOUS (Session 062 first half — Mar 11, 2026)
 
 ### Delta from Session 061
 **Prediction Market + Dual Consensus + Module Hardening**

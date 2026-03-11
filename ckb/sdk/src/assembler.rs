@@ -189,10 +189,11 @@ pub struct MockSigner {
 
 impl MockSigner {
     pub fn new(lock: Script) -> Self {
+        let seed = lock.code_hash[0];
         let mut sig = [0u8; SECP256K1_SIGNATURE_SIZE];
-        // Fill with recognizable pattern for testing
+        // Fill with recognizable pattern derived from lock identity
         for (i, byte) in sig.iter_mut().enumerate() {
-            *byte = (i as u8).wrapping_mul(0x37);
+            *byte = (i as u8).wrapping_mul(0x37).wrapping_add(seed);
         }
         Self { lock, signature: sig }
     }

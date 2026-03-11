@@ -25,3 +25,6 @@ mod lending;
 
 #[cfg(test)]
 mod token;
+
+#[cfg(test)]
+mod assembler;

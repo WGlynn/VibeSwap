@@ -2098,6 +2098,237 @@ impl VibeSwapSDK {
             witnesses: vec![vec![]],
         })
     }
+
+    // ============ Prediction Market Operations ============
+
+    /// Build a transaction to create a new prediction market.
+    ///
+    /// Creates a market cell with the initial state (ACTIVE, no bets).
+    /// The market_id is derived deterministically from question_hash,
+    /// creator lock hash, and creation block.
+    pub fn create_market_tx(
+        &self,
+        params: &prediction::CreateMarketParams,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        let (market_data, market_id) = prediction::create_market(params)?;
+
+        let market_output = CellOutput {
+            capacity: prediction::MARKET_CELL_CAPACITY,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: market_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.prediction_market_type_code_hash,
+                hash_type: HashType::Type,
+                args: market_id.to_vec(),
+            }),
+            data: market_data.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![params.creator_input.clone()],
+            outputs: vec![market_output],
+            witnesses: vec![vec![]],
+        })
+    }
+
+    /// Build a transaction to place a bet on a prediction market.
+    ///
+    /// Updates the market cell (tier pool + total liquidity increase)
+    /// and creates a new immutable position cell for the bettor.
+    pub fn place_bet_tx(
+        &self,
+        market_outpoint: CellInput,
+        market_data: &PredictionMarketCellData,
+        tier_index: u8,
+        amount: u128,
+        bettor_lock: Script,
+        bettor_input: CellInput,
+        current_block: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        let owner_lock_hash = prediction::hash_script(&bettor_lock);
+
+        let (updated_market, position) = prediction::place_bet(
+            market_data, tier_index, amount, owner_lock_hash, current_block,
+        )?;
+
+        let market_output = CellOutput {
+            capacity: prediction::MARKET_CELL_CAPACITY,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: market_data.market_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.prediction_market_type_code_hash,
+                hash_type: HashType::Type,
+                args: market_data.market_id.to_vec(),
+            }),
+            data: updated_market.serialize().to_vec(),
+        };
+
+        let position_output = CellOutput {
+            capacity: prediction::POSITION_CELL_CAPACITY,
+            lock_script: bettor_lock,
+            type_script: Some(Script {
+                code_hash: self.deployment.prediction_position_type_code_hash,
+                hash_type: HashType::Type,
+                args: market_data.market_id.to_vec(),
+            }),
+            data: position.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![market_outpoint, bettor_input],
+            outputs: vec![market_output, position_output],
+            witnesses: vec![vec![]; 2],
+        })
+    }
+
+    /// Build a transaction to resolve a prediction market.
+    ///
+    /// Maps an oracle value to a winning tier and transitions the market
+    /// from ACTIVE → RESOLVED. Must be called at or after resolution_block.
+    pub fn resolve_market_tx(
+        &self,
+        market_outpoint: CellInput,
+        market_data: &PredictionMarketCellData,
+        oracle_value: u128,
+        resolver_lock: Script,
+        current_block: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        let resolved = prediction::resolve_market(market_data, oracle_value, current_block)?;
+
+        let market_output = CellOutput {
+            capacity: prediction::MARKET_CELL_CAPACITY,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: market_data.market_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.prediction_market_type_code_hash,
+                hash_type: HashType::Type,
+                args: market_data.market_id.to_vec(),
+            }),
+            data: resolved.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![market_outpoint],
+            outputs: vec![market_output],
+            witnesses: vec![vec![]],
+        })
+    }
+
+    /// Build a transaction to settle a position (claim payout).
+    ///
+    /// Calculates the position's payout based on the market's settlement mode
+    /// and destroys the position cell. The payout goes to the position owner.
+    /// Market cell is consumed and re-emitted with SETTLED status once all
+    /// positions are settled — but individual settlements don't require
+    /// changing market status (positions are immutable, destroyed on claim).
+    pub fn settle_position_tx(
+        &self,
+        market_data: &PredictionMarketCellData,
+        position_outpoint: CellInput,
+        position_data: &PredictionPositionCellData,
+        claimer_lock: Script,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        let (_gross, _fee, net_payout) = prediction::calculate_payout(market_data, position_data)?;
+
+        if net_payout == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Position cell is consumed (destroyed) — owner gets payout
+        let payout_output = CellOutput {
+            capacity: prediction::POSITION_CELL_CAPACITY,
+            lock_script: claimer_lock,
+            type_script: None,
+            data: net_payout.to_le_bytes().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![position_outpoint],
+            outputs: vec![payout_output],
+            witnesses: vec![vec![]],
+        })
+    }
+
+    /// Build a transaction to cancel a prediction market.
+    ///
+    /// Only the creator can cancel, and only if the market has no bets.
+    /// Transitions ACTIVE → CANCELLED.
+    pub fn cancel_market_tx(
+        &self,
+        market_outpoint: CellInput,
+        market_data: &PredictionMarketCellData,
+        creator_lock: Script,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        let creator_lock_hash = prediction::hash_script(&creator_lock);
+        let cancelled = prediction::cancel_market(market_data, &creator_lock_hash)?;
+
+        let market_output = CellOutput {
+            capacity: prediction::MARKET_CELL_CAPACITY,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: market_data.market_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.prediction_market_type_code_hash,
+                hash_type: HashType::Type,
+                args: market_data.market_id.to_vec(),
+            }),
+            data: cancelled.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![market_outpoint],
+            outputs: vec![market_output],
+            witnesses: vec![vec![]],
+        })
+    }
 }
 
 // ============ Order Type ============
@@ -3337,5 +3568,326 @@ mod tests {
 
         assert_eq!(reveal.priority_bid, 999_999_999);
         assert_eq!(reveal.commit_index, 5);
+    }
+
+    // ============ Prediction Market Transaction Builder Tests ============
+
+    fn make_market_params(block: u64) -> prediction::CreateMarketParams {
+        prediction::CreateMarketParams {
+            question_hash: [0xAA; 32],
+            oracle_pair_id: [0xBB; 32],
+            num_tiers: 3,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: block + 1000,
+            dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+            fee_rate_bps: DEFAULT_MARKET_FEE_BPS,
+            creator_lock: make_lock(),
+            creator_input: make_input(0x50),
+            current_block: block,
+        }
+    }
+
+    #[test]
+    fn test_create_market_tx() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+
+        let tx = sdk.create_market_tx(&params).unwrap();
+
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].capacity, prediction::MARKET_CELL_CAPACITY);
+
+        // Verify market data
+        let market = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(market.status, MARKET_ACTIVE);
+        assert_eq!(market.num_tiers, 3);
+        assert_eq!(market.settlement_mode, SETTLEMENT_WINNER_TAKES_ALL);
+        assert_eq!(market.total_liquidity, 0);
+        assert_eq!(market.resolution_block, 1100);
+        assert_ne!(market.market_id, [0u8; 32]); // Deterministic non-zero
+
+        // Type script uses prediction market code hash
+        let ts = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0x0D; 32]);
+    }
+
+    #[test]
+    fn test_create_market_tx_invalid_tiers() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let mut params = make_market_params(100);
+        params.num_tiers = 1; // Below minimum
+        assert!(sdk.create_market_tx(&params).is_err());
+
+        params.num_tiers = 9; // Above maximum
+        assert!(sdk.create_market_tx(&params).is_err());
+    }
+
+    #[test]
+    fn test_create_market_tx_past_resolution() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let mut params = make_market_params(100);
+        params.resolution_block = 50; // In the past
+        assert_eq!(sdk.create_market_tx(&params).unwrap_err(), SDKError::InvalidPhase);
+    }
+
+    #[test]
+    fn test_place_bet_tx() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (market, _id) = prediction::create_market(&params).unwrap();
+
+        let tx = sdk.place_bet_tx(
+            make_input(0x60), &market,
+            1, // Tier index 1 (middle tier in 3-tier market)
+            5_000 * PRECISION,
+            make_lock(), make_input(0x61),
+            200,
+        ).unwrap();
+
+        // 2 outputs: updated market + position
+        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.inputs.len(), 2);
+
+        let updated = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(updated.total_liquidity, 5_000 * PRECISION);
+        assert_eq!(updated.tier_pools[1], 5_000 * PRECISION);
+
+        let position = PredictionPositionCellData::deserialize(&tx.outputs[1].data).unwrap();
+        assert_eq!(position.tier_index, 1);
+        assert_eq!(position.amount, 5_000 * PRECISION);
+        assert_eq!(position.market_id, market.market_id);
+
+        // Position type script uses position code hash
+        let ts = tx.outputs[1].type_script.as_ref().unwrap();
+        assert_eq!(ts.code_hash, [0x0E; 32]);
+    }
+
+    #[test]
+    fn test_place_bet_tx_invalid_tier() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (market, _) = prediction::create_market(&params).unwrap();
+
+        let result = sdk.place_bet_tx(
+            make_input(0x60), &market,
+            5, // Invalid: market only has 3 tiers (0, 1, 2)
+            5_000 * PRECISION,
+            make_lock(), make_input(0x61), 200,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_place_bet_tx_after_resolution() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (market, _) = prediction::create_market(&params).unwrap();
+
+        let result = sdk.place_bet_tx(
+            make_input(0x60), &market,
+            0, 5_000 * PRECISION,
+            make_lock(), make_input(0x61),
+            1200, // After resolution block (1100)
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidPhase);
+    }
+
+    #[test]
+    fn test_resolve_market_tx() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (mut market, _) = prediction::create_market(&params).unwrap();
+        // Add some bets
+        market.tier_pools[0] = 10_000 * PRECISION;
+        market.tier_pools[1] = 5_000 * PRECISION;
+        market.total_liquidity = 15_000 * PRECISION;
+
+        // Resolve with oracle value in tier 0 range
+        let tx = sdk.resolve_market_tx(
+            make_input(0x60), &market,
+            PRECISION / 6, // Low value → tier 0 for 3-tier market
+            make_lock(), 1100,
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+
+        let resolved = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(resolved.status, MARKET_RESOLVED);
+        assert_eq!(resolved.resolved_tier, 0);
+        assert_eq!(resolved.resolved_value, PRECISION / 6);
+        // Pools unchanged
+        assert_eq!(resolved.total_liquidity, 15_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_resolve_market_tx_too_early() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (market, _) = prediction::create_market(&params).unwrap();
+
+        let result = sdk.resolve_market_tx(
+            make_input(0x60), &market,
+            PRECISION / 2, make_lock(), 500, // Before resolution block
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidPhase);
+    }
+
+    #[test]
+    fn test_settle_position_tx() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (mut market, _) = prediction::create_market(&params).unwrap();
+
+        // Set up a resolved market
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+        market.tier_pools[0] = 10_000 * PRECISION;
+        market.tier_pools[1] = 5_000 * PRECISION;
+        market.total_liquidity = 15_000 * PRECISION;
+
+        let position = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x99; 32],
+            tier_index: 0, // Winning tier
+            amount: 10_000 * PRECISION,
+            created_block: 200,
+        };
+
+        let tx = sdk.settle_position_tx(
+            &market, make_input(0x70), &position, make_lock(),
+        ).unwrap();
+
+        // 1 output: payout (position consumed)
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.inputs.len(), 1);
+
+        // Payout should be close to total liquidity (sole winner, minus fee)
+        let payout_data = &tx.outputs[0].data;
+        let payout = u128::from_le_bytes(payout_data[..16].try_into().unwrap());
+        assert!(payout > 0);
+        // With 1% fee: net = 15000 * 0.99 = 14850
+        assert!(payout > 14_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_settle_position_tx_losing_tier() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (mut market, _) = prediction::create_market(&params).unwrap();
+
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+        market.settlement_mode = SETTLEMENT_WINNER_TAKES_ALL;
+        market.tier_pools[0] = 10_000 * PRECISION;
+        market.tier_pools[2] = 5_000 * PRECISION;
+        market.total_liquidity = 15_000 * PRECISION;
+
+        let position = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x99; 32],
+            tier_index: 2, // Losing tier (tier 0 won)
+            amount: 5_000 * PRECISION,
+            created_block: 200,
+        };
+
+        // WTA: losing tier gets 0 payout → should error
+        let result = sdk.settle_position_tx(
+            &market, make_input(0x70), &position, make_lock(),
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_cancel_market_tx() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (market, _) = prediction::create_market(&params).unwrap();
+
+        let tx = sdk.cancel_market_tx(
+            make_input(0x60), &market, make_lock(),
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+
+        let cancelled = PredictionMarketCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cancelled.status, MARKET_CANCELLED);
+        assert_eq!(cancelled.market_id, market.market_id);
+    }
+
+    #[test]
+    fn test_cancel_market_tx_with_bets_rejected() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (mut market, _) = prediction::create_market(&params).unwrap();
+        market.total_liquidity = 1000; // Has bets
+
+        let result = sdk.cancel_market_tx(
+            make_input(0x60), &market, make_lock(),
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_cancel_market_tx_wrong_creator() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+        let params = make_market_params(100);
+        let (market, _) = prediction::create_market(&params).unwrap();
+
+        let wrong_lock = Script {
+            code_hash: [0x11; 32], // Different from creator
+            hash_type: HashType::Type,
+            args: vec![0x02; 20],
+        };
+
+        let result = sdk.cancel_market_tx(
+            make_input(0x60), &market, wrong_lock,
+        );
+        assert_eq!(result.unwrap_err(), SDKError::InvalidAmounts);
+    }
+
+    #[test]
+    fn test_full_prediction_market_lifecycle_tx() {
+        let sdk = VibeSwapSDK::new(test_deployment());
+
+        // 1. Create market
+        let params = make_market_params(100);
+        let create_tx = sdk.create_market_tx(&params).unwrap();
+        let market = PredictionMarketCellData::deserialize(&create_tx.outputs[0].data).unwrap();
+        assert_eq!(market.status, MARKET_ACTIVE);
+
+        // 2. Place bets (simulate two bettors)
+        let bet_tx1 = sdk.place_bet_tx(
+            make_input(0x60), &market,
+            0, 10_000 * PRECISION,
+            make_lock(), make_input(0x61), 200,
+        ).unwrap();
+        let market_after_bet1 = PredictionMarketCellData::deserialize(&bet_tx1.outputs[0].data).unwrap();
+
+        let bet_tx2 = sdk.place_bet_tx(
+            make_input(0x62), &market_after_bet1,
+            1, 5_000 * PRECISION,
+            make_lock(), make_input(0x63), 300,
+        ).unwrap();
+        let market_after_bet2 = PredictionMarketCellData::deserialize(&bet_tx2.outputs[0].data).unwrap();
+        assert_eq!(market_after_bet2.total_liquidity, 15_000 * PRECISION);
+
+        // 3. Resolve (oracle says tier 0 wins)
+        let resolve_tx = sdk.resolve_market_tx(
+            make_input(0x64), &market_after_bet2,
+            PRECISION / 6, make_lock(), 1100,
+        ).unwrap();
+        let resolved = PredictionMarketCellData::deserialize(&resolve_tx.outputs[0].data).unwrap();
+        assert_eq!(resolved.status, MARKET_RESOLVED);
+        assert_eq!(resolved.resolved_tier, 0);
+
+        // 4. Settle winning position
+        let position1 = PredictionPositionCellData::deserialize(&bet_tx1.outputs[1].data).unwrap();
+        let settle_tx = sdk.settle_position_tx(
+            &resolved, make_input(0x70), &position1, make_lock(),
+        ).unwrap();
+
+        let payout = u128::from_le_bytes(settle_tx.outputs[0].data[..16].try_into().unwrap());
+        assert!(payout > 14_000 * PRECISION); // ~14850 after 1% fee
     }
 }

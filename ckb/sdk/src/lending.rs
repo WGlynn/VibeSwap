@@ -1629,4 +1629,263 @@ mod tests {
         // max = 15000, debt = 7500, util = 5000 bps
         assert_eq!(cap.utilization_bps, 5000);
     }
+
+    // ============ Batch 6: Hardening — Edge Cases, Boundaries, Overflow ============
+
+    #[test]
+    fn test_utilization_rate_near_100_percent() {
+        // Borrows just below deposits
+        let pool = LendingPool {
+            total_deposits: 1_000 * PRECISION,
+            total_borrows: 999 * PRECISION,
+            ..default_pool()
+        };
+        assert_eq!(utilization_rate(&pool), 9990);
+    }
+
+    #[test]
+    fn test_utilization_rate_1_wei_borrow_large_deposit() {
+        let pool = LendingPool {
+            total_deposits: u128::MAX / 2,
+            total_borrows: 1,
+            ..default_pool()
+        };
+        // 1 * 10000 / (u128::MAX/2) == 0 in integer division
+        assert_eq!(utilization_rate(&pool), 0);
+    }
+
+    #[test]
+    fn test_borrow_rate_optimal_at_10000_bps() {
+        // Edge: optimal = 10000 means the "above kink" branch has denom = 0
+        let pool = LendingPool {
+            total_deposits: 1_000 * PRECISION,
+            total_borrows: 1_000 * PRECISION,
+            optimal_utilization_bps: 10000,
+            ..default_pool()
+        };
+        let rate = borrow_rate_bps(&pool);
+        // util = 10000, optimal = 10000, so util <= optimal
+        // rate = base + slope1 * 10000 / 10000 = 200 + 400 = 600
+        assert_eq!(rate, 600);
+    }
+
+    #[test]
+    fn test_borrow_rate_zero_slopes() {
+        // Both slopes at zero — rate is always base rate
+        let pool = LendingPool {
+            slope1_bps: 0,
+            slope2_bps: 0,
+            ..default_pool()
+        };
+        let rate = borrow_rate_bps(&pool);
+        assert_eq!(rate, 200); // Just base rate
+    }
+
+    #[test]
+    fn test_supply_rate_100_percent_reserve_factor() {
+        // 100% reserve factor — protocol takes all interest, suppliers earn zero
+        let pool = LendingPool {
+            reserve_factor_bps: 10000,
+            ..default_pool()
+        };
+        let sr = supply_rate_bps(&pool);
+        assert_eq!(sr, 0);
+    }
+
+    #[test]
+    fn test_apy_from_apr_max_u16() {
+        // APR at u16::MAX should not overflow and should cap at u16::MAX
+        let apy = apy_from_apr_bps(u16::MAX);
+        // apr = 65535, apr^2/(2*10000) = 65535*65535/20000 = 214_726
+        // total = 65535 + 214726 > u16::MAX, so capped
+        assert_eq!(apy, u16::MAX);
+    }
+
+    #[test]
+    fn test_health_factor_zero_debt_price() {
+        // If debt_price is zero, debt_value is zero, so HF = u128::MAX
+        let pos = UserPosition {
+            debt_price: 0,
+            debt_shares: 5 * PRECISION,
+            ..default_position()
+        };
+        let hf = health_factor(&pos, PRECISION);
+        assert_eq!(hf, u128::MAX);
+    }
+
+    #[test]
+    fn test_health_factor_zero_liquidation_threshold() {
+        // LT = 0 means adjusted_col = 0, so HF = 0 if debt > 0
+        let pos = UserPosition {
+            liquidation_threshold_bps: 0,
+            ..default_position()
+        };
+        let hf = health_factor(&pos, PRECISION);
+        assert_eq!(hf, 0);
+    }
+
+    #[test]
+    fn test_borrow_capacity_zero_collateral_factor() {
+        // Collateral factor = 0 means max_borrow = 0 regardless of collateral
+        let pos = UserPosition {
+            collateral_factor_bps: 0,
+            debt_shares: 0,
+            ..default_position()
+        };
+        let cap = borrow_capacity(&pos, PRECISION);
+        assert_eq!(cap.max_borrow_value, 0);
+        assert_eq!(cap.remaining_capacity, 0);
+    }
+
+    #[test]
+    fn test_borrow_capacity_100_percent_collateral_factor() {
+        // 100% collateral factor
+        let pos = UserPosition {
+            collateral_factor_bps: 10000,
+            debt_shares: 0,
+            ..default_position()
+        };
+        let cap = borrow_capacity(&pos, PRECISION);
+        // max_borrow = 10 * 2000 * 10000/10000 = 20000
+        assert_eq!(cap.max_borrow_value, 20_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_liquidation_100_percent_close_factor() {
+        // Close factor = 100% means liquidator repays all debt at once
+        let pos = UserPosition {
+            debt_shares: 20_000 * PRECISION,
+            ..default_position()
+        };
+        let opp = liquidation_check(&pos, PRECISION, 10000, DEFAULT_LIQUIDATION_BONUS_BPS).unwrap();
+        assert_eq!(opp.debt_to_repay, 20_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_liquidation_zero_close_factor() {
+        // Close factor = 0 means nothing can be liquidated
+        let pos = UserPosition {
+            debt_shares: 20_000 * PRECISION,
+            ..default_position()
+        };
+        let opp = liquidation_check(&pos, PRECISION, 0, DEFAULT_LIQUIDATION_BONUS_BPS).unwrap();
+        assert_eq!(opp.debt_to_repay, 0);
+        assert_eq!(opp.collateral_to_seize, 0);
+    }
+
+    #[test]
+    fn test_accrue_interest_preserves_pool_id() {
+        let pool = default_pool();
+        let accrued = accrue_interest(&pool, 500);
+        assert_eq!(accrued.pool_id, pool.pool_id);
+    }
+
+    #[test]
+    fn test_accrue_interest_one_block() {
+        let pool = default_pool();
+        let accrued = accrue_interest(&pool, 101); // 1 block elapsed
+        // Should accrue some tiny interest
+        assert!(accrued.total_borrows > pool.total_borrows);
+        assert!(accrued.borrow_index > pool.borrow_index);
+    }
+
+    #[test]
+    fn test_deposit_to_shares_underlying_greater_than_shares() {
+        // When underlying > shares, depositor gets fewer shares per token
+        let shares = deposit_to_shares(100 * PRECISION, 500 * PRECISION, 1000 * PRECISION);
+        // 100 * 500 / 1000 = 50
+        assert_eq!(shares, 50 * PRECISION);
+    }
+
+    #[test]
+    fn test_deposit_to_shares_shares_greater_than_underlying() {
+        // Rare case: shares > underlying (deflation scenario)
+        let shares = deposit_to_shares(100 * PRECISION, 2000 * PRECISION, 1000 * PRECISION);
+        // 100 * 2000 / 1000 = 200
+        assert_eq!(shares, 200 * PRECISION);
+    }
+
+    #[test]
+    fn test_shares_to_underlying_single_share_all_underlying() {
+        // 1 share out of 1 total, backed by huge underlying
+        let underlying = shares_to_underlying(1 * PRECISION, 1 * PRECISION, 1_000_000 * PRECISION);
+        assert_eq!(underlying, 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_repayment_schedule_high_index_growth() {
+        // Index went from 1.0 to 10.0 — debt grew 10x
+        let schedule = repayment_schedule(
+            100 * PRECISION,
+            10 * PRECISION,   // borrow_index = 10.0
+            PRECISION,        // initial_index = 1.0
+            0,
+            1000,
+        );
+        assert_eq!(schedule.principal, 100 * PRECISION);
+        assert_eq!(schedule.total_owed, 1000 * PRECISION);
+        assert_eq!(schedule.interest_accrued, 900 * PRECISION);
+    }
+
+    #[test]
+    fn test_pool_summary_single_depositor_single_borrower() {
+        let pool = default_pool();
+        let summary = pool_summary(&pool, 1, 1);
+        assert_eq!(summary.depositor_count, 1);
+        assert_eq!(summary.borrower_count, 1);
+        assert!(summary.available_liquidity > 0);
+    }
+
+    #[test]
+    fn test_max_safe_borrow_zero_collateral_factor() {
+        let result = max_safe_borrow(10_000 * PRECISION, 0, 0);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_debt_value_double_index() {
+        // Borrow index 2x means actual debt is 2x shares
+        let dv = debt_value(50 * PRECISION, 2 * PRECISION, 1000 * PRECISION);
+        // actual_debt = 50 * 2 = 100
+        // value = 100 * 1000 = 100_000
+        assert_eq!(dv, 100_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_interest_rate_info_high_utilization() {
+        let pool = LendingPool {
+            total_deposits: 1_000 * PRECISION,
+            total_borrows: 950 * PRECISION,
+            ..default_pool()
+        };
+        let info = interest_rate_info(&pool);
+        assert_eq!(info.utilization_bps, 9500);
+        // Above optimal, so borrow rate is steep
+        assert!(info.borrow_rate_bps > 600);
+        assert!(info.borrow_apy_bps >= info.borrow_rate_bps);
+    }
+
+    #[test]
+    fn test_borrow_capacity_with_higher_borrow_index() {
+        // Higher borrow index inflates debt, reducing remaining capacity
+        let pos = default_position(); // debt_shares = 5, debt_price = $1
+        let cap_normal = borrow_capacity(&pos, PRECISION);
+        let cap_inflated = borrow_capacity(&pos, 2 * PRECISION); // index doubled
+        assert!(cap_inflated.remaining_capacity < cap_normal.remaining_capacity,
+            "Higher borrow index should reduce borrow capacity");
+        assert!(cap_inflated.utilization_bps > cap_normal.utilization_bps,
+            "Higher borrow index should increase utilization");
+    }
+
+    #[test]
+    fn test_liquidation_profit_increases_with_bonus() {
+        let pos = UserPosition {
+            debt_shares: 20_000 * PRECISION,
+            ..default_position()
+        };
+        let opp_low = liquidation_check(&pos, PRECISION, DEFAULT_CLOSE_FACTOR_BPS, 100).unwrap();  // 1%
+        let opp_high = liquidation_check(&pos, PRECISION, DEFAULT_CLOSE_FACTOR_BPS, 2000).unwrap(); // 20%
+        assert!(opp_high.profit > opp_low.profit,
+            "Higher bonus should yield higher profit");
+    }
 }

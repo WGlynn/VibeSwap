@@ -22,3 +22,6 @@ mod fuzz;
 
 #[cfg(test)]
 mod lending;
+
+#[cfg(test)]
+mod token;

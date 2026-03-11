@@ -826,3 +826,300 @@ fn test_token_info_for_pool_discovery() {
     assert_eq!(meta0.decimals, 8);
     assert_eq!(meta1.decimals, 6);
 }
+
+// ============ Test 13: Transfer Insufficient Funds ============
+
+/// Attempting to transfer more than available should fail.
+#[test]
+fn test_transfer_insufficient_funds() {
+    let xudt_config = test_xudt_config();
+    let issuer = test_lock(0x01);
+
+    let type_script = Script {
+        code_hash: xudt_config.xudt_code_hash,
+        hash_type: xudt_config.xudt_hash_type.clone(),
+        args: build_xudt_args(&hash_script_sha256(&issuer)),
+    };
+
+    let result = transfer_token(
+        &xudt_config,
+        type_script,
+        test_lock(0x10),
+        test_lock(0x20),
+        5_000 * PRECISION, // Want 5000
+        vec![(test_input(0x60), 1_000 * PRECISION)], // Only have 1000
+    );
+
+    assert!(result.is_err(), "Should fail when insufficient funds");
+}
+
+// ============ Test 14: Transfer Exact Amount No Change ============
+
+/// Transferring the exact amount should produce one output (no change cell).
+#[test]
+fn test_transfer_exact_amount_no_change() {
+    let xudt_config = test_xudt_config();
+    let issuer = test_lock(0x01);
+
+    let type_script = Script {
+        code_hash: xudt_config.xudt_code_hash,
+        hash_type: xudt_config.xudt_hash_type.clone(),
+        args: build_xudt_args(&hash_script_sha256(&issuer)),
+    };
+
+    let tx = transfer_token(
+        &xudt_config,
+        type_script,
+        test_lock(0x10),
+        test_lock(0x20),
+        1_000 * PRECISION,
+        vec![(test_input(0x60), 1_000 * PRECISION)],
+    ).unwrap();
+
+    assert_eq!(tx.outputs.len(), 1);
+    assert_eq!(parse_token_amount(&tx.outputs[0].data).unwrap(), 1_000 * PRECISION);
+}
+
+// ============ Test 15: Multi-Input Transfer Consolidation ============
+
+/// Consolidate multiple small UTXOs into a single transfer.
+#[test]
+fn test_multi_input_consolidation() {
+    let xudt_config = test_xudt_config();
+    let issuer = test_lock(0x01);
+
+    let type_script = Script {
+        code_hash: xudt_config.xudt_code_hash,
+        hash_type: xudt_config.xudt_hash_type.clone(),
+        args: build_xudt_args(&hash_script_sha256(&issuer)),
+    };
+
+    // 4 small UTXOs totaling 10000
+    let inputs = vec![
+        (test_input(0x60), 2_500 * PRECISION),
+        (test_input(0x61), 2_500 * PRECISION),
+        (test_input(0x62), 2_500 * PRECISION),
+        (test_input(0x63), 2_500 * PRECISION),
+    ];
+
+    let tx = transfer_token(
+        &xudt_config,
+        type_script,
+        test_lock(0x10),
+        test_lock(0x20),
+        8_000 * PRECISION, // Take 8000 from 10000 across 4 inputs
+        inputs,
+    ).unwrap();
+
+    // Recipient gets 8000, change cell gets 2000
+    assert_eq!(tx.outputs.len(), 2);
+    assert_eq!(parse_token_amount(&tx.outputs[0].data).unwrap(), 8_000 * PRECISION);
+    assert_eq!(parse_token_amount(&tx.outputs[1].data).unwrap(), 2_000 * PRECISION);
+
+    // All 4 inputs consumed
+    assert_eq!(tx.inputs.len(), 4);
+}
+
+// ============ Test 16: Burn Entire Supply ============
+
+/// Burning the entire supply should leave no change cell.
+#[test]
+fn test_burn_entire_supply() {
+    let xudt_config = test_xudt_config();
+    let issuer = test_lock(0x01);
+
+    let type_script = Script {
+        code_hash: xudt_config.xudt_code_hash,
+        hash_type: xudt_config.xudt_hash_type.clone(),
+        args: build_xudt_args(&hash_script_sha256(&issuer)),
+    };
+
+    let tx = burn_token(
+        &xudt_config,
+        type_script,
+        1_000_000 * PRECISION, // Burn all
+        issuer,
+        vec![(test_input(0x60), 1_000_000 * PRECISION)],
+    ).unwrap();
+
+    // All burned — no output cells (or one with 0)
+    let remaining: u128 = tx.outputs.iter()
+        .map(|o| parse_token_amount(&o.data).unwrap_or(0))
+        .sum();
+    assert_eq!(remaining, 0, "All tokens should be burned");
+}
+
+// ============ Test 17: Different Issuers Different Tokens ============
+
+/// Two different issuers minting produce different token types.
+#[test]
+fn test_different_issuers_different_tokens() {
+    let xudt_config = test_xudt_config();
+
+    let (_, hash_a) = mint_token(
+        &xudt_config, test_lock(0x01), test_lock(0x10),
+        1_000 * PRECISION, test_input(0x50),
+    );
+    let (_, hash_b) = mint_token(
+        &xudt_config, test_lock(0x02), test_lock(0x10),
+        1_000 * PRECISION, test_input(0x51),
+    );
+    let (_, hash_c) = mint_token(
+        &xudt_config, test_lock(0x03), test_lock(0x10),
+        1_000 * PRECISION, test_input(0x52),
+    );
+
+    assert_ne!(hash_a, hash_b);
+    assert_ne!(hash_b, hash_c);
+    assert_ne!(hash_a, hash_c);
+}
+
+// ============ Test 18: Token + Insurance Pool Integration ============
+
+/// Mint a token, create a lending pool, then create an insurance pool
+/// for that lending pool. Verifies hash consistency across all three.
+#[test]
+fn test_token_lending_insurance_pipeline() {
+    let xudt_config = test_xudt_config();
+    let sdk = VibeSwapSDK::new(make_deployment());
+
+    // Mint the lending asset
+    let (_, asset_hash) = mint_token(
+        &xudt_config, test_lock(0x01), test_lock(0x10),
+        10_000_000 * PRECISION, test_input(0x50),
+    );
+
+    // Create lending pool
+    let pool_id = [0xAA; 32];
+    let pool_tx = sdk.create_lending_pool(
+        pool_id, asset_hash, 5_000_000 * PRECISION,
+        test_lock(0x10), test_input(0x60), 100,
+    );
+    let pool_data = LendingPoolCellData::deserialize(&pool_tx.outputs[0].data).unwrap();
+    assert_eq!(pool_data.asset_type_hash, asset_hash);
+
+    // Create insurance pool for this lending pool
+    let ins_tx = sdk.create_insurance_pool(
+        pool_id, asset_hash,
+        DEFAULT_PREMIUM_RATE_BPS as u64,
+        DEFAULT_MAX_COVERAGE_BPS as u64,
+        DEFAULT_COOLDOWN_BLOCKS,
+        test_lock(0x10), test_input(0x70),
+    ).unwrap();
+    let ins_data = InsurancePoolCellData::deserialize(&ins_tx.outputs[0].data).unwrap();
+    assert_eq!(ins_data.asset_type_hash, asset_hash);
+    assert_eq!(ins_data.pool_id, pool_id);
+
+    // Hash consistency: lending pool and insurance pool reference same asset
+    assert_eq!(pool_data.asset_type_hash, ins_data.asset_type_hash);
+}
+
+// ============ Test 19: Token + Router Integration ============
+
+/// Mint three tokens, create two pools, then use the router to find
+/// a multi-hop swap path through them.
+#[test]
+fn test_token_router_multi_hop() {
+    use vibeswap_sdk::router::{PoolGraph, PoolEdge};
+
+    let xudt_config = test_xudt_config();
+    let sdk = VibeSwapSDK::new(make_deployment());
+
+    // Mint three tokens
+    let (_, token_a) = mint_token(&xudt_config, test_lock(0x01), test_lock(0x10), 10_000_000 * PRECISION, test_input(0x50));
+    let (_, token_b) = mint_token(&xudt_config, test_lock(0x02), test_lock(0x10), 10_000_000 * PRECISION, test_input(0x51));
+    let (_, token_c) = mint_token(&xudt_config, test_lock(0x03), test_lock(0x10), 10_000_000 * PRECISION, test_input(0x52));
+
+    // Create pool A-B and pool B-C
+    let pair_ab = [0x01; 32];
+    let pair_bc = [0x02; 32];
+
+    let pool_ab_tx = sdk.create_pool(pair_ab, token_a, token_b, 1_000_000 * PRECISION, 1_000_000 * PRECISION, test_lock(0x10), vec![test_input(0x60)], 100).unwrap();
+    let pool_bc_tx = sdk.create_pool(pair_bc, token_b, token_c, 1_000_000 * PRECISION, 2_000_000 * PRECISION, test_lock(0x10), vec![test_input(0x61)], 100).unwrap();
+
+    let pool_ab = PoolCellData::deserialize(&pool_ab_tx.outputs[0].data).unwrap();
+    let pool_bc = PoolCellData::deserialize(&pool_bc_tx.outputs[0].data).unwrap();
+
+    // Build router graph from pool data
+    let mut graph = PoolGraph::new();
+    graph.add_pool(PoolEdge {
+        pair_id: pair_ab,
+        token0: pool_ab.token0_type_hash,
+        token1: pool_ab.token1_type_hash,
+        reserve0: pool_ab.reserve0,
+        reserve1: pool_ab.reserve1,
+        fee_rate_bps: pool_ab.fee_rate_bps,
+    });
+    graph.add_pool(PoolEdge {
+        pair_id: pair_bc,
+        token0: pool_bc.token0_type_hash,
+        token1: pool_bc.token1_type_hash,
+        reserve0: pool_bc.reserve0,
+        reserve1: pool_bc.reserve1,
+        fee_rate_bps: pool_bc.fee_rate_bps,
+    });
+
+    // Route: A → C (should go A → B → C)
+    let route = graph.find_best_route(&token_a, &token_c, 1_000 * PRECISION).unwrap();
+    assert_eq!(route.hops.len(), 2);
+    assert_eq!(route.hops[0].token_in, token_a);
+    assert_eq!(route.hops[0].token_out, token_b);
+    assert_eq!(route.hops[1].token_in, token_b);
+    assert_eq!(route.hops[1].token_out, token_c);
+
+    // Output should be roughly 2x (B:C = 1:2) minus fees and slippage
+    assert!(route.expected_output > 1_500 * PRECISION, "Should get ~2x minus fees");
+}
+
+// ============ Test 20: Token Mint Amounts Are Exact ============
+
+/// Verify that parse_token_amount correctly recovers exact u128 values
+/// for a range of magnitudes.
+#[test]
+fn test_token_amount_precision() {
+    let amounts = vec![
+        1u128,
+        1_000,
+        1_000_000_000_000_000_000, // 1e18
+        u128::MAX / 2,
+    ];
+
+    for amount in amounts {
+        let data = amount.to_le_bytes().to_vec();
+        let parsed = parse_token_amount(&data).unwrap();
+        assert_eq!(parsed, amount, "Amount {} roundtrip failed", amount);
+    }
+}
+
+// ============ Test 21: TokenInfo Roundtrip Edge Cases ============
+
+/// Test TokenInfo with empty/long strings and edge-case decimals.
+#[test]
+fn test_token_info_edge_cases() {
+    let info_empty = TokenInfo {
+        name: String::new(),
+        symbol: String::new(),
+        decimals: 0,
+        description: String::new(),
+        max_supply: 0,
+    };
+    let serialized = info_empty.serialize();
+    let parsed = TokenInfo::deserialize(&serialized).unwrap();
+    assert_eq!(parsed.name, "");
+    assert_eq!(parsed.decimals, 0);
+    assert_eq!(parsed.max_supply, 0);
+
+    let info_max = TokenInfo {
+        name: "A".repeat(100),
+        symbol: "ABCDEFGHIJ".to_string(),
+        decimals: 255,
+        description: "D".repeat(500),
+        max_supply: u128::MAX,
+    };
+    let serialized = info_max.serialize();
+    let parsed = TokenInfo::deserialize(&serialized).unwrap();
+    assert_eq!(parsed.name.len(), 100);
+    assert_eq!(parsed.symbol, "ABCDEFGHIJ");
+    assert_eq!(parsed.decimals, 255);
+    assert_eq!(parsed.max_supply, u128::MAX);
+}

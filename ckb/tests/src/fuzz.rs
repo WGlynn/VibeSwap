@@ -11,15 +11,15 @@ use vibeswap_mmr::MMR;
 use vibeswap_pow;
 use vibeswap_types::*;
 use vibeswap_sdk::collector::{
-    self, LiveCell, CellSelection, SelectionStrategy, CollectorError,
+    LiveCell, SelectionStrategy, CollectorError,
     select_capacity_cells, select_token_cells, merge_cells, split_cell,
-    calculate_cell_capacity, min_plain_cell_capacity, min_token_cell_capacity,
+    calculate_cell_capacity,
 };
 use vibeswap_sdk::token::parse_token_amount;
 use ckb_lending_math::{
     interest::{self, RateModel},
-    collateral::{self, CollateralParams},
-    shares, pool,
+    collateral,
+    shares,
 };
 use core::cmp::Ordering;
 

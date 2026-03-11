@@ -1,80 +1,79 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-10 (Session 056, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-10 (Session 058, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 057 — Mar 10, 2026)
+## CURRENT (Session 058 — Mar 10, 2026)
 
-### Delta from Session 056
+### Delta from Session 057
 **Added:**
-- VibeLiquidStaking (financial) unit tests (75 passing) — staking, withdrawal queue, instant unstake, oracle, operators, insurance
-- VibeLiquidStaking (financial) fuzz tests (13 passing, 256 runs) — share proportionality, fee exactness, conservation
-- VibeLiquidStaking (financial) invariant tests (7 passing, 128K calls) — solvency, share price, supply consistency
-- VibeLiquidStaking (mechanism) unit tests (28 passing) — vsETH simple staking
-- VibeStaking unit tests (39 passing) — lock-up tiers, delegation, auto-compound, emergency withdraw
-- VibeInsurancePool unit tests (34 passing) — underwriting, coverage, claims, voting, resolution
-- VibeFeeDistributor unit tests (21 passing) — fee collection, epoch distribution, splits
-- VibeFlashLoan unit tests (14 passing) — EIP-3156, repayment verification, insurance cut
-- VibeLendPool unit tests (30 passing) — deposit/withdraw/borrow/repay, liquidation, interest, flash loans
-- P-076: Liquid Derivatives of Locked Assets — extracted from Will's governance liquidity insight
+- VibePerpetual unit tests (34/34 passing) — perpetual futures with commit-reveal
+- VibePerpEngine unit tests (75/75 passing) — ERC-20 perp engine, oracle, PID funding, liquidation
+- VibeRevShare unit tests (51/51 passing) — Synthetix accumulator revenue distribution
+- VibeBonds unit tests (51/51 passing) — ERC-1155 semi-fungible bonds, Dutch auction, coupons
+- VibeStream unit tests (57/57 passing) — ERC-721 streaming + conviction funding pools
+- VibeCredit unit tests (43/43 passing) — P2P reputation-gated credit delegation
+- VibeOptions unit test file created (pending compilation — via_ir rebuild in progress)
+- App Store expanded: 24 → 57 apps (33 new "Coming Soon" SVC apps)
+- New categories: Commerce (5 apps), Builder (5 apps), expanded Knowledge/Social/Tools
+- Subtitle: "The Everything App — All Shapley Value Compliant"
+- Builder Sandbox + VibeForge + VibeClone + VibeAPI + VibeDocs (Builder category)
+- VibeJobs, VibeMarket, VibeShorts, VibeTube, VibeHousing, VibeSnap, VibePost (SVC clones)
+- Telegram badge system spec (docs/features/telegram-badges.md)
+- Knowledge primitives P-095, P-096, P-097
+- 10 compute/performance problems list (memory/compute-problems.md)
 
-**Test Totals This Session**: 261 new tests (75+13+7+28+39+34+21+14+30)
-**Commits This Session**: 10
+**Fixed:**
+- VibePerpetual `_calculatePnL` uint256 underflow → int256 cast before subtraction
+- VibeOptions stack-too-deep: scoping blocks + `_transferCollateral` helper
+- VibeAMM stack-too-deep: extracted `_validateTWAP`, scoped `removeLiquidity` locals
 
-### Focus
-- Will's directive: "just do liquid staking maybe" → built full test suite for financial VibeLiquidStaking
-- Will's insight: liquid derivatives of locked assets (lsJUL for conviction governance) → P-076
-- Continued alternating easy wins + hard tasks for GitHub grid cadence
+**Commits (12 so far):**
+- `e01d3f2` — VibePerpetual tests 34/34
+- `a779132` — Fix _calculatePnL underflow
+- `a2f9907` — VibePerpEngine tests 75/75
+- `d2910d7` — VibeRevShare tests 51/51
+- `2cd6e37` — VibeBonds tests 51/51
+- `9a0031b` — VibeStream tests 57/57
+- `2a00699` — VibeCredit tests 43/43
+- `d794c4b` — App Store 57 apps + VibeOptions/VibeAMM stack fixes
+- `04d8949` — VibeAMM removeLiquidity fix + P-095/096/097
+- `a583dfb` — Telegram badge spec
+
+**Test Totals This Session**: 311+ new tests (34+75+51+51+57+43)
+**Total new test files**: 7 (6 passing, 1 pending compilation)
+
+### Pending
+- VibeOptions test verification (blocked on 805-file via_ir rebuild)
+- VibeSynth tests (last untested financial contract, 523 lines)
+- Fuzz + invariant tests for newly unit-tested contracts
+- Vercel redeployment in progress (auto-deploy from git push)
+
+### Active Focus
+- FULL AUTOPILOT MODE — alternating big/small tasks
+- Will's new vision: Everything App with 57 SVC apps
+- 3-dimensional incentive design: utility + status + perks
+- Telegram badges: stars + percentile + color roles
 
 ---
 
-## PREVIOUS (Session 056 — Mar 10, 2026)
+## PREVIOUS (Session 057 — Mar 10, 2026)
 
-### Delta from Session 055
+### Delta from Session 056
 **Added:**
-- AugmentedBondingCurve.sol (515 lines) — V(R,S) = S^κ/R conservation invariant, 4 formal mechanisms
-- HatchManager.sol (457 lines) — Trust-gated initialization, θ split, half-life vesting with governance boost
-- IAugmentedBondingCurve.sol + IHatchManager.sol interfaces
-- ABC unit tests (32 passing), fuzz tests (22 passing), invariant tests (8 passing, 1M+ calls)
-- HatchManager unit tests (28 tests) — phases, contributions, vesting, refunds, theta split, return rate
-- CrossChainEndToEnd.t.sol (12 E2E tests) — mock LayerZero with outbox capture
-- GovernanceABCPipeline.t.sol (6 integration tests) — full governance → allocateWithRebond pipeline
-- Knowledge primitives P-072 to P-074 (Supply Hint Convergence, Handler-Bounded Invariant, Mock Relay Outbox)
-- Session 055 report
-
-**Changed:**
-- ConvictionGovernance.sol: executeProposal now calls abc.allocateWithRebond when bonding curve is set
-- IConvictionGovernance.sol: added ProposalFunded event, FundingInsufficient error
-- Contracts catalogue updated with ABC + HatchManager entries
-- ABC invariant tests: fixed unicode char in assertion, cleaned up compiler warnings
-
-**Key Math Fixes:**
-- _pow: Math.mulDiv for overflow-safe 512-bit intermediates (was overflowing at S=500M, κ=6)
-- _nthRoot → _powInverse: Newton's method with supply hint (blind guess diverged catastrophically)
-
-**Wiring Completed:**
-- ConvictionGovernance → ABC.allocateWithRebond (governance proposals fund from ABC funding pool)
-- HatchManager → ABC.openCurve (hatch completion initializes the bonding curve)
-- Backwards compatible: ConvictionGovernance works without ABC reference (just marks EXECUTED)
-
-**Pending:**
-- HatchManager tests need compilation (solc rebuild in progress after OOM + zombie cleanup)
-- GovernanceABCPipeline tests need compilation
-- Full `forge build` verification (via_ir with 782 files)
-- Fly.io redeploy (still stale)
-
-### Active Focus
-- FULL AUTOPILOT MODE — continuous building
-- Alternating easy wins + hard tasks for commit diversity
-- /reinforce and /revert checkpoint protocol agreed with Will
+- VibeLiquidStaking unit/fuzz/invariant tests (95 passing)
+- VibeStaking unit tests (39), VibeInsurancePool (34), VibeFeeDistributor (21)
+- VibeFlashLoan (14), VibeLendPool (30)
+- P-076: Liquid Derivatives of Locked Assets
+**Test Totals**: 261 new tests, 10 commits
 
 ---
 
 ## BASELINE (Session 055)
-- 5-task stress test COMPLETED (security audit, novel mechanism, deep refactor, cross-chain E2E, formal proof)
-- BASE MAINNET PHASE 2: LIVE — 11 contracts deployed on Base
+- 5-task stress test COMPLETED
+- BASE MAINNET PHASE 2: LIVE — 11 contracts on Base
 - 3000+ Solidity tests, 0 failures
 - CKB: 190 Rust tests, ALL 7 PHASES complete
 - JARVIS Mind Network: 3-node BFT on Fly.io

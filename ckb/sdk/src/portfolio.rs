@@ -1102,4 +1102,318 @@ mod tests {
         assert_eq!(portfolio.lp_positions.len(), 2);
         assert!(portfolio.summary.lp_value > 0);
     }
+
+    // ============ New Hardening Tests ============
+
+    #[test]
+    fn test_empty_portfolio_all_summaries_zero() {
+        let builder = PortfolioBuilder::new([0xAA; 32], make_prices());
+        let p = builder.build();
+
+        assert_eq!(p.summary.lp_value, 0);
+        assert_eq!(p.summary.lending_net_value, 0);
+        assert_eq!(p.summary.insurance_value, 0);
+        assert_eq!(p.summary.prediction_value, 0);
+        assert_eq!(p.summary.token_value, 0);
+        assert_eq!(p.summary.total_collateral, 0);
+        assert_eq!(p.summary.total_debt, 0);
+        assert_eq!(p.summary.estimated_apy_bps, 0);
+        assert_eq!(p.summary.concentration_bps, 0);
+        assert_eq!(p.owner_lock_hash, [0xAA; 32]);
+    }
+
+    #[test]
+    fn test_il_zero_entry_price() {
+        // Entry price = 0 should return IL = 0 (guard clause)
+        let pool = make_pool(1, 2, 100 * PRECISION, 300_000 * PRECISION);
+        let il = calculate_il(0, &pool, 3_000 * PRECISION, PRECISION);
+        assert_eq!(il, 0);
+    }
+
+    #[test]
+    fn test_il_extreme_price_move_10x() {
+        // 10x price move: reserve ratio shifted dramatically
+        let pool = PoolCellData {
+            reserve0: 10 * PRECISION,
+            reserve1: 1_000 * PRECISION, // current price = 100
+            ..make_pool(1, 2, 10 * PRECISION, 1_000 * PRECISION)
+        };
+        let entry_price = 10 * PRECISION; // was 10, now 100 → 10x move
+
+        let il = calculate_il(entry_price, &pool, 0, 0);
+        // 10x move should produce significant IL (capped at 10000 bps)
+        assert!(il > 0, "IL should be positive for 10x move");
+        assert!(il <= 10_000, "IL should be capped at 10000 bps");
+    }
+
+    #[test]
+    fn test_lending_near_liquidation_health_factor() {
+        // Vault near liquidation: large debt relative to collateral
+        let prices = make_prices();
+        // 10 ETH @ $3000 = $30K collateral
+        // Debt = 30K USDC → HF = (30K * 0.8) / 30K = 0.8 (below 1 = liquidatable)
+        let vault = make_vault(10 * PRECISION, 30_000 * PRECISION);
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lending_positions[0];
+        // HF should be below PRECISION (unhealthy)
+        assert!(
+            pos.health_factor < PRECISION,
+            "HF should be below 1.0 for near-liquidation vault: {}",
+            pos.health_factor
+        );
+        assert_eq!(portfolio.summary.worst_health_factor, pos.health_factor);
+    }
+
+    #[test]
+    fn test_lending_zero_collateral() {
+        // Zero collateral but some deposit shares: deposit-only position
+        let prices = make_prices();
+        let vault = VaultCellData {
+            collateral_amount: 0,
+            debt_shares: 0,
+            deposit_shares: 100_000 * PRECISION,
+            ..make_vault(0, 0)
+        };
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lending_positions[0];
+        assert_eq!(pos.collateral_value, 0);
+        assert_eq!(pos.debt_value, 0);
+        assert_eq!(pos.health_factor, u128::MAX);
+        // deposit_shares = 100K of total 1M → 100K USDC at $1 = 100K
+        assert_eq!(pos.deposit_value, 100_000 * PRECISION);
+        assert_eq!(pos.net_value, 100_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_insurance_claims_exceed_premiums() {
+        // Edge: claims paid > premiums earned → net yield is negative → clamped to 0 by saturating_sub
+        let ins = InsurancePoolCellData {
+            total_premiums_earned: 2_000 * PRECISION,
+            total_claims_paid: 5_000 * PRECISION,   // claims > premiums
+            ..make_insurance()
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_insurance(ins, 10_000 * PRECISION);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.insurance_positions[0];
+        // yield_bps uses saturating_sub, so (2K - 5K) saturates to 0
+        assert_eq!(pos.premium_yield_bps, 0);
+        // Underlying value: user_shares * (deposits + premiums - claims) / total_shares
+        // = 10K * (100K + 2K - 5K) / 100K = 10K * 97K / 100K = 9.7K USDC
+        assert!(pos.underlying_value > 9_000 * PRECISION);
+        assert!(pos.underlying_value < 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_prediction_settled_market() {
+        let market = PredictionMarketCellData {
+            market_id: [0x55; 32],
+            num_tiers: 2,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 50_000 * PRECISION;
+                t[1] = 50_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_SETTLED,
+            ..Default::default()
+        };
+
+        let position = PredictionPositionCellData {
+            market_id: [0x55; 32],
+            tier_index: 0,
+            amount: 5_000 * PRECISION,
+            owner_lock_hash: [0x11; 32],
+            created_block: 200,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(market, position);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.prediction_positions[0];
+        assert!(pos.is_settled);
+        // 50/50 split: payout = 5K * 100K / 50K = 10K
+        assert_eq!(pos.potential_payout, 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_prediction_zero_tier_pool() {
+        // Tier pool = 0 → potential_payout = 0
+        let market = PredictionMarketCellData {
+            market_id: [0x66; 32],
+            num_tiers: 3,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 100_000 * PRECISION;
+                t[1] = 0; // empty tier
+                t[2] = 50_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_ACTIVE,
+            ..Default::default()
+        };
+
+        let position = PredictionPositionCellData {
+            market_id: [0x66; 32],
+            tier_index: 1, // bet on empty tier
+            amount: 10_000 * PRECISION,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(market, position);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.prediction_positions[0].potential_payout, 0);
+    }
+
+    #[test]
+    fn test_portfolio_only_lending_deposits_apy() {
+        // APY from lending deposits only (no insurance) → nominal 300 bps (3%)
+        let prices = make_prices();
+        let vault = VaultCellData {
+            collateral_amount: 0,
+            debt_shares: 0,
+            deposit_shares: 200_000 * PRECISION,
+            ..make_vault(0, 0)
+        };
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        // Lending deposits get a nominal 300 bps (3%) in estimate_portfolio_apy
+        assert_eq!(portfolio.summary.estimated_apy_bps, 300);
+    }
+
+    #[test]
+    fn test_mixed_apy_insurance_and_lending() {
+        // Both insurance (4% yield) and lending deposits (3% nominal) contribute
+        let prices = make_prices();
+        let ins = make_insurance(); // 4% yield = 400 bps
+
+        let vault = VaultCellData {
+            collateral_amount: 0,
+            debt_shares: 0,
+            deposit_shares: 100_000 * PRECISION, // = 100K USDC deposit value
+            ..make_vault(0, 0)
+        };
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_insurance(ins, 50_000 * PRECISION); // 50K shares → ~52K value
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        // Weighted average should be between 300 and 400 bps
+        let apy = portfolio.summary.estimated_apy_bps;
+        assert!(
+            apy > 300 && apy < 400,
+            "Mixed APY should be between 300 and 400 bps, got {}",
+            apy
+        );
+    }
+
+    #[test]
+    fn test_full_five_protocol_portfolio() {
+        // All 5 position types present → protocol_count = 5
+        let prices = make_prices();
+        let amm_pool = make_pool(1, 2, 100 * PRECISION, 300_000 * PRECISION);
+        let lp = make_lp(amm_pool.total_lp_supply / 10, 3_000 * PRECISION);
+        let lending_pool = make_lending_pool();
+        let ins = make_insurance();
+
+        let market = PredictionMarketCellData {
+            market_id: [0x77; 32],
+            num_tiers: 2,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 80_000 * PRECISION;
+                t[1] = 120_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_ACTIVE,
+            ..Default::default()
+        };
+        let position = PredictionPositionCellData {
+            market_id: [0x77; 32],
+            tier_index: 0,
+            amount: 5_000 * PRECISION,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder
+            .add_lp(lp, amm_pool)
+            .add_vault(make_vault(10 * PRECISION, 15_000 * PRECISION), lending_pool)
+            .add_insurance(ins, 10_000 * PRECISION)
+            .add_prediction(market, position)
+            .add_token(token(3), PRECISION); // 1 BTC
+
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.summary.protocol_count, 5);
+        assert!(portfolio.summary.lp_value > 0);
+        assert!(portfolio.summary.lending_net_value > 0);
+        assert!(portfolio.summary.insurance_value > 0);
+        assert!(portfolio.summary.prediction_value > 0);
+        assert!(portfolio.summary.token_value > 0);
+        // Total > sum of individual minimums
+        assert!(portfolio.summary.total_value > 100_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_concentration_single_position() {
+        // Single position → 100% concentration
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_token(token(1), 10 * PRECISION);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.summary.concentration_bps, 10_000);
+    }
+
+    #[test]
+    fn test_concentration_equal_split() {
+        // Two equal value positions → ~50% concentration each
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        // ETH @ $3000: need 10 ETH = $30K, and 30K USDC = $30K
+        builder.add_token(token(1), 10 * PRECISION);  // $30,000
+        builder.add_token(token(2), 30_000 * PRECISION); // $30,000
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.summary.concentration_bps, 5_000);
+    }
+
+    #[test]
+    fn test_lp_with_unknown_token_prices() {
+        // Pool tokens not in price map → values are 0
+        let prices = BTreeMap::new();
+        // Only add token(10) and token(11) which have no prices
+        let pool = make_pool(10, 11, 500 * PRECISION, 500 * PRECISION);
+        let lp = make_lp(pool.total_lp_supply / 5, PRECISION);
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, pool);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.lp_positions[0].token0_value, 0);
+        assert_eq!(portfolio.lp_positions[0].token1_value, 0);
+        assert_eq!(portfolio.summary.lp_value, 0);
+    }
 }

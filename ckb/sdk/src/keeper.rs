@@ -2471,4 +2471,288 @@ mod tests {
         assert!(matches!(result.action, KeeperAction::SoftLiquidate { .. }),
             "Insufficient insurance should fall back to SoftLiquidate, got {:?}", result.action);
     }
+
+    // ============ Batch 7: Additional Hardening Tests ============
+
+    #[test]
+    fn test_assess_vault_u128_max_collateral_safe() {
+        // Vault with maximum possible collateral and minimal debt should be safe
+        let vault = test_vault(1, u128::MAX / PRECISION);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::Safe);
+        assert!(result.health_factor > PRECISION);
+    }
+
+    #[test]
+    fn test_assess_vault_one_wei_collateral_one_wei_debt() {
+        // Absolute minimal values: 1 unit collateral, 1 unit debt
+        let vault = test_vault(1, 1);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, PRECISION, PRECISION);
+
+        // HF = (1 * 1.0 * 0.8) / (1 * 1.0) = 0.8 → HardLiquidation
+        assert_eq!(result.risk_tier, RiskTier::HardLiquidation);
+        assert!(result.health_factor < PRECISION);
+    }
+
+    #[test]
+    fn test_batch_assess_ten_vaults_all_safe() {
+        // All ten vaults are safe — verify sort stability and correctness
+        let pool = test_lending_pool();
+        let vaults: Vec<(VaultCellData, CellInput)> = (1..=10)
+            .map(|i| {
+                let debt = (i as u128) * 100 * PRECISION; // small debt
+                (test_vault(debt, 100 * PRECISION), test_cell_input(i as u8))
+            })
+            .collect();
+
+        let results = assess_vaults(&vaults, &pool, None, 2000 * PRECISION, PRECISION);
+
+        assert_eq!(results.len(), 10);
+        for (assessment, _) in &results {
+            assert_eq!(assessment.risk_tier, RiskTier::Safe);
+        }
+        // Still sorted ascending
+        for i in 1..results.len() {
+            assert!(results[i].0.health_factor >= results[i - 1].0.health_factor);
+        }
+    }
+
+    #[test]
+    fn test_stress_test_no_price_drop_zero_bps() {
+        // 0% price drop — no vaults should be at risk that aren't already
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(5_000 * PRECISION, 10 * PRECISION), test_cell_input(1)),
+        ];
+
+        let at_risk = stress_test_vaults(
+            &vaults, &pool,
+            2000 * PRECISION, PRECISION,
+            0, // 0% drop
+        );
+
+        // At 0% drop: HF = (10*2000*0.8)/5000 = 3.2 → not at risk
+        assert!(at_risk.is_empty(),
+            "0% price drop should not put a safe vault at risk");
+    }
+
+    #[test]
+    fn test_premium_accrual_very_small_total_borrows() {
+        // 1 unit of total_borrows — premium should be tiny but computable
+        let ins = InsurancePoolCellData {
+            last_premium_block: 0,
+            ..test_insurance_pool()
+        };
+        let pool = LendingPoolCellData {
+            total_borrows: 1,
+            ..test_lending_pool()
+        };
+
+        let premium = check_premium_accrual(&ins, &pool, 100_000, 0);
+        // Very small borrows → premium could be 0 due to integer division, that's OK
+        assert!(premium <= 1, "Premium for 1 unit of borrows should be tiny");
+    }
+
+    #[test]
+    fn test_assess_vault_insurance_claim_has_positive_estimated_new_hf() {
+        // When insurance claim is issued, estimated_new_hf should be meaningful
+        let vault = test_vault(8_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let ins = test_insurance_pool();
+
+        let result = assess_vault(&vault, &pool, Some(&ins), 1050 * PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::SoftLiquidation);
+        if let KeeperAction::InsuranceClaim { estimated_new_hf, .. } = result.action {
+            assert!(estimated_new_hf > 0,
+                "Insurance claim should have positive estimated_new_hf");
+        }
+    }
+
+    #[test]
+    fn test_vault_assessment_clone_debug() {
+        // Verify VaultAssessment has Clone and Debug (compile-time test + basic usage)
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let cloned = result.clone();
+        let _debug = format!("{:?}", cloned);
+
+        assert_eq!(cloned.health_factor, result.health_factor);
+        assert_eq!(cloned.current_debt, result.current_debt);
+    }
+
+    #[test]
+    fn test_keeper_action_clone_debug_eq() {
+        // Verify KeeperAction Clone, Debug, PartialEq, Eq (compile-time + usage)
+        let a = KeeperAction::Safe { health_factor: 42 };
+        let b = a.clone();
+        assert_eq!(a, b);
+        let _debug = format!("{:?}", a);
+
+        let c = KeeperAction::Warn { health_factor: 10, vault_owner: [0xAA; 32] };
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn test_assess_vault_soft_liq_with_large_insurance_prefers_insurance() {
+        // Abundant insurance should allow successful claim in soft liquidation zone
+        let vault = test_vault(8_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let ins = InsurancePoolCellData {
+            total_deposits: 10_000_000 * PRECISION, // Very large fund
+            total_shares: 10_000_000 * PRECISION,
+            max_coverage_bps: 5000, // 50% coverage
+            ..test_insurance_pool()
+        };
+
+        let result = assess_vault(&vault, &pool, Some(&ins), 1050 * PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::SoftLiquidation);
+        // With a huge insurance pool, it should prefer insurance claim
+        assert!(matches!(result.action, KeeperAction::InsuranceClaim { .. }),
+            "Large insurance pool should enable claim, got {:?}", result.action);
+    }
+
+    #[test]
+    fn test_stress_test_single_vault_at_exact_threshold() {
+        // Vault whose stressed HF is exactly at the threshold boundary (1.0)
+        // After stress, HF ≈ 1.0 → not at risk (< PRECISION means at risk)
+        let pool = test_lending_pool();
+        // HF = (10*P*0.8)/debt. After D% drop, stressed HF = (10*P*(1-D)*0.8)/debt
+        // Want stressed_hf = 1.0: P*(1-0.3)*0.8*10 / debt = 1.0
+        // P=2000, D=0.3: 2000*0.7*0.8*10 / debt = 1 → debt = 11200
+        let vaults = vec![
+            (test_vault(11_200 * PRECISION, 10 * PRECISION), test_cell_input(1)),
+        ];
+
+        let at_risk = stress_test_vaults(
+            &vaults, &pool,
+            2000 * PRECISION, PRECISION,
+            3000, // 30% drop
+        );
+
+        // stressed_hf is approximately 1.0 — might be exactly at boundary
+        // Either at risk or not is acceptable, just shouldn't panic
+        assert!(at_risk.len() <= 1);
+    }
+
+    #[test]
+    fn test_batch_assess_single_no_debt_vault() {
+        // Single vault with zero debt
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(0, 10 * PRECISION), test_cell_input(1)),
+        ];
+
+        let results = assess_vaults(&vaults, &pool, None, 2000 * PRECISION, PRECISION);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.health_factor, u128::MAX);
+        assert_eq!(results[0].0.risk_tier, RiskTier::Safe);
+        assert_eq!(results[0].1, 0);
+    }
+
+    #[test]
+    fn test_assess_vault_borrow_index_snapshot_higher_than_current() {
+        // Edge case: snapshot > current index (shouldn't happen in practice, but tests robustness)
+        let vault = VaultCellData {
+            borrow_index_snapshot: 2 * PRECISION, // snapshot at 2x
+            ..test_vault(5_000 * PRECISION, 10 * PRECISION)
+        };
+        let pool = test_lending_pool(); // borrow_index = PRECISION (1x)
+
+        // current_debt = 5000 * 1.0 / 2.0 = 2500 (debt is reduced)
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+
+        assert!(result.current_debt < 5_000 * PRECISION,
+            "Debt should be reduced when snapshot > current: {}", result.current_debt);
+        assert_eq!(result.risk_tier, RiskTier::Safe);
+    }
+
+    #[test]
+    fn test_premium_accrual_rate_zero_bps_always_zero() {
+        // Insurance pool with premium_rate_bps = 0 → premium should always be 0
+        let ins = InsurancePoolCellData {
+            premium_rate_bps: 0,
+            last_premium_block: 0,
+            ..test_insurance_pool()
+        };
+        let pool = test_lending_pool();
+
+        let premium = check_premium_accrual(&ins, &pool, 1_000_000, 0);
+        assert_eq!(premium, 0, "Zero premium rate should yield zero premium");
+    }
+
+    #[test]
+    fn test_auto_deleverage_shares_bounded_by_deposit_shares() {
+        // Auto-deleverage should not redeem more shares than the vault has
+        let vault = test_vault_with_deposits(
+            8_000 * PRECISION, 10 * PRECISION, 100 * PRECISION, // 100 deposit shares
+        );
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 1200 * PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::AutoDeleverage);
+        if let KeeperAction::AutoDeleverage { shares_to_redeem, .. } = result.action {
+            assert!(shares_to_redeem <= vault.deposit_shares,
+                "Shares to redeem ({}) should not exceed deposit shares ({})",
+                shares_to_redeem, vault.deposit_shares);
+        }
+    }
+
+    #[test]
+    fn test_assess_vault_collateral_value_independent_of_debt_price() {
+        // Collateral value should only depend on collateral_amount and collateral_price
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let r1 = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let r2 = assess_vault(&vault, &pool, None, 2000 * PRECISION, 5 * PRECISION);
+
+        assert_eq!(r1.collateral_value, r2.collateral_value,
+            "Collateral value should not depend on debt price");
+    }
+
+    #[test]
+    fn test_stress_test_two_vaults_same_parameters() {
+        // Two identical vaults should produce identical stressed HFs
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(8_000 * PRECISION, 10 * PRECISION), test_cell_input(1)),
+            (test_vault(8_000 * PRECISION, 10 * PRECISION), test_cell_input(2)),
+        ];
+
+        let at_risk = stress_test_vaults(
+            &vaults, &pool,
+            1500 * PRECISION, PRECISION,
+            3000, // 30% drop
+        );
+
+        // If both are at risk, they should have the same stressed HF
+        if at_risk.len() == 2 {
+            assert_eq!(at_risk[0].1, at_risk[1].1,
+                "Identical vaults should have identical stressed HFs");
+        }
+    }
+
+    #[test]
+    fn test_assess_vault_with_zero_deposit_shares_zero_insurance_auto_deleverage_zone() {
+        // Auto-deleverage zone with absolutely nothing to fall back on
+        let vault = test_vault_with_deposits(8_000 * PRECISION, 10 * PRECISION, 0);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 1200 * PRECISION, PRECISION);
+
+        assert_eq!(result.risk_tier, RiskTier::AutoDeleverage);
+        // No deposits, no insurance → falls to Warn
+        assert!(matches!(result.action, KeeperAction::Warn { .. }),
+            "Auto-deleverage with no resources should fall to Warn");
+    }
 }

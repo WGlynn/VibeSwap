@@ -696,16 +696,7 @@ contract VibeAMM is
         // ============ TWAP Validation for Batch Execution ============
         // Validate clearing price against TWAP (post-calculation, pre-execution)
         if ((protectionFlags & FLAG_TWAP) != 0 && poolOracles[poolId].cardinality >= 2) {
-            if (poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
-                uint256 twapPrice = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
-                if (!SecurityLib.checkPriceDeviation(clearingPrice, twapPrice, MAX_PRICE_DEVIATION_BPS)) {
-                    // Apply golden ratio damping instead of hard revert
-                    // This preserves liquidity while capping manipulation
-                    clearingPrice = BatchMath.applyGoldenRatioDamping(
-                        twapPrice, clearingPrice, MAX_PRICE_DEVIATION_BPS
-                    );
-                }
-            }
+            clearingPrice = _validateTWAP(poolId, clearingPrice);
         }
 
         result.clearingPrice = clearingPrice;
@@ -1806,13 +1797,20 @@ contract VibeAMM is
 
     // ============ True Price Internal Functions ============
 
+    function _validateTWAP(bytes32 poolId, uint256 clearingPrice) internal view returns (uint256) {
+        if (poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
+            uint256 twapPrice = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+            if (!SecurityLib.checkPriceDeviation(clearingPrice, twapPrice, MAX_PRICE_DEVIATION_BPS)) {
+                return BatchMath.applyGoldenRatioDamping(
+                    twapPrice, clearingPrice, MAX_PRICE_DEVIATION_BPS
+                );
+            }
+        }
+        return clearingPrice;
+    }
+
     /**
      * @notice Validate clearing price against True Price Oracle and apply golden ratio damping
-     * @dev Three-tier enforcement:
-     *      1. Within bounds → clearing price passes unchanged
-     *      2. Beyond bounds → golden ratio damping clamps the price (soft enforcement)
-     *      3. Extreme deviation → TRUE_PRICE_BREAKER trips (hard enforcement for future batches)
-     *
      * @param poolId Pool identifier
      * @param clearingPrice Raw clearing price from BatchMath
      * @param reserve0 Current reserve0 (for spot price reference)

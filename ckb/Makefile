@@ -3,7 +3,7 @@
 #
 # Usage:
 #   make build        — Build all 12 scripts for CKB-VM (RISC-V)
-#   make test         — Run all native tests (902 tests)
+#   make test         — Run all native tests (959 tests)
 #   make clean        — Clean build artifacts
 #   make <script>     — Build a single script (e.g., make pow-lock)
 #   make size         — Show binary sizes
@@ -14,11 +14,11 @@ TARGET := riscv64imac-unknown-none-elf
 BUILD_DIR := target/$(TARGET)/release
 OUT_DIR := build
 
-# All 13 CKB scripts
+# All 14 CKB scripts
 SCRIPTS := pow-lock batch-auction-type commit-type amm-pool-type \
            lp-position-type compliance-type config-type oracle-type \
            knowledge-type lending-pool-type vault-type insurance-pool-type \
-           prediction-market-type
+           prediction-market-type prediction-position-type
 
 # Binary names (Cargo replaces hyphens with underscores)
 BINARIES := $(patsubst %,$(OUT_DIR)/%, $(SCRIPTS))

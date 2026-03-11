@@ -4,6 +4,7 @@
 
 pub mod accounting;
 pub mod analytics;
+pub mod antibot;
 pub mod assembler;
 pub mod auction;
 pub mod bridge;

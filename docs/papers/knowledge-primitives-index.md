@@ -1279,3 +1279,39 @@ All divisions use `mul_div(a, b, c)` with 256-bit intermediate to prevent overfl
 **Generalization**: Any DeFi primitive that requires shared state on UTXO chains should follow this pattern: minimize shared state (pool cells updated rarely) and maximize per-user state (vault/position cells with no contention). This is the UTXO equivalent of account-model's "read from storage, write to storage" — except reads are free (cell_deps) and writes require consuming + recreating cells.
 
 **Cross-references**: P-100 (The Crossover Protocol — lending IS the crossover, building what CKB needs with VibeSwap patterns), P-101 (Consensus Determinism — all lending math is pure integer), P-098 (As Above, So Below — the two-cell pattern mirrors CKB's own architecture of lock scripts vs type scripts)
+
+### P-103: UTXO Token Identity (March 2026)
+
+**Source**: `ckb/sdk/src/token.rs` — xUDT token issuance, transfer, burn, and metadata
+**Discovered during**: Building CKB token infrastructure (Session 059)
+**Principle**: On cell-model chains, token identity is genetically derived from the issuer's identity.
+
+**The Insight**: In account-model chains (Ethereum), tokens have addresses — arbitrary contracts at arbitrary locations. The token IS the contract. On cell-model chains (CKB), tokens have *type script hashes* — derived from `hash(code_hash || hash_type || owner_lock_hash || flags)`. The token's identity is a function of who created it.
+
+**Why this matters**:
+- **Genetic identity**: You cannot create the same token from a different lock script. The issuer's lock hash is baked into the type script args, making token identity a deterministic function of creator identity. Like DNA.
+- **Owner mode**: The issuer doesn't need special minting contracts — any transaction that includes an input cell locked by the issuer's lock script automatically enters "owner mode," bypassing amount validation. Power derives from identity, not from code.
+- **Atomic transfers**: UTXO transfers are inherently atomic (no reentrancy, no approval front-running) but require explicit change handling. Every transfer creates and destroys cells — there's no "modify balance in place."
+- **Token-agnostic DEX**: VibeSwap references all tokens by `token_type_hash` (32 bytes), making it standard-agnostic. Whether it's sUDT, xUDT with extensions, or a future standard — if it has a type hash, VibeSwap can trade it.
+
+**The Token Lifecycle on UTXO**:
+```
+1. Mint:     Issuer creates cells with token type script (owner mode)
+2. Transfer: Consumer destroys input cells, creates output cells (amount balance enforced)
+3. Burn:     Owner destroys cells without creating equal outputs (owner mode)
+4. Info:     Separate metadata cell linked by token_type_hash (name, symbol, decimals)
+```
+
+**Contrast with Account Model**:
+| Aspect | Account (ERC-20) | Cell (xUDT) |
+|--------|------------------|-------------|
+| Identity | Contract address | Type script hash (derived from issuer) |
+| Balance | Single storage slot | Multiple cells (UTXO set) |
+| Transfer | Modify two balances | Destroy + create cells |
+| Approval | Separate allowance state | Not needed (atomic) |
+| Reentrancy | Possible | Impossible (no callbacks) |
+| Front-running | Common (approve/transferFrom) | Not applicable |
+
+**Generalization**: Systems where identity is derived rather than assigned produce stronger security properties. When your token's existence is a mathematical consequence of your identity, it cannot be impersonated — only the holder of the issuer's lock script can enter owner mode. This is a structural guarantee, not a contractual one.
+
+**Cross-references**: P-100 (The Crossover Protocol — building ecosystem infrastructure), P-101 (Consensus Determinism — token amounts are u128 integers), P-102 (UTXO-Native Lending — tokens interact with lending via type_hash references)

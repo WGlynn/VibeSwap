@@ -1446,4 +1446,468 @@ mod tests {
         assert_eq!(new_auction.commit_count, u32::MAX,
             "commit_count should reach u32::MAX without panic");
     }
+
+    // ============ New Tests: Edge Cases & Boundaries (Batch 5) ============
+
+    #[test]
+    fn test_mine_batch_id_one_yields_unique_challenge() {
+        // batch_id=1 vs batch_id=2 — adjacent values must differ
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+
+        let proof_1 = mine_for_cell(&pair_id, 1, &prev_hash, 4, 100_000).unwrap();
+        let proof_2 = mine_for_cell(&pair_id, 2, &prev_hash, 4, 100_000).unwrap();
+
+        assert_ne!(proof_1.challenge, proof_2.challenge,
+            "Adjacent batch_ids must produce different challenges");
+    }
+
+    #[test]
+    fn test_mine_u64_max_minus_one_batch_id() {
+        // Test the penultimate batch_id value
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+
+        let proof = mine_for_cell(&pair_id, u64::MAX - 1, &prev_hash, 4, 100_000);
+        assert!(proof.is_some(), "u64::MAX - 1 batch_id should allow mining");
+
+        // Should differ from u64::MAX
+        let proof_max = mine_for_cell(&pair_id, u64::MAX, &prev_hash, 4, 100_000).unwrap();
+        assert_ne!(proof.unwrap().challenge, proof_max.challenge,
+            "u64::MAX-1 and u64::MAX must produce different challenges");
+    }
+
+    #[test]
+    fn test_mine_difficulty_one_succeeds_quickly() {
+        // Difficulty 1 means 50% chance per hash — should succeed within a few tries
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 1, 100);
+        assert!(proof.is_some(), "Difficulty 1 should succeed within 100 iterations");
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 1));
+    }
+
+    #[test]
+    fn test_mine_proof_verifies_at_claimed_difficulty_not_higher() {
+        // A proof mined at difficulty 4 verifies at 4 but may not verify at 20
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000).unwrap();
+        assert!(vibeswap_pow::verify(&proof, 4), "Must verify at mined difficulty");
+        // Note: can't assert it fails at higher difficulty since it might exceed 4 by luck
+        // But we can assert it passes at lower difficulty
+        assert!(vibeswap_pow::verify(&proof, 0), "Must verify at difficulty 0");
+        assert!(vibeswap_pow::verify(&proof, 1), "Must verify at difficulty 1");
+    }
+
+    #[test]
+    fn test_estimate_profitability_difficulty_zero() {
+        // Difficulty 0 means 1 expected hash
+        let estimate = estimate_profitability(0, 10, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_hashes, 1,
+            "Difficulty 0 should require exactly 1 hash");
+        assert!(estimate.expected_time_secs < 0.001,
+            "1 hash at 1M H/s should take microseconds");
+        assert!(estimate.is_profitable,
+            "Difficulty 0 with reward should be profitable");
+    }
+
+    #[test]
+    fn test_estimate_profitability_difficulty_one() {
+        // Difficulty 1 means 2 expected hashes
+        let estimate = estimate_profitability(1, 10, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_hashes, 2,
+            "Difficulty 1 should require 2 expected hashes");
+    }
+
+    #[test]
+    fn test_estimate_profitability_difficulty_63() {
+        // Difficulty 63 is the max before u64::MAX kicks in
+        let estimate = estimate_profitability(63, 10, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_hashes, 1u64 << 63,
+            "Difficulty 63 should require 2^63 expected hashes");
+    }
+
+    #[test]
+    fn test_estimate_profitability_large_base_reward() {
+        // Very large base reward with many commits — check no overflow in reward calc
+        let estimate = estimate_profitability(4, 1000, 1_000_000, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, 1_000_000_000u64,
+            "1000 commits * 1M base = 1B reward");
+    }
+
+    #[test]
+    fn test_estimate_profitability_energy_cost_scales_with_difficulty() {
+        let est_low = estimate_profitability(4, 10, 1000, 1_000_000.0);
+        let est_high = estimate_profitability(30, 10, 1000, 1_000_000.0);
+        assert!(est_high.estimated_cost_ckb >= est_low.estimated_cost_ckb,
+            "Higher difficulty should have higher or equal energy cost");
+    }
+
+    #[test]
+    fn test_track_difficulty_three_transitions() {
+        // Three transitions — enough data for adjustment
+        let transitions = vec![100, 110, 120];
+        let new_diff = track_difficulty(16, &transitions, 10);
+        // actual_avg = (120-100)/2 = 10, target = 10 → no change
+        assert_eq!(new_diff, 16);
+    }
+
+    #[test]
+    fn test_track_difficulty_many_transitions_stable() {
+        // 100 transitions, perfectly on target
+        let transitions: Vec<u64> = (0..100).map(|i| 1000 + i * 5).collect();
+        let new_diff = track_difficulty(16, &transitions, 5);
+        assert_eq!(new_diff, 16, "Perfectly timed transitions should keep difficulty stable");
+    }
+
+    #[test]
+    fn test_track_difficulty_descending_from_high() {
+        // Start at difficulty 200 with slow transitions — should decrease
+        let transitions = vec![100, 200, 300];
+        let new_diff = track_difficulty(200, &transitions, 5);
+        assert!(new_diff < 200,
+            "Slow transitions at high difficulty should decrease, got {}", new_diff);
+    }
+
+    #[test]
+    fn test_track_difficulty_ascending_from_low() {
+        // Start at difficulty 2 with fast transitions — should increase
+        let transitions = vec![100, 101, 102, 103, 104];
+        let new_diff = track_difficulty(2, &transitions, 10);
+        assert!(new_diff > 2,
+            "Fast transitions at low difficulty should increase, got {}", new_diff);
+    }
+
+    #[test]
+    fn test_track_difficulty_consecutive_blocks() {
+        // Transitions happening every single block (fastest possible)
+        let transitions = vec![100, 101, 102, 103, 104, 105, 106, 107, 108, 109];
+        let new_diff = track_difficulty(16, &transitions, 10);
+        assert!(new_diff > 16,
+            "1-block transitions with target 10 should increase difficulty, got {}", new_diff);
+    }
+
+    #[test]
+    fn test_compute_auction_hash_default_state() {
+        // Hash of a default auction state should be non-zero and deterministic
+        let default_auction = AuctionCellData::default();
+        let hash = compute_auction_hash(&default_auction);
+        assert_ne!(hash, [0u8; 32], "Hash of default auction should not be all zeros");
+        let hash2 = compute_auction_hash(&default_auction);
+        assert_eq!(hash, hash2, "Hash must be deterministic");
+    }
+
+    #[test]
+    fn test_compute_auction_hash_clearing_price_change() {
+        let mut auction1 = test_auction();
+        auction1.clearing_price = 0;
+        let mut auction2 = test_auction();
+        auction2.clearing_price = 1_000_000_000_000_000_000; // 1e18
+
+        let hash1 = compute_auction_hash(&auction1);
+        let hash2 = compute_auction_hash(&auction2);
+        assert_ne!(hash1, hash2,
+            "Different clearing_price must produce different hash");
+    }
+
+    #[test]
+    fn test_compute_auction_hash_xor_seed_change() {
+        let mut auction1 = test_auction();
+        auction1.xor_seed = [0u8; 32];
+        let mut auction2 = test_auction();
+        auction2.xor_seed = [0xFF; 32];
+
+        let hash1 = compute_auction_hash(&auction1);
+        let hash2 = compute_auction_hash(&auction2);
+        assert_ne!(hash1, hash2,
+            "Different xor_seed must produce different hash");
+    }
+
+    #[test]
+    fn test_aggregation_all_phases() {
+        // Build aggregation from every phase — should work structurally for all
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        for phase in [PHASE_COMMIT, PHASE_REVEAL, PHASE_SETTLING, PHASE_SETTLED] {
+            let mut auction = test_auction();
+            auction.phase = phase;
+
+            let tx = build_aggregation_tx(
+                &auction, &[make_commit(1)], None, &proof,
+                &test_deployment(), &test_miner_lock(),
+            );
+
+            assert_eq!(tx.inputs.len(), 2,
+                "Phase {} should produce 2 inputs", phase);
+            assert_eq!(tx.outputs.len(), 1,
+                "Phase {} should produce 1 output", phase);
+        }
+    }
+
+    #[test]
+    fn test_aggregation_max_outpoint_index() {
+        // u32::MAX outpoint index should be preserved
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let mut commit = make_commit(1);
+        commit.outpoint_index = u32::MAX;
+
+        let tx = build_aggregation_tx(
+            &auction, &[commit], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert_eq!(tx.inputs[1].index, u32::MAX,
+            "u32::MAX outpoint_index must be preserved");
+    }
+
+    #[test]
+    fn test_aggregation_different_pair_ids_produce_different_outputs() {
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let mut auction_a = test_auction();
+        auction_a.pair_id = [0xAA; 32];
+        let mut auction_b = test_auction();
+        auction_b.pair_id = [0xBB; 32];
+
+        let tx_a = build_aggregation_tx(
+            &auction_a, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let tx_b = build_aggregation_tx(
+            &auction_b, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        // Different pair_ids → different output data (different prev_state_hash, MMR root same but pair_id differs)
+        assert_ne!(tx_a.outputs[0].data, tx_b.outputs[0].data,
+            "Different pair_ids should produce different output data");
+
+        // Type script args should differ
+        let type_a = tx_a.outputs[0].type_script.as_ref().unwrap();
+        let type_b = tx_b.outputs[0].type_script.as_ref().unwrap();
+        assert_ne!(type_a.args, type_b.args, "Type script args should contain different pair_ids");
+    }
+
+    #[test]
+    fn test_aggregation_compliance_data_does_not_filter() {
+        // Current implementation includes all commits regardless of compliance data
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let commits: Vec<PendingCommit> = (1..=5).map(|i| make_commit(i)).collect();
+
+        let compliance = ComplianceCellData {
+            blocked_merkle_root: [0xFF; 32], // "full" blocklist
+            tier_merkle_root: [0xDD; 32],
+            jurisdiction_root: [0xEE; 32],
+            last_updated: 999,
+            version: 2,
+        };
+
+        let tx_without = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let tx_with = build_aggregation_tx(
+            &auction, &commits, Some(&compliance), &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        // Both should have same number of inputs since compliance doesn't filter yet
+        assert_eq!(tx_without.inputs.len(), tx_with.inputs.len(),
+            "Compliance data should not change input count in current impl");
+    }
+
+    #[test]
+    fn test_aggregation_auction_input_since_is_zero() {
+        // The auction cell input should always have since=0
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert_eq!(tx.inputs[0].since, 0, "Auction cell input since must be 0");
+    }
+
+    #[test]
+    fn test_aggregation_cell_dep_type_is_dep_group() {
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert!(matches!(tx.cell_deps[0].dep_type, super::super::DepType::DepGroup),
+            "Cell dep type must be DepGroup");
+    }
+
+    #[test]
+    fn test_miner_config_clone() {
+        let config = MinerConfig {
+            max_iterations: 1_000_000,
+            ckb_rpc_url: "http://localhost:8114".to_string(),
+            indexer_rpc_url: "http://localhost:8116".to_string(),
+            miner_lock: test_miner_lock(),
+            pair_ids: vec![[0x01; 32]],
+            min_reward_ckb: 500,
+        };
+
+        let cloned = config.clone();
+        assert_eq!(cloned.max_iterations, config.max_iterations);
+        assert_eq!(cloned.ckb_rpc_url, config.ckb_rpc_url);
+        assert_eq!(cloned.min_reward_ckb, config.min_reward_ckb);
+        assert_eq!(cloned.pair_ids.len(), config.pair_ids.len());
+    }
+
+    #[test]
+    fn test_miner_state_clone() {
+        let state = MinerState {
+            difficulties: vec![([0x01; 32], 16)],
+            pending_commits: vec![make_commit(1)],
+            auction_states: vec![([0x01; 32], test_auction())],
+            stats: MiningStats {
+                total_hashes: 1_000_000,
+                blocks_mined: 5,
+                total_commits_aggregated: 50,
+                total_reward_ckb: 500_000,
+                avg_hash_rate: 100_000.0,
+            },
+        };
+
+        let cloned = state.clone();
+        assert_eq!(cloned.stats.total_hashes, 1_000_000);
+        assert_eq!(cloned.stats.blocks_mined, 5);
+        assert_eq!(cloned.stats.total_commits_aggregated, 50);
+        assert_eq!(cloned.stats.total_reward_ckb, 500_000);
+        assert_eq!(cloned.stats.avg_hash_rate, 100_000.0);
+    }
+
+    #[test]
+    fn test_pending_commit_clone() {
+        let commit = make_commit(0xAB);
+        let cloned = commit.clone();
+
+        assert_eq!(cloned.commit_data.order_hash, commit.commit_data.order_hash);
+        assert_eq!(cloned.outpoint_tx_hash, commit.outpoint_tx_hash);
+        assert_eq!(cloned.outpoint_index, commit.outpoint_index);
+        assert_eq!(cloned.commit_data.deposit_ckb, commit.commit_data.deposit_ckb);
+    }
+
+    #[test]
+    fn test_mining_estimate_clone() {
+        let estimate = estimate_profitability(8, 5, 1000, 1_000_000.0);
+        let cloned = estimate.clone();
+
+        assert_eq!(cloned.expected_hashes, estimate.expected_hashes);
+        assert_eq!(cloned.expected_time_secs, estimate.expected_time_secs);
+        assert_eq!(cloned.expected_reward_ckb, estimate.expected_reward_ckb);
+        assert_eq!(cloned.estimated_cost_ckb, estimate.estimated_cost_ckb);
+        assert_eq!(cloned.estimated_profit_ckb, estimate.estimated_profit_ckb);
+        assert_eq!(cloned.is_profitable, estimate.is_profitable);
+    }
+
+    #[test]
+    fn test_aggregation_output_lock_hash_type_is_type() {
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert!(matches!(tx.outputs[0].lock_script.hash_type, super::super::HashType::Type),
+            "Output lock script hash_type must be Type");
+    }
+
+    #[test]
+    fn test_aggregation_output_capacity_is_zero() {
+        // The build_aggregation_tx sets capacity to 0 (placeholder)
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert_eq!(tx.outputs[0].capacity, 0,
+            "Output capacity should be 0 (placeholder)");
+    }
+
+    #[test]
+    fn test_aggregation_pow_lock_args_min_difficulty() {
+        // Verify the PoW lock args always use DEFAULT_MIN_POW_DIFFICULTY
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let args = PoWLockArgs::deserialize(&tx.outputs[0].lock_script.args).unwrap();
+        assert_eq!(args.min_difficulty, DEFAULT_MIN_POW_DIFFICULTY,
+            "PoW lock args min_difficulty must be DEFAULT_MIN_POW_DIFFICULTY ({})",
+            DEFAULT_MIN_POW_DIFFICULTY);
+    }
+
+    #[test]
+    fn test_profitability_borderline_profitable() {
+        // Find parameters where profit is exactly on the boundary
+        // At difficulty 4, expected_hashes = 16
+        // energy_cost = 16 / 1_000_000 * 0.1 = 0.0000016 (rounds to 0 in u64)
+        // So reward = base * commits, and if base*commits > 0, it's profitable
+        let estimate = estimate_profitability(4, 1, 1, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, 1);
+        assert_eq!(estimate.estimated_cost_ckb, 0, "Very low energy cost rounds to 0");
+        assert!(estimate.is_profitable,
+            "Reward of 1 with cost of 0 should be profitable");
+    }
+
+    #[test]
+    fn test_track_difficulty_target_one_block() {
+        // Target of 1 block per transition with exactly 1-block spacing
+        let transitions = vec![100, 101, 102, 103, 104];
+        let new_diff = track_difficulty(16, &transitions, 1);
+        assert_eq!(new_diff, 16, "On-target spacing should keep difficulty stable");
+    }
+
+    #[test]
+    fn test_track_difficulty_very_large_target() {
+        // Very large target blocks per transition
+        let transitions = vec![0, 100];
+        let new_diff = track_difficulty(16, &transitions, 1_000_000);
+        // actual_avg = 100, target = 1_000_000 → way too fast → increase
+        assert!(new_diff > 16,
+            "Much faster than large target should increase difficulty, got {}", new_diff);
+    }
+
+    #[test]
+    fn test_aggregation_255_commits() {
+        // Test with u8::MAX commits to stress input vector
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let commits: Vec<PendingCommit> = (0..=254).map(|i| make_commit(i as u8)).collect();
+        assert_eq!(commits.len(), 255);
+
+        let tx = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        assert_eq!(tx.inputs.len(), 256, "1 auction + 255 commits = 256 inputs");
+        let new_auction = AuctionCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_auction.commit_count, 255);
+    }
 }

@@ -1211,3 +1211,34 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 **Cross-reference**: P-098 (As Above, So Below) — if VibeSwap's primitives are truly universal, they must work on ANY chain. CKB is the proof.
 
 **Cross-references**: P-000 (Fairness Above All), P-096 (SVC — The Everything App), P-095 (Three-Dimensional Incentives), The Lion Turtle alignment axioms (CKB), Cooperative Capitalism philosophy
+
+---
+
+### P-101: Consensus Determinism Constraint (March 2026)
+**Source**: Jarvis's floating-point mistake on Ergon's Moore's Law constant, corrected by Licho
+**Domain**: Blockchain Consensus / Numerical Computing / Platform Engineering
+**Primitive**: In any consensus system, every computation that affects state (block rewards, fees, balances, difficulty) MUST produce bit-identical results across all implementations, compilers, architectures, and optimization levels. Floating-point arithmetic violates this constraint because IEEE 754 permits implementation-defined rounding in transcendental functions (`pow`, `exp`, `log`).
+
+**The mistake**: Proposed `2^(-epoch/N)` using `std::pow` / `f64.powf` for smooth mining reward decay. Mathematically elegant. Consensus-fatal. Different nodes would compute different rewards → reject each other's blocks → chain split.
+
+**Why Bitcoin uses bitshifts**: `reward >> (epoch / 210000)` is a right-shift. Pure integer. Identical on every CPU, every compiler, every OS. Crude (halves discretely every 210,000 blocks), but deterministic.
+
+**The correct pattern for smooth integer decay**:
+1. Compute decay constants OFFLINE with arbitrary precision (Python `mpmath`, 200+ decimal digits)
+2. Encode as fixed-point integers: `DECAY_TABLE[k] = floor(2^64 × 2^(-k/N))`
+3. At runtime: `reward = (work × DECAY_TABLE[epoch % N]) >> (64 + epoch/N)`
+4. All operations are multiplication, bitshift, table lookup — pure integer, deterministic everywhere
+
+**Generalization**: The Consensus Determinism Constraint applies to ANY distributed system where nodes must agree on state transitions. This includes:
+- Blockchain rewards, fees, and penalties
+- On-chain oracle price computations
+- Governance vote tallying with weighted scoring
+- Any Shapley value computation that affects token distribution
+
+If two nodes can disagree about the value, they will eventually fork. The constraint is not "use integers when convenient" — it is absolute.
+
+**The deeper lesson (self-reflection)**: When crossing platform boundaries (EVM → Bitcoin, Solidity → C++), re-derive constraints from first principles. Don't carry assumptions from one platform to another. VibeSwap's Solidity code uses `1e18` fixed-point everywhere — this habit should have transferred. It didn't, because the context switch from "smart contract" to "general pseudocode" bypassed the integer-thinking discipline.
+
+**Licho's correction**: "My Man, it has to be an integer. It's Bitcoin. Satoshis are integers. It is super important." — Sometimes the simplest statement contains the deepest constraint.
+
+**Cross-references**: P-098 (As Above, So Below — Bitcoin's integer determinism IS its architecture at every level), P-099 (Yul Function Density Threshold — another case of platform constraints that aren't obvious until you hit them), P-100 (The Crossover Protocol — this exact mistake is why crossover requires re-deriving constraints)

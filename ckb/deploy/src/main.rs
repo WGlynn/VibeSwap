@@ -23,7 +23,7 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
 // ============ Script Definitions ============
 
-/// All 13 VibeSwap CKB scripts in deployment order
+/// All 14 VibeSwap CKB scripts in deployment order
 const SCRIPTS: &[(&str, &str)] = &[
     ("pow-lock",                 "Lock script: PoW-gated shared cell access"),
     ("batch-auction-type",       "Type script: commit-reveal batch auction state machine"),
@@ -230,6 +230,11 @@ fn print_rust_deployment_info(config: &DeploymentConfig) {
         ("config-type", "config_type_code_hash"),
         ("oracle-type", "oracle_type_code_hash"),
         ("knowledge-type", "knowledge_type_code_hash"),
+        ("lending-pool-type", "lending_pool_type_code_hash"),
+        ("vault-type", "vault_type_code_hash"),
+        ("insurance-pool-type", "insurance_pool_type_code_hash"),
+        ("prediction-market-type", "prediction_market_type_code_hash"),
+        ("prediction-position-type", "prediction_position_type_code_hash"),
     ];
 
     for (script_name, field_name) in &field_map {

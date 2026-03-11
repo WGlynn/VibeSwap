@@ -96,10 +96,28 @@
 - 7 lending math fuzz tests (7600+ random iterations)
 - Compiler warnings cleaned up (lending.rs, fuzz.rs)
 
+**Liquidation Engine (continued Session 059):**
+- `ckb/sdk/src/lib.rs` — `liquidate()` SDK builder
+  - Interest accrual, health factor check, close factor enforcement
+  - Collateral seizure with liquidation incentive
+  - Pool + vault state updates, debt share retirement
+  - Rejects overcollateralized positions (OverCollateralized error)
+- `ckb/scripts/vault-type/src/lib.rs` — `verify_liquidation()` validation
+  - Debt must decrease, collateral must decrease
+  - Owner/pool/collateral_type immutable, deposit shares frozen
+  - New error variants: CollateralIncreased, DepositSharesChanged
+- `ckb/tests/src/assembler.rs` — **NEW** 19 assembler integration tests
+  - Every SDK builder through the signing pipeline
+  - Full mint→pool→commit pipeline with assembler
+  - Multi-signer, fee deduction, witness preservation
+- P-105: Mutualist Liquidation Prevention (knowledge primitive)
+  - Prevention > punishment: graduated warnings, insurance pool, soft liquidation
+  - Cascading liqs are coordination failure, mutualism is structural fix
+
 ### Running Test Count
-- **CKB tests**: 437 passing (was 315 at session start, +122)
+- **CKB tests**: 463 passing (was 315 at session start, +148)
 - **Solidity tests**: 393 passing (from Session 058)
-- **Total knowledge primitives**: 76 (P-000 through P-104, some gaps)
+- **Total knowledge primitives**: 77 (P-000 through P-105, some gaps)
 
 ---
 

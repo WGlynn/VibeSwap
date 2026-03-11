@@ -83,10 +83,23 @@
 - Learning primitives auto-extrapolation
 - Continue autopilot loop
 
+**Transaction Assembler (continued Session 059):**
+- `ckb/sdk/src/assembler.rs` — **NEW** Signing pipeline module (36 tests)
+  - WitnessArgs Molecule serialization/deserialization
+  - Lock group signing (O(groups) not O(inputs))
+  - `Signer` trait + `MockSigner` for deterministic testing
+  - `assemble()` — multi-signer, multi-lock-group signing
+  - `assemble_single_signer()` — shortcut for common case
+  - `assemble_with_fee()` — fee estimation + capacity deduction
+  - Transaction hashing, validation, size estimation
+- P-104: UTXO Transaction Signing Model (knowledge primitive)
+- 7 lending math fuzz tests (7600+ random iterations)
+- Compiler warnings cleaned up (lending.rs, fuzz.rs)
+
 ### Running Test Count
-- **CKB tests**: 394 passing (was 315 at session start, +79)
+- **CKB tests**: 437 passing (was 315 at session start, +122)
 - **Solidity tests**: 393 passing (from Session 058)
-- **Total knowledge primitives**: 75 (P-000 through P-103, some gaps)
+- **Total knowledge primitives**: 76 (P-000 through P-104, some gaps)
 
 ---
 

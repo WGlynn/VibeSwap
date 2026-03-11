@@ -2938,4 +2938,210 @@ mod tests {
 
         assert_eq!(portfolio.lending_positions[0].deposit_shares, 33_333 * PRECISION);
     }
+
+    // ============ Batch 7: Hardening to 120+ Tests ============
+
+    #[test]
+    fn test_empty_portfolio_protocol_count_zero() {
+        let builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        let portfolio = builder.build();
+        assert_eq!(portfolio.summary.protocol_count, 0);
+    }
+
+    #[test]
+    fn test_empty_portfolio_worst_hf_is_max() {
+        let builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        let portfolio = builder.build();
+        assert_eq!(portfolio.summary.worst_health_factor, u128::MAX);
+    }
+
+    #[test]
+    fn test_lp_positions_empty_in_empty_portfolio() {
+        let builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        let portfolio = builder.build();
+        assert!(portfolio.lp_positions.is_empty());
+        assert!(portfolio.lending_positions.is_empty());
+        assert!(portfolio.insurance_positions.is_empty());
+        assert!(portfolio.prediction_positions.is_empty());
+        assert!(portfolio.token_balances.is_empty());
+    }
+
+    #[test]
+    fn test_lending_health_factor_exactly_one() {
+        // Construct a vault where HF = exactly 1.0 (PRECISION)
+        // HF = (collateral_value * liquidation_threshold) / debt_value
+        // With LTV 80% (8000 bps): HF = 1.0 when col*0.8 = debt
+        // col = 10 ETH * $3000 = $30K, debt = $24K → HF = 30K*0.8/24K = 1.0
+        let prices = make_prices();
+        let vault = make_vault(10 * PRECISION, 24_000 * PRECISION);
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lending_positions[0];
+        assert_eq!(pos.health_factor, PRECISION, "HF should be exactly 1.0");
+    }
+
+    #[test]
+    fn test_insurance_position_shares_preserved() {
+        let ins = make_insurance();
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_insurance(ins, 42_000 * PRECISION);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.insurance_positions[0].shares, 42_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_prediction_amount_preserved() {
+        let market = PredictionMarketCellData {
+            market_id: [0xF3; 32],
+            num_tiers: 2,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 50_000 * PRECISION;
+                t[1] = 50_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_ACTIVE,
+            ..Default::default()
+        };
+        let position = PredictionPositionCellData {
+            market_id: [0xF3; 32],
+            tier_index: 1,
+            amount: 7_777 * PRECISION,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(market, position);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.prediction_positions[0].amount, 7_777 * PRECISION);
+    }
+
+    #[test]
+    fn test_token_balance_amount_preserved() {
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_token(token(1), 123 * PRECISION);
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.token_balances[0].amount, 123 * PRECISION);
+    }
+
+    #[test]
+    fn test_summary_total_value_empty_is_zero() {
+        let builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        let portfolio = builder.build();
+        assert_eq!(portfolio.summary.total_value, 0);
+    }
+
+    #[test]
+    fn test_lp_position_il_bps_type() {
+        // IL should be a u16 value (0..=10000)
+        let prices = make_prices();
+        let pool = PoolCellData {
+            reserve0: 100 * PRECISION,
+            reserve1: 200 * PRECISION,
+            ..make_pool(1, 2, 100 * PRECISION, 200 * PRECISION)
+        };
+        let lp = make_lp(pool.total_lp_supply / 10, PRECISION);
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_lp(lp, pool);
+        let portfolio = builder.build();
+
+        assert!(portfolio.lp_positions[0].il_bps <= 10_000);
+    }
+
+    #[test]
+    fn test_lending_net_value_with_deposits_only() {
+        // No collateral, no debt, just deposits → net = deposit_value
+        let prices = make_prices();
+        let vault = VaultCellData {
+            collateral_amount: 0,
+            debt_shares: 0,
+            deposit_shares: 50_000 * PRECISION,
+            ..make_vault(0, 0)
+        };
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(vault, pool);
+        let portfolio = builder.build();
+
+        let pos = &portfolio.lending_positions[0];
+        assert_eq!(pos.net_value, pos.deposit_value);
+    }
+
+    #[test]
+    fn test_summary_lending_net_is_sum() {
+        // Total lending_net_value should be sum of all positions' net_value
+        let prices = make_prices();
+        let pool = make_lending_pool();
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], prices);
+        builder.add_vault(make_vault(10 * PRECISION, 5_000 * PRECISION), pool.clone());
+        builder.add_vault(make_vault(20 * PRECISION, 10_000 * PRECISION), pool);
+        let portfolio = builder.build();
+
+        let manual_sum: u128 = portfolio.lending_positions.iter()
+            .map(|p| p.net_value)
+            .sum();
+        assert_eq!(portfolio.summary.lending_net_value, manual_sum);
+    }
+
+    #[test]
+    fn test_summary_insurance_value_is_sum() {
+        // Total insurance_value should be sum of all positions' underlying_value
+        let ins1 = make_insurance();
+        let ins2 = InsurancePoolCellData {
+            pool_id: [0x44; 32],
+            ..make_insurance()
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_insurance(ins1, 10_000 * PRECISION);
+        builder.add_insurance(ins2, 20_000 * PRECISION);
+        let portfolio = builder.build();
+
+        let manual_sum: u128 = portfolio.insurance_positions.iter()
+            .map(|p| p.underlying_value)
+            .sum();
+        assert_eq!(portfolio.summary.insurance_value, manual_sum);
+    }
+
+    #[test]
+    fn test_summary_prediction_value_is_sum_of_amounts() {
+        // prediction_value in summary should be sum of all position amounts
+        let make_market = |id: u8| PredictionMarketCellData {
+            market_id: [id; 32],
+            num_tiers: 2,
+            tier_pools: {
+                let mut t = [0u128; 8];
+                t[0] = 50_000 * PRECISION;
+                t[1] = 50_000 * PRECISION;
+                t
+            },
+            status: vibeswap_types::MARKET_ACTIVE,
+            ..Default::default()
+        };
+        let make_pos = |id: u8, amount: u128| PredictionPositionCellData {
+            market_id: [id; 32],
+            tier_index: 0,
+            amount,
+            owner_lock_hash: [0x11; 32],
+            created_block: 100,
+        };
+
+        let mut builder = PortfolioBuilder::new([0x11; 32], make_prices());
+        builder.add_prediction(make_market(1), make_pos(1, 3_000 * PRECISION));
+        builder.add_prediction(make_market(2), make_pos(2, 7_000 * PRECISION));
+        let portfolio = builder.build();
+
+        assert_eq!(portfolio.summary.prediction_value, 10_000 * PRECISION);
+    }
 }

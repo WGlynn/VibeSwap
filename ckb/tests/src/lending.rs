@@ -13,7 +13,7 @@ use ckb_lending_math::{
     shares, pool, mul_div, PRECISION,
 };
 use vibeswap_types::*;
-use lending_pool_type::{verify_creation, verify_update, verify_destruction};
+use lending_pool_type::{verify_creation, verify_update};
 use vault_type::{
     verify_creation as verify_vault_creation,
     verify_update as verify_vault_update,
@@ -43,6 +43,7 @@ fn default_pool_cell() -> LendingPoolCellData {
     }
 }
 
+#[allow(dead_code)]
 fn default_vault_cell(owner: [u8; 32], pool_id: [u8; 32]) -> VaultCellData {
     VaultCellData {
         owner_lock_hash: owner,
@@ -283,9 +284,9 @@ fn test_lending_two_users_lender_borrower() {
 
 #[test]
 fn test_lending_liquidation_flow() {
-    let alice = [0xA1; 32]; // Lender
+    let _alice = [0xA1; 32]; // Lender
     let bob = [0xB0; 32];   // Borrower (gets liquidated)
-    let charlie = [0xC3; 32]; // Liquidator
+    let _charlie = [0xC3; 32]; // Liquidator
     let col_token = [0xCC; 32];
 
     // Setup: Create empty pool, then update to active state

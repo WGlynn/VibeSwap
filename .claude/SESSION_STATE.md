@@ -1,82 +1,62 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-10 (Session 058, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-10 (Session 058 continued, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 058 — Mar 10, 2026)
+## CURRENT (Session 058 continued — Mar 10-11, 2026)
 
-### Delta from Session 057
-**Added:**
-- VibePerpetual unit tests (34/34 passing) — perpetual futures with commit-reveal
-- VibePerpEngine unit tests (75/75 passing) — ERC-20 perp engine, oracle, PID funding, liquidation
-- VibeRevShare unit tests (51/51 passing) — Synthetix accumulator revenue distribution
-- VibeBonds unit tests (51/51 passing) — ERC-1155 semi-fungible bonds, Dutch auction, coupons
-- VibeStream unit tests (57/57 passing) — ERC-721 streaming + conviction funding pools
-- VibeCredit unit tests (43/43 passing) — P2P reputation-gated credit delegation
-- VibeOptions unit test file created (pending compilation — via_ir rebuild in progress)
-- App Store expanded: 24 → 57 apps (33 new "Coming Soon" SVC apps)
-- New categories: Commerce (5 apps), Builder (5 apps), expanded Knowledge/Social/Tools
-- Subtitle: "The Everything App — All Shapley Value Compliant"
-- Builder Sandbox + VibeForge + VibeClone + VibeAPI + VibeDocs (Builder category)
-- VibeJobs, VibeMarket, VibeShorts, VibeTube, VibeHousing, VibeSnap, VibePost (SVC clones)
-- Telegram badge system spec (docs/features/telegram-badges.md)
-- Knowledge primitives P-095, P-096, P-097
-- 10 compute/performance problems list (memory/compute-problems.md)
+### Delta from Session 058 initial
+**Verified & Passing:**
+- VibeOptions unit tests: 31/31 passing (split across 3 files to avoid Yul stack overflow)
+- VibeSynth unit tests: 51/51 passing
+- Total new verified tests this session: 82
 
 **Fixed:**
-- VibePerpetual `_calculatePnL` uint256 underflow → int256 cast before subtraction
-- VibeOptions stack-too-deep: scoping blocks + `_transferCollateral` helper
-- VibeAMM stack-too-deep: extracted `_validateTWAP`, scoped `removeLiquidity` locals
+- VibeOptions stack-too-deep ROOT CAUSE FOUND: via_ir Yul optimizer overflows at ~10-12 public functions per contract when returning large structs (IVibeAMM.Pool = 7 fields). Fix: split tests into VibeOptionsTest (12), VibeOptionsExerciseTest (12), VibeOptionsRevertTest (9) with shared abstract base.
+- Duplicate contract names across test files (test/VibeOptions.t.sol vs test/unit/VibeOptionsTest.t.sol) caused Yul compilation collisions. Removed root-level duplicates.
+- Added `_storeOption` and `_emitWritten` helper functions to VibeOptions.sol to reduce stack pressure
 
-**Commits (12 so far):**
-- `e01d3f2` — VibePerpetual tests 34/34
-- `a779132` — Fix _calculatePnL underflow
-- `a2f9907` — VibePerpEngine tests 75/75
-- `d2910d7` — VibeRevShare tests 51/51
-- `2cd6e37` — VibeBonds tests 51/51
-- `9a0031b` — VibeStream tests 57/57
-- `2a00699` — VibeCredit tests 43/43
-- `d794c4b` — App Store 57 apps + VibeOptions/VibeAMM stack fixes
-- `04d8949` — VibeAMM removeLiquidity fix + P-095/096/097
-- `a583dfb` — Telegram badge spec
+**Created:**
+- `test/unit/helpers/VibeOptionsTestBase.sol` — shared abstract base with mocks + setup
+- `test/unit/VibeOptionsExerciseTest.t.sol` — exercise, cancel, reclaim tests (12)
+- `test/unit/VibeOptionsRevertTest.t.sol` — revert tests + put lifecycle (9)
+- P-099: Yul Function Density Threshold (knowledge primitive)
+- P-100: The Crossover Protocol (knowledge primitive for CKB development)
 
-**Test Totals This Session**: 311+ new tests (34+75+51+51+57+43)
-**Total new test files**: 7 (6 passing, 1 pending compilation)
+**Deleted:**
+- `test/VibeOptions.t.sol` — duplicate root-level test (caused name collision)
+- `test/VibeSynth.t.sol` — duplicate root-level test (caused name collision)
 
-### Pending
-- VibeOptions test verification (blocked on 805-file via_ir rebuild)
-- VibeSynth tests (last untested financial contract, 523 lines)
-- Fuzz + invariant tests for newly unit-tested contracts
-- Vercel redeployment in progress (auto-deploy from git push)
+**Pending (Will's requests):**
+- Nervos CKB development — transition to building for their ecosystem (Will: "I just think they need some help bootstrapping their ecosystem")
+- Learning primitives auto-extrapolation — self-reinforcing pattern
+- Continue autopilot loop
 
-### Active Focus
-- FULL AUTOPILOT MODE — alternating big/small tasks
-- Will's new vision: Everything App with 57 SVC apps
-- 3-dimensional incentive design: utility + status + perks
-- Telegram badges: stars + percentile + color roles
+### Running Test Count
+- **Verified passing this session**: 311 (prior) + 82 (Options + Synth) = 393
+- **Total knowledge primitives**: 73 (P-000 through P-100, some gaps)
 
 ---
 
-## PREVIOUS (Session 057 — Mar 10, 2026)
+## PREVIOUS (Session 058 initial — Mar 10, 2026)
 
-### Delta from Session 056
 **Added:**
-- VibeLiquidStaking unit/fuzz/invariant tests (95 passing)
-- VibeStaking unit tests (39), VibeInsurancePool (34), VibeFeeDistributor (21)
-- VibeFlashLoan (14), VibeLendPool (30)
-- P-076: Liquid Derivatives of Locked Assets
-**Test Totals**: 261 new tests, 10 commits
+- VibePerpetual unit tests (34/34 passing)
+- VibePerpEngine unit tests (75/75 passing)
+- VibeRevShare unit tests (51/51 passing)
+- VibeBonds unit tests (51/51 passing)
+- VibeStream unit tests (57/57 passing)
+- VibeCredit unit tests (43/43 passing)
+- App Store expanded: 24 → 57 apps (33 new "Coming Soon" SVC apps)
+- Builder Sandbox + 4 builder apps
+- Commerce category (5 SVC apps)
+- Telegram badge system spec
+- Knowledge primitives P-095 through P-098
+- Self-reflection log (docs/will-reviews-my-problems/session-058.md)
+- 10 compute/performance problems list
 
----
-
-## BASELINE (Session 055)
-- 5-task stress test COMPLETED
-- BASE MAINNET PHASE 2: LIVE — 11 contracts on Base
-- 3000+ Solidity tests, 0 failures
-- CKB: 190 Rust tests, ALL 7 PHASES complete
-- JARVIS Mind Network: 3-node BFT on Fly.io
-- Vercel: frontend-jade-five-87.vercel.app
-- Fly.io: STALE (needs redeploy)
-- VPS: 46.225.173.213 (Cincinnatus Protocol active)
+**Fixed:**
+- VibePerpetual `_calculatePnL` uint256 underflow
+- VibeAMM stack-too-deep (2 fixes: `_validateTWAP` extraction + `removeLiquidity` scoping)

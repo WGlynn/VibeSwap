@@ -2017,4 +2017,168 @@ mod tests {
         );
         assert_eq!(weights[&pair(1)], expected);
     }
+
+    // ============ Batch 6: Hardening — Edge Cases, Boundaries, Overflow ============
+
+    #[test]
+    fn test_fee_config_zero_all_shares() {
+        // All shares at zero — is_valid should be false (0 != 10000)
+        let config = FeeConfig {
+            protocol_fee_bps: 500,
+            treasury_share_bps: 0,
+            staker_share_bps: 0,
+            insurance_share_bps: 0,
+        };
+        assert!(!config.is_valid());
+    }
+
+    #[test]
+    fn test_record_amm_fee_zero_amount() {
+        // Recording zero amount should be a no-op (adds 0)
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 0);
+        assert_eq!(epoch.amm_fees[&pair(1)], 0);
+        assert_eq!(epoch.total_fees(), 0);
+    }
+
+    #[test]
+    fn test_record_lending_fee_accumulates_same_pool() {
+        let mut epoch = default_epoch();
+        epoch.record_lending_fee(pair(5), 100);
+        epoch.record_lending_fee(pair(5), 250);
+        epoch.record_lending_fee(pair(5), 50);
+        assert_eq!(epoch.lending_fees[&pair(5)], 400);
+    }
+
+    #[test]
+    fn test_record_insurance_fee_accumulates_same_pool() {
+        let mut epoch = default_epoch();
+        epoch.record_insurance_fee(pair(7), 111);
+        epoch.record_insurance_fee(pair(7), 222);
+        assert_eq!(epoch.insurance_fees[&pair(7)], 333);
+    }
+
+    #[test]
+    fn test_record_prediction_fee_accumulates_same_market() {
+        let mut epoch = default_epoch();
+        epoch.record_prediction_fee(pair(9), 500);
+        epoch.record_prediction_fee(pair(9), 700);
+        assert_eq!(epoch.prediction_fees[&pair(9)], 1200);
+    }
+
+    #[test]
+    fn test_swap_fee_tiny_amount_rounds_fee_to_zero() {
+        // Amount so small that fee rounds to zero at 30 bps
+        // amount * 30 / 10000 < 1 when amount < 334
+        let (fee, output) = calculate_swap_fee(100, 1_000_000 * PRECISION, 1_000_000 * PRECISION, 30);
+        assert_eq!(fee, 0); // 100 * 30 / 10000 = 0 in integer math
+        assert!(output > 0);
+    }
+
+    #[test]
+    fn test_swap_fee_output_never_exceeds_reserve_out() {
+        // Even with extreme input, output is bounded by reserve_out
+        let reserve_out = 500 * PRECISION;
+        let (_, output) = calculate_swap_fee(
+            u128::MAX / 20_000, // large input
+            1 * PRECISION,      // tiny reserve_in
+            reserve_out,
+            30,
+        );
+        assert!(output <= reserve_out, "Output {} must not exceed reserve_out {}", output, reserve_out);
+    }
+
+    #[test]
+    fn test_calculate_distribution_prediction_fees_only() {
+        // Only prediction fees — all go to protocol
+        let mut epoch = default_epoch();
+        epoch.record_prediction_fee(pair(1), 7_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+
+        assert!(dist.lp_distributions.is_empty());
+        let total_protocol = dist.treasury_amount + dist.staker_amount + dist.insurance_amount;
+        let diff = if total_protocol > 7_000 * PRECISION {
+            total_protocol - 7_000 * PRECISION
+        } else {
+            7_000 * PRECISION - total_protocol
+        };
+        assert!(diff < 10, "Prediction fee conservation violated");
+    }
+
+    #[test]
+    fn test_calculate_distribution_insurance_fees_only() {
+        // Only insurance fees — protocol takes its protocol_fee_bps cut
+        let mut epoch = default_epoch();
+        epoch.record_insurance_fee(pair(1), 8_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+
+        assert!(dist.lp_distributions.is_empty());
+        // Protocol cut of insurance = insurance_total * protocol_fee_bps / 10000
+        let protocol_cut = vibeswap_math::mul_div(8_000 * PRECISION, config.protocol_fee_bps as u128, 10_000);
+        let total_protocol = dist.treasury_amount + dist.staker_amount + dist.insurance_amount;
+        let diff = if total_protocol > protocol_cut {
+            total_protocol - protocol_cut
+        } else {
+            protocol_cut - total_protocol
+        };
+        assert!(diff < 10, "Insurance fee protocol cut mismatch");
+    }
+
+    #[test]
+    fn test_shapley_distribution_with_mixed_zero_and_nonzero_depth() {
+        // Mix of zero-depth and positive-depth pools — only positive gets LP fees
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 6_000 * PRECISION);
+        epoch.record_amm_fee(pair(2), 4_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let pools = vec![
+            make_pool(1, 0, 100_000 * PRECISION, 5),                  // zero depth
+            make_pool(2, 2_000_000 * PRECISION, 500_000 * PRECISION, 3), // positive depth
+        ];
+
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        // Pool 2 should get all LP fees since pool 1 has zero weight
+        let lp_2 = dist.lp_distributions.get(&pair(2)).copied().unwrap_or(0);
+        assert!(lp_2 > 0, "Pool with positive depth should get LP fees");
+        // Pool 1 with zero depth gets zero
+        let lp_1 = dist.lp_distributions.get(&pair(1)).copied().unwrap_or(0);
+        assert_eq!(lp_1, 0, "Zero-depth pool should get zero LP fees");
+    }
+
+    #[test]
+    fn test_annualize_revenue_max_block_epoch() {
+        // Epoch spanning near-max u64 blocks — should not overflow
+        let mut epoch = FeeEpoch::new(1, 0, u64::MAX / 2);
+        epoch.record_amm_fee(pair(1), 1_000 * PRECISION);
+
+        let annual = annualize_revenue(&epoch);
+        // With such a long epoch, annualized should be tiny (nearly zero)
+        assert!(annual < 1_000 * PRECISION,
+            "Very long epoch should annualize to small amount");
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_tiny_tvl() {
+        // Very small TVL with moderate revenue — high yield
+        let yield_bps = revenue_yield_bps(1_000 * PRECISION, 1 * PRECISION);
+        assert_eq!(yield_bps, 10_000_000); // 1000x = 10M bps
+    }
+
+    #[test]
+    fn test_shapley_large_route_count_difference() {
+        // Extreme route count disparity: 1000 vs 1
+        let pools = vec![
+            make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 1000),
+            make_pool(2, 1_000_000 * PRECISION, 500_000 * PRECISION, 1),
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        // Pool 1 (1000 routes) should have much higher weight
+        assert!(weights[&pair(1)] > weights[&pair(2)] * 3 / 2,
+            "Pool with 1000x routes should significantly outweigh pool with 1 route");
+    }
 }

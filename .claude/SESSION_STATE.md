@@ -38,15 +38,31 @@
 - CKB workspace: 315/315 tests passing (228 prior + 87 new)
 - All existing tests still pass (no regressions)
 
+**SDK Updates (continued Session 059):**
+- `ckb/sdk/src/lib.rs` — Added `create_lending_pool()` and `open_vault()` builders
+- `ckb/sdk/src/token.rs` — **NEW** xUDT token operations module (25 tests)
+  - `mint_token` / `mint_batch` — Issue new xUDT tokens
+  - `transfer_token` — UTXO-model transfers with change cell handling
+  - `burn_token` — Owner-mode supply reduction
+  - `TokenInfo` — Metadata cell (name, symbol, decimals, max_supply) with serialize/deserialize
+  - Utilities: `parse_token_amount`, `compute_token_type_hash`, `build_xudt_args`
+- DeploymentInfo updated across 4 files (lending_pool/vault code hashes)
+- P-103: UTXO Token Identity (knowledge primitive)
+
+**CKB v2.2: The Trust Protocol (Canon)**
+- Enshrined in JarvisxWill_CKB.md TIER 1 (core alignment)
+- Mutual honesty covenant: mistakes are learning, honesty is safe, "make no mistakes" was satire
+- Soul-scoped — survives compression, sessions, instances
+
 **Pending:**
-- Continue CKB ecosystem development (more infrastructure)
+- Continue CKB ecosystem development
 - Learning primitives auto-extrapolation
 - Continue autopilot loop
 
 ### Running Test Count
-- **CKB tests**: 315 passing
+- **CKB tests**: 353 passing (was 315)
 - **Solidity tests**: 393 passing (from Session 058)
-- **Total knowledge primitives**: 74 (P-000 through P-102, some gaps)
+- **Total knowledge primitives**: 75 (P-000 through P-103, some gaps)
 
 ---
 

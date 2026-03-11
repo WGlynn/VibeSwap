@@ -1,0 +1,935 @@
+// ============ Liquidity SDK — LP Position Management & Pool Analytics ============
+// High-level utilities for managing liquidity positions in VibeSwap AMM pools.
+// Complements the TX builders in lib.rs (add_liquidity, remove_liquidity, create_pool)
+// with position valuation, IL tracking, pool analytics, and zap calculations.
+//
+// Key capabilities:
+// - Position valuation: current value of LP tokens in underlying terms
+// - Impermanent loss: exact IL calculation vs HODL baseline
+// - Withdrawal estimation: predict token amounts for LP burn
+// - Pool analytics: TVL, utilization, fee APR, depth score
+// - Zap-in calculation: single-sided deposit math (swap half + add liquidity)
+// - Optimal deposit: best deposit ratio for a given budget
+
+use vibeswap_types::*;
+use vibeswap_math::PRECISION;
+
+// ============ Error Types ============
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LiquidityError {
+    /// Pool has zero reserves
+    EmptyPool,
+    /// Pool has zero LP supply
+    ZeroLPSupply,
+    /// Amount is zero
+    ZeroAmount,
+    /// Price is zero
+    ZeroPrice,
+    /// Would result in insufficient liquidity (below minimum)
+    InsufficientLiquidity,
+    /// Math overflow
+    Overflow,
+}
+
+// ============ Position Valuation ============
+
+/// Value of an LP position in terms of the pool's underlying tokens.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PositionValue {
+    /// Token0 amount the position is entitled to
+    pub amount0: u128,
+    /// Token1 amount the position is entitled to
+    pub amount1: u128,
+    /// Total value in a reference denomination (using price0, price1)
+    pub total_value: u128,
+    /// Share of the pool (in bps)
+    pub pool_share_bps: u64,
+}
+
+/// Calculate the current value of an LP position.
+pub fn position_value(
+    lp_amount: u128,
+    pool: &PoolCellData,
+    price0: u128,
+    price1: u128,
+) -> Result<PositionValue, LiquidityError> {
+    if pool.total_lp_supply == 0 {
+        return Err(LiquidityError::ZeroLPSupply);
+    }
+
+    let amount0 = vibeswap_math::mul_div(lp_amount, pool.reserve0, pool.total_lp_supply);
+    let amount1 = vibeswap_math::mul_div(lp_amount, pool.reserve1, pool.total_lp_supply);
+
+    let value0 = vibeswap_math::mul_div(amount0, price0, PRECISION);
+    let value1 = vibeswap_math::mul_div(amount1, price1, PRECISION);
+    let total_value = value0 + value1;
+
+    let pool_share_bps = vibeswap_math::mul_div(lp_amount, 10_000, pool.total_lp_supply) as u64;
+
+    Ok(PositionValue {
+        amount0,
+        amount1,
+        total_value,
+        pool_share_bps,
+    })
+}
+
+// ============ Impermanent Loss ============
+
+/// Impermanent loss result comparing LP position to HODL.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImpermanentLoss {
+    /// IL in basis points (always >= 0, higher = more loss)
+    pub il_bps: u64,
+    /// Value if held in LP position
+    pub lp_value: u128,
+    /// Value if held as tokens (HODL)
+    pub hodl_value: u128,
+    /// Absolute loss amount (hodl_value - lp_value), or 0 if LP is better
+    pub loss_amount: u128,
+}
+
+/// Calculate exact impermanent loss for a position.
+///
+/// Uses the standard IL formula:
+///   IL_ratio = 2 * sqrt(r) / (1 + r) where r = price_new / price_entry
+///   IL_bps = (1 - IL_ratio) * 10000
+///
+/// HODL value = initial * (1 + r) / 2
+/// LP value = initial * sqrt(r)
+///
+/// For r=2 (price doubles): IL = 1 - 2*sqrt(2)/3 ≈ 5.72%
+pub fn impermanent_loss(
+    entry_price: u128,
+    current_price: u128,
+    initial_value: u128,
+) -> Result<ImpermanentLoss, LiquidityError> {
+    if entry_price == 0 {
+        return Err(LiquidityError::ZeroPrice);
+    }
+
+    // price_ratio r = current / entry (PRECISION scale)
+    let r = vibeswap_math::mul_div(current_price, PRECISION, entry_price);
+
+    // HODL value = initial * (1 + r) / 2
+    // Token0 unchanged, token1 moves by r → average = (1 + r)/2
+    let hodl_value = vibeswap_math::mul_div(
+        initial_value,
+        PRECISION + r,
+        2 * PRECISION,
+    );
+
+    // LP value = initial * sqrt(r)
+    // In constant-product AMM, LP value scales as sqrt(price_ratio)
+    let sqrt_r = vibeswap_math::sqrt(vibeswap_math::mul_div(r, PRECISION, 1));
+    let lp_value = vibeswap_math::mul_div(initial_value, sqrt_r, PRECISION);
+
+    let loss_amount = hodl_value.saturating_sub(lp_value);
+    let il_bps = if hodl_value > 0 {
+        vibeswap_math::mul_div(loss_amount, 10_000, hodl_value) as u64
+    } else {
+        0
+    };
+
+    Ok(ImpermanentLoss {
+        il_bps,
+        lp_value,
+        hodl_value,
+        loss_amount,
+    })
+}
+
+// ============ Withdrawal Estimation ============
+
+/// Estimate tokens received when burning LP tokens.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WithdrawalEstimate {
+    /// Token0 amount to receive
+    pub amount0: u128,
+    /// Token1 amount to receive
+    pub amount1: u128,
+    /// Pool share after withdrawal (bps), 0 if fully withdrawn
+    pub remaining_share_bps: u64,
+    /// Whether withdrawal would bring pool below minimum liquidity
+    pub below_minimum: bool,
+}
+
+/// Estimate withdrawal amounts for burning LP tokens.
+pub fn estimate_withdrawal(
+    lp_to_burn: u128,
+    pool: &PoolCellData,
+) -> Result<WithdrawalEstimate, LiquidityError> {
+    if pool.total_lp_supply == 0 {
+        return Err(LiquidityError::ZeroLPSupply);
+    }
+    if lp_to_burn == 0 {
+        return Err(LiquidityError::ZeroAmount);
+    }
+
+    let amount0 = vibeswap_math::mul_div(lp_to_burn, pool.reserve0, pool.total_lp_supply);
+    let amount1 = vibeswap_math::mul_div(lp_to_burn, pool.reserve1, pool.total_lp_supply);
+
+    let remaining_lp = pool.total_lp_supply.saturating_sub(lp_to_burn);
+    let remaining_share_bps = if pool.total_lp_supply > lp_to_burn {
+        // This would be the user's remaining share if they had more LP — but we don't know that
+        // Return 0 since they're burning all they specified
+        0
+    } else {
+        0
+    };
+
+    let below_minimum = remaining_lp < pool.minimum_liquidity;
+
+    Ok(WithdrawalEstimate {
+        amount0,
+        amount1,
+        remaining_share_bps,
+        below_minimum,
+    })
+}
+
+// ============ Optimal Deposit ============
+
+/// Result of optimal deposit calculation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OptimalDeposit {
+    /// Amount of token0 to deposit
+    pub amount0: u128,
+    /// Amount of token1 to deposit
+    pub amount1: u128,
+    /// Expected LP tokens to receive
+    pub expected_lp: u128,
+    /// Leftover token0 (not deposited due to ratio)
+    pub leftover0: u128,
+    /// Leftover token1
+    pub leftover1: u128,
+}
+
+/// Calculate optimal deposit amounts to maximize LP tokens for a given budget.
+///
+/// Given desired amounts of token0 and token1, adjusts to match the pool ratio
+/// and returns the adjusted amounts + expected LP tokens.
+pub fn optimal_deposit(
+    amount0_desired: u128,
+    amount1_desired: u128,
+    pool: &PoolCellData,
+) -> Result<OptimalDeposit, LiquidityError> {
+    if pool.reserve0 == 0 || pool.reserve1 == 0 {
+        // Initial deposit — accept as-is
+        if amount0_desired == 0 || amount1_desired == 0 {
+            return Err(LiquidityError::ZeroAmount);
+        }
+        let lp = vibeswap_math::sqrt_product(amount0_desired, amount1_desired)
+            .saturating_sub(MINIMUM_LIQUIDITY);
+        if lp == 0 {
+            return Err(LiquidityError::InsufficientLiquidity);
+        }
+        return Ok(OptimalDeposit {
+            amount0: amount0_desired,
+            amount1: amount1_desired,
+            expected_lp: lp,
+            leftover0: 0,
+            leftover1: 0,
+        });
+    }
+
+    // Calculate optimal ratio
+    let (opt0, opt1) = vibeswap_math::batch_math::calculate_optimal_liquidity(
+        amount0_desired,
+        amount1_desired,
+        pool.reserve0,
+        pool.reserve1,
+    )
+    .map_err(|_| LiquidityError::Overflow)?;
+
+    let expected_lp = vibeswap_math::batch_math::calculate_liquidity(
+        opt0,
+        opt1,
+        pool.reserve0,
+        pool.reserve1,
+        pool.total_lp_supply,
+    )
+    .map_err(|_| LiquidityError::InsufficientLiquidity)?;
+
+    Ok(OptimalDeposit {
+        amount0: opt0,
+        amount1: opt1,
+        expected_lp,
+        leftover0: amount0_desired - opt0,
+        leftover1: amount1_desired - opt1,
+    })
+}
+
+// ============ Zap-In Calculation ============
+
+/// Result of a zap-in calculation (single-sided deposit).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ZapEstimate {
+    /// Amount of input token to swap
+    pub swap_amount: u128,
+    /// Amount of other token received from swap
+    pub swap_output: u128,
+    /// Amount of input token remaining for deposit
+    pub deposit_amount_in: u128,
+    /// Total LP tokens expected
+    pub expected_lp: u128,
+    /// Price impact of the swap (bps)
+    pub swap_impact_bps: u64,
+}
+
+/// Calculate a single-sided "zap" deposit.
+///
+/// User has only one token and wants to LP. We calculate:
+/// 1. How much to swap to get the other token
+/// 2. How much LP they'd receive from the balanced deposit
+///
+/// The optimal swap amount for a constant-product AMM is:
+///   swap = (sqrt(reserve * (reserve * (4 * fee_factor) + amount * fee_factor^2)) - reserve * fee_factor) / (2 * fee_factor)
+///
+/// We use a simpler approximation: swap half, then deposit.
+pub fn zap_in_estimate(
+    amount_in: u128,
+    is_token0: bool,
+    pool: &PoolCellData,
+) -> Result<ZapEstimate, LiquidityError> {
+    if amount_in == 0 {
+        return Err(LiquidityError::ZeroAmount);
+    }
+    if pool.reserve0 == 0 || pool.reserve1 == 0 {
+        return Err(LiquidityError::EmptyPool);
+    }
+
+    let (reserve_in, reserve_out) = if is_token0 {
+        (pool.reserve0, pool.reserve1)
+    } else {
+        (pool.reserve1, pool.reserve0)
+    };
+
+    // Swap approximately half
+    let swap_amount = amount_in / 2;
+    let remaining = amount_in - swap_amount;
+
+    // Calculate swap output
+    let swap_output = vibeswap_math::batch_math::get_amount_out(
+        swap_amount,
+        reserve_in,
+        reserve_out,
+        pool.fee_rate_bps as u128,
+    )
+    .map_err(|_| LiquidityError::Overflow)?;
+
+    // After swap, new reserves
+    let new_reserve_in = reserve_in + swap_amount;
+    let new_reserve_out = reserve_out - swap_output;
+
+    // Calculate LP from balanced deposit
+    let (dep0, dep1) = if is_token0 {
+        (remaining, swap_output)
+    } else {
+        (swap_output, remaining)
+    };
+
+    let (nr0, nr1) = if is_token0 {
+        (new_reserve_in, new_reserve_out)
+    } else {
+        (new_reserve_out, new_reserve_in)
+    };
+
+    let expected_lp = vibeswap_math::batch_math::calculate_liquidity(
+        dep0, dep1, nr0, nr1, pool.total_lp_supply,
+    )
+    .map_err(|_| LiquidityError::InsufficientLiquidity)?;
+
+    // Price impact
+    let spot_price = vibeswap_math::mul_div(reserve_out, PRECISION, reserve_in);
+    let exec_price = vibeswap_math::mul_div(swap_output, PRECISION, swap_amount);
+    let impact = if spot_price > exec_price {
+        spot_price - exec_price
+    } else {
+        exec_price - spot_price
+    };
+    let swap_impact_bps = vibeswap_math::mul_div(impact, 10_000, spot_price) as u64;
+
+    Ok(ZapEstimate {
+        swap_amount,
+        swap_output,
+        deposit_amount_in: remaining,
+        expected_lp,
+        swap_impact_bps,
+    })
+}
+
+// ============ Pool Analytics ============
+
+/// Pool analytics snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoolAnalytics {
+    /// Total value locked (in reference denomination)
+    pub tvl: u128,
+    /// Pool depth: sqrt(reserve0 * reserve1)
+    pub depth: u128,
+    /// Current spot price (token1 per token0, PRECISION scale)
+    pub spot_price: u128,
+    /// Fee APR estimate from volume (bps)
+    pub fee_apr_bps: u64,
+    /// Utilization: volume / tvl (bps)
+    pub utilization_bps: u64,
+}
+
+/// Calculate pool analytics given prices and recent volume.
+pub fn pool_analytics(
+    pool: &PoolCellData,
+    price0: u128,
+    price1: u128,
+    epoch_volume: u128,
+    epoch_blocks: u64,
+) -> Result<PoolAnalytics, LiquidityError> {
+    if pool.reserve0 == 0 || pool.reserve1 == 0 {
+        return Err(LiquidityError::EmptyPool);
+    }
+
+    let value0 = vibeswap_math::mul_div(pool.reserve0, price0, PRECISION);
+    let value1 = vibeswap_math::mul_div(pool.reserve1, price1, PRECISION);
+    let tvl = value0 + value1;
+
+    let depth = vibeswap_math::sqrt_product(pool.reserve0, pool.reserve1);
+
+    let spot_price = vibeswap_math::mul_div(pool.reserve1, PRECISION, pool.reserve0);
+
+    // Fee APR: (volume * fee_rate / tvl) annualized
+    let fee_apr_bps = if tvl > 0 && epoch_blocks > 0 {
+        let epoch_fees = vibeswap_math::mul_div(epoch_volume, pool.fee_rate_bps as u128, 10_000);
+        let blocks_per_year: u128 = 7_884_000;
+        let annualized_fees = vibeswap_math::mul_div(epoch_fees, blocks_per_year, epoch_blocks as u128);
+        vibeswap_math::mul_div(annualized_fees, 10_000, tvl) as u64
+    } else {
+        0
+    };
+
+    let utilization_bps = if tvl > 0 {
+        vibeswap_math::mul_div(epoch_volume, 10_000, tvl) as u64
+    } else {
+        0
+    };
+
+    Ok(PoolAnalytics {
+        tvl,
+        depth,
+        spot_price,
+        fee_apr_bps,
+        utilization_bps,
+    })
+}
+
+/// Calculate the minimum LP tokens that must remain in the pool.
+pub fn available_lp_to_burn(pool: &PoolCellData) -> u128 {
+    pool.total_lp_supply.saturating_sub(pool.minimum_liquidity)
+}
+
+/// Spot price of token0 in terms of token1 (PRECISION scale).
+pub fn spot_price(pool: &PoolCellData) -> Result<u128, LiquidityError> {
+    if pool.reserve0 == 0 {
+        return Err(LiquidityError::EmptyPool);
+    }
+    Ok(vibeswap_math::mul_div(pool.reserve1, PRECISION, pool.reserve0))
+}
+
+/// Calculate the k-invariant: reserve0 * reserve1.
+/// Returns (high, low) for 256-bit result.
+pub fn k_invariant(pool: &PoolCellData) -> (u128, u128) {
+    vibeswap_math::wide_mul(pool.reserve0, pool.reserve1)
+}
+
+// ============ Tests ============
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_pool(r0: u128, r1: u128, lp: u128, fee_bps: u16) -> PoolCellData {
+        PoolCellData {
+            reserve0: r0,
+            reserve1: r1,
+            total_lp_supply: lp,
+            fee_rate_bps: fee_bps,
+            twap_price_cum: 0,
+            twap_last_block: 0,
+            k_last: [0; 32],
+            minimum_liquidity: MINIMUM_LIQUIDITY,
+            pair_id: [1; 32],
+            token0_type_hash: [2; 32],
+            token1_type_hash: [3; 32],
+        }
+    }
+
+    fn balanced_pool() -> PoolCellData {
+        make_pool(
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            30, // 0.3%
+        )
+    }
+
+    fn imbalanced_pool() -> PoolCellData {
+        make_pool(
+            500_000 * PRECISION,
+            2_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            30,
+        )
+    }
+
+    // ============ Position Value ============
+
+    #[test]
+    fn test_position_value_full_pool() {
+        let pool = balanced_pool();
+        let val = position_value(
+            pool.total_lp_supply,
+            &pool,
+            PRECISION, // $1 per token0
+            PRECISION, // $1 per token1
+        ).unwrap();
+
+        assert_eq!(val.amount0, pool.reserve0);
+        assert_eq!(val.amount1, pool.reserve1);
+        assert_eq!(val.total_value, pool.reserve0 + pool.reserve1);
+        assert_eq!(val.pool_share_bps, 10_000); // 100%
+    }
+
+    #[test]
+    fn test_position_value_half_pool() {
+        let pool = balanced_pool();
+        let val = position_value(
+            pool.total_lp_supply / 2,
+            &pool,
+            PRECISION,
+            PRECISION,
+        ).unwrap();
+
+        assert_eq!(val.amount0, pool.reserve0 / 2);
+        assert_eq!(val.amount1, pool.reserve1 / 2);
+        assert_eq!(val.pool_share_bps, 5_000); // 50%
+    }
+
+    #[test]
+    fn test_position_value_imbalanced_pool() {
+        let pool = imbalanced_pool();
+        let val = position_value(
+            pool.total_lp_supply / 4,
+            &pool,
+            PRECISION,     // $1 per token0
+            PRECISION / 4, // $0.25 per token1
+        ).unwrap();
+
+        let expected0 = pool.reserve0 / 4;
+        let expected1 = pool.reserve1 / 4;
+        assert_eq!(val.amount0, expected0);
+        assert_eq!(val.amount1, expected1);
+
+        // Value: 125K * $1 + 500K * $0.25 = $250K
+        let exp_val = vibeswap_math::mul_div(expected0, PRECISION, PRECISION)
+            + vibeswap_math::mul_div(expected1, PRECISION / 4, PRECISION);
+        assert_eq!(val.total_value, exp_val);
+    }
+
+    #[test]
+    fn test_position_value_zero_lp_supply() {
+        let mut pool = balanced_pool();
+        pool.total_lp_supply = 0;
+        let err = position_value(1000, &pool, PRECISION, PRECISION).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroLPSupply);
+    }
+
+    #[test]
+    fn test_position_value_zero_prices() {
+        let pool = balanced_pool();
+        let val = position_value(pool.total_lp_supply, &pool, 0, 0).unwrap();
+        assert_eq!(val.total_value, 0);
+        assert!(val.amount0 > 0); // Still entitled to tokens
+    }
+
+    // ============ Impermanent Loss ============
+
+    #[test]
+    fn test_il_no_price_change() {
+        let il = impermanent_loss(PRECISION, PRECISION, 100_000 * PRECISION).unwrap();
+        assert_eq!(il.il_bps, 0);
+        assert_eq!(il.loss_amount, 0);
+        assert_eq!(il.lp_value, il.hodl_value);
+    }
+
+    #[test]
+    fn test_il_2x_price_increase() {
+        // Classic IL scenario: price doubles
+        let il = impermanent_loss(
+            PRECISION,
+            2 * PRECISION,
+            100_000 * PRECISION,
+        ).unwrap();
+
+        // IL for 2x should be ~5.7% = ~570 bps
+        assert!(il.il_bps > 500, "IL should be > 5%: {}", il.il_bps);
+        assert!(il.il_bps < 700, "IL should be < 7%: {}", il.il_bps);
+        assert!(il.hodl_value > il.lp_value);
+        assert!(il.loss_amount > 0);
+    }
+
+    #[test]
+    fn test_il_half_price_decrease() {
+        // Price halves
+        let il = impermanent_loss(
+            PRECISION,
+            PRECISION / 2,
+            100_000 * PRECISION,
+        ).unwrap();
+
+        // IL for 0.5x should also be ~5.7% (symmetric)
+        assert!(il.il_bps > 500);
+        assert!(il.il_bps < 700);
+    }
+
+    #[test]
+    fn test_il_symmetry() {
+        // IL should be roughly symmetric for reciprocal price moves
+        let il_up = impermanent_loss(PRECISION, 4 * PRECISION, 100_000 * PRECISION).unwrap();
+        let il_down = impermanent_loss(4 * PRECISION, PRECISION, 100_000 * PRECISION).unwrap();
+
+        // Not exactly equal due to how HODL vs LP scale, but same IL mechanism
+        assert!(il_up.il_bps > 0);
+        assert!(il_down.il_bps > 0);
+    }
+
+    #[test]
+    fn test_il_zero_entry_price() {
+        let err = impermanent_loss(0, PRECISION, 100_000 * PRECISION).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroPrice);
+    }
+
+    #[test]
+    fn test_il_extreme_10x() {
+        let il = impermanent_loss(PRECISION, 10 * PRECISION, 100_000 * PRECISION).unwrap();
+        // IL for 10x is ~42.5%
+        assert!(il.il_bps > 4000);
+        assert!(il.il_bps < 5000);
+    }
+
+    // ============ Withdrawal Estimation ============
+
+    #[test]
+    fn test_withdrawal_full() {
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(pool.total_lp_supply, &pool).unwrap();
+        assert_eq!(est.amount0, pool.reserve0);
+        assert_eq!(est.amount1, pool.reserve1);
+        assert!(est.below_minimum); // Withdrawing all would go below minimum
+    }
+
+    #[test]
+    fn test_withdrawal_partial() {
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(pool.total_lp_supply / 10, &pool).unwrap();
+        assert_eq!(est.amount0, pool.reserve0 / 10);
+        assert_eq!(est.amount1, pool.reserve1 / 10);
+        assert!(!est.below_minimum);
+    }
+
+    #[test]
+    fn test_withdrawal_zero_amount() {
+        let pool = balanced_pool();
+        let err = estimate_withdrawal(0, &pool).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_withdrawal_zero_supply() {
+        let mut pool = balanced_pool();
+        pool.total_lp_supply = 0;
+        let err = estimate_withdrawal(1000, &pool).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroLPSupply);
+    }
+
+    #[test]
+    fn test_withdrawal_below_minimum() {
+        let pool = make_pool(
+            10_000 * PRECISION,
+            10_000 * PRECISION,
+            2_000, // Just above minimum_liquidity (1000)
+            30,
+        );
+        let est = estimate_withdrawal(1_500, &pool).unwrap();
+        assert!(est.below_minimum); // 2000 - 1500 = 500 < 1000
+    }
+
+    // ============ Optimal Deposit ============
+
+    #[test]
+    fn test_optimal_deposit_balanced() {
+        let pool = balanced_pool();
+        let dep = optimal_deposit(
+            10_000 * PRECISION,
+            10_000 * PRECISION,
+            &pool,
+        ).unwrap();
+
+        // Pool is 1:1, so optimal is to deposit equal amounts
+        assert_eq!(dep.amount0, 10_000 * PRECISION);
+        assert_eq!(dep.amount1, 10_000 * PRECISION);
+        assert_eq!(dep.leftover0, 0);
+        assert_eq!(dep.leftover1, 0);
+        assert!(dep.expected_lp > 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_excess_token0() {
+        let pool = balanced_pool();
+        let dep = optimal_deposit(
+            20_000 * PRECISION, // 2x token0
+            10_000 * PRECISION,
+            &pool,
+        ).unwrap();
+
+        // Should cap token0 to match pool ratio
+        assert_eq!(dep.amount0, 10_000 * PRECISION);
+        assert_eq!(dep.amount1, 10_000 * PRECISION);
+        assert_eq!(dep.leftover0, 10_000 * PRECISION);
+        assert_eq!(dep.leftover1, 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_imbalanced_pool() {
+        let pool = imbalanced_pool(); // 500K:2M ratio = 1:4
+        let dep = optimal_deposit(
+            10_000 * PRECISION,
+            10_000 * PRECISION,
+            &pool,
+        ).unwrap();
+
+        // Pool ratio is 1:4, so 10K token0 needs 40K token1
+        // But we only have 10K token1, so cap based on token1
+        // 10K token1 needs 2.5K token0
+        assert_eq!(dep.amount0, 2_500 * PRECISION);
+        assert_eq!(dep.amount1, 10_000 * PRECISION);
+        assert_eq!(dep.leftover0, 7_500 * PRECISION);
+        assert!(dep.expected_lp > 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_initial() {
+        let empty = make_pool(0, 0, 0, 30);
+        let dep = optimal_deposit(
+            1_000_000 * PRECISION,
+            1_000_000 * PRECISION,
+            &empty,
+        ).unwrap();
+
+        assert_eq!(dep.amount0, 1_000_000 * PRECISION);
+        assert_eq!(dep.amount1, 1_000_000 * PRECISION);
+        assert!(dep.expected_lp > 0);
+        // Initial LP = sqrt(a0 * a1) - 1000
+        let expected = vibeswap_math::sqrt_product(1_000_000 * PRECISION, 1_000_000 * PRECISION)
+            .saturating_sub(MINIMUM_LIQUIDITY);
+        assert_eq!(dep.expected_lp, expected);
+    }
+
+    #[test]
+    fn test_optimal_deposit_zero_amounts() {
+        let empty = make_pool(0, 0, 0, 30);
+        let err = optimal_deposit(0, 1000, &empty).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroAmount);
+    }
+
+    // ============ Zap-In ============
+
+    #[test]
+    fn test_zap_in_token0() {
+        let pool = balanced_pool();
+        let zap = zap_in_estimate(10_000 * PRECISION, true, &pool).unwrap();
+
+        assert_eq!(zap.swap_amount, 5_000 * PRECISION);
+        assert!(zap.swap_output > 0);
+        assert_eq!(zap.deposit_amount_in, 5_000 * PRECISION);
+        assert!(zap.expected_lp > 0);
+        // Small swap relative to pool — low impact
+        assert!(zap.swap_impact_bps < 100, "Impact should be < 1%: {}", zap.swap_impact_bps);
+    }
+
+    #[test]
+    fn test_zap_in_token1() {
+        let pool = balanced_pool();
+        let zap = zap_in_estimate(10_000 * PRECISION, false, &pool).unwrap();
+
+        assert!(zap.swap_output > 0);
+        assert!(zap.expected_lp > 0);
+    }
+
+    #[test]
+    fn test_zap_in_large_relative_to_pool() {
+        let pool = balanced_pool();
+        // Zap 50% of pool reserves — should have significant impact
+        let zap = zap_in_estimate(500_000 * PRECISION, true, &pool).unwrap();
+        assert!(zap.swap_impact_bps > 100, "Large zap should have > 1% impact");
+    }
+
+    #[test]
+    fn test_zap_in_zero_amount() {
+        let pool = balanced_pool();
+        let err = zap_in_estimate(0, true, &pool).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_zap_in_empty_pool() {
+        let pool = make_pool(0, 0, 0, 30);
+        let err = zap_in_estimate(1000, true, &pool).unwrap_err();
+        assert_eq!(err, LiquidityError::EmptyPool);
+    }
+
+    // ============ Pool Analytics ============
+
+    #[test]
+    fn test_pool_analytics_balanced() {
+        let pool = balanced_pool();
+        let analytics = pool_analytics(
+            &pool,
+            PRECISION,  // $1
+            PRECISION,  // $1
+            100_000 * PRECISION, // 100K volume
+            788_400, // ~1/10 year
+        ).unwrap();
+
+        assert_eq!(analytics.tvl, 2_000_000 * PRECISION); // $1M + $1M
+        assert!(analytics.depth > 0);
+        assert_eq!(analytics.spot_price, PRECISION); // 1:1
+        assert!(analytics.fee_apr_bps > 0);
+        assert!(analytics.utilization_bps > 0);
+    }
+
+    #[test]
+    fn test_pool_analytics_fee_apr() {
+        let pool = balanced_pool(); // TVL = $2M, fee = 0.3%
+        let analytics = pool_analytics(
+            &pool,
+            PRECISION,
+            PRECISION,
+            2_000_000 * PRECISION, // $2M volume per epoch (= TVL)
+            7_884_000, // Full year
+        ).unwrap();
+
+        // Fee income = $2M × 0.3% = $6K
+        // APR = $6K / $2M = 0.3% = 30 bps
+        assert!(analytics.fee_apr_bps >= 28 && analytics.fee_apr_bps <= 32,
+            "Expected ~30 bps APR, got {}", analytics.fee_apr_bps);
+    }
+
+    #[test]
+    fn test_pool_analytics_empty_pool() {
+        let pool = make_pool(0, 0, 0, 30);
+        let err = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap_err();
+        assert_eq!(err, LiquidityError::EmptyPool);
+    }
+
+    #[test]
+    fn test_pool_analytics_zero_volume() {
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap();
+        assert_eq!(analytics.fee_apr_bps, 0);
+        assert_eq!(analytics.utilization_bps, 0);
+    }
+
+    // ============ Utility Functions ============
+
+    #[test]
+    fn test_available_lp_to_burn() {
+        let pool = balanced_pool();
+        let available = available_lp_to_burn(&pool);
+        assert_eq!(available, pool.total_lp_supply - MINIMUM_LIQUIDITY);
+    }
+
+    #[test]
+    fn test_spot_price_balanced() {
+        let pool = balanced_pool();
+        assert_eq!(spot_price(&pool).unwrap(), PRECISION);
+    }
+
+    #[test]
+    fn test_spot_price_imbalanced() {
+        let pool = imbalanced_pool(); // 500K:2M → price = 4
+        let price = spot_price(&pool).unwrap();
+        assert_eq!(price, 4 * PRECISION);
+    }
+
+    #[test]
+    fn test_spot_price_empty() {
+        let pool = make_pool(0, 1000, 1000, 30);
+        let err = spot_price(&pool).unwrap_err();
+        assert_eq!(err, LiquidityError::EmptyPool);
+    }
+
+    #[test]
+    fn test_k_invariant() {
+        let pool = balanced_pool();
+        let (hi, lo) = k_invariant(&pool);
+        // 1M * 1M * PRECISION^2 — will have high bits
+        assert!(hi > 0 || lo > 0);
+    }
+
+    // ============ Integration ============
+
+    #[test]
+    fn test_deposit_then_withdraw_roundtrip() {
+        let pool = balanced_pool();
+
+        // Deposit 10K:10K
+        let dep = optimal_deposit(10_000 * PRECISION, 10_000 * PRECISION, &pool).unwrap();
+
+        // Simulate pool after deposit
+        let mut new_pool = pool.clone();
+        new_pool.reserve0 += dep.amount0;
+        new_pool.reserve1 += dep.amount1;
+        new_pool.total_lp_supply += dep.expected_lp;
+
+        // Withdraw the same LP
+        let est = estimate_withdrawal(dep.expected_lp, &new_pool).unwrap();
+
+        // Should get back approximately what was deposited (within rounding)
+        let diff0 = if est.amount0 > dep.amount0 { est.amount0 - dep.amount0 } else { dep.amount0 - est.amount0 };
+        let diff1 = if est.amount1 > dep.amount1 { est.amount1 - dep.amount1 } else { dep.amount1 - est.amount1 };
+
+        // Allow 0.01% rounding error
+        assert!(diff0 < dep.amount0 / 10_000, "Token0 roundtrip error too large");
+        assert!(diff1 < dep.amount1 / 10_000, "Token1 roundtrip error too large");
+    }
+
+    #[test]
+    fn test_il_vs_position_value() {
+        let pool = balanced_pool();
+        let initial_value = 100_000 * PRECISION;
+
+        // Position value at entry
+        let val_entry = position_value(
+            pool.total_lp_supply / 10, // 10% of pool
+            &pool,
+            PRECISION, PRECISION,
+        ).unwrap();
+
+        // Simulate 2x price move (reserve0 halves, reserve1 doubles to maintain k)
+        let mut moved_pool = pool.clone();
+        // After arb: r0 = r0/sqrt(2), r1 = r1*sqrt(2) to maintain k and get 2x price
+        let sqrt2 = vibeswap_math::sqrt(2 * PRECISION * PRECISION);
+        moved_pool.reserve0 = vibeswap_math::mul_div(pool.reserve0, PRECISION, sqrt2);
+        moved_pool.reserve1 = vibeswap_math::mul_div(pool.reserve1, sqrt2, PRECISION);
+
+        let val_after = position_value(
+            pool.total_lp_supply / 10,
+            &moved_pool,
+            PRECISION,     // token0 still $1
+            2 * PRECISION, // token1 now $2
+        ).unwrap();
+
+        // LP value should have grown, but less than HODL
+        assert!(val_after.total_value > val_entry.total_value, "LP value should increase with price");
+    }
+}

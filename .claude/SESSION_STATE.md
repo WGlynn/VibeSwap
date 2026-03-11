@@ -46,12 +46,18 @@
   - Config change full lifecycle, circuit breaker detection
   - 20-voter weighted, timelock boundary precision
   - Emergency + normal coexistence, analytics edge cases
-- consensus, collector, miner — hardening in progress (agents running)
+- Consensus: 23 → 35 (+12), Collector: 24 → 37 (+13), Miner: 24 → 35 (+11)
+- `sdk/src/auction.rs` — **NEW** Auction SDK module (47 tests)
+  - commit_order_hash, validate_commit, verify_reveal, phase_info
+  - simulate_batch (clearing price estimation), estimate_fill
+  - calculate_slash (non-revealer penalties), optimal_priority_bid
+  - analyze_order_book, verify_execution_order, compute_xor_seed
+- portfolio, knowledge, token — hardening in progress
 
 **Verified:**
-- CKB workspace: 1187/1187 tests passing (1051 → 1187, +136)
+- CKB workspace: 1270/1270 tests passing (1051 → 1270, +219)
 - All existing tests still pass (no regressions)
-- SDK now has 16 modules (was 13): +router, +portfolio, +fees
+- SDK now has 17 modules (was 13): +router, +portfolio, +fees, +auction
 
 **Commits this session:**
 1. `b27dddc` — DEX router module (43 tests)
@@ -60,11 +66,12 @@
 4. `26f2417` — Portfolio analytics module (23 tests)
 5. `4bb7ef0` — Governance integration hardening (14→24, +10)
 6. `ed1a849` — Fee distributor with Shapley-depth LP allocation (42 tests)
+7. `406741b` — Consensus/Collector/Miner hardening (+36 tests)
+8. `cb236a4` — Auction SDK module (47 tests)
 
 **Pending:**
-- Consensus, collector, miner hardening (agents running)
+- Portfolio, knowledge, token hardening (agents running)
 - Continue CKB ecosystem development (autopilot loop)
-- Next BIG rotation candidate: new on-chain capability or cross-chain
 
 ---
 

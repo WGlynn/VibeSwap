@@ -10,6 +10,7 @@ pub mod fees;
 pub mod governance;
 pub mod keeper;
 pub mod knowledge;
+pub mod liquidity;
 pub mod miner;
 pub mod oracle;
 pub mod portfolio;

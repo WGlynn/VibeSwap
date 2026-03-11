@@ -9,6 +9,7 @@ pub mod bridge;
 pub mod collector;
 pub mod compliance;
 pub mod consensus;
+pub mod emission;
 pub mod fees;
 pub mod governance;
 pub mod insurance;

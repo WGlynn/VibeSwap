@@ -673,4 +673,156 @@ mod tests {
         assert!(cell.has_type_code_hash(&[0xDD; 32]));
         assert!(!cell.has_type_code_hash(&[0xFF; 32]));
     }
+
+    // ============ New Edge Case & Hardening Tests ============
+
+    #[test]
+    fn test_has_type_code_hash_plain_cell_returns_false() {
+        let cell = plain_cell(1000);
+        // Plain cell has no type script, should always return false
+        assert!(!cell.has_type_code_hash(&[0x00; 32]));
+        assert!(!cell.has_type_code_hash(&[0xFF; 32]));
+    }
+
+    #[test]
+    fn test_token_amount_short_data() {
+        // Cell data shorter than 16 bytes should return None
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: vec![0x01, 0x02, 0x03], // Only 3 bytes, need 16
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), None);
+    }
+
+    #[test]
+    fn test_select_capacity_empty_available() {
+        // No cells available at all
+        let result = select_capacity_cells(&[], 100, &SelectionStrategy::SmallestFirst);
+        assert!(matches!(
+            result,
+            Err(CollectorError::InsufficientCapacity { needed: 100, available: 0 })
+        ));
+    }
+
+    #[test]
+    fn test_select_capacity_zero_target() {
+        // Requesting zero capacity should succeed immediately with no cells selected
+        let cells = vec![plain_cell(500), plain_cell(300)];
+        let result = select_capacity_cells(&cells, 0, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.selected.len(), 0);
+        assert_eq!(result.total_capacity, 0);
+        assert_eq!(result.capacity_change, 0);
+    }
+
+    #[test]
+    fn test_select_capacity_best_fit_strategy() {
+        // BestFit should preserve original order (no sorting)
+        let cells = vec![plain_cell(300), plain_cell(100), plain_cell(500)];
+        let result = select_capacity_cells(&cells, 350, &SelectionStrategy::BestFit).unwrap();
+        // BestFit preserves insertion order, so picks 300 then 100
+        assert_eq!(result.selected.len(), 2);
+        assert_eq!(result.total_capacity, 400);
+        assert_eq!(result.capacity_change, 50);
+    }
+
+    #[test]
+    fn test_select_capacity_all_cells_are_typed() {
+        // When all cells have type scripts, none qualify as plain capacity cells
+        let cells = vec![
+            token_cell(10000, 100, 0x01),
+            token_cell(20000, 200, 0x02),
+        ];
+        let result = select_capacity_cells(&cells, 100, &SelectionStrategy::LargestFirst);
+        assert!(matches!(
+            result,
+            Err(CollectorError::InsufficientCapacity { needed: 100, available: 0 })
+        ));
+    }
+
+    #[test]
+    fn test_select_token_cells_zero_target() {
+        // Requesting zero tokens should succeed immediately
+        let cells = vec![token_cell(1000, 500, 0x01)];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 0,
+            &SelectionStrategy::SmallestFirst,
+        ).unwrap();
+        assert_eq!(result.selected.len(), 0);
+        assert_eq!(result.total_token_amount, 0);
+        assert_eq!(result.token_change, 0);
+    }
+
+    #[test]
+    fn test_select_token_cells_no_matching_code_hash() {
+        // Cells exist but none match the requested code_hash
+        let cells = vec![token_cell(1000, 500, 0x01)];
+        let result = select_token_cells(
+            &cells, &[0xAA; 32], &vec![0x01; 36], 100,
+            &SelectionStrategy::SmallestFirst,
+        );
+        assert!(matches!(
+            result,
+            Err(CollectorError::InsufficientTokens { needed: 100, available: 0 })
+        ));
+    }
+
+    #[test]
+    fn test_select_token_cells_largest_first_picks_fewest() {
+        // LargestFirst should pick the big cell, needing fewer inputs
+        let cells = vec![
+            token_cell(1000, 100, 0x01),
+            token_cell(1000, 900, 0x01),
+            token_cell(1000, 50, 0x01),
+        ];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 800,
+            &SelectionStrategy::LargestFirst,
+        ).unwrap();
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_token_amount, 900);
+        assert_eq!(result.token_change, 100);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_zero_lock_args() {
+        // Lock script with zero-length args
+        // 8 (capacity) + 32+1+4+0 (lock) = 45 bytes
+        let cap = calculate_cell_capacity(0, 0, None);
+        assert_eq!(cap, 45 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_merge_single_cell() {
+        // Merging a single cell is a degenerate but valid case
+        let cells = vec![plain_cell(5000)];
+        let tx = merge_cells(&cells, test_lock(0x03)).unwrap();
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].capacity, 5000);
+        // Output lock script should be the recipient's
+        assert_eq!(tx.outputs[0].lock_script.args, vec![0x03; 20]);
+    }
+
+    #[test]
+    fn test_split_cell_empty_amounts() {
+        // Splitting with empty amounts should fail
+        let cell = token_cell(100_000_000_000, 10000, 0x01);
+        let result = split_cell(&cell, &[], test_lock(0x02));
+        assert_eq!(result.unwrap_err(), CollectorError::NoCells);
+    }
+
+    #[test]
+    fn test_split_cell_insufficient_capacity() {
+        // Cell has enough tokens but not enough capacity for multiple outputs
+        // Each token output needs min_token_cell_capacity(20) = 154 CKB = 15_400_000_000 shannons
+        let min_per_output = min_token_cell_capacity(20);
+        // Give cell barely enough capacity for 1 output, but ask for 3
+        let cell = token_cell(min_per_output + 1, 10000, 0x01);
+        let result = split_cell(&cell, &[3000, 3000, 3000], test_lock(0x02));
+        assert!(matches!(result, Err(CollectorError::InsufficientCapacity { .. })));
+    }
 }

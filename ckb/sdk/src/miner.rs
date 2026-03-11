@@ -676,4 +676,206 @@ mod tests {
         let hash3 = compute_auction_hash(&auction1);
         assert_ne!(hash1, hash3);
     }
+
+    // ============ New Hardening Tests ============
+
+    #[test]
+    fn test_mine_max_batch_id_boundary() {
+        // Verify mining works at the u64 boundary for batch_id
+        let pair_id = [0x77; 32];
+        let prev_hash = [0x88; 32];
+
+        let proof = mine_for_cell(&pair_id, u64::MAX, &prev_hash, 4, 100_000);
+        assert!(proof.is_some(), "Mining should succeed at max batch_id");
+
+        let p = proof.unwrap();
+        assert!(vibeswap_pow::verify(&p, 4));
+
+        // Challenge should differ from batch_id = 0
+        let proof_zero = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000).unwrap();
+        assert_ne!(p.challenge, proof_zero.challenge,
+            "Max batch_id must produce different challenge than batch_id 0");
+    }
+
+    #[test]
+    fn test_mine_zero_iterations_returns_none() {
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+
+        // Zero iterations means no work is done — always returns None
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 0);
+        assert!(proof.is_none(), "Zero iterations must return None");
+    }
+
+    #[test]
+    fn test_mine_single_iteration_low_difficulty() {
+        // At difficulty 0, even a single iteration should succeed
+        let pair_id = [0xAB; 32];
+        let prev_hash = [0xCD; 32];
+
+        let proof = mine_for_cell(&pair_id, 42, &prev_hash, 0, 1);
+        assert!(proof.is_some(), "Difficulty 0 should succeed in 1 iteration");
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 0));
+    }
+
+    #[test]
+    fn test_aggregation_prev_state_hash_is_current_auction_hash() {
+        // Verify the new auction state's prev_state_hash is the hash of the input auction
+        let auction = test_auction();
+        let expected_hash = compute_auction_hash(&auction);
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let output_data = &tx.outputs[0].data;
+        let new_auction = AuctionCellData::deserialize(output_data).unwrap();
+        assert_eq!(new_auction.prev_state_hash, expected_hash,
+            "New auction's prev_state_hash must be the hash of the input auction state");
+    }
+
+    #[test]
+    fn test_aggregation_commit_inputs_preserve_outpoints() {
+        // Verify that commit outpoints are faithfully transferred to tx inputs
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let mut commit = make_commit(0xAA);
+        commit.outpoint_tx_hash = [0xBE; 32];
+        commit.outpoint_index = 7;
+
+        let tx = build_aggregation_tx(
+            &auction, &[commit], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        // Input[0] is auction cell, Input[1] is the commit cell
+        assert_eq!(tx.inputs[1].tx_hash, [0xBE; 32]);
+        assert_eq!(tx.inputs[1].index, 7);
+        assert_eq!(tx.inputs[1].since, 0);
+    }
+
+    #[test]
+    fn test_aggregation_output_lock_script_uses_pow_lock() {
+        // Output auction cell must use the PoW lock with correct code_hash and args
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let deployment = test_deployment();
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &deployment, &test_miner_lock(),
+        );
+
+        let lock = &tx.outputs[0].lock_script;
+        assert_eq!(lock.code_hash, deployment.pow_lock_code_hash,
+            "Output lock must use PoW lock code hash");
+
+        // Deserialize the lock args to verify pair_id and min_difficulty
+        let args = PoWLockArgs::deserialize(&lock.args).unwrap();
+        assert_eq!(args.pair_id, auction.pair_id);
+        assert_eq!(args.min_difficulty, DEFAULT_MIN_POW_DIFFICULTY);
+    }
+
+    #[test]
+    fn test_aggregation_witness_contains_challenge_and_nonce() {
+        // Verify witness bytes are exactly challenge || nonce
+        let auction = test_auction();
+        let challenge = [0xAA; 32];
+        let nonce = [0xBB; 32];
+        let proof = PoWProof { challenge, nonce };
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let witness = &tx.witnesses[0];
+        assert_eq!(&witness[0..32], &challenge, "First 32 bytes must be challenge");
+        assert_eq!(&witness[32..64], &nonce, "Last 32 bytes must be nonce");
+    }
+
+    #[test]
+    fn test_profitability_zero_hash_rate_infinite_time() {
+        // With zero hash rate, expected time should be infinity
+        let estimate = estimate_profitability(8, 10, 1000, 0.0_f64.max(f64::MIN_POSITIVE));
+        // At essentially zero hash rate, time is astronomically large
+        assert!(estimate.expected_time_secs > 1e10,
+            "Near-zero hash rate should produce enormous time estimate");
+    }
+
+    #[test]
+    fn test_profitability_zero_base_reward() {
+        // Zero base reward means zero reward regardless of commit count
+        let estimate = estimate_profitability(8, 100, 0, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, 0);
+        assert!(!estimate.is_profitable, "Zero reward should never be profitable");
+    }
+
+    #[test]
+    fn test_track_difficulty_two_transitions_minimal() {
+        // Exactly two transitions — the minimum for adjustment
+        let transitions = vec![100, 105];
+        let new_diff = track_difficulty(16, &transitions, 5);
+        // actual_avg = 5, target = 5 → no change
+        assert_eq!(new_diff, 16);
+
+        // Two transitions, too fast
+        let fast = vec![100, 101];
+        let fast_diff = track_difficulty(16, &fast, 5);
+        assert!(fast_diff > 16, "Fast transitions should increase difficulty: {}", fast_diff);
+
+        // Two transitions, too slow
+        let slow = vec![100, 130];
+        let slow_diff = track_difficulty(16, &slow, 5);
+        assert!(slow_diff < 16, "Slow transitions should decrease difficulty: {}", slow_diff);
+    }
+
+    #[test]
+    fn test_mine_then_aggregate_integration() {
+        // Full pipeline: mine a valid proof, then build an aggregation tx with it
+        let pair_id = [0x42; 32];
+        let auction = AuctionCellData {
+            phase: PHASE_COMMIT,
+            batch_id: 7,
+            pair_id,
+            ..Default::default()
+        };
+        let prev_state_hash = compute_auction_hash(&auction);
+
+        // Step 1: Mine a valid proof
+        let proof = mine_for_cell(&pair_id, 7, &prev_state_hash, 4, 100_000)
+            .expect("Should mine successfully at difficulty 4");
+        assert!(vibeswap_pow::verify(&proof, 4));
+
+        // Step 2: Build aggregation tx with 3 commits
+        let commits: Vec<PendingCommit> = (1..=3).map(|i| {
+            let mut c = make_commit(i);
+            c.commit_data.batch_id = 7;
+            c
+        }).collect();
+
+        let tx = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        // Verify structural integrity
+        assert_eq!(tx.inputs.len(), 4, "1 auction + 3 commits");
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.witnesses[0].len(), 64);
+
+        // Verify output auction state
+        let new_auction = AuctionCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_auction.commit_count, 3);
+        assert_eq!(new_auction.prev_state_hash, prev_state_hash);
+        assert_ne!(new_auction.commit_mmr_root, [0u8; 32],
+            "MMR root should be non-zero with commits");
+
+        // Verify the proof in the witness matches what we mined
+        assert_eq!(&tx.witnesses[0][0..32], &proof.challenge);
+        assert_eq!(&tx.witnesses[0][32..64], &proof.nonce);
+    }
 }

@@ -1560,3 +1560,208 @@ fn test_fuzz_insurance_coverage_ratio_bounded() {
             "Coverage ratio {} exceeds 100%", ratio);
     }
 }
+
+// ============ Test 18: Oracle Median Aggregation Invariant ============
+
+/// Property: median of oracle prices is always bounded by min and max of inputs.
+#[test]
+fn test_fuzz_oracle_median_bounded() {
+    use vibeswap_sdk::oracle;
+
+    let mut rng = TestRng::new(0x0AC1_E000_0001_0001);
+    let pair_id = {
+        let mut id = [0u8; 32];
+        id[0..4].copy_from_slice(b"ETH\0");
+        id
+    };
+
+    for _ in 0..500 {
+        let base_price = rng.range_u128(1 * PRECISION, 100_000 * PRECISION);
+        let block = rng.range_u64(100, 10000);
+        let current_block = block + rng.range_u64(0, 50);
+
+        // Generate 1-5 oracles within 10% of base price
+        let count = (rng.next_u64() % 5 + 1) as usize;
+        let mut oracles = Vec::new();
+        let mut min_price = u128::MAX;
+        let mut max_price = 0u128;
+
+        for j in 0..count {
+            // Random deviation within ±5%
+            let dev_bps = rng.range_u128(0, 500); // 0-5%
+            let positive = rng.next_u64() % 2 == 0;
+            let deviation = base_price * dev_bps / 10_000;
+            let price = if positive {
+                base_price + deviation
+            } else {
+                base_price.saturating_sub(deviation)
+            };
+            if price == 0 { continue; }
+            min_price = min_price.min(price);
+            max_price = max_price.max(price);
+
+            oracles.push(OracleCellData {
+                price,
+                block_number: block + j as u64,
+                confidence: 80,
+                source_hash: [0xAA; 32],
+                pair_id,
+            });
+        }
+
+        if oracles.is_empty() { continue; }
+
+        // Check deviation first — only test bounded property if within limits
+        let deviation_bps = if min_price > 0 {
+            ((max_price - min_price) * 10_000) / min_price
+        } else {
+            continue;
+        };
+
+        if deviation_bps <= 1000 { // Within 10% max
+            if let Ok(median) = oracle::aggregate_prices(&oracles, &pair_id, current_block) {
+                assert!(median >= min_price,
+                    "Median {} below min {} (iter)", median, min_price);
+                assert!(median <= max_price,
+                    "Median {} above max {} (iter)", median, max_price);
+            }
+        }
+    }
+}
+
+// ============ Test 19: Oracle Price Change BPS Symmetry ============
+
+/// Property: price_change_bps(a, b) == price_change_bps(b, a) for non-zero a, b.
+/// (Absolute change is the same regardless of direction, though BPS is relative to first arg.)
+/// Actually this is NOT symmetric because BPS is relative. But the absolute diff IS the same.
+/// Real property: price_change_bps always returns a non-negative value.
+#[test]
+fn test_fuzz_oracle_price_change_nonnegative() {
+    use vibeswap_sdk::oracle;
+
+    let mut rng = TestRng::new(0x0AC1_E000_0002_0001);
+
+    for _ in 0..500 {
+        let a = rng.range_u128(1, 1_000_000 * PRECISION);
+        let b = rng.range_u128(1, 1_000_000 * PRECISION);
+
+        let bps_ab = oracle::price_change_bps(a, b);
+        let bps_ba = oracle::price_change_bps(b, a);
+
+        // Both should be non-negative (u64 ensures this, but verify semantics)
+        assert!(bps_ab < u64::MAX, "BPS overflow");
+        assert!(bps_ba < u64::MAX, "BPS overflow");
+
+        // Zero change only when equal
+        if a == b {
+            assert_eq!(bps_ab, 0);
+            assert_eq!(bps_ba, 0);
+        } else {
+            // At least one direction should show non-zero change
+            assert!(bps_ab > 0 || bps_ba > 0);
+        }
+    }
+}
+
+// ============ Test 20: Oracle Weighted Price Bounded ============
+
+/// Property: confidence-weighted price is bounded by min and max individual prices.
+#[test]
+fn test_fuzz_oracle_weighted_bounded() {
+    use vibeswap_sdk::oracle;
+
+    let mut rng = TestRng::new(0x0AC1_E000_0003_0001);
+    let pair_id = {
+        let mut id = [0u8; 32];
+        id[0..4].copy_from_slice(b"ETH\0");
+        id
+    };
+
+    for _ in 0..500 {
+        let base_price = rng.range_u128(1 * PRECISION, 100_000 * PRECISION);
+        let block = rng.range_u64(100, 10000);
+        let current_block = block + rng.range_u64(0, 50);
+
+        let count = (rng.next_u64() % 5 + 1) as usize;
+        let mut oracles = Vec::new();
+        let mut min_price = u128::MAX;
+        let mut max_price = 0u128;
+        let mut total_confidence = 0u128;
+
+        for j in 0..count {
+            let dev_bps = rng.range_u128(0, 500);
+            let positive = rng.next_u64() % 2 == 0;
+            let deviation = base_price * dev_bps / 10_000;
+            let price = if positive {
+                base_price + deviation
+            } else {
+                base_price.saturating_sub(deviation)
+            };
+            if price == 0 { continue; }
+            let confidence = rng.range_u64(1, 100) as u8;
+            total_confidence += confidence as u128;
+
+            min_price = min_price.min(price);
+            max_price = max_price.max(price);
+
+            oracles.push(OracleCellData {
+                price,
+                block_number: block + j as u64,
+                confidence,
+                source_hash: [0xAA; 32],
+                pair_id,
+            });
+        }
+
+        if oracles.is_empty() || total_confidence == 0 { continue; }
+
+        if let Ok(weighted) = oracle::weighted_price(&oracles, &pair_id, current_block) {
+            // Weighted average is always between min and max
+            // Allow small rounding error (1 unit)
+            assert!(weighted >= min_price.saturating_sub(1),
+                "Weighted {} below min {} (count={})", weighted, min_price, oracles.len());
+            assert!(weighted <= max_price + 1,
+                "Weighted {} above max {} (count={})", weighted, max_price, oracles.len());
+        }
+    }
+}
+
+// ============ Test 21: Oracle Freshness Monotonic ============
+
+/// Property: if oracle passes freshness at block N, it also passes at all blocks <= N.
+/// (Staleness can only increase as current_block advances.)
+#[test]
+fn test_fuzz_oracle_freshness_monotonic() {
+    use vibeswap_sdk::oracle;
+
+    let mut rng = TestRng::new(0x0AC1_E000_0004_0001);
+
+    for _ in 0..500 {
+        let oracle_block = rng.range_u64(50, 10000);
+        let check_block = rng.range_u64(oracle_block, oracle_block + 200);
+
+        let oracle = OracleCellData {
+            price: 1000 * PRECISION,
+            block_number: oracle_block,
+            confidence: 80,
+            source_hash: [0xAA; 32],
+            pair_id: [0x01; 32],
+        };
+
+        let result_at_check = oracle::validate_freshness(&oracle, check_block);
+
+        if result_at_check.is_ok() {
+            // Any earlier check_block should also pass
+            let earlier = rng.range_u64(oracle_block, check_block + 1);
+            assert!(oracle::validate_freshness(&oracle, earlier).is_ok(),
+                "Freshness should pass at earlier block {} if it passed at {}",
+                earlier, check_block);
+        } else {
+            // Any later check_block should also fail
+            let later = check_block + rng.range_u64(1, 200);
+            assert!(oracle::validate_freshness(&oracle, later).is_err(),
+                "Freshness should fail at later block {} if it failed at {}",
+                later, check_block);
+        }
+    }
+}

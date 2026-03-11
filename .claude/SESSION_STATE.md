@@ -1,11 +1,54 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-11 (Session 059, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-11 (Session 060, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 059 — Mar 11, 2026)
+## CURRENT (Session 060 — Mar 11, 2026)
+
+### Delta from Session 059
+**Insurance Pool (P-105 → P-106 implementation)**
+
+**Created:**
+- `ckb/scripts/insurance-pool-type/` — Insurance pool type script (23 tests)
+  - Creation, deposit, withdrawal, premium accrual, claim validation
+  - Immutable fields: pool_id, asset, premium_rate, max_coverage, cooldown
+  - Anti-predation: max 10% premium, max 50% per-claim coverage
+- Insurance math module in `ckb/lib/lending-math/src/lib.rs` (22 tests)
+  - `calculate_premium()` — annual premium from lending pool borrows
+  - `deposit_to_shares()` / `shares_to_underlying()` — share accounting
+  - `available_coverage()` — per-claim cap
+  - `calculate_claim()` — claim amount with coverage caps + new HF estimate
+  - `exchange_rate()` — share value after premium accrual
+  - `cooldown_satisfied()` — bank-run prevention
+  - `coverage_ratio()` — insurance/borrows ratio
+  - `insurance_apy()` — depositor yield
+- `InsurancePoolCellData` type (160 bytes) in `lib/types/src/lib.rs`
+- Molecule schema in `schemas/cells.mol`
+- P-106: Insurance Pool Economics (knowledge primitive)
+
+**Updated:**
+- `ckb/sdk/src/lib.rs` — 5 new SDK builders:
+  - `create_insurance_pool()`, `deposit_insurance()`, `withdraw_insurance()`
+  - `claim_insurance()`, `accrue_insurance_premium()`
+- `DeploymentInfo` — added `insurance_pool_type_code_hash`
+- All test helpers (8 files) — added insurance code hash field
+- `ckb/Cargo.toml` — 12th workspace member
+- `ckb/Makefile` — 12 scripts, 525 tests
+- `ckb/deploy/src/main.rs` — 12th script entry
+
+**Verified:**
+- CKB workspace: 525/525 tests passing (477 prior + 48 new)
+- All existing tests still pass (no regressions)
+
+**Pending:**
+- Continue CKB ecosystem development (autopilot loop)
+- Integration tests for insurance SDK builders
+
+---
+
+### PREVIOUS (Session 059 — Mar 11, 2026)
 
 ### Delta from Session 058
 **CKB Lending Protocol (NEW — Ecosystem infrastructure for Nervos)**
@@ -125,9 +168,9 @@
 - P-105 enshrined: prevention > punishment, mutualism > predation
 
 ### Running Test Count
-- **CKB tests**: 477 passing (was 315 at session start, +162)
+- **CKB tests**: 525 passing (was 477 at session 059 end, +48)
 - **Solidity tests**: 393 passing (from Session 058)
-- **Total knowledge primitives**: 77 (P-000 through P-105, some gaps)
+- **Total knowledge primitives**: 78 (P-000 through P-106, some gaps)
 
 ---
 

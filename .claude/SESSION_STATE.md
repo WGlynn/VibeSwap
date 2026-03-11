@@ -114,8 +114,18 @@
   - Prevention > punishment: graduated warnings, insurance pool, soft liquidation
   - Cascading liqs are coordination failure, mutualism is structural fix
 
+**Mutualist Liquidation Prevention Math (continued Session 059):**
+- `ckb/lib/lending-math/src/lib.rs` — `prevention` module (14 tests)
+  - `RiskTier` enum: Safe/Warning/AutoDeleverage/SoftLiquidation/HardLiquidation
+  - `classify_risk()` — graduated HF thresholds (1.5/1.3/1.1/1.0)
+  - `auto_deleverage_amount()` — convert deposit shares to repay debt
+  - `soft_liquidation_step()` — 5% incremental release (vs 50% catastrophic)
+  - `insurance_needed()` — calculate insurance pool buffer to prevent liq
+  - `stress_test()` — "does this vault survive an X% price drop?"
+- P-105 enshrined: prevention > punishment, mutualism > predation
+
 ### Running Test Count
-- **CKB tests**: 463 passing (was 315 at session start, +148)
+- **CKB tests**: 477 passing (was 315 at session start, +162)
 - **Solidity tests**: 393 passing (from Session 058)
 - **Total knowledge primitives**: 77 (P-000 through P-105, some gaps)
 

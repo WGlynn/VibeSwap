@@ -398,3 +398,218 @@ fn test_execute_defeated_proposal_rejected() {
     let result = execute_proposal(&mut proposal, end_block + TIMELOCK_DELAY_BLOCKS + 1);
     assert!(matches!(result, Err(GovernanceError::ProposalNotActive)));
 }
+
+// ============ Config Change Impact Tests ============
+
+#[test]
+fn test_governance_change_fee_rate_applied() {
+    let sdk = test_sdk();
+
+    // Governance proposes new fee rate via config change
+    let new_config = ConfigCellData {
+        max_trade_size_bps: 2000, // Doubled from 1000
+        ..base_config()
+    };
+
+    // Full lifecycle: propose → vote → execute
+    let mut proposal = create_proposal(
+        10, proposer(), new_config.clone(), [0xCC; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    cast_vote(&mut proposal, voter(0x01), 6_000_000 * PRECISION, true, 2000).unwrap();
+    let end = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+    finalize_voting(&mut proposal, TOTAL_SUPPLY, end).unwrap();
+    let approved = execute_proposal(&mut proposal, end + TIMELOCK_DELAY_BLOCKS + 1).unwrap();
+
+    // Build config update transaction
+    let tx = sdk.update_config(
+        CellInput { tx_hash: [0xCF; 32], index: 0, since: 0 },
+        approved,
+        governance_lock(),
+    );
+
+    let config = ConfigCellData::deserialize(&tx.outputs[0].data).unwrap();
+    assert_eq!(config.max_trade_size_bps, 2000);
+}
+
+#[test]
+fn test_governance_disable_circuit_breakers_flagged_unsafe() {
+    let current = base_config();
+
+    // Disabling price breaker (setting to 0) is unsafe
+    let disabled = ConfigCellData {
+        price_breaker_bps: 0,
+        ..current.clone()
+    };
+    assert!(!is_safe_config_change(&current, &disabled));
+
+    // Reducing but not disabling is safe
+    let reduced = ConfigCellData {
+        price_breaker_bps: 500,
+        ..current.clone()
+    };
+    assert!(is_safe_config_change(&current, &reduced));
+
+    // Increasing is safe
+    let doubled = ConfigCellData {
+        price_breaker_bps: 2000,
+        ..current.clone()
+    };
+    assert!(is_safe_config_change(&current, &doubled));
+}
+
+// ============ Voting Edge Cases ============
+
+#[test]
+fn test_many_voters_weighted() {
+    let mut proposal = create_proposal(
+        1, proposer(), base_config(), [0xDD; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    // 20 voters with increasing weight
+    for i in 1..=20u8 {
+        let weight = i as u128 * 200_000 * PRECISION; // 200K to 4M
+        let is_for = i % 3 != 0; // 2/3 vote for, 1/3 against
+        cast_vote(&mut proposal, voter(i), weight, is_for, 1000 + i as u64 * 100).unwrap();
+    }
+
+    // Total voted = sum(200K * i for i=1..20) = 200K * 210 = 42M
+    assert!(has_quorum(&proposal, TOTAL_SUPPLY)); // 42M >> 4M quorum
+    // For = voters where i%3 != 0, Against = voters where i%3 == 0
+    // Should have clear majority for
+    assert!(has_passed(&proposal, TOTAL_SUPPLY));
+}
+
+#[test]
+fn test_vote_accumulates_for_same_voter() {
+    let mut proposal = create_proposal(
+        1, proposer(), base_config(), [0xDD; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    cast_vote(&mut proposal, voter(0x01), 3_000_000 * PRECISION, true, 2000).unwrap();
+    cast_vote(&mut proposal, voter(0x01), 2_000_000 * PRECISION, true, 3000).unwrap();
+
+    // Both votes accumulated
+    assert_eq!(proposal.votes_for, 5_000_000 * PRECISION);
+}
+
+#[test]
+fn test_zero_weight_vote_has_no_effect() {
+    let mut proposal = create_proposal(
+        1, proposer(), base_config(), [0xDD; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    cast_vote(&mut proposal, voter(0x01), 0, true, 2000).unwrap();
+    assert_eq!(proposal.votes_for, 0);
+    assert!(!has_quorum(&proposal, TOTAL_SUPPLY));
+}
+
+// ============ Proposer Threshold ============
+
+#[test]
+fn test_insufficient_stake_cannot_propose() {
+    // Need 0.1% of total supply = 100K tokens
+    let result = can_propose(50_000 * PRECISION, TOTAL_SUPPLY);
+    assert!(result.is_err());
+
+    // Exactly at threshold — should pass
+    let result = can_propose(100_000 * PRECISION, TOTAL_SUPPLY);
+    assert!(result.is_ok());
+}
+
+// ============ Timelock Precision ============
+
+#[test]
+fn test_execute_at_exact_timelock_boundary() {
+    let mut proposal = create_proposal(
+        1, proposer(), base_config(), [0xDD; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    cast_vote(&mut proposal, voter(0x01), 5_000_000 * PRECISION, true, 2000).unwrap();
+    let end = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+    finalize_voting(&mut proposal, TOTAL_SUPPLY, end).unwrap();
+
+    // One block before timelock — should fail
+    let before = end + TIMELOCK_DELAY_BLOCKS - 1;
+    let result = execute_proposal(&mut proposal, before);
+    assert!(matches!(result, Err(GovernanceError::TimelockNotExpired)));
+
+    // Exactly at timelock boundary — should succeed (check is current_block < execute_after)
+    let exact = end + TIMELOCK_DELAY_BLOCKS;
+    let config = execute_proposal(&mut proposal, exact).unwrap();
+    assert_eq!(config.commit_window_blocks, base_config().commit_window_blocks);
+}
+
+// ============ Full Lifecycle Stress ============
+
+#[test]
+fn test_emergency_then_normal_proposal_coexist() {
+    // Emergency proposal runs faster
+    let mut emergency = create_proposal(
+        1, proposer(),
+        ConfigCellData { min_pow_difficulty: 5, ..base_config() },
+        [0xEE; 32], 1000, MIN_VOTING_PERIOD_BLOCKS, true,
+    ).unwrap();
+
+    // Normal proposal in parallel
+    let mut normal = create_proposal(
+        2, proposer(),
+        ConfigCellData { commit_window_blocks: 80, ..base_config() },
+        [0x0F; 32], 1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    // Both get votes
+    cast_vote(&mut emergency, voter(0x01), 10_000_001 * PRECISION, true, 1500).unwrap();
+    cast_vote(&mut normal, voter(0x02), 5_000_000 * PRECISION, true, 2000).unwrap();
+
+    // Emergency finalizes first
+    let e_end = 1000 + MIN_VOTING_PERIOD_BLOCKS + 1;
+    finalize_voting(&mut emergency, TOTAL_SUPPLY, e_end).unwrap();
+
+    // Normal still voting at that point
+    assert!(matches!(normal.status, ProposalStatus::Active { .. }));
+
+    // Execute emergency
+    let e_exec = e_end + EMERGENCY_TIMELOCK_BLOCKS + 1;
+    let e_config = execute_proposal(&mut emergency, e_exec).unwrap();
+    assert_eq!(e_config.min_pow_difficulty, 5);
+
+    // Normal finalizes later
+    let n_end = 1000 + DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+    finalize_voting(&mut normal, TOTAL_SUPPLY, n_end).unwrap();
+    let n_config = execute_proposal(&mut normal, n_end + TIMELOCK_DELAY_BLOCKS + 1).unwrap();
+    assert_eq!(n_config.commit_window_blocks, 80);
+}
+
+// ============ Analytics Edge Cases ============
+
+#[test]
+fn test_analytics_100_percent_against() {
+    let mut proposal = create_proposal(
+        1, proposer(), base_config(), [0xDD; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    cast_vote(&mut proposal, voter(0x01), 5_000_000 * PRECISION, false, 2000).unwrap();
+
+    assert_eq!(approval_rate_bps(&proposal), 0); // 0% approval
+    assert!(!has_passed(&proposal, TOTAL_SUPPLY)); // Doesn't pass
+}
+
+#[test]
+fn test_cancel_by_non_guardian_rejected() {
+    let mut proposal = create_proposal(
+        1, proposer(), base_config(), [0xDD; 32],
+        1000, DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    let random_user = [0x99; 32];
+    let result = cancel_proposal(&mut proposal, &random_user, &guardian());
+    // Only proposer or guardian can cancel
+    assert!(result.is_err());
+}

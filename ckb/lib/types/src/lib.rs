@@ -704,6 +704,201 @@ impl KnowledgeCellData {
     }
 }
 
+// ============ Lending Protocol Cell Data ============
+
+/// Lending pool cell — shared state per asset market, PoW-gated
+/// Tracks aggregate deposits, borrows, interest, and share accounting.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LendingPoolCellData {
+    pub total_deposits: u128,    // Total underlying deposited
+    pub total_borrows: u128,     // Total outstanding borrows
+    pub total_shares: u128,      // Total deposit shares (like cTokens)
+    pub total_reserves: u128,    // Protocol-owned reserves
+    pub borrow_index: u128,      // Cumulative interest index (starts at 1e18)
+    pub last_accrual_block: u64, // Block number of last interest accrual
+    pub asset_type_hash: [u8; 32], // Type script hash of the lent asset
+    pub pool_id: [u8; 32],      // Unique pool identifier
+    // Rate model params (baked in to avoid separate config lookup)
+    pub base_rate: u128,         // Annual base borrow rate (1e18 scale)
+    pub slope1: u128,            // Rate slope below kink
+    pub slope2: u128,            // Rate slope above kink
+    pub optimal_utilization: u128, // Kink point
+    pub reserve_factor: u128,    // Protocol's share of interest
+    // Collateral params
+    pub collateral_factor: u128, // Max LTV for this asset as collateral
+    pub liquidation_threshold: u128, // Liquidation trigger point
+    pub liquidation_incentive: u128, // Bonus for liquidators
+}
+
+impl LendingPoolCellData {
+    // 16*13 + 8 + 32*2 = 208 + 8 + 64 = 280
+    pub const SERIALIZED_SIZE: usize = 280;
+
+    pub fn serialize(&self) -> [u8; Self::SERIALIZED_SIZE] {
+        let mut buf = [0u8; Self::SERIALIZED_SIZE];
+        let mut offset = 0;
+
+        macro_rules! write_u128 {
+            ($val:expr) => {
+                buf[offset..offset + 16].copy_from_slice(&$val.to_le_bytes());
+                offset += 16;
+            };
+        }
+
+        write_u128!(self.total_deposits);
+        write_u128!(self.total_borrows);
+        write_u128!(self.total_shares);
+        write_u128!(self.total_reserves);
+        write_u128!(self.borrow_index);
+
+        buf[offset..offset + 8].copy_from_slice(&self.last_accrual_block.to_le_bytes());
+        offset += 8;
+
+        buf[offset..offset + 32].copy_from_slice(&self.asset_type_hash);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.pool_id);
+        offset += 32;
+
+        write_u128!(self.base_rate);
+        write_u128!(self.slope1);
+        write_u128!(self.slope2);
+        write_u128!(self.optimal_utilization);
+        write_u128!(self.reserve_factor);
+        write_u128!(self.collateral_factor);
+        write_u128!(self.liquidation_threshold);
+        write_u128!(self.liquidation_incentive);
+
+        buf
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SERIALIZED_SIZE {
+            return None;
+        }
+        let mut offset = 0;
+        let mut result = Self::default();
+
+        macro_rules! read_u128 {
+            ($field:expr) => {
+                $field = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+                offset += 16;
+            };
+        }
+
+        read_u128!(result.total_deposits);
+        read_u128!(result.total_borrows);
+        read_u128!(result.total_shares);
+        read_u128!(result.total_reserves);
+        read_u128!(result.borrow_index);
+
+        result.last_accrual_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+        offset += 8;
+
+        result.asset_type_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.pool_id.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        read_u128!(result.base_rate);
+        read_u128!(result.slope1);
+        read_u128!(result.slope2);
+        read_u128!(result.optimal_utilization);
+        read_u128!(result.reserve_factor);
+        read_u128!(result.collateral_factor);
+        read_u128!(result.liquidation_threshold);
+        read_u128!(result.liquidation_incentive);
+
+        Some(result)
+    }
+}
+
+/// Vault cell — per-user lending position, no contention
+/// Each borrower has their own vault cell tracking collateral and debt.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct VaultCellData {
+    pub owner_lock_hash: [u8; 32],   // Owner's lock script hash
+    pub pool_id: [u8; 32],          // Which lending pool
+    pub collateral_amount: u128,     // Collateral deposited (in collateral token units)
+    pub collateral_type_hash: [u8; 32], // Type hash of collateral asset
+    pub debt_shares: u128,           // Share of pool's total borrows (for index-based accrual)
+    pub borrow_index_snapshot: u128, // Borrow index at time of last debt change
+    pub deposit_shares: u128,        // Lending shares owned (like cTokens)
+    pub last_update_block: u64,      // Block number of last modification
+}
+
+impl VaultCellData {
+    // 32*3 + 16*4 + 8 = 96 + 64 + 8 = 168
+    pub const SERIALIZED_SIZE: usize = 168;
+
+    pub fn serialize(&self) -> [u8; Self::SERIALIZED_SIZE] {
+        let mut buf = [0u8; Self::SERIALIZED_SIZE];
+        let mut offset = 0;
+
+        buf[offset..offset + 32].copy_from_slice(&self.owner_lock_hash);
+        offset += 32;
+        buf[offset..offset + 32].copy_from_slice(&self.pool_id);
+        offset += 32;
+
+        buf[offset..offset + 16].copy_from_slice(&self.collateral_amount.to_le_bytes());
+        offset += 16;
+
+        buf[offset..offset + 32].copy_from_slice(&self.collateral_type_hash);
+        offset += 32;
+
+        buf[offset..offset + 16].copy_from_slice(&self.debt_shares.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 16].copy_from_slice(&self.borrow_index_snapshot.to_le_bytes());
+        offset += 16;
+        buf[offset..offset + 16].copy_from_slice(&self.deposit_shares.to_le_bytes());
+        offset += 16;
+
+        buf[offset..offset + 8].copy_from_slice(&self.last_update_block.to_le_bytes());
+
+        buf
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SERIALIZED_SIZE {
+            return None;
+        }
+        let mut offset = 0;
+        let mut result = Self::default();
+
+        result.owner_lock_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        result.pool_id.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.collateral_amount = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+
+        result.collateral_type_hash.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+
+        result.debt_shares = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.borrow_index_snapshot = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+        result.deposit_shares = u128::from_le_bytes(data[offset..offset + 16].try_into().ok()?);
+        offset += 16;
+
+        result.last_update_block = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?);
+
+        Some(result)
+    }
+}
+
+// ============ Lending Constants ============
+
+pub const DEFAULT_BASE_RATE: u128 = 20_000_000_000_000_000;           // 2%
+pub const DEFAULT_SLOPE1: u128 = 40_000_000_000_000_000;               // 4%
+pub const DEFAULT_SLOPE2: u128 = 3_000_000_000_000_000_000;            // 300%
+pub const DEFAULT_OPTIMAL_UTILIZATION: u128 = 800_000_000_000_000_000; // 80%
+pub const DEFAULT_RESERVE_FACTOR: u128 = 100_000_000_000_000_000;      // 10%
+pub const DEFAULT_COLLATERAL_FACTOR: u128 = 750_000_000_000_000_000;   // 75%
+pub const DEFAULT_LIQUIDATION_THRESHOLD: u128 = 800_000_000_000_000_000; // 80%
+pub const DEFAULT_LIQUIDATION_INCENTIVE: u128 = 50_000_000_000_000_000;  // 5%
+
 // ============ Knowledge Constants ============
 
 /// Minimum PoW difficulty for knowledge cells
@@ -852,6 +1047,62 @@ mod tests {
     #[test]
     fn test_knowledge_cell_serialized_size() {
         assert_eq!(KnowledgeCellData::SERIALIZED_SIZE, 181);
+    }
+
+    #[test]
+    fn test_lending_pool_roundtrip() {
+        let data = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 800_000 * PRECISION,
+            total_shares: 1_000_000 * PRECISION,
+            total_reserves: 5_000 * PRECISION,
+            borrow_index: PRECISION + PRECISION / 10, // 1.1
+            last_accrual_block: 500_000,
+            asset_type_hash: [0xAA; 32],
+            pool_id: [0xBB; 32],
+            base_rate: DEFAULT_BASE_RATE,
+            slope1: DEFAULT_SLOPE1,
+            slope2: DEFAULT_SLOPE2,
+            optimal_utilization: DEFAULT_OPTIMAL_UTILIZATION,
+            reserve_factor: DEFAULT_RESERVE_FACTOR,
+            collateral_factor: DEFAULT_COLLATERAL_FACTOR,
+            liquidation_threshold: DEFAULT_LIQUIDATION_THRESHOLD,
+            liquidation_incentive: DEFAULT_LIQUIDATION_INCENTIVE,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), LendingPoolCellData::SERIALIZED_SIZE);
+        let decoded = LendingPoolCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_lending_pool_deserialize_too_short() {
+        let short = [0u8; 100];
+        assert!(LendingPoolCellData::deserialize(&short).is_none());
+    }
+
+    #[test]
+    fn test_vault_cell_roundtrip() {
+        let data = VaultCellData {
+            owner_lock_hash: [0x11; 32],
+            pool_id: [0x22; 32],
+            collateral_amount: 10 * PRECISION,
+            collateral_type_hash: [0x33; 32],
+            debt_shares: 5_000 * PRECISION,
+            borrow_index_snapshot: PRECISION,
+            deposit_shares: 1_000 * PRECISION,
+            last_update_block: 100_000,
+        };
+        let bytes = data.serialize();
+        assert_eq!(bytes.len(), VaultCellData::SERIALIZED_SIZE);
+        let decoded = VaultCellData::deserialize(&bytes).unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_vault_cell_deserialize_too_short() {
+        let short = [0u8; 50];
+        assert!(VaultCellData::deserialize(&short).is_none());
     }
 
     #[test]

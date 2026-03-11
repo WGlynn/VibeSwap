@@ -113,6 +113,40 @@ table OracleCellData {
     pair_id:            Byte32,     // Which trading pair
 }
 
+// ============ Lending Pool Cell Data ============
+// Shared state per asset market, PoW-gated
+table LendingPoolCellData {
+    total_deposits:         Uint128,    // Total underlying deposited
+    total_borrows:          Uint128,    // Total outstanding borrows
+    total_shares:           Uint128,    // Total deposit shares (like cTokens)
+    total_reserves:         Uint128,    // Protocol-owned reserves
+    borrow_index:           Uint128,    // Cumulative interest index (starts at 1e18)
+    last_accrual_block:     Uint64,     // When interest was last accrued
+    asset_type_hash:        Byte32,     // Type script hash of lent asset
+    pool_id:                Byte32,     // Unique pool identifier
+    base_rate:              Uint128,    // Annual base borrow rate
+    slope1:                 Uint128,    // Rate slope below kink
+    slope2:                 Uint128,    // Rate slope above kink
+    optimal_utilization:    Uint128,    // Kink point
+    reserve_factor:         Uint128,    // Protocol share of interest
+    collateral_factor:      Uint128,    // Max LTV for collateral
+    liquidation_threshold:  Uint128,    // Liquidation trigger
+    liquidation_incentive:  Uint128,    // Bonus for liquidators
+}
+
+// ============ Vault Cell Data ============
+// Per-user lending position, no contention
+table VaultCellData {
+    owner_lock_hash:        Byte32,     // Owner's lock script hash
+    pool_id:                Byte32,     // Which lending pool
+    collateral_amount:      Uint128,    // Collateral deposited
+    collateral_type_hash:   Byte32,     // Type hash of collateral asset
+    debt_shares:            Uint128,    // Share of pool's borrows
+    borrow_index_snapshot:  Uint128,    // Index at last debt change
+    deposit_shares:         Uint128,    // Lending shares owned
+    last_update_block:      Uint64,     // Last modification block
+}
+
 // ============ PoW Lock Args ============
 // Arguments for the PoW lock script
 table PoWLockArgs {

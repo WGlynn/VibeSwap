@@ -1,0 +1,16 @@
+[package]
+name = "ckb-lending-math"
+version = "0.1.0"
+edition = "2021"
+description = "Integer-only lending protocol math for Nervos CKB. Reusable by any CKB DeFi builder."
+
+[features]
+default = ["std"]
+std = []
+no_std = []
+
+[dependencies]
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+proptest = "1.4"

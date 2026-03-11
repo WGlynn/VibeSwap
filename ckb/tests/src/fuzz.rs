@@ -10,6 +10,12 @@ use vibeswap_math::twap::OracleState;
 use vibeswap_mmr::MMR;
 use vibeswap_pow;
 use vibeswap_types::*;
+use vibeswap_sdk::collector::{
+    self, LiveCell, CellSelection, SelectionStrategy, CollectorError,
+    select_capacity_cells, select_token_cells, merge_cells, split_cell,
+    calculate_cell_capacity, min_plain_cell_capacity, min_token_cell_capacity,
+};
+use vibeswap_sdk::token::parse_token_amount;
 use core::cmp::Ordering;
 
 // ============ Deterministic PRNG ============
@@ -905,5 +911,286 @@ fn test_fuzz_oracle_pow_roundtrip() {
                 i
             );
         }
+    }
+}
+
+// ============ Cell Collector Property Tests ============
+
+fn fuzz_plain_cell(rng: &mut TestRng) -> LiveCell {
+    LiveCell {
+        tx_hash: rng.next_bytes_32(),
+        index: (rng.next_u64() % 16) as u32,
+        capacity: rng.range_u64(6_500_000_000, 100_000_000_000), // 65-1000 CKB
+        data: vec![],
+        lock_script: vibeswap_sdk::Script {
+            code_hash: rng.next_bytes_32(),
+            hash_type: vibeswap_sdk::HashType::Type,
+            args: vec![0x01; 20],
+        },
+        type_script: None,
+    }
+}
+
+fn fuzz_token_cell(rng: &mut TestRng, token_id: u8) -> LiveCell {
+    let amount = rng.range_u128(1, 1_000_000_000_000_000_000_000);
+    LiveCell {
+        tx_hash: rng.next_bytes_32(),
+        index: (rng.next_u64() % 16) as u32,
+        capacity: rng.range_u64(14_200_000_000, 50_000_000_000),
+        data: amount.to_le_bytes().to_vec(),
+        lock_script: vibeswap_sdk::Script {
+            code_hash: [0x99; 32],
+            hash_type: vibeswap_sdk::HashType::Type,
+            args: vec![0x01; 20],
+        },
+        type_script: Some(vibeswap_sdk::Script {
+            code_hash: [0xDD; 32],
+            hash_type: vibeswap_sdk::HashType::Data1,
+            args: vec![token_id; 36],
+        }),
+    }
+}
+
+// ============ Fuzz Test: Capacity Selection Conservation ============
+
+/// Property: selected capacity always >= target, change = total - target.
+/// For any random set of cells, if selection succeeds,
+/// the accounting must be exact.
+#[test]
+fn test_fuzz_capacity_selection_conservation() {
+    let mut rng = TestRng::new(0xCE11_C011_EC70_0001);
+
+    for i in 0..500 {
+        let num_cells = (rng.next_u64() % 20) as usize + 1;
+        let cells: Vec<LiveCell> = (0..num_cells).map(|_| fuzz_plain_cell(&mut rng)).collect();
+
+        let total_available: u64 = cells.iter().map(|c| c.capacity).sum();
+        let target = rng.range_u64(1, total_available.saturating_add(1));
+
+        for strategy in &[
+            SelectionStrategy::SmallestFirst,
+            SelectionStrategy::LargestFirst,
+            SelectionStrategy::BestFit,
+        ] {
+            match select_capacity_cells(&cells, target, strategy) {
+                Ok(selection) => {
+                    // Invariant 1: Total selected >= target
+                    assert!(
+                        selection.total_capacity >= target,
+                        "Iter {}: selected {} < target {}",
+                        i, selection.total_capacity, target
+                    );
+
+                    // Invariant 2: Change = total - target
+                    assert_eq!(
+                        selection.capacity_change,
+                        selection.total_capacity - target,
+                        "Iter {}: change mismatch", i
+                    );
+
+                    // Invariant 3: Selected cells sum matches total_capacity
+                    let sum: u64 = selection.selected.iter().map(|c| c.capacity).sum();
+                    assert_eq!(sum, selection.total_capacity, "Iter {}: sum mismatch", i);
+
+                    // Invariant 4: No typed cells in selection
+                    for cell in &selection.selected {
+                        assert!(cell.type_script.is_none(), "Iter {}: typed cell in capacity selection", i);
+                    }
+                }
+                Err(CollectorError::InsufficientCapacity { needed, available }) => {
+                    assert_eq!(needed, target);
+                    assert!(available < target);
+                }
+                Err(e) => panic!("Iter {}: unexpected error {:?}", i, e),
+            }
+        }
+    }
+}
+
+// ============ Fuzz Test: Token Selection Conservation ============
+
+/// Property: selected token amount always >= target, change = total - target.
+/// Token conservation must hold for any random cell set.
+#[test]
+fn test_fuzz_token_selection_conservation() {
+    let mut rng = TestRng::new(0xCE11_C011_EC70_0002);
+
+    for i in 0..500 {
+        let num_cells = (rng.next_u64() % 15) as usize + 1;
+        let token_id: u8 = 0x42;
+        let cells: Vec<LiveCell> = (0..num_cells).map(|_| fuzz_token_cell(&mut rng, token_id)).collect();
+
+        let total_available: u128 = cells.iter().filter_map(|c| c.token_amount()).sum();
+        if total_available == 0 { continue; }
+        let target = rng.range_u128(1, total_available.saturating_add(1));
+
+        match select_token_cells(&cells, &[0xDD; 32], &vec![token_id; 36], target, &SelectionStrategy::SmallestFirst) {
+            Ok(selection) => {
+                // Invariant 1: Total tokens >= target
+                assert!(
+                    selection.total_token_amount >= target,
+                    "Iter {}: tokens {} < target {}",
+                    i, selection.total_token_amount, target
+                );
+
+                // Invariant 2: Change = total - target
+                assert_eq!(
+                    selection.token_change,
+                    selection.total_token_amount - target,
+                    "Iter {}: token change mismatch", i
+                );
+
+                // Invariant 3: Selected cells sum matches
+                let sum: u128 = selection.selected.iter().filter_map(|c| c.token_amount()).sum();
+                assert_eq!(sum, selection.total_token_amount, "Iter {}: token sum mismatch", i);
+            }
+            Err(CollectorError::InsufficientTokens { needed, available }) => {
+                assert_eq!(needed, target);
+                assert!(available < target);
+            }
+            Err(e) => panic!("Iter {}: unexpected error {:?}", i, e),
+        }
+    }
+}
+
+// ============ Fuzz Test: Merge Cell Token Conservation ============
+
+/// Property: merging N token cells produces one cell with the sum of all tokens.
+/// Total tokens in = total tokens out.
+#[test]
+fn test_fuzz_merge_token_conservation() {
+    let mut rng = TestRng::new(0xCE11_C011_EC70_0003);
+
+    for i in 0..500 {
+        let num_cells = (rng.next_u64() % 10) as usize + 2; // At least 2
+        let token_id: u8 = 0x42;
+        let cells: Vec<LiveCell> = (0..num_cells).map(|_| fuzz_token_cell(&mut rng, token_id)).collect();
+
+        let expected_total: u128 = cells.iter().filter_map(|c| c.token_amount()).sum();
+        let expected_capacity: u64 = cells.iter().map(|c| c.capacity).sum();
+
+        let lock = vibeswap_sdk::Script {
+            code_hash: [0x99; 32],
+            hash_type: vibeswap_sdk::HashType::Type,
+            args: vec![0x01; 20],
+        };
+
+        let tx = merge_cells(&cells, lock).unwrap();
+
+        // Invariant 1: Single output
+        assert_eq!(tx.outputs.len(), 1, "Iter {}: expected 1 output", i);
+
+        // Invariant 2: Token conservation
+        let merged_amount = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(
+            merged_amount, expected_total,
+            "Iter {}: token conservation violated: {} != {}",
+            i, merged_amount, expected_total
+        );
+
+        // Invariant 3: Capacity conservation
+        assert_eq!(
+            tx.outputs[0].capacity, expected_capacity,
+            "Iter {}: capacity conservation violated", i
+        );
+
+        // Invariant 4: Input count matches cell count
+        assert_eq!(tx.inputs.len(), num_cells, "Iter {}: input count mismatch", i);
+    }
+}
+
+// ============ Fuzz Test: Split Cell Token Conservation ============
+
+/// Property: splitting a cell into N parts conserves total tokens.
+/// sum(outputs) = input amount.
+#[test]
+fn test_fuzz_split_token_conservation() {
+    let mut rng = TestRng::new(0xCE11_C011_EC70_0004);
+
+    for i in 0..500 {
+        let total_amount = rng.range_u128(1000, 1_000_000_000_000);
+        let num_splits = (rng.next_u64() % 5) as usize + 2; // 2-6 splits
+
+        // Generate random split amounts that sum to <= total
+        let mut splits = Vec::new();
+        let mut remaining = total_amount;
+        for j in 0..num_splits {
+            if remaining == 0 { break; }
+            let amount = if j == num_splits - 1 {
+                remaining // Last split gets the rest (might be 0, skip it)
+            } else {
+                rng.range_u128(1, remaining.min(remaining / 2 + 1))
+            };
+            if amount > 0 {
+                splits.push(amount);
+                remaining -= amount;
+            }
+        }
+        if splits.is_empty() { continue; }
+
+        let cell = LiveCell {
+            tx_hash: rng.next_bytes_32(),
+            index: 0,
+            capacity: 1_000_000_000_000, // 10000 CKB (plenty)
+            data: total_amount.to_le_bytes().to_vec(),
+            lock_script: vibeswap_sdk::Script {
+                code_hash: [0x99; 32],
+                hash_type: vibeswap_sdk::HashType::Type,
+                args: vec![0x01; 20],
+            },
+            type_script: Some(vibeswap_sdk::Script {
+                code_hash: [0xDD; 32],
+                hash_type: vibeswap_sdk::HashType::Data1,
+                args: vec![0x42; 36],
+            }),
+        };
+
+        let lock = vibeswap_sdk::Script {
+            code_hash: [0x99; 32],
+            hash_type: vibeswap_sdk::HashType::Type,
+            args: vec![0x01; 20],
+        };
+
+        match split_cell(&cell, &splits, lock) {
+            Ok(tx) => {
+                // Invariant: total tokens across all outputs = input total
+                let output_total: u128 = tx.outputs.iter()
+                    .filter_map(|o| parse_token_amount(&o.data))
+                    .sum();
+                assert_eq!(
+                    output_total, total_amount,
+                    "Iter {}: split conservation violated: {} != {}",
+                    i, output_total, total_amount
+                );
+            }
+            Err(CollectorError::InsufficientCapacity { .. }) => {
+                // OK — cell didn't have enough capacity for all outputs
+            }
+            Err(e) => panic!("Iter {}: unexpected error {:?}", i, e),
+        }
+    }
+}
+
+// ============ Fuzz Test: Capacity Calculation Monotonicity ============
+
+/// Property: larger data/args always requires more capacity.
+/// calculate_cell_capacity is monotonically increasing in all arguments.
+#[test]
+fn test_fuzz_capacity_monotonicity() {
+    let mut rng = TestRng::new(0xCE11_C011_EC70_0005);
+
+    for _ in 0..1000 {
+        let data1 = (rng.next_u64() % 500) as usize;
+        let data2 = data1 + (rng.next_u64() % 100) as usize + 1; // Strictly larger
+        let args = (rng.next_u64() % 100) as usize;
+
+        let cap1 = calculate_cell_capacity(data1, args, None);
+        let cap2 = calculate_cell_capacity(data2, args, None);
+        assert!(cap2 > cap1, "Larger data should need more capacity");
+
+        // Adding a type script should increase capacity
+        let cap_no_type = calculate_cell_capacity(data1, args, None);
+        let cap_with_type = calculate_cell_capacity(data1, args, Some(32));
+        assert!(cap_with_type > cap_no_type, "Type script should increase capacity");
     }
 }

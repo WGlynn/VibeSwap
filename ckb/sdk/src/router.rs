@@ -1488,4 +1488,103 @@ mod tests {
         assert_eq!(forward, vibeswap_math::PRECISION);
         assert_eq!(reverse, vibeswap_math::PRECISION);
     }
+
+    // ============ Batch 4: Additional Edge Case & Coverage Tests ============
+
+    #[test]
+    fn test_add_pool_returns_sequential_indices() {
+        // Each add_pool call should return the next sequential index
+        let mut g = PoolGraph::new();
+        let i0 = g.add_pool(pool(1, 2, 1000, 2000));
+        let i1 = g.add_pool(pool(2, 3, 3000, 4000));
+        let i2 = g.add_pool(pool(3, 4, 5000, 6000));
+        assert_eq!(i0, 0);
+        assert_eq!(i1, 1);
+        assert_eq!(i2, 2);
+        assert_eq!(g.pool_count(), 3);
+        assert_eq!(g.token_count(), 4);
+    }
+
+    #[test]
+    fn test_find_all_routes_max_hops_1() {
+        // max_hops parameter means max intermediate hops
+        // max_hops=1 allows up to 2 pools chained (A→B→C)
+        let g = graph_two_pools();
+        // A→B is direct (1 pool), should be found with max_hops=1
+        let routes_ab = g.find_all_routes(&token(1), &token(2), 1).unwrap();
+        assert_eq!(routes_ab.len(), 1);
+        assert_eq!(routes_ab[0].len(), 1);
+
+        // A→C requires 2 pools (A→B→C), and max_hops=1 allows 2 pools
+        let routes_ac = g.find_all_routes(&token(1), &token(3), 1).unwrap();
+        assert_eq!(routes_ac.len(), 1);
+        assert_eq!(routes_ac[0].len(), 2);
+
+        // With max_hops=0, only direct (single pool) routes are found
+        // A→C has no direct pool, so it should fail
+        let result = g.find_all_routes(&token(1), &token(3), 0);
+        assert_eq!(result, Err(RouterError::NoRouteFound));
+    }
+
+    #[test]
+    fn test_simulate_route_output_always_less_than_input_on_1_to_1_pool() {
+        // On a 1:1 pool with fees, output should always be < input
+        let g = graph_two_pools();
+        let hop = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+        for exp in [100, 1_000, 10_000, 100_000u128] {
+            let amount = exp * 1_000_000_000_000_000_000; // exp * 1e18
+            if let Some(output) = g.simulate_route(&hop, amount) {
+                assert!(output < amount,
+                    "Output ({}) should be < input ({}) on 1:1 pool with fees", output, amount);
+            }
+        }
+    }
+
+    #[test]
+    fn test_price_impact_empty_hops() {
+        // Empty hops should have 0 price impact
+        let g = graph_two_pools();
+        let impact = g.estimate_price_impact(&[], 1_000_000);
+        assert_eq!(impact, 0, "Empty hops should produce 0 price impact");
+    }
+
+    #[test]
+    fn test_split_route_same_token_error() {
+        let g = graph_two_pools();
+        let result = g.find_split_route(&token(1), &token(1), 1_000e18 as u128);
+        assert_eq!(result.unwrap_err(), RouterError::SameToken);
+    }
+
+    #[test]
+    fn test_split_route_empty_graph() {
+        let g = PoolGraph::new();
+        let result = g.find_split_route(&token(1), &token(2), 1_000e18 as u128);
+        assert_eq!(result.unwrap_err(), RouterError::EmptyGraph);
+    }
+
+    #[test]
+    fn test_best_route_two_hop_output_less_than_reserves() {
+        // Two-hop route output should never exceed the final pool's reserves
+        let g = graph_two_pools();
+        let amount = 10_000e18 as u128;
+        let route = g.find_best_route(&token(1), &token(3), amount).unwrap();
+        // Final pool B-C has 2M token1 reserves
+        let final_reserve = g.pools[1].reserve1;
+        assert!(route.expected_output < final_reserve,
+            "Output should not exceed final pool's reserves");
+    }
+
+    #[test]
+    fn test_min_output_slippage_1_bps() {
+        // 1 bps = 0.01% slippage
+        let expected = 1_000_000u128;
+        let min = PoolGraph::min_output_with_slippage(expected, 1);
+        // 1_000_000 * 1 / 10_000 = 100
+        assert_eq!(min, 999_900);
+    }
 }

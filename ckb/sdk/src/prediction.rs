@@ -1436,4 +1436,119 @@ mod tests {
         assert_eq!(potential_multiplier(&market, 2), 0);
         assert_eq!(potential_multiplier(&market, 255), 0);
     }
+
+    // ============ Batch 4: Additional Edge Case & Coverage Tests ============
+
+    #[test]
+    fn test_resolve_at_exact_resolution_block() {
+        // Resolving at exactly the resolution block should succeed
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = resolve_market(&market, PRECISION / 2, 1000);
+        assert!(result.is_ok(), "Resolving at exact resolution block should succeed");
+        assert_eq!(result.unwrap().status, MARKET_RESOLVED);
+    }
+
+    #[test]
+    fn test_value_to_tier_1_tier() {
+        // Edge case: 1 tier (below MIN_TIERS, but value_to_tier handles it)
+        assert_eq!(value_to_tier(0, 1), 0);
+        assert_eq!(value_to_tier(PRECISION / 2, 1), 0);
+        assert_eq!(value_to_tier(PRECISION, 1), 0);
+    }
+
+    #[test]
+    fn test_scalar_resolved_at_last_tier() {
+        // Scalar mode with resolution at the last tier — distance increases from right
+        let bets = [
+            (0, 5 * MINIMUM_BET_AMOUNT),
+            (1, 5 * MINIMUM_BET_AMOUNT),
+            (2, 5 * MINIMUM_BET_AMOUNT),
+        ];
+        let mut market = market_with_bets(3, SETTLEMENT_SCALAR, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 2; // last tier
+
+        let pos0 = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let pos2 = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x33; 32],
+            tier_index: 2,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+
+        let (g0, _, _) = calculate_payout(&market, &pos0).unwrap();
+        let (g2, _, _) = calculate_payout(&market, &pos2).unwrap();
+
+        assert!(g2 > g0, "Resolved tier should get more than distant tier");
+        assert!(g0 > 0, "All tiers should get something in scalar mode");
+    }
+
+    #[test]
+    fn test_settle_already_settled_fails() {
+        // Cannot settle a market that's already settled
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_SETTLED;
+        market.dispute_end_block = 2200;
+        let result = settle_market(&market, 3000);
+        assert!(result.is_err(), "Re-settling should fail");
+    }
+
+    #[test]
+    fn test_wta_payout_fee_deducted_correctly() {
+        // Verify net = gross - fee and fee = gross * fee_rate / 10000
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT), (1, 5 * MINIMUM_BET_AMOUNT)];
+        let mut market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+
+        let (gross, fee, net) = calculate_payout(&market, &pos).unwrap();
+        let expected_fee = mul_div(gross, market.fee_rate_bps as u128, BPS_DENOMINATOR);
+        assert_eq!(fee, expected_fee);
+        assert_eq!(net, gross - fee);
+        assert!(net < gross);
+    }
+
+    #[test]
+    fn test_market_depth_empty_market() {
+        // Empty market (no bets) should have 0 depth and 0 imbalance
+        let market = test_market(3, SETTLEMENT_WINNER_TAKES_ALL);
+        let (min_pool, max_pool, imbalance) = market_depth(&market);
+        assert_eq!(min_pool, 0);
+        assert_eq!(max_pool, 0);
+        assert_eq!(imbalance, 0);
+    }
+
+    #[test]
+    fn test_place_bet_exactly_before_resolution() {
+        // Betting at resolution_block - 1 should succeed
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 999);
+        assert!(result.is_ok(), "Betting one block before resolution should succeed");
+    }
+
+    #[test]
+    fn test_market_id_is_32_bytes() {
+        // Market ID should always be exactly 32 bytes (SHA-256)
+        let id = derive_market_id(&[0x00; 32], &[0xFF; 32], 0);
+        assert_eq!(id.len(), 32);
+        // And with different inputs
+        let id2 = derive_market_id(&[0xFF; 32], &[0x00; 32], u64::MAX);
+        assert_eq!(id2.len(), 32);
+        assert_ne!(id, id2);
+    }
 }

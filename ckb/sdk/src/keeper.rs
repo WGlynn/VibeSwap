@@ -1539,4 +1539,150 @@ mod tests {
         assert!(matches!(results[0].0.action, KeeperAction::InsuranceClaim { .. }),
             "Insurance should be propagated to batch assessment");
     }
+
+    // ============ Batch 4: Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_assess_vault_debt_value_scales_with_debt_price() {
+        // debt_value should scale linearly with debt_price
+        let vault = test_vault(10_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let r1 = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let r2 = assess_vault(&vault, &pool, None, 2000 * PRECISION, 3 * PRECISION);
+
+        assert_eq!(r2.debt_value, r1.debt_value * 3,
+            "Debt value should triple when debt price triples");
+    }
+
+    #[test]
+    fn test_assess_vault_no_debt_has_correct_collateral_value() {
+        // Even with no debt, collateral_value should be computed correctly
+        let vault = test_vault(0, 25 * PRECISION);
+        let pool = test_lending_pool();
+        let col_price = 3000 * PRECISION;
+
+        let result = assess_vault(&vault, &pool, None, col_price, PRECISION);
+
+        let expected_col = ckb_lending_math::mul_div(25 * PRECISION, col_price, PRECISION);
+        assert_eq!(result.collateral_value, expected_col);
+        assert_eq!(result.debt_value, 0);
+        assert_eq!(result.current_debt, 0);
+    }
+
+    #[test]
+    fn test_stress_test_small_price_drop() {
+        // 1% price drop should not affect a very healthy vault
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(2_000 * PRECISION, 10 * PRECISION), test_cell_input(1)),
+        ];
+        // HF = (10*2000*0.8)/2000 = 8.0 → extremely safe
+        let at_risk = stress_test_vaults(
+            &vaults, &pool,
+            2000 * PRECISION, PRECISION,
+            100, // 1% drop
+        );
+        assert!(at_risk.is_empty(),
+            "1% drop should not threaten a vault with HF=8.0");
+    }
+
+    #[test]
+    fn test_batch_assess_two_identical_vaults_same_hf() {
+        // Two vaults with identical parameters should have the same health factor
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(6_000 * PRECISION, 10 * PRECISION), test_cell_input(1)),
+            (test_vault(6_000 * PRECISION, 10 * PRECISION), test_cell_input(2)),
+        ];
+        let results = assess_vaults(&vaults, &pool, None, 1500 * PRECISION, PRECISION);
+        assert_eq!(results[0].0.health_factor, results[1].0.health_factor,
+            "Identical vaults should have identical health factors");
+    }
+
+    #[test]
+    fn test_premium_accrual_proportional_to_premium_rate() {
+        // Higher premium rate should produce proportionally higher premium
+        let ins_low = InsurancePoolCellData {
+            premium_rate_bps: 50, // 0.5%
+            ..test_insurance_pool()
+        };
+        let ins_high = InsurancePoolCellData {
+            premium_rate_bps: 200, // 2%
+            ..test_insurance_pool()
+        };
+        let pool = test_lending_pool();
+
+        let prem_low = check_premium_accrual(&ins_low, &pool, 200_000, 10_000);
+        let prem_high = check_premium_accrual(&ins_high, &pool, 200_000, 10_000);
+
+        assert!(prem_high > prem_low,
+            "Higher premium rate should produce higher premium: low={}, high={}", prem_low, prem_high);
+        // Should be roughly 4x (200/50)
+        let ratio = prem_high / prem_low.max(1);
+        assert!(ratio >= 3 && ratio <= 5,
+            "Premium ratio should be ~4x for 4x rate: got {}x", ratio);
+    }
+
+    #[test]
+    fn test_hard_liquidation_max_repay_bounded_by_debt() {
+        // max_repay should never exceed the vault's total current_debt
+        let vault = test_vault(20_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 500 * PRECISION, PRECISION);
+        assert_eq!(result.risk_tier, RiskTier::HardLiquidation);
+
+        if let KeeperAction::HardLiquidate { max_repay, .. } = result.action {
+            assert!(max_repay <= result.current_debt,
+                "max_repay ({}) should not exceed current_debt ({})", max_repay, result.current_debt);
+        } else {
+            panic!("Expected HardLiquidate action");
+        }
+    }
+
+    #[test]
+    fn test_assess_safe_vault_action_contains_hf() {
+        // Safe action should contain the correct health_factor
+        let vault = test_vault(3_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        assert_eq!(result.risk_tier, RiskTier::Safe);
+
+        if let KeeperAction::Safe { health_factor } = result.action {
+            assert_eq!(health_factor, result.health_factor,
+                "Safe action HF should match assessment HF");
+        } else {
+            panic!("Expected Safe action");
+        }
+    }
+
+    #[test]
+    fn test_stress_test_50_percent_drop_most_distressed_first() {
+        // With a 50% price drop, verify sorting puts the most distressed first
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (test_vault(6_000 * PRECISION, 10 * PRECISION), test_cell_input(1)),   // HF moderate
+            (test_vault(14_000 * PRECISION, 10 * PRECISION), test_cell_input(2)),  // HF low
+            (test_vault(9_000 * PRECISION, 10 * PRECISION), test_cell_input(3)),   // HF in between
+        ];
+
+        let at_risk = stress_test_vaults(
+            &vaults, &pool,
+            1500 * PRECISION, PRECISION,
+            5000, // 50% drop
+        );
+
+        // Should be sorted by stressed HF ascending
+        for i in 1..at_risk.len() {
+            assert!(at_risk[i].1 >= at_risk[i - 1].1,
+                "Stress results must be sorted ascending by stressed HF");
+        }
+        // Most at-risk should be index 1 (highest debt)
+        if !at_risk.is_empty() {
+            assert_eq!(at_risk[0].0, 1,
+                "Vault with highest debt should be most at-risk under 50% drop");
+        }
+    }
 }

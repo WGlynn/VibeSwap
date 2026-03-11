@@ -1223,4 +1223,92 @@ mod tests {
         let available = available_lp_to_burn(&pool);
         assert_eq!(available, u128::MAX / 2 - MINIMUM_LIQUIDITY);
     }
+
+    // ============ Batch 4: Additional Edge Case & Coverage Tests ============
+
+    #[test]
+    fn test_position_value_with_different_prices() {
+        // Token0 at $2 and Token1 at $0.50 — verify total_value computed correctly
+        let pool = balanced_pool();
+        let lp_amount = pool.total_lp_supply / 10; // 10%
+        let val = position_value(lp_amount, &pool, 2 * PRECISION, PRECISION / 2).unwrap();
+
+        let expected_amount0 = pool.reserve0 / 10;
+        let expected_amount1 = pool.reserve1 / 10;
+        assert_eq!(val.amount0, expected_amount0);
+        assert_eq!(val.amount1, expected_amount1);
+
+        let value0 = vibeswap_math::mul_div(expected_amount0, 2 * PRECISION, PRECISION);
+        let value1 = vibeswap_math::mul_div(expected_amount1, PRECISION / 2, PRECISION);
+        assert_eq!(val.total_value, value0 + value1);
+    }
+
+    #[test]
+    fn test_il_4x_price_increase() {
+        // Price quadruples: IL should be ~20%
+        let il = impermanent_loss(PRECISION, 4 * PRECISION, 100_000 * PRECISION).unwrap();
+        // IL for 4x: 1 - 2*sqrt(4)/(1+4) = 1 - 4/5 = 20% = 2000 bps
+        assert!(il.il_bps > 1800, "IL for 4x should be ~20%: got {}", il.il_bps);
+        assert!(il.il_bps < 2200, "IL for 4x should be ~20%: got {}", il.il_bps);
+    }
+
+    #[test]
+    fn test_withdrawal_one_unit_lp() {
+        // Withdrawing exactly 1 LP unit from a large pool
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(1, &pool).unwrap();
+        // Should get proportional (tiny) amounts
+        let expected0 = vibeswap_math::mul_div(1, pool.reserve0, pool.total_lp_supply);
+        let expected1 = vibeswap_math::mul_div(1, pool.reserve1, pool.total_lp_supply);
+        assert_eq!(est.amount0, expected0);
+        assert_eq!(est.amount1, expected1);
+        assert!(!est.below_minimum);
+    }
+
+    #[test]
+    fn test_optimal_deposit_initial_zero_token0() {
+        // Initial deposit with zero token0 on empty pool should fail
+        let empty = make_pool(0, 0, 0, 30);
+        let err = optimal_deposit(0, 1_000_000 * PRECISION, &empty).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_zap_in_half_split_amount() {
+        // Verify the swap_amount is exactly half and deposit_amount_in is the remainder
+        let pool = balanced_pool();
+        let amount = 1_000 * PRECISION;
+        let zap = zap_in_estimate(amount, true, &pool).unwrap();
+        assert_eq!(zap.swap_amount, amount / 2);
+        assert_eq!(zap.deposit_amount_in, amount - amount / 2);
+        assert_eq!(zap.swap_amount + zap.deposit_amount_in, amount);
+    }
+
+    #[test]
+    fn test_pool_analytics_spot_price_imbalanced() {
+        // Spot price in analytics should match the standalone spot_price function
+        let pool = imbalanced_pool();
+        let analytics = pool_analytics(
+            &pool, PRECISION, PRECISION, 0, 1000,
+        ).unwrap();
+        let standalone_price = spot_price(&pool).unwrap();
+        assert_eq!(analytics.spot_price, standalone_price);
+    }
+
+    #[test]
+    fn test_k_invariant_zero_reserves() {
+        // Pool with zero reserves should have k = 0
+        let pool = make_pool(0, 0, 0, 30);
+        let (hi, lo) = k_invariant(&pool);
+        assert_eq!(hi, 0);
+        assert_eq!(lo, 0);
+    }
+
+    #[test]
+    fn test_spot_price_one_sided_zero_reserve1() {
+        // reserve1 = 0, reserve0 > 0 → spot price = 0
+        let pool = make_pool(1000 * PRECISION, 0, 1000, 30);
+        let price = spot_price(&pool).unwrap();
+        assert_eq!(price, 0, "Zero reserve1 should give spot price of 0");
+    }
 }

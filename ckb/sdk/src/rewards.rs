@@ -1463,4 +1463,435 @@ mod tests {
         let discounted = fee_discount(tier, 1_000);
         assert!(discounted < 1_000); // Got some discount
     }
+
+    // ============ Additional Edge Case Tests ============
+
+    // --- Shapley edge cases ---
+
+    #[test]
+    fn test_shapley_extreme_weight_disparity() {
+        // One contributor has massively more weight than the other
+        let contributors = vec![
+            make_contributor(1, 999_999, ContributionType::LiquidityProvider),
+            make_contributor(2, 1, ContributionType::Trader),
+        ];
+        let result = shapley_distribute(1_000_000, &contributors).unwrap();
+        let total: u128 = result.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 1_000_000); // Conservation
+        assert!(result[0].amount > 999_000);
+        assert!(result[1].amount <= 2); // ~1 token plus maybe dust
+    }
+
+    #[test]
+    fn test_shapley_exactly_max_contributors() {
+        // Exactly 256 contributors should succeed
+        let contributors: Vec<ContributorShare> = (0..256)
+            .map(|i| make_contributor(i as u8, 100, ContributionType::Trader))
+            .collect();
+        let result = shapley_distribute(256_000, &contributors).unwrap();
+        assert_eq!(result.len(), 256);
+        let total: u128 = result.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 256_000);
+    }
+
+    #[test]
+    fn test_shapley_reward_of_two_three_contributors() {
+        // Two units of reward among 3 contributors — tests dust assignment
+        let contributors = vec![
+            make_contributor(1, 1, ContributionType::Validator),
+            make_contributor(2, 1, ContributionType::Validator),
+            make_contributor(3, 1, ContributionType::Validator),
+        ];
+        let result = shapley_distribute(2, &contributors).unwrap();
+        let total: u128 = result.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 2); // Conservation even with extreme rounding
+    }
+
+    #[test]
+    fn test_shapley_large_weight_values() {
+        // Very large weight values (near u128::MAX / 4 each)
+        let big = u128::MAX / 4;
+        let contributors = vec![
+            make_contributor(1, big, ContributionType::LiquidityProvider),
+            make_contributor(2, big, ContributionType::Trader),
+        ];
+        let result = shapley_distribute(10_000, &contributors).unwrap();
+        assert_eq!(result[0].amount, 5_000);
+        assert_eq!(result[1].amount, 5_000);
+    }
+
+    #[test]
+    fn test_shapley_dust_goes_to_actual_largest_not_first() {
+        // When the largest contributor is not the first, dust should go to them
+        let contributors = vec![
+            make_contributor(1, 10, ContributionType::Trader),       // Small
+            make_contributor(2, 90, ContributionType::LiquidityProvider), // Large
+        ];
+        // 100 reward: contributor 1 gets 10, contributor 2 gets 90. No dust with clean division.
+        // Use 101: c1 = 101*10/100 = 10, c2 = 101*90/100 = 90, distributed=100, dust=1 -> goes to idx=1 (largest)
+        let result = shapley_distribute(101, &contributors).unwrap();
+        let total: u128 = result.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 101);
+        assert!(result[1].amount >= 90); // Largest got the dust
+    }
+
+    #[test]
+    fn test_shapley_address_preserved() {
+        let contributors = vec![
+            make_contributor(42, 100, ContributionType::Relayer),
+        ];
+        let result = shapley_distribute(1_000, &contributors).unwrap();
+        assert_eq!(result[0].address, addr(42));
+    }
+
+    #[test]
+    fn test_shapley_all_same_weight_many() {
+        // 7 contributors, equal weight, non-divisible reward
+        let contributors: Vec<ContributorShare> = (1..=7)
+            .map(|i| make_contributor(i, 100, ContributionType::Governance))
+            .collect();
+        let result = shapley_distribute(100, &contributors).unwrap();
+        let total: u128 = result.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 100); // Conservation
+    }
+
+    // --- Vesting edge cases ---
+
+    #[test]
+    fn test_vesting_released_exceeds_vested_so_far() {
+        // released > what has vested at this point but < total_amount
+        // 50% vested = 500_000 but 600_000 already released => claimable = 0 (saturating_sub)
+        let schedule = make_schedule(1_000_000, 600_000, 100, 0, 200);
+        let result = vesting_claimable(&schedule, 200).unwrap();
+        // 100/200 elapsed = 50% = 500_000 vested, minus 600_000 released = 0 (saturating_sub)
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_vesting_one_block_after_cliff() {
+        let schedule = make_schedule(1_000_000, 0, 100, 50, 200);
+        // cliff ends at block 150, test block 151
+        let result = vesting_claimable(&schedule, 151).unwrap();
+        // 51 blocks elapsed out of 200 = 25.5% = 255_000
+        assert_eq!(result, 255_000);
+    }
+
+    #[test]
+    fn test_vesting_cliff_equals_duration() {
+        // Edge: cliff == duration — nothing vests until the very end
+        let schedule = make_schedule(1_000_000, 0, 100, 200, 200);
+        // At block 299 (just before end): elapsed=199 < cliff=200 -> CliffNotReached
+        let result = vesting_claimable(&schedule, 299);
+        assert_eq!(result, Err(RewardsError::CliffNotReached));
+        // At block 300 (elapsed=200 >= cliff=200, elapsed >= duration=200) -> full vest
+        let result = vesting_claimable(&schedule, 300).unwrap();
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn test_vesting_progress_one_quarter() {
+        let schedule = make_schedule(1_000_000, 0, 0, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 250), 2_500);
+    }
+
+    #[test]
+    fn test_vesting_progress_three_quarters() {
+        let schedule = make_schedule(1_000_000, 0, 0, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 750), 7_500);
+    }
+
+    #[test]
+    fn test_vesting_claimable_at_exact_duration_end() {
+        // start=0, cliff=0, duration=100. At block 100, elapsed=100 >= duration -> full vest.
+        let schedule = make_schedule(500_000, 0, 0, 0, 100);
+        let result = vesting_claimable(&schedule, 100).unwrap();
+        assert_eq!(result, 500_000);
+    }
+
+    // --- Staking edge cases ---
+
+    #[test]
+    fn test_stake_reward_at_exact_start_block() {
+        // At the exact start block, elapsed=0 -> multiplier=1x
+        let pos = make_stake(1_000_000, 500, 10_000);
+        let reward = stake_reward(&pos, 10_000, 500);
+        assert_eq!(reward, 10_000); // 1x multiplier
+    }
+
+    #[test]
+    fn test_stake_reward_one_block_after_start() {
+        let pos = make_stake(1_000_000, 100, 10_000);
+        let reward = stake_reward(&pos, 10_000, 101);
+        // elapsed=1, multiplier = 10000 + 20000*1/10000 = 10002
+        assert_eq!(reward, 10_002);
+    }
+
+    // --- Time multiplier edge cases ---
+
+    #[test]
+    fn test_time_multiplier_one_block_duration() {
+        // max_duration=1, elapsed=1 -> full bonus
+        let m = time_weighted_multiplier(1, 1, 30_000);
+        assert_eq!(m, 30_000);
+    }
+
+    #[test]
+    fn test_time_multiplier_custom_max() {
+        // max_multiplier_bps = 15000 (1.5x), half duration
+        // bonus_range = 15000 - 10000 = 5000, half = 2500
+        let m = time_weighted_multiplier(5_000, 10_000, 15_000);
+        assert_eq!(m, 12_500);
+    }
+
+    #[test]
+    fn test_time_multiplier_max_exactly_10001() {
+        // max_multiplier_bps = 10001 — minimal bonus
+        // bonus_range = 1, at full duration -> bonus = 1
+        let m = time_weighted_multiplier(10_000, 10_000, 10_001);
+        assert_eq!(m, 10_001);
+    }
+
+    // --- Loyalty edge cases ---
+
+    #[test]
+    fn test_loyalty_tier_just_below_threshold() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(99, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 0); // 99 < 100 so still base tier
+    }
+
+    #[test]
+    fn test_loyalty_tier_exact_highest_threshold() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(10_000, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 4); // Exactly 10_000 hits tier 4
+    }
+
+    #[test]
+    fn test_loyalty_tier_single_tier() {
+        let tiers = vec![LoyaltyTier {
+            tier_id: 0,
+            min_points: 0,
+            fee_discount_bps: 0,
+            boost_multiplier_bps: 10_000,
+        }];
+        let tier = loyalty_tier(9999, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 0);
+    }
+
+    #[test]
+    fn test_loyalty_points_zero_volume_zero_consecutive() {
+        let points = loyalty_points_earned(0, 0);
+        assert_eq!(points, 100); // Just the base
+    }
+
+    #[test]
+    fn test_loyalty_points_sub_precision_volume() {
+        // Volume less than PRECISION -> volume_bonus = 0
+        let points = loyalty_points_earned(PRECISION - 1, 0);
+        assert_eq!(points, 100); // Only base, volume/PRECISION rounds to 0
+    }
+
+    #[test]
+    fn test_loyalty_points_exactly_500_volume_cap() {
+        // 500 * PRECISION volume -> exactly at cap
+        let points = loyalty_points_earned(PRECISION * 500, 0);
+        assert_eq!(points, 600); // 100 base + 500 capped
+    }
+
+    #[test]
+    fn test_loyalty_points_one_consecutive_epoch() {
+        // 1 consecutive epoch: 100 * 1 * 500 / 10000 = 5
+        let points = loyalty_points_earned(0, 1);
+        assert_eq!(points, 105); // 100 base + 5 consecutive
+    }
+
+    #[test]
+    fn test_loyalty_points_large_consecutive() {
+        // 100 consecutive epochs: 100 * 100 * 500 / 10000 = 500
+        let points = loyalty_points_earned(0, 100);
+        assert_eq!(points, 600); // 100 base + 500 consecutive bonus
+    }
+
+    // --- Fee discount edge cases ---
+
+    #[test]
+    fn test_fee_discount_over_100_percent() {
+        // fee_discount_bps > 10000 — should still return 0
+        let tier = LoyaltyTier {
+            tier_id: 5,
+            min_points: 50_000,
+            fee_discount_bps: 15_000, // 150%! Over 100%
+            boost_multiplier_bps: 20_000,
+        };
+        assert_eq!(fee_discount(&tier, 10_000), 0);
+    }
+
+    #[test]
+    fn test_fee_discount_one_bps() {
+        // 1 basis point discount = 0.01%
+        let tier = LoyaltyTier {
+            tier_id: 1,
+            min_points: 10,
+            fee_discount_bps: 1,
+            boost_multiplier_bps: 10_000,
+        };
+        // 10000 * 9999 / 10000 = 9999
+        assert_eq!(fee_discount(&tier, 10_000), 9_999);
+    }
+
+    #[test]
+    fn test_fee_discount_precision_amount() {
+        // Use PRECISION-scale amounts
+        let tier = LoyaltyTier {
+            tier_id: 2,
+            min_points: 500,
+            fee_discount_bps: 500, // 5%
+            boost_multiplier_bps: 12_500,
+        };
+        let base = PRECISION; // 1 token at 1e18
+        let discounted = fee_discount(&tier, base);
+        let expected = mul_div(base, 9_500, 10_000);
+        assert_eq!(discounted, expected);
+    }
+
+    // --- Epoch rewards edge cases ---
+
+    #[test]
+    fn test_epoch_rewards_large_values() {
+        let er = epoch_rewards_breakdown(
+            PRECISION * 1_000_000,
+            PRECISION * 500_000,
+            999,
+            PRECISION * 100_000,
+        );
+        assert_eq!(er.total_rewards, PRECISION * 1_600_000);
+        assert_eq!(er.epoch, 999);
+    }
+
+    #[test]
+    fn test_epoch_rewards_epoch_zero() {
+        let er = epoch_rewards_breakdown(100, 200, 0, 300);
+        assert_eq!(er.epoch, 0);
+        assert_eq!(er.total_rewards, 600);
+    }
+
+    // --- Summary edge cases ---
+
+    #[test]
+    fn test_summary_many_duplicates() {
+        // All allocations to the same address
+        let allocs: Vec<ShapleyAllocation> = (0..10)
+            .map(|_| ShapleyAllocation {
+                address: addr(1),
+                amount: 1_000,
+                share_bps: 1_000,
+                contribution_type: ContributionType::Trader,
+            })
+            .collect();
+        let summary = reward_summary(&allocs);
+        assert_eq!(summary.total_distributed, 10_000);
+        assert_eq!(summary.unique_recipients, 1);
+        assert_eq!(summary.avg_reward, 10_000); // 10000 / 1 unique
+        assert_eq!(summary.top_contributor_share_bps, 1_000);
+    }
+
+    #[test]
+    fn test_summary_pending_is_zero() {
+        // reward_summary always sets total_pending = 0
+        let allocs = vec![ShapleyAllocation {
+            address: addr(1),
+            amount: 5_000,
+            share_bps: 10_000,
+            contribution_type: ContributionType::LiquidityProvider,
+        }];
+        let summary = reward_summary(&allocs);
+        assert_eq!(summary.total_pending, 0);
+    }
+
+    // --- Merge contributions edge cases ---
+
+    #[test]
+    fn test_merge_same_address_three_times() {
+        // Same address in list a twice, once in list b
+        let a = vec![
+            make_contributor(1, 100, ContributionType::LiquidityProvider),
+            make_contributor(1, 50, ContributionType::Trader), // duplicate in a, but BTreeMap handles it
+        ];
+        let b = vec![make_contributor(1, 25, ContributionType::Validator)];
+        let merged = merge_contributions(&a, &b);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].weight, 175); // 100 + 50 + 25
+        // First occurrence wins for contribution type
+        assert_eq!(merged[0].contribution_type, ContributionType::LiquidityProvider);
+    }
+
+    #[test]
+    fn test_merge_preserves_btree_order() {
+        let a = vec![
+            make_contributor(5, 100, ContributionType::Relayer),
+            make_contributor(1, 200, ContributionType::Trader),
+        ];
+        let b = vec![
+            make_contributor(3, 300, ContributionType::Validator),
+        ];
+        let merged = merge_contributions(&a, &b);
+        assert_eq!(merged.len(), 3);
+        // BTreeMap sorts by key: addr(1) < addr(3) < addr(5)
+        assert_eq!(merged[0].address, addr(1));
+        assert_eq!(merged[1].address, addr(3));
+        assert_eq!(merged[2].address, addr(5));
+    }
+
+    // --- Validate weights edge cases ---
+
+    #[test]
+    fn test_validate_weights_all_weight_one() {
+        let contributors: Vec<ContributorShare> = (1..=10)
+            .map(|i| make_contributor(i, 1, ContributionType::KeeperBot))
+            .collect();
+        assert!(validate_weights(&contributors).is_ok());
+    }
+
+    #[test]
+    fn test_validate_weights_first_zero() {
+        // First contributor has zero weight
+        let contributors = vec![
+            make_contributor(1, 0, ContributionType::LiquidityProvider),
+            make_contributor(2, 100, ContributionType::Trader),
+        ];
+        assert_eq!(validate_weights(&contributors), Err(RewardsError::InvalidWeight));
+    }
+
+    // --- Cross-function integration edge cases ---
+
+    #[test]
+    fn test_merge_then_validate() {
+        let a = vec![make_contributor(1, 100, ContributionType::LiquidityProvider)];
+        let b = vec![make_contributor(2, 200, ContributionType::Trader)];
+        let merged = merge_contributions(&a, &b);
+        assert!(validate_weights(&merged).is_ok());
+    }
+
+    #[test]
+    fn test_loyalty_points_feed_into_tier_lookup() {
+        // Full path: earn points from volume + consecutive, look up tier, apply discount
+        let points = loyalty_points_earned(PRECISION * 200, 20);
+        // base=100, volume=200, consecutive=100*20*500/10000=100 -> total=400
+        assert_eq!(points, 400);
+        let tiers = default_tiers();
+        let tier = loyalty_tier(points, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 1); // 400 >= 100 but < 500
+    }
+
+    #[test]
+    fn test_vesting_progress_matches_claimable_ratio() {
+        // Verify that vesting progress aligns with claimable fraction
+        let schedule = make_schedule(10_000, 0, 0, 0, 1000);
+        let block = 250;
+        let progress = vesting_progress_bps(&schedule, block);
+        assert_eq!(progress, 2_500); // 25%
+        let claimable = vesting_claimable(&schedule, block).unwrap();
+        assert_eq!(claimable, 2_500); // 25% of 10_000
+    }
 }

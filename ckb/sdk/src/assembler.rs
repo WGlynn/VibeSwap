@@ -247,7 +247,7 @@ struct LockGroup {
 
 /// Group transaction inputs by their lock script hash
 #[allow(dead_code)]
-fn group_inputs_by_lock(inputs: &[CellInput], outputs: &[CellOutput], unsigned: &UnsignedTransaction) -> Vec<LockGroup> {
+fn group_inputs_by_lock(inputs: &[CellInput], outputs: &[CellOutput], _unsigned: &UnsignedTransaction) -> Vec<LockGroup> {
     // We need the lock script for each input, but CellInput only has outpoint.
     // In a real implementation, we'd query the chain for input cells.
     // For our SDK, inputs correspond 1:1 to the outputs in the builder pattern.

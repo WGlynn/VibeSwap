@@ -4,6 +4,7 @@
 
 pub mod assembler;
 pub mod collector;
+pub mod consensus;
 pub mod governance;
 pub mod keeper;
 pub mod knowledge;

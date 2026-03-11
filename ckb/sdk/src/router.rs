@@ -1243,4 +1243,118 @@ mod tests {
         assert_eq!(g.pool_count(), 2);
         assert_eq!(g.token_count(), 3);
     }
+
+    // ============ Additional Edge Case & Hardening Tests ============
+
+    #[test]
+    fn test_find_all_routes_same_token_error() {
+        let g = graph_two_pools();
+        assert_eq!(
+            g.find_all_routes(&token(1), &token(1), 4),
+            Err(RouterError::SameToken)
+        );
+    }
+
+    #[test]
+    fn test_find_all_routes_empty_graph_error() {
+        let g = PoolGraph::new();
+        assert_eq!(
+            g.find_all_routes(&token(1), &token(2), 4),
+            Err(RouterError::EmptyGraph)
+        );
+    }
+
+    #[test]
+    fn test_split_route_zero_input() {
+        let g = graph_two_pools();
+        let result = g.find_split_route(&token(1), &token(2), 0);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), RouterError::ZeroInput);
+    }
+
+    #[test]
+    fn test_split_route_no_route() {
+        let mut g = PoolGraph::new();
+        g.add_pool(pool(1, 2, 1_000_000e18 as u128, 1_000_000e18 as u128));
+        g.add_pool(pool(3, 4, 1_000_000e18 as u128, 1_000_000e18 as u128));
+        // token(1) and token(4) are disconnected
+        let result = g.find_split_route(&token(1), &token(4), 1_000e18 as u128);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), RouterError::NoRouteFound);
+    }
+
+    #[test]
+    fn test_spot_price_reverse_token() {
+        // Spot price queried with token1 as input should give inverse
+        let p = pool(1, 2, 1_000_000e18 as u128, 2_000_000e18 as u128);
+        let price_t1_in = PoolGraph::spot_price(&p, &token(1));  // = 2e18
+        let price_t2_in = PoolGraph::spot_price(&p, &token(2));  // = 0.5e18
+
+        assert_eq!(price_t1_in, 2 * vibeswap_math::PRECISION);
+        assert_eq!(price_t2_in, vibeswap_math::PRECISION / 2);
+    }
+
+    #[test]
+    fn test_effective_price_empty_hops() {
+        let g = graph_two_pools();
+        // Empty hops, amount_in = 1000 → output = 1000 (passthrough)
+        // effective_price = output * PRECISION / input = 1000 * P / 1000 = P
+        let price = g.effective_price(&[], 1000);
+        assert_eq!(price, Some(vibeswap_math::PRECISION));
+    }
+
+    #[test]
+    fn test_required_input_empty_hops() {
+        let g = graph_two_pools();
+        // Empty hops returns None (guard clause at start of required_input)
+        let result = g.required_input(&[], 500);
+        assert!(result.is_none(), "Empty hops should return None");
+    }
+
+    #[test]
+    fn test_slippage_saturating_sub() {
+        // Very large slippage on small amount should saturate to 0, not underflow
+        let min = PoolGraph::min_output_with_slippage(100, 10_000);
+        assert_eq!(min, 0, "100% slippage on 100 should give 0");
+
+        let min2 = PoolGraph::min_output_with_slippage(50, 9999);
+        // 50 * 9999 / 10000 = 49, so 50 - 49 = 1
+        assert_eq!(min2, 1);
+    }
+
+    #[test]
+    fn test_find_best_route_returns_highest_output() {
+        // With triangle graph, best route should have the highest expected_output
+        let g = graph_triangle();
+        let amount = 500e18 as u128;
+        let best = g.find_best_route(&token(1), &token(3), amount).unwrap();
+
+        // Get all routes and simulate each
+        let all_routes = g.find_all_routes(&token(1), &token(3), MAX_HOPS).unwrap();
+        for route_hops in &all_routes {
+            if let Some(output) = g.simulate_route(route_hops, amount) {
+                assert!(best.expected_output >= output,
+                    "Best route output ({}) should be >= all alternatives ({})",
+                    best.expected_output, output);
+            }
+        }
+    }
+
+    #[test]
+    fn test_price_impact_increases_with_trade_size() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+
+        let impact_small = g.estimate_price_impact(&hops, 1_000e18 as u128);
+        let impact_large = g.estimate_price_impact(&hops, 100_000e18 as u128);
+
+        assert!(impact_large > impact_small,
+            "Larger trade should have more price impact: small={}, large={}",
+            impact_small, impact_large);
+    }
 }

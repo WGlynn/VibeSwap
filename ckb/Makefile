@@ -3,7 +3,7 @@
 #
 # Usage:
 #   make build        — Build all 12 scripts for CKB-VM (RISC-V)
-#   make test         — Run all native tests (715 tests)
+#   make test         — Run all native tests (716 tests)
 #   make clean        — Clean build artifacts
 #   make <script>     — Build a single script (e.g., make pow-lock)
 #   make size         — Show binary sizes

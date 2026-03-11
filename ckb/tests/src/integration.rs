@@ -1928,3 +1928,217 @@ fn test_config_parameter_update() {
         "Unauthorized config update must fail"
     );
 }
+
+// ============ Protocol Symphony Test ============
+// Exercises the ENTIRE lending protocol stack in a single test:
+// Oracle → Lending → Insurance → Keeper → Risk → Governance
+
+#[test]
+fn test_protocol_symphony_full_stack() {
+    use ckb_lending_math::{
+        interest::RateModel, collateral, pool, shares, insurance, prevention,
+    };
+    use lending_pool_type::{verify_creation, verify_update};
+    use vault_type::verify_creation as verify_vault_creation;
+    use vibeswap_sdk::{oracle, keeper, risk, governance};
+
+    let sdk = VibeSwapSDK::new(DeploymentInfo {
+        pow_lock_code_hash: [0x01; 32],
+        batch_auction_type_code_hash: [0x02; 32],
+        commit_type_code_hash: [0x03; 32],
+        amm_pool_type_code_hash: [0x04; 32],
+        lp_position_type_code_hash: [0x05; 32],
+        compliance_type_code_hash: [0x06; 32],
+        config_type_code_hash: [0x07; 32],
+        oracle_type_code_hash: [0x08; 32],
+        knowledge_type_code_hash: [0x09; 32],
+        lending_pool_type_code_hash: [0x0A; 32],
+        vault_type_code_hash: [0x0B; 32],
+        insurance_pool_type_code_hash: [0x0C; 32],
+        script_dep_tx_hash: [0x10; 32],
+        script_dep_index: 0,
+    });
+
+    let eth_pair = {
+        let mut id = [0u8; 32];
+        id[0..4].copy_from_slice(b"ETH\0");
+        id
+    };
+
+    // ====== ACT 1: Oracle — Fresh prices from 3 sources ======
+
+    let eth_oracles = vec![
+        OracleCellData {
+            price: 3000 * PRECISION, block_number: 95,
+            confidence: 90, source_hash: [0xA1; 32], pair_id: eth_pair,
+        },
+        OracleCellData {
+            price: 3005 * PRECISION, block_number: 96,
+            confidence: 85, source_hash: [0xA2; 32], pair_id: eth_pair,
+        },
+        OracleCellData {
+            price: 2998 * PRECISION, block_number: 97,
+            confidence: 88, source_hash: [0xA3; 32], pair_id: eth_pair,
+        },
+    ];
+
+    let eth_price = oracle::aggregate_prices(&eth_oracles, &eth_pair, 100).unwrap();
+    assert_eq!(eth_price, 3000 * PRECISION); // Median of 2998, 3000, 3005
+
+    // ====== ACT 2: Lending — Alice creates pool, Bob borrows ======
+
+    // Alice creates lending pool with 1M USDC
+    let alice_lock = Script {
+        code_hash: [0xA1; 32], hash_type: HashType::Type, args: vec![0xA1; 20],
+    };
+    let create_tx = sdk.create_lending_pool(
+        [0xBB; 32], [0xAA; 32], 1_000_000 * PRECISION,
+        alice_lock.clone(),
+        CellInput { tx_hash: [0x01; 32], index: 0, since: 0 },
+        100,
+    );
+    let pool = LendingPoolCellData::deserialize(&create_tx.outputs[0].data).unwrap();
+    assert!(verify_creation(&pool).is_ok());
+    assert_eq!(pool.total_deposits, 1_000_000 * PRECISION);
+
+    // Bob opens vault with 50 ETH
+    let bob_lock = Script {
+        code_hash: [0xB0; 32], hash_type: HashType::Type, args: vec![0xB0; 20],
+    };
+    let vault_tx = sdk.open_vault(
+        [0xBB; 32], 50 * PRECISION, [0xCC; 32],
+        bob_lock.clone(),
+        CellInput { tx_hash: [0x02; 32], index: 0, since: 0 },
+        101,
+    );
+    let bob_vault = VaultCellData::deserialize(&vault_tx.outputs[0].data).unwrap();
+    assert!(verify_vault_creation(&bob_vault).is_ok());
+
+    // Bob borrows 50K USDC using oracle price
+    let borrow_tx = sdk.borrow_from_lending_pool(
+        CellInput { tx_hash: [0x03; 32], index: 0, since: 0 }, &pool,
+        CellInput { tx_hash: [0x04; 32], index: 0, since: 0 }, &bob_vault,
+        50_000 * PRECISION,
+        eth_price, PRECISION,
+        bob_lock.clone(),
+        200,
+    ).unwrap();
+    let pool_after_borrow = LendingPoolCellData::deserialize(&borrow_tx.outputs[0].data).unwrap();
+    let bob_after_borrow = VaultCellData::deserialize(&borrow_tx.outputs[1].data).unwrap();
+    assert!(bob_after_borrow.debt_shares > 0);
+    assert!(verify_update(&pool, &pool_after_borrow).is_ok());
+
+    // ====== ACT 3: Insurance — Pool created, premium accrued ======
+
+    let insurance = InsurancePoolCellData {
+        pool_id: [0xBB; 32],
+        asset_type_hash: [0xAA; 32],
+        total_deposits: 50_000 * PRECISION, // 50K insurance fund
+        total_shares: 50_000 * PRECISION,
+        total_premiums_earned: 0,
+        total_claims_paid: 0,
+        premium_rate_bps: DEFAULT_PREMIUM_RATE_BPS,
+        max_coverage_bps: DEFAULT_MAX_COVERAGE_BPS,
+        cooldown_blocks: DEFAULT_COOLDOWN_BLOCKS,
+        last_premium_block: 100,
+    };
+
+    // Premium accrued over 1000 blocks
+    let premium = insurance::calculate_premium(
+        pool_after_borrow.total_borrows,
+        insurance.premium_rate_bps,
+        1000,
+    );
+    assert!(premium > 0);
+
+    // Coverage ratio: 50K insurance / borrows
+    if pool_after_borrow.total_borrows > 0 {
+        let coverage = insurance::coverage_ratio(
+            insurance.total_deposits,
+            pool_after_borrow.total_borrows,
+        );
+        // 50K / borrows — should be a fraction
+        assert!(coverage <= PRECISION);
+    }
+
+    // ====== ACT 4: Keeper — Assess Bob's vault health ======
+
+    let assessment = keeper::assess_vault(
+        &bob_after_borrow, &pool_after_borrow,
+        Some(&insurance),
+        eth_price, PRECISION,
+    );
+
+    // At $3000 with 50 ETH and ~50K debt: HF = (50*3000*0.8)/50000 = 2.4 → Safe
+    assert!(assessment.health_factor > PRECISION * 150 / 100);
+    assert!(matches!(assessment.action, keeper::KeeperAction::Safe { .. }));
+
+    // ====== ACT 5: Risk — Protocol-wide assessment ======
+
+    let vaults = vec![bob_after_borrow.clone()];
+    let health = risk::assess_protocol(
+        &vaults, &pool_after_borrow, Some(&insurance),
+        eth_price, PRECISION,
+    );
+
+    assert_eq!(health.vaults_assessed, 1);
+    assert_eq!(health.tier_counts.safe, 1);
+    assert!(health.pending_actions.is_empty());
+
+    let score = risk::risk_score(&health);
+    assert!(score <= 30, "Healthy protocol risk score: {}", score);
+
+    // ====== ACT 6: Stress Test — What if ETH drops 40%? ======
+
+    let stressed = risk::simulate_price_drop(
+        &vaults, &pool_after_borrow, Some(&insurance),
+        eth_price, PRECISION, 4000, // 40% drop
+    );
+
+    // At $1800: HF = (50*1800*0.8)/50000 = 1.44 → Warning zone
+    let stressed_score = risk::risk_score(&stressed);
+    assert!(stressed_score > score, "Stress should increase risk");
+
+    // ====== ACT 7: Governance — Propose rate model change ======
+
+    let new_config = ConfigCellData {
+        commit_window_blocks: 60,
+        ..ConfigCellData::default()
+    };
+
+    let mut proposal = governance::create_proposal(
+        1, [0xDA; 32], new_config.clone(), [0xDD; 32],
+        300, governance::DEFAULT_VOTING_PERIOD_BLOCKS, false,
+    ).unwrap();
+
+    // Community votes
+    governance::cast_vote(
+        &mut proposal, [0x01; 32], 5_000_000 * PRECISION, true, 1000,
+    ).unwrap();
+    governance::cast_vote(
+        &mut proposal, [0x02; 32], 1_000_000 * PRECISION, false, 2000,
+    ).unwrap();
+
+    let total_supply = 100_000_000 * PRECISION;
+    assert!(governance::has_passed(&proposal, total_supply));
+
+    // Finalize and execute
+    let end_block = 300 + governance::DEFAULT_VOTING_PERIOD_BLOCKS + 1;
+    governance::finalize_voting(&mut proposal, total_supply, end_block).unwrap();
+
+    let execute_block = end_block + governance::TIMELOCK_DELAY_BLOCKS + 1;
+    let approved_config = governance::execute_proposal(&mut proposal, execute_block).unwrap();
+    assert_eq!(approved_config.commit_window_blocks, 60);
+
+    // Apply via SDK
+    let config_tx = sdk.update_config(
+        CellInput { tx_hash: [0xCF; 32], index: 0, since: 0 },
+        approved_config,
+        alice_lock,
+    );
+    let final_config = ConfigCellData::deserialize(&config_tx.outputs[0].data).unwrap();
+    assert_eq!(final_config.commit_window_blocks, 60);
+
+    // ====== FINALE: Protocol is healthy, governed, and insured ======
+    // All systems exercised: Oracle ✓ Lending ✓ Insurance ✓ Keeper ✓ Risk ✓ Governance ✓
+}

@@ -1109,3 +1109,34 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 **Primitive**: Any price delta computation in derivatives contracts (perpetuals, options, futures) MUST cast to signed integers (int256) BEFORE subtraction, never after. `uint256(markPrice) - uint256(entryPrice)` is a ticking bomb — it panics on underflow when price moves against position direction. The safe pattern: `int256(markPrice) - int256(entryPrice)` always produces the correct signed result.
 **Generalization**: This extends beyond price deltas to ANY subtraction where the result can legitimately be negative: PnL, funding payments, margin calculations, oracle price differences, rebalancing deltas. The rule is simple — if the sign of the result is unknown at compile time, the types must be signed at the point of subtraction.
 **Cross-references**: P-040 (DeFi Mathematics), P-071 (Formal Verification), VibePerpEngine._calculatePnL (correct implementation using pos.size * priceDelta)
+
+### P-095: Three-Dimensional Incentive Design (March 2026)
+**Source**: Will's contributor incentive framework (Session 057)
+**Domain**: Mechanism Design / Game Theory
+**Primitive**: Effective contributor incentives require three orthogonal dimensions, each targeting a different human motivation:
+1. **Utility** (intrinsic) — The product is genuinely useful. People contribute because they want the thing to exist.
+2. **Status** (social) — Points, leaderboards, contribution history. Future rewards for early contributors. Shapley-scored reputation.
+3. **Perks** (economic) — Tangible benefits like reduced trading fees, priority access, governance weight proportional to contribution.
+**Why it works**: Each dimension captures a different contributor archetype. Utility attracts builders. Status attracts reputation-seekers. Perks attract pragmatists. An attacker must simultaneously fake all three to game the system. Honest contributors naturally accumulate all three.
+**Generalization**: Any multi-stakeholder system (DAOs, open source, prediction markets) should design incentives across at least 3 orthogonal dimensions. Single-dimension incentives (just money, or just reputation) are trivially Sybil-attacked. The cost of attack scales multiplicatively with each independent dimension.
+**Cross-references**: P-000 (Fairness Above All), P-017 (Shapley Distribution), ShapleyDistributor.sol, LoyaltyRewards.sol
+
+### P-096: Shapley Value Compliance (SVC) — The Everything App (March 2026)
+**Source**: Will's vision for decentralized app ecosystem (Session 057)
+**Domain**: Platform Economics / Protocol Design
+**Primitive**: Every application in the VibeSwap ecosystem must be Shapley Value Compliant (SVC): value flows to contributors proportional to their actual contribution, with zero platform rent-seeking. This is the universal constraint that turns any web2 clone into a fundamentally different economic system.
+**Application**: Replace centralized platforms (LinkedIn→VibeJobs, Amazon→VibeMarket, YouTube→VibeTube, Instagram→VibeShorts, Twitter→VibePost, Zillow→VibeHousing, Snapchat→VibeSnap) with SVC clones where:
+- Content creators earn proportional to engagement via Shapley distribution (not algorithmic favoritism)
+- Marketplace sellers are reputation-gated with Shapley reviews (not pay-to-play rankings)
+- Job seekers have Shapley-scored portfolios (proof of contribution > proof of credential)
+- All ad revenue flows to content creators, not platform operators
+**The builder sandbox**: Anyone can fork the foundational design principles and build their own SVC app with the same primitives (Builder Sandbox, VibeForge, VibeClone).
+**Generalization**: "Rebuilding the internet from scratch with love" means every interaction generates Shapley-attributable value. The protocol IS the platform. No intermediary can extract rent because the contribution graph is transparent and the distribution is mathematically fair.
+**Cross-references**: P-000 (Fairness Above All), P-017 (Shapley Distribution), P-095 (Three-Dimensional Incentives), AppStore.jsx (57 apps)
+
+### P-097: Stack Depth as Architecture Signal (March 2026)
+**Source**: VibeOptions + VibeAMM stack-too-deep fixes (Session 057)
+**Domain**: Smart Contract Architecture
+**Primitive**: A Solidity "stack too deep" error is not a compiler bug — it's an architecture signal. When a function needs 17+ stack slots, the function is doing too much. The fix is not mechanical (scoping blocks, helper functions) but architectural: decompose the responsibility. Pattern: if a function needs to access a 7-field struct AND maintain 5+ local variables AND emit a multi-parameter event, it should delegate to helper functions that isolate each Pool-accessing operation behind its own stack frame.
+**Anti-pattern**: `_getCollateralToken(poolId, optionType)` that creates a full `Pool memory` (7 fields) just to return one address. Better: `_transferCollateral(poolId, type, from, to, amount)` — does the Pool lookup AND the transfer in one isolated stack frame.
+**Generalization**: In any resource-constrained environment (EVM stack, embedded systems, context windows), hitting a resource limit is a signal to restructure, not to hack around the limit. The restructured version is always better code.

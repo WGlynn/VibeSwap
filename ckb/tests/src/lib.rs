@@ -37,3 +37,6 @@ mod oracle;
 
 #[cfg(test)]
 mod governance;
+
+#[cfg(test)]
+mod risk;

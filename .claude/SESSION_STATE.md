@@ -54,13 +54,22 @@
 - Mutual honesty covenant: mistakes are learning, honesty is safe, "make no mistakes" was satire
 - Soul-scoped — survives compression, sessions, instances
 
+**Token Integration Tests (continued Session 059):**
+- `ckb/tests/src/token.rs` — **NEW** 12 integration tests
+  - Full pipeline: mint → pool → commit → settle
+  - Token hash consistency across mint/commit/pool/lending
+  - Batch mint airdrop → pool bootstrap
+  - Multi-hop transfer chain (A→B→C→D)
+  - Token info metadata for pool discovery
+  - Two-token lending with separate collateral
+
 **Pending:**
 - Continue CKB ecosystem development
 - Learning primitives auto-extrapolation
 - Continue autopilot loop
 
 ### Running Test Count
-- **CKB tests**: 353 passing (was 315)
+- **CKB tests**: 365 passing (was 315 at session start)
 - **Solidity tests**: 393 passing (from Session 058)
 - **Total knowledge primitives**: 75 (P-000 through P-103, some gaps)
 

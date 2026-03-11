@@ -878,4 +878,234 @@ mod tests {
         assert_eq!(&tx.witnesses[0][0..32], &proof.challenge);
         assert_eq!(&tx.witnesses[0][32..64], &proof.nonce);
     }
+
+    // ============ Additional Hardening Tests ============
+
+    #[test]
+    fn test_mine_different_pair_ids_yield_different_challenges() {
+        // Same batch_id and prev_hash but different pair_ids must produce different challenges
+        let prev_hash = [0xAA; 32];
+        let batch_id = 5;
+
+        let proof_a = mine_for_cell(&[0x01; 32], batch_id, &prev_hash, 4, 100_000).unwrap();
+        let proof_b = mine_for_cell(&[0x02; 32], batch_id, &prev_hash, 4, 100_000).unwrap();
+
+        assert_ne!(proof_a.challenge, proof_b.challenge,
+            "Different pair_ids must produce different challenges");
+    }
+
+    #[test]
+    fn test_mine_different_prev_hashes_yield_different_challenges() {
+        // Same pair_id and batch_id but different prev_state_hash must produce different challenges
+        let pair_id = [0x42; 32];
+        let batch_id = 0;
+
+        let proof_a = mine_for_cell(&pair_id, batch_id, &[0x00; 32], 4, 100_000).unwrap();
+        let proof_b = mine_for_cell(&pair_id, batch_id, &[0xFF; 32], 4, 100_000).unwrap();
+
+        assert_ne!(proof_a.challenge, proof_b.challenge,
+            "Different prev_state_hashes must produce different challenges");
+    }
+
+    #[test]
+    fn test_mine_proof_nonce_is_nonzero() {
+        // A mined proof should have a non-zero nonce (the PoW library hashes iterations)
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000).unwrap();
+        assert_ne!(proof.nonce, [0u8; 32],
+            "Mined nonce should not be all zeros");
+    }
+
+    #[test]
+    fn test_aggregation_cumulative_commit_count() {
+        // If auction already has commits, new commits should add to the existing count
+        let mut auction = test_auction();
+        auction.commit_count = 10; // Already has 10 commits from previous aggregation
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let commits: Vec<PendingCommit> = (1..=3).map(|i| make_commit(i)).collect();
+
+        let tx = build_aggregation_tx(
+            &auction, &commits, None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let output_data = &tx.outputs[0].data;
+        let new_auction = AuctionCellData::deserialize(output_data).unwrap();
+        assert_eq!(new_auction.commit_count, 13,
+            "commit_count should be 10 (existing) + 3 (new) = 13");
+    }
+
+    #[test]
+    fn test_aggregation_cell_deps_structure() {
+        // Verify cell_deps contains the script dep from deployment info
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let deployment = test_deployment();
+
+        let tx = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &deployment, &test_miner_lock(),
+        );
+
+        assert_eq!(tx.cell_deps.len(), 1, "Should have exactly 1 cell dep");
+        assert_eq!(tx.cell_deps[0].tx_hash, deployment.script_dep_tx_hash);
+        assert_eq!(tx.cell_deps[0].index, deployment.script_dep_index);
+    }
+
+    #[test]
+    fn test_aggregation_output_type_script_code_hash() {
+        // Verify the output type script uses the batch_auction_type code hash
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let deployment = test_deployment();
+
+        let tx = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &deployment, &test_miner_lock(),
+        );
+
+        let type_script = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(type_script.code_hash, deployment.batch_auction_type_code_hash,
+            "Output type script must use batch_auction_type code hash");
+        assert!(matches!(type_script.hash_type, super::super::HashType::Type));
+    }
+
+    #[test]
+    fn test_aggregation_with_reveal_phase_auction() {
+        // Build aggregation from a REVEAL phase auction state (not just COMMIT)
+        let mut auction = test_auction();
+        auction.phase = PHASE_REVEAL;
+        auction.batch_id = 42;
+        auction.reveal_count = 5;
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        // Should still produce a valid transaction structure
+        assert_eq!(tx.inputs.len(), 2);
+        assert_eq!(tx.outputs.len(), 1);
+
+        let new_auction = AuctionCellData::deserialize(&tx.outputs[0].data).unwrap();
+        // prev_state_hash should be hash of the REVEAL phase auction
+        let expected_hash = compute_auction_hash(&auction);
+        assert_eq!(new_auction.prev_state_hash, expected_hash);
+    }
+
+    #[test]
+    fn test_aggregation_mmr_root_empty_vs_nonempty() {
+        // Zero commits should produce a different MMR root than one commit
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        let tx_empty = build_aggregation_tx(
+            &auction, &[], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let tx_one = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+
+        let auction_empty = AuctionCellData::deserialize(&tx_empty.outputs[0].data).unwrap();
+        let auction_one = AuctionCellData::deserialize(&tx_one.outputs[0].data).unwrap();
+
+        assert_ne!(auction_empty.commit_mmr_root, auction_one.commit_mmr_root,
+            "Empty commit set should produce different MMR root than single commit");
+    }
+
+    #[test]
+    fn test_aggregation_sequential_builds_chain_prev_state_hash() {
+        // Simulate two sequential aggregations: the second should reference the first's output hash
+        let auction = test_auction();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+
+        // First aggregation
+        let tx1 = build_aggregation_tx(
+            &auction, &[make_commit(1)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let auction_after_1 = AuctionCellData::deserialize(&tx1.outputs[0].data).unwrap();
+
+        // Second aggregation uses the output of the first
+        let tx2 = build_aggregation_tx(
+            &auction_after_1, &[make_commit(2)], None, &proof,
+            &test_deployment(), &test_miner_lock(),
+        );
+        let auction_after_2 = AuctionCellData::deserialize(&tx2.outputs[0].data).unwrap();
+
+        // The second auction's prev_state_hash should be the hash of the first auction's output
+        let expected_prev = compute_auction_hash(&auction_after_1);
+        assert_eq!(auction_after_2.prev_state_hash, expected_prev,
+            "Chained aggregation must link prev_state_hash correctly");
+
+        // And commit counts should be cumulative
+        assert_eq!(auction_after_1.commit_count, 1);
+        assert_eq!(auction_after_2.commit_count, 2);
+    }
+
+    #[test]
+    fn test_profitability_very_high_difficulty_caps_hashes() {
+        // Difficulty > 63 should produce u64::MAX expected hashes
+        let estimate = estimate_profitability(64, 10, 1000, 1_000_000.0);
+        assert_eq!(estimate.expected_hashes, u64::MAX,
+            "Difficulty 64+ should cap expected_hashes at u64::MAX");
+    }
+
+    #[test]
+    fn test_profitability_reward_equals_base_times_commits() {
+        // Verify the exact reward calculation: base_reward * commit_count
+        let estimate = estimate_profitability(4, 7, 500, 1_000_000.0);
+        assert_eq!(estimate.expected_reward_ckb, 3500,
+            "Reward should be 500 * 7 = 3500");
+    }
+
+    #[test]
+    fn test_profitability_very_high_hash_rate_low_time() {
+        // Very fast miner should have near-zero time estimate at low difficulty
+        let estimate = estimate_profitability(4, 10, 1000, 1e15);
+        assert!(estimate.expected_time_secs < 1.0,
+            "1 petahash/sec should solve difficulty 4 in well under 1 second, got {}",
+            estimate.expected_time_secs);
+    }
+
+    #[test]
+    fn test_track_difficulty_minimum_floor() {
+        // Even with extremely slow mining, difficulty should not drop below 1
+        // (the PoW library's adjust_difficulty clamps to min 1)
+        let transitions = vec![0, 1_000_000];
+        let new_diff = track_difficulty(2, &transitions, 5);
+        assert!(new_diff >= 1,
+            "Difficulty should never drop below 1, got {}", new_diff);
+    }
+
+    #[test]
+    fn test_auction_hash_phase_change_produces_different_hash() {
+        // Changing only the phase should produce a different hash
+        let mut auction_commit = test_auction();
+        auction_commit.phase = PHASE_COMMIT;
+
+        let mut auction_reveal = test_auction();
+        auction_reveal.phase = PHASE_REVEAL;
+
+        let hash_commit = compute_auction_hash(&auction_commit);
+        let hash_reveal = compute_auction_hash(&auction_reveal);
+        assert_ne!(hash_commit, hash_reveal,
+            "Different phases must produce different auction hashes");
+    }
+
+    #[test]
+    fn test_auction_hash_is_32_bytes() {
+        // Sanity: compute_auction_hash always returns exactly 32 bytes (SHA-256)
+        let auction = test_auction();
+        let hash = compute_auction_hash(&auction);
+        assert_eq!(hash.len(), 32);
+        // Non-trivial: hash of non-zero data should not be all zeros
+        assert_ne!(hash, [0u8; 32], "Hash of non-trivial auction should not be all zeros");
+    }
 }

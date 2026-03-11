@@ -14,6 +14,7 @@ pub mod governance;
 pub mod insurance;
 pub mod keeper;
 pub mod knowledge;
+pub mod lending;
 pub mod liquidity;
 pub mod miner;
 pub mod oracle;

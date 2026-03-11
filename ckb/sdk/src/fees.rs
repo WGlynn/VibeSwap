@@ -1311,4 +1311,121 @@ mod tests {
         let fee = calculate_prediction_fee(0, 0, 200);
         assert_eq!(fee, 0);
     }
+
+    // ============ New Edge Case & Coverage Tests (Batch 3) ============
+
+    #[test]
+    fn test_fee_config_all_to_stakers() {
+        // Config where 100% of protocol fees go to stakers
+        let config = FeeConfig {
+            protocol_fee_bps: 2000,
+            treasury_share_bps: 0,
+            staker_share_bps: 10_000,
+            insurance_share_bps: 0,
+        };
+        assert!(config.is_valid());
+
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000 * PRECISION);
+        let dist = calculate_distribution(&epoch, &config);
+        assert_eq!(dist.treasury_amount, 0);
+        assert_eq!(dist.insurance_amount, 0);
+        assert!(dist.staker_amount > 0);
+    }
+
+    #[test]
+    fn test_fee_config_all_to_insurance() {
+        // Config where 100% of protocol fees go to insurance
+        let config = FeeConfig {
+            protocol_fee_bps: 1000,
+            treasury_share_bps: 0,
+            staker_share_bps: 0,
+            insurance_share_bps: 10_000,
+        };
+        assert!(config.is_valid());
+
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 5_000 * PRECISION);
+        let dist = calculate_distribution(&epoch, &config);
+        assert_eq!(dist.treasury_amount, 0);
+        assert_eq!(dist.staker_amount, 0);
+        assert!(dist.insurance_amount > 0);
+    }
+
+    #[test]
+    fn test_record_multiple_fee_types_same_pool_id() {
+        // Record AMM and lending fees under the same pool ID
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 1000);
+        epoch.record_lending_fee(pair(1), 500);
+        epoch.record_insurance_fee(pair(1), 200);
+
+        assert_eq!(epoch.amm_fees[&pair(1)], 1000);
+        assert_eq!(epoch.lending_fees[&pair(1)], 500);
+        assert_eq!(epoch.insurance_fees[&pair(1)], 200);
+        assert_eq!(epoch.total_fees(), 1700);
+    }
+
+    #[test]
+    fn test_swap_fee_large_amount_relative_to_reserves() {
+        // Input amount equals reserve — extreme slippage scenario
+        let amount = 1_000_000 * PRECISION;
+        let reserve = 1_000_000 * PRECISION;
+        let (fee, output) = calculate_swap_fee(amount, reserve, reserve, 30);
+        assert_eq!(fee, amount * 30 / 10_000);
+        // With amount = reserve, output ≈ reserve/2 (constant product math)
+        assert!(output > 0);
+        assert!(output < amount);
+        assert!(output < reserve, "Output should not exceed reserve_out");
+    }
+
+    #[test]
+    fn test_prediction_fee_zero_fee_rate() {
+        // Zero fee rate should produce zero fee regardless of pool size
+        let fee = calculate_prediction_fee(50_000 * PRECISION, 100_000 * PRECISION, 0);
+        assert_eq!(fee, 0);
+    }
+
+    #[test]
+    fn test_shapley_weights_single_pool_zero_volume() {
+        // Single pool with zero volume — utilization bonus should be 0
+        let pools = vec![make_pool(1, 1_000_000 * PRECISION, 0, 1)];
+        let weights = calculate_shapley_weights(&pools);
+        // Weight = depth * (1 + 0) * (1 + 1) = depth * 2
+        assert!(weights[&pair(1)] > 0);
+        // Compare to same pool with volume
+        let pools_vol = vec![make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 1)];
+        let weights_vol = calculate_shapley_weights(&pools_vol);
+        assert!(weights_vol[&pair(1)] > weights[&pair(1)],
+            "Pool with volume should have higher weight than identical pool without volume");
+    }
+
+    #[test]
+    fn test_shapley_distribution_single_pool_gets_all_lp_fees() {
+        // With one pool in depth info, it should receive all LP fees
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000 * PRECISION);
+        epoch.record_amm_fee(pair(2), 5_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let pools = vec![make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 3)];
+
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        // Only pool 1 has depth info, so it gets ALL LP fees from both AMM pools
+        assert!(dist.lp_distributions.contains_key(&pair(1)));
+        // Pool 2 has no depth entry — it gets nothing
+        let total_lp: u128 = dist.lp_distributions.values().sum();
+        assert_eq!(dist.lp_distributions.get(&pair(1)).copied().unwrap_or(0), total_lp);
+    }
+
+    #[test]
+    fn test_annualize_revenue_single_block_epoch() {
+        // Epoch of exactly 1 block with fees
+        let mut epoch = FeeEpoch::new(1, 0, 1);
+        epoch.record_amm_fee(pair(1), 100 * PRECISION);
+
+        let annual = annualize_revenue(&epoch);
+        // 100 per block * 7_884_000 blocks/year = 788_400_000
+        assert_eq!(annual, 100 * PRECISION * 7_884_000);
+    }
 }

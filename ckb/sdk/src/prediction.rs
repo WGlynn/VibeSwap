@@ -1321,4 +1321,119 @@ mod tests {
         let total_gross = g0 + g1 + g2 + g3;
         assert!(total_gross <= m4.total_liquidity + 4); // rounding tolerance
     }
+
+    // ============ New Edge Case & Coverage Tests (Batch 3) ============
+
+    #[test]
+    fn test_value_to_tier_boundary_3_tiers() {
+        // 3 tiers with bucket size = PRECISION/3
+        let bucket = PRECISION / 3;
+        assert_eq!(value_to_tier(0, 3), 0);
+        assert_eq!(value_to_tier(bucket - 1, 3), 0);
+        assert_eq!(value_to_tier(bucket, 3), 1);
+        assert_eq!(value_to_tier(2 * bucket - 1, 3), 1);
+        assert_eq!(value_to_tier(2 * bucket, 3), 2);
+        assert_eq!(value_to_tier(PRECISION, 3), 2); // clamped to last tier
+    }
+
+    #[test]
+    fn test_place_bet_exactly_at_minimum() {
+        // Bet exactly at MINIMUM_BET_AMOUNT should succeed
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let (updated, pos) = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 200).unwrap();
+        assert_eq!(updated.total_liquidity, MINIMUM_BET_AMOUNT);
+        assert_eq!(pos.amount, MINIMUM_BET_AMOUNT);
+    }
+
+    #[test]
+    fn test_place_bet_on_resolving_market() {
+        // A market in RESOLVING status should reject bets
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_RESOLVING;
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cancel_resolved_market_fails() {
+        // Cannot cancel a resolved market
+        let lock = test_lock();
+        let lock_hash = hash_script(&lock);
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_RESOLVED;
+        let result = cancel_market(&market, &lock_hash);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_proportional_winner_at_edge_only_one_adjacent() {
+        // Tier 0 wins — only tier 1 is adjacent (no tier -1)
+        let bets = [
+            (0, 5 * MINIMUM_BET_AMOUNT),
+            (1, 5 * MINIMUM_BET_AMOUNT),
+            (2, 5 * MINIMUM_BET_AMOUNT),
+        ];
+        let mut market = market_with_bets(3, SETTLEMENT_PROPORTIONAL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0; // edge tier
+
+        let total = 15 * MINIMUM_BET_AMOUNT;
+
+        // Winning tier should get 100% - 15% (only one adjacent) = 85%
+        let pos_winner = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_win, _, _) = calculate_payout(&market, &pos_winner).unwrap();
+        let expected_win = mul_div(total, BPS_DENOMINATOR - ADJACENT_PAYOUT_BPS, BPS_DENOMINATOR);
+        assert_eq!(gross_win, expected_win);
+
+        // Tier 2 is distance 2 — should get nothing
+        let pos_far = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x33; 32],
+            tier_index: 2,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_far, _, _) = calculate_payout(&market, &pos_far).unwrap();
+        assert_eq!(gross_far, 0);
+    }
+
+    #[test]
+    fn test_market_depth_single_tier_with_bets() {
+        // Only one tier has bets — high imbalance
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT)];
+        let market = market_with_bets(3, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        let (min_pool, max_pool, imbalance) = market_depth(&market);
+        assert_eq!(min_pool, 0); // tiers 1 and 2 have 0
+        assert_eq!(max_pool, 10 * MINIMUM_BET_AMOUNT);
+        assert_eq!(imbalance, BPS_DENOMINATOR); // max - min = total → 100%
+    }
+
+    #[test]
+    fn test_implied_odds_sum_to_10000() {
+        // For a balanced 4-tier market, all odds should sum to 10000 bps
+        let bets = [
+            (0, 3 * MINIMUM_BET_AMOUNT),
+            (1, 2 * MINIMUM_BET_AMOUNT),
+            (2, 4 * MINIMUM_BET_AMOUNT),
+            (3, 1 * MINIMUM_BET_AMOUNT),
+        ];
+        let market = market_with_bets(4, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        let total_odds: u128 = (0..4).map(|i| implied_odds_bps(&market, i)).sum();
+        assert_eq!(total_odds, BPS_DENOMINATOR, "Implied odds must sum to 100%");
+    }
+
+    #[test]
+    fn test_potential_multiplier_invalid_tier() {
+        // Multiplier for a tier index beyond num_tiers should be 0
+        let bets = [(0, 5 * MINIMUM_BET_AMOUNT), (1, 5 * MINIMUM_BET_AMOUNT)];
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        assert_eq!(potential_multiplier(&market, 2), 0);
+        assert_eq!(potential_multiplier(&market, 255), 0);
+    }
 }

@@ -1253,4 +1253,139 @@ mod tests {
         assert_eq!(alerts[2].level, AlertLevel::Watch);
         assert_eq!(alerts[2].threshold, 3000);
     }
+
+    // ============ New Edge Case & Coverage Tests (Batch 3) ============
+
+    #[test]
+    fn test_arb_symmetric_spread_direction() {
+        // Pool A is cheap, Pool B is expensive — verify buy/sell direction
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 500_000 * PRECISION, 5); // price = 0.5
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 2_000_000 * PRECISION, 5); // price = 2.0
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+
+        let arbs = find_arbitrage(&pools, 10);
+        assert_eq!(arbs.len(), 1);
+        assert_eq!(arbs[0].buy_pool_id, id(1), "Should buy from cheaper pool");
+        assert_eq!(arbs[0].sell_pool_id, id(2), "Should sell to more expensive pool");
+        assert!(arbs[0].buy_price < arbs[0].sell_price);
+    }
+
+    #[test]
+    fn test_arb_five_pools_pairwise() {
+        // 5 pools should check C(5,2)=10 pairs
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 5);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_100_000 * PRECISION, 5);
+        let pool_c = make_pool_data(1_000_000 * PRECISION, 1_200_000 * PRECISION, 5);
+        let pool_d = make_pool_data(1_000_000 * PRECISION, 1_300_000 * PRECISION, 5);
+        let pool_e = make_pool_data(1_000_000 * PRECISION, 1_400_000 * PRECISION, 5);
+        let pools = vec![
+            (id(1), &pool_a), (id(2), &pool_b), (id(3), &pool_c),
+            (id(4), &pool_d), (id(5), &pool_e),
+        ];
+
+        let arbs = find_arbitrage(&pools, 10);
+        // With increasing prices and low fees, many pairs should be profitable
+        assert!(arbs.len() >= 4, "Multiple pairs should have profitable spreads: found {}", arbs.len());
+        // First arb should be the most profitable (A vs E has biggest spread)
+        assert_eq!(arbs[0].buy_pool_id, id(1));
+        assert_eq!(arbs[0].sell_pool_id, id(5));
+    }
+
+    #[test]
+    fn test_rebalance_small_price_drop_with_fees() {
+        // Small price drop (0.95x) + substantial fees → AddLiquidity
+        let signal = check_rebalance(
+            PRECISION,
+            PRECISION * 95 / 100, // 5% drop
+            100_000 * PRECISION,
+            10_000 * PRECISION, // 10K fees (covers any IL from 5% move)
+            500,
+            2000,
+        ).unwrap();
+
+        // IL from 5% move is very small (< 0.1%)
+        assert!(!signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::AddLiquidity);
+    }
+
+    #[test]
+    fn test_yield_high_risk_high_apy_loses_to_safe() {
+        // Risk-adjusted: apy / (1 + risk/100)
+        // Source 1: 500 / 1.9 = ~263   (high risk dominates)
+        // Source 2: 800 / 1.05 = ~762  (safe wins on risk-adjusted basis)
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::InsurancePremium, apy_bps: 500, tvl: 500_000, risk_score: 90 },
+            YieldSource { source_id: id(2), source_type: YieldType::StakingRewards, apy_bps: 800, tvl: 5_000_000, risk_score: 5 },
+        ];
+
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(2), "Safe low-APY should beat risky high-APY on risk-adjusted basis");
+    }
+
+    #[test]
+    fn test_yield_many_sources_ranking() {
+        // 5 sources — verify all are present and ranked
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 400, tvl: 1_000_000, risk_score: 20 },
+            YieldSource { source_id: id(2), source_type: YieldType::LendingDeposit, apy_bps: 300, tvl: 2_000_000, risk_score: 10 },
+            YieldSource { source_id: id(3), source_type: YieldType::InsurancePremium, apy_bps: 900, tvl: 500_000, risk_score: 50 },
+            YieldSource { source_id: id(4), source_type: YieldType::StakingRewards, apy_bps: 600, tvl: 3_000_000, risk_score: 15 },
+            YieldSource { source_id: id(5), source_type: YieldType::LPFees, apy_bps: 150, tvl: 10_000_000, risk_score: 3 },
+        ];
+
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.ranked_sources.len(), 5);
+        // Verify ranked by risk-adjusted score descending
+        for w in rec.ranked_sources.windows(2) {
+            assert!(w[0].2 >= w[1].2, "Ranked sources should be in descending risk-adjusted order");
+        }
+    }
+
+    #[test]
+    fn test_liquidation_exactly_at_threshold() {
+        // Vault exactly at liquidation threshold — HF = 1.0, NOT liquidatable
+        // collateral * threshold / (debt * 10000) = 100K * 8000 / (80K * 10000) = 1.0
+        let vaults = vec![
+            (100_000 * PRECISION, 80_000 * PRECISION, 8000u128),
+        ];
+
+        let opps = find_liquidations(&vaults, 500, 0);
+        assert!(opps.is_empty(), "Vault exactly at HF=1.0 should NOT be liquidatable");
+    }
+
+    #[test]
+    fn test_alerts_metric_value_and_threshold_correct() {
+        // Verify each alert carries the original metric value and correct threshold
+        let positions = vec![
+            (id(1), 4500u64, AlertReason::HighImpermanentLoss), // Watch
+            (id(2), 7200u64, AlertReason::LowHealthFactor),     // Warning
+        ];
+
+        let alerts = check_risk_alerts(&positions, 3000, 6000, 9000);
+        assert_eq!(alerts.len(), 2);
+
+        let warning_alert = alerts.iter().find(|a| a.level == AlertLevel::Warning).unwrap();
+        assert_eq!(warning_alert.metric_value, 7200);
+        assert_eq!(warning_alert.threshold, 6000);
+
+        let watch_alert = alerts.iter().find(|a| a.level == AlertLevel::Watch).unwrap();
+        assert_eq!(watch_alert.metric_value, 4500);
+        assert_eq!(watch_alert.threshold, 3000);
+    }
+
+    #[test]
+    fn test_rebalance_signal_rebalanced_value_includes_fees() {
+        // The rebalanced_value should be lp_value + accrued_fees
+        let signal = check_rebalance(
+            PRECISION,
+            2 * PRECISION,         // Price doubled
+            100_000 * PRECISION,
+            15_000 * PRECISION,    // 15K fees
+            500,
+            2000,
+        ).unwrap();
+
+        assert_eq!(signal.rebalanced_value, signal.position_value + 15_000 * PRECISION,
+            "Rebalanced value should be LP value + accrued fees");
+    }
 }

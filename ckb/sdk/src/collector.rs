@@ -1023,4 +1023,114 @@ mod tests {
         let change_amount = super::super::token::parse_token_amount(&tx.outputs[1].data).unwrap();
         assert_eq!(change_amount, 7000);
     }
+
+    // ============ New Edge Case & Hardening Tests (Batch 3) ============
+
+    #[test]
+    fn test_select_capacity_saturating_add() {
+        // Verify cell capacities don't overflow with large values
+        let cells = vec![plain_cell(u64::MAX / 2), plain_cell(u64::MAX / 2)];
+        let result = select_capacity_cells(&cells, u64::MAX / 2, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_capacity, u64::MAX / 2);
+    }
+
+    #[test]
+    fn test_select_token_cells_with_zero_amount_cells() {
+        // Cells with 0 token amount should be selected but contribute 0
+        let cells = vec![
+            token_cell(1000, 0, 0x01),     // 0 tokens
+            token_cell(1000, 500, 0x01),   // 500 tokens
+        ];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 400,
+            &SelectionStrategy::SmallestFirst,
+        ).unwrap();
+        // SmallestFirst: picks 0 first, then 500 → total 500
+        assert_eq!(result.total_token_amount, 500);
+        assert_eq!(result.selected.len(), 2);
+        assert_eq!(result.token_change, 100);
+    }
+
+    #[test]
+    fn test_merge_many_plain_cells() {
+        // Merge 20 small cells into one large cell
+        let cells: Vec<LiveCell> = (0..20).map(|_| plain_cell(1000)).collect();
+        let tx = merge_cells(&cells, test_lock(0x05)).unwrap();
+        assert_eq!(tx.inputs.len(), 20);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].capacity, 20_000);
+        assert_eq!(tx.witnesses.len(), 20);
+    }
+
+    #[test]
+    fn test_split_cell_many_outputs() {
+        // Split into 8 equal amounts
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 20, 80000, 0x01);
+        let amounts = vec![10000u128; 8]; // 8 * 10000 = 80000 (exact)
+        let tx = split_cell(&cell, &amounts, test_lock(0x02)).unwrap();
+        assert_eq!(tx.outputs.len(), 8); // No change — exact split
+        let total: u128 = tx.outputs.iter()
+            .filter_map(|o| super::super::token::parse_token_amount(&o.data))
+            .sum();
+        assert_eq!(total, 80000);
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_exactly_16_bytes() {
+        // Cell data is exactly 16 bytes — should parse successfully
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: 42u128.to_le_bytes().to_vec(),
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), Some(42));
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_more_than_16_bytes() {
+        // Cell data has extra bytes after the amount (xUDT extension data)
+        let mut data = 999u128.to_le_bytes().to_vec();
+        data.extend_from_slice(&[0xFF; 20]); // extra extension data
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data,
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), Some(999));
+    }
+
+    #[test]
+    fn test_merge_token_cells_preserves_recipient_lock() {
+        // Merged output should use the recipient's lock script, not the input cells' lock
+        let cells = vec![
+            token_cell(10_000_000_000, 500, 0x01),
+            token_cell(10_000_000_000, 300, 0x01),
+        ];
+        let recipient = test_lock(0xAA);
+        let tx = merge_cells(&cells, recipient.clone()).unwrap();
+        assert_eq!(tx.outputs[0].lock_script.code_hash, recipient.code_hash);
+        assert_eq!(tx.outputs[0].lock_script.args, recipient.args);
+    }
+
+    #[test]
+    fn test_split_cell_all_outputs_have_correct_type_script() {
+        // Every split output should carry the same type script as the input cell
+        let cap = min_token_cell_capacity(20);
+        let cell = token_cell(cap * 10, 6000, 0x01);
+        let tx = split_cell(&cell, &[1000, 2000], test_lock(0x02)).unwrap();
+        let expected_type = cell.type_script.as_ref().unwrap();
+        for output in &tx.outputs {
+            let ts = output.type_script.as_ref().unwrap();
+            assert_eq!(ts.code_hash, expected_type.code_hash);
+            assert_eq!(ts.args, expected_type.args);
+        }
+    }
 }

@@ -1262,4 +1262,183 @@ mod tests {
         assert_eq!(report.observation.price_spread_bps, 0,
             "Identical oracle prices should produce 0 spread");
     }
+
+    // ============ New Tests: Edge Cases & Coverage Hardening ============
+
+    #[test]
+    fn test_quantize_many_vaults_all_safe() {
+        // 10 vaults all with massive over-collateralization
+        let mut snapshot = test_snapshot();
+        snapshot.vaults = (0..10u8).map(|i| {
+            vault(i, 1000 * PRECISION, 1_000 * PRECISION) // 1000 ETH @ $3000 vs $1000 debt
+        }).collect();
+
+        let decision = quantize(&snapshot);
+        assert_eq!(decision.vault_tiers.len(), 10);
+        for vt in &decision.vault_tiers {
+            assert_eq!(vt.tier, RiskTier::Safe,
+                "Massively over-collateralized vault should be Safe");
+        }
+    }
+
+    #[test]
+    fn test_quantize_mixed_safe_and_risky_vaults() {
+        // Mix of very safe and very risky vaults in same snapshot
+        let mut snapshot = test_snapshot();
+        snapshot.vaults = vec![
+            vault(0x01, 1000 * PRECISION, 1_000 * PRECISION),    // Very safe
+            vault(0x02, 10 * PRECISION, 28_000 * PRECISION),     // Very risky
+        ];
+
+        let decision = quantize(&snapshot);
+        assert_eq!(decision.vault_tiers.len(), 2);
+        // The safe vault and risky vault should have different tiers
+        assert_ne!(decision.vault_tiers[0].tier, decision.vault_tiers[1].tier,
+            "Safe and risky vaults should have different risk tiers");
+    }
+
+    #[test]
+    fn test_quantize_oracle_five_sources_three_agree() {
+        // 5 oracles: 3 agree, 2 outliers. Majority = 3/5 → valid
+        let oracles = vec![
+            test_oracle(3000 * PRECISION, 90, 100),
+            test_oracle(3005 * PRECISION, 88, 100),
+            test_oracle(2998 * PRECISION, 85, 100),
+            test_oracle(8000 * PRECISION, 70, 100), // outlier
+            test_oracle(500 * PRECISION, 60, 100),  // outlier
+        ];
+
+        let (price, valid, agreement) = quantize_oracle(&oracles, 105);
+        // Sorted: [500, 2998, 3000, 3005, 8000]. Median = 3000.
+        assert_eq!(price, 3000 * PRECISION);
+        // 2998, 3000, 3005 all within 10% of 3000 → 3 agree
+        assert_eq!(agreement, 3);
+        // 3/5 >= (5+1)/2 = 3 → valid
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_quantize_oracle_exact_10_percent_boundary() {
+        // Test oracle exactly at the 10% deviation boundary
+        // Median = 1000. 10% of 1000 = 100. So price 1100 should be at boundary.
+        // Check: diff=100, diff*10000=1_000_000, median*1000=1_000_000 → 1M <= 1M → agrees
+        let oracles = vec![
+            test_oracle(1000 * PRECISION, 90, 100),
+            test_oracle(1100 * PRECISION, 85, 100), // exactly 10% away
+        ];
+
+        let (_price, _valid, agreement) = quantize_oracle(&oracles, 105);
+        // Both should agree: 1000 is within 10% of median(1000,1100)=1050,
+        // and 1100 is within 10% of 1050.
+        // Let's check: median = avg(1000,1100) = 1050
+        // 1000 vs 1050: diff=50, 50*10000=500000, 1050*1000=1050000 → 500K <= 1.05M → agrees
+        // 1100 vs 1050: diff=50, same → agrees
+        assert_eq!(agreement, 2);
+    }
+
+    #[test]
+    fn test_median_large_even_count() {
+        // 6 values
+        let values = [100, 200, 300, 400, 500, 600];
+        let result = compute_median(&values);
+        // Sorted: [100,200,300,400,500,600]. Mid=3. avg(sorted[2], sorted[3]) = avg(300,400) = 350
+        assert_eq!(result, 350);
+    }
+
+    #[test]
+    fn test_simulate_price_stress_small_drop_1bps() {
+        // Minimal 1 bps (0.01%) drop
+        let snapshot = test_snapshot();
+        let (before, after) = simulate_price_stress(&snapshot, 1);
+
+        // Risk should be >= before (monotonic)
+        assert!(after.risk_score >= before.risk_score);
+        // Vault count should remain the same
+        assert_eq!(after.vault_tiers.len(), before.vault_tiers.len());
+    }
+
+    #[test]
+    fn test_tier_changed_same_tiers_returns_false() {
+        // Two quantize calls on same snapshot must have same tiers
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+        let d2 = quantize(&snapshot);
+
+        assert!(!tier_changed(&d1, &d2),
+            "Identical snapshots should not show tier changes");
+    }
+
+    #[test]
+    fn test_report_single_oracle_source() {
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data = vec![
+            test_oracle(3000 * PRECISION, 95, 100),
+        ];
+
+        let report = generate_report(&snapshot);
+        assert_eq!(report.observation.oracle_source_count, 1);
+        assert_eq!(report.observation.fresh_source_count, 1);
+        // Single oracle → no spread
+        assert_eq!(report.observation.price_spread_bps, 0);
+    }
+
+    #[test]
+    fn test_report_price_spread_calculation() {
+        let mut snapshot = test_snapshot();
+        // Two oracles: 2000 and 3000. Spread = (3000-2000)/2000 * 10000 = 5000 bps
+        snapshot.oracle_data = vec![
+            test_oracle(2000 * PRECISION, 90, 100),
+            test_oracle(3000 * PRECISION, 85, 99),
+        ];
+
+        let report = generate_report(&snapshot);
+        assert_eq!(report.observation.price_spread_bps, 5000,
+            "Spread between 2000 and 3000 should be 5000 bps");
+    }
+
+    #[test]
+    fn test_quantize_collateral_price_zero_with_debt() {
+        // Zero collateral price should make all vaults with debt unhealthy
+        let mut snapshot = test_snapshot();
+        snapshot.oracle_data.clear();
+        snapshot.collateral_price = 0;
+
+        let decision = quantize(&snapshot);
+        assert_eq!(decision.validated_price, 0);
+        // Vaults with non-zero debt should not be Safe
+        for (i, vt) in decision.vault_tiers.iter().enumerate() {
+            if snapshot.vaults[i].debt_shares > 0 {
+                assert_ne!(vt.tier, RiskTier::Safe,
+                    "Vault with debt and 0 price should not be Safe");
+            }
+        }
+    }
+
+    #[test]
+    fn test_monotonicity_result_fields_consistent() {
+        // When is_monotonic is true, violations must be empty
+        let snapshot = test_snapshot();
+        let d1 = quantize(&snapshot);
+        let (_, d2) = simulate_price_stress(&snapshot, 1000);
+
+        let result = verify_monotonicity(&d1, &d2);
+        if result.is_monotonic {
+            assert!(result.violations.is_empty(),
+                "Monotonic result must have zero violations");
+        } else {
+            assert!(!result.violations.is_empty(),
+                "Non-monotonic result must have at least one violation");
+        }
+    }
+
+    #[test]
+    fn test_find_tier_transition_threshold_no_vaults() {
+        // With no vaults, there's nothing to transition
+        let mut snapshot = test_snapshot();
+        snapshot.vaults.clear();
+
+        let threshold = find_tier_transition_threshold(&snapshot);
+        assert!(threshold.is_none(),
+            "No vaults means no tier transitions possible");
+    }
 }

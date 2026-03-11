@@ -1556,4 +1556,465 @@ mod tests {
             assert!(d < 10, "Equal pools should get equal shares");
         }
     }
+
+    // ============ Batch 5: Edge Cases, Boundaries, Overflow, Error Paths ============
+
+    #[test]
+    fn test_fee_config_zero_protocol_fee_bps() {
+        // 0% protocol fee — LPs keep everything from AMM fees
+        let config = FeeConfig {
+            protocol_fee_bps: 0,
+            treasury_share_bps: 5000,
+            staker_share_bps: 3000,
+            insurance_share_bps: 2000,
+        };
+        assert!(config.is_valid());
+
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000 * PRECISION);
+        let dist = calculate_distribution(&epoch, &config);
+
+        // LPs get 100% of AMM fees
+        assert_eq!(dist.lp_distributions[&pair(1)], 10_000 * PRECISION);
+        // Protocol gets nothing from AMM fees
+        assert_eq!(dist.treasury_amount, 0);
+        assert_eq!(dist.staker_amount, 0);
+        assert_eq!(dist.insurance_amount, 0);
+    }
+
+    #[test]
+    fn test_fee_config_max_protocol_fee_bps() {
+        // 100% protocol fee — LPs get nothing from AMM fees
+        let config = FeeConfig {
+            protocol_fee_bps: 10_000,
+            treasury_share_bps: 5000,
+            staker_share_bps: 3000,
+            insurance_share_bps: 2000,
+        };
+        assert!(config.is_valid());
+
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000 * PRECISION);
+        let dist = calculate_distribution(&epoch, &config);
+
+        // LPs get nothing
+        assert_eq!(dist.lp_distributions[&pair(1)], 0);
+        // Protocol gets all AMM fees
+        let total_protocol = dist.treasury_amount + dist.staker_amount + dist.insurance_amount;
+        let diff = if total_protocol > 10_000 * PRECISION {
+            total_protocol - 10_000 * PRECISION
+        } else {
+            10_000 * PRECISION - total_protocol
+        };
+        assert!(diff < 10, "All AMM fees should go to protocol");
+    }
+
+    #[test]
+    fn test_fee_config_is_valid_boundary_sums() {
+        // Exactly 10000 is valid
+        let config = FeeConfig {
+            protocol_fee_bps: 500,
+            treasury_share_bps: 3333,
+            staker_share_bps: 3334,
+            insurance_share_bps: 3333,
+        };
+        assert!(config.is_valid());
+
+        // 10001 is invalid
+        let config_over = FeeConfig {
+            protocol_fee_bps: 500,
+            treasury_share_bps: 5000,
+            staker_share_bps: 3001,
+            insurance_share_bps: 2000,
+        };
+        assert!(!config_over.is_valid());
+
+        // 9999 is invalid
+        let config_under = FeeConfig {
+            protocol_fee_bps: 500,
+            treasury_share_bps: 4999,
+            staker_share_bps: 3000,
+            insurance_share_bps: 2000,
+        };
+        assert!(!config_under.is_valid());
+    }
+
+    #[test]
+    fn test_fee_config_clone_and_eq() {
+        let config = FeeConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config, cloned);
+
+        let different = FeeConfig {
+            protocol_fee_bps: 9999,
+            ..Default::default()
+        };
+        assert_ne!(config, different);
+    }
+
+    #[test]
+    fn test_swap_fee_asymmetric_reserves() {
+        // reserve_out >> reserve_in — a highly imbalanced pool
+        let amount = 100 * PRECISION;
+        let (fee, output) = calculate_swap_fee(
+            amount,
+            1_000 * PRECISION,       // small reserve_in
+            1_000_000 * PRECISION,   // large reserve_out
+        30,
+        );
+        assert_eq!(fee, amount * 30 / 10_000);
+        // With reserve_out much larger, output should be large relative to input
+        assert!(output > 0);
+        assert!(output < 1_000_000 * PRECISION, "Output must be less than reserve_out");
+    }
+
+    #[test]
+    fn test_swap_fee_zero_fee_rate() {
+        // 0 bps fee rate — no fee, pure constant-product output
+        let amount = 1_000 * PRECISION;
+        let reserve = 1_000_000 * PRECISION;
+        let (fee, output) = calculate_swap_fee(amount, reserve, reserve, 0);
+        assert_eq!(fee, 0);
+        assert!(output > 0);
+        // With zero fee the full input goes to AMM calculation
+        let expected = vibeswap_math::mul_div(amount, reserve, reserve + amount);
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_swap_fee_both_reserves_zero() {
+        // Both reserves zero — degenerate pool
+        let (fee, output) = calculate_swap_fee(1000, 0, 0, 30);
+        assert_eq!(fee, 1000 * 30 / 10_000);
+        // reserve_out is 0, so output should be 0 regardless
+        assert_eq!(output, 0);
+    }
+
+    #[test]
+    fn test_swap_fee_zero_reserve_out() {
+        // reserve_out = 0 means nothing to give out
+        let amount = 1_000 * PRECISION;
+        let (fee, output) = calculate_swap_fee(amount, 1_000_000 * PRECISION, 0, 30);
+        assert_eq!(fee, amount * 30 / 10_000);
+        assert_eq!(output, 0);
+    }
+
+    #[test]
+    fn test_lending_reserve_income_zero_blocks() {
+        // Zero blocks should produce zero income
+        let income = calculate_lending_reserve_income(
+            1_000_000 * PRECISION,
+            500,
+            2000,
+            0,
+        );
+        assert_eq!(income, 0);
+    }
+
+    #[test]
+    fn test_lending_reserve_income_one_block() {
+        // 1 block should produce very small income
+        let income = calculate_lending_reserve_income(
+            1_000_000 * PRECISION,
+            500,   // 5%
+            2000,  // 20% reserve
+            1,
+        );
+        // Extremely small but non-negative
+        // interest = 1M * 500 * 1 / (10000 * 7884000) ≈ tiny
+        // reserve_income = interest * 2000 / 10000
+        assert!(income < PRECISION, "1-block income should be minuscule");
+    }
+
+    #[test]
+    fn test_prediction_fee_max_fee_rate() {
+        // 100% fee rate on prediction market
+        let total_pool = 100_000 * PRECISION;
+        let fee = calculate_prediction_fee(50_000 * PRECISION, total_pool, 10_000);
+        assert_eq!(fee, total_pool);
+    }
+
+    #[test]
+    fn test_prediction_fee_1_bps() {
+        // Minimum meaningful fee rate
+        let total_pool = 1_000_000 * PRECISION;
+        let fee = calculate_prediction_fee(500_000 * PRECISION, total_pool, 1);
+        assert_eq!(fee, total_pool / 10_000);
+    }
+
+    #[test]
+    fn test_annualize_revenue_very_short_epoch() {
+        // Very short epoch (10 blocks) extrapolates to huge annual
+        let mut epoch = FeeEpoch::new(1, 0, 10);
+        epoch.record_amm_fee(pair(1), 1_000 * PRECISION);
+
+        let annual = annualize_revenue(&epoch);
+        // 1000 per 10 blocks * 7_884_000 / 10 = 788_400_000
+        assert_eq!(annual, vibeswap_math::mul_div(1_000 * PRECISION, 7_884_000, 10));
+    }
+
+    #[test]
+    fn test_annualize_revenue_with_all_fee_types() {
+        let mut epoch = FeeEpoch::new(1, 0, 7_884_000);
+        epoch.record_amm_fee(pair(1), 50_000 * PRECISION);
+        epoch.record_lending_fee(pair(2), 20_000 * PRECISION);
+        epoch.record_insurance_fee(pair(3), 10_000 * PRECISION);
+        epoch.record_prediction_fee(pair(4), 5_000 * PRECISION);
+        epoch.record_priority_fee(15_000 * PRECISION);
+
+        let annual = annualize_revenue(&epoch);
+        // Full year epoch, so annualized = total
+        assert_eq!(annual, epoch.total_fees());
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_small_tvl_large_revenue() {
+        // Revenue larger than TVL — yield > 100%
+        let yield_bps = revenue_yield_bps(10_000_000 * PRECISION, 1_000_000 * PRECISION);
+        // 10M / 1M = 10x = 100_000 bps
+        assert_eq!(yield_bps, 100_000);
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_equal_revenue_and_tvl() {
+        // Revenue = TVL = 100% yield = 10000 bps
+        let amount = 5_000_000 * PRECISION;
+        let yield_bps = revenue_yield_bps(amount, amount);
+        assert_eq!(yield_bps, 10_000);
+    }
+
+    #[test]
+    fn test_shapley_weights_all_zero_routes() {
+        // All pools have zero routes — max_routes normalization should handle gracefully
+        // (max(routes) = 0, but code does .max(1) to avoid div-by-zero)
+        let pools = vec![
+            make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 0),
+            make_pool(2, 2_000_000 * PRECISION, 500_000 * PRECISION, 0),
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        // Both should have non-zero weights (depth > 0)
+        assert!(weights[&pair(1)] > 0);
+        assert!(weights[&pair(2)] > 0);
+        // Deeper pool still wins
+        assert!(weights[&pair(2)] > weights[&pair(1)]);
+    }
+
+    #[test]
+    fn test_shapley_weights_zero_volume_zero_routes() {
+        // Pool with depth but zero volume and zero routes
+        let pools = vec![make_pool(1, 1_000_000 * PRECISION, 0, 0)];
+        let weights = calculate_shapley_weights(&pools);
+        // Weight = depth * (1 + 0) * (1 + 0/1) = depth * 1 * 1 = depth
+        // Actually connectivity_bonus = 0/max(0,1) * PRECISION = 0
+        // So weight = depth * (PREC + 0) / PREC * (PREC + 0) / PREC = depth
+        assert_eq!(weights[&pair(1)], 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_shapley_distribution_all_zero_depth_pools() {
+        // All pools have zero depth — no LP fees distributed
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let pools = vec![
+            make_pool(1, 0, 500_000 * PRECISION, 5),
+            make_pool(2, 0, 300_000 * PRECISION, 3),
+        ];
+
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        // Total weight is 0 so no LP distribution happens
+        let total_lp: u128 = dist.lp_distributions.values().sum();
+        assert_eq!(total_lp, 0, "All zero-depth pools should yield zero LP distributions");
+        // Protocol fees should still be distributed
+        assert!(dist.treasury_amount > 0);
+    }
+
+    #[test]
+    fn test_insurance_fee_distribution_protocol_cut() {
+        // Insurance fees: protocol takes protocol_fee_bps cut, rest stays in insurance
+        let mut epoch = default_epoch();
+        epoch.record_insurance_fee(pair(1), 10_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+
+        // Insurance protocol cut = 10000 * 1667/10000 = 1667 PRECISION
+        let insurance_protocol_cut = vibeswap_math::mul_div(
+            10_000 * PRECISION,
+            config.protocol_fee_bps as u128,
+            10_000,
+        );
+        // That cut is split into treasury/staker/insurance according to shares
+        let expected_treasury = vibeswap_math::mul_div(
+            insurance_protocol_cut,
+            config.treasury_share_bps as u128,
+            10_000,
+        );
+        assert_eq!(dist.treasury_amount, expected_treasury);
+    }
+
+    #[test]
+    fn test_total_distributed_equals_sum_of_parts() {
+        // Verify total_distributed field is correctly computed
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000 * PRECISION);
+        epoch.record_lending_fee(pair(2), 5_000 * PRECISION);
+        epoch.record_priority_fee(1_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+
+        let manual_total = dist.treasury_amount
+            + dist.staker_amount
+            + dist.insurance_amount
+            + dist.lp_distributions.values().sum::<u128>();
+        assert_eq!(dist.total_distributed, manual_total);
+    }
+
+    #[test]
+    fn test_shapley_total_distributed_equals_sum_of_parts() {
+        // Same check for Shapley distribution
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 8_000 * PRECISION);
+        epoch.record_amm_fee(pair(2), 4_000 * PRECISION);
+        epoch.record_lending_fee(pair(3), 2_000 * PRECISION);
+
+        let config = FeeConfig::default();
+        let pools = vec![
+            make_pool(1, 3_000_000 * PRECISION, 1_000_000 * PRECISION, 5),
+            make_pool(2, 1_000_000 * PRECISION, 500_000 * PRECISION, 2),
+        ];
+
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+
+        let manual_total = dist.treasury_amount
+            + dist.staker_amount
+            + dist.insurance_amount
+            + dist.lp_distributions.values().sum::<u128>();
+        assert_eq!(dist.total_distributed, manual_total);
+    }
+
+    #[test]
+    fn test_fee_epoch_default() {
+        // Default FeeEpoch should have all zeroes and empty maps
+        let epoch = FeeEpoch::default();
+        assert_eq!(epoch.epoch_id, 0);
+        assert_eq!(epoch.start_block, 0);
+        assert_eq!(epoch.end_block, 0);
+        assert_eq!(epoch.priority_fees, 0);
+        assert!(epoch.amm_fees.is_empty());
+        assert!(epoch.lending_fees.is_empty());
+        assert!(epoch.insurance_fees.is_empty());
+        assert!(epoch.prediction_fees.is_empty());
+        assert_eq!(epoch.total_fees(), 0);
+    }
+
+    #[test]
+    fn test_fee_breakdown_default() {
+        // Default FeeBreakdown should be all zeroes
+        let b = FeeBreakdown::default();
+        assert_eq!(b.amm, 0);
+        assert_eq!(b.lending, 0);
+        assert_eq!(b.insurance, 0);
+        assert_eq!(b.prediction, 0);
+        assert_eq!(b.priority, 0);
+        assert_eq!(b.total(), 0);
+    }
+
+    #[test]
+    fn test_fee_distribution_default() {
+        // Default FeeDistribution should be all zeroes
+        let d = FeeDistribution::default();
+        assert_eq!(d.treasury_amount, 0);
+        assert_eq!(d.staker_amount, 0);
+        assert_eq!(d.insurance_amount, 0);
+        assert_eq!(d.total_distributed, 0);
+        assert!(d.lp_distributions.is_empty());
+    }
+
+    #[test]
+    fn test_pool_depth_info_clone_eq() {
+        let pool = make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 3);
+        let cloned = pool.clone();
+        assert_eq!(pool, cloned);
+
+        let different = make_pool(2, 1_000_000 * PRECISION, 500_000 * PRECISION, 3);
+        assert_ne!(pool, different);
+    }
+
+    #[test]
+    fn test_many_pools_distribution_no_panic() {
+        // 50 pools — stress test for no overflow or panic
+        let mut epoch = default_epoch();
+        let mut pools = Vec::new();
+        for i in 1..=50u8 {
+            epoch.record_amm_fee(pair(i), (i as u128) * 1_000 * PRECISION);
+            pools.push(make_pool(
+                i,
+                (i as u128) * 100_000 * PRECISION,
+                (i as u128) * 50_000 * PRECISION,
+                i as u32,
+            ));
+        }
+
+        let config = FeeConfig::default();
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+
+        // Should not panic, and total_distributed should be positive
+        assert!(dist.total_distributed > 0);
+        assert_eq!(dist.lp_distributions.len(), 50);
+        // Pool 50 (deepest) should get more than pool 1 (shallowest)
+        assert!(dist.lp_distributions[&pair(50)] > dist.lp_distributions[&pair(1)]);
+    }
+
+    #[test]
+    fn test_large_amm_fee_no_overflow() {
+        // Use near-max u128 values (scaled down to avoid mul_div overflow)
+        let mut epoch = default_epoch();
+        let big_fee = u128::MAX / 10_000; // Safe for mul_div with 10000 divisor
+        epoch.record_amm_fee(pair(1), big_fee);
+
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+
+        // Should not overflow or panic
+        assert!(dist.lp_distributions[&pair(1)] > 0);
+        assert!(dist.treasury_amount > 0);
+        assert!(dist.total_distributed > 0);
+    }
+
+    #[test]
+    fn test_shapley_weight_utilization_exactly_at_depth() {
+        // Volume exactly equals depth — utilization bonus should be exactly PRECISION (100%)
+        let pools = vec![
+            make_pool(1, 1_000_000 * PRECISION, 1_000_000 * PRECISION, 1), // volume == depth
+            make_pool(2, 1_000_000 * PRECISION, 999_999 * PRECISION, 1),   // volume < depth
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        // Pool 1 (volume >= depth) should have slightly higher weight due to cap hit
+        assert!(weights[&pair(1)] >= weights[&pair(2)]);
+    }
+
+    #[test]
+    fn test_shapley_connectivity_bonus_single_route_max() {
+        // Single pool with 1 route — should get max connectivity bonus (1 out of 1)
+        let pools = vec![make_pool(1, 1_000_000 * PRECISION, 500_000 * PRECISION, 1)];
+        let weights = calculate_shapley_weights(&pools);
+
+        // connectivity_bonus = 1/1 * PRECISION = PRECISION
+        // utilization_bonus = 500000/1000000 * PRECISION = PRECISION/2
+        // weight = depth * (PREC + PREC/2) / PREC * (PREC + PREC) / PREC
+        //        = depth * 1.5 * 2 = depth * 3
+        let expected = vibeswap_math::mul_div(
+            vibeswap_math::mul_div(
+                1_000_000 * PRECISION,
+                PRECISION + PRECISION / 2,
+                PRECISION,
+            ),
+            PRECISION + PRECISION,
+            PRECISION,
+        );
+        assert_eq!(weights[&pair(1)], expected);
+    }
 }

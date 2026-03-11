@@ -554,6 +554,253 @@ pub mod pool {
     }
 }
 
+// ============ Mutualist Liquidation Prevention ============
+//
+// P-105: Prevention over punishment.
+// Traditional liquidation rewards vultures for exploiting distress.
+// Mutualist liquidation PREVENTS the distress in the first place.
+//
+// Graduated de-risking thresholds:
+//   HF < 1.5 → Warning (notify user on-chain)
+//   HF < 1.3 → Auto-deleverage (convert deposit shares to repay)
+//   HF < 1.1 → Soft liquidation (incremental collateral release)
+//   HF < 1.0 → Hard liquidation (last resort)
+
+pub mod prevention {
+    use super::*;
+
+    /// Health factor thresholds for graduated de-risking
+    pub const HF_WARNING: u128 = PRECISION * 150 / 100;      // 1.5
+    pub const HF_AUTO_DELEVERAGE: u128 = PRECISION * 130 / 100; // 1.3
+    pub const HF_SOFT_LIQUIDATION: u128 = PRECISION * 110 / 100; // 1.1
+    pub const HF_HARD_LIQUIDATION: u128 = PRECISION;            // 1.0
+
+    /// Maximum number of soft liquidation steps (prevents infinite loop)
+    pub const MAX_SOFT_STEPS: u128 = 20;
+
+    /// Risk tier based on health factor
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum RiskTier {
+        /// HF >= 1.5 — Safe
+        Safe,
+        /// 1.3 <= HF < 1.5 — Warning zone
+        Warning,
+        /// 1.1 <= HF < 1.3 — Auto-deleverage eligible
+        AutoDeleverage,
+        /// 1.0 <= HF < 1.1 — Soft liquidation zone
+        SoftLiquidation,
+        /// HF < 1.0 — Hard liquidation
+        HardLiquidation,
+    }
+
+    /// Classify a position's risk tier based on health factor
+    pub fn classify_risk(health_factor: u128) -> RiskTier {
+        if health_factor >= HF_WARNING {
+            RiskTier::Safe
+        } else if health_factor >= HF_AUTO_DELEVERAGE {
+            RiskTier::Warning
+        } else if health_factor >= HF_SOFT_LIQUIDATION {
+            RiskTier::AutoDeleverage
+        } else if health_factor >= HF_HARD_LIQUIDATION {
+            RiskTier::SoftLiquidation
+        } else {
+            RiskTier::HardLiquidation
+        }
+    }
+
+    /// Calculate auto-deleverage amount: how much debt to repay using deposit shares
+    ///
+    /// When HF < 1.3, the protocol converts the user's deposit shares to underlying
+    /// and uses them to repay debt, bringing HF back above the threshold.
+    ///
+    /// Returns: (shares_to_redeem, debt_to_repay)
+    /// Returns (0, 0) if user has no deposit shares or is already safe
+    pub fn auto_deleverage_amount(
+        collateral_amount: u128,
+        collateral_price: u128,
+        debt_amount: u128,
+        debt_price: u128,
+        liquidation_threshold: u128,
+        deposit_shares: u128,
+        total_shares: u128,
+        total_underlying: u128,
+    ) -> (u128, u128) {
+        if deposit_shares == 0 || total_shares == 0 || total_underlying == 0 {
+            return (0, 0);
+        }
+
+        // Current health factor
+        let hf = match collateral::health_factor(
+            collateral_amount, collateral_price,
+            debt_amount, debt_price,
+            liquidation_threshold,
+        ) {
+            Ok(h) => h,
+            Err(_) => return (0, 0),
+        };
+
+        if hf >= HF_AUTO_DELEVERAGE {
+            return (0, 0); // Already safe
+        }
+
+        // Target: bring HF to 1.3
+        // HF_target = (col_value * LT) / ((debt - repay) * debt_price / PRECISION)
+        // Solving for repay:
+        // repay = debt - (col_value * LT) / (HF_target * debt_price / PRECISION)
+        let col_value = collateral::collateral_value(collateral_amount, collateral_price);
+        let adjusted_col = mul_div(col_value, liquidation_threshold, PRECISION);
+        let target_debt_value = mul_div(adjusted_col, PRECISION, HF_AUTO_DELEVERAGE);
+        let current_debt_value = collateral::collateral_value(debt_amount, debt_price);
+
+        if target_debt_value >= current_debt_value {
+            return (0, 0); // No repayment needed
+        }
+
+        let repay_value = current_debt_value - target_debt_value;
+        let debt_to_repay = mul_div(repay_value, PRECISION, debt_price);
+
+        // Cap by available deposit shares
+        let max_underlying = mul_div(deposit_shares, total_underlying, total_shares);
+        let actual_repay = debt_to_repay.min(max_underlying);
+
+        // Convert to shares
+        let shares_to_redeem = if actual_repay == max_underlying {
+            deposit_shares
+        } else {
+            mul_div(actual_repay, total_shares, total_underlying)
+        };
+
+        (shares_to_redeem, actual_repay)
+    }
+
+    /// Calculate soft liquidation step: incremental collateral release
+    ///
+    /// Instead of 50% close factor at once, soft liquidation does 5% per step
+    /// over multiple blocks. This spreads selling pressure and prevents cascades.
+    ///
+    /// Returns: (debt_to_repay, collateral_to_release) for one step
+    /// Returns (0, 0) if position doesn't qualify for soft liquidation
+    pub fn soft_liquidation_step(
+        collateral_amount: u128,
+        collateral_price: u128,
+        debt_amount: u128,
+        debt_price: u128,
+        liquidation_threshold: u128,
+        liquidation_incentive: u128,
+        step_factor: u128, // e.g., 5% = 0.05e18
+    ) -> (u128, u128) {
+        // Check health factor is in soft liquidation range
+        let hf = match collateral::health_factor(
+            collateral_amount, collateral_price,
+            debt_amount, debt_price,
+            liquidation_threshold,
+        ) {
+            Ok(h) => h,
+            Err(_) => return (0, 0),
+        };
+
+        if hf >= HF_SOFT_LIQUIDATION || hf < HF_HARD_LIQUIDATION {
+            return (0, 0); // Not in soft liquidation range
+        }
+
+        // Step size: step_factor of total debt
+        let step_repay = mul_div(debt_amount, step_factor, PRECISION);
+        if step_repay == 0 {
+            return (0, 0);
+        }
+
+        // Collateral released = repay_value * (1 + reduced_incentive) / col_price
+        // Soft liquidation uses half the normal incentive (less predatory)
+        let reduced_incentive = liquidation_incentive / 2;
+        let repay_value = collateral::collateral_value(step_repay, debt_price);
+        let release_value = mul_div(
+            repay_value,
+            PRECISION + reduced_incentive,
+            PRECISION,
+        );
+        let collateral_release = mul_div(release_value, PRECISION, collateral_price);
+
+        // Cap at available collateral
+        let actual_release = collateral_release.min(collateral_amount);
+
+        (step_repay, actual_release)
+    }
+
+    /// Calculate insurance pool contribution needed to prevent liquidation
+    ///
+    /// The insurance pool absorbs the first loss, topping up collateral value
+    /// before any liquidation occurs. This is mutualized — all users contribute
+    /// a fraction of the reserve factor to the pool.
+    ///
+    /// Returns: amount of insurance tokens needed to bring HF above threshold
+    /// Returns 0 if position is already safe or insurance can't help
+    pub fn insurance_needed(
+        collateral_amount: u128,
+        collateral_price: u128,
+        debt_amount: u128,
+        debt_price: u128,
+        liquidation_threshold: u128,
+        target_hf: u128, // Where to bring HF to (e.g., 1.1)
+    ) -> u128 {
+        let hf = match collateral::health_factor(
+            collateral_amount, collateral_price,
+            debt_amount, debt_price,
+            liquidation_threshold,
+        ) {
+            Ok(h) => h,
+            Err(_) => return 0,
+        };
+
+        if hf >= target_hf {
+            return 0; // Already safe
+        }
+
+        // Need to reduce debt_value to bring HF to target
+        // target_hf = adjusted_col / new_debt_value
+        // new_debt_value = adjusted_col / target_hf
+        // insurance_amount = (current_debt_value - new_debt_value) / debt_price
+        let col_value = collateral::collateral_value(collateral_amount, collateral_price);
+        let adjusted_col = mul_div(col_value, liquidation_threshold, PRECISION);
+        let target_debt_value = mul_div(adjusted_col, PRECISION, target_hf);
+        let current_debt_value = collateral::collateral_value(debt_amount, debt_price);
+
+        if target_debt_value >= current_debt_value {
+            return 0;
+        }
+
+        let shortfall_value = current_debt_value - target_debt_value;
+        mul_div(shortfall_value, PRECISION, debt_price)
+    }
+
+    /// Check if a position would survive a price drop of given percentage
+    ///
+    /// Used for stress testing: "if ETH drops 20%, does this vault survive?"
+    /// Returns health factor at the stressed price
+    pub fn stress_test(
+        collateral_amount: u128,
+        collateral_price: u128,
+        debt_amount: u128,
+        debt_price: u128,
+        liquidation_threshold: u128,
+        price_drop_bps: u128, // basis points (e.g., 2000 = 20% drop)
+    ) -> u128 {
+        let stressed_price = mul_div(
+            collateral_price,
+            BPS_DENOMINATOR - price_drop_bps,
+            BPS_DENOMINATOR,
+        );
+
+        match collateral::health_factor(
+            collateral_amount, stressed_price,
+            debt_amount, debt_price,
+            liquidation_threshold,
+        ) {
+            Ok(hf) => hf,
+            Err(_) => 0,
+        }
+    }
+}
+
 // ============ Integer Math Helpers ============
 
 /// Compute (a * b) / c using 256-bit intermediate to avoid overflow.
@@ -1108,6 +1355,196 @@ mod tests {
         // Should be approximately e ≈ 2.718e18
         assert!(result > 2_710_000_000_000_000_000);
         assert!(result < 2_730_000_000_000_000_000);
+    }
+
+    // ============ Prevention (P-105) Tests ============
+
+    #[test]
+    fn test_risk_tier_safe() {
+        use super::prevention::*;
+        assert_eq!(classify_risk(2 * PRECISION), RiskTier::Safe);
+        assert_eq!(classify_risk(HF_WARNING), RiskTier::Safe);
+    }
+
+    #[test]
+    fn test_risk_tier_warning() {
+        use super::prevention::*;
+        assert_eq!(classify_risk(HF_WARNING - 1), RiskTier::Warning);
+        assert_eq!(classify_risk(HF_AUTO_DELEVERAGE), RiskTier::Warning);
+    }
+
+    #[test]
+    fn test_risk_tier_auto_deleverage() {
+        use super::prevention::*;
+        assert_eq!(classify_risk(HF_AUTO_DELEVERAGE - 1), RiskTier::AutoDeleverage);
+        assert_eq!(classify_risk(HF_SOFT_LIQUIDATION), RiskTier::AutoDeleverage);
+    }
+
+    #[test]
+    fn test_risk_tier_soft_liquidation() {
+        use super::prevention::*;
+        assert_eq!(classify_risk(HF_SOFT_LIQUIDATION - 1), RiskTier::SoftLiquidation);
+        assert_eq!(classify_risk(PRECISION), RiskTier::SoftLiquidation);
+    }
+
+    #[test]
+    fn test_risk_tier_hard_liquidation() {
+        use super::prevention::*;
+        assert_eq!(classify_risk(PRECISION - 1), RiskTier::HardLiquidation);
+        assert_eq!(classify_risk(0), RiskTier::HardLiquidation);
+    }
+
+    #[test]
+    fn test_auto_deleverage_safe_position() {
+        use super::prevention::*;
+        // HF = 3.2 — safe, no deleverage needed
+        let (shares, repay) = auto_deleverage_amount(
+            10 * PRECISION, 2000 * PRECISION,
+            5000 * PRECISION, PRECISION,
+            800_000_000_000_000_000, // 80% LT
+            1000 * PRECISION, // deposit shares
+            10000 * PRECISION,
+            11000 * PRECISION,
+        );
+        assert_eq!(shares, 0);
+        assert_eq!(repay, 0);
+    }
+
+    #[test]
+    fn test_auto_deleverage_underwater() {
+        use super::prevention::*;
+        // 10 ETH at $1300, 8000 USDC debt, 80% LT
+        // HF = (10 * 1300 * 0.8) / 8000 = 10400/8000 = 1.3 — right at threshold
+        // Drop to $1200: HF = (10 * 1200 * 0.8) / 8000 = 9600/8000 = 1.2 — needs deleverage
+        let (shares, repay) = auto_deleverage_amount(
+            10 * PRECISION, 1200 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            5000 * PRECISION, // has deposit shares
+            100000 * PRECISION,
+            110000 * PRECISION,
+        );
+        assert!(repay > 0, "Should recommend repayment");
+        assert!(shares > 0, "Should redeem shares");
+        assert!(repay < 8000 * PRECISION, "Should not repay all debt");
+    }
+
+    #[test]
+    fn test_auto_deleverage_no_deposit_shares() {
+        use super::prevention::*;
+        let (shares, repay) = auto_deleverage_amount(
+            10 * PRECISION, 1200 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            0, // no deposit shares
+            100000 * PRECISION,
+            110000 * PRECISION,
+        );
+        assert_eq!(shares, 0);
+        assert_eq!(repay, 0);
+    }
+
+    #[test]
+    fn test_soft_liquidation_step_in_range() {
+        use super::prevention::*;
+        // HF between 1.0 and 1.1 — soft liquidation range
+        // 10 ETH at $1050, 8000 USDC debt, 80% LT
+        // HF = (10 * 1050 * 0.8) / 8000 = 8400/8000 = 1.05
+        let (repay, release) = soft_liquidation_step(
+            10 * PRECISION, 1050 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            50_000_000_000_000_000,  // 5% incentive
+            50_000_000_000_000_000,  // 5% step factor
+        );
+        assert!(repay > 0, "Should repay some debt");
+        assert!(release > 0, "Should release some collateral");
+        // Step should be 5% of 8000 = 400
+        assert_eq!(repay, 400 * PRECISION);
+        // Release should be about 400 * 1.025 / 1050
+        assert!(release > 0);
+        assert!(release < PRECISION); // Less than 1 ETH
+    }
+
+    #[test]
+    fn test_soft_liquidation_not_in_range() {
+        use super::prevention::*;
+        // HF = 1.2 — in auto-deleverage range, NOT soft liquidation
+        let (repay, release) = soft_liquidation_step(
+            10 * PRECISION, 1200 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            50_000_000_000_000_000,
+            50_000_000_000_000_000,
+        );
+        assert_eq!(repay, 0);
+        assert_eq!(release, 0);
+    }
+
+    #[test]
+    fn test_insurance_needed_safe() {
+        use super::prevention::*;
+        let needed = insurance_needed(
+            10 * PRECISION, 2000 * PRECISION,
+            5000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            HF_SOFT_LIQUIDATION,
+        );
+        assert_eq!(needed, 0); // Already safe
+    }
+
+    #[test]
+    fn test_insurance_needed_distressed() {
+        use super::prevention::*;
+        // 10 ETH at $1000, 8000 USDC debt, 80% LT
+        // HF = (10*1000*0.8)/8000 = 1.0 — at threshold
+        // Need insurance to bring HF to 1.1
+        let needed = insurance_needed(
+            10 * PRECISION, 1000 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            HF_SOFT_LIQUIDATION, // target 1.1
+        );
+        assert!(needed > 0, "Should need insurance");
+        // After insurance repays `needed` debt, HF should be ~1.1
+        let new_debt = 8000 * PRECISION - needed;
+        let new_hf = collateral::health_factor(
+            10 * PRECISION, 1000 * PRECISION,
+            new_debt, PRECISION,
+            800_000_000_000_000_000,
+        ).unwrap();
+        // Should be approximately at target (within rounding)
+        assert!(new_hf >= HF_SOFT_LIQUIDATION - PRECISION / 100);
+    }
+
+    #[test]
+    fn test_stress_test_survives() {
+        use super::prevention::*;
+        // 10 ETH at $2000, 5000 USDC, 80% LT
+        // 20% drop: price = $1600
+        // HF = (10*1600*0.8)/5000 = 12800/5000 = 2.56
+        let hf = stress_test(
+            10 * PRECISION, 2000 * PRECISION,
+            5000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            2000, // 20% drop
+        );
+        assert!(hf > PRECISION, "Should survive 20% drop");
+    }
+
+    #[test]
+    fn test_stress_test_fails() {
+        use super::prevention::*;
+        // 10 ETH at $1000, 8000 USDC, 80% LT
+        // 30% drop: price = $700
+        // HF = (10*700*0.8)/8000 = 5600/8000 = 0.7
+        let hf = stress_test(
+            10 * PRECISION, 1000 * PRECISION,
+            8000 * PRECISION, PRECISION,
+            800_000_000_000_000_000,
+            3000, // 30% drop
+        );
+        assert!(hf < PRECISION, "Should fail 30% drop");
     }
 
     #[test]

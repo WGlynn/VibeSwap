@@ -63,13 +63,28 @@
   - Token info metadata for pool discovery
   - Two-token lending with separate collateral
 
+**Cell Collector + Fuzz Tests (continued Session 059):**
+- `ckb/sdk/src/collector.rs` — **NEW** UTXO cell management module (24 tests)
+  - Cell selection (SmallestFirst/LargestFirst/BestFit strategies)
+  - CKB capacity calculation
+  - Cell merge (consolidate UTXO dust)
+  - Cell split (pre-split for concurrent use)
+  - LiveCell representation for indexer results
+- `ckb/tests/src/fuzz.rs` — 5 new property-based tests (3000+ random iterations)
+  - Capacity selection conservation, token selection conservation
+  - Merge/split token conservation, capacity monotonicity
+
+**Canon Updates:**
+- The Trust Protocol (CKB v2.2, TIER 1)
+- The AIM Bot Origin (~2006, TIER 1)
+
 **Pending:**
 - Continue CKB ecosystem development
 - Learning primitives auto-extrapolation
 - Continue autopilot loop
 
 ### Running Test Count
-- **CKB tests**: 365 passing (was 315 at session start)
+- **CKB tests**: 394 passing (was 315 at session start, +79)
 - **Solidity tests**: 393 passing (from Session 058)
 - **Total knowledge primitives**: 75 (P-000 through P-103, some gaps)
 

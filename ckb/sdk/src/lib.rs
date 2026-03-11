@@ -12,6 +12,7 @@ pub mod consensus;
 pub mod emission;
 pub mod fees;
 pub mod governance;
+pub mod indexer;
 pub mod insurance;
 pub mod keeper;
 pub mod knowledge;

@@ -12,6 +12,7 @@ pub mod compliance;
 pub mod consensus;
 pub mod emission;
 pub mod fees;
+pub mod gauge;
 pub mod governance;
 pub mod identity;
 pub mod indexer;

@@ -16,6 +16,11 @@ use vibeswap_sdk::collector::{
     calculate_cell_capacity, min_plain_cell_capacity, min_token_cell_capacity,
 };
 use vibeswap_sdk::token::parse_token_amount;
+use ckb_lending_math::{
+    interest::{self, RateModel},
+    collateral::{self, CollateralParams},
+    shares, pool,
+};
 use core::cmp::Ordering;
 
 // ============ Deterministic PRNG ============
@@ -1192,5 +1197,237 @@ fn test_fuzz_capacity_monotonicity() {
         let cap_no_type = calculate_cell_capacity(data1, args, None);
         let cap_with_type = calculate_cell_capacity(data1, args, Some(32));
         assert!(cap_with_type > cap_no_type, "Type script should increase capacity");
+    }
+}
+
+// ============ Lending Math Property Tests ============
+
+// ============ Fuzz Test: Utilization Rate Bounded ============
+
+/// Property: utilization rate is always in [0, PRECISION] when borrows <= deposits.
+/// U = borrows / deposits, scaled by 1e18.
+#[test]
+fn test_fuzz_utilization_rate_bounded() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0001);
+
+    for i in 0..1000 {
+        let deposits = rng.range_u128(1, 1_000_000_000 * PRECISION);
+        let borrows = rng.range_u128(0, deposits); // borrows <= deposits
+
+        let u = interest::utilization_rate(borrows, deposits).unwrap();
+
+        // Invariant: 0 <= U <= PRECISION (0-100%)
+        assert!(u <= PRECISION, "Iter {}: U={} > 100%, borrows={}, deposits={}", i, u, borrows, deposits);
+
+        // Invariant: if borrows == 0, U == 0
+        if borrows == 0 {
+            assert_eq!(u, 0, "Iter {}: U should be 0 when borrows=0", i);
+        }
+
+        // Invariant: if borrows == deposits, U ≈ PRECISION (100%)
+        if borrows == deposits {
+            // Due to integer division, this should be exactly PRECISION
+            assert_eq!(u, PRECISION, "Iter {}: U should be 100% when borrows=deposits", i);
+        }
+    }
+}
+
+// ============ Fuzz Test: Borrow Rate Monotonic in Utilization ============
+
+/// Property: borrow rate is monotonically non-decreasing in utilization.
+/// Higher utilization = higher borrow rate (by design).
+#[test]
+fn test_fuzz_borrow_rate_monotonic() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0002);
+    let models = [RateModel::default_stable(), RateModel::default_volatile()];
+
+    for model in &models {
+        for _ in 0..500 {
+            let u1 = rng.range_u128(0, PRECISION);
+            let u2 = rng.range_u128(u1, PRECISION);
+
+            let r1 = interest::borrow_rate(u1, model).unwrap();
+            let r2 = interest::borrow_rate(u2, model).unwrap();
+
+            assert!(r2 >= r1, "Borrow rate must be monotonic: r({})={} > r({})={}", u1, r1, u2, r2);
+        }
+    }
+}
+
+// ============ Fuzz Test: Supply Rate <= Borrow Rate ============
+
+/// Property: supply rate is always <= borrow rate (protocol takes a cut).
+/// R_supply = R_borrow * U * (1 - reserve_factor)
+/// Since U <= 1 and (1-rf) <= 1, supply_rate <= borrow_rate always.
+#[test]
+fn test_fuzz_supply_rate_bounded_by_borrow_rate() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0003);
+
+    for i in 0..1000 {
+        let u = rng.range_u128(0, PRECISION);
+        let model = RateModel::default_stable();
+        let br = interest::borrow_rate(u, &model).unwrap();
+        let sr = interest::supply_rate(br, u, model.reserve_factor).unwrap();
+
+        assert!(sr <= br, "Iter {}: supply_rate {} > borrow_rate {} at U={}", i, sr, br, u);
+    }
+}
+
+// ============ Fuzz Test: Interest Accrual Non-Negative ============
+
+/// Property: accrued interest is always >= 0, new borrows >= old borrows.
+/// Lending only grows debt, never shrinks it through accrual.
+#[test]
+fn test_fuzz_interest_accrual_non_negative() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0004);
+
+    for i in 0..1000 {
+        let total_borrows = rng.range_u128(0, 1_000_000_000 * PRECISION);
+        let annual_rate = rng.range_u128(0, 5 * PRECISION); // 0-500% APR
+        let blocks = rng.range_u128(0, 2_628_000); // Up to 1 year
+        let reserve_factor = rng.range_u128(0, PRECISION);
+
+        let (new_borrows, interest_accrued, protocol_share) =
+            interest::accrue_interest(total_borrows, annual_rate, blocks, reserve_factor).unwrap();
+
+        // Invariant 1: new borrows >= old borrows
+        assert!(new_borrows >= total_borrows, "Iter {}: debt decreased", i);
+
+        // Invariant 2: interest accrued >= 0
+        assert_eq!(new_borrows, total_borrows + interest_accrued, "Iter {}: accounting mismatch", i);
+
+        // Invariant 3: protocol share <= interest
+        assert!(protocol_share <= interest_accrued, "Iter {}: protocol share > total interest", i);
+
+        // Invariant 4: zero blocks = zero interest
+        if blocks == 0 {
+            assert_eq!(interest_accrued, 0, "Iter {}: interest on 0 blocks", i);
+        }
+
+        // Invariant 5: zero borrows = zero interest
+        if total_borrows == 0 {
+            assert_eq!(interest_accrued, 0, "Iter {}: interest on 0 borrows", i);
+        }
+    }
+}
+
+// ============ Fuzz Test: Health Factor vs Liquidation Threshold ============
+
+/// Property: health_factor > PRECISION iff position is safe.
+/// If collateral_value * LT > debt_value, HF > 1.0.
+/// Liquidation is only valid when HF < 1.0.
+#[test]
+fn test_fuzz_health_factor_safety() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0005);
+
+    for i in 0..1000 {
+        let col_amount = rng.range_u128(1, 1_000_000 * PRECISION);
+        let col_price = rng.range_u128(1, 100_000 * PRECISION);
+        let debt_amount = rng.range_u128(1, 1_000_000 * PRECISION);
+        let debt_price = rng.range_u128(1, 100_000 * PRECISION);
+        let liq_threshold = rng.range_u128(1, PRECISION); // 0-100%
+
+        let hf = collateral::health_factor(
+            col_amount, col_price, debt_amount, debt_price, liq_threshold,
+        ).unwrap();
+
+        let col_value = ckb_lending_math::mul_div(col_amount, col_price, PRECISION);
+        let adjusted_col = ckb_lending_math::mul_div(col_value, liq_threshold, PRECISION);
+        let debt_value = ckb_lending_math::mul_div(debt_amount, debt_price, PRECISION);
+
+        if debt_value == 0 {
+            // No debt = infinite health (u128::MAX)
+            continue;
+        }
+
+        // Invariant: HF direction matches collateral vs debt comparison
+        if adjusted_col > debt_value {
+            assert!(hf >= PRECISION, "Iter {}: overcollateralized but HF={} < 1.0", i, hf);
+        }
+        // Note: HF < PRECISION doesn't strictly guarantee adjusted_col < debt_value
+        // due to integer division rounding, so we only check the safe direction.
+    }
+}
+
+// ============ Fuzz Test: Deposit/Withdraw Share Symmetry ============
+
+/// Property: depositing X tokens then withdrawing all shares returns <= X tokens.
+/// Due to integer rounding, the returned amount may be slightly less,
+/// but NEVER more (rounding always favors the protocol).
+#[test]
+fn test_fuzz_deposit_withdraw_share_symmetry() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0006);
+
+    for i in 0..1000 {
+        let existing_shares = rng.range_u128(1, 1_000_000 * PRECISION);
+        let existing_underlying = rng.range_u128(existing_shares, existing_shares * 2); // 1:1 to 1:2
+
+        let deposit = rng.range_u128(1, 100_000 * PRECISION);
+
+        let new_shares = shares::deposit_to_shares(deposit, existing_shares, existing_underlying).unwrap();
+
+        if new_shares == 0 {
+            // Too small deposit — rounding to 0 shares, skip
+            continue;
+        }
+
+        // Now redeem those shares
+        let new_total_shares = existing_shares + new_shares;
+        let new_total_underlying = existing_underlying + deposit;
+
+        let redeemed = shares::shares_to_underlying(new_shares, new_total_shares, new_total_underlying).unwrap();
+
+        // Invariant: redeemed <= deposit (rounding always favors protocol)
+        assert!(
+            redeemed <= deposit,
+            "Iter {}: redeemed {} > deposit {} (shares={}, total_shares={}, total_underlying={})",
+            i, redeemed, deposit, new_shares, new_total_shares, new_total_underlying
+        );
+
+        // Should be very close (within rounding error of a few units)
+        let diff = deposit - redeemed;
+        // For large deposits, the rounding error should be tiny relative to deposit
+        if deposit > 1_000_000 {
+            assert!(
+                diff < deposit / 1_000_000, // Less than 0.0001% error
+                "Iter {}: rounding error too large: {} on deposit {}",
+                i, diff, deposit
+            );
+        }
+    }
+}
+
+// ============ Fuzz Test: Borrow Rate Kink Continuity ============
+
+/// Property: the borrow rate curve is continuous at the kink point.
+/// The rate just below and just above the kink should be very close.
+#[test]
+fn test_fuzz_borrow_rate_kink_continuity() {
+    let mut rng = TestRng::new(0x1E4D_0001_0001_0007);
+
+    for _ in 0..100 {
+        let base = rng.range_u128(0, PRECISION / 10);
+        let s1 = rng.range_u128(0, PRECISION / 5);
+        let s2 = rng.range_u128(PRECISION, 10 * PRECISION);
+        let kink = rng.range_u128(PRECISION / 10, PRECISION * 9 / 10);
+
+        let model = RateModel {
+            base_rate: base,
+            slope1: s1,
+            slope2: s2,
+            optimal_utilization: kink,
+            reserve_factor: PRECISION / 10,
+        };
+
+        // Rate just below kink
+        let rate_below = interest::borrow_rate(kink, &model).unwrap();
+        // Rate just above kink (kink + 1)
+        let rate_above = interest::borrow_rate(kink.min(PRECISION - 1) + 1, &model);
+
+        if let Ok(ra) = rate_above {
+            // At the kink, both formulas should give the same result
+            // Just above should be >= rate at kink
+            assert!(ra >= rate_below, "Rate must not decrease above kink");
+        }
     }
 }

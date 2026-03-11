@@ -1,11 +1,4 @@
-// ============ Lending Pool Type Script ============
-// Validates state transitions for lending pool cells.
-// Shared state per asset market — PoW-gated for contention resolution.
-//
-// Operations:
-//   Creation  (None → Some) — Initialize new lending market
-//   Update    (Some → Some) — Accrue interest, deposit, borrow, repay, liquidate
-//   Destruction (Some → None) — Only if pool is empty
+// ============ Lending Pool Type Script — CKB Entry Point ============
 
 #![cfg_attr(feature = "ckb", no_std)]
 #![cfg_attr(feature = "ckb", no_main)]
@@ -34,27 +27,23 @@ fn main() -> i8 {
 
 #[cfg(feature = "ckb")]
 fn entry_main() -> Result<(), i8> {
-    use ckb_std::high_level::{load_cell_data as lcd, QueryIter};
+    use ckb_std::high_level::load_cell_data as lcd;
     use ckb_std::ckb_constants::Source;
+    use lending_pool_type::{verify_creation, verify_update, verify_destruction};
 
-    // Load type script args (pool_id)
     let script = load_script().map_err(|_| -1i8)?;
     let _args = script.args().raw_data();
 
-    // Load old cell data (input group)
     let old_data = lcd(0, Source::GroupInput).ok();
-    // Load new cell data (output group)
     let new_data = lcd(0, Source::GroupOutput).ok();
 
     match (old_data.as_deref(), new_data.as_deref()) {
         (None, Some(data)) => {
-            // Creation
             let pool = vibeswap_types::LendingPoolCellData::deserialize(data)
                 .ok_or(-2i8)?;
             verify_creation(&pool).map_err(|_| -3i8)
         }
         (Some(old), Some(new)) => {
-            // Update
             let old_pool = vibeswap_types::LendingPoolCellData::deserialize(old)
                 .ok_or(-4i8)?;
             let new_pool = vibeswap_types::LendingPoolCellData::deserialize(new)
@@ -62,7 +51,6 @@ fn entry_main() -> Result<(), i8> {
             verify_update(&old_pool, &new_pool).map_err(|_| -6i8)
         }
         (Some(old), None) => {
-            // Destruction
             let pool = vibeswap_types::LendingPoolCellData::deserialize(old)
                 .ok_or(-7i8)?;
             verify_destruction(&pool).map_err(|_| -8i8)
@@ -71,141 +59,14 @@ fn entry_main() -> Result<(), i8> {
     }
 }
 
-// ============ Native Entry (for testing) ============
-
 #[cfg(not(feature = "ckb"))]
 fn main() {}
 
-// ============ Verification Logic ============
-
-use vibeswap_types::{LendingPoolCellData, PRECISION};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum PoolError {
-    InvalidBorrowIndex,
-    InvalidAssetHash,
-    InvalidPoolId,
-    InvalidRateParams,
-    InvalidCollateralParams,
-    BorrowsExceedDeposits,
-    PoolNotEmpty,
-    AssetChanged,
-    PoolIdChanged,
-    RateParamsChanged,
-    CollateralParamsChanged,
-    InvalidAccrual,
-    AccrualBlockRegression,
-    IndexDecreased,
-    SharesNegative,
-}
-
-/// Verify creation of a new lending pool
-pub fn verify_creation(pool: &LendingPoolCellData) -> Result<(), PoolError> {
-    // Borrow index must start at PRECISION (1.0)
-    if pool.borrow_index != PRECISION {
-        return Err(PoolError::InvalidBorrowIndex);
-    }
-
-    // Asset type hash must be non-zero
-    if pool.asset_type_hash == [0u8; 32] {
-        return Err(PoolError::InvalidAssetHash);
-    }
-
-    // Pool ID must be non-zero
-    if pool.pool_id == [0u8; 32] {
-        return Err(PoolError::InvalidPoolId);
-    }
-
-    // Rate model params must be reasonable
-    if pool.optimal_utilization == 0 || pool.optimal_utilization > PRECISION {
-        return Err(PoolError::InvalidRateParams);
-    }
-    if pool.reserve_factor > PRECISION {
-        return Err(PoolError::InvalidRateParams);
-    }
-
-    // Collateral params must be valid
-    if pool.collateral_factor > PRECISION {
-        return Err(PoolError::InvalidCollateralParams);
-    }
-    if pool.liquidation_threshold > PRECISION || pool.liquidation_threshold == 0 {
-        return Err(PoolError::InvalidCollateralParams);
-    }
-    // Liquidation threshold must be >= collateral factor
-    if pool.liquidation_threshold < pool.collateral_factor {
-        return Err(PoolError::InvalidCollateralParams);
-    }
-
-    // Initial state: no borrows
-    if pool.total_borrows != 0 {
-        return Err(PoolError::BorrowsExceedDeposits);
-    }
-
-    Ok(())
-}
-
-/// Verify update of existing lending pool
-pub fn verify_update(
-    old: &LendingPoolCellData,
-    new: &LendingPoolCellData,
-) -> Result<(), PoolError> {
-    // Immutable fields
-    if old.asset_type_hash != new.asset_type_hash {
-        return Err(PoolError::AssetChanged);
-    }
-    if old.pool_id != new.pool_id {
-        return Err(PoolError::PoolIdChanged);
-    }
-
-    // Rate model params are immutable (governance can create new pool)
-    if old.base_rate != new.base_rate
-        || old.slope1 != new.slope1
-        || old.slope2 != new.slope2
-        || old.optimal_utilization != new.optimal_utilization
-        || old.reserve_factor != new.reserve_factor
-    {
-        return Err(PoolError::RateParamsChanged);
-    }
-
-    // Collateral params immutable
-    if old.collateral_factor != new.collateral_factor
-        || old.liquidation_threshold != new.liquidation_threshold
-        || old.liquidation_incentive != new.liquidation_incentive
-    {
-        return Err(PoolError::CollateralParamsChanged);
-    }
-
-    // Accrual block must not go backwards
-    if new.last_accrual_block < old.last_accrual_block {
-        return Err(PoolError::AccrualBlockRegression);
-    }
-
-    // Borrow index must not decrease (interest only accrues)
-    if new.borrow_index < old.borrow_index {
-        return Err(PoolError::IndexDecreased);
-    }
-
-    // Borrows cannot exceed deposits + reserves
-    if new.total_borrows > new.total_deposits + new.total_reserves {
-        return Err(PoolError::BorrowsExceedDeposits);
-    }
-
-    Ok(())
-}
-
-/// Verify destruction of lending pool (only if empty)
-pub fn verify_destruction(pool: &LendingPoolCellData) -> Result<(), PoolError> {
-    if pool.total_deposits != 0 || pool.total_borrows != 0 || pool.total_shares != 0 {
-        return Err(PoolError::PoolNotEmpty);
-    }
-    Ok(())
-}
-
-// ============ Tests ============
+// ============ Tests (use lib functions) ============
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use lending_pool_type::*;
     use vibeswap_types::*;
 
     fn default_pool() -> LendingPoolCellData {
@@ -229,75 +90,66 @@ mod tests {
         }
     }
 
-    // ============ Creation Tests ============
-
     #[test]
     fn test_valid_creation() {
-        let pool = default_pool();
-        assert!(verify_creation(&pool).is_ok());
+        assert!(verify_creation(&default_pool()).is_ok());
     }
 
     #[test]
     fn test_creation_wrong_index() {
-        let mut pool = default_pool();
-        pool.borrow_index = 0;
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidBorrowIndex));
+        let mut p = default_pool();
+        p.borrow_index = 0;
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidBorrowIndex));
     }
 
     #[test]
     fn test_creation_zero_asset_hash() {
-        let mut pool = default_pool();
-        pool.asset_type_hash = [0u8; 32];
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidAssetHash));
+        let mut p = default_pool();
+        p.asset_type_hash = [0u8; 32];
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidAssetHash));
     }
 
     #[test]
     fn test_creation_zero_pool_id() {
-        let mut pool = default_pool();
-        pool.pool_id = [0u8; 32];
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidPoolId));
+        let mut p = default_pool();
+        p.pool_id = [0u8; 32];
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidPoolId));
     }
 
     #[test]
     fn test_creation_invalid_utilization() {
-        let mut pool = default_pool();
-        pool.optimal_utilization = 0;
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidRateParams));
-
-        let mut pool2 = default_pool();
-        pool2.optimal_utilization = PRECISION + 1;
-        assert_eq!(verify_creation(&pool2), Err(PoolError::InvalidRateParams));
+        let mut p = default_pool();
+        p.optimal_utilization = 0;
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidRateParams));
     }
 
     #[test]
     fn test_creation_reserve_factor_too_high() {
-        let mut pool = default_pool();
-        pool.reserve_factor = PRECISION + 1;
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidRateParams));
+        let mut p = default_pool();
+        p.reserve_factor = PRECISION + 1;
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidRateParams));
     }
 
     #[test]
     fn test_creation_collateral_factor_too_high() {
-        let mut pool = default_pool();
-        pool.collateral_factor = PRECISION + 1;
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidCollateralParams));
+        let mut p = default_pool();
+        p.collateral_factor = PRECISION + 1;
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidCollateralParams));
     }
 
     #[test]
     fn test_creation_lt_below_cf() {
-        let mut pool = default_pool();
-        pool.liquidation_threshold = pool.collateral_factor - 1;
-        assert_eq!(verify_creation(&pool), Err(PoolError::InvalidCollateralParams));
+        let mut p = default_pool();
+        p.liquidation_threshold = p.collateral_factor - 1;
+        assert_eq!(verify_creation(&p), Err(PoolError::InvalidCollateralParams));
     }
 
     #[test]
     fn test_creation_nonzero_borrows() {
-        let mut pool = default_pool();
-        pool.total_borrows = 100;
-        assert_eq!(verify_creation(&pool), Err(PoolError::BorrowsExceedDeposits));
+        let mut p = default_pool();
+        p.total_borrows = 100;
+        assert_eq!(verify_creation(&p), Err(PoolError::BorrowsExceedDeposits));
     }
-
-    // ============ Update Tests ============
 
     #[test]
     fn test_valid_deposit() {
@@ -313,7 +165,6 @@ mod tests {
         let mut old = default_pool();
         old.total_deposits = 1000 * PRECISION;
         old.total_shares = 1000 * PRECISION;
-
         let mut new = old.clone();
         new.total_borrows = 800 * PRECISION;
         assert!(verify_update(&old, &new).is_ok());
@@ -377,35 +228,31 @@ mod tests {
         old.total_borrows = 800 * PRECISION;
         old.total_shares = 1000 * PRECISION;
         old.last_accrual_block = 100;
-
         let mut new = old.clone();
         new.last_accrual_block = 200;
-        new.total_borrows = 800 * PRECISION + 1000; // Interest accrued
-        new.total_deposits = old.total_deposits + 900; // 90% to depositors
-        new.total_reserves = 100; // 10% to protocol
-        new.borrow_index = PRECISION + 1; // Slightly increased
+        new.total_borrows = 800 * PRECISION + 1000;
+        new.total_deposits = old.total_deposits + 900;
+        new.total_reserves = 100;
+        new.borrow_index = PRECISION + 1;
         assert!(verify_update(&old, &new).is_ok());
     }
 
-    // ============ Destruction Tests ============
-
     #[test]
     fn test_valid_destruction() {
-        let pool = default_pool();
-        assert!(verify_destruction(&pool).is_ok());
+        assert!(verify_destruction(&default_pool()).is_ok());
     }
 
     #[test]
     fn test_destruction_nonempty() {
-        let mut pool = default_pool();
-        pool.total_deposits = 1;
-        assert_eq!(verify_destruction(&pool), Err(PoolError::PoolNotEmpty));
+        let mut p = default_pool();
+        p.total_deposits = 1;
+        assert_eq!(verify_destruction(&p), Err(PoolError::PoolNotEmpty));
     }
 
     #[test]
     fn test_destruction_with_borrows() {
-        let mut pool = default_pool();
-        pool.total_borrows = 1;
-        assert_eq!(verify_destruction(&pool), Err(PoolError::PoolNotEmpty));
+        let mut p = default_pool();
+        p.total_borrows = 1;
+        assert_eq!(verify_destruction(&p), Err(PoolError::PoolNotEmpty));
     }
 }

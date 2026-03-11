@@ -83,32 +83,10 @@ contract VibeOptions is ERC721, Ownable, ReentrancyGuard, IVibeOptions {
         optionId = _nextOptionId++;
         _safeMint(msg.sender, optionId);
 
-        _options[optionId] = Option({
-            writer: msg.sender,
-            expiry: params.expiry,
-            exerciseEnd: params.expiry + params.exerciseWindow,
-            optionType: params.optionType,
-            state: OptionState.WRITTEN,
-            poolId: params.poolId,
-            amount: params.amount,
-            strikePrice: params.strikePrice,
-            collateral: collateral,
-            premium: params.premium
-        });
-
+        _storeOption(optionId, msg.sender, params, collateral);
         _writerOptions[msg.sender].push(optionId);
         _totalOptions++;
-
-        emit OptionWritten(
-            optionId,
-            msg.sender,
-            params.poolId,
-            params.optionType,
-            params.amount,
-            params.strikePrice,
-            params.premium,
-            params.expiry
-        );
+        _emitWritten(optionId, msg.sender, params);
     }
 
     function purchase(uint256 optionId) external nonReentrant {
@@ -292,6 +270,33 @@ contract VibeOptions is ERC721, Ownable, ReentrancyGuard, IVibeOptions {
     }
 
     // ============ Internal Functions ============
+
+    function _emitWritten(uint256 optionId, address writer, WriteParams calldata params) internal {
+        emit OptionWritten(
+            optionId, writer, params.poolId, params.optionType,
+            params.amount, params.strikePrice, params.premium, params.expiry
+        );
+    }
+
+    function _storeOption(
+        uint256 optionId,
+        address writer,
+        WriteParams calldata params,
+        uint256 collateral
+    ) internal {
+        _options[optionId] = Option({
+            writer: writer,
+            expiry: params.expiry,
+            exerciseEnd: params.expiry + params.exerciseWindow,
+            optionType: params.optionType,
+            state: OptionState.WRITTEN,
+            poolId: params.poolId,
+            amount: params.amount,
+            strikePrice: params.strikePrice,
+            collateral: collateral,
+            premium: params.premium
+        });
+    }
 
     function _getSettlementPrice(bytes32 poolId) internal view returns (uint256) {
         uint256 twap = amm.getTWAP(poolId, TWAP_PERIOD);

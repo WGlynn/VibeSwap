@@ -975,6 +975,223 @@ impl VibeSwapSDK {
             witnesses: vec![vec![]],
         }
     }
+    // ============ Liquidation ============
+
+    /// Build a transaction to liquidate an underwater vault position
+    ///
+    /// A liquidator repays some of the borrower's debt and receives their
+    /// collateral at a discount (the liquidation incentive).
+    ///
+    /// Inputs: pool cell + borrower's vault cell + oracle cell + liquidator's repay tokens
+    /// Outputs: updated pool + updated vault + collateral to liquidator
+    ///
+    /// # Arguments
+    /// * `pool_outpoint` / `pool_data` — the lending pool
+    /// * `vault_outpoint` / `vault_data` — the borrower's underwater vault
+    /// * `collateral_price` / `debt_price` — oracle-provided prices (scaled by 1e18)
+    /// * `repay_amount` — how much debt the liquidator wants to repay
+    /// * `liquidator_lock` — the liquidator's lock script (receives collateral)
+    /// * `liquidator_inputs` — liquidator's token cells to pay debt
+    /// * `block_number` — current block for accrual
+    pub fn liquidate(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &LendingPoolCellData,
+        vault_outpoint: CellInput,
+        vault_data: &VaultCellData,
+        collateral_price: u128,
+        debt_price: u128,
+        repay_amount: u128,
+        liquidator_lock: Script,
+        liquidator_inputs: Vec<CellInput>,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        use ckb_lending_math::{
+            collateral::{self, CollateralParams},
+            interest, shares,
+        };
+
+        // Build rate model from pool params
+        let model = interest::RateModel {
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+        };
+
+        // Accrue interest on the pool first
+        let blocks_elapsed = if block_number > pool_data.last_accrual_block {
+            (block_number - pool_data.last_accrual_block) as u128
+        } else {
+            0
+        };
+
+        let utilization = if pool_data.total_deposits > 0 {
+            interest::utilization_rate(pool_data.total_borrows, pool_data.total_deposits)
+                .map_err(|_| SDKError::Overflow)?
+        } else {
+            0
+        };
+
+        let borrow_rate = interest::borrow_rate(utilization, &model)
+            .map_err(|_| SDKError::Overflow)?;
+
+        let (new_total_borrows, interest_accrued, protocol_share) =
+            interest::accrue_interest(
+                pool_data.total_borrows,
+                borrow_rate,
+                blocks_elapsed,
+                pool_data.reserve_factor,
+            )
+            .map_err(|_| SDKError::Overflow)?;
+
+        // Calculate new borrow index
+        let new_borrow_index = if pool_data.total_borrows > 0 {
+            vibeswap_math::mul_div(
+                pool_data.borrow_index,
+                new_total_borrows,
+                pool_data.total_borrows,
+            )
+        } else {
+            pool_data.borrow_index
+        };
+
+        // Calculate actual debt from shares using borrow index
+        let actual_debt = vibeswap_math::mul_div(
+            vault_data.debt_shares,
+            new_borrow_index,
+            vault_data.borrow_index_snapshot,
+        );
+
+        // Check liquidation math
+        let params = CollateralParams {
+            collateral_factor: pool_data.collateral_factor,
+            liquidation_threshold: pool_data.liquidation_threshold,
+            liquidation_incentive: pool_data.liquidation_incentive,
+            close_factor: PRECISION / 2, // 50% close factor
+        };
+
+        let (max_repay, max_seized) = collateral::liquidation_amounts(
+            vault_data.collateral_amount,
+            collateral_price,
+            actual_debt,
+            debt_price,
+            &params,
+        )
+        .map_err(|_| SDKError::InvalidAmounts)?;
+
+        // Cap repay at requested amount and max allowed
+        let actual_repay = repay_amount.min(max_repay);
+        if actual_repay == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Calculate collateral seized proportional to repay
+        let seized_collateral = if actual_repay == max_repay {
+            max_seized
+        } else {
+            // Proportional: seized = max_seized * (actual_repay / max_repay)
+            vibeswap_math::mul_div(max_seized, actual_repay, max_repay)
+        };
+
+        // Convert repay amount to debt shares being retired
+        let repaid_shares = vibeswap_math::mul_div(
+            actual_repay,
+            vault_data.borrow_index_snapshot,
+            new_borrow_index,
+        );
+
+        // Updated vault
+        let new_vault = VaultCellData {
+            owner_lock_hash: vault_data.owner_lock_hash,
+            pool_id: vault_data.pool_id,
+            collateral_amount: vault_data.collateral_amount - seized_collateral,
+            collateral_type_hash: vault_data.collateral_type_hash,
+            debt_shares: vault_data.debt_shares.saturating_sub(repaid_shares),
+            borrow_index_snapshot: new_borrow_index,
+            deposit_shares: vault_data.deposit_shares,
+            last_update_block: block_number,
+        };
+
+        // Updated pool
+        let new_pool = LendingPoolCellData {
+            total_deposits: pool_data.total_deposits + interest_accrued - protocol_share,
+            total_borrows: new_total_borrows - actual_repay,
+            total_shares: pool_data.total_shares,
+            total_reserves: pool_data.total_reserves + protocol_share,
+            borrow_index: new_borrow_index,
+            last_accrual_block: block_number,
+            // Immutable fields carry forward
+            asset_type_hash: pool_data.asset_type_hash,
+            pool_id: pool_data.pool_id,
+            base_rate: pool_data.base_rate,
+            slope1: pool_data.slope1,
+            slope2: pool_data.slope2,
+            optimal_utilization: pool_data.optimal_utilization,
+            reserve_factor: pool_data.reserve_factor,
+            collateral_factor: pool_data.collateral_factor,
+            liquidation_threshold: pool_data.liquidation_threshold,
+            liquidation_incentive: pool_data.liquidation_incentive,
+        };
+
+        // Build outputs
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.lending_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: vault_data.owner_lock_hash, // Owner still controls vault
+                hash_type: HashType::Type,
+                args: vec![],
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_vault.serialize().to_vec(),
+        };
+
+        // Liquidator receives seized collateral
+        let liquidator_output = CellOutput {
+            capacity: 0,
+            lock_script: liquidator_lock,
+            type_script: None, // Collateral token type script would go here in production
+            data: seized_collateral.to_le_bytes().to_vec(),
+        };
+
+        let mut inputs = vec![pool_outpoint, vault_outpoint];
+        inputs.extend(liquidator_inputs);
+        let witness_count = inputs.len();
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs,
+            outputs: vec![pool_output, vault_output, liquidator_output],
+            witnesses: vec![vec![]; witness_count],
+        })
+    }
 }
 
 // ============ Order Type ============

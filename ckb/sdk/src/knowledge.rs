@@ -218,8 +218,8 @@ fn compute_new_difficulty(old_cell: &KnowledgeCellData, current_block: u64) -> u
     let adjusted = vibeswap_pow::adjust_difficulty(old_cell.difficulty, blocks_elapsed, target_blocks);
 
     // Clamp to ±1 of current
-    let clamped = if adjusted > old_cell.difficulty + KNOWLEDGE_MAX_DIFFICULTY_DELTA {
-        old_cell.difficulty + KNOWLEDGE_MAX_DIFFICULTY_DELTA
+    let clamped = if adjusted > old_cell.difficulty.saturating_add(KNOWLEDGE_MAX_DIFFICULTY_DELTA) {
+        old_cell.difficulty.saturating_add(KNOWLEDGE_MAX_DIFFICULTY_DELTA)
     } else if adjusted < old_cell.difficulty.saturating_sub(KNOWLEDGE_MAX_DIFFICULTY_DELTA) {
         old_cell.difficulty.saturating_sub(KNOWLEDGE_MAX_DIFFICULTY_DELTA)
     } else {
@@ -656,6 +656,257 @@ mod tests {
         let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
         assert_eq!(cell.value_size, 0);
         assert_ne!(cell.value_hash, [0u8; 32]); // Empty still has hash
+    }
+
+    // ============ New Edge Case Tests ============
+
+    #[test]
+    fn test_create_cell_large_value() {
+        // Verify that a large value (64KB) produces correct value_size and a valid hash
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x77; 32], index: 0, since: 0 };
+        let large_value = vec![0xCDu8; 65_536]; // 64KB
+
+        let tx = create_knowledge_cell(
+            "storage", "blob", &large_value, [0xAA; 32], 999, &deployment, input,
+        );
+
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.value_size, 65_536);
+        assert_eq!(cell.value_hash, compute_value_hash(&large_value));
+        assert_eq!(cell.timestamp_block, 999);
+    }
+
+    #[test]
+    fn test_create_cell_block_zero() {
+        // Genesis at block 0 should work fine
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x33; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell(
+            "ns", "key", b"data", [0xFF; 32], 0, &deployment, input,
+        );
+
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.timestamp_block, 0);
+        assert_eq!(cell.update_count, 0);
+        assert_eq!(cell.difficulty, KNOWLEDGE_MIN_DIFFICULTY);
+    }
+
+    #[test]
+    fn test_create_cell_type_script_args_match_key_hash() {
+        // The type script args must equal key_hash for on-chain uniqueness enforcement
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x55; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell(
+            "jarvis", "memory_index", b"pointer data", [0xBB; 32], 42, &deployment, input,
+        );
+
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        let type_script = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(type_script.args, cell.key_hash.to_vec(),
+            "Type script args must be key_hash for uniqueness");
+    }
+
+    #[test]
+    fn test_create_cell_lock_script_encodes_pow_args() {
+        // Verify the lock script args correctly encode PoWLockArgs
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x66; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell(
+            "vibeswap", "config", b"settings", [0xDD; 32], 100, &deployment, input,
+        );
+
+        let lock_args_bytes = &tx.outputs[0].lock_script.args;
+        let lock_args = PoWLockArgs::deserialize(lock_args_bytes).unwrap();
+        let expected_key_hash = compute_key_hash("vibeswap", "config");
+
+        assert_eq!(lock_args.pair_id, expected_key_hash);
+        assert_eq!(lock_args.min_difficulty, KNOWLEDGE_MIN_DIFFICULTY);
+    }
+
+    #[test]
+    fn test_update_preserves_key_hash_across_author_change() {
+        // Different authors can update the same cell; key_hash must remain constant
+        let deployment = test_deployment();
+        let key_hash = compute_key_hash("shared", "resource");
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash,
+            value_hash: compute_value_hash(b"author_a_data"),
+            value_size: 13,
+            prev_state_hash: [0u8; 32],
+            mmr_root: [0u8; 32],
+            update_count: 0,
+            author_lock_hash: [0xAA; 32], // Author A
+            timestamp_block: 100,
+            difficulty: KNOWLEDGE_MIN_DIFFICULTY,
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"author_b_data", [0xBB; 32], // New MMR
+            [0xCC; 32], // Author B (different)
+            200, &proof, &deployment,
+        );
+
+        let new_data = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_data.key_hash, key_hash, "Key hash must never change between authors");
+        assert_eq!(new_data.author_lock_hash, [0xCC; 32], "Author should be updated");
+        assert_ne!(new_data.author_lock_hash, old.author_lock_hash);
+    }
+
+    #[test]
+    fn test_update_mmr_root_propagation() {
+        // Verify MMR root from update_knowledge_cell is correctly stored
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("jarvis", "mmr_test"),
+            value_hash: compute_value_hash(b"v1"),
+            value_size: 2,
+            mmr_root: [0u8; 32], // Empty MMR at genesis
+            ..Default::default()
+        };
+
+        let new_mmr = [0xDE; 32];
+        let tx = update_knowledge_cell(
+            &old, input, b"v2", new_mmr, [0xFF; 32], 50, &proof, &deployment,
+        );
+
+        let new_data = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_data.mmr_root, new_mmr, "MMR root must be stored exactly as provided");
+        assert_ne!(new_data.mmr_root, old.mmr_root, "MMR root should differ from genesis");
+    }
+
+    #[test]
+    fn test_update_witness_contains_pow_challenge_and_nonce() {
+        // Verify the witness is exactly [challenge || nonce] (64 bytes)
+        let deployment = test_deployment();
+        let challenge = [0xAB; 32];
+        let nonce = [0xCD; 32];
+        let proof = PoWProof { challenge, nonce };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("jarvis", "witness_test"),
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"data", [0u8; 32], [0xFF; 32], 10, &proof, &deployment,
+        );
+
+        assert_eq!(tx.witnesses.len(), 1);
+        assert_eq!(tx.witnesses[0].len(), 64);
+        assert_eq!(&tx.witnesses[0][..32], &challenge);
+        assert_eq!(&tx.witnesses[0][32..64], &nonce);
+    }
+
+    #[test]
+    fn test_difficulty_near_max_u8() {
+        // Edge case: difficulty at 254 (one below u8::MAX)
+        // Note: difficulty=255 causes overflow in compute_new_difficulty due to
+        // unchecked `old_cell.difficulty + KNOWLEDGE_MAX_DIFFICULTY_DELTA` on line 221.
+        // This test validates behavior at the highest safe difficulty value.
+        let cell = KnowledgeCellData {
+            difficulty: 254,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+
+        // Fast update: wants to increase, clamped to +1 = 255
+        let fast_diff = compute_new_difficulty(&cell, 101);
+        assert!(fast_diff >= 254, "Should not decrease on fast update");
+        assert!(fast_diff <= 255, "Clamped to +1 max");
+
+        // Slow update: should decrease by 1
+        let slow_diff = compute_new_difficulty(&cell, 100 + 10_000_000);
+        assert!(slow_diff >= 253, "Slow update should decrease by at most 1");
+        assert!(slow_diff <= 254, "Should not increase on slow update");
+    }
+
+    #[test]
+    fn test_difficulty_at_minimum_with_slow_update() {
+        // Edge case: difficulty is at minimum and update is slow
+        // Should remain at minimum, not underflow
+        let cell = KnowledgeCellData {
+            difficulty: KNOWLEDGE_MIN_DIFFICULTY,
+            timestamp_block: 0,
+            ..Default::default()
+        };
+
+        let new_diff = compute_new_difficulty(&cell, u64::MAX / 2);
+        assert_eq!(new_diff, KNOWLEDGE_MIN_DIFFICULTY,
+            "Cannot go below minimum even with extremely slow updates");
+    }
+
+    #[test]
+    fn test_full_lifecycle_create_mine_update() {
+        // Integration test: create genesis -> mine PoW -> update cell -> verify chain integrity
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        // Step 1: Create genesis cell
+        let create_tx = create_knowledge_cell(
+            "lifecycle", "test", b"genesis_value", [0xAA; 32], 100, &deployment, input.clone(),
+        );
+        let genesis = KnowledgeCellData::deserialize(&create_tx.outputs[0].data).unwrap();
+        assert_eq!(genesis.update_count, 0);
+        assert_eq!(genesis.prev_state_hash, [0u8; 32]);
+
+        // Step 2: Mine PoW for update (low difficulty for test speed)
+        let mut mineable = genesis.clone();
+        mineable.difficulty = 4; // Override to low difficulty for fast mining
+        let proof = mine_for_knowledge_cell(&mineable, 1_000_000);
+        assert!(proof.is_some(), "Should find PoW proof at difficulty 4");
+        let proof = proof.unwrap();
+        assert!(vibeswap_pow::verify(&proof, 4));
+
+        // Step 3: Build update transaction
+        let update_tx = update_knowledge_cell(
+            &mineable, input.clone(), b"updated_value",
+            [0xBB; 32], [0xCC; 32], 200, &proof, &deployment,
+        );
+        let updated = KnowledgeCellData::deserialize(&update_tx.outputs[0].data).unwrap();
+
+        // Step 4: Verify chain integrity
+        assert_eq!(updated.update_count, 1);
+        assert_eq!(updated.key_hash, mineable.key_hash, "Key must persist");
+        assert_eq!(updated.prev_state_hash, sha256_data(&mineable.serialize()),
+            "Must link to genesis via prev_state_hash");
+        assert_eq!(updated.value_hash, compute_value_hash(b"updated_value"));
+        assert_eq!(updated.value_size, 13); // "updated_value".len()
+
+        // Step 5: Verify second update chains off first
+        let second_tx = update_knowledge_cell(
+            &updated, input, b"third_value",
+            [0xDD; 32], [0xEE; 32], 300, &proof, &deployment,
+        );
+        let third = KnowledgeCellData::deserialize(&second_tx.outputs[0].data).unwrap();
+        assert_eq!(third.update_count, 2);
+        assert_eq!(third.prev_state_hash, sha256_data(&updated.serialize()));
+    }
+
+    #[test]
+    fn test_key_hash_long_inputs() {
+        // Verify correctness with very long namespace and key strings
+        let long_ns = "a".repeat(10_000);
+        let long_key = "b".repeat(10_000);
+
+        let h1 = compute_key_hash(&long_ns, &long_key);
+        let h2 = compute_key_hash(&long_ns, &long_key);
+        assert_eq!(h1, h2, "Long inputs must still be deterministic");
+
+        // Slightly different long input must differ
+        let long_key_alt = format!("{}c", "b".repeat(9_999));
+        let h3 = compute_key_hash(&long_ns, &long_key_alt);
+        assert_ne!(h1, h3, "Even 1-char difference in long input must produce different hash");
     }
 
     fn test_deployment() -> super::super::DeploymentInfo {

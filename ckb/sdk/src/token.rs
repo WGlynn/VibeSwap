@@ -894,6 +894,306 @@ mod tests {
         assert_ne!(token_type_hash, [0u8; 32]);
     }
 
+    // ============ Edge Case: Zero & Boundary Values ============
+
+    #[test]
+    fn test_mint_zero_amount() {
+        let config = test_xudt_config();
+        let (tx, token_type_hash) = mint_token(
+            &config,
+            test_lock(0x01),
+            test_lock(0x02),
+            0, // zero amount mint
+            test_input(0x50),
+        );
+
+        // Should succeed — on-chain validation handles rules, SDK just builds tx
+        assert_eq!(tx.outputs.len(), 1);
+        let parsed = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(parsed, 0);
+        assert_ne!(token_type_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_mint_u128_max() {
+        let config = test_xudt_config();
+        let max_amount = u128::MAX;
+        let (tx, _) = mint_token(
+            &config,
+            test_lock(0x01),
+            test_lock(0x02),
+            max_amount,
+            test_input(0x50),
+        );
+
+        let parsed = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(parsed, u128::MAX);
+        assert_eq!(tx.outputs[0].data.len(), 16);
+    }
+
+    #[test]
+    fn test_transfer_zero_amount() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        // Transfer 0 tokens — should succeed, all input becomes change
+        let tx = transfer_token(
+            &config,
+            type_script,
+            test_lock(0x01),
+            test_lock(0x02),
+            0,
+            vec![(test_input(0x50), 5000)],
+        ).unwrap();
+
+        // Recipient gets 0
+        let recipient_amount = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(recipient_amount, 0);
+
+        // Change cell gets full balance back
+        assert_eq!(tx.outputs.len(), 2);
+        let change_amount = parse_token_amount(&tx.outputs[1].data).unwrap();
+        assert_eq!(change_amount, 5000);
+    }
+
+    #[test]
+    fn test_burn_zero_amount() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        // Burn 0 — all tokens remain as change
+        let tx = burn_token(
+            &config,
+            type_script,
+            0,
+            test_lock(0x01),
+            vec![(test_input(0x50), 1000)],
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        let remaining = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(remaining, 1000);
+    }
+
+    // ============ Edge Case: Empty & Boundary Inputs ============
+
+    #[test]
+    fn test_mint_batch_empty_recipients() {
+        let config = test_xudt_config();
+        let recipients: Vec<(super::super::Script, u128)> = vec![];
+        let (tx, token_type_hash) = mint_batch(
+            &config,
+            test_lock(0x01),
+            &recipients,
+            test_input(0x50),
+        );
+
+        // Empty batch: no outputs, but tx is structurally valid
+        assert_eq!(tx.outputs.len(), 0);
+        assert_eq!(tx.inputs.len(), 1);
+        // witnesses.len() = max(0, 1) = 1
+        assert_eq!(tx.witnesses.len(), 1);
+        assert_ne!(token_type_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_mint_batch_single_recipient() {
+        let config = test_xudt_config();
+        let recipients = vec![(test_lock(0x02), 42_000_u128)];
+        let (tx, hash_batch) = mint_batch(
+            &config,
+            test_lock(0x01),
+            &recipients,
+            test_input(0x50),
+        );
+
+        // Single recipient batch should match single mint token_type_hash
+        let (_, hash_single) = mint_token(
+            &config,
+            test_lock(0x01),
+            test_lock(0x02),
+            42_000,
+            test_input(0x51),
+        );
+        assert_eq!(hash_batch, hash_single);
+
+        assert_eq!(tx.outputs.len(), 1);
+        let parsed = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(parsed, 42_000);
+    }
+
+    // ============ Error Path: Transfer Exactly One Short ============
+
+    #[test]
+    fn test_transfer_one_short_of_balance() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        // Transfer 999 out of 1000 — should succeed with 1 change
+        let tx = transfer_token(
+            &config,
+            type_script,
+            test_lock(0x01),
+            test_lock(0x02),
+            999,
+            vec![(test_input(0x50), 1000)],
+        ).unwrap();
+
+        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(parse_token_amount(&tx.outputs[0].data).unwrap(), 999);
+        assert_eq!(parse_token_amount(&tx.outputs[1].data).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_burn_from_multiple_inputs() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+
+        // Burn 1500 across three input cells (500 + 600 + 700 = 1800)
+        let tx = burn_token(
+            &config,
+            type_script,
+            1500,
+            test_lock(0x01),
+            vec![
+                (test_input(0x50), 500),
+                (test_input(0x51), 600),
+                (test_input(0x52), 700),
+            ],
+        ).unwrap();
+
+        assert_eq!(tx.inputs.len(), 3);
+        assert_eq!(tx.witnesses.len(), 3);
+        assert_eq!(tx.outputs.len(), 1); // 300 remaining
+        assert_eq!(parse_token_amount(&tx.outputs[0].data).unwrap(), 300);
+    }
+
+    // ============ Token Info Edge Cases ============
+
+    #[test]
+    fn test_token_info_max_decimals() {
+        let info = TokenInfo {
+            name: "Precision Token".to_string(),
+            symbol: "PREC".to_string(),
+            decimals: 255, // u8::MAX
+            description: "A token with maximum decimal places".to_string(),
+            max_supply: u128::MAX,
+        };
+
+        let serialized = info.serialize();
+        let deserialized = TokenInfo::deserialize(&serialized).unwrap();
+
+        assert_eq!(deserialized.decimals, 255);
+        assert_eq!(deserialized.max_supply, u128::MAX);
+        assert_eq!(deserialized.name, "Precision Token");
+        assert_eq!(deserialized.symbol, "PREC");
+    }
+
+    #[test]
+    fn test_token_info_truncated_data_rejects() {
+        // Build valid data then truncate at various points
+        let info = TokenInfo {
+            name: "Test".to_string(),
+            symbol: "TST".to_string(),
+            decimals: 18,
+            description: "Description".to_string(),
+            max_supply: 1000,
+        };
+        let full = info.serialize();
+
+        // Truncate before max_supply (cut off last 16 bytes)
+        let truncated = &full[..full.len() - 16];
+        assert!(TokenInfo::deserialize(truncated).is_none());
+
+        // Truncate mid-description (cut after symbol but partway through desc)
+        // 1 (decimals) + 2 (name_len) + 4 (name) + 2 (symbol_len) + 3 (symbol) + 2 (desc_len) = 14
+        // Then desc is "Description" (11 bytes), we cut at 5 bytes into it
+        let mid_cut = &full[..19]; // 14 + 5
+        assert!(TokenInfo::deserialize(mid_cut).is_none());
+    }
+
+    // ============ Integration: Mint-Transfer-Burn Chain ============
+
+    #[test]
+    fn test_mint_transfer_burn_chain() {
+        let config = test_xudt_config();
+        let issuer = test_lock(0x10);
+        let alice = test_lock(0x20);
+        let bob = test_lock(0x30);
+
+        // 1. Issuer mints 50_000 tokens to Alice
+        let (mint_tx, _token_type_hash) = mint_token(
+            &config,
+            issuer.clone(),
+            alice.clone(),
+            50_000,
+            test_input(0xA0),
+        );
+        let type_script = mint_tx.outputs[0].type_script.clone().unwrap();
+        let alice_balance = parse_token_amount(&mint_tx.outputs[0].data).unwrap();
+        assert_eq!(alice_balance, 50_000);
+
+        // 2. Alice transfers 20_000 to Bob (keeps 30_000)
+        let transfer_tx = transfer_token(
+            &config,
+            type_script.clone(),
+            alice.clone(),
+            bob.clone(),
+            20_000,
+            vec![(test_input(0xA1), 50_000)],
+        ).unwrap();
+        let bob_balance = parse_token_amount(&transfer_tx.outputs[0].data).unwrap();
+        let alice_remaining = parse_token_amount(&transfer_tx.outputs[1].data).unwrap();
+        assert_eq!(bob_balance, 20_000);
+        assert_eq!(alice_remaining, 30_000);
+
+        // 3. Bob transfers 5_000 back to Alice (keeps 15_000)
+        let transfer_tx2 = transfer_token(
+            &config,
+            type_script.clone(),
+            bob.clone(),
+            alice.clone(),
+            5_000,
+            vec![(test_input(0xA2), 20_000)],
+        ).unwrap();
+        let alice_received = parse_token_amount(&transfer_tx2.outputs[0].data).unwrap();
+        let bob_remaining = parse_token_amount(&transfer_tx2.outputs[1].data).unwrap();
+        assert_eq!(alice_received, 5_000);
+        assert_eq!(bob_remaining, 15_000);
+
+        // 4. Issuer burns 10_000 from their own cells
+        // (In practice issuer would need owner-mode cells; SDK just builds the tx)
+        let burn_tx = burn_token(
+            &config,
+            type_script.clone(),
+            10_000,
+            issuer,
+            vec![(test_input(0xA3), 10_000)],
+        ).unwrap();
+        assert_eq!(burn_tx.outputs.len(), 0); // All burned
+
+        // Verify conservation: Alice has 30k+5k=35k, Bob has 15k, burned 10k
+        // But these are separate UTXO cells; verify the chain of values is consistent
+        assert_eq!(alice_remaining + alice_received, 35_000);
+        assert_eq!(bob_remaining, 15_000);
+    }
+
     // ============ Integration: Full Lifecycle ============
 
     #[test]

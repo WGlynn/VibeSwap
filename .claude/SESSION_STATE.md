@@ -40,8 +40,9 @@
 - `ckb/tests/src/fuzz.rs` — +5 consensus fuzz + 5 prediction fuzz tests (4800 iterations)
 
 **Verified:**
-- CKB workspace: 902/902 tests passing (797 at session start → 902, +105)
+- CKB workspace: 979/979 tests passing (797 at session start → 979, +182)
 - All existing tests still pass (no regressions)
+- 14 CKB scripts (was 12)
 
 **Commits this session:**
 1. `cd93e05` — Miner hardening (5→24 tests)
@@ -53,11 +54,14 @@
 7. `5e5e23f` — Prediction integration + fuzz (21 tests)
 8. `73682a1` — Risk hardening (14→32 tests)
 9. `6d77a60` — Keeper hardening (15→31 tests)
+10. `ad9a74d` — Prediction market type script (57 tests)
+11. `63d9d51` — DeploymentInfo update (13 scripts)
+12. `b2153bb` — Prediction position type script (20 tests)
 
 **Pending:**
 - Continue CKB ecosystem development (autopilot loop)
-- Prediction market CKB type script (on-chain validation)
 - Governance integration tests
+- Prediction market SDK transaction builders (create_market_tx, place_bet_tx, etc.)
 
 ---
 

@@ -1595,4 +1595,295 @@ mod tests {
         let result = verify_proof(&tampered_proof);
         assert!(result.is_ok());
     }
+
+    // ============ Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_message_hash_empty_payload() {
+        let mut msg = make_message(1, 2, 0);
+        msg.payload = vec![];
+        let hash = message_hash(&msg);
+        // Should still produce a valid non-zero hash
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_message_hash_max_nonce() {
+        let msg = CrossChainMessage {
+            source_chain: 1,
+            dest_chain: 2,
+            nonce: u64::MAX,
+            sender: [0xAA; 32],
+            receiver: [0xBB; 32],
+            payload: vec![1],
+            timestamp: u64::MAX,
+        };
+        let hash = message_hash(&msg);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_message_hash_differs_by_source_chain() {
+        let m1 = make_message(1, 3, 0);
+        let m2 = make_message(2, 3, 0);
+        assert_ne!(message_hash(&m1), message_hash(&m2));
+    }
+
+    #[test]
+    fn test_message_hash_differs_by_receiver() {
+        let mut m1 = make_message(1, 2, 0);
+        let mut m2 = make_message(1, 2, 0);
+        m1.receiver = [0x01; 32];
+        m2.receiver = [0x02; 32];
+        assert_ne!(message_hash(&m1), message_hash(&m2));
+    }
+
+    #[test]
+    fn test_verify_proof_three_leaves() {
+        // Odd number of leaves exercises the padding path in build_merkle_tree
+        let leaves: Vec<[u8; 32]> = (0..3)
+            .map(|i| message_hash(&make_message(1, 2, i)))
+            .collect();
+
+        let (root, proof_nodes) = build_merkle_tree(&leaves);
+
+        let proof = MessageProof {
+            message_hash: leaves[0],
+            block_number: 100,
+            proof_data: proof_nodes,
+            root,
+        };
+        assert_eq!(verify_proof(&proof), Ok(true));
+    }
+
+    #[test]
+    fn test_verify_proof_eight_leaves() {
+        // Power-of-two > 4 to exercise deeper tree
+        let leaves: Vec<[u8; 32]> = (0..8)
+            .map(|i| message_hash(&make_message(1, 2, i)))
+            .collect();
+
+        let (root, proof_nodes) = build_merkle_tree(&leaves);
+
+        let proof = MessageProof {
+            message_hash: leaves[0],
+            block_number: 200,
+            proof_data: proof_nodes,
+            root,
+        };
+        assert_eq!(verify_proof(&proof), Ok(true));
+    }
+
+    #[test]
+    fn test_estimate_fee_one_byte_payload() {
+        let chains = default_chains();
+        let est = estimate_bridge_fee(&chains, 2, 1).unwrap();
+        assert_eq!(est.relay_fee, BASE_RELAY_FEE + PER_BYTE_RELAY_FEE);
+    }
+
+    #[test]
+    fn test_estimate_fee_protocol_fee_scales_with_bps() {
+        // CKB has 10 bps, Ethereum has 50 bps — Ethereum should have higher protocol fee
+        let chains = default_chains();
+        let est_ckb = estimate_bridge_fee(&chains, 1, 100).unwrap();
+        let est_eth = estimate_bridge_fee(&chains, 2, 100).unwrap();
+        assert!(est_eth.protocol_fee > est_ckb.protocol_fee);
+    }
+
+    #[test]
+    fn test_validate_transfer_deadline_one_above_current() {
+        // deadline = current_block + 1 should pass (strictly greater)
+        let transfer = make_transfer(1, 2, 1000 * PRECISION, 900 * PRECISION, 101);
+        let tokens = supported_tokens();
+        assert!(validate_transfer(&transfer, 100, &tokens).is_ok());
+    }
+
+    #[test]
+    fn test_validate_transfer_max_payload_boundary() {
+        // Payload exactly at MAX_MESSAGE_SIZE should be accepted
+        let mut transfer = make_transfer(1, 2, 1000 * PRECISION, 900 * PRECISION, 1_000_000);
+        transfer.message.payload = vec![0u8; MAX_MESSAGE_SIZE as usize];
+        let tokens = supported_tokens();
+        assert!(validate_transfer(&transfer, 500_000, &tokens).is_ok());
+    }
+
+    #[test]
+    fn test_validate_transfer_empty_supported_tokens() {
+        // No supported tokens means every token is unsupported
+        let transfer = make_transfer(1, 2, 1000 * PRECISION, 900 * PRECISION, 1_000_000);
+        let err = validate_transfer(&transfer, 500_000, &[]).unwrap_err();
+        assert!(matches!(err, BridgeError::UnsupportedToken { .. }));
+    }
+
+    #[test]
+    fn test_calculate_min_receive_small_amount() {
+        // Amount = 1 with 30 bps fee: 1 * 9970 / 10000 = 0 (integer truncation)
+        let result = calculate_min_receive(1, 30, 0);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_fee_exceeds_10000_bps() {
+        // fee_rate_bps > 10000 should saturate to 0 in the subtraction
+        let result = calculate_min_receive(1_000_000, 20_000, 0);
+        // (10000 - 20000) saturates to 0, so result = 0
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_both_exceed_10000_bps() {
+        let result = calculate_min_receive(1_000_000, 15_000, 15_000);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "attempt to add with overflow")]
+    fn test_next_nonce_max_u64_overflows() {
+        // max u64 + 1 causes arithmetic overflow panic in debug mode
+        let _ = next_nonce(&[u64::MAX]);
+    }
+
+    #[test]
+    fn test_message_status_confirmed_one_before_finality() {
+        // confirmed=100, current=109, finality=10 → need 110 to be Relayed
+        let status = message_status(100, 109, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Confirmed);
+    }
+
+    #[test]
+    fn test_message_status_relayed_exactly_at_finality() {
+        // confirmed=100, current=110, finality=10 → exactly at finality boundary
+        let status = message_status(100, 110, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Relayed);
+    }
+
+    #[test]
+    fn test_message_status_pending_zero_finality() {
+        // Edge: zero finality blocks, confirmed=0 → still Pending
+        let status = message_status(0, 50, 0, false, 1000);
+        assert_eq!(status, BridgeStatus::Pending);
+    }
+
+    #[test]
+    fn test_message_status_relayed_zero_finality() {
+        // Zero finality blocks, confirmed > 0: current >= confirmed + 0 → Relayed
+        let status = message_status(50, 50, 0, false, 1000);
+        assert_eq!(status, BridgeStatus::Relayed);
+    }
+
+    #[test]
+    fn test_message_status_expired_deadline_one() {
+        // deadline=1, current=2 → expired
+        let status = message_status(0, 2, 10, false, 1);
+        assert_eq!(status, BridgeStatus::Expired);
+    }
+
+    #[test]
+    fn test_bridge_summary_single_transfer_in() {
+        let summary = bridge_summary(&[(500 * PRECISION, 42)], &[], &[], 100);
+        assert_eq!(summary.total_bridged_in, 500 * PRECISION);
+        assert_eq!(summary.total_bridged_out, 0);
+        assert_eq!(summary.avg_relay_time, 42);
+        assert_eq!(summary.pending_count, 0);
+    }
+
+    #[test]
+    fn test_bridge_summary_avg_relay_integer_division() {
+        // Test that avg relay time uses integer division (truncation)
+        let transfers_in = vec![(100 * PRECISION, 10u64), (200 * PRECISION, 11u64)];
+        let summary = bridge_summary(&transfers_in, &[], &[], 100);
+        // avg = (10 + 11) / 2 = 10 (integer division truncates)
+        assert_eq!(summary.avg_relay_time, 10);
+    }
+
+    #[test]
+    fn test_find_cheapest_path_only_two_chains() {
+        let chains = vec![
+            make_chain(1, "A", 10, 10, true),
+            make_chain(2, "B", 10, 20, true),
+        ];
+        let path = find_cheapest_path(&chains, 1, 2).unwrap();
+        assert_eq!(path, vec![1, 2]); // Only direct route possible
+    }
+
+    #[test]
+    fn test_find_cheapest_path_skips_inactive_intermediate() {
+        let chains = vec![
+            make_chain(1, "A", 10, 10, true),
+            make_chain(2, "B", 10, 1, false), // Cheap but inactive
+            make_chain(3, "C", 10, 50, true),
+        ];
+        let path = find_cheapest_path(&chains, 1, 3).unwrap();
+        // B is inactive, so can't be used as intermediate
+        assert_eq!(path, vec![1, 3]);
+    }
+
+    #[test]
+    fn test_payload_roundtrip_all_zeros() {
+        let token = [0x00; 32];
+        let receiver = [0x00; 32];
+        let encoded = encode_transfer_payload(&token, 0, &receiver);
+        let (dec_token, dec_amount, dec_receiver) = decode_transfer_payload(&encoded).unwrap();
+        assert_eq!(dec_token, [0x00; 32]);
+        assert_eq!(dec_amount, 0);
+        assert_eq!(dec_receiver, [0x00; 32]);
+    }
+
+    #[test]
+    fn test_payload_roundtrip_all_ones() {
+        let token = [0xFF; 32];
+        let receiver = [0xFF; 32];
+        let encoded = encode_transfer_payload(&token, u128::MAX, &receiver);
+        let (dec_token, dec_amount, dec_receiver) = decode_transfer_payload(&encoded).unwrap();
+        assert_eq!(dec_token, [0xFF; 32]);
+        assert_eq!(dec_amount, u128::MAX);
+        assert_eq!(dec_receiver, [0xFF; 32]);
+    }
+
+    #[test]
+    fn test_decode_payload_one_byte() {
+        let err = decode_transfer_payload(&[0x42]).unwrap_err();
+        assert_eq!(err, BridgeError::MalformedPayload);
+    }
+
+    #[test]
+    fn test_is_message_expired_max_u64_deadline() {
+        // u64::MAX deadline should never expire unless current_block overflows
+        assert!(!is_message_expired(u64::MAX, u64::MAX));
+        assert!(!is_message_expired(u64::MAX, u64::MAX - 1));
+    }
+
+    #[test]
+    fn test_validate_chain_pair_empty_configs() {
+        let err = validate_chain_pair(&[], 1, 2).unwrap_err();
+        assert_eq!(err, BridgeError::InvalidChainId(1));
+    }
+
+    #[test]
+    fn test_validate_chain_pair_returns_correct_configs() {
+        let chains = default_chains();
+        let (src, dest) = validate_chain_pair(&chains, 3, 4).unwrap();
+        assert_eq!(src.chain_id, 3);
+        assert_eq!(src.finality_blocks, 15);
+        assert_eq!(dest.chain_id, 4);
+        assert_eq!(dest.finality_blocks, 32);
+    }
+
+    #[test]
+    fn test_chain_name_helper_truncates_long_names() {
+        let name = chain_name("A very long chain name that exceeds 32 bytes limit definitely");
+        // Only first 32 bytes should be used
+        assert_eq!(name.len(), 32);
+        assert_eq!(&name[..5], b"A ver");
+    }
+
+    #[test]
+    fn test_estimate_fee_all_chains_produce_valid_estimates() {
+        let chains = default_chains();
+        for config in &chains {
+            let est = estimate_bridge_fee(&chains, config.chain_id, 100).unwrap();
+            assert!(est.relay_fee >= BASE_RELAY_FEE);
+            assert!(est.estimated_time_blocks >= config.finality_blocks);
+        }
+    }
 }

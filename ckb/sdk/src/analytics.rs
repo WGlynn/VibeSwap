@@ -1460,4 +1460,352 @@ mod tests {
         let rate = growth_rate_bps(1, 1000);
         assert_eq!(rate, 9_990_000);
     }
+
+    // ============ Additional Edge Case Tests ============
+
+    // --- Protocol Metrics: saturating addition with many pools ---
+
+    #[test]
+    fn protocol_metrics_three_pools_at_max() {
+        let pools = vec![
+            make_pool(0x01, u128::MAX, u128::MAX, 0, 0),
+            make_pool(0x02, u128::MAX, u128::MAX, 0, 0),
+            make_pool(0x03, u128::MAX, u128::MAX, 0, 0),
+        ];
+        let m = protocol_metrics(&pools, u128::MAX, u32::MAX, u64::MAX);
+        assert_eq!(m.total_tvl, u128::MAX);
+        assert_eq!(m.total_volume_24h, u128::MAX);
+        assert_eq!(m.total_users, u32::MAX);
+        assert_eq!(m.protocol_revenue, u128::MAX);
+    }
+
+    #[test]
+    fn protocol_metrics_avg_batch_size_truncates() {
+        // 7 txs / 3 pools = 2 (integer truncation)
+        let pools = vec![
+            make_pool(0x01, 100, 50, 100, 10),
+            make_pool(0x02, 200, 60, 200, 20),
+            make_pool(0x03, 300, 70, 300, 30),
+        ];
+        let m = protocol_metrics(&pools, 0, 0, 7);
+        assert_eq!(m.avg_batch_size, 2);
+    }
+
+    // --- Pool Ranking: single pool ---
+
+    #[test]
+    fn pool_ranking_single_pool() {
+        let pools = vec![make_pool(0x01, 500, 200, 100, 50)];
+        let ranked = pool_ranking(&pools, SortBy::Tvl);
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].0, 0);
+        assert_eq!(ranked[0].1.tvl, 500);
+    }
+
+    // --- Volume Moving Average: all snapshots outside window ---
+
+    #[test]
+    fn volume_ma_saturating_addition() {
+        // Large volumes that would overflow without saturating_add
+        let snaps = vec![
+            VolumeSnapshot { block: 100, volume: u128::MAX / 2 },
+            VolumeSnapshot { block: 200, volume: u128::MAX / 2 },
+        ];
+        // window covers both; sum saturates, then divide by 2
+        let ma = volume_moving_average(&snaps, 200).unwrap();
+        // saturating_add(MAX/2, MAX/2) = MAX-1, then /2 = (MAX-1)/2
+        assert_eq!(ma, (u128::MAX - 1) / 2);
+    }
+
+    #[test]
+    fn volume_ma_non_contiguous_blocks() {
+        // Snapshots at blocks 10, 1000, 5000; window of 100
+        // max_block=5000, window_start=4901
+        // Only snapshot at block 5000 is in range
+        let snaps = vec![
+            VolumeSnapshot { block: 10, volume: 100 },
+            VolumeSnapshot { block: 1000, volume: 200 },
+            VolumeSnapshot { block: 5000, volume: 999 },
+        ];
+        let ma = volume_moving_average(&snaps, 100).unwrap();
+        assert_eq!(ma, 999);
+    }
+
+    #[test]
+    fn volume_ma_window_exact_boundary() {
+        // max_block=300, window=200, window_start=101
+        // block 100 is OUTSIDE (100 < 101), blocks 200 and 300 are inside
+        let snaps = make_snapshots(&[100, 200, 300]);
+        let ma = volume_moving_average(&snaps, 200).unwrap();
+        assert_eq!(ma, (200 + 300) / 2);
+    }
+
+    // --- Trend Analysis: exactly 3 points (minimum) with down trend ---
+
+    #[test]
+    fn trend_analysis_minimum_data_points_downtrend() {
+        let series = make_series(&[300, 200, 100]);
+        let t = trend_analysis(&series).unwrap();
+        assert_eq!(t.direction, TrendDirection::Down);
+        assert_eq!(t.data_points, 3);
+    }
+
+    #[test]
+    fn trend_analysis_large_values_no_overflow() {
+        // Values near u128 max that could overflow naive arithmetic
+        let series = make_series(&[
+            PRECISION * 1000,
+            PRECISION * 2000,
+            PRECISION * 3000,
+        ]);
+        let t = trend_analysis(&series).unwrap();
+        assert_eq!(t.direction, TrendDirection::Up);
+    }
+
+    #[test]
+    fn trend_analysis_unsorted_blocks() {
+        // Blocks given out of order; function should sort internally
+        let series = vec![
+            TimeSeriesPoint { block: 500, value: 300 },
+            TimeSeriesPoint { block: 100, value: 100 },
+            TimeSeriesPoint { block: 300, value: 200 },
+        ];
+        let t = trend_analysis(&series).unwrap();
+        // After sorting: 100->200->300, clear uptrend
+        assert_eq!(t.direction, TrendDirection::Up);
+    }
+
+    #[test]
+    fn trend_analysis_exactly_at_flat_threshold() {
+        // Construct series where change_bps is exactly TREND_FLAT_THRESHOLD_BPS (100)
+        // first_avg=10000, last_avg=10100 → change = (100/10000)*10000 = 100 bps
+        let series = make_series(&[10000, 10050, 10100]);
+        let t = trend_analysis(&series).unwrap();
+        assert_eq!(t.direction, TrendDirection::Flat);
+        assert!(t.change_bps <= TREND_FLAT_THRESHOLD_BPS);
+    }
+
+    #[test]
+    fn trend_analysis_just_above_flat_threshold() {
+        // first_avg=10000, last_avg=10200 → change = 200 bps > 100 threshold
+        let series = make_series(&[10000, 10100, 10200]);
+        let t = trend_analysis(&series).unwrap();
+        assert_eq!(t.direction, TrendDirection::Up);
+        assert!(t.change_bps > TREND_FLAT_THRESHOLD_BPS);
+    }
+
+    // --- TVL Composition: single pool with zero TVL among nonzero ---
+
+    #[test]
+    fn tvl_composition_one_zero_among_nonzero() {
+        let pools = vec![
+            make_pool(0x01, 1000, 0, 0, 0),
+            make_pool(0x02, 0, 0, 0, 0),
+        ];
+        let comp = tvl_composition(&pools);
+        assert_eq!(comp[0], (0, 10_000)); // 100%
+        assert_eq!(comp[1], (1, 0));       // 0%
+    }
+
+    #[test]
+    fn tvl_composition_many_tiny_pools() {
+        // 100 pools with TVL=1 each
+        let pools: Vec<PoolMetrics> = (0..100u8)
+            .map(|i| make_pool(i, 1, 0, 0, 0))
+            .collect();
+        let comp = tvl_composition(&pools);
+        // Each pool has 1/100 = 100 bps = 1%
+        for (i, &(idx, share)) in comp.iter().enumerate() {
+            assert_eq!(idx, i);
+            assert_eq!(share, 100);
+        }
+    }
+
+    // --- Fee APR: both zero fees AND zero TVL ---
+
+    #[test]
+    fn fee_apr_both_zero() {
+        let apr = fee_apr(0, 0, BLOCKS_PER_YEAR, BLOCKS_PER_YEAR);
+        assert_eq!(apr, 0);
+    }
+
+    #[test]
+    fn fee_apr_very_short_period() {
+        // 1 fee on 100 TVL over 1 block, annualized over 7.884M blocks
+        let apr = fee_apr(1, 100, 1, BLOCKS_PER_YEAR);
+        // (1/100)*10000 = 100 bps per block; *7_884_000 = huge, capped at u16::MAX
+        assert_eq!(apr, u16::MAX);
+    }
+
+    // --- Retention: all users are returning ---
+
+    #[test]
+    fn retention_all_returning_no_new() {
+        // 200 prev, 200 current, 0 new → 200 returning → 100%
+        let rate = user_retention_rate(200, 200, 0);
+        assert_eq!(rate, 10_000);
+    }
+
+    #[test]
+    fn retention_one_prev_user() {
+        // 1 prev, 1 current, 0 new → 100%
+        let rate = user_retention_rate(1, 1, 0);
+        assert_eq!(rate, 10_000);
+    }
+
+    #[test]
+    fn retention_one_prev_user_lost() {
+        // 1 prev, 1 current, 1 new → 0 returning → 0%
+        let rate = user_retention_rate(1, 1, 1);
+        assert_eq!(rate, 0);
+    }
+
+    // --- Leaderboard: all zero volumes ---
+
+    #[test]
+    fn leaderboard_all_zero_volume() {
+        let users = vec![
+            make_user(0x03, 0, 0),
+            make_user(0x01, 0, 0),
+            make_user(0x02, 0, 0),
+        ];
+        let lb = leaderboard(&users, 3);
+        assert_eq!(lb.len(), 3);
+        // All tied at 0; sorted by address ascending
+        assert_eq!(lb[0].address, [0x01; 32]);
+        assert_eq!(lb[1].address, [0x02; 32]);
+        assert_eq!(lb[2].address, [0x03; 32]);
+        assert_eq!(lb[0].score, 0);
+    }
+
+    #[test]
+    fn leaderboard_top_1_many_users() {
+        let users = vec![
+            make_user(0x01, 500, 5),
+            make_user(0x02, 900, 9),
+            make_user(0x03, 100, 1),
+            make_user(0x04, 700, 7),
+        ];
+        let lb = leaderboard(&users, 1);
+        assert_eq!(lb.len(), 1);
+        assert_eq!(lb[0].address, [0x02; 32]);
+        assert_eq!(lb[0].rank, 1);
+        assert_eq!(lb[0].score, 900);
+    }
+
+    // --- Protocol Health: zero users prev AND current ---
+
+    #[test]
+    fn protocol_health_zero_users_both_periods() {
+        let tvl = make_series(&[100, 200, 300]);
+        let vol = make_series(&[50, 60, 70]);
+        let h = protocol_health(&tvl, &vol, 0, 0, &[5000], 7000).unwrap();
+        assert_eq!(h.user_growth_bps, 0);
+    }
+
+    #[test]
+    fn protocol_health_declining_users_no_growth() {
+        let tvl = make_series(&[100, 200, 300]);
+        let vol = make_series(&[50, 60, 70]);
+        // users_current < users_prev: growth is 0 (clamped, no negative)
+        let h = protocol_health(&tvl, &vol, 200, 100, &[5000], 7000).unwrap();
+        assert_eq!(h.user_growth_bps, 0);
+    }
+
+    #[test]
+    fn protocol_health_max_risk_accumulation() {
+        // Declining TVL (strong), declining volume, low insurance, high utilization
+        let tvl = make_series(&[1000, 500, 100]);
+        let vol = make_series(&[500, 250, 50]);
+        let h = protocol_health(&tvl, &vol, 100, 100, &[9500, 10000], 1000).unwrap();
+        assert_eq!(h.tvl_trend, TrendDirection::Down);
+        assert_eq!(h.volume_trend, TrendDirection::Down);
+        // Risk score should be non-trivially large
+        assert!(h.risk_score > 1000);
+    }
+
+    // --- Concentration Index: large number of equal pools ---
+
+    #[test]
+    fn concentration_ten_equal_pools() {
+        let tvls = vec![100u128; 10];
+        let index = concentration_index(&tvls);
+        // Each has 1000 bps share. HHI = 10 * (1000^2/10000) = 10 * 100 = 1000
+        assert_eq!(index, 1_000);
+    }
+
+    #[test]
+    fn concentration_one_dominant_one_tiny() {
+        let index = concentration_index(&[999_999, 1]);
+        // Dominant pool has ~10000 bps, tiny has ~0 bps
+        // HHI ~ 10000^2/10000 = 10000
+        // With rounding: 999_999/1_000_000 * 10000 = 9999 bps
+        // 9999^2/10000 = 9998, tiny ~ 0
+        assert!(index >= 9_990);
+    }
+
+    // --- Volume to TVL: extreme values ---
+
+    #[test]
+    fn volume_tvl_very_small_tvl() {
+        // Volume much larger than TVL
+        let ratio = volume_to_tvl_ratio(PRECISION * 100, 1);
+        assert!(ratio > 0);
+    }
+
+    #[test]
+    fn volume_tvl_equal_precision_values() {
+        let ratio = volume_to_tvl_ratio(PRECISION, PRECISION);
+        assert_eq!(ratio, PRECISION); // 1:1
+    }
+
+    // --- Growth Rate: near i32 boundaries ---
+
+    #[test]
+    fn growth_rate_massive_growth_caps_at_i32_max() {
+        // previous=1, current=u128::MAX → rate exceeds i32::MAX
+        let rate = growth_rate_bps(1, u128::MAX);
+        assert_eq!(rate, i32::MAX);
+    }
+
+    #[test]
+    fn growth_rate_tiny_decline() {
+        // 10000 → 9999 = -0.01% = -1 bps
+        let rate = growth_rate_bps(10_000, 9_999);
+        assert_eq!(rate, -1);
+    }
+
+    #[test]
+    fn growth_rate_symmetry() {
+        // +50% and -50% from appropriate bases
+        let up = growth_rate_bps(100, 150);
+        let down = growth_rate_bps(150, 100);
+        assert_eq!(up, 5_000);
+        // 50/150 * 10000 = 3333 bps (not symmetric due to different base)
+        assert_eq!(down, -3_333);
+    }
+
+    #[test]
+    fn growth_rate_one_to_two() {
+        // 1 → 2 = +100%
+        let rate = growth_rate_bps(1, 2);
+        assert_eq!(rate, 10_000);
+    }
+
+    #[test]
+    fn growth_rate_large_equal_values() {
+        // Both large, no change
+        let rate = growth_rate_bps(u128::MAX / 2, u128::MAX / 2);
+        assert_eq!(rate, 0);
+    }
+
+    // --- Constants verification ---
+
+    #[test]
+    fn constants_blocks_per_year_consistent() {
+        // BLOCKS_PER_YEAR = BLOCKS_PER_DAY * 365
+        assert_eq!(BLOCKS_PER_YEAR, BLOCKS_PER_DAY * 365);
+        // Sanity: each block ~4 seconds, so ~21600 blocks/day
+        assert_eq!(BLOCKS_PER_DAY, 86_400 / 4);
+    }
 }

@@ -1993,4 +1993,336 @@ mod tests {
                 under, desired);
         }
     }
+
+    // ============ Batch 6: Additional Edge Cases & Coverage Tests ============
+
+    #[test]
+    fn test_best_route_reverse_direction() {
+        // Find best route from B→A (reverse of the typical A→B direction)
+        let g = graph_two_pools();
+        let amount = 1_000e18 as u128;
+        let route = g.find_best_route(&token(2), &token(1), amount).unwrap();
+        assert_eq!(route.hops.len(), 1);
+        assert_eq!(route.hops[0].token_in, token(2));
+        assert_eq!(route.hops[0].token_out, token(1));
+        assert!(route.expected_output > 0);
+        assert!(route.expected_output < amount); // 1:1 pool with fees
+    }
+
+    #[test]
+    fn test_best_route_reverse_through_two_hops() {
+        // C→B→A (reverse through two-hop chain)
+        let g = graph_two_pools();
+        let amount = 1_000e18 as u128;
+        let route = g.find_best_route(&token(3), &token(1), amount).unwrap();
+        assert_eq!(route.hops.len(), 2);
+        assert_eq!(route.hops[0].token_in, token(3));
+        assert_eq!(route.hops[0].token_out, token(2));
+        assert_eq!(route.hops[1].token_in, token(2));
+        assert_eq!(route.hops[1].token_out, token(1));
+        // B:C = 1M:2M, so going C→B gives roughly 0.5x, then B→A gives ~1x, net ~0.5x minus fees
+        assert!(route.expected_output < amount);
+    }
+
+    #[test]
+    fn test_triangle_best_route_reverse() {
+        // In triangle graph, find best route C→A (both direct and indirect paths exist)
+        let g = graph_triangle();
+        let amount = 1_000e18 as u128;
+        let best = g.find_best_route(&token(3), &token(1), amount).unwrap();
+        // Should pick the route with highest output
+        let all_routes = g.find_all_routes(&token(3), &token(1), MAX_HOPS).unwrap();
+        for route_hops in &all_routes {
+            if let Some(output) = g.simulate_route(route_hops, amount) {
+                assert!(best.expected_output >= output);
+            }
+        }
+    }
+
+    #[test]
+    fn test_effective_price_two_hop_route() {
+        // Effective price through a two-hop route
+        let g = graph_two_pools();
+        let hops = vec![
+            SwapHop {
+                pool_index: 0,
+                pair_id: pair(1, 2),
+                token_in: token(1),
+                token_out: token(2),
+            },
+            SwapHop {
+                pool_index: 1,
+                pair_id: pair(2, 3),
+                token_in: token(2),
+                token_out: token(3),
+            },
+        ];
+        let amount = 1_000e18 as u128;
+        let price = g.effective_price(&hops, amount).unwrap();
+        // A→B (1:1) → B→C (1:2), effective rate ~2x minus double fees
+        assert!(price > vibeswap_math::PRECISION, "Two-hop through 1:2 pool should give >1x rate");
+        assert!(price < 2 * vibeswap_math::PRECISION, "But less than 2x due to fees and slippage");
+    }
+
+    #[test]
+    fn test_simulate_route_max_fee_10000_bps() {
+        // Fee rate of 10000 bps (100%) — entire input is taken as fee, output should be 0
+        let mut g = PoolGraph::new();
+        g.add_pool(PoolEdge {
+            pair_id: pair(1, 2),
+            token0: token(1),
+            token1: token(2),
+            reserve0: 1_000_000e18 as u128,
+            reserve1: 1_000_000e18 as u128,
+            fee_rate_bps: 10_000,
+        });
+        let hop = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+        let amount = 1_000e18 as u128;
+        let output = g.simulate_route(&hop, amount);
+        // With 100% fee, amount_in_with_fee = amount * 0 / 10000 = 0, so output = 0
+        assert!(output.is_none() || output == Some(0),
+            "100% fee should yield zero output, got {:?}", output);
+    }
+
+    #[test]
+    fn test_spot_price_extreme_asymmetry() {
+        // Very asymmetric reserves: 1 vs 1e27
+        let p = PoolEdge {
+            pair_id: pair(1, 2),
+            token0: token(1),
+            token1: token(2),
+            reserve0: 1,
+            reserve1: 1_000_000_000_000_000_000_000_000_000u128, // 1e27
+            fee_rate_bps: 30,
+        };
+        let price = PoolGraph::spot_price(&p, &token(1));
+        // price = reserve1 * PRECISION / reserve0 = 1e27 * 1e18 / 1 = 1e45
+        assert!(price > 0);
+        // Reverse direction
+        let price_rev = PoolGraph::spot_price(&p, &token(2));
+        // price_rev = 1 * 1e18 / 1e27 = 0 (integer division truncates)
+        assert_eq!(price_rev, 0, "Tiny reserve_out / huge reserve_in should truncate to 0");
+    }
+
+    #[test]
+    fn test_find_all_routes_verifies_pair_ids() {
+        // Verify that each hop in discovered routes has correct pair_id matching the pool
+        let g = graph_triangle();
+        let routes = g.find_all_routes(&token(1), &token(3), MAX_HOPS).unwrap();
+        for route in &routes {
+            for hop in route {
+                assert_eq!(hop.pair_id, g.pools[hop.pool_index].pair_id,
+                    "Hop pair_id should match pool's pair_id at index {}", hop.pool_index);
+            }
+        }
+    }
+
+    #[test]
+    fn test_split_route_asymmetric_parallel_pools() {
+        // Two very different parallel paths — split should favor the deeper one
+        let mut g = PoolGraph::new();
+        // Direct A→C: tiny pool (1K/2K)
+        g.add_pool(pool(1, 3, 1_000e18 as u128, 2_000e18 as u128));
+        // Indirect A→B→C: huge pools
+        g.add_pool(pool(1, 2, 10_000_000e18 as u128, 10_000_000e18 as u128));
+        g.add_pool(pool(2, 3, 10_000_000e18 as u128, 20_000_000e18 as u128));
+
+        let amount = 5_000e18 as u128;
+        let split = g.find_split_route(&token(1), &token(3), amount).unwrap();
+        // Total allocation must match input
+        let total_alloc: u128 = split.legs.iter().map(|(_, a)| *a).sum();
+        assert_eq!(total_alloc, amount);
+        assert!(split.total_output > 0);
+    }
+
+    #[test]
+    fn test_required_input_impossible_output() {
+        // Request more output than the pool could ever produce
+        let mut g = PoolGraph::new();
+        g.add_pool(pool(1, 2, 1_000, 1_000)); // Tiny pool
+        let hops = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+        // Request 2000 output from a pool with only 1000 reserve_out — impossible
+        let result = g.required_input(&hops, 2_000);
+        assert!(result.is_none(), "Should return None when desired output exceeds pool capacity");
+    }
+
+    #[test]
+    fn test_min_output_slippage_odd_values() {
+        // Values that don't divide evenly
+        let expected = 333u128;
+        let min = PoolGraph::min_output_with_slippage(expected, 100); // 1%
+        // 333 * 100 / 10000 = 3 (integer), so min = 333 - 3 = 330
+        assert_eq!(min, 330);
+
+        let min2 = PoolGraph::min_output_with_slippage(7, 5000); // 50%
+        // 7 * 5000 / 10000 = 3, so min = 7 - 3 = 4
+        assert_eq!(min2, 4);
+
+        let min3 = PoolGraph::min_output_with_slippage(1, 1); // 0.01% of 1
+        // 1 * 1 / 10000 = 0, so min = 1 - 0 = 1
+        assert_eq!(min3, 1);
+    }
+
+    #[test]
+    fn test_graph_shared_tokens_count() {
+        // Adding pools that share a token — token count should reflect unique tokens only
+        let mut g = PoolGraph::new();
+        g.add_pool(pool(1, 2, 1000, 2000)); // tokens 1, 2
+        g.add_pool(pool(2, 3, 3000, 4000)); // tokens 2, 3 (2 is shared)
+        g.add_pool(pool(3, 4, 5000, 6000)); // tokens 3, 4 (3 is shared)
+        assert_eq!(g.pool_count(), 3);
+        assert_eq!(g.token_count(), 4); // 4 unique tokens: 1, 2, 3, 4
+    }
+
+    #[test]
+    fn test_simulate_route_monotonic_output() {
+        // Increasing input should produce increasing (or equal) output — monotonicity
+        let g = graph_two_pools();
+        let hop = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+        let mut prev_output = 0u128;
+        for exp in 1..=10u128 {
+            let amount = exp * 1_000_000_000_000_000_000; // exp * 1e18
+            if let Some(output) = g.simulate_route(&hop, amount) {
+                assert!(output >= prev_output,
+                    "Output should increase with input: at {}e18, got {} vs prev {}",
+                    exp, output, prev_output);
+                prev_output = output;
+            }
+        }
+    }
+
+    #[test]
+    fn test_price_impact_on_zero_fee_pool() {
+        // Price impact should still exist even with zero fees (due to AMM curve)
+        let mut g = PoolGraph::new();
+        g.add_pool(PoolEdge {
+            pair_id: pair(1, 2),
+            token0: token(1),
+            token1: token(2),
+            reserve0: 1_000_000e18 as u128,
+            reserve1: 1_000_000e18 as u128,
+            fee_rate_bps: 0,
+        });
+        let hop = vec![SwapHop {
+            pool_index: 0,
+            pair_id: pair(1, 2),
+            token_in: token(1),
+            token_out: token(2),
+        }];
+        // 10% of reserves — should have measurable price impact even with zero fee
+        let impact = g.estimate_price_impact(&hop, 100_000e18 as u128);
+        assert!(impact > 0, "Even with zero fees, large trade should have price impact");
+    }
+
+    #[test]
+    fn test_diamond_graph_split_route() {
+        // Diamond graph: A→B→D and A→C→D — split route should use both paths
+        let mut g = PoolGraph::new();
+        g.add_pool(pool(1, 2, 1_000_000e18 as u128, 1_000_000e18 as u128));
+        g.add_pool(pool(2, 4, 1_000_000e18 as u128, 1_000_000e18 as u128));
+        g.add_pool(pool(1, 3, 1_000_000e18 as u128, 1_000_000e18 as u128));
+        g.add_pool(pool(3, 4, 1_000_000e18 as u128, 1_000_000e18 as u128));
+
+        let amount = 100_000e18 as u128;
+        let split = g.find_split_route(&token(1), &token(4), amount).unwrap();
+        assert!(split.legs.len() >= 1);
+        let total_alloc: u128 = split.legs.iter().map(|(_, a)| *a).sum();
+        assert_eq!(total_alloc, amount);
+        assert!(split.total_output > 0);
+    }
+
+    #[test]
+    fn test_find_all_routes_no_pool_reuse() {
+        // Routes should not reuse the same pool index in a single path
+        let g = graph_triangle();
+        let routes = g.find_all_routes(&token(1), &token(3), MAX_HOPS).unwrap();
+        for route in &routes {
+            let mut seen_pools = Vec::new();
+            for hop in route {
+                assert!(!seen_pools.contains(&hop.pool_index),
+                    "Route should not reuse pool index {}", hop.pool_index);
+                seen_pools.push(hop.pool_index);
+            }
+        }
+    }
+
+    #[test]
+    fn test_required_input_two_hop_tight_bound() {
+        // Required input for a two-hop route should be tight
+        let g = graph_two_pools();
+        let hops = vec![
+            SwapHop {
+                pool_index: 0,
+                pair_id: pair(1, 2),
+                token_in: token(1),
+                token_out: token(2),
+            },
+            SwapHop {
+                pool_index: 1,
+                pair_id: pair(2, 3),
+                token_in: token(2),
+                token_out: token(3),
+            },
+        ];
+        let desired = 5_000e18 as u128;
+        let required = g.required_input(&hops, desired).unwrap();
+        let actual = g.simulate_route(&hops, required).unwrap();
+        assert!(actual >= desired);
+        if required > 1 {
+            let under = g.simulate_route(&hops, required - 1).unwrap_or(0);
+            assert!(under < desired,
+                "Two-hop required-1 should produce less than desired");
+        }
+    }
+
+    #[test]
+    fn test_best_route_with_high_fee_vs_low_fee_different_reserves() {
+        // Pool A: low reserves but low fee vs Pool B: high reserves but high fee
+        let mut g = PoolGraph::new();
+        g.add_pool(PoolEdge {
+            pair_id: pair(1, 2),
+            token0: token(1),
+            token1: token(2),
+            reserve0: 100_000e18 as u128,
+            reserve1: 100_000e18 as u128,
+            fee_rate_bps: 5, // 0.05% fee
+        });
+        g.add_pool(PoolEdge {
+            pair_id: {
+                let mut p = pair(1, 2);
+                p[31] = 1;
+                p
+            },
+            token0: token(1),
+            token1: token(2),
+            reserve0: 10_000_000e18 as u128,
+            reserve1: 10_000_000e18 as u128,
+            fee_rate_bps: 100, // 1% fee
+        });
+
+        // Small trade — low-fee pool should win despite smaller reserves
+        let small_amount = 100e18 as u128;
+        let route_small = g.find_best_route(&token(1), &token(2), small_amount).unwrap();
+        assert_eq!(route_small.hops[0].pool_index, 0, "Small trade should prefer low-fee pool");
+
+        // Very large trade — high-reserve pool should win despite higher fees
+        let large_amount = 50_000e18 as u128;
+        let route_large = g.find_best_route(&token(1), &token(2), large_amount).unwrap();
+        assert_eq!(route_large.hops[0].pool_index, 1, "Large trade should prefer deep pool");
+    }
 }

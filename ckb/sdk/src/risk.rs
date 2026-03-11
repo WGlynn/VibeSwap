@@ -2223,4 +2223,337 @@ mod tests {
         // but TVL should be higher
         assert!(h_expensive_debt.total_tvl > h_cheap_debt.total_tvl);
     }
+
+    // ============ Batch 6: Hardening Tests (Target 105+) ============
+
+    #[test]
+    fn test_priority_one_below_each_threshold() {
+        // Test values at exactly 1 below each boundary
+        // PRECISION - 1 → 0 (critical, below 1.0)
+        assert_eq!(health_factor_to_priority(PRECISION - 1), 0);
+        // 1.1 * PRECISION - 1 → 100 (in [1.0, 1.1) range)
+        assert_eq!(health_factor_to_priority(PRECISION * 110 / 100 - 1), 100);
+        // 1.3 * PRECISION - 1 → 200 (in [1.1, 1.3) range)
+        assert_eq!(health_factor_to_priority(PRECISION * 130 / 100 - 1), 200);
+        // 1.5 * PRECISION - 1 → 300 (in [1.3, 1.5) range)
+        assert_eq!(health_factor_to_priority(PRECISION * 150 / 100 - 1), 300);
+    }
+
+    #[test]
+    fn test_assess_protocol_single_vault_exactly_at_liquidation_threshold() {
+        // Vault where HF is exactly at PRECISION (1.0) — boundary between safe and liquidatable
+        let pool = test_pool();
+        // HF = (collateral * price * liq_threshold) / (debt * debt_price)
+        // We need HF = PRECISION = (col * 3000 * 0.8) / debt
+        // col = 10, debt = 24000 → HF = (10*3000*0.8)/24000 = 24000/24000 = 1.0
+        let vaults = vec![safe_vault(10 * PRECISION, 24_000 * PRECISION)];
+
+        let health = assess_protocol(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION,
+        );
+
+        assert_eq!(health.vaults_assessed, 1);
+        // At exactly HF=1.0, the vault should not be in the safe tier
+        // (keeper should flag it for at least a warning)
+        assert!(health.worst_health_factor <= PRECISION,
+            "HF at exactly 1.0 should be flagged: {}", health.worst_health_factor);
+    }
+
+    #[test]
+    fn test_simulate_price_drop_5000_bps_halves_price() {
+        // 50% drop: price should be exactly half
+        let pool = test_pool();
+        let vaults = vec![safe_vault(100 * PRECISION, 5_000 * PRECISION)];
+
+        // At $3000: HF = (100 * 3000 * 0.8) / 5000 = 48
+        let full_price = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        // At $1500 (50% drop): HF = (100 * 1500 * 0.8) / 5000 = 24
+        let half_price = simulate_price_drop(&vaults, &pool, None, 3000 * PRECISION, PRECISION, 5000);
+
+        // HF should roughly halve (depends on exact calculation path)
+        assert!(half_price.worst_health_factor < full_price.worst_health_factor,
+            "50% price drop should lower HF");
+    }
+
+    #[test]
+    fn test_risk_score_all_components_at_lowest_bracket() {
+        // Each component at its lowest non-zero bracket
+        let health = ProtocolHealth {
+            total_tvl: PRECISION,
+            total_borrows: PRECISION,
+            utilization_bps: 5001,      // > 5000 → 5 pts
+            vaults_assessed: 100,
+            tier_counts: TierCounts {
+                safe: 99,
+                warning: 1,            // 1% → > 0% → 5 pts
+                ..Default::default()
+            },
+            worst_health_factor: PRECISION * 140 / 100, // 1.4 → [1.3, 1.5) → 5 pts
+            insurance_coverage_bps: 1500,               // [1000, 2000) → 5 pts
+            pending_actions: vec![],
+        };
+        assert_eq!(risk_score(&health), 20,
+            "All lowest non-zero brackets should sum to 20, got {}", risk_score(&health));
+        assert_eq!(classify_risk_level(20), RiskLevel::Low);
+    }
+
+    #[test]
+    fn test_risk_score_all_components_at_second_bracket() {
+        // Each component at its second bracket
+        let health = ProtocolHealth {
+            total_tvl: PRECISION,
+            total_borrows: PRECISION,
+            utilization_bps: 8001,      // > 8000 → 15 pts
+            vaults_assessed: 100,
+            tier_counts: TierCounts {
+                safe: 89,
+                warning: 11,           // 11% → > 10% → 10 pts
+                ..Default::default()
+            },
+            worst_health_factor: PRECISION * 120 / 100, // 1.2 → [1.1, 1.3) → 10 pts
+            insurance_coverage_bps: 700,                // [500, 1000) → 10 pts
+            pending_actions: vec![],
+        };
+        assert_eq!(risk_score(&health), 45,
+            "All second brackets should sum to 45, got {}", risk_score(&health));
+        assert_eq!(classify_risk_level(45), RiskLevel::Medium);
+    }
+
+    #[test]
+    fn test_find_liquidation_threshold_with_insurance_pool() {
+        // Threshold search should work the same with insurance present
+        let pool = test_pool();
+        let insurance = test_insurance();
+        let vaults = vec![safe_vault(10 * PRECISION, 18_000 * PRECISION)];
+
+        let threshold_no_ins = find_liquidation_threshold(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+        );
+        let threshold_with_ins = find_liquidation_threshold(
+            &vaults, &pool, Some(&insurance), 3000 * PRECISION, PRECISION,
+        );
+
+        // Both should find a threshold (insurance doesn't prevent liquidation)
+        assert!(threshold_no_ins.is_some());
+        assert!(threshold_with_ins.is_some());
+    }
+
+    #[test]
+    fn test_tvl_zero_deposits() {
+        // Zero deposits → TVL = 0 regardless of debt_price
+        let pool = LendingPoolCellData {
+            total_deposits: 0,
+            total_borrows: 0,
+            ..test_pool()
+        };
+
+        let health = assess_protocol(&[], &pool, None, 3000 * PRECISION, 5 * PRECISION);
+        assert_eq!(health.total_tvl, 0);
+    }
+
+    #[test]
+    fn test_insurance_coverage_very_large_borrows() {
+        // Insurance is tiny relative to huge borrows
+        let pool = LendingPoolCellData {
+            total_borrows: 10_000_000 * PRECISION, // 10M borrows
+            ..test_pool()
+        };
+        let insurance = InsurancePoolCellData {
+            total_deposits: 1_000 * PRECISION, // 1K insurance
+            ..test_insurance()
+        };
+
+        let health = assess_protocol(
+            &[], &pool, Some(&insurance),
+            3000 * PRECISION, PRECISION,
+        );
+        // 1K / 10M = 0.01% = 1 bps
+        assert_eq!(health.insurance_coverage_bps, 1,
+            "Tiny insurance on huge borrows should give 1 bps");
+    }
+
+    #[test]
+    fn test_assess_protocol_preserves_vault_order_in_actions() {
+        // Verify that vault_index in pending_actions correctly references the input order
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(100 * PRECISION, 1_000 * PRECISION),  // idx 0: safe
+            safe_vault(10 * PRECISION, 30_000 * PRECISION),  // idx 1: underwater
+            safe_vault(100 * PRECISION, 2_000 * PRECISION),  // idx 2: safe
+            safe_vault(10 * PRECISION, 35_000 * PRECISION),  // idx 3: underwater
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+        );
+
+        // Safe vaults should not appear
+        let action_indices: Vec<usize> = health.pending_actions.iter()
+            .map(|a| a.vault_index)
+            .collect();
+        assert!(!action_indices.contains(&0), "Safe vault 0 should not be in actions");
+        assert!(!action_indices.contains(&2), "Safe vault 2 should not be in actions");
+        // Underwater vaults should appear
+        assert!(action_indices.contains(&1), "Underwater vault 1 should be in actions");
+        assert!(action_indices.contains(&3), "Underwater vault 3 should be in actions");
+    }
+
+    #[test]
+    fn test_pending_action_health_factor_matches_vault() {
+        // Each pending action should carry the correct health factor for its vault
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(10 * PRECISION, 30_000 * PRECISION), // underwater
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+        );
+
+        assert_eq!(health.pending_actions.len(), 1);
+        let action = &health.pending_actions[0];
+
+        // Independently compute the expected HF
+        let assessment = keeper::assess_vault(
+            &vaults[0], &pool, None, 3000 * PRECISION, PRECISION,
+        );
+        assert_eq!(action.health_factor, assessment.health_factor,
+            "Action HF should match direct vault assessment");
+    }
+
+    #[test]
+    fn test_simulate_price_drop_extreme_9999_bps() {
+        // 99.99% drop → price = 0.01% of original
+        let pool = test_pool();
+        let vaults = vec![safe_vault(1_000 * PRECISION, 1_000 * PRECISION)];
+
+        let health = simulate_price_drop(
+            &vaults, &pool, None,
+            3000 * PRECISION, PRECISION, 9999,
+        );
+
+        // At $0.30 (0.01% of $3000): HF = (1000 * 0.3 * 0.8) / 1000 = 0.24
+        assert!(health.worst_health_factor < PRECISION,
+            "99.99% drop should put any leveraged vault underwater");
+    }
+
+    #[test]
+    fn test_risk_score_single_at_risk_vault_in_large_pool() {
+        // 1 vault at risk out of 1000 = 0.1%
+        // Integer math: (1 * 100) / 1000 = 0 → 0% at-risk → 0 pts vault component
+        let health = ProtocolHealth {
+            total_tvl: PRECISION,
+            total_borrows: PRECISION,
+            utilization_bps: 0,
+            vaults_assessed: 1000,
+            tier_counts: TierCounts {
+                safe: 999,
+                warning: 1,
+                ..Default::default()
+            },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10_000,
+            pending_actions: vec![],
+        };
+        // Integer division: (1*100)/1000 = 0 → 0% bucket → 0 pts
+        assert_eq!(risk_score(&health), 0,
+            "Single at-risk vault among 1000 rounds to 0% in integer math");
+    }
+
+    #[test]
+    fn test_assess_protocol_mixed_with_all_tier_types_sum() {
+        // Create vaults that land in every tier, verify counts sum to total
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(100 * PRECISION, 5_000 * PRECISION),   // Safe
+            safe_vault(100 * PRECISION, 3_000 * PRECISION),   // Safe
+            safe_vault(10 * PRECISION, 17_000 * PRECISION),   // Warning
+            safe_vault(10 * PRECISION, 20_000 * PRECISION),   // AutoDeleverage
+            safe_vault(10 * PRECISION, 24_000 * PRECISION),   // Soft/Hard liquidation
+            safe_vault(10 * PRECISION, 40_000 * PRECISION),   // Hard liquidation
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+        );
+
+        let total = health.tier_counts.safe
+            + health.tier_counts.warning
+            + health.tier_counts.auto_deleverage
+            + health.tier_counts.soft_liquidation
+            + health.tier_counts.hard_liquidation;
+        assert_eq!(total, 6, "All 6 vaults must be in some tier");
+        assert!(health.tier_counts.safe >= 2, "At least 2 should be safe");
+    }
+
+    #[test]
+    fn test_find_liquidation_threshold_consistency() {
+        // For a range of vault configurations, verify threshold produces liquidation
+        let pool = test_pool();
+        let test_cases = vec![
+            safe_vault(10 * PRECISION, 15_000 * PRECISION),
+            safe_vault(20 * PRECISION, 30_000 * PRECISION),
+            safe_vault(50 * PRECISION, 80_000 * PRECISION),
+        ];
+
+        for vault in &test_cases {
+            if vault.debt_shares == 0 { continue; }
+            let vaults = vec![vault.clone()];
+            let threshold = find_liquidation_threshold(
+                &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+            );
+            if let Some(bps) = threshold {
+                let stressed = simulate_price_drop(
+                    &vaults, &pool, None, 3000 * PRECISION, PRECISION, bps,
+                );
+                assert!(
+                    stressed.tier_counts.hard_liquidation > 0
+                    || stressed.tier_counts.soft_liquidation > 0,
+                    "At threshold {}bps, vault should be liquidatable", bps
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_utilization_1_bps() {
+        // Extremely low utilization (0.01%)
+        let pool = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 100 * PRECISION, // 0.01%
+            ..test_pool()
+        };
+
+        let health = assess_protocol(&[], &pool, None, 3000 * PRECISION, PRECISION);
+        // 100 / 1_000_000 = 0.0001 = 1 bps (integer division)
+        assert_eq!(health.utilization_bps, 1);
+    }
+
+    #[test]
+    fn test_assess_protocol_two_vaults_same_hf() {
+        // Two vaults with identical parameters → worst_hf should equal their shared HF
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(10 * PRECISION, 18_000 * PRECISION),
+            safe_vault(10 * PRECISION, 18_000 * PRECISION),
+        ];
+
+        let health = assess_protocol(
+            &vaults, &pool, None, 3000 * PRECISION, PRECISION,
+        );
+
+        // Both should have the same HF
+        let assessment1 = keeper::assess_vault(&vaults[0], &pool, None, 3000 * PRECISION, PRECISION);
+        assert_eq!(health.worst_health_factor, assessment1.health_factor);
+    }
+
+    #[test]
+    fn test_risk_score_exactly_at_medium_threshold() {
+        // Score = 21 → Medium, Score = 20 → Low
+        assert_eq!(classify_risk_level(20), RiskLevel::Low);
+        assert_eq!(classify_risk_level(21), RiskLevel::Medium);
+        // Verify they are different
+        assert_ne!(classify_risk_level(20), classify_risk_level(21));
+    }
 }

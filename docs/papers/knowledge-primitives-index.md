@@ -1102,3 +1102,10 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 **Generalization**: In any multi-agent communication system (chat, protocol messages, cross-chain relays), every message carries both content and metadata. The metadata (who quoted whom, reply threading, temporal context) is often more informative than the content itself. Systems that ignore structural metadata will misroute messages, misattribute intent, and waste cycles on false positives. The rule: **exhaust structural signals before interpreting content.**
 
 **Will's framing**: "Pressure makes diamonds. I'm harsh for a reason. But I'm fair."
+
+### P-094: Signed Arithmetic Safety (March 2026)
+**Source**: VibePerpetual._calculatePnL uint256 underflow fix (Session 056)
+**Domain**: Smart Contract Security / DeFi Mathematics
+**Primitive**: Any price delta computation in derivatives contracts (perpetuals, options, futures) MUST cast to signed integers (int256) BEFORE subtraction, never after. `uint256(markPrice) - uint256(entryPrice)` is a ticking bomb — it panics on underflow when price moves against position direction. The safe pattern: `int256(markPrice) - int256(entryPrice)` always produces the correct signed result.
+**Generalization**: This extends beyond price deltas to ANY subtraction where the result can legitimately be negative: PnL, funding payments, margin calculations, oracle price differences, rebalancing deltas. The rule is simple — if the sign of the result is unknown at compile time, the types must be signed at the point of subtraction.
+**Cross-references**: P-040 (DeFi Mathematics), P-071 (Formal Verification), VibePerpEngine._calculatePnL (correct implementation using pos.size * priceDelta)

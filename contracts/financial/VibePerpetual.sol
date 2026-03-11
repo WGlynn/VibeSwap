@@ -367,10 +367,11 @@ contract VibePerpetual is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     function _calculatePnL(Position storage pos, Market storage market) internal view returns (int256) {
         uint256 absSize = pos.size > 0 ? uint256(pos.size) : uint256(-pos.size);
+        int256 priceDelta = int256(market.markPrice) - int256(pos.entryPrice);
         if (pos.size > 0) {
-            return int256((absSize * (market.markPrice - pos.entryPrice)) / SCALE);
+            return (int256(absSize) * priceDelta) / int256(SCALE);
         } else {
-            return int256((absSize * (pos.entryPrice - market.markPrice)) / SCALE);
+            return -(int256(absSize) * priceDelta) / int256(SCALE);
         }
     }
 

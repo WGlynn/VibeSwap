@@ -1315,3 +1315,35 @@ All divisions use `mul_div(a, b, c)` with 256-bit intermediate to prevent overfl
 **Generalization**: Systems where identity is derived rather than assigned produce stronger security properties. When your token's existence is a mathematical consequence of your identity, it cannot be impersonated — only the holder of the issuer's lock script can enter owner mode. This is a structural guarantee, not a contractual one.
 
 **Cross-references**: P-100 (The Crossover Protocol — building ecosystem infrastructure), P-101 (Consensus Determinism — token amounts are u128 integers), P-102 (UTXO-Native Lending — tokens interact with lending via type_hash references)
+
+### P-104: UTXO Transaction Signing Model (March 2026)
+
+**Source**: `ckb/sdk/src/assembler.rs` — Transaction assembler and signing pipeline
+
+**Insight**: CKB's signing model groups inputs by lock script hash. One signature covers all inputs sharing the same lock — instead of N signatures for N inputs (as on account-based chains), you need only G signatures for G distinct lock groups. This is O(lock groups) not O(inputs).
+
+The process:
+1. Serialize the raw transaction (cell_deps + inputs + outputs, no witnesses) → `tx_hash`
+2. Group inputs by their lock script hash
+3. For each group's first input: build `WitnessArgs` with empty 65-byte lock placeholder
+4. Sign: `message = SHA-256(tx_hash || witness_length || witness_bytes || extra_witnesses...)`
+5. Fill the lock field with the recoverable secp256k1 signature
+6. Remaining inputs in the group carry empty witnesses (the signature covers them all)
+
+**Key architectural implications**:
+
+| Property | Account Model (EVM) | Cell Model (CKB) |
+|---|---|---|
+| Signature count | 1 per transaction | 1 per lock group |
+| Multi-input signing | N/A (1 sender) | Single sig covers all inputs with same lock |
+| Witness structure | Flat bytes (v, r, s) | Molecule table (lock, input_type, output_type) |
+| Fee source | msg.sender balance | Any input capacity |
+| Signing scope | Entire transaction | Lock group within transaction |
+
+**Molecule serialization**: CKB uses Molecule, a zero-copy serialization format where tables use offset arrays. Optional fields cost 0 bytes when absent (only the offset entry exists). `WitnessArgs` is a 3-field table — when only `lock` is present, `input_type` and `output_type` add zero overhead.
+
+**Design decision**: The assembler uses a `Signer` trait rather than hardcoding secp256k1, allowing future integration with Schnorr signatures, multisig schemes, or hardware wallets. The `MockSigner` enables deterministic testing without cryptographic dependencies.
+
+**Generalization**: When your signing model operates at the lock-group level rather than the input level, you get natural batching — a wallet consolidating 50 UTXOs pays the same signature cost as spending 1. This eliminates the "dust problem" at the cryptographic level, not just the economic level.
+
+**Cross-references**: P-101 (Consensus Determinism — all hashing/serialization is deterministic), P-102 (UTXO-Native Lending — lending transactions use the same assembler), P-103 (Token Identity — token transfers through the same signing pipeline)

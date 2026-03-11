@@ -756,3 +756,158 @@ fn test_assemble_lending_full_cycle() {
     // Different signers = different tx hashes
     assert_ne!(signed_pool.tx_hash(), signed_vault.tx_hash());
 }
+
+// ============ Test: Prediction Market through Assembler ============
+
+#[test]
+fn test_assemble_create_prediction_market() {
+    use vibeswap_sdk::prediction;
+
+    let sdk = VibeSwapSDK::new(make_deployment());
+    let params = prediction::CreateMarketParams {
+        question_hash: [0xBB; 32],
+        oracle_pair_id: [0xCC; 32],
+        num_tiers: 3,
+        settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+        resolution_block: 2000,
+        dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+        fee_rate_bps: DEFAULT_MARKET_FEE_BPS,
+        creator_lock: alice_lock(),
+        creator_input: test_input(0x01),
+        current_block: 100,
+    };
+
+    let tx = sdk.create_market_tx(&params).unwrap();
+    let signed = assemble_single_signer(&tx, &alice_signer()).unwrap();
+    verify_signed_tx(&signed);
+
+    let market = PredictionMarketCellData::deserialize(&signed.outputs[0].data).unwrap();
+    assert_eq!(market.status, MARKET_ACTIVE);
+    assert_eq!(market.num_tiers, 3);
+}
+
+#[test]
+fn test_assemble_place_bet() {
+    use vibeswap_sdk::prediction;
+
+    let sdk = VibeSwapSDK::new(make_deployment());
+    let params = prediction::CreateMarketParams {
+        question_hash: [0xBB; 32],
+        oracle_pair_id: [0xCC; 32],
+        num_tiers: 2,
+        settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+        resolution_block: 2000,
+        dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+        fee_rate_bps: DEFAULT_MARKET_FEE_BPS,
+        creator_lock: alice_lock(),
+        creator_input: test_input(0x01),
+        current_block: 100,
+    };
+    let (market, _) = prediction::create_market(&params).unwrap();
+
+    let tx = sdk.place_bet_tx(
+        test_input(0x02), &market,
+        0, 10 * MINIMUM_BET_AMOUNT,
+        bob_lock(), test_input(0x03), 200,
+    ).unwrap();
+
+    // Multi-signer: market cell needs PoW lock, position needs bob's lock
+    let signed = assemble_single_signer(&tx, &bob_signer()).unwrap();
+    verify_signed_tx(&signed);
+
+    let pos = PredictionPositionCellData::deserialize(&signed.outputs[1].data).unwrap();
+    assert_eq!(pos.tier_index, 0);
+    assert_eq!(pos.amount, 10 * MINIMUM_BET_AMOUNT);
+}
+
+#[test]
+fn test_assemble_prediction_market_full_cycle() {
+    use vibeswap_sdk::prediction;
+
+    let sdk = VibeSwapSDK::new(make_deployment());
+
+    // 1. Create market
+    let params = prediction::CreateMarketParams {
+        question_hash: [0xBB; 32],
+        oracle_pair_id: [0xCC; 32],
+        num_tiers: 2,
+        settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+        resolution_block: 2000,
+        dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+        fee_rate_bps: DEFAULT_MARKET_FEE_BPS,
+        creator_lock: alice_lock(),
+        creator_input: test_input(0x01),
+        current_block: 100,
+    };
+    let create_tx = sdk.create_market_tx(&params).unwrap();
+    let signed_create = assemble_single_signer(&create_tx, &alice_signer()).unwrap();
+    verify_signed_tx(&signed_create);
+
+    // 2. Place bets
+    let mut market = PredictionMarketCellData::deserialize(&signed_create.outputs[0].data).unwrap();
+    let (m, _pos_alice) = prediction::place_bet(&market, 0, 10 * MINIMUM_BET_AMOUNT, [0xA1; 32], 200).unwrap();
+    market = m;
+    let (m, _pos_bob) = prediction::place_bet(&market, 1, 5 * MINIMUM_BET_AMOUNT, [0xB0; 32], 201).unwrap();
+    market = m;
+
+    // 3. Resolve
+    let resolve_tx = sdk.resolve_market_tx(
+        test_input(0x04), &market,
+        PRECISION / 4, // Tier 0 wins
+        alice_lock(), 2000,
+    ).unwrap();
+    let signed_resolve = assemble_single_signer(&resolve_tx, &alice_signer()).unwrap();
+    verify_signed_tx(&signed_resolve);
+
+    let resolved = PredictionMarketCellData::deserialize(&signed_resolve.outputs[0].data).unwrap();
+    assert_eq!(resolved.status, MARKET_RESOLVED);
+
+    // 4. Settle winner
+    let winner_pos = PredictionPositionCellData {
+        market_id: resolved.market_id,
+        owner_lock_hash: [0xA1; 32],
+        tier_index: 0,
+        amount: 10 * MINIMUM_BET_AMOUNT,
+        created_block: 200,
+    };
+    let settle_tx = sdk.settle_position_tx(
+        &resolved, test_input(0x05), &winner_pos, alice_lock(),
+    ).unwrap();
+    let signed_settle = assemble_single_signer(&settle_tx, &alice_signer()).unwrap();
+    verify_signed_tx(&signed_settle);
+
+    // Payout should be positive
+    let payout = u128::from_le_bytes(signed_settle.outputs[0].data[..16].try_into().unwrap());
+    assert!(payout > 10 * MINIMUM_BET_AMOUNT, "Winner should profit");
+
+    // All signed transactions have unique hashes
+    assert_ne!(signed_create.tx_hash(), signed_resolve.tx_hash());
+    assert_ne!(signed_resolve.tx_hash(), signed_settle.tx_hash());
+}
+
+#[test]
+fn test_assemble_cancel_market() {
+    use vibeswap_sdk::prediction;
+
+    let sdk = VibeSwapSDK::new(make_deployment());
+    let params = prediction::CreateMarketParams {
+        question_hash: [0xBB; 32],
+        oracle_pair_id: [0xCC; 32],
+        num_tiers: 4,
+        settlement_mode: SETTLEMENT_SCALAR,
+        resolution_block: 5000,
+        dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+        fee_rate_bps: DEFAULT_MARKET_FEE_BPS,
+        creator_lock: alice_lock(),
+        creator_input: test_input(0x01),
+        current_block: 100,
+    };
+    let (market, _) = prediction::create_market(&params).unwrap();
+
+    let tx = sdk.cancel_market_tx(test_input(0x02), &market, alice_lock()).unwrap();
+    let signed = assemble_single_signer(&tx, &alice_signer()).unwrap();
+    verify_signed_tx(&signed);
+
+    let cancelled = PredictionMarketCellData::deserialize(&signed.outputs[0].data).unwrap();
+    assert_eq!(cancelled.status, MARKET_CANCELLED);
+}

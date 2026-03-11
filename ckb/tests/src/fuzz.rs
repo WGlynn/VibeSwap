@@ -1907,3 +1907,272 @@ fn test_fuzz_governance_vote_conservation() {
             "Vote weights not conserved");
     }
 }
+
+// ============ Dual Consensus Fuzz Tests ============
+
+// ============ Test 25: Quantization Determinism ============
+
+/// Property: for ANY valid snapshot, quantize() always returns the same result.
+/// Tests with 500 random snapshots, each run twice.
+#[test]
+fn test_fuzz_consensus_quantize_deterministic() {
+    use vibeswap_sdk::consensus::{self, ProtocolSnapshot};
+
+    let mut rng = TestRng::new(0xDC01_0001_0001_0001);
+
+    for _ in 0..500 {
+        let snapshot = random_snapshot(&mut rng);
+
+        let d1 = consensus::quantize(&snapshot);
+        let d2 = consensus::quantize(&snapshot);
+
+        assert_eq!(d1.risk_score, d2.risk_score, "Determinism violated: risk_score");
+        assert_eq!(d1.risk_level, d2.risk_level, "Determinism violated: risk_level");
+        assert_eq!(d1.validated_price, d2.validated_price, "Determinism violated: price");
+        assert_eq!(d1.oracle_valid, d2.oracle_valid, "Determinism violated: oracle_valid");
+        assert_eq!(d1.vault_tiers.len(), d2.vault_tiers.len(), "Determinism violated: tier count");
+        for (a, b) in d1.vault_tiers.iter().zip(d2.vault_tiers.iter()) {
+            assert_eq!(a.tier, b.tier, "Determinism violated: vault tier");
+            assert_eq!(a.health_factor, b.health_factor, "Determinism violated: HF");
+        }
+    }
+}
+
+// ============ Test 26: Monotonicity Under Random Price Drops ============
+
+/// Property: for ANY valid snapshot, dropping the price always produces
+/// a risk score >= the original risk score (or equal if saturated).
+#[test]
+fn test_fuzz_consensus_price_drop_monotonic() {
+    use vibeswap_sdk::consensus;
+
+    let mut rng = TestRng::new(0xDC01_0002_0001_0001);
+
+    for _ in 0..300 {
+        let snapshot = random_snapshot(&mut rng);
+        let drop_bps = rng.range_u64(100, 5000); // 1% to 50% drop
+
+        let (before, after) = consensus::simulate_price_stress(&snapshot, drop_bps);
+        let result = consensus::verify_monotonicity(&before, &after);
+
+        assert!(result.is_monotonic,
+            "Monotonicity violated at drop {}bps: {:?}", drop_bps, result.violations);
+    }
+}
+
+// ============ Test 27: Tier Completeness ============
+
+/// Property: for ANY vault with ANY price, quantize() maps it to exactly one tier.
+/// No vault should be unclassified or belong to multiple tiers.
+#[test]
+fn test_fuzz_consensus_tier_completeness() {
+    use vibeswap_sdk::consensus;
+    use ckb_lending_math::prevention::RiskTier;
+
+    let mut rng = TestRng::new(0xDC01_0003_0001_0001);
+
+    for _ in 0..500 {
+        let snapshot = random_snapshot(&mut rng);
+        let decision = consensus::quantize(&snapshot);
+
+        // Every vault must be in the decision
+        assert_eq!(decision.vault_tiers.len(), snapshot.vaults.len(),
+            "Not all vaults were classified");
+
+        // Each vault has exactly one valid tier
+        for vt in &decision.vault_tiers {
+            let valid = matches!(vt.tier,
+                RiskTier::Safe | RiskTier::Warning | RiskTier::AutoDeleverage |
+                RiskTier::SoftLiquidation | RiskTier::HardLiquidation
+            );
+            assert!(valid, "Invalid tier for vault: {:?}", vt.tier);
+        }
+    }
+}
+
+// ============ Test 28: Oracle Majority Agreement ============
+
+/// Property: oracle agreement count is always <= total fresh oracle count.
+/// Validated oracle is only marked valid when majority agrees.
+#[test]
+fn test_fuzz_consensus_oracle_agreement_bounded() {
+    use vibeswap_sdk::consensus;
+
+    let mut rng = TestRng::new(0xDC01_0004_0001_0001);
+
+    for _ in 0..500 {
+        let mut snapshot = random_snapshot(&mut rng);
+
+        // Generate 1-7 random oracles
+        let count = rng.range_u64(1, 8) as usize;
+        snapshot.oracle_data.clear();
+        let base_price = rng.range_u128(100 * PRECISION, 10_000 * PRECISION);
+
+        for j in 0..count {
+            let dev = rng.range_u128(0, 2000); // 0-20% deviation
+            let positive = rng.next_u64() % 2 == 0;
+            let deviation = base_price * dev / 10_000;
+            let price = if positive {
+                base_price + deviation
+            } else {
+                base_price.saturating_sub(deviation).max(1)
+            };
+
+            snapshot.oracle_data.push(OracleCellData {
+                price,
+                block_number: snapshot.current_block.saturating_sub(rng.range_u64(0, 50)),
+                confidence: rng.range_u64(20, 100) as u8,
+                source_hash: [j as u8; 32],
+                pair_id: [0xDD; 32],
+            });
+        }
+
+        let decision = consensus::quantize(&snapshot);
+
+        // Agreement count bounded by total oracle count
+        assert!(decision.oracle_agreement_count <= count,
+            "Agreement {} exceeds oracle count {}", decision.oracle_agreement_count, count);
+
+        // If valid, majority must agree
+        if decision.oracle_valid {
+            // Count fresh oracles
+            let fresh_count = snapshot.oracle_data.iter()
+                .filter(|o| snapshot.current_block <= o.block_number + 100)
+                .count();
+            assert!(decision.oracle_agreement_count >= (fresh_count + 1) / 2,
+                "Valid but agreement {} < majority of {}",
+                decision.oracle_agreement_count, fresh_count);
+        }
+    }
+}
+
+// ============ Test 29: Risk Score Bounded ============
+
+/// Property: risk_score is always in [0, 100] for ANY snapshot.
+#[test]
+fn test_fuzz_consensus_risk_score_bounded() {
+    use vibeswap_sdk::consensus;
+
+    let mut rng = TestRng::new(0xDC01_0005_0001_0001);
+
+    for _ in 0..500 {
+        let snapshot = random_snapshot(&mut rng);
+        let decision = consensus::quantize(&snapshot);
+
+        assert!(decision.risk_score <= 100,
+            "Risk score {} exceeds 100", decision.risk_score);
+    }
+}
+
+// ============ Consensus Snapshot Generator ============
+
+fn random_snapshot(rng: &mut TestRng) -> vibeswap_sdk::consensus::ProtocolSnapshot {
+    let price = rng.range_u128(100 * PRECISION, 10_000 * PRECISION);
+
+    // Generate 0-5 vaults
+    let vault_count = rng.range_u64(0, 6) as usize;
+    let mut vaults = Vec::new();
+    for i in 0..vault_count {
+        let collateral = rng.range_u128(1 * PRECISION, 100 * PRECISION);
+        let max_safe_debt = ckb_lending_math::mul_div(
+            ckb_lending_math::mul_div(collateral, price, PRECISION),
+            DEFAULT_LIQUIDATION_THRESHOLD,
+            PRECISION,
+        );
+        // Debt can be 0 to 150% of max safe debt (some will be underwater)
+        let debt = if max_safe_debt > 0 {
+            rng.range_u128(0, max_safe_debt * 3 / 2)
+        } else {
+            0
+        };
+
+        vaults.push(VaultCellData {
+            owner_lock_hash: [i as u8 + 1; 32],
+            pool_id: [0xBB; 32],
+            collateral_amount: collateral,
+            collateral_type_hash: [0xCC; 32],
+            debt_shares: debt,
+            borrow_index_snapshot: PRECISION,
+            deposit_shares: 0,
+            last_update_block: 100,
+        });
+    }
+
+    // Random pool utilization
+    let total_deposits = rng.range_u128(100_000 * PRECISION, 10_000_000 * PRECISION);
+    let utilization_bps = rng.range_u64(0, 10_000);
+    let total_borrows = total_deposits * utilization_bps as u128 / 10_000;
+
+    let pool = LendingPoolCellData {
+        total_deposits,
+        total_borrows,
+        total_shares: total_deposits,
+        total_reserves: 0,
+        borrow_index: PRECISION,
+        last_accrual_block: 100,
+        asset_type_hash: [0xAA; 32],
+        pool_id: [0xBB; 32],
+        base_rate: DEFAULT_BASE_RATE,
+        slope1: DEFAULT_SLOPE1,
+        slope2: DEFAULT_SLOPE2,
+        optimal_utilization: DEFAULT_OPTIMAL_UTILIZATION,
+        reserve_factor: DEFAULT_RESERVE_FACTOR,
+        collateral_factor: DEFAULT_COLLATERAL_FACTOR,
+        liquidation_threshold: DEFAULT_LIQUIDATION_THRESHOLD,
+        liquidation_incentive: DEFAULT_LIQUIDATION_INCENTIVE,
+    };
+
+    // 50% chance of insurance
+    let insurance = if rng.next_u64() % 2 == 0 {
+        Some(InsurancePoolCellData {
+            pool_id: [0xBB; 32],
+            asset_type_hash: [0xAA; 32],
+            total_deposits: rng.range_u128(1000 * PRECISION, 500_000 * PRECISION),
+            total_shares: rng.range_u128(1000 * PRECISION, 500_000 * PRECISION),
+            total_premiums_earned: rng.range_u128(0, 10_000 * PRECISION),
+            total_claims_paid: rng.range_u128(0, 5_000 * PRECISION),
+            premium_rate_bps: DEFAULT_PREMIUM_RATE_BPS,
+            max_coverage_bps: DEFAULT_MAX_COVERAGE_BPS,
+            cooldown_blocks: DEFAULT_COOLDOWN_BLOCKS,
+            last_premium_block: 100,
+        })
+    } else {
+        None
+    };
+
+    // 1-3 oracle sources
+    let oracle_count = rng.range_u64(1, 4) as usize;
+    let mut oracle_data = Vec::new();
+    for j in 0..oracle_count {
+        let dev = rng.range_u128(0, 300); // 0-3% deviation
+        let positive = rng.next_u64() % 2 == 0;
+        let deviation = price * dev / 10_000;
+        let oracle_price = if positive {
+            price + deviation
+        } else {
+            price.saturating_sub(deviation).max(1)
+        };
+
+        oracle_data.push(OracleCellData {
+            price: oracle_price,
+            block_number: 100 + j as u64,
+            confidence: rng.range_u64(50, 100) as u8,
+            source_hash: [j as u8; 32],
+            pair_id: [0xDD; 32],
+        });
+    }
+
+    vibeswap_sdk::consensus::ProtocolSnapshot {
+        oracle_data,
+        current_block: 105,
+        vaults,
+        pool,
+        insurance,
+        collateral_price: price,
+        debt_price: PRECISION,
+    }
+}
+
+fn range_u64_helper(rng: &mut TestRng, min: u64, max: u64) -> u64 {
+    rng.range_u64(min, max)
+}

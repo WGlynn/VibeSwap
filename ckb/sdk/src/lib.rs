@@ -4,6 +4,7 @@
 
 pub mod assembler;
 pub mod auction;
+pub mod bridge;
 pub mod collector;
 pub mod consensus;
 pub mod fees;

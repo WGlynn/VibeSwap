@@ -43,3 +43,6 @@ mod risk;
 
 #[cfg(test)]
 mod consensus;
+
+#[cfg(test)]
+mod prediction;

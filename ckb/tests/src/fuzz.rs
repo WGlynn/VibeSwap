@@ -2176,3 +2176,178 @@ fn random_snapshot(rng: &mut TestRng) -> vibeswap_sdk::consensus::ProtocolSnapsh
 fn range_u64_helper(rng: &mut TestRng, min: u64, max: u64) -> u64 {
     rng.range_u64(min, max)
 }
+
+// ============ Prediction Market Fuzz Tests ============
+
+use vibeswap_sdk::prediction::{
+    create_market, place_bet, resolve_market, calculate_payout, value_to_tier,
+    implied_odds_bps, potential_multiplier, market_depth,
+    CreateMarketParams, MIN_TIERS, MAX_TIERS,
+};
+
+/// Invariant: value_to_tier always returns a valid tier index (< num_tiers)
+#[test]
+fn test_fuzz_value_to_tier_bounded() {
+    let mut rng = TestRng::new(0xD001);
+    for _ in 0..1000 {
+        let num_tiers = (rng.range_u64(2, 9)) as u8;
+        let value = rng.range_u128(0, PRECISION * 2);
+        let tier = value_to_tier(value, num_tiers);
+        assert!(tier < num_tiers, "tier {} >= num_tiers {} for value {}", tier, num_tiers, value);
+    }
+}
+
+/// Invariant: value_to_tier is monotonically non-decreasing
+#[test]
+fn test_fuzz_value_to_tier_monotonic() {
+    let mut rng = TestRng::new(0xD002);
+    for _ in 0..500 {
+        let num_tiers = (rng.range_u64(2, 9)) as u8;
+        let v1 = rng.range_u128(0, PRECISION);
+        let v2 = rng.range_u128(v1, PRECISION);
+        let t1 = value_to_tier(v1, num_tiers);
+        let t2 = value_to_tier(v2, num_tiers);
+        assert!(t2 >= t1, "Tier decreased: v1={} t1={}, v2={} t2={}", v1, t1, v2, t2);
+    }
+}
+
+/// Invariant: implied odds of all tiers sum to exactly BPS_DENOMINATOR (10000)
+#[test]
+fn test_fuzz_implied_odds_sum() {
+    let mut rng = TestRng::new(0xD003);
+    let lock = vibeswap_sdk::Script {
+        code_hash: [0xAA; 32],
+        hash_type: vibeswap_sdk::HashType::Type,
+        args: vec![0x01],
+    };
+    let cell_input = vibeswap_sdk::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+    for _ in 0..300 {
+        let num_tiers = (rng.range_u64(2, 9)) as u8;
+        let params = CreateMarketParams {
+            question_hash: [0xBB; 32],
+            oracle_pair_id: [0xCC; 32],
+            num_tiers,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 1000,
+            dispute_window_blocks: 1200,
+            fee_rate_bps: 100,
+            creator_lock: lock.clone(),
+            creator_input: cell_input.clone(),
+            current_block: 100,
+        };
+        let (mut market, _) = create_market(&params).unwrap();
+
+        // Place random bets on ALL tiers (so odds are well-defined)
+        let mut total_bet: u128 = 0;
+        for t in 0..num_tiers {
+            let amount = rng.range_u128(MINIMUM_BET_AMOUNT, 100 * MINIMUM_BET_AMOUNT);
+            let (m, _) = place_bet(&market, t, amount, [t + 1; 32], 200 + t as u64).unwrap();
+            market = m;
+            total_bet += amount;
+        }
+
+        let odds_sum: u128 = (0..num_tiers).map(|i| implied_odds_bps(&market, i)).sum();
+        // Allow 1 bps rounding error per tier
+        assert!(
+            odds_sum >= BPS_DENOMINATOR - num_tiers as u128
+                && odds_sum <= BPS_DENOMINATOR + num_tiers as u128,
+            "Odds sum {} far from {} for {} tiers",
+            odds_sum, BPS_DENOMINATOR, num_tiers
+        );
+    }
+}
+
+/// Invariant: WTA payout for winning tier always equals total_liquidity
+#[test]
+fn test_fuzz_wta_winner_gets_total() {
+    let mut rng = TestRng::new(0xD004);
+    let lock = vibeswap_sdk::Script {
+        code_hash: [0xAA; 32],
+        hash_type: vibeswap_sdk::HashType::Type,
+        args: vec![0x01],
+    };
+    let cell_input = vibeswap_sdk::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+    for _ in 0..300 {
+        let num_tiers = (rng.range_u64(2, 5)) as u8;
+        let params = CreateMarketParams {
+            question_hash: [0xBB; 32],
+            oracle_pair_id: [0xCC; 32],
+            num_tiers,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 1000,
+            dispute_window_blocks: 1200,
+            fee_rate_bps: 0, // No fee for clean math
+            creator_lock: lock.clone(),
+            creator_input: cell_input.clone(),
+            current_block: 100,
+        };
+        let (mut market, _) = create_market(&params).unwrap();
+
+        // Place one bet per tier
+        let mut positions = Vec::new();
+        for t in 0..num_tiers {
+            let amount = rng.range_u128(MINIMUM_BET_AMOUNT, 100 * MINIMUM_BET_AMOUNT);
+            let (m, pos) = place_bet(&market, t, amount, [t + 1; 32], 200 + t as u64).unwrap();
+            market = m;
+            positions.push(pos);
+        }
+
+        // Resolve to random tier
+        let oracle_value = rng.range_u128(0, PRECISION);
+        let mut resolved = market.clone();
+        resolved.status = MARKET_RESOLVED;
+        resolved.resolved_tier = value_to_tier(oracle_value, num_tiers);
+        resolved.resolved_value = oracle_value;
+
+        // Sum payouts for winning tier
+        let winning_tier = resolved.resolved_tier;
+        let mut total_payout: u128 = 0;
+        for pos in &positions {
+            let (gross, _, _) = calculate_payout(&resolved, pos).unwrap();
+            total_payout += gross;
+        }
+
+        // In WTA with 0 fee, total payout for winners = total_liquidity
+        assert_eq!(
+            total_payout, market.total_liquidity,
+            "WTA total payout {} != liquidity {} (winning tier {})",
+            total_payout, market.total_liquidity, winning_tier
+        );
+    }
+}
+
+/// Invariant: market creation is deterministic (same params → same market_id)
+#[test]
+fn test_fuzz_market_id_deterministic() {
+    let mut rng = TestRng::new(0xD005);
+    let lock = vibeswap_sdk::Script {
+        code_hash: [0xAA; 32],
+        hash_type: vibeswap_sdk::HashType::Type,
+        args: vec![0x01],
+    };
+    let cell_input = vibeswap_sdk::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+    for _ in 0..200 {
+        let mut q = [0u8; 32];
+        for b in q.iter_mut() { *b = (rng.next_u64() & 0xFF) as u8; }
+
+        let params = CreateMarketParams {
+            question_hash: q,
+            oracle_pair_id: [0xCC; 32],
+            num_tiers: 2,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 1000,
+            dispute_window_blocks: 1200,
+            fee_rate_bps: 100,
+            creator_lock: lock.clone(),
+            creator_input: cell_input.clone(),
+            current_block: 100,
+        };
+
+        let (_, id1) = create_market(&params).unwrap();
+        let (_, id2) = create_market(&params).unwrap();
+        assert_eq!(id1, id2);
+    }
+}

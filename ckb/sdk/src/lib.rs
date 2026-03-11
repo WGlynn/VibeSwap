@@ -81,6 +81,7 @@ pub struct DeploymentInfo {
     pub knowledge_type_code_hash: [u8; 32],
     pub lending_pool_type_code_hash: [u8; 32],
     pub vault_type_code_hash: [u8; 32],
+    pub insurance_pool_type_code_hash: [u8; 32],
     pub script_dep_tx_hash: [u8; 32],
     pub script_dep_index: u32,
 }
@@ -1192,6 +1193,371 @@ impl VibeSwapSDK {
             witnesses: vec![vec![]; witness_count],
         })
     }
+
+    // ============ Insurance Pool Operations ============
+
+    /// Create a new insurance pool for a given asset.
+    ///
+    /// The insurance pool collects premiums from lending operations and uses
+    /// them to de-risk positions before liquidation occurs (P-105).
+    pub fn create_insurance_pool(
+        &self,
+        pool_id: [u8; 32],
+        asset_type_hash: [u8; 32],
+        premium_rate_bps: u64,
+        max_coverage_bps: u64,
+        cooldown_blocks: u64,
+        creator_lock: Script,
+        creator_input: CellInput,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        let pool_data = InsurancePoolCellData {
+            pool_id,
+            asset_type_hash,
+            total_deposits: 0,
+            total_shares: 0,
+            total_premiums_earned: 0,
+            total_claims_paid: 0,
+            premium_rate_bps,
+            max_coverage_bps,
+            cooldown_blocks,
+            last_premium_block: 0,
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.insurance_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_id.to_vec(),
+            }),
+            data: pool_data.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![creator_input],
+            outputs: vec![pool_output],
+            witnesses: vec![vec![]],
+        })
+    }
+
+    /// Deposit into an insurance pool.
+    ///
+    /// Mints pool shares proportional to the deposit amount.
+    /// Depositors earn yield from premiums collected on lending operations.
+    pub fn deposit_insurance(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &InsurancePoolCellData,
+        deposit_amount: u128,
+        depositor_lock: Script,
+        depositor_input: CellInput,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if deposit_amount == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        let new_shares = ckb_lending_math::insurance::deposit_to_shares(
+            deposit_amount,
+            pool_data.total_shares,
+            pool_data.total_deposits,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        let new_pool = InsurancePoolCellData {
+            total_deposits: pool_data.total_deposits + deposit_amount,
+            total_shares: pool_data.total_shares + new_shares,
+            last_premium_block: pool_data.last_premium_block.max(block_number),
+            ..*pool_data
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.insurance_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        // Change cell back to depositor
+        let change_output = CellOutput {
+            capacity: 0,
+            lock_script: depositor_lock,
+            type_script: None,
+            data: vec![],
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![pool_outpoint, depositor_input],
+            outputs: vec![pool_output, change_output],
+            witnesses: vec![vec![]; 2],
+        })
+    }
+
+    /// Withdraw from an insurance pool by burning shares.
+    ///
+    /// Returns underlying tokens proportional to shares burned.
+    /// Respects cooldown period if configured.
+    pub fn withdraw_insurance(
+        &self,
+        pool_outpoint: CellInput,
+        pool_data: &InsurancePoolCellData,
+        shares_to_burn: u128,
+        withdrawer_lock: Script,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if shares_to_burn == 0 || shares_to_burn > pool_data.total_shares {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        let underlying = ckb_lending_math::insurance::shares_to_underlying(
+            shares_to_burn,
+            pool_data.total_shares,
+            pool_data.total_deposits,
+        ).map_err(|_| SDKError::InvalidAmounts)?;
+
+        if underlying > pool_data.total_deposits {
+            return Err(SDKError::InsufficientLiquidity);
+        }
+
+        let new_pool = InsurancePoolCellData {
+            total_deposits: pool_data.total_deposits - underlying,
+            total_shares: pool_data.total_shares - shares_to_burn,
+            last_premium_block: pool_data.last_premium_block.max(block_number),
+            ..*pool_data
+        };
+
+        let pool_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: pool_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.insurance_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: pool_data.pool_id.to_vec(),
+            }),
+            data: new_pool.serialize().to_vec(),
+        };
+
+        // Withdrawn tokens go to withdrawer
+        let withdraw_output = CellOutput {
+            capacity: 0,
+            lock_script: withdrawer_lock,
+            type_script: None,
+            data: underlying.to_le_bytes().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![pool_outpoint],
+            outputs: vec![pool_output, withdraw_output],
+            witnesses: vec![vec![]],
+        })
+    }
+
+    /// Claim insurance coverage for a distressed vault.
+    ///
+    /// When a vault's health factor drops below the soft liquidation threshold,
+    /// the insurance pool can repay some of the vault's debt to prevent liquidation.
+    /// This is the mutualist alternative to predatory liquidation.
+    pub fn claim_insurance(
+        &self,
+        insurance_outpoint: CellInput,
+        insurance_data: &InsurancePoolCellData,
+        vault_outpoint: CellInput,
+        vault_data: &VaultCellData,
+        lending_pool_data: &LendingPoolCellData,
+        collateral_price: u128,
+        debt_price: u128,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        // Calculate how much insurance is needed
+        let (claim_amount, _new_hf) = ckb_lending_math::insurance::calculate_claim(
+            vault_data.collateral_amount,
+            collateral_price,
+            // Current debt with index accrual
+            ckb_lending_math::pool::current_debt(
+                vault_data.debt_shares,
+                vault_data.borrow_index_snapshot,
+                lending_pool_data.borrow_index,
+            ),
+            debt_price,
+            lending_pool_data.liquidation_threshold,
+            ckb_lending_math::prevention::HF_SOFT_LIQUIDATION,
+            insurance_data.total_deposits,
+            insurance_data.max_coverage_bps,
+        );
+
+        if claim_amount == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        // Update insurance pool: decrease deposits, increase claims
+        let new_insurance = InsurancePoolCellData {
+            total_deposits: insurance_data.total_deposits - claim_amount,
+            total_claims_paid: insurance_data.total_claims_paid + claim_amount,
+            last_premium_block: insurance_data.last_premium_block.max(block_number),
+            ..*insurance_data
+        };
+
+        // Claim repays vault debt (reduce debt shares)
+        let repaid_shares = vibeswap_math::mul_div(
+            claim_amount,
+            vault_data.borrow_index_snapshot,
+            lending_pool_data.borrow_index,
+        );
+
+        let new_vault = VaultCellData {
+            debt_shares: vault_data.debt_shares.saturating_sub(repaid_shares),
+            borrow_index_snapshot: lending_pool_data.borrow_index,
+            last_update_block: block_number,
+            ..*vault_data
+        };
+
+        let insurance_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: insurance_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.insurance_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: insurance_data.pool_id.to_vec(),
+            }),
+            data: new_insurance.serialize().to_vec(),
+        };
+
+        let vault_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: vault_data.owner_lock_hash,
+                hash_type: HashType::Type,
+                args: vec![],
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.vault_type_code_hash,
+                hash_type: HashType::Type,
+                args: vault_data.pool_id.to_vec(),
+            }),
+            data: new_vault.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![insurance_outpoint, vault_outpoint],
+            outputs: vec![insurance_output, vault_output],
+            witnesses: vec![vec![]; 2],
+        })
+    }
+
+    /// Accrue premiums from a lending pool to the insurance pool.
+    ///
+    /// Called periodically to transfer premium payments from the lending pool's
+    /// reserve to the insurance pool.
+    pub fn accrue_insurance_premium(
+        &self,
+        insurance_outpoint: CellInput,
+        insurance_data: &InsurancePoolCellData,
+        lending_pool_borrows: u128,
+        block_number: u64,
+    ) -> Result<UnsignedTransaction, SDKError> {
+        if block_number <= insurance_data.last_premium_block {
+            return Err(SDKError::StaleOracleData);
+        }
+
+        let blocks_elapsed = block_number - insurance_data.last_premium_block;
+        let premium = ckb_lending_math::insurance::calculate_premium(
+            lending_pool_borrows,
+            insurance_data.premium_rate_bps,
+            blocks_elapsed,
+        );
+
+        if premium == 0 {
+            return Err(SDKError::InvalidAmounts);
+        }
+
+        let new_insurance = InsurancePoolCellData {
+            total_deposits: insurance_data.total_deposits + premium,
+            total_premiums_earned: insurance_data.total_premiums_earned + premium,
+            last_premium_block: block_number,
+            ..*insurance_data
+        };
+
+        let insurance_output = CellOutput {
+            capacity: 0,
+            lock_script: Script {
+                code_hash: self.deployment.pow_lock_code_hash,
+                hash_type: HashType::Type,
+                args: PoWLockArgs {
+                    pair_id: insurance_data.pool_id,
+                    min_difficulty: DEFAULT_MIN_POW_DIFFICULTY,
+                }.serialize().to_vec(),
+            },
+            type_script: Some(Script {
+                code_hash: self.deployment.insurance_pool_type_code_hash,
+                hash_type: HashType::Type,
+                args: insurance_data.pool_id.to_vec(),
+            }),
+            data: new_insurance.serialize().to_vec(),
+        };
+
+        Ok(UnsignedTransaction {
+            cell_deps: vec![CellDep {
+                tx_hash: self.deployment.script_dep_tx_hash,
+                index: self.deployment.script_dep_index,
+                dep_type: DepType::DepGroup,
+            }],
+            inputs: vec![insurance_outpoint],
+            outputs: vec![insurance_output],
+            witnesses: vec![vec![]],
+        })
+    }
 }
 
 // ============ Order Type ============
@@ -1262,6 +1628,7 @@ mod tests {
             knowledge_type_code_hash: [0x09; 32],
             lending_pool_type_code_hash: [0x0A; 32],
             vault_type_code_hash: [0x0B; 32],
+            insurance_pool_type_code_hash: [0x0C; 32],
             script_dep_tx_hash: [0x10; 32],
             script_dep_index: 0,
         }

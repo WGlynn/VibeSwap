@@ -147,6 +147,21 @@ table VaultCellData {
     last_update_block:      Uint64,     // Last modification block
 }
 
+// ============ Insurance Pool Cell Data ============
+// Mutualized protection fund — prevents liquidations (P-105)
+table InsurancePoolCellData {
+    pool_id:                Byte32,     // Unique pool identifier
+    asset_type_hash:        Byte32,     // Which token this pool covers
+    total_deposits:         Uint128,    // Total insurance deposits
+    total_shares:           Uint128,    // Share accounting
+    total_premiums_earned:  Uint128,    // Accumulated premiums from lending
+    total_claims_paid:      Uint128,    // Total payouts for de-risk events
+    premium_rate_bps:       Uint64,     // Annual premium rate (bps)
+    max_coverage_bps:       Uint64,     // Max % of deposits per claim (bps)
+    cooldown_blocks:        Uint64,     // Withdrawal cooldown period
+    last_premium_block:     Uint64,     // Last premium accrual block
+}
+
 // ============ PoW Lock Args ============
 // Arguments for the PoW lock script
 table PoWLockArgs {

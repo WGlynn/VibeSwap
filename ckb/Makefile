@@ -2,8 +2,8 @@
 # Compiles all CKB scripts to RISC-V ELF binaries for CKB-VM deployment
 #
 # Usage:
-#   make build        — Build all 11 scripts for CKB-VM (RISC-V)
-#   make test         — Run all native tests (477 tests)
+#   make build        — Build all 12 scripts for CKB-VM (RISC-V)
+#   make test         — Run all native tests (525 tests)
 #   make clean        — Clean build artifacts
 #   make <script>     — Build a single script (e.g., make pow-lock)
 #   make size         — Show binary sizes
@@ -14,10 +14,10 @@ TARGET := riscv64imac-unknown-none-elf
 BUILD_DIR := target/$(TARGET)/release
 OUT_DIR := build
 
-# All 11 CKB scripts
+# All 12 CKB scripts
 SCRIPTS := pow-lock batch-auction-type commit-type amm-pool-type \
            lp-position-type compliance-type config-type oracle-type \
-           knowledge-type lending-pool-type vault-type
+           knowledge-type lending-pool-type vault-type insurance-pool-type
 
 # Binary names (Cargo replaces hyphens with underscores)
 BINARIES := $(patsubst %,$(OUT_DIR)/%, $(SCRIPTS))

@@ -1129,4 +1129,174 @@ mod tests {
         assert_eq!(decoded.input_type.as_ref().unwrap().len(), 1024);
         assert_eq!(decoded.output_type.as_ref().unwrap().len(), 2048);
     }
+
+    // ============ New Hardening Tests ============
+
+    #[test]
+    fn test_witness_args_input_type_only_roundtrip() {
+        let wa = WitnessArgs {
+            lock: None,
+            input_type: Some(vec![0xDE, 0xAD, 0xBE, 0xEF]),
+            output_type: None,
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert!(decoded.lock.is_none());
+        assert_eq!(decoded.input_type.unwrap(), vec![0xDE, 0xAD, 0xBE, 0xEF]);
+        assert!(decoded.output_type.is_none());
+    }
+
+    #[test]
+    fn test_witness_args_output_type_only_roundtrip() {
+        let wa = WitnessArgs {
+            lock: None,
+            input_type: None,
+            output_type: Some(vec![0xCA, 0xFE]),
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert!(decoded.lock.is_none());
+        assert!(decoded.input_type.is_none());
+        assert_eq!(decoded.output_type.unwrap(), vec![0xCA, 0xFE]);
+    }
+
+    #[test]
+    fn test_witness_args_deserialize_truncated_field() {
+        // Build valid serialized data, then truncate it mid-field
+        let wa = WitnessArgs {
+            lock: Some(vec![0xFF; 65]),
+            input_type: None,
+            output_type: None,
+        };
+        let bytes = wa.serialize();
+        // Truncate so the field data is incomplete (cut off last 10 bytes)
+        let truncated = &bytes[..bytes.len() - 10];
+        // Patch total_size to match truncated length so we pass the first check
+        let mut patched = truncated.to_vec();
+        let new_len = patched.len() as u32;
+        patched[0..4].copy_from_slice(&new_len.to_le_bytes());
+        assert!(WitnessArgs::deserialize(&patched).is_err());
+    }
+
+    #[test]
+    fn test_fee_calculation_zero_size() {
+        // Zero-sized transaction should still pay MIN_FEE
+        assert_eq!(calculate_fee(0, 1), MIN_FEE);
+        assert_eq!(calculate_fee(0, 100), MIN_FEE);
+    }
+
+    #[test]
+    fn test_fee_calculation_high_fee_rate() {
+        // 500 bytes at 10 shannons/byte = 5000 > MIN_FEE
+        assert_eq!(calculate_fee(500, 10), 5000);
+        // 2000 bytes at 5 shannons/byte = 10000
+        assert_eq!(calculate_fee(2000, 5), 10_000);
+    }
+
+    #[test]
+    fn test_tx_hash_changes_with_cell_deps() {
+        let mut tx1 = test_unsigned(1);
+        let tx2 = test_unsigned(1);
+        // Modify a cell dep
+        tx1.cell_deps[0].dep_type = DepType::Code;
+        let h1 = hash_raw_transaction(&tx1.cell_deps, &tx1.inputs, &tx1.outputs);
+        let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_assemble_with_extra_witnesses() {
+        // Transaction with extra witnesses beyond the input count
+        let mut tx = test_unsigned(1);
+        // Add two extra data witnesses
+        tx.witnesses.push(vec![0xAA, 0xBB, 0xCC]);
+        tx.witnesses.push(vec![0xDD, 0xEE]);
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        // Should have 1 signed witness + 2 extra witnesses = 3
+        assert_eq!(signed.witnesses.len(), 3);
+        assert!(!signed.witnesses[0].is_empty()); // signed witness
+        assert_eq!(signed.witnesses[1], vec![0xAA, 0xBB, 0xCC]);
+        assert_eq!(signed.witnesses[2], vec![0xDD, 0xEE]);
+    }
+
+    #[test]
+    fn test_estimate_tx_size_with_type_script() {
+        let mut tx = test_unsigned(1);
+        let s1 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        // Add a type script to the output
+        tx.outputs[0].type_script = Some(Script {
+            code_hash: [0xBB; 32],
+            hash_type: HashType::Data,
+            args: vec![0x01; 20],
+        });
+        let s2 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        // Size should increase by: 1 (presence flag already counted) + 32 (code_hash) + 1 (hash_type) + 4 (args_len) + 20 (args)
+        // The None case is 1 byte, Some case is 1 + 32 + 1 + 4 + 20 = 58, delta = 57
+        assert!(s2 > s1);
+        assert_eq!(s2 - s1, 32 + 1 + 4 + 20); // 57 bytes added (the 1 byte flag is in both branches)
+    }
+
+    #[test]
+    fn test_validate_single_input_transaction() {
+        // Boundary: exactly one input should be valid
+        let tx = test_unsigned(1);
+        assert!(validate_unsigned(&tx).is_ok());
+    }
+
+    #[test]
+    fn test_assemble_zero_capacity_output() {
+        // Edge case: output with zero capacity (valid structurally, fee check is separate)
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].capacity = 0;
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+
+        // Assembly itself should succeed (fee validation is separate)
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.outputs[0].capacity, 0);
+    }
+
+    #[test]
+    fn test_end_to_end_assemble_verify_signature_roundtrip() {
+        // Multi-step: build tx, assemble with 2 signers, verify each group's
+        // first witness contains a valid WitnessArgs with the expected signature
+        let mut tx = test_unsigned(3);
+        // Input 0 uses lock 0x10, inputs 1-2 use lock 0x20
+        tx.outputs[0].lock_script = test_script(0x10);
+        tx.outputs[1].lock_script = test_script(0x20);
+        tx.outputs[2].lock_script = test_script(0x20);
+
+        let signer_a = MockSigner::new(test_script(0x10));
+        let signer_b = MockSigner::new(test_script(0x20));
+        let locks = vec![test_script(0x10), test_script(0x20), test_script(0x20)];
+
+        validate_unsigned(&tx).unwrap();
+        let signed = assemble(&tx, &[&signer_a, &signer_b], &locks).unwrap();
+
+        assert_eq!(signed.witnesses.len(), 3);
+
+        // Witness 0: first in group A — should contain signer_a's signature
+        let wa0 = WitnessArgs::deserialize(&signed.witnesses[0]).unwrap();
+        assert_eq!(wa0.lock.as_ref().unwrap().len(), SECP256K1_SIGNATURE_SIZE);
+        assert_eq!(wa0.lock.as_ref().unwrap(), &signer_a.signature.to_vec());
+
+        // Witness 1: first in group B — should contain signer_b's signature
+        let wa1 = WitnessArgs::deserialize(&signed.witnesses[1]).unwrap();
+        assert_eq!(wa1.lock.as_ref().unwrap().len(), SECP256K1_SIGNATURE_SIZE);
+        assert_eq!(wa1.lock.as_ref().unwrap(), &signer_b.signature.to_vec());
+
+        // Witness 2: second in group B — should be empty (CKB convention)
+        assert!(signed.witnesses[2].is_empty());
+
+        // Verify tx_hash is consistent
+        let raw_hash = hash_raw_transaction(&tx.cell_deps, &tx.inputs, &tx.outputs);
+        assert_eq!(signed.tx_hash(), raw_hash);
+
+        // Verify estimated size is positive and reasonable
+        let size = signed.estimated_size();
+        assert!(size > 100, "Signed tx size should be > 100 bytes, got {}", size);
+    }
 }

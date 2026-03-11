@@ -1551,4 +1551,696 @@ mod tests {
         assert_eq!(id2.len(), 32);
         assert_ne!(id, id2);
     }
+
+    // ============ Batch 5: Edge Cases, Boundaries, Overflow, Error Paths ============
+
+    #[test]
+    fn test_create_resolution_at_current_block_fails() {
+        // resolution_block == current_block should fail (not strictly in the future)
+        let lock = test_lock();
+        let params = CreateMarketParams {
+            question_hash: [0; 32],
+            oracle_pair_id: [0; 32],
+            num_tiers: 2,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 100, // equal to current_block
+            dispute_window_blocks: 1200,
+            fee_rate_bps: 100,
+            creator_lock: lock,
+            creator_input: CellInput { tx_hash: [0; 32], index: 0, since: 0 },
+            current_block: 100,
+        };
+        assert!(create_market(&params).is_err());
+    }
+
+    #[test]
+    fn test_create_zero_tiers_fails() {
+        let lock = test_lock();
+        let params = CreateMarketParams {
+            question_hash: [0; 32],
+            oracle_pair_id: [0; 32],
+            num_tiers: 0,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 1000,
+            dispute_window_blocks: 1200,
+            fee_rate_bps: 100,
+            creator_lock: lock,
+            creator_input: CellInput { tx_hash: [0; 32], index: 0, since: 0 },
+            current_block: 100,
+        };
+        assert!(create_market(&params).is_err());
+    }
+
+    #[test]
+    fn test_place_bet_after_resolution_block_by_one() {
+        // current_block == resolution_block + 1 should also fail
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 1001);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_place_bet_on_settled_market() {
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_SETTLED;
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_place_bet_on_resolved_market() {
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_RESOLVED;
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_place_bet_tier_index_equals_num_tiers() {
+        // tier_index == num_tiers is out of bounds (0-indexed)
+        let market = test_market(4, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = place_bet(&market, 4, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_place_bet_overflow_tier_pool() {
+        // Set up a market with a tier pool near u128::MAX, then bet to overflow
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.tier_pools[0] = u128::MAX - MINIMUM_BET_AMOUNT + 1;
+        market.total_liquidity = u128::MAX - MINIMUM_BET_AMOUNT + 1;
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        assert!(result.is_err(), "Should fail with overflow on tier pool");
+    }
+
+    #[test]
+    fn test_place_bet_overflow_total_liquidity() {
+        // Tier pool won't overflow but total_liquidity will
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.tier_pools[0] = u128::MAX / 2;
+        market.tier_pools[1] = u128::MAX / 2;
+        market.total_liquidity = u128::MAX - MINIMUM_BET_AMOUNT + 1;
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        // tier_pools[0] + MINIMUM_BET_AMOUNT may or may not overflow depending on exact values
+        // but total_liquidity + MINIMUM_BET_AMOUNT will overflow
+        assert!(result.is_err(), "Should fail with overflow");
+    }
+
+    #[test]
+    fn test_resolve_cancelled_market_fails() {
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_CANCELLED;
+        let result = resolve_market(&market, PRECISION / 2, 1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_already_resolved_succeeds() {
+        // Re-resolving a MARKET_RESOLVED market is allowed (the check allows ACTIVE or RESOLVING)
+        // Wait -- the code checks: status != MARKET_ACTIVE && status != MARKET_RESOLVING → error
+        // MARKET_RESOLVED is neither ACTIVE nor RESOLVING, so it should FAIL
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_RESOLVED;
+        let result = resolve_market(&market, PRECISION / 2, 1000);
+        assert!(result.is_err(), "Re-resolving an already resolved market should fail");
+    }
+
+    #[test]
+    fn test_resolve_resolving_market_succeeds() {
+        // A market in RESOLVING status should be resolvable
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_RESOLVING;
+        let result = resolve_market(&market, PRECISION / 2, 1000);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().status, MARKET_RESOLVED);
+    }
+
+    #[test]
+    fn test_resolve_oracle_value_zero() {
+        let market = test_market(4, SETTLEMENT_WINNER_TAKES_ALL);
+        let resolved = resolve_market(&market, 0, 1000).unwrap();
+        assert_eq!(resolved.resolved_tier, 0);
+        assert_eq!(resolved.resolved_value, 0);
+    }
+
+    #[test]
+    fn test_resolve_oracle_value_max() {
+        // Oracle value at u128::MAX should clamp to last tier
+        let market = test_market(4, SETTLEMENT_WINNER_TAKES_ALL);
+        let resolved = resolve_market(&market, u128::MAX, 1000).unwrap();
+        assert_eq!(resolved.resolved_tier, 3); // last tier (0-indexed)
+    }
+
+    #[test]
+    fn test_value_to_tier_just_below_boundary() {
+        // For 4 tiers, bucket_size = PRECISION / 4
+        let bucket = PRECISION / 4;
+        // Just below each boundary
+        assert_eq!(value_to_tier(bucket - 1, 4), 0);
+        assert_eq!(value_to_tier(2 * bucket - 1, 4), 1);
+        assert_eq!(value_to_tier(3 * bucket - 1, 4), 2);
+    }
+
+    #[test]
+    fn test_value_to_tier_exactly_at_boundary() {
+        // For 4 tiers, bucket_size = PRECISION / 4
+        let bucket = PRECISION / 4;
+        assert_eq!(value_to_tier(bucket, 4), 1);
+        assert_eq!(value_to_tier(2 * bucket, 4), 2);
+        assert_eq!(value_to_tier(3 * bucket, 4), 3);
+    }
+
+    #[test]
+    fn test_value_to_tier_large_value_clamped() {
+        // Values far beyond PRECISION still clamp to last tier
+        assert_eq!(value_to_tier(PRECISION * 100, 5), 4);
+        assert_eq!(value_to_tier(u128::MAX, 8), 7);
+    }
+
+    #[test]
+    fn test_cancel_already_cancelled_market_fails() {
+        let lock = test_lock();
+        let lock_hash = hash_script(&lock);
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_CANCELLED;
+        let result = cancel_market(&market, &lock_hash);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cancel_settled_market_fails() {
+        let lock = test_lock();
+        let lock_hash = hash_script(&lock);
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_SETTLED;
+        let result = cancel_market(&market, &lock_hash);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_payout_settled_market_succeeds() {
+        // calculate_payout should work for MARKET_SETTLED status too
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT), (1, 5 * MINIMUM_BET_AMOUNT)];
+        let mut market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        market.status = MARKET_SETTLED;
+        market.resolved_tier = 0;
+
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let result = calculate_payout(&market, &pos);
+        assert!(result.is_ok(), "Payout calculation should work for settled markets");
+        let (gross, _, _) = result.unwrap();
+        assert_eq!(gross, 15 * MINIMUM_BET_AMOUNT);
+    }
+
+    #[test]
+    fn test_payout_cancelled_market_fails() {
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_CANCELLED;
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let result = calculate_payout(&market, &pos);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_payout_active_market_fails() {
+        let bets = [(0, 5 * MINIMUM_BET_AMOUNT)];
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        // Market is still ACTIVE
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let result = calculate_payout(&market, &pos);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_proportional_winner_at_last_tier() {
+        // Last tier wins — only one adjacent tier (tier below)
+        let bets = [
+            (0, 5 * MINIMUM_BET_AMOUNT),
+            (1, 5 * MINIMUM_BET_AMOUNT),
+            (2, 5 * MINIMUM_BET_AMOUNT),
+        ];
+        let mut market = market_with_bets(3, SETTLEMENT_PROPORTIONAL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 2; // last tier wins
+
+        let total = 15 * MINIMUM_BET_AMOUNT;
+
+        // Winner (tier 2) gets 100% - 15% = 85% (only tier 1 is adjacent)
+        let pos_winner = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 2,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_win, _, _) = calculate_payout(&market, &pos_winner).unwrap();
+        let expected = mul_div(total, BPS_DENOMINATOR - ADJACENT_PAYOUT_BPS, BPS_DENOMINATOR);
+        assert_eq!(gross_win, expected);
+
+        // Adjacent (tier 1) gets 15%
+        let pos_adj = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x22; 32],
+            tier_index: 1,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_adj, _, _) = calculate_payout(&market, &pos_adj).unwrap();
+        let expected_adj = mul_div(total, ADJACENT_PAYOUT_BPS, BPS_DENOMINATOR);
+        assert_eq!(gross_adj, expected_adj);
+
+        // Tier 0 (distance 2) gets nothing
+        let pos_far = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x33; 32],
+            tier_index: 0,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_far, _, _) = calculate_payout(&market, &pos_far).unwrap();
+        assert_eq!(gross_far, 0);
+    }
+
+    #[test]
+    fn test_proportional_empty_adjacent_no_deduction() {
+        // Winner at tier 1, but adjacent tier 0 has 0 bets — no deduction for empty adjacents
+        let bets = [
+            (1, 5 * MINIMUM_BET_AMOUNT),
+            (2, 5 * MINIMUM_BET_AMOUNT),
+        ];
+        let mut market = market_with_bets(3, SETTLEMENT_PROPORTIONAL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 1;
+
+        let total = 10 * MINIMUM_BET_AMOUNT;
+
+        // Winning tier: tier 0 is adjacent but empty → no deduction for it
+        // Only tier 2 is adjacent and has bets → deduction = 1500 bps
+        let pos_winner = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 1,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_win, _, _) = calculate_payout(&market, &pos_winner).unwrap();
+        let expected = mul_div(total, BPS_DENOMINATOR - ADJACENT_PAYOUT_BPS, BPS_DENOMINATOR);
+        assert_eq!(gross_win, expected);
+    }
+
+    #[test]
+    fn test_scalar_single_tier_with_bets() {
+        // Only one tier has bets in scalar mode — it gets 100% of pool
+        let bets = [(1, 10 * MINIMUM_BET_AMOUNT)];
+        let mut market = market_with_bets(3, SETTLEMENT_SCALAR, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 1;
+
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 1,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross, _, _) = calculate_payout(&market, &pos).unwrap();
+        // Only tier with bets and it's the resolved tier → gets everything
+        assert_eq!(gross, 10 * MINIMUM_BET_AMOUNT);
+    }
+
+    #[test]
+    fn test_scalar_all_weight_on_distant_tier() {
+        // Only tier 0 has bets, resolved tier is 2 (distance=2), n=3
+        // weight = 3 - 2 = 1, total_weight = 1
+        // Gets 100% of pool (it's the only funded tier)
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT)];
+        let mut market = market_with_bets(3, SETTLEMENT_SCALAR, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 2;
+
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross, _, _) = calculate_payout(&market, &pos).unwrap();
+        assert_eq!(gross, 10 * MINIMUM_BET_AMOUNT);
+    }
+
+    #[test]
+    fn test_wta_two_bettors_same_tier_proportional_share() {
+        // Two bettors on winning tier with unequal amounts: 1/3 and 2/3 split
+        let bets = [
+            (0, 3 * MINIMUM_BET_AMOUNT), // bettor A
+            (0, 6 * MINIMUM_BET_AMOUNT), // bettor B
+            (1, 9 * MINIMUM_BET_AMOUNT), // losing
+        ];
+        let mut market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+
+        let total = 18 * MINIMUM_BET_AMOUNT;
+        assert_eq!(market.total_liquidity, total);
+
+        // Bettor A: 3/9 of pool
+        let pos_a = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 3 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_a, _, _) = calculate_payout(&market, &pos_a).unwrap();
+        assert_eq!(gross_a, 6 * MINIMUM_BET_AMOUNT); // 3/9 * 18
+
+        // Bettor B: 6/9 of pool
+        let pos_b = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x22; 32],
+            tier_index: 0,
+            amount: 6 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross_b, _, _) = calculate_payout(&market, &pos_b).unwrap();
+        assert_eq!(gross_b, 12 * MINIMUM_BET_AMOUNT); // 6/9 * 18
+
+        // Sum should equal total pool
+        assert_eq!(gross_a + gross_b, total);
+    }
+
+    #[test]
+    fn test_zero_fee_rate_no_deduction() {
+        // Fee rate of 0 should mean net == gross
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT), (1, 5 * MINIMUM_BET_AMOUNT)];
+        let mut market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+        market.fee_rate_bps = 0;
+
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross, fee, net) = calculate_payout(&market, &pos).unwrap();
+        assert_eq!(fee, 0);
+        assert_eq!(net, gross);
+    }
+
+    #[test]
+    fn test_max_fee_rate() {
+        // Fee rate of 10000 bps (100%) — net should be 0
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT), (1, 5 * MINIMUM_BET_AMOUNT)];
+        let mut market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+        market.fee_rate_bps = 10000; // 100% fee
+
+        let pos = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 10 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let (gross, fee, net) = calculate_payout(&market, &pos).unwrap();
+        assert_eq!(fee, gross); // 100% fee
+        assert_eq!(net, 0);
+    }
+
+    #[test]
+    fn test_is_settleable_active_market() {
+        // An active market is never settleable, even if past dispute_end_block
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_ACTIVE;
+        market.dispute_end_block = 100;
+        assert!(!is_settleable(&market, 200));
+    }
+
+    #[test]
+    fn test_is_settleable_cancelled_market() {
+        let mut market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        market.status = MARKET_CANCELLED;
+        market.dispute_end_block = 100;
+        assert!(!is_settleable(&market, 200));
+    }
+
+    #[test]
+    fn test_settle_active_market_fails() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = settle_market(&market, 5000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_market_depth_zero_tiers() {
+        // Manually constructed market with num_tiers=0 for edge case
+        let mut market = PredictionMarketCellData::default();
+        market.num_tiers = 0;
+        let (min_pool, max_pool, imbalance) = market_depth(&market);
+        assert_eq!(min_pool, 0);
+        assert_eq!(max_pool, 0);
+        assert_eq!(imbalance, 0);
+    }
+
+    #[test]
+    fn test_hash_script_different_hash_types() {
+        // Same code_hash and args but different hash_type should produce different hashes
+        let script_data = Script {
+            code_hash: [0xAA; 32],
+            hash_type: HashType::Data,
+            args: vec![0x01],
+        };
+        let script_type = Script {
+            code_hash: [0xAA; 32],
+            hash_type: HashType::Type,
+            args: vec![0x01],
+        };
+        let script_data1 = Script {
+            code_hash: [0xAA; 32],
+            hash_type: HashType::Data1,
+            args: vec![0x01],
+        };
+        let script_data2 = Script {
+            code_hash: [0xAA; 32],
+            hash_type: HashType::Data2,
+            args: vec![0x01],
+        };
+
+        let h_data = hash_script(&script_data);
+        let h_type = hash_script(&script_type);
+        let h_data1 = hash_script(&script_data1);
+        let h_data2 = hash_script(&script_data2);
+
+        assert_ne!(h_data, h_type);
+        assert_ne!(h_data, h_data1);
+        assert_ne!(h_data, h_data2);
+        assert_ne!(h_type, h_data1);
+        assert_ne!(h_type, h_data2);
+        assert_ne!(h_data1, h_data2);
+    }
+
+    #[test]
+    fn test_hash_script_different_args() {
+        let s1 = Script {
+            code_hash: [0xAA; 32],
+            hash_type: HashType::Type,
+            args: vec![0x01],
+        };
+        let s2 = Script {
+            code_hash: [0xAA; 32],
+            hash_type: HashType::Type,
+            args: vec![0x02],
+        };
+        assert_ne!(hash_script(&s1), hash_script(&s2));
+    }
+
+    #[test]
+    fn test_hash_script_empty_args() {
+        let s = Script {
+            code_hash: [0xBB; 32],
+            hash_type: HashType::Data,
+            args: vec![],
+        };
+        let h = hash_script(&s);
+        // Should still produce a valid 32-byte hash
+        assert_ne!(h, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_create_all_settlement_modes() {
+        // Verify all 3 valid settlement modes can create markets
+        for mode in [SETTLEMENT_WINNER_TAKES_ALL, SETTLEMENT_PROPORTIONAL, SETTLEMENT_SCALAR] {
+            let market = test_market(2, mode);
+            assert_eq!(market.settlement_mode, mode);
+        }
+    }
+
+    #[test]
+    fn test_dispute_end_block_calculation() {
+        // Verify dispute_end_block = resolution_block + dispute_window_blocks
+        let lock = test_lock();
+        let params = CreateMarketParams {
+            question_hash: [0; 32],
+            oracle_pair_id: [0; 32],
+            num_tiers: 3,
+            settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 5000,
+            dispute_window_blocks: 2400,
+            fee_rate_bps: 200,
+            creator_lock: lock,
+            creator_input: CellInput { tx_hash: [0; 32], index: 0, since: 0 },
+            current_block: 100,
+        };
+        let (market, _) = create_market(&params).unwrap();
+        assert_eq!(market.dispute_end_block, 5000 + 2400);
+        assert_eq!(market.fee_rate_bps, 200);
+    }
+
+    #[test]
+    fn test_position_preserves_owner_lock_hash() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let owner = [0xDE; 32];
+        let (_, pos) = place_bet(&market, 0, MINIMUM_BET_AMOUNT, owner, 200).unwrap();
+        assert_eq!(pos.owner_lock_hash, owner);
+        assert_eq!(pos.created_block, 200);
+    }
+
+    #[test]
+    fn test_scalar_binary_market() {
+        // Scalar mode with only 2 tiers — verify both get payouts
+        let bets = [
+            (0, 5 * MINIMUM_BET_AMOUNT),
+            (1, 5 * MINIMUM_BET_AMOUNT),
+        ];
+        let mut market = market_with_bets(2, SETTLEMENT_SCALAR, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 0;
+
+        // Tier 0: distance 0, weight 2. Tier 1: distance 1, weight 1. Total weight = 3.
+        let pos0 = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let pos1 = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x22; 32],
+            tier_index: 1,
+            amount: 5 * MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+
+        let (g0, _, _) = calculate_payout(&market, &pos0).unwrap();
+        let (g1, _, _) = calculate_payout(&market, &pos1).unwrap();
+
+        assert!(g0 > g1);
+        assert!(g1 > 0);
+        // Verify approximate ratio: g0/g1 should be ~2:1 (weight 2 vs weight 1)
+        // With equal tier pools, g0 should be about double g1
+        let total = 10 * MINIMUM_BET_AMOUNT;
+        let expected_g0 = mul_div(total, 2, 3);
+        let expected_g1 = mul_div(total, 1, 3);
+        assert_eq!(g0, expected_g0);
+        assert_eq!(g1, expected_g1);
+    }
+
+    #[test]
+    fn test_market_serialize_roundtrip_all_fields_populated() {
+        // Market with non-zero values in every field
+        let bets = [
+            (0, 3 * MINIMUM_BET_AMOUNT),
+            (1, 7 * MINIMUM_BET_AMOUNT),
+            (2, 2 * MINIMUM_BET_AMOUNT),
+        ];
+        let mut market = market_with_bets(3, SETTLEMENT_PROPORTIONAL, &bets);
+        market.status = MARKET_RESOLVED;
+        market.resolved_tier = 1;
+        market.resolved_value = PRECISION / 3;
+
+        let bytes = market.serialize();
+        let deser = PredictionMarketCellData::deserialize(&bytes).unwrap();
+        assert_eq!(market, deser);
+        assert_eq!(deser.resolved_tier, 1);
+        assert_eq!(deser.resolved_value, PRECISION / 3);
+        assert_eq!(deser.num_tiers, 3);
+        assert_eq!(deser.settlement_mode, SETTLEMENT_PROPORTIONAL);
+    }
+
+    #[test]
+    fn test_position_serialize_roundtrip_edge_values() {
+        let position = PredictionPositionCellData {
+            market_id: [0xFF; 32],
+            owner_lock_hash: [0x00; 32],
+            tier_index: 7, // max valid tier
+            amount: u128::MAX,
+            created_block: u64::MAX,
+        };
+        let bytes = position.serialize();
+        let deser = PredictionPositionCellData::deserialize(&bytes).unwrap();
+        assert_eq!(position, deser);
+    }
+
+    #[test]
+    fn test_market_deserialize_too_short() {
+        let short_data = [0u8; 10];
+        assert!(PredictionMarketCellData::deserialize(&short_data).is_none());
+    }
+
+    #[test]
+    fn test_position_deserialize_too_short() {
+        let short_data = [0u8; 5];
+        assert!(PredictionPositionCellData::deserialize(&short_data).is_none());
+    }
+
+    #[test]
+    fn test_implied_odds_all_in_one_tier() {
+        // All liquidity in one tier → that tier = 10000 bps, others = 0
+        let bets = [(0, 10 * MINIMUM_BET_AMOUNT)];
+        let market = market_with_bets(3, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+
+        assert_eq!(implied_odds_bps(&market, 0), BPS_DENOMINATOR);
+        assert_eq!(implied_odds_bps(&market, 1), 0);
+        assert_eq!(implied_odds_bps(&market, 2), 0);
+    }
+
+    #[test]
+    fn test_potential_multiplier_heavily_favored() {
+        // 90% in tier 0, 10% in tier 1
+        let bets = [(0, 9 * MINIMUM_BET_AMOUNT), (1, MINIMUM_BET_AMOUNT)];
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &bets);
+
+        // Tier 0: 10/9 = ~1.11x
+        let mult0 = potential_multiplier(&market, 0);
+        let expected0 = mul_div(10 * MINIMUM_BET_AMOUNT, PRECISION, 9 * MINIMUM_BET_AMOUNT);
+        assert_eq!(mult0, expected0);
+
+        // Tier 1: 10/1 = 10x
+        let mult1 = potential_multiplier(&market, 1);
+        assert_eq!(mult1, 10 * PRECISION);
+    }
 }

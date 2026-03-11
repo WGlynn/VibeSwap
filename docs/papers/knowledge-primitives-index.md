@@ -1140,3 +1140,36 @@ When computing the inverse of a PRECISION-scaled power function (finding S such 
 **Primitive**: A Solidity "stack too deep" error is not a compiler bug — it's an architecture signal. When a function needs 17+ stack slots, the function is doing too much. The fix is not mechanical (scoping blocks, helper functions) but architectural: decompose the responsibility. Pattern: if a function needs to access a 7-field struct AND maintain 5+ local variables AND emit a multi-parameter event, it should delegate to helper functions that isolate each Pool-accessing operation behind its own stack frame.
 **Anti-pattern**: `_getCollateralToken(poolId, optionType)` that creates a full `Pool memory` (7 fields) just to return one address. Better: `_transferCollateral(poolId, type, from, to, amount)` — does the Pool lookup AND the transfer in one isolated stack frame.
 **Generalization**: In any resource-constrained environment (EVM stack, embedded systems, context windows), hitting a resource limit is a signal to restructure, not to hack around the limit. The restructured version is always better code.
+
+### P-098: As Above, So Below — Fractal Design Principle (March 2026)
+**Source**: Will's directive (Session 058) — foundational ethos applicable to everything
+**Domain**: Philosophy / Architecture / Mechanism Design / Protocol Design
+**Primitive**: The structure at any scale mirrors the structure at every other scale. This is the master design pattern:
+
+**In Protocol Architecture:**
+- A single swap follows the same commit-reveal-settle lifecycle as an entire batch
+- A pool's bonding curve shape mirrors the entire market's supply-demand dynamics
+- A user's position NFT contains the same information structure as the protocol's global state
+
+**In Incentive Design:**
+- Individual contributor rewards (Shapley) mirror DAO-level treasury allocation
+- A single app's revenue distribution follows the same fairness axioms as the platform's
+- Micro-governance (pool parameter votes) mirrors macro-governance (protocol upgrades)
+
+**In Identity:**
+- A user's local reputation (pool-level trust tier) mirrors their global reputation (cross-chain identity)
+- A shard's cognitive state mirrors the whole Mind Network's consensus
+- A single knowledge primitive mirrors the entire knowledge base structure
+
+**In Security:**
+- A contract's reentrancy guard mirrors the protocol's circuit breaker
+- A function's input validation mirrors the system's oracle validation
+- A test's assertion mirrors the invariant test's conservation law
+
+**Why it matters**: When the micro mirrors the macro, you only need to understand one level to understand all levels. Complexity stays constant regardless of scale. Systems that violate this principle develop "impedance mismatches" at scale boundaries — the micro-optimized subsystem fights the macro-optimized whole.
+
+**Will's framing**: This is not just a design pattern. It's the ethos. The protocol's fairness at the swap level IS its fairness at the civilization level. If you can't make it fair for one trade, you can't make it fair for the world. And if you CAN make it fair for one trade, the world follows.
+
+**Hermetic origin**: "That which is above is like that which is below, and that which is below is like that which is above, to accomplish the miracle of the One Thing." — The Emerald Tablet
+
+**Cross-references**: P-000 (Fairness Above All), P-096 (SVC — The Everything App), P-095 (Three-Dimensional Incentives), The Lion Turtle alignment axioms (CKB), Cooperative Capitalism philosophy

@@ -20,3 +20,4 @@ oracle-type = { path = "../scripts/oracle-type" }
 config-type = { path = "../scripts/config-type" }
 lending-pool-type = { path = "../scripts/lending-pool-type" }
 vault-type = { path = "../scripts/vault-type" }
+insurance-pool-type = { path = "../scripts/insurance-pool-type" }

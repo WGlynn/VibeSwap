@@ -28,3 +28,6 @@ mod token;
 
 #[cfg(test)]
 mod assembler;
+
+#[cfg(test)]
+mod insurance;

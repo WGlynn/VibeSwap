@@ -909,6 +909,260 @@ mod tests {
         assert_ne!(h1, h3, "Even 1-char difference in long input must produce different hash");
     }
 
+    // ============ Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_value_hash_single_byte() {
+        // Single byte inputs should produce distinct, valid hashes
+        let h0 = compute_value_hash(&[0x00]);
+        let h1 = compute_value_hash(&[0x01]);
+        let hff = compute_value_hash(&[0xFF]);
+
+        assert_ne!(h0, [0u8; 32]);
+        assert_ne!(h0, h1);
+        assert_ne!(h0, hff);
+        assert_ne!(h1, hff);
+    }
+
+    #[test]
+    fn test_key_hash_separator_boundary_behavior() {
+        // The hash format is: "vibeswap:knowledge:{ns}:{key}"
+        // Since there's a single colon separator, ("ns:", "key") and ("ns", ":key")
+        // both produce "vibeswap:knowledge:ns::key" — this is expected.
+        // However, shifting characters across the boundary without adding colons
+        // must produce different hashes.
+        let h1 = compute_key_hash("abc", "def");
+        let h2 = compute_key_hash("ab", "cdef");
+        let h3 = compute_key_hash("abcd", "ef");
+        let h4 = compute_key_hash("abcde", "f");
+        let h5 = compute_key_hash("a", "bcdef");
+
+        // All must differ because the colon separator changes position
+        let hashes = [h1, h2, h3, h4, h5];
+        for i in 0..hashes.len() {
+            for j in (i + 1)..hashes.len() {
+                assert_ne!(hashes[i], hashes[j],
+                    "Boundary shift: hash[{}] == hash[{}]", i, j);
+            }
+        }
+
+        // Verify the known collision: moving colon across boundary produces same hash
+        let ha = compute_key_hash("ns:", "key");
+        let hb = compute_key_hash("ns", ":key");
+        assert_eq!(ha, hb, "Expected collision: both produce 'vibeswap:knowledge:ns::key'");
+    }
+
+    #[test]
+    fn test_sha256_data_deterministic() {
+        let data = b"test data for hashing";
+        let h1 = sha256_data(data);
+        let h2 = sha256_data(data);
+        assert_eq!(h1, h2);
+        assert_ne!(h1, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_sha256_data_empty_input() {
+        let h = sha256_data(b"");
+        assert_ne!(h, [0u8; 32]);
+        // SHA-256 of empty string is a known constant
+        assert_eq!(h, sha256_data(b""));
+    }
+
+    #[test]
+    fn test_create_cell_capacity_is_300_ckb() {
+        // Verify the capacity field is always 300 CKB = 30_000_000_000 shannons
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell(
+            "ns", "key", b"data", [0xFF; 32], 100, &deployment, input,
+        );
+
+        assert_eq!(tx.outputs[0].capacity, 30_000_000_000u64,
+            "Knowledge cell capacity must be exactly 300 CKB");
+    }
+
+    #[test]
+    fn test_create_cell_has_single_cell_dep() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell(
+            "ns", "key", b"data", [0xFF; 32], 100, &deployment, input,
+        );
+
+        assert_eq!(tx.cell_deps.len(), 1);
+        assert_eq!(tx.cell_deps[0].tx_hash, deployment.script_dep_tx_hash);
+        assert_eq!(tx.cell_deps[0].index, deployment.script_dep_index);
+    }
+
+    #[test]
+    fn test_create_cell_genesis_witness_is_empty() {
+        // Genesis cell has no PoW proof, witness should be empty vec
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x01; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell(
+            "ns", "key", b"val", [0xFF; 32], 100, &deployment, input,
+        );
+
+        assert_eq!(tx.witnesses.len(), 1);
+        assert!(tx.witnesses[0].is_empty(),
+            "Genesis cell witness should be empty (filled during signing)");
+    }
+
+    #[test]
+    fn test_update_cell_capacity_matches_create() {
+        // Update cell must have same capacity as create cell
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "key"),
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"data", [0u8; 32], [0xFF; 32], 10, &proof, &deployment,
+        );
+
+        assert_eq!(tx.outputs[0].capacity, 30_000_000_000u64);
+    }
+
+    #[test]
+    fn test_update_increments_count_correctly_at_high_values() {
+        // Verify update_count increments correctly even at high values
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "counter"),
+            update_count: u64::MAX - 1, // Near max
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(
+            &old, input, b"data", [0u8; 32], [0xFF; 32], 10, &proof, &deployment,
+        );
+
+        let new_data = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(new_data.update_count, u64::MAX,
+            "update_count should increment to u64::MAX");
+    }
+
+    #[test]
+    fn test_update_value_hash_changes_with_content() {
+        // Verify that different new values produce different value_hashes in the output cell
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "key"),
+            ..Default::default()
+        };
+
+        let tx_a = update_knowledge_cell(
+            &old, input.clone(), b"value_a", [0u8; 32], [0xFF; 32], 10, &proof, &deployment,
+        );
+        let tx_b = update_knowledge_cell(
+            &old, input, b"value_b", [0u8; 32], [0xFF; 32], 10, &proof, &deployment,
+        );
+
+        let cell_a = KnowledgeCellData::deserialize(&tx_a.outputs[0].data).unwrap();
+        let cell_b = KnowledgeCellData::deserialize(&tx_b.outputs[0].data).unwrap();
+
+        assert_ne!(cell_a.value_hash, cell_b.value_hash,
+            "Different values must produce different value_hashes");
+        assert_eq!(cell_a.value_hash, compute_value_hash(b"value_a"));
+        assert_eq!(cell_b.value_hash, compute_value_hash(b"value_b"));
+    }
+
+    #[test]
+    fn test_difficulty_clamped_both_directions() {
+        // Verify +-1 clamping explicitly: fast update → +1, slow update → -1
+        let cell_mid = KnowledgeCellData {
+            difficulty: 20,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+
+        let fast = compute_new_difficulty(&cell_mid, 101);
+        let slow = compute_new_difficulty(&cell_mid, 100 + 10_000_000);
+
+        assert!(fast <= 21, "Fast update clamped to at most +1: got {}", fast);
+        assert!(fast >= 20, "Fast update should not decrease: got {}", fast);
+        assert!(slow >= 19, "Slow update clamped to at most -1: got {}", slow);
+        assert!(slow <= 20, "Slow update should not increase: got {}", slow);
+    }
+
+    #[test]
+    fn test_difficulty_at_target_blocks_stays_same() {
+        // When elapsed == target, difficulty should not change
+        let target_blocks = vibeswap_pow::TARGET_TRANSITION_BLOCKS * vibeswap_pow::ADJUSTMENT_WINDOW;
+        for diff in [KNOWLEDGE_MIN_DIFFICULTY, 12, 16, 20, 30] {
+            let cell = KnowledgeCellData {
+                difficulty: diff,
+                timestamp_block: 100,
+                ..Default::default()
+            };
+
+            let new_diff = compute_new_difficulty(&cell, 100 + target_blocks);
+            assert_eq!(new_diff, diff,
+                "At exact target interval, difficulty {} should remain unchanged, got {}", diff, new_diff);
+        }
+    }
+
+    #[test]
+    fn test_mine_proof_challenge_uses_next_update_count() {
+        // Verify that mine_for_knowledge_cell uses (update_count + 1) as batch_id
+        let cell = KnowledgeCellData {
+            key_hash: compute_key_hash("test", "batch_id"),
+            update_count: 42,
+            difficulty: 4,
+            ..Default::default()
+        };
+
+        let old_bytes = cell.serialize();
+        let prev_state_hash = sha256_data(&old_bytes);
+        let expected_challenge = vibeswap_pow::generate_challenge(
+            &cell.key_hash,
+            43, // update_count + 1
+            &prev_state_hash,
+        );
+
+        let proof = mine_for_knowledge_cell(&cell, 1_000_000);
+        assert!(proof.is_some());
+        assert_eq!(proof.unwrap().challenge, expected_challenge,
+            "Challenge must use update_count + 1 as batch_id");
+    }
+
+    #[test]
+    fn test_update_timestamp_block_propagates() {
+        // Verify current_block parameter becomes the new cell's timestamp_block
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            key_hash: compute_key_hash("ns", "ts"),
+            timestamp_block: 100,
+            ..Default::default()
+        };
+
+        for block in [200u64, 0, 999_999, u64::MAX] {
+            let tx = update_knowledge_cell(
+                &old, input.clone(), b"data", [0u8; 32], [0xFF; 32], block, &proof, &deployment,
+            );
+            let new_data = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+            assert_eq!(new_data.timestamp_block, block,
+                "timestamp_block should be set to current_block={}", block);
+        }
+    }
+
     fn test_deployment() -> super::super::DeploymentInfo {
         super::super::DeploymentInfo {
             pow_lock_code_hash: [0x01; 32],

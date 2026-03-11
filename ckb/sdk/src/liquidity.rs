@@ -932,4 +932,191 @@ mod tests {
         // LP value should have grown, but less than HODL
         assert!(val_after.total_value > val_entry.total_value, "LP value should increase with price");
     }
+
+    // ============ Additional Edge Case & Boundary Tests ============
+
+    #[test]
+    fn test_position_value_tiny_lp_amount() {
+        // Minimal LP amount (1 unit) should still return valid proportional amounts
+        let pool = balanced_pool();
+        let val = position_value(1, &pool, PRECISION, PRECISION).unwrap();
+        // 1 / total_lp_supply fraction of reserves
+        assert_eq!(val.amount0, vibeswap_math::mul_div(1, pool.reserve0, pool.total_lp_supply));
+        assert_eq!(val.amount1, vibeswap_math::mul_div(1, pool.reserve1, pool.total_lp_supply));
+        assert_eq!(val.pool_share_bps, 0); // Less than 1 bps
+    }
+
+    #[test]
+    fn test_position_value_asymmetric_prices() {
+        // Token0 worth much more than token1
+        let pool = balanced_pool();
+        let val = position_value(
+            pool.total_lp_supply,
+            &pool,
+            100 * PRECISION,  // $100 per token0
+            PRECISION / 100,  // $0.01 per token1
+        ).unwrap();
+        // Value should be dominated by token0
+        let value0 = vibeswap_math::mul_div(pool.reserve0, 100 * PRECISION, PRECISION);
+        let value1 = vibeswap_math::mul_div(pool.reserve1, PRECISION / 100, PRECISION);
+        assert_eq!(val.total_value, value0 + value1);
+        assert!(value0 > value1 * 1000); // token0 side dominates
+    }
+
+    #[test]
+    fn test_il_zero_current_price() {
+        // Current price drops to zero — extreme edge case
+        let il = impermanent_loss(PRECISION, 0, 100_000 * PRECISION).unwrap();
+        // r = 0, sqrt(0) = 0, LP value = 0
+        // HODL value = initial * (1+0)/2 = initial/2
+        assert_eq!(il.lp_value, 0);
+        assert!(il.hodl_value > 0);
+        assert_eq!(il.loss_amount, il.hodl_value);
+    }
+
+    #[test]
+    fn test_il_same_price_zero_initial_value() {
+        // Zero initial value — IL should be zero
+        let il = impermanent_loss(PRECISION, PRECISION, 0).unwrap();
+        assert_eq!(il.il_bps, 0);
+        assert_eq!(il.lp_value, 0);
+        assert_eq!(il.hodl_value, 0);
+        assert_eq!(il.loss_amount, 0);
+    }
+
+    #[test]
+    fn test_il_100x_price_increase() {
+        // Extreme price move: 100x
+        let il = impermanent_loss(PRECISION, 100 * PRECISION, 100_000 * PRECISION).unwrap();
+        // IL for 100x is very large — sqrt(100)=10, HODL=(1+100)/2=50.5, LP=10
+        // IL = 1 - 10/50.5 ≈ 80.2%
+        assert!(il.il_bps > 7500, "IL for 100x should be > 75%: {}", il.il_bps);
+        assert!(il.il_bps < 8500, "IL for 100x should be < 85%: {}", il.il_bps);
+    }
+
+    #[test]
+    fn test_withdrawal_more_than_supply() {
+        // Burning more LP than exists — should still compute (saturating_sub handles it)
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(pool.total_lp_supply + 1000, &pool).unwrap();
+        // Should get more than total reserves due to proportional calculation
+        assert!(est.amount0 >= pool.reserve0);
+        assert!(est.amount1 >= pool.reserve1);
+        assert!(est.below_minimum);
+    }
+
+    #[test]
+    fn test_withdrawal_imbalanced_pool() {
+        // Withdrawal from a pool with imbalanced reserves
+        let pool = imbalanced_pool();
+        let est = estimate_withdrawal(pool.total_lp_supply / 5, &pool).unwrap();
+        // Should get 1/5 of each reserve
+        assert_eq!(est.amount0, pool.reserve0 / 5);
+        assert_eq!(est.amount1, pool.reserve1 / 5);
+        // 4/5 of LP remains, which is well above minimum
+        assert!(!est.below_minimum);
+    }
+
+    #[test]
+    fn test_optimal_deposit_both_zero_on_empty_pool() {
+        let empty = make_pool(0, 0, 0, 30);
+        let err = optimal_deposit(0, 0, &empty).unwrap_err();
+        assert_eq!(err, LiquidityError::ZeroAmount);
+    }
+
+    #[test]
+    fn test_optimal_deposit_excess_token1() {
+        // Excess token1 instead of token0
+        let pool = balanced_pool();
+        let dep = optimal_deposit(
+            10_000 * PRECISION,
+            30_000 * PRECISION, // 3x token1
+            &pool,
+        ).unwrap();
+        // Should cap token1 to match pool ratio (1:1)
+        assert_eq!(dep.amount0, 10_000 * PRECISION);
+        assert_eq!(dep.amount1, 10_000 * PRECISION);
+        assert_eq!(dep.leftover0, 0);
+        assert_eq!(dep.leftover1, 20_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_zap_in_imbalanced_pool_token0() {
+        // Zap into an imbalanced pool (1:4 ratio)
+        let pool = imbalanced_pool();
+        let zap = zap_in_estimate(10_000 * PRECISION, true, &pool).unwrap();
+        assert_eq!(zap.swap_amount, 5_000 * PRECISION);
+        assert!(zap.swap_output > 0);
+        assert!(zap.expected_lp > 0);
+    }
+
+    #[test]
+    fn test_zap_in_tiny_amount_errors() {
+        // Very small zap amount (1 unit) — swap_amount = 0 causes InsufficientInput
+        // which maps to Overflow via the map_err in get_amount_out
+        let pool = balanced_pool();
+        let result = zap_in_estimate(1, true, &pool);
+        assert!(result.is_err(), "Tiny zap should fail because swap_amount rounds to 0");
+    }
+
+    #[test]
+    fn test_zap_in_small_but_valid_amount() {
+        // Minimum viable zap: 2 units (swap_amount = 1, remaining = 1)
+        let pool = balanced_pool();
+        let zap = zap_in_estimate(2, true, &pool).unwrap();
+        assert_eq!(zap.swap_amount, 1);
+        assert_eq!(zap.deposit_amount_in, 1);
+    }
+
+    #[test]
+    fn test_pool_analytics_imbalanced() {
+        let pool = imbalanced_pool(); // 500K:2M
+        let analytics = pool_analytics(
+            &pool,
+            PRECISION,     // $1 per token0
+            PRECISION / 4, // $0.25 per token1
+            50_000 * PRECISION,
+            788_400,
+        ).unwrap();
+        // TVL = 500K*$1 + 2M*$0.25 = $500K + $500K = $1M
+        assert_eq!(analytics.tvl, 1_000_000 * PRECISION);
+        // Spot price = reserve1 / reserve0 = 2M / 500K = 4
+        assert_eq!(analytics.spot_price, 4 * PRECISION);
+    }
+
+    #[test]
+    fn test_pool_analytics_zero_epoch_blocks() {
+        // Zero blocks in epoch — fee APR should be 0
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 100_000 * PRECISION, 0).unwrap();
+        assert_eq!(analytics.fee_apr_bps, 0);
+    }
+
+    #[test]
+    fn test_available_lp_to_burn_below_minimum() {
+        // Pool with LP supply at or below minimum — available should be 0
+        let pool = make_pool(10_000, 10_000, MINIMUM_LIQUIDITY, 30);
+        let available = available_lp_to_burn(&pool);
+        assert_eq!(available, 0);
+
+        // Below minimum (shouldn't happen in practice but test saturating_sub)
+        let pool2 = make_pool(10_000, 10_000, MINIMUM_LIQUIDITY - 1, 30);
+        let available2 = available_lp_to_burn(&pool2);
+        assert_eq!(available2, 0);
+    }
+
+    #[test]
+    fn test_k_invariant_imbalanced() {
+        let pool = imbalanced_pool();
+        let (hi, lo) = k_invariant(&pool);
+        // k should be reserve0 * reserve1
+        // 500K * 2M * PRECISION^2 — verify non-zero
+        assert!(hi > 0 || lo > 0);
+        // Compare against balanced pool: balanced has 1M*1M = 1e12, imbalanced has 500K*2M = 1e12
+        // Same product (both have k = 1e12 * PRECISION^2)
+        let balanced = balanced_pool();
+        let (bhi, blo) = k_invariant(&balanced);
+        assert_eq!(hi, bhi);
+        assert_eq!(lo, blo);
+    }
 }

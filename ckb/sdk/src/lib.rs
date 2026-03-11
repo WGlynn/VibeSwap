@@ -4,6 +4,7 @@
 
 pub mod knowledge;
 pub mod miner;
+pub mod token;
 
 use vibeswap_types::*;
 use vibeswap_math::PRECISION;

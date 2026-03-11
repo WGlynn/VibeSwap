@@ -1429,3 +1429,224 @@ This is a *coordination failure* — individually rational liquidation is collec
 **Generalization**: Any system with catastrophic tail risk benefits from mutualized insurance funded by small regular contributions. This is literally how insurance works in the real world — the innovation is making it trustless, on-chain, and automatic.
 
 **Cross-references**: P-105 (Mutualist Liquidation Prevention — the philosophy this implements), P-102 (UTXO-Native Lending — the lending system it protects), P-000 (Fairness Above All — insurance is fairer than liquidation)
+
+---
+
+## Emission Economic Coherence Primitives
+
+### P-107: The Supply Conservation Law — Every VIBE Has a Source and a Sink (March 2026)
+
+**Source**: `EmissionController.sol`, `VIBEToken.sol`, VIBE_TOKENOMICS.md
+**Discovered during**: Hardening VIBE emission economic coherence
+**Domain**: Token Economics / Protocol Accounting / Invariant Testing
+
+**Primitive**: The emission system must satisfy a strict accounting identity at ALL times:
+
+```
+totalEmitted == shapleyPool + totalShapleyDrained + totalGaugeFunded + stakingPending + totalStakingFunded
+```
+
+No VIBE can exist outside this identity. Every token minted by `drip()` enters exactly one of three sinks (Shapley pool, gauge, staking). Every token leaving a sink enters exactly one destination (ShapleyDistributor, LiquidityGauge, SingleStaking). This is a conservation law — the protocol equivalent of energy conservation in physics.
+
+**Testing methodology**:
+1. **Invariant fuzzing**: After any arbitrary sequence of `drip()`, `createContributionGame()`, `fundStaking()` calls, assert the identity holds
+2. **Cross-era stress**: Call `drip()` after long gaps spanning multiple eras. Verify no dust is created or destroyed
+3. **Boundary hunt**: Call `drip()` at exact era boundaries (genesis + N × ERA_DURATION). Verify smooth transitions
+4. **Supply cap sentinel**: After every operation, assert `totalEmitted <= MAX_SUPPLY` at BOTH the EmissionController layer AND the VIBEToken layer
+
+**Hardening pattern**: Two-layer cap enforcement. The EmissionController caps `pending` at `vibeToken.mintableSupply()`. The VIBEToken independently reverts if `totalSupply() + amount > MAX_SUPPLY`. A bug in either layer is caught by the other.
+
+**Generalization**: Any token emission system must prove a conservation law. If you can't write the accounting identity as a single equation, your system has a leak. The equation IS the spec.
+
+**Cross-references**: P-000 (Fairness Above All — accounting identity ensures no hidden allocation), P-101 (Consensus Determinism — all arithmetic is integer), P-098 (As Above, So Below — micro conservation mirrors macro cap)
+
+---
+
+### P-108: Time-Intentional vs Time-Neutral Emission — The Double-Halving Trap (March 2026)
+
+**Source**: `EmissionController.sol` (wall-clock halving), `ShapleyDistributor.sol` (FEE_DISTRIBUTION game type)
+**Discovered during**: Emission activation design (Session 053+)
+**Domain**: Mechanism Design / Token Economics / Incentive Theory
+
+**Primitive**: A system with TWO reward-scaling mechanisms (emission halving + game-count halving) can accidentally apply halving twice — punishing contributors unfairly.
+
+**The trap**: EmissionController applies wall-clock halving (`rate = baseRate >> era`). ShapleyDistributor has its own game-count-based halving for TOKEN_EMISSION games. If the emission pool drains into a TOKEN_EMISSION game, contributors receive `(baseRate >> era) >> gameHalving` — double discounting.
+
+**The fix**: The EmissionController creates FEE_DISTRIBUTION games (type 0), not TOKEN_EMISSION games (type 1). FEE_DISTRIBUTION distributes the pool proportionally without additional halving. The wall-clock halving has ALREADY been applied when the pool accumulated. Single-source-of-truth for time discounting.
+
+**Testing methodology**:
+1. **Game type assertion**: Every `createContributionGame()` call must create a game of type FEE_DISTRIBUTION. Invariant test this
+2. **Reward equivalence**: Two identical contributions to two sequential games of equal pool size must yield equal rewards (time-neutral within a game)
+3. **Cross-era monotonicity**: A contribution in Era N should earn MORE per-token-in-pool than the same contribution in Era N+1 (because less VIBE enters the pool), but the per-token-distributed should be the SAME (because distribution is time-neutral)
+4. **Halving accounting**: Sum(all Shapley game distributions) must equal totalShapleyDrained, which is bounded by sum(all drip shapleyShares)
+
+**Generalization**: Any multi-layer reward system must have exactly ONE layer that applies time discounting. Multiple layers applying their own discounting create compounding unfairness that's hard to detect because each layer looks correct in isolation.
+
+**Cross-references**: P-000 (Fairness — double-halving violates equal treatment), P-107 (Supply Conservation — games distribute exactly what was drained, no more), P-002 (Cooperation and Competition — fee distribution is cooperative, time discounting is competitive incentive design)
+
+---
+
+### P-109: Self-Scaling Minimums — The Price Appreciation Immunity Principle (March 2026)
+
+**Source**: `EmissionController.sol` (`minDrainBps` parameter), VIBE_TOKENOMICS.md
+**Discovered during**: Drain mechanism design
+**Domain**: Mechanism Design / Economic Resilience / Anti-Bricking
+
+**Primitive**: Any minimum threshold in a token system that is defined as an ABSOLUTE amount will eventually brick the system under price appreciation. A minimum defined as a PERCENTAGE of the relevant pool is immune to price changes without any oracle.
+
+**The failure mode**: Minimum drain = 100 VIBE (absolute). VIBE goes from $1 to $10,000. Minimum drain = $1,000,000. No contribution game can start because nobody can justify draining $1M worth of tokens per game. System is effectively dead.
+
+**The solution**: Minimum drain = 1% of pool (relative). Pool has 10,000 VIBE at $10,000 each = $100M pool. Minimum drain = 100 VIBE = $1M. Pool has 0.01 VIBE at $10,000 each = $100 pool. Minimum drain = 0.0001 VIBE = $1. The percentage AUTOMATICALLY adjusts to the economic context.
+
+**Testing methodology**:
+1. **Price-sweep test**: Simulate pool with constant VIBE, sweep assumed price from $0.001 to $1,000,000. Verify the drain mechanism remains functional (drain > 0, drain < pool) at EVERY price point
+2. **Shrinking pool test**: As the pool shrinks (late eras, fewer emissions), verify minimum drain doesn't exceed pool size
+3. **Governance attack**: Set `minDrainBps = 10000` (100%). Verify this is rejected or results in single-drain-empties-pool (which maxDrainBps prevents)
+4. **Zero pool test**: Pool = 0 VIBE. Verify no division by zero, drain correctly returns 0
+
+**Invariant**: For any pool size S > 0 and any minDrainBps M in [0, 10000]:
+```
+0 <= minDrainAmount <= S
+minDrainAmount = S * M / 10000
+```
+
+**Generalization**: In any parameterized system, prefer relative thresholds (percentages, basis points) over absolute thresholds. Relative thresholds inherit the denomination's purchasing power automatically. This applies to: governance quorums (% of supply, not fixed number), circuit breaker thresholds (% deviation, not fixed price), insurance coverage (% of pool, not fixed amount).
+
+**Cross-references**: P-000 (Fairness — system must remain accessible regardless of price), P-107 (Supply Conservation — drain stays within identity), P-004 (Emergency Stops — circuit breakers use relative thresholds for the same reason)
+
+---
+
+### P-110: The Three-Sink Invariant — Budget Splits Must Be Exhaustive (March 2026)
+
+**Source**: `EmissionController.sol` (shapleyBps + gaugeBps + stakingBps = 10000)
+**Discovered during**: Emission budget split verification
+**Domain**: Token Economics / Protocol Accounting / Governance Safety
+
+**Primitive**: When a fixed budget is split across N sinks, the split must satisfy two invariants:
+1. **Exhaustive**: The shares sum to exactly 100% (10000 bps). No VIBE is unaccounted for
+2. **Remainder assignment**: The last sink gets `total - sum(others)`, not `total * lastBps / BPS`. This prevents dust loss from integer division
+
+**The pattern**:
+```solidity
+shapleyShare = pending * shapleyBps / BPS;
+gaugeShare = pending * gaugeBps / BPS;
+stakingShare = pending - shapleyShare - gaugeShare;  // remainder, not calculation
+```
+
+**Why remainder, not calculation**: `pending * 5000 / 10000 + pending * 3500 / 10000 + pending * 1500 / 10000` may not equal `pending` due to integer truncation. With pending = 7, you get `3 + 2 + 1 = 6` (1 VIBE lost!). Remainder assignment: `3 + 2 + (7 - 3 - 2) = 7` (exact).
+
+**Testing methodology**:
+1. **Sum invariant**: For any `pending` value and any valid bps split, assert `shapleyShare + gaugeShare + stakingShare == pending` (EXACT equality, not approximate)
+2. **Fuzz the split**: Random bps values that sum to 10000, random pending amounts. Assert identity holds
+3. **Governance guard**: Any `setDistribution()` call where the three bps don't sum to 10000 must revert
+4. **Dust accumulation test**: Call `drip()` 10000 times with small amounts. Verify cumulative accounting identity (P-107) still holds — no dust leak
+
+**Generalization**: In ANY integer-based budget split, assign N-1 sinks by calculation and the Nth by subtraction. This pattern appears everywhere: fee splits (treasury/stakers/insurance), reward distributions (LP/governance/treasury), tax calculations.
+
+**Cross-references**: P-107 (Supply Conservation — the split is part of the identity), P-101 (Consensus Determinism — integer arithmetic must be exact), P-000 (Fairness — lost dust is unfair to someone)
+
+---
+
+### P-111: The Accumulation Pool — Bursty Rewards over Continuous Streaming (March 2026)
+
+**Source**: `EmissionController.sol` (shapleyPool accumulation + drain), cooperative-emission-design.md
+**Discovered during**: Emission mechanism comparison analysis
+**Domain**: Mechanism Design / Behavioral Economics / Game Theory
+
+**Primitive**: Streaming rewards (Synthetix-style) incentivize passive time-in-protocol. Accumulation pools incentivize active contribution during moments that matter. The accumulation creates a natural game-theoretic dynamic:
+
+```
+Pool grows during quiet periods → Large pool attracts contributors →
+Contribution game fires → Pool drains → Cycle repeats
+```
+
+**Why this matters for VIBE**:
+- A flash-liquidity provider who appears for 1 second cannot capture a stream
+- The pool size signals "how much is at stake" — larger pools create coordination points
+- Games happen WHEN there's enough to distribute, not on a fixed schedule
+- Contributors who act during high-pool periods earn more (natural market-making incentive)
+
+**Testing methodology**:
+1. **Stream comparison**: Simulate identical contribution over 100 epochs. Compare Synthetix-style stream payout vs accumulation-and-drain payout. Verify accumulation rewards burstier but equal in expectation
+2. **Flash attack**: Simulate contributor appearing 1 block before drain, contributing minimally. Verify reward is proportional to actual contribution (Shapley), not time-of-arrival
+3. **Pool growth monotonicity**: Between drains, pool size must be monotonically non-decreasing (drip only adds)
+4. **Drain bounds**: Every drain must satisfy `minDrainBps/BPS * pool <= drain <= maxDrainBps/BPS * pool`
+5. **Post-drain minimum**: After drain, pool >= pool_before * (1 - maxDrainBps/BPS). The 50% max drain ensures every game leaves reserves
+
+**Anti-pattern**: Setting maxDrainBps = 10000 (100% drain per game). This allows a single coordinated group to empty the pool in one game, leaving nothing for future contributors. The 50% cap ensures inter-temporal fairness.
+
+**Generalization**: Any incentive system should match its reward distribution frequency to the frequency of the behavior it wants to incentivize. Continuous streaming incentivizes continuous presence. Bursty accumulation incentivizes bursty, high-impact contribution. Match the mechanism to the behavior.
+
+**Cross-references**: P-000 (Fairness — flash attacks are unfair, accumulation prevents them), P-108 (Time-Neutral distribution WITHIN games), P-109 (Self-Scaling minimums for drain floors), P-002 (Cooperation — the accumulation pool IS cooperative infrastructure)
+
+---
+
+### P-112: Emission Rate Monotonicity — Halving Never Reverses (March 2026)
+
+**Source**: `EmissionController.sol` (`getCurrentRate() = BASE_EMISSION_RATE >> era`)
+**Discovered during**: Cross-era emission invariant verification
+**Domain**: Token Economics / Monetary Policy / Protocol Safety
+
+**Primitive**: The emission rate must be MONOTONICALLY NON-INCREASING over time. Once the rate halves, it never un-halves. This is the protocol-level equivalent of Bitcoin's "no inflation surprises."
+
+**Why monotonicity matters**:
+- Contributors can make rational long-term decisions because the emission schedule is deterministic
+- No governance attack can increase the emission rate (it's determined by time, not vote)
+- Price models can incorporate the supply schedule as a known constant
+- Early contributors PROVABLY earned at a higher rate — this can never be retroactively diluted
+
+**The invariant**:
+```
+For all t1 < t2: getCurrentRate(t2) <= getCurrentRate(t1)
+```
+
+**Since rate = BASE >> era, and era = (now - genesis) / ERA_DURATION:**
+```
+t1 < t2 → era(t1) <= era(t2) → BASE >> era(t1) >= BASE >> era(t2) ✓
+```
+
+**Testing methodology**:
+1. **Timestamp sweep**: Walk through 33 years of timestamps (0 to 33 × ERA_DURATION). At each second, verify rate <= previous rate
+2. **Era boundary precision**: At `genesis + N × ERA_DURATION ± 1`, verify the exact halving moment. Rate at boundary-1 must be DOUBLE rate at boundary
+3. **MAX_ERAS cap**: After era 32, rate = 0 forever. Verify `getCurrentRate()` returns 0 for all t > genesis + 32 × ERA_DURATION
+4. **Governance cannot override**: No owner function can increase BASE_EMISSION_RATE. It's immutable (set in constructor, no setter)
+5. **Clock manipulation resistance**: Wall-clock halving means no "fast-forward" exploit. On Ethereum, `block.timestamp` can be slightly manipulated by miners (~15 seconds). Verify this has negligible impact on emission amounts
+
+**Generalization**: Any economic policy embedded in a protocol should be monotonic in its restrictiveness. Inflation rates should only decrease. Fee floors should only increase. Supply caps should never increase. This makes the protocol's economic contract with users irrevocable. "The rules only get tighter, never looser."
+
+**Cross-references**: P-107 (Supply Conservation — monotonic rate ensures total converges to MAX_SUPPLY), P-101 (Consensus Determinism — bit-shift halving is deterministic), P-000 (Fairness — non-monotonic rates could retroactively dilute early contributors)
+
+---
+
+### P-113: Cross-Sink Coherence — Emissions Must Reach Their Intended Destination (March 2026)
+
+**Source**: EmissionController → ShapleyDistributor / LiquidityGauge / SingleStaking integration
+**Discovered during**: End-to-end emission flow hardening
+**Domain**: System Integration / Economic Coherence / Multi-Contract Invariants
+
+**Primitive**: It's not enough for the EmissionController to compute correct amounts. The VIBE must actually arrive at the intended contract AND be distributable to end users. The full chain:
+
+```
+drip() → EmissionController holds VIBE →
+  Shapley: createContributionGame() → ShapleyDistributor → contributors claim
+  Gauge:   drip() transfers to LiquidityGauge → LP stakers earn pro-rata
+  Staking: fundStaking() → SingleStaking.notifyRewardAmount() → stakers earn
+```
+
+**Every link in this chain is a potential failure point:**
+1. EmissionController sends to wrong address (misconfigured sink)
+2. ShapleyDistributor receives VIBE but game computation underflows (Shapley bug)
+3. LiquidityGauge receives VIBE but no gauges have weights (VIBE stuck in gauge)
+4. SingleStaking receives VIBE but reward duration is 0 (division by zero)
+5. End users can't claim (missing approval, wrong reward token address)
+
+**Testing methodology**:
+1. **End-to-end trace**: drip() → verify EmissionController balance increases → createContributionGame() → verify ShapleyDistributor balance increases → contributors claim → verify contributor balances increase. Sum of all claims == amount drained
+2. **Gauge liveness**: If totalWeight == 0 in gauge, drip should still succeed but VIBE accumulates (not lost). When gauges are voted, accumulated VIBE distributes
+3. **Staking liveness**: fundStaking() → notifyRewardAmount() → staker stakes → fast-forward rewardDuration → staker claims full amount
+4. **Stuck VIBE detection**: After all claims are processed, verify no VIBE is orphaned in intermediate contracts. EmissionController balance == shapleyPool + stakingPending. ShapleyDistributor balance == unclaimed rewards. SingleStaking balance == unclaimed rewards
+5. **Re-entrancy at each hop**: No callback during drip/drain/claim can re-enter
+
+**Generalization**: Multi-contract economic flows require end-to-end integration tests, not just unit tests of each contract. A system where every contract passes its unit tests can still fail systemically if contracts disagree on amounts, timing, or state. The economic coherence test is: "can a user who contributes actually receive VIBE, and does the total distributed equal the total emitted?"
+
+**Cross-references**: P-107 (Supply Conservation — the end-to-end identity), P-110 (Three-Sink Invariant — sinks must actually receive their share), P-098 (As Above, So Below — each hop mirrors the same pattern: receive, hold, distribute)

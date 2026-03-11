@@ -6,6 +6,7 @@ pub mod analytics;
 pub mod assembler;
 pub mod auction;
 pub mod bridge;
+pub mod circuit_breaker;
 pub mod collector;
 pub mod compliance;
 pub mod consensus;

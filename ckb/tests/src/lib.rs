@@ -40,3 +40,6 @@ mod governance;
 
 #[cfg(test)]
 mod risk;
+
+#[cfg(test)]
+mod consensus;

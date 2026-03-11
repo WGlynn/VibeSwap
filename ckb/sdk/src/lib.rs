@@ -9,6 +9,7 @@ pub mod keeper;
 pub mod knowledge;
 pub mod miner;
 pub mod oracle;
+pub mod risk;
 pub mod token;
 
 use vibeswap_types::*;

@@ -1401,3 +1401,31 @@ This is a *coordination failure* — individually rational liquidation is collec
 **Generalization**: In any system where individual rational action creates collective harm (tragedy of the commons), the solution is to make prevention cheaper than cure. Paying liquidators 5% to crash the market is more expensive than spending 0.5% on an insurance pool that prevents the crash entirely.
 
 **Cross-references**: P-000 (Fairness Above All — liquidation cascades are structurally unfair), P-102 (UTXO-Native Lending — the lending protocol this applies to), P-104 (UTXO Transaction Signing — liquidation transactions use the assembler)
+
+### P-106: Insurance Pool Economics (March 2026)
+
+**Source**: `ckb/scripts/insurance-pool-type/`, `ckb/lib/lending-math/src/lib.rs` (insurance module)
+
+**Insight**: Liquidation prevention needs an economic engine. The insurance pool is the mechanism that makes P-105's mutualist philosophy financially sustainable. It's funded by premiums that cost less than the damage liquidation cascades cause.
+
+**The Economics**:
+
+1. **Premium Collection**: Lending pools pay a small annual premium (default 0.5% of outstanding borrows) to the insurance pool. This is far cheaper than the 5% liquidation incentive + cascade losses.
+
+2. **Share Accounting**: Insurance depositors receive shares (like cTokens). As premiums accrue, each share becomes worth more underlying tokens. Depositors earn yield for providing protection.
+
+3. **Coverage Caps**: No single claim can exceed 20% of pool deposits (configurable). This prevents catastrophic drain from a single event and ensures the pool remains solvent across multiple simultaneous distress events.
+
+4. **Claim Mechanics**: When a vault's HF drops below the soft liquidation threshold (1.1), insurance can repay part of the debt. This is cheaper for everyone: the borrower keeps their position, the market avoids selling pressure, and the insurance pool's cost is less than what liquidation would destroy.
+
+**Anti-Predation Guards**:
+- Max 10% annual premium rate (above this, the insurance itself becomes extractive)
+- Max 50% per-claim coverage (pool survives even severe events)
+- Withdrawal cooldown (prevents bank runs during market stress)
+- Premiums and claims are monotonically increasing (no manipulation)
+
+**Key Equation**: If liquidation cascade damages D and insurance premium costs P, the system is rational when P << D. With D typically 10-20x the liquidation incentive (due to cascading effects), even a premium of 0.5% creates massive positive EV.
+
+**Generalization**: Any system with catastrophic tail risk benefits from mutualized insurance funded by small regular contributions. This is literally how insurance works in the real world — the innovation is making it trustless, on-chain, and automatic.
+
+**Cross-references**: P-105 (Mutualist Liquidation Prevention — the philosophy this implements), P-102 (UTXO-Native Lending — the lending system it protects), P-000 (Fairness Above All — insurance is fairer than liquidation)

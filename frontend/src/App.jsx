@@ -107,6 +107,7 @@ const DCAPage = lazy(() => import('./components/DCAPage'))
 const InsurancePage = lazy(() => import('./components/InsurancePage'))
 const AggregatorPage = lazy(() => import('./components/AggregatorPage'))
 const BondsPage = lazy(() => import('./components/BondsPage'))
+const NFTPage = lazy(() => import('./components/NFTPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -203,6 +204,7 @@ function AnimatedRoutes() {
             <Route path="/insurance" element={<InsurancePage />} />
             <Route path="/aggregator" element={<AggregatorPage />} />
             <Route path="/bonds" element={<BondsPage />} />
+            <Route path="/nft" element={<NFTPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

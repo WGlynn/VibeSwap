@@ -185,6 +185,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/mine', label: 'Mine JUL', icon: '⛏' },
     ]},
     { label: 'Ecosystem', items: [
+      { path: '/nft', label: 'NFT Market', icon: '🖼' },
       { path: '/agents', label: 'AI Agents', icon: '🤖' },
       { path: '/depin', label: 'DePIN Network', icon: '📡' },
       { path: '/rwa', label: 'Real World Assets', icon: '🏠' },

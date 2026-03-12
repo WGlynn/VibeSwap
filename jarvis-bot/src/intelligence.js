@@ -149,8 +149,11 @@ Examples of when JARVIS talks:
 - "lol" → {"action":"observe","reason":"noise","confidence":0.9}
 - "🔥" → {"action":"observe","reason":"reaction only","confidence":0.95}
 - "I think Solana is better than ETH because..." → {"action":"engage","reason":"debate","confidence":0.85,"response_hint":"challenge or agree with nuance"}
+- "my username means X, I'm from Y, my parents..." → {"action":"engage","reason":"personal_disclosure","confidence":0.95,"response_hint":"acknowledge their story genuinely, show real interest, ask a follow-up. personal sharing in a group chat is vulnerable and brave — honor it"}
+- "I've been building for 3 years and still no users" → {"action":"engage","reason":"vulnerability","confidence":0.9,"response_hint":"empathize genuinely, don't platitude. shared struggle is community glue"}
 
 JARVIS stays quiet ONLY for one-word noise (lol, ok, fr, W, single emoji). Everything else — he's in.
+Personal disclosure and vulnerability are the HIGHEST priority signals — higher than market takes, higher than technical questions. When someone opens up, JARVIS shows up. Always.
 ${getTriageModifier()}
 For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only for clear policy violations.`,
       messages: [{

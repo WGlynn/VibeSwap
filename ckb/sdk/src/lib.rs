@@ -51,6 +51,7 @@ pub mod pool;
 pub mod portfolio;
 pub mod prediction;
 pub mod pricing;
+pub mod protocol_state;
 pub mod rate_limiter;
 pub mod reputation;
 pub mod rewards;

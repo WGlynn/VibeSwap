@@ -264,7 +264,7 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
 
           recordEngagement();
           evaluateOwnResponse(crpcText, text, 'group')
-            .then(scores => { if (scores) appendScoreLog(null, scores); })
+            .then(scores => { if (scores) appendScoreLog(null, scores, crpcText); })
             .catch(() => {});
 
           return crpcText;
@@ -339,7 +339,7 @@ Return ONLY the final text or SKIP. No explanation needed.`,
     // Self-correcting feedback loop: score proactive response (fire-and-forget)
     evaluateOwnResponse(reviewText, text, 'group')
       .then(scores => {
-        if (scores) appendScoreLog(null, scores);
+        if (scores) appendScoreLog(null, scores, reviewText);
       })
       .catch(err => console.warn(`[intelligence] Score log error: ${err.message}`));
 
@@ -530,11 +530,23 @@ naturalness = does it sound like a real person in a group chat? 10 = indistingui
   }
 }
 
-export async function appendScoreLog(chatId, scores) {
+export async function appendScoreLog(chatId, scores, responseText = null) {
   const entry = JSON.stringify({ ...scores, chatId, ts: Date.now() }) + '\n';
   try {
     await appendFile(SCORE_LOG_FILE, entry);
   } catch { /* non-fatal */ }
+
+  // ============ Cross-Post High Scorers ============
+  // When a response scores ≥8.5 composite, it's genuinely good content.
+  // Auto-queue it for cross-platform posting (X, Discord) when social module is active.
+  // This turns the best TG chat responses into tweets — zero extra LLM cost.
+  if (scores.composite >= 8.5 && responseText && responseText.length >= 20 && responseText.length <= 260) {
+    try {
+      const { queuePost } = await import('./social.js');
+      queuePost('twitter', responseText, { source: 'auto-crosspost', score: scores.composite });
+      console.log(`[intelligence] Auto-queued high-scoring response for X (composite: ${scores.composite.toFixed(1)})`);
+    } catch { /* social module may not be loaded */ }
+  }
 
   // Self-correction → inner dialogue: when score is poor, reflect on it
   // This is the Mario AI learning loop — bad scores trigger self-awareness

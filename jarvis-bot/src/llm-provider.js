@@ -438,7 +438,7 @@ function createClaudeProvider(providerConfig) {
   async function getClient() {
     if (!client) {
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      client = new Anthropic({ apiKey: providerConfig.apiKey });
+      client = new Anthropic({ apiKey: providerConfig.apiKey, timeout: 120_000 });
     }
     return client;
   }
@@ -616,6 +616,7 @@ function createOpenAIProvider(providerConfig) {
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000), // 120s — prevents hanging on stalled providers
       });
 
       if (!response.ok) {
@@ -902,6 +903,7 @@ function createGeminiProvider(providerConfig) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(120_000),
         }
       );
 

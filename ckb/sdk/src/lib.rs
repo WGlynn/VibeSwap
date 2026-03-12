@@ -52,6 +52,7 @@ pub mod portfolio;
 pub mod prediction;
 pub mod pricing;
 pub mod rate_limiter;
+pub mod reputation;
 pub mod rewards;
 pub mod risk;
 pub mod rollup;

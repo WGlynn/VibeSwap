@@ -294,12 +294,17 @@ document.getElementById('secret').addEventListener('keydown',e=>{if(e.key==='Ent
 async function login(){
 const secret=document.getElementById('secret').value;
 const r=await fetch('/nyx/api/files',{headers:{'x-api-secret':secret}});
-if(r.ok){localStorage.setItem('nyx-secret',secret);location.reload()}
+if(r.ok){localStorage.setItem('nyx-secret',secret);await loadNyx(secret)}
 else{document.getElementById('err').style.display='block'}
+}
+async function loadNyx(secret){
+const r=await fetch('/nyx',{headers:{'x-api-secret':secret}});
+const html=await r.text();
+document.open();document.write(html);document.close();
 }
 // Auto-login if secret stored
 const s=localStorage.getItem('nyx-secret');
-if(s){fetch('/nyx/api/files',{headers:{'x-api-secret':s}}).then(r=>{if(r.ok)location.reload()})}
+if(s){fetch('/nyx/api/files',{headers:{'x-api-secret':s}}).then(r=>{if(r.ok)loadNyx(s)})}
 </script>
 </body></html>`;
 }

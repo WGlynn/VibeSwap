@@ -9,6 +9,11 @@
 //   GET  /web/mind         → Knowledge chain, shards, learning, inner dialogue
 //   GET  /web/health       → Status + uptime
 //   POST /web/shadow/verify → Validate shadow invite token
+//   GET  /web/rosetta/view      → Full Rosetta Protocol state
+//   GET  /web/rosetta/translate  → Translate concept between agents
+//   GET  /web/rosetta/all        → Translate concept to ALL agents
+//   GET  /web/rosetta/lexicon    → Get agent vocabulary
+//   GET  /web/covenants          → Ten Covenants + hash
 // ============
 
 import { config } from './config.js';
@@ -28,6 +33,7 @@ import { getPendingCommands, acknowledgeCommand, acknowledgeAll } from './relay.
 import { getGraphStats, getAuthorAttribution } from './passive-attribution.js';
 import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStructured, getMyBets, getPredictorLeaderboard, getLeaderboardStructured } from './tools-predictions.js';
 import { createHmac } from 'crypto';
+import { getRosettaView, translate, translateToAll, getLexicon, TEN_COVENANTS, COVENANT_HASH } from './rosetta.js';
 
 // ============ Rate Limiter ============
 
@@ -1123,6 +1129,93 @@ export async function handleWebRequest(req, res, pathname) {
       if (now - t > 60_000) ubuntuPresence.delete(k);
     }
     jsonResponse(res, 200, { here: ubuntuPresence.size });
+    return true;
+  }
+
+  // ============ GET /web/rosetta/view ============
+  // Full Rosetta Protocol state: all lexicons, universal concepts, covenant hash, active challenges
+  if (pathname === '/web/rosetta/view' && req.method === 'GET') {
+    try {
+      const view = getRosettaView();
+      jsonResponse(res, 200, view);
+    } catch (err) {
+      console.error('[web-api] Rosetta view error:', err.message);
+      jsonResponse(res, 500, { error: 'Could not fetch Rosetta state' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/rosetta/translate ============
+  // Translate a concept between two agents
+  // ?from=poseidon&to=athena&concept=liquidity
+  if (pathname === '/web/rosetta/translate' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const from = url.searchParams.get('from');
+      const to = url.searchParams.get('to');
+      const concept = url.searchParams.get('concept');
+      if (!from || !to || !concept) {
+        jsonResponse(res, 400, { error: 'Missing required params: from, to, concept' });
+        return true;
+      }
+      const result = translate(from, to, concept);
+      jsonResponse(res, 200, result);
+    } catch (err) {
+      console.error('[web-api] Rosetta translate error:', err.message);
+      jsonResponse(res, 500, { error: 'Translation failed' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/rosetta/all ============
+  // Translate a concept from one agent to ALL other agents
+  // ?from=poseidon&concept=liquidity
+  if (pathname === '/web/rosetta/all' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const from = url.searchParams.get('from');
+      const concept = url.searchParams.get('concept');
+      if (!from || !concept) {
+        jsonResponse(res, 400, { error: 'Missing required params: from, concept' });
+        return true;
+      }
+      const result = translateToAll(from, concept);
+      jsonResponse(res, 200, result);
+    } catch (err) {
+      console.error('[web-api] Rosetta translate-all error:', err.message);
+      jsonResponse(res, 500, { error: 'Translation failed' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/rosetta/lexicon ============
+  // Get an agent's vocabulary
+  // ?agent=poseidon
+  if (pathname === '/web/rosetta/lexicon' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const agent = url.searchParams.get('agent');
+      if (!agent) {
+        jsonResponse(res, 400, { error: 'Missing required param: agent' });
+        return true;
+      }
+      const lexicon = getLexicon(agent);
+      jsonResponse(res, 200, lexicon);
+    } catch (err) {
+      console.error('[web-api] Rosetta lexicon error:', err.message);
+      jsonResponse(res, 500, { error: 'Could not fetch lexicon' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/covenants ============
+  // Returns the Ten Covenants with their hash
+  if (pathname === '/web/covenants' && req.method === 'GET') {
+    jsonResponse(res, 200, {
+      covenants: TEN_COVENANTS,
+      hash: COVENANT_HASH,
+      count: TEN_COVENANTS.length,
+    });
     return true;
   }
 

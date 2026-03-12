@@ -122,7 +122,11 @@ export function initProactive(deps = {}) {
 
   // Start the proactive loop (check every 5 minutes)
   if (intervalId) clearInterval(intervalId)
-  intervalId = setInterval(tick, 5 * 60 * 1000)
+  intervalId = setInterval(() => {
+    tick().catch(err => {
+      console.error('[proactive] Tick error:', err.message)
+    })
+  }, 5 * 60 * 1000)
 
   console.log(`[proactive] Initialized — enabled: ${state.enabled}, actions: ${state.activeActions.length}`)
   return { enabled: state.enabled, actions: state.activeActions }

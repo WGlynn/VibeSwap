@@ -8,6 +8,9 @@ echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Configure git identity for commits (backup operations)
 git config --global user.name "JARVIS"
 git config --global user.email "jarvis@vibeswap.io"
+# Git timeout settings — prevent hangs on slow networks
+git config --global http.lowSpeedLimit 1000
+git config --global http.lowSpeedTime 30
 
 # If GITHUB_TOKEN is set, configure credential helper for HTTPS auth
 if [ -n "$GITHUB_TOKEN" ]; then
@@ -16,19 +19,31 @@ if [ -n "$GITHUB_TOKEN" ]; then
 fi
 
 # ============ Clone/Pull Repository ============
+# Uses shallow sparse checkout — only downloads CLAUDE.md, .claude/, and jarvis-bot/memory
+# instead of the full 338MB repo (contracts, frontend, oracle, etc.)
 REPO_DIR="${VIBESWAP_REPO:-/repo}"
 REPO_URL="${GITHUB_REPO_URL:-https://github.com/WGlynn/vibeswap-private.git}"
+GIT_TIMEOUT=60  # Max seconds for any single git operation
 
 if [ -d "$REPO_DIR/.git" ]; then
     echo "Repository exists at $REPO_DIR — pulling latest..."
     cd "$REPO_DIR"
-    git pull origin master || echo "Pull failed — using existing state"
+    timeout $GIT_TIMEOUT git pull origin master 2>&1 || echo "[WARN] Pull failed — using existing state"
     cd /app
 else
-    echo "Cloning repository to $REPO_DIR..."
-    git clone "$REPO_URL" "$REPO_DIR" || {
-        echo "Clone failed. Jarvis will run with local context only."
-        mkdir -p "$REPO_DIR"
+    echo "Cloning repository to $REPO_DIR (sparse checkout)..."
+    # Shallow sparse clone — downloads only what Jarvis needs (~5MB vs 338MB)
+    timeout $GIT_TIMEOUT git clone --depth=1 --filter=blob:none --sparse "$REPO_URL" "$REPO_DIR" 2>&1 && {
+        cd "$REPO_DIR"
+        git sparse-checkout set CLAUDE.md .claude/ jarvis-bot/memory jarvis-bot/data 2>&1 || true
+        cd /app
+        echo "Sparse checkout configured — only context files downloaded"
+    } || {
+        echo "[WARN] Sparse clone failed — trying full clone..."
+        timeout $GIT_TIMEOUT git clone --depth=1 "$REPO_URL" "$REPO_DIR" 2>&1 || {
+            echo "[ERROR] Clone failed. Jarvis will run with bundled context only."
+            mkdir -p "$REPO_DIR"
+        }
     }
 fi
 

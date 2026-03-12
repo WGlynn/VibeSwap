@@ -236,13 +236,17 @@ export async function initGroupContext() {
 
 export async function flushGroupContext() {
   if (!contextDirty) return;
-  const obj = {};
-  for (const [chatId, win] of contextWindows) {
-    obj[chatId] = {
-      messages: win.messages,
-      jarvisResponses: win.jarvisResponses,
-    };
+  try {
+    const obj = {};
+    for (const [chatId, win] of contextWindows) {
+      obj[chatId] = {
+        messages: win.messages,
+        jarvisResponses: win.jarvisResponses,
+      };
+    }
+    await writeFile(CONTEXT_FILE, JSON.stringify(obj));
+    contextDirty = false;
+  } catch (err) {
+    console.error('[group-context] Flush failed:', err.message);
   }
-  await writeFile(CONTEXT_FILE, JSON.stringify(obj));
-  contextDirty = false;
 }

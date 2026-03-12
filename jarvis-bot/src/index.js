@@ -6065,37 +6065,50 @@ async function main() {
   await loadRuntimeAuthorized();
 
   // Step 3: Load context, conversation history, moderation log, threads, comms
+  // Parallelized independent init groups to reduce startup time (~15-30s savings)
   console.log('[jarvis] Step 3: Loading memory, conversations, moderation, threads, comms...');
+
+  // Group A: Core context (must complete first — other modules depend on system prompt)
   await initClaude();
-  await initTracker();
-  await initModeration();
-  await initAntispam();
-  await initThreads();
-  await loadBehavior();
-  await loadComms();
-  await initLearning();
-  try { await initShardLearnings(); } catch (err) { console.warn(`[jarvis] Shard learnings init failed: ${err.message}`); }
+
+  // Group B: Independent data loaders — all read separate files, no dependencies
+  const initStartMs = Date.now();
+  await Promise.all([
+    initTracker(),
+    initModeration(),
+    initAntispam(),
+    initThreads(),
+    loadBehavior(),
+    loadComms(),
+    initLearning(),
+    initShardLearnings().catch(err => console.warn(`[jarvis] Shard learnings init failed: ${err.message}`)),
+    initInnerDialogue(),
+    initStickers(),
+    initShadow(),
+    initOperators(),
+    initPreferences(),
+    initGroupContext(),
+    initXP(),
+    initPredictions(),
+    initSocial(),
+    initCKB(),
+  ]);
+
+  // Group C: MI Host (depends on nothing but may fail — keep isolated)
   try {
     const miResult = await initMIHost('./cells');
     console.log(`[jarvis] MI Host: ${miResult.cellCount} cells active (${miResult.manifests} manifests loaded)`);
     const bridgeResult = await registerMIBridge();
     console.log(`[jarvis] MI Bridge: ${bridgeResult.registered} capability handlers registered`);
   } catch (err) { console.warn(`[jarvis] MI Host init failed: ${err.message}`); }
-  await initInnerDialogue();
-  await initStickers();
+
+  // Group D: Chain recovery (sequential — WAL must recover before chain, chain before retry queue)
   await recoverWAL();
   await recoverChain();
   await initAnchor();
   await recoverRetryQueue();
   await recoverCommittedIds();
-  await initShadow();
-  await initOperators();
-  await initPreferences();
-  await initGroupContext();
-  await initXP();
-  await initPredictions();
-  await initSocial();
-  await initCKB();
+  console.log(`[jarvis] Parallel init completed in ${Date.now() - initStartMs}ms`);
   await initScheduler((chatId, text) => bot.telegram.sendMessage(chatId, text));
   await initTaskQueue(
     (chatId, text, opts) => bot.telegram.sendMessage(chatId, text, opts),
@@ -6344,8 +6357,17 @@ async function main() {
         const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
         const isAuthenticated = apiSecret && req.headers['x-api-secret'] === apiSecret;
         if (!isAuthenticated) {
+          // Quick health check for Fly.io — include basic memory info
+          // Returns 200 even during startup so Fly.io doesn't kill us during init
+          const mem = process.memoryUsage();
+          const rssMB = Math.round(mem.rss / 1024 / 1024);
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+          res.end(JSON.stringify({
+            status: 'ok',
+            uptime: process.uptime(),
+            memMB: rssMB,
+            polling: pollingRestartAttempts === 0 ? 'ok' : `degraded (${pollingRestartAttempts} restarts)`,
+          }));
         } else {
         try {
           const report = await diagnoseContext();

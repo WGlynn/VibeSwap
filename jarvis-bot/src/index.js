@@ -151,7 +151,7 @@ import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedu
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
-import { initPantheon, getAllCosts, getInfraCosts, listAgents } from './pantheon.js';
+import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation } from './pantheon.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -1173,9 +1173,15 @@ TRADING (owner-only)
   /trade history — Recent trades
   /trade pnl — P&L breakdown
 
-PANTHEON (owner-only)
-  /pantheon — List agents
+THEAI PANTHEON (owner-only)
+  /pantheon — Dashboard
+  /pantheon archetypes — Available god-agents
+  /pantheon fork <name> — Create agent from archetype
+  /pantheon chat <agent> <msg> — Talk to any agent
+  /pantheon consult <from> <to> <q> — Agent-to-agent messaging
   /pantheon costs — LLM + infra cost breakdown
+  /pantheon prune — 24h context prune upstream
+  /pantheon clear <agent> — Reset conversation
 
 SOCIAL PRESENCE (owner-only)
   /social status — Platform status
@@ -2470,7 +2476,7 @@ bot.command('pantheon', async (ctx) => {
   if (sub === 'costs' || sub === 'cost') {
     const costs = await getAllCosts();
     const infra = getInfraCosts();
-    let msg = `Pantheon Costs\n━━━━━━━━━━━━━━━━\n`;
+    let msg = `TheAI — Costs\n━━━━━━━━━━━━━━━━\n`;
     msg += `Total LLM: ${costs.totalUsd} (${costs.totalCalls} calls)\n\n`;
     for (const [agent, data] of Object.entries(costs.agents)) {
       msg += `${agent}: ${data.formatted} (${data.calls} calls, avg ${data.perCall})\n`;
@@ -2479,10 +2485,80 @@ bot.command('pantheon', async (ctx) => {
     msg += `Headless: ${infra.estimate.headless}\n`;
     msg += `Desktop: ${infra.estimate.desktop}`;
     ctx.reply(msg);
+
+  } else if (sub === 'fork') {
+    const archetype = args[1]?.toLowerCase();
+    if (!archetype) {
+      const archetypes = getArchetypes();
+      const lines = Object.entries(archetypes).map(([name, a]) => `  ${name} (T${a.tier}) — ${a.domain}`);
+      return ctx.reply(`Usage: /pantheon fork <archetype>\n\nAvailable:\n${lines.join('\n')}`);
+    }
+    const result = await forkAgent(archetype, { additionalContext: args.slice(2).join(' ') });
+    if (result.error) return ctx.reply(`Fork failed: ${result.error}`);
+    ctx.reply(`Agent "${result.agent}" forked!\nTier: ${result.tier}\nDomain: ${result.domain}\nManager: ${result.manager || 'root'}`);
+
+  } else if (sub === 'chat' || sub === 'ask') {
+    const agentName = args[1]?.toLowerCase();
+    const message = args.slice(2).join(' ');
+    if (!agentName || !message) return ctx.reply('Usage: /pantheon chat <agent> <message>');
+    ctx.reply(`Asking ${agentName}...`);
+    try {
+      const response = await pantheonChat(agentName, message, `tg-${ctx.from.id}`);
+      ctx.reply(`[${agentName}] ${response.text}\n\n(${response.usage.cost})`);
+    } catch (err) {
+      ctx.reply(`Error: ${err.message}`);
+    }
+
+  } else if (sub === 'consult') {
+    const from = args[1]?.toLowerCase();
+    const to = args[2]?.toLowerCase();
+    const question = args.slice(3).join(' ');
+    if (!from || !to || !question) return ctx.reply('Usage: /pantheon consult <from> <to> <question>');
+    ctx.reply(`${from} → ${to}: consulting...`);
+    try {
+      const response = await consultAgent(from, to, question);
+      ctx.reply(`[${to} → ${from}] ${response.text}\n\n(${response.usage.cost})`);
+    } catch (err) {
+      ctx.reply(`Error: ${err.message}`);
+    }
+
+  } else if (sub === 'prune') {
+    ctx.reply('Running 24h context prune...');
+    const results = await pruneAll();
+    const lines = results.map(r => r.error ? `${r.agent}: ERROR ${r.error}` : `${r.agent} → ${r.manager}: OK (${r.cost})`);
+    ctx.reply(`Prune Results:\n${lines.join('\n') || 'No agents to prune.'}`);
+
+  } else if (sub === 'clear') {
+    const agentName = args[1]?.toLowerCase();
+    if (!agentName) return ctx.reply('Usage: /pantheon clear <agent>');
+    clearConversation(agentName, `tg-${ctx.from.id}`);
+    ctx.reply(`Conversation with ${agentName} cleared.`);
+
+  } else if (sub === 'archetypes') {
+    const archetypes = getArchetypes();
+    let msg = `TheAI — Archetypes\n━━━━━━━━━━━━━━━━\n`;
+    for (const [name, a] of Object.entries(archetypes)) {
+      const status = (await listAgents()).includes(name) ? '✅' : '⬜';
+      msg += `${status} ${name} (T${a.tier}, ${a.tradition}) — ${a.domain}\n`;
+    }
+    msg += `\nFork: /pantheon fork <name>`;
+    ctx.reply(msg);
+
   } else {
     const agentList = await listAgents();
     const costs = await getAllCosts();
-    ctx.reply(`Pantheon Agents: ${agentList.length ? agentList.join(', ') : 'none'}\nTotal LLM cost: ${costs.totalUsd}\nUse /pantheon costs for breakdown`);
+    let msg = `TheAI — Digital Corporation\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Active Agents: ${agentList.length ? agentList.join(', ') : 'none'}\n`;
+    msg += `Total LLM cost: ${costs.totalUsd}\n\n`;
+    msg += `Commands:\n`;
+    msg += `  /pantheon archetypes — Available god-agents\n`;
+    msg += `  /pantheon fork <name> — Create agent from archetype\n`;
+    msg += `  /pantheon chat <agent> <msg> — Talk to an agent\n`;
+    msg += `  /pantheon consult <from> <to> <q> — Agent-to-agent\n`;
+    msg += `  /pantheon costs — Cost breakdown\n`;
+    msg += `  /pantheon prune — Run 24h context prune\n`;
+    msg += `  /pantheon clear <agent> — Clear conversation`;
+    ctx.reply(msg);
   }
 });
 

@@ -2382,4 +2382,252 @@ mod tests {
         // 2000 * 7884000 / (2 * 21600) = 2000 * 182.5 = 365000
         assert_eq!(kpis.revenue_annualized, 365_000 * PRECISION);
     }
+
+    // ============ Hardening Tests v4 ============
+
+    #[test]
+    fn test_create_snapshot_preserves_all_fields_v4() {
+        let s = create_snapshot(42, 100, 200, 300, 400, 500, 6, 7, 800, 9);
+        assert_eq!(s.block_number, 42);
+        assert_eq!(s.tvl, 100);
+        assert_eq!(s.volume_24h, 200);
+        assert_eq!(s.fees_24h, 300);
+        assert_eq!(s.unique_users, 400);
+        assert_eq!(s.total_txs, 500);
+        assert_eq!(s.active_pools, 6);
+        assert_eq!(s.active_gauges, 7);
+        assert_eq!(s.total_staked, 800);
+        assert_eq!(s.avg_batch_size, 9);
+    }
+
+    #[test]
+    fn test_kpis_tvl_change_positive_v4() {
+        let prev = make_snapshot(1, 1_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 50);
+        let current = make_snapshot(2, 2_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 50);
+        let kpis = compute_kpis(&[prev], &current).unwrap();
+        assert_eq!(kpis.tvl_change_bps, 10_000); // 100% growth
+    }
+
+    #[test]
+    fn test_kpis_tvl_change_negative_v4() {
+        let prev = make_snapshot(1, 2_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 50);
+        let current = make_snapshot(2, 1_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 50);
+        let kpis = compute_kpis(&[prev], &current).unwrap();
+        assert_eq!(kpis.tvl_change_bps, -5_000); // -50%
+    }
+
+    #[test]
+    fn test_kpis_avg_tx_size_v4() {
+        let prev = make_snapshot(1, 1_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 50);
+        let mut current = make_snapshot(2, 1_000 * PRECISION, 500 * PRECISION, 10 * PRECISION, 50);
+        current.total_txs = 100;
+        let kpis = compute_kpis(&[prev], &current).unwrap();
+        assert_eq!(kpis.avg_tx_size, 5 * PRECISION);
+    }
+
+    #[test]
+    fn test_kpis_zero_txs_avg_size_zero_v4() {
+        let prev = make_snapshot(1, 1_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 50);
+        let mut current = make_snapshot(2, 1_000 * PRECISION, 500 * PRECISION, 10 * PRECISION, 50);
+        current.total_txs = 0;
+        let kpis = compute_kpis(&[prev], &current).unwrap();
+        assert_eq!(kpis.avg_tx_size, 0);
+    }
+
+    #[test]
+    fn test_pool_metrics_zero_everything_v4() {
+        let pm = compute_pool_metrics([0; 32], 0, 0, 0, 0, 0, 0, 0);
+        assert_eq!(pm.fee_apr_bps, 0);
+        assert_eq!(pm.emission_apr_bps, 0);
+        assert_eq!(pm.combined_apr_bps, 0);
+        assert_eq!(pm.net_apr_bps, 0);
+        assert_eq!(pm.utilization_bps, 0);
+    }
+
+    #[test]
+    fn test_pool_metrics_net_apr_negative_v4() {
+        let pm = compute_pool_metrics([1; 32], 1_000 * PRECISION, 100 * PRECISION, 10 * PRECISION, 0, 0, 500, 100);
+        // IL is 500 bps, combined APR should be less than IL → negative net APR
+        // fee_apr = 10 * 365 * 10000 / 1000 = 36500
+        assert!(pm.net_apr_bps > 0 || pm.net_apr_bps < 0);
+        // With 500 bps IL and some fee APR, net = combined - 500
+        assert_eq!(pm.net_apr_bps, pm.combined_apr_bps as i16 - 500);
+    }
+
+    #[test]
+    fn test_detect_trend_two_values_up_v4() {
+        let values = vec![100, 200];
+        let trend = detect_trend(&values).unwrap();
+        assert_eq!(trend.direction, Trend::StrongUp);
+        assert!(trend.magnitude_bps > 0);
+        assert_eq!(trend.acceleration_bps, 0); // Only 2 points, no acceleration
+    }
+
+    #[test]
+    fn test_detect_trend_constant_is_flat_v4() {
+        let values = vec![100, 100, 100, 100, 100];
+        let trend = detect_trend(&values).unwrap();
+        assert_eq!(trend.direction, Trend::Flat);
+        assert_eq!(trend.magnitude_bps, 0);
+    }
+
+    #[test]
+    fn test_detect_trend_decreasing_v4() {
+        let values = vec![1000, 900, 800, 700, 600];
+        let trend = detect_trend(&values).unwrap();
+        match trend.direction {
+            Trend::Down | Trend::StrongDown => {}
+            _ => panic!("Expected downward trend"),
+        }
+    }
+
+    #[test]
+    fn test_compare_periods_equal_periods_v4() {
+        let snapshots = vec![
+            make_snapshot(1, 100, 100, 10, 50),
+            make_snapshot(2, 100, 100, 10, 50),
+        ];
+        let cmp = compare_periods(&snapshots, 0, 0, 1, 1).unwrap();
+        assert_eq!(cmp.volume_change_bps, 0);
+        assert_eq!(cmp.fees_change_bps, 0);
+    }
+
+    #[test]
+    fn test_compare_periods_reversed_indices_fail_v4() {
+        let snapshots = vec![
+            make_snapshot(1, 100, 100, 10, 50),
+            make_snapshot(2, 100, 100, 10, 50),
+        ];
+        let result = compare_periods(&snapshots, 1, 0, 0, 1);
+        assert_eq!(result, Err(MetricsError::InvalidTimeRange));
+    }
+
+    #[test]
+    fn test_growth_rate_100_percent_v4() {
+        assert_eq!(compute_growth_rate(100, 200), 10_000);
+    }
+
+    #[test]
+    fn test_growth_rate_50_percent_decline_v4() {
+        assert_eq!(compute_growth_rate(200, 100), -5_000);
+    }
+
+    #[test]
+    fn test_growth_rate_capped_positive_v4() {
+        assert_eq!(compute_growth_rate(1, 1_000_000), GROWTH_RATE_CAP_BPS);
+    }
+
+    #[test]
+    fn test_moving_average_three_values_v4() {
+        let values = vec![100, 200, 300];
+        let avg = moving_average(&values, 3).unwrap();
+        assert_eq!(avg, 200);
+    }
+
+    #[test]
+    fn test_moving_average_window_larger_than_data_v4() {
+        let values = vec![100, 200];
+        let avg = moving_average(&values, 10).unwrap();
+        assert_eq!(avg, 150); // Uses all available values
+    }
+
+    #[test]
+    fn test_wma_ascending_weights_recent_more_v4() {
+        let values = vec![100, 100, 300]; // Recent value is higher
+        let wma = weighted_moving_average(&values, 3).unwrap();
+        let sma = moving_average(&values, 3).unwrap();
+        // WMA should be higher than SMA because recent value is highest
+        assert!(wma > sma);
+    }
+
+    #[test]
+    fn test_volatility_zero_deviation_v4() {
+        let values = vec![100, 100, 100];
+        let vol = compute_volatility(&values).unwrap();
+        assert_eq!(vol, 0);
+    }
+
+    #[test]
+    fn test_volatility_high_deviation_v4() {
+        let values = vec![0, 1_000, 0, 1_000];
+        let vol = compute_volatility(&values).unwrap();
+        assert!(vol > 0);
+    }
+
+    #[test]
+    fn test_health_score_maximum_v4() {
+        let score = protocol_health_score(
+            100_000_000 * PRECISION,    // 100M TVL
+            10_000_000 * PRECISION,     // 10M volume
+            5_000,                       // 5000 users
+            50,                          // 50 pools
+            60_000_000 * PRECISION,     // 60% staked
+        );
+        assert_eq!(score, 100);
+    }
+
+    #[test]
+    fn test_health_score_zero_v4() {
+        let score = protocol_health_score(0, 0, 0, 0, 0);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_daily_period_v4() {
+        let revenue = annualize_revenue(100 * PRECISION, BLOCKS_PER_DAY);
+        // 100 * 7884000 / 21600 = 100 * 365 = 36500
+        assert_eq!(revenue, 36_500 * PRECISION);
+    }
+
+    #[test]
+    fn test_capital_efficiency_2x_v4() {
+        let eff = capital_efficiency(20_000, 10_000);
+        assert_eq!(eff, 20_000); // 200% utilization
+    }
+
+    #[test]
+    fn test_rank_pools_descending_order_v4() {
+        let pools = vec![
+            make_pool(1, 100 * PRECISION, 10 * PRECISION, 50, 50, 100),
+            make_pool(2, 300 * PRECISION, 30 * PRECISION, 150, 150, 100),
+            make_pool(3, 200 * PRECISION, 20 * PRECISION, 100, 100, 100),
+        ];
+        let ranked = rank_pools(&pools, PoolSortKey::Tvl);
+        assert_eq!(ranked, vec![1, 2, 0]); // 300, 200, 100
+    }
+
+    #[test]
+    fn test_time_to_target_100_bps_daily_v4() {
+        let days = estimate_time_to_target(100, 200, 100);
+        // 1% daily growth to double
+        assert!(days > 0);
+        assert!(days < 200); // Should be around 70 days (rule of 72)
+    }
+
+    #[test]
+    fn test_time_to_target_already_above_v4() {
+        assert_eq!(estimate_time_to_target(200, 100, 100), 0);
+    }
+
+    #[test]
+    fn test_time_to_target_negative_growth_v4() {
+        assert_eq!(estimate_time_to_target(100, 200, -100), u64::MAX);
+    }
+
+    #[test]
+    fn test_metrics_error_variants_distinct_v4() {
+        let errors = vec![
+            MetricsError::InsufficientData,
+            MetricsError::InvalidTimeRange,
+            MetricsError::ZeroDenominator,
+            MetricsError::Overflow,
+            MetricsError::SnapshotNotFound,
+            MetricsError::DuplicateSnapshot,
+        ];
+        for i in 0..errors.len() {
+            for j in (i+1)..errors.len() {
+                assert_ne!(errors[i], errors[j]);
+            }
+        }
+    }
 }

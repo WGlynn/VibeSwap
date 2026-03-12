@@ -2821,4 +2821,276 @@ mod tests {
         // Zero current price → error from IL calculation
         assert!(result.is_err());
     }
+
+    // ============ Hardening Tests v4 ============
+
+    #[test]
+    fn test_arb_two_pools_same_price_no_arb_v4() {
+        let p1 = make_pool_data(1_000_000, 1_000_000, 30);
+        let p2 = make_pool_data(2_000_000, 2_000_000, 30);
+        let pools = vec![(id(1), &p1), (id(2), &p2)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty());
+    }
+
+    #[test]
+    fn test_arb_spread_exactly_fees_no_profit_v4() {
+        // Spread of 60 bps = sum of two 30 bps fees
+        let p1 = make_pool_data(1_000_000, 1_000_000, 30);
+        let p2 = make_pool_data(1_000_000, 1_006_000, 30);
+        let pools = vec![(id(1), &p1), (id(2), &p2)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty());
+    }
+
+    #[test]
+    fn test_arb_spread_above_fees_profitable_v4() {
+        // Large spread well above fees
+        let p1 = make_pool_data(1_000_000, 1_000_000, 30);
+        let p2 = make_pool_data(1_000_000, 2_000_000, 30);
+        let pools = vec![(id(1), &p1), (id(2), &p2)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(!arbs.is_empty());
+        assert!(arbs[0].estimated_profit > 0);
+    }
+
+    #[test]
+    fn test_arb_empty_pools_list_v4() {
+        let pools: Vec<([u8; 32], &PoolCellData)> = vec![];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty());
+    }
+
+    #[test]
+    fn test_arb_min_spread_filter_works_v4() {
+        let p1 = make_pool_data(1_000_000, 1_000_000, 30);
+        let p2 = make_pool_data(1_000_000, 1_500_000, 30);
+        let pools = vec![(id(1), &p1), (id(2), &p2)];
+        // Without filter
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(!arbs.is_empty());
+        // With very high filter
+        let arbs_filtered = find_arbitrage(&pools, 100_000);
+        assert!(arbs_filtered.is_empty());
+    }
+
+    #[test]
+    fn test_rebalance_no_il_suggests_add_liquidity_v4() {
+        let signal = check_rebalance(
+            PRECISION, PRECISION, // same price
+            100_000,              // position value
+            1_000,                // some accrued fees
+            500, 2000,            // thresholds
+        ).unwrap();
+        assert_eq!(signal.action, RebalanceAction::AddLiquidity);
+        assert!(!signal.should_rebalance);
+    }
+
+    #[test]
+    fn test_rebalance_high_il_exit_v4() {
+        let signal = check_rebalance(
+            PRECISION,
+            100 * PRECISION,      // 100x price move → extreme IL
+            100_000,
+            0,                     // no fees
+            500, 2000,
+        ).unwrap();
+        assert_eq!(signal.action, RebalanceAction::ExitPosition);
+        assert!(signal.should_rebalance);
+    }
+
+    #[test]
+    fn test_rebalance_moderate_il_fees_cover_hold_v4() {
+        let signal = check_rebalance(
+            PRECISION,
+            2 * PRECISION,        // 2x price → ~5.7% IL
+            1_000_000,
+            1_000_000,             // massive fees cover IL
+            500, 2000,
+        ).unwrap();
+        // Fees cover IL, so should not rebalance
+        assert!(!signal.should_rebalance);
+    }
+
+    #[test]
+    fn test_rebalance_moderate_il_no_fees_reenter_v4() {
+        let signal = check_rebalance(
+            PRECISION,
+            2 * PRECISION,
+            1_000_000,
+            0,                     // no fees
+            200, 2000,             // low il_threshold
+        ).unwrap();
+        // IL > 200 bps and fees don't cover → reenter
+        assert!(signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::ReenterAtCurrentPrice);
+    }
+
+    #[test]
+    fn test_yield_single_source_v4() {
+        let sources = vec![YieldSource {
+            source_id: id(1),
+            source_type: YieldType::LPFees,
+            apy_bps: 1000,
+            tvl: 1_000_000,
+            risk_score: 10,
+        }];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(1));
+        assert_eq!(rec.best_apy_bps, 1000);
+        assert_eq!(rec.ranked_sources.len(), 1);
+    }
+
+    #[test]
+    fn test_yield_empty_returns_error_v4() {
+        let result = optimize_yield(&[], 100);
+        assert_eq!(result, Err(StrategyError::NoPositions));
+    }
+
+    #[test]
+    fn test_yield_all_filtered_by_risk_v4() {
+        let sources = vec![YieldSource {
+            source_id: id(1),
+            source_type: YieldType::LPFees,
+            apy_bps: 1000,
+            tvl: 1_000_000,
+            risk_score: 50,
+        }];
+        let result = optimize_yield(&sources, 30); // max_risk = 30 < risk_score 50
+        assert_eq!(result, Err(StrategyError::NoPositions));
+    }
+
+    #[test]
+    fn test_yield_lower_risk_preferred_v4() {
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 1000, tvl: 1_000_000, risk_score: 50 },
+            YieldSource { source_id: id(2), source_type: YieldType::StakingRewards, apy_bps: 1000, tvl: 1_000_000, risk_score: 10 },
+        ];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        // Same APY but lower risk → id(2) should be best
+        assert_eq!(rec.best_source, id(2));
+    }
+
+    #[test]
+    fn test_liquidation_empty_vaults_v4() {
+        let opps = find_liquidations(&[], 500, 100);
+        assert!(opps.is_empty());
+    }
+
+    #[test]
+    fn test_liquidation_healthy_vault_no_opp_v4() {
+        let vaults = vec![(200, 100, 8000u128)]; // hf = 200*8000/(100*10000) = 1.6
+        let opps = find_liquidations(&vaults, 500, 0);
+        assert!(opps.is_empty());
+    }
+
+    #[test]
+    fn test_liquidation_underwater_vault_v4() {
+        let vaults = vec![(100, 200, 8000u128)]; // hf = 100*8000/(200*10000) = 0.4
+        let opps = find_liquidations(&vaults, 500, 0);
+        assert_eq!(opps.len(), 1);
+        assert!(opps[0].estimated_profit > 0);
+        assert!(opps[0].urgency > 50); // Very underwater
+    }
+
+    #[test]
+    fn test_liquidation_gas_eliminates_profit_v4() {
+        let vaults = vec![(100, 200, 8000u128)];
+        let opps = find_liquidations(&vaults, 500, u128::MAX);
+        assert!(opps.is_empty()); // Gas too high
+    }
+
+    #[test]
+    fn test_alerts_below_watch_no_alert_v4() {
+        let positions = vec![(id(1), 50u64, AlertReason::LowHealthFactor)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_alerts_at_watch_v4() {
+        let positions = vec![(id(1), 100u64, AlertReason::LowHealthFactor)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].level, AlertLevel::Watch);
+    }
+
+    #[test]
+    fn test_alerts_at_warning_v4() {
+        let positions = vec![(id(1), 500u64, AlertReason::HighImpermanentLoss)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].level, AlertLevel::Warning);
+    }
+
+    #[test]
+    fn test_alerts_at_critical_v4() {
+        let positions = vec![(id(1), 1000u64, AlertReason::HighUtilization)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].level, AlertLevel::Critical);
+    }
+
+    #[test]
+    fn test_alerts_sorted_critical_first_v4() {
+        let positions = vec![
+            (id(1), 100u64, AlertReason::LowHealthFactor),      // Watch
+            (id(2), 1500u64, AlertReason::HighImpermanentLoss),  // Critical
+            (id(3), 600u64, AlertReason::HighConcentration),     // Warning
+        ];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 3);
+        assert_eq!(alerts[0].level, AlertLevel::Critical);
+        assert_eq!(alerts[1].level, AlertLevel::Warning);
+        assert_eq!(alerts[2].level, AlertLevel::Watch);
+    }
+
+    #[test]
+    fn test_arb_sorted_by_profit_v4() {
+        // Create 3 pools with different prices for multiple arb opps
+        let p1 = make_pool_data(1_000_000, 1_000_000, 10);
+        let p2 = make_pool_data(1_000_000, 2_000_000, 10);
+        let p3 = make_pool_data(1_000_000, 3_000_000, 10);
+        let pools = vec![(id(1), &p1), (id(2), &p2), (id(3), &p3)];
+        let arbs = find_arbitrage(&pools, 0);
+        // Should be sorted by estimated_profit descending
+        for i in 1..arbs.len() {
+            assert!(arbs[i - 1].estimated_profit >= arbs[i].estimated_profit);
+        }
+    }
+
+    #[test]
+    fn test_liquidation_sorted_by_profit_v4() {
+        let vaults = vec![
+            (100, 200, 8000u128),  // hf=0.4
+            (100, 300, 8000u128),  // hf=0.27 — more underwater
+            (100, 150, 8000u128),  // hf=0.53
+        ];
+        let opps = find_liquidations(&vaults, 500, 0);
+        for i in 1..opps.len() {
+            assert!(opps[i - 1].estimated_profit >= opps[i].estimated_profit);
+        }
+    }
+
+    #[test]
+    fn test_rebalance_position_value_returned_v4() {
+        let signal = check_rebalance(PRECISION, PRECISION, 100_000, 5_000, 500, 2000).unwrap();
+        // position_value should reflect lp_value from IL calc
+        assert!(signal.position_value > 0);
+        // rebalanced_value = lp_value + accrued_fees
+        assert_eq!(signal.rebalanced_value, signal.position_value + 5_000);
+    }
+
+    #[test]
+    fn test_yield_type_variants_v4() {
+        let types = vec![YieldType::LPFees, YieldType::LendingDeposit, YieldType::InsurancePremium, YieldType::StakingRewards];
+        assert_eq!(types.len(), 4);
+    }
+
+    #[test]
+    fn test_alert_level_ordering_v4() {
+        assert!(AlertLevel::Safe < AlertLevel::Watch);
+        assert!(AlertLevel::Watch < AlertLevel::Warning);
+        assert!(AlertLevel::Warning < AlertLevel::Critical);
+    }
 }

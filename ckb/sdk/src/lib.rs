@@ -11,6 +11,7 @@ pub mod auction;
 pub mod batch;
 pub mod checkpoint;
 pub mod bridge;
+pub mod cache;
 pub mod circuit_breaker;
 pub mod config;
 pub mod collector;

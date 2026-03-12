@@ -2674,4 +2674,316 @@ mod tests {
         assert_eq!(m1, m2);
         assert_ne!(m1, [0u8; 32]);
     }
+
+    // ============ Hardening Tests v4 ============
+
+    #[test]
+    fn test_witness_args_new_with_empty_lock_v4() {
+        let wa = WitnessArgs::new_with_empty_lock();
+        assert!(wa.lock.is_some());
+        assert_eq!(wa.lock.as_ref().unwrap().len(), SECP256K1_SIGNATURE_SIZE);
+        assert!(wa.lock.as_ref().unwrap().iter().all(|&b| b == 0));
+        assert!(wa.input_type.is_none());
+        assert!(wa.output_type.is_none());
+    }
+
+    #[test]
+    fn test_witness_args_roundtrip_lock_only_v4() {
+        let wa = WitnessArgs {
+            lock: Some(vec![1, 2, 3, 4, 5]),
+            input_type: None,
+            output_type: None,
+        };
+        let serialized = wa.serialize();
+        let deserialized = WitnessArgs::deserialize(&serialized).unwrap();
+        assert_eq!(deserialized.lock, wa.lock);
+        assert_eq!(deserialized.input_type, None);
+        assert_eq!(deserialized.output_type, None);
+    }
+
+    #[test]
+    fn test_witness_args_roundtrip_all_fields_v4() {
+        let wa = WitnessArgs {
+            lock: Some(vec![10; 65]),
+            input_type: Some(vec![20; 32]),
+            output_type: Some(vec![30; 16]),
+        };
+        let serialized = wa.serialize();
+        let deserialized = WitnessArgs::deserialize(&serialized).unwrap();
+        assert_eq!(deserialized.lock, wa.lock);
+        assert_eq!(deserialized.input_type, wa.input_type);
+        assert_eq!(deserialized.output_type, wa.output_type);
+    }
+
+    #[test]
+    fn test_witness_args_deserialize_too_short_v4() {
+        let result = WitnessArgs::deserialize(&[0; 10]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tx_hash_deterministic_v4() {
+        let tx = test_unsigned(2);
+        let h1 = hash_raw_transaction(&tx.cell_deps, &tx.inputs, &tx.outputs);
+        let h2 = hash_raw_transaction(&tx.cell_deps, &tx.inputs, &tx.outputs);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_tx_hash_changes_with_different_inputs_v4() {
+        let tx1 = test_unsigned(1);
+        let tx2 = test_unsigned(2);
+        let h1 = hash_raw_transaction(&tx1.cell_deps, &tx1.inputs, &tx1.outputs);
+        let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_calculate_fee_minimum_v4() {
+        assert_eq!(calculate_fee(0, 1), MIN_FEE);
+        assert_eq!(calculate_fee(500, 1), MIN_FEE);
+        assert_eq!(calculate_fee(999, 1), MIN_FEE);
+    }
+
+    #[test]
+    fn test_calculate_fee_above_minimum_v4() {
+        assert_eq!(calculate_fee(1000, 1), MIN_FEE);
+        assert_eq!(calculate_fee(1001, 1), 1001);
+        assert_eq!(calculate_fee(2000, 1), 2000);
+    }
+
+    #[test]
+    fn test_calculate_fee_higher_rate_v4() {
+        assert_eq!(calculate_fee(1000, 2), 2000);
+        assert_eq!(calculate_fee(500, 10), 5000);
+    }
+
+    #[test]
+    fn test_mock_signer_produces_65_byte_sig_v4() {
+        let signer = MockSigner::new(test_script(1));
+        let message = [0u8; 32];
+        let sig = signer.sign(&message).unwrap();
+        assert_eq!(sig.len(), SECP256K1_SIGNATURE_SIZE);
+    }
+
+    #[test]
+    fn test_mock_signer_different_locks_different_sigs_v4() {
+        let s1 = MockSigner::new(test_script(1));
+        let s2 = MockSigner::new(test_script(2));
+        assert_ne!(s1.signature, s2.signature);
+    }
+
+    #[test]
+    fn test_assemble_single_input_v4() {
+        let tx = test_unsigned(1);
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.inputs.len(), 1);
+        assert_eq!(signed.witnesses.len(), 1);
+        assert!(!signed.witnesses[0].is_empty());
+    }
+
+    #[test]
+    fn test_assemble_empty_transaction_fails_v4() {
+        let tx = UnsignedTransaction {
+            cell_deps: vec![],
+            inputs: vec![],
+            outputs: vec![],
+            witnesses: vec![],
+        };
+        let signer = MockSigner::new(test_script(1));
+        let result = assemble(&tx, &[&signer], &[]);
+        assert!(matches!(result, Err(AssemblerError::EmptyTransaction)));
+    }
+
+    #[test]
+    fn test_assemble_duplicate_inputs_detected_v4() {
+        let mut tx = test_unsigned(2);
+        tx.inputs[1] = tx.inputs[0].clone();
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1), test_script(1)];
+        let result = assemble(&tx, &[&signer], &locks);
+        assert!(matches!(result, Err(AssemblerError::DuplicateInput { .. })));
+    }
+
+    #[test]
+    fn test_assemble_lock_count_mismatch_v4() {
+        let tx = test_unsigned(2);
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1)]; // Only 1 lock for 2 inputs
+        let result = assemble(&tx, &[&signer], &locks);
+        assert!(matches!(result, Err(AssemblerError::WitnessMismatch { .. })));
+    }
+
+    #[test]
+    fn test_assemble_no_matching_signer_v4() {
+        let tx = test_unsigned(1);
+        let signer = MockSigner::new(test_script(99)); // Different lock
+        let locks = vec![test_script(1)];
+        let result = assemble(&tx, &[&signer], &locks);
+        assert!(matches!(result, Err(AssemblerError::SigningFailed(_))));
+    }
+
+    #[test]
+    fn test_assemble_with_fee_deducts_v4() {
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].capacity = 100_000;
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1)];
+        let signed = assemble_with_fee(&mut tx, &[&signer], &locks, 1).unwrap();
+        assert!(signed.outputs[0].capacity < 100_000);
+    }
+
+    #[test]
+    fn test_assemble_with_fee_insufficient_fails_v4() {
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].capacity = 1; // Too little capacity for fee
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1)];
+        let result = assemble_with_fee(&mut tx, &[&signer], &locks, 1);
+        assert!(matches!(result, Err(AssemblerError::InsufficientFeeCapacity { .. })));
+    }
+
+    #[test]
+    fn test_validate_unsigned_valid_v4() {
+        let tx = test_unsigned(3);
+        assert!(validate_unsigned(&tx).is_ok());
+    }
+
+    #[test]
+    fn test_validate_unsigned_empty_v4() {
+        let tx = UnsignedTransaction {
+            cell_deps: vec![],
+            inputs: vec![],
+            outputs: vec![],
+            witnesses: vec![],
+        };
+        assert!(matches!(validate_unsigned(&tx), Err(AssemblerError::EmptyTransaction)));
+    }
+
+    #[test]
+    fn test_validate_unsigned_duplicate_v4() {
+        let mut tx = test_unsigned(2);
+        tx.inputs[1] = tx.inputs[0].clone();
+        assert!(matches!(validate_unsigned(&tx), Err(AssemblerError::DuplicateInput { .. })));
+    }
+
+    #[test]
+    fn test_signed_tx_hash_matches_raw_v4() {
+        let tx = test_unsigned(2);
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1), test_script(1)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        let signed_hash = signed.tx_hash();
+        let raw_hash = hash_raw_transaction(&tx.cell_deps, &tx.inputs, &tx.outputs);
+        assert_eq!(signed_hash, raw_hash);
+    }
+
+    #[test]
+    fn test_signed_tx_estimated_size_nonzero_v4() {
+        let tx = test_unsigned(2);
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1), test_script(1)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert!(signed.estimated_size() > 0);
+    }
+
+    #[test]
+    fn test_assemble_single_signer_shortcut_v4() {
+        let tx = test_unsigned(3);
+        let signer = MockSigner::new(test_script(1));
+        let signed = assemble_single_signer(&tx, &signer).unwrap();
+        assert_eq!(signed.inputs.len(), 3);
+        assert_eq!(signed.witnesses.len(), 3);
+    }
+
+    #[test]
+    fn test_assemble_preserves_cell_deps_v4() {
+        let tx = test_unsigned(1);
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.cell_deps.len(), tx.cell_deps.len());
+    }
+
+    #[test]
+    fn test_assemble_preserves_outputs_v4() {
+        let tx = test_unsigned(2);
+        let signer = MockSigner::new(test_script(1));
+        let locks = vec![test_script(1), test_script(1)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.outputs.len(), tx.outputs.len());
+    }
+
+    #[test]
+    fn test_hash_script_bytes_deterministic_v4() {
+        let script = test_script(5);
+        let h1 = hash_script_bytes(&script);
+        let h2 = hash_script_bytes(&script);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_script_bytes_different_for_different_scripts_v4() {
+        let h1 = hash_script_bytes(&test_script(1));
+        let h2 = hash_script_bytes(&test_script(2));
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_constants_correct_v4() {
+        assert_eq!(SECP256K1_SIGNATURE_SIZE, 65);
+        assert_eq!(EMPTY_WITNESS_LOCK.len(), 65);
+        assert_eq!(MIN_FEE, 1_000);
+        assert_eq!(DEFAULT_FEE_RATE, 1);
+    }
+
+    #[test]
+    fn test_assembler_error_eq_v4() {
+        assert_eq!(AssemblerError::EmptyTransaction, AssemblerError::EmptyTransaction);
+        assert_ne!(
+            AssemblerError::EmptyTransaction,
+            AssemblerError::EmptyLockGroup
+        );
+        assert_eq!(
+            AssemblerError::WitnessMismatch { inputs: 2, witnesses: 3 },
+            AssemblerError::WitnessMismatch { inputs: 2, witnesses: 3 }
+        );
+    }
+
+    #[test]
+    fn test_witness_args_serialize_size_grows_v4() {
+        let wa_small = WitnessArgs {
+            lock: Some(vec![0; 10]),
+            input_type: None,
+            output_type: None,
+        };
+        let wa_large = WitnessArgs {
+            lock: Some(vec![0; 100]),
+            input_type: Some(vec![0; 50]),
+            output_type: Some(vec![0; 30]),
+        };
+        assert!(wa_small.serialize().len() < wa_large.serialize().len());
+    }
+
+    #[test]
+    fn test_signing_message_changes_with_tx_hash_v4() {
+        let wa = WitnessArgs::new_with_empty_lock();
+        let extras: &[&[u8]] = &[];
+        let hash1 = [1u8; 32];
+        let hash2 = [2u8; 32];
+        let m1 = compute_signing_message(&hash1, &wa, extras);
+        let m2 = compute_signing_message(&hash2, &wa, extras);
+        assert_ne!(m1, m2);
+    }
+
+    #[test]
+    fn test_signing_message_is_32_bytes_v4() {
+        let wa = WitnessArgs::new_with_empty_lock();
+        let hash = [0u8; 32];
+        let extras: &[&[u8]] = &[];
+        let msg = compute_signing_message(&hash, &wa, extras);
+        assert_eq!(msg.len(), 32);
+    }
 }

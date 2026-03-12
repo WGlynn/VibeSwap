@@ -2590,4 +2590,304 @@ mod tests {
         assert!(q1 >= PROGRESSIVE_FEE_BASE_BPS);
         assert!(q3 <= PROGRESSIVE_FEE_MAX_BPS);
     }
+
+    // ============ Hardening Tests v4 ============
+
+    #[test]
+    fn test_create_profile_fields_v4() {
+        let addr = test_address(42);
+        let p = create_profile(addr, 500);
+        assert_eq!(p.address, addr);
+        assert_eq!(p.first_seen_block, 500);
+        assert_eq!(p.tx_count_window, 0);
+        assert_eq!(p.tx_count_total, 0);
+        assert_eq!(p.last_tx_block, 0);
+        assert_eq!(p.rate_limit_hits, 0);
+        assert!(!p.is_blocked);
+        assert_eq!(p.bot_score, 0);
+        assert_eq!(p.cooldown_until, 0);
+    }
+
+    #[test]
+    fn test_rate_limit_fresh_allowed_v4() {
+        let p = create_profile(test_address(1), 0);
+        let result = check_rate_limit(&p, 100);
+        assert!(result.allowed);
+        assert_eq!(result.remaining_in_block, MAX_TX_PER_BLOCK);
+        assert_eq!(result.remaining_in_window, MAX_TX_PER_WINDOW);
+    }
+
+    #[test]
+    fn test_rate_limit_blocked_not_allowed_v4() {
+        let p = block_address(&create_profile(test_address(1), 0));
+        let result = check_rate_limit(&p, 100);
+        assert!(!result.allowed);
+        assert_eq!(result.current_fee_bps, PROGRESSIVE_FEE_MAX_BPS);
+    }
+
+    #[test]
+    fn test_rate_limit_in_cooldown_not_allowed_v4() {
+        let p = apply_cooldown(&create_profile(test_address(1), 0), 100);
+        let result = check_rate_limit(&p, 105); // within cooldown (100 + 10 = 110)
+        assert!(!result.allowed);
+        assert_eq!(result.cooldown_blocks, 5);
+    }
+
+    #[test]
+    fn test_rate_limit_cooldown_expired_allowed_v4() {
+        let p = apply_cooldown(&create_profile(test_address(1), 0), 100);
+        let result = check_rate_limit(&p, 110); // cooldown_until = 110, current = 110
+        assert!(result.allowed);
+    }
+
+    #[test]
+    fn test_record_transaction_increments_counts_v4() {
+        let p = create_profile(test_address(1), 0);
+        let updated = record_transaction(&p, 100).unwrap();
+        assert_eq!(updated.tx_count_window, 1);
+        assert_eq!(updated.tx_count_total, 1);
+        assert_eq!(updated.last_tx_block, 100);
+    }
+
+    #[test]
+    fn test_record_transaction_blocked_fails_v4() {
+        let p = block_address(&create_profile(test_address(1), 0));
+        let result = record_transaction(&p, 100);
+        assert_eq!(result, Err(AntiBotError::AddressBlocked));
+    }
+
+    #[test]
+    fn test_record_transaction_cooldown_fails_v4() {
+        let p = apply_cooldown(&create_profile(test_address(1), 0), 100);
+        let result = record_transaction(&p, 105);
+        assert_eq!(result, Err(AntiBotError::CooldownActive));
+    }
+
+    #[test]
+    fn test_progressive_fee_at_zero_v4() {
+        assert_eq!(compute_progressive_fee(0, 100), PROGRESSIVE_FEE_BASE_BPS);
+    }
+
+    #[test]
+    fn test_progressive_fee_at_max_v4() {
+        assert_eq!(compute_progressive_fee(100, 100), PROGRESSIVE_FEE_MAX_BPS);
+    }
+
+    #[test]
+    fn test_progressive_fee_above_window_capped_v4() {
+        // Even if count > window, fee should cap at max
+        assert_eq!(compute_progressive_fee(200, 100), PROGRESSIVE_FEE_MAX_BPS);
+    }
+
+    #[test]
+    fn test_analyze_uniform_intervals_bot_like_v4() {
+        let intervals = vec![10, 10, 10, 10, 10];
+        let amounts = vec![1000, 1000, 1000, 1000, 1000];
+        let pattern = analyze_pattern(&intervals, &amounts, 1);
+        assert_eq!(pattern.avg_interval_blocks, 10);
+        assert_eq!(pattern.interval_variance, 0);
+        assert_eq!(pattern.amount_variance_bps, 0);
+        // All same amounts → high repeat ratio
+        assert!(pattern.repeat_amount_ratio_bps > 0);
+    }
+
+    #[test]
+    fn test_analyze_varied_intervals_human_v4() {
+        let intervals = vec![5, 20, 3, 50, 12];
+        let amounts = vec![1000, 5000, 300, 10000, 700];
+        let pattern = analyze_pattern(&intervals, &amounts, 5);
+        assert!(pattern.interval_variance > 0);
+        assert!(pattern.amount_variance_bps > 0);
+    }
+
+    #[test]
+    fn test_behavioral_score_bot_high_v4() {
+        let pattern = TransactionPattern {
+            avg_interval_blocks: 10,
+            interval_variance: 0,        // perfectly regular
+            amount_variance_bps: 0,      // all same
+            unique_counterparties: 1,    // single counterparty
+            repeat_amount_ratio_bps: 10_000, // all repeats
+            time_clustering_score: 10_000,    // all clustered
+        };
+        let score = compute_behavioral_score(&pattern);
+        assert!(score.total_score > 5000);
+        assert!(score.is_flagged);
+    }
+
+    #[test]
+    fn test_behavioral_score_human_low_v4() {
+        let pattern = TransactionPattern {
+            avg_interval_blocks: 100,
+            interval_variance: 5000,     // high variance
+            amount_variance_bps: 8000,   // varied amounts
+            unique_counterparties: 25,   // many counterparties
+            repeat_amount_ratio_bps: 0,  // no repeats
+            time_clustering_score: 0,    // no clustering
+        };
+        let score = compute_behavioral_score(&pattern);
+        assert!(score.total_score < BEHAVIORAL_SCORE_THRESHOLD);
+        assert!(!score.is_flagged);
+    }
+
+    #[test]
+    fn test_behavioral_score_components_sum_v4() {
+        let pattern = TransactionPattern {
+            avg_interval_blocks: 50,
+            interval_variance: 100,
+            amount_variance_bps: 500,
+            unique_counterparties: 10,
+            repeat_amount_ratio_bps: 2000,
+            time_clustering_score: 3000,
+        };
+        let score = compute_behavioral_score(&pattern);
+        let expected_total = score.interval_score as u16
+            + score.amount_score as u16
+            + score.counterparty_score as u16
+            + score.timing_score as u16;
+        assert_eq!(score.total_score, expected_total);
+    }
+
+    #[test]
+    fn test_sybil_two_identical_bots_v4() {
+        let p1 = create_profile(test_address(1), 0);
+        let p2 = create_profile(test_address(2), 0);
+        let pat = TransactionPattern {
+            avg_interval_blocks: 10,
+            interval_variance: 0,
+            amount_variance_bps: 0,
+            unique_counterparties: 1,
+            repeat_amount_ratio_bps: 10_000,
+            time_clustering_score: 10_000,
+        };
+        let result = detect_sybil(&[p1, p2], &[pat.clone(), pat]);
+        assert!(result.is_some());
+        let cluster = result.unwrap();
+        assert_eq!(cluster.address_count, 2);
+    }
+
+    #[test]
+    fn test_sybil_different_patterns_no_cluster_v4() {
+        let p1 = create_profile(test_address(1), 0);
+        let p2 = create_profile(test_address(2), 0);
+        let pat1 = TransactionPattern {
+            avg_interval_blocks: 10,
+            interval_variance: 0,
+            amount_variance_bps: 0,
+            unique_counterparties: 1,
+            repeat_amount_ratio_bps: 10_000,
+            time_clustering_score: 10_000,
+        };
+        let pat2 = TransactionPattern {
+            avg_interval_blocks: 500,
+            interval_variance: 50_000,
+            amount_variance_bps: 9_000,
+            unique_counterparties: 30,
+            repeat_amount_ratio_bps: 0,
+            time_clustering_score: 0,
+        };
+        let result = detect_sybil(&[p1, p2], &[pat1, pat2]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_is_account_mature_boundary_v4() {
+        let p = create_profile(test_address(1), 100);
+        assert!(!is_account_mature(&p, 100)); // 0 blocks age
+        assert!(!is_account_mature(&p, 199)); // 99 blocks age
+        assert!(is_account_mature(&p, 200));  // exactly 100 blocks age
+        assert!(is_account_mature(&p, 300));  // well past
+    }
+
+    #[test]
+    fn test_apply_cooldown_sets_fields_v4() {
+        let p = create_profile(test_address(1), 0);
+        let cooled = apply_cooldown(&p, 100);
+        assert_eq!(cooled.cooldown_until, 100 + COOLDOWN_BLOCKS);
+        assert_eq!(cooled.rate_limit_hits, 1);
+    }
+
+    #[test]
+    fn test_apply_cooldown_stacks_v4() {
+        let p = create_profile(test_address(1), 0);
+        let c1 = apply_cooldown(&p, 100);
+        let c2 = apply_cooldown(&c1, 200);
+        assert_eq!(c2.rate_limit_hits, 2);
+        assert_eq!(c2.cooldown_until, 200 + COOLDOWN_BLOCKS);
+    }
+
+    #[test]
+    fn test_block_unblock_roundtrip_v4() {
+        let p = create_profile(test_address(1), 0);
+        let blocked = block_address(&p);
+        assert!(blocked.is_blocked);
+        let unblocked = unblock_address(&blocked);
+        assert!(!unblocked.is_blocked);
+        assert_eq!(unblocked.address, p.address);
+    }
+
+    #[test]
+    fn test_reset_window_preserves_total_v4() {
+        let mut p = create_profile(test_address(1), 0);
+        p.tx_count_window = 50;
+        p.tx_count_total = 100;
+        let reset = reset_window(&p, 500);
+        assert_eq!(reset.tx_count_window, 0);
+        assert_eq!(reset.tx_count_total, 100);
+    }
+
+    #[test]
+    fn test_risk_assessment_clean_profile_low_v4() {
+        let p = create_profile(test_address(1), 0);
+        let score = BehavioralScore {
+            interval_score: 0,
+            amount_score: 0,
+            counterparty_score: 0,
+            timing_score: 0,
+            total_score: 0,
+            is_flagged: false,
+        };
+        let risk = overall_risk_assessment(&p, &score);
+        // Brand new account with zero behavior → age component maxed but others low
+        assert!(risk > 0); // New account has some risk
+        assert!(risk < 5000); // But not extreme
+    }
+
+    #[test]
+    fn test_risk_assessment_max_risk_v4() {
+        let mut p = create_profile(test_address(1), 0);
+        p.rate_limit_hits = 20;
+        p.bot_score = 10_000;
+        let score = BehavioralScore {
+            interval_score: 2500,
+            amount_score: 2500,
+            counterparty_score: 2500,
+            timing_score: 2500,
+            total_score: 10_000,
+            is_flagged: true,
+        };
+        let risk = overall_risk_assessment(&p, &score);
+        assert_eq!(risk, 10_000);
+    }
+
+    #[test]
+    fn test_antibot_error_variants_distinct_v4() {
+        let errors = vec![
+            AntiBotError::RateLimitExceeded,
+            AntiBotError::CooldownActive,
+            AntiBotError::AccountTooNew,
+            AntiBotError::SybilDetected,
+            AntiBotError::BehaviorFlagged,
+            AntiBotError::AddressBlocked,
+            AntiBotError::InvalidPattern,
+            AntiBotError::ZeroValue,
+            AntiBotError::Overflow,
+            AntiBotError::MaxAddressesReached,
+        ];
+        for i in 0..errors.len() {
+            for j in (i+1)..errors.len() {
+                assert_ne!(errors[i], errors[j]);
+            }
+        }
+    }
 }

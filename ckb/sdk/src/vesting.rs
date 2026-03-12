@@ -2185,4 +2185,246 @@ mod tests {
         assert_eq!(remaining_duration(&revoked, 50_000), 0);
         assert_eq!(remaining_duration(&revoked, 75_000), 0);
     }
+
+    // ============ Hardening Tests v4 ============
+
+    #[test]
+    fn linear_vested_one_block_before_cliff_end_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        assert_eq!(compute_vested(&s, 4_999), 0);
+    }
+
+    #[test]
+    fn linear_vested_exactly_at_cliff_end_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let v = compute_vested(&s, 5_000);
+        // At cliff end, vested = total * 5000 / 100000 = 5%
+        assert_eq!(v, mul_div(THOUSAND_VIBE, 5_000, 100_000));
+    }
+
+    #[test]
+    fn linear_vested_one_block_after_cliff_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let v = compute_vested(&s, 5_001);
+        assert_eq!(v, mul_div(THOUSAND_VIBE, 5_001, 100_000));
+    }
+
+    #[test]
+    fn graded_step_boundaries_exact_v4() {
+        // 10 steps over 10000 blocks (cliff=0), each step = 1000 blocks
+        let s = create_graded(beneficiary_a(), TEN_VIBE, 0, 0, 10_000, 10, true).unwrap();
+        // At exactly step 1 boundary (block 1000), should get 1/10
+        assert_eq!(compute_vested(&s, 1_000), TEN_VIBE / 10);
+        // At block 999, should get 0/10 (step not yet complete)
+        assert_eq!(compute_vested(&s, 999), 0);
+    }
+
+    #[test]
+    fn graded_step_last_step_boundary_v4() {
+        let s = create_graded(beneficiary_a(), TEN_VIBE, 0, 0, 10_000, 10, true).unwrap();
+        // At exactly the last step (block 10000), should be fully vested
+        assert_eq!(compute_vested(&s, 10_000), TEN_VIBE);
+    }
+
+    #[test]
+    fn milestone_create_bps_over_10000_v4() {
+        let result = create_milestone(
+            beneficiary_a(),
+            TEN_VIBE,
+            0,
+            &[(1_000, 5_000), (2_000, 10_001)],
+            true,
+        );
+        assert_eq!(result, Err(VestingError::InvalidMilestone));
+    }
+
+    #[test]
+    fn milestone_create_exactly_10000_bps_v4() {
+        let result = create_milestone(
+            beneficiary_a(),
+            TEN_VIBE,
+            0,
+            &[(1_000, 5_000), (2_000, 10_000)],
+            true,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn claim_returns_updated_schedule_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (amount, updated) = claim(&s, 50_000).unwrap();
+        assert_eq!(updated.claimed_amount, amount);
+        assert_eq!(updated.beneficiary, s.beneficiary);
+        assert_eq!(updated.total_amount, s.total_amount);
+    }
+
+    #[test]
+    fn claim_nothing_when_fully_claimed_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (_, updated) = claim(&s, 100_000).unwrap();
+        // Already fully claimed
+        let result = claim(&updated, 100_000);
+        assert_eq!(result, Err(VestingError::NothingToClaim));
+    }
+
+    #[test]
+    fn revoke_unvested_portion_calculation_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (beneficiary_gets, returned, _updated) = revoke(&s, 50_000).unwrap();
+        // At 50% vested: beneficiary gets 500, unvested = 500
+        // Penalty = 500 * 2000/10000 = 100
+        // Returned = 500 - 100 = 400
+        let expected_vested = THOUSAND_VIBE / 2;
+        let expected_unvested = THOUSAND_VIBE - expected_vested;
+        let expected_penalty = mul_div(expected_unvested, EARLY_TERMINATION_PENALTY_BPS as u128, BPS);
+        let expected_returned = expected_unvested - expected_penalty;
+        assert_eq!(beneficiary_gets, expected_vested);
+        assert_eq!(returned, expected_returned);
+    }
+
+    #[test]
+    fn revoke_fully_vested_returns_zero_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (beneficiary_gets, returned, _updated) = revoke(&s, 100_000).unwrap();
+        assert_eq!(beneficiary_gets, THOUSAND_VIBE);
+        assert_eq!(returned, 0);
+    }
+
+    #[test]
+    fn accelerate_preserves_beneficiary_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let accel = accelerate(&s, 2500).unwrap();
+        assert_eq!(accel.beneficiary, beneficiary_a());
+        assert_eq!(accel.total_amount, THOUSAND_VIBE);
+    }
+
+    #[test]
+    fn accelerate_duration_decreases_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let accel = accelerate(&s, 2500).unwrap();
+        assert!(accel.duration_blocks < s.duration_blocks);
+        // 25% reduction: 100000 * 2500/10000 = 25000, new = 75000
+        assert_eq!(accel.duration_blocks, 75_000);
+    }
+
+    #[test]
+    fn extend_increases_duration_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let extended = extend(&s, 50_000).unwrap();
+        assert_eq!(extended.duration_blocks, 150_000);
+    }
+
+    #[test]
+    fn extend_to_exactly_max_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let additional = MAX_VESTING_DURATION - s.duration_blocks;
+        let extended = extend(&s, additional).unwrap();
+        assert_eq!(extended.duration_blocks, MAX_VESTING_DURATION);
+    }
+
+    #[test]
+    fn extend_one_over_max_fails_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let additional = MAX_VESTING_DURATION - s.duration_blocks + 1;
+        assert_eq!(extend(&s, additional), Err(VestingError::ExceedsMaxDuration));
+    }
+
+    #[test]
+    fn summarize_empty_schedules_v4() {
+        let summary = summarize(&[], 50_000);
+        assert_eq!(summary.total_allocated, 0);
+        assert_eq!(summary.total_vested, 0);
+        assert_eq!(summary.active_schedules, 0);
+        assert_eq!(summary.revoked_schedules, 0);
+        assert_eq!(summary.fully_vested_schedules, 0);
+    }
+
+    #[test]
+    fn summarize_counts_revoked_v4() {
+        let s1 = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (_, _, revoked) = revoke(&s1, 50_000).unwrap();
+        let summary = summarize(&[revoked], 60_000);
+        assert_eq!(summary.revoked_schedules, 1);
+        assert_eq!(summary.active_schedules, 0);
+    }
+
+    #[test]
+    fn next_unlock_graded_between_steps_v4() {
+        // 4 steps over 40000 blocks, cliff=0, step_size=10000
+        let s = create_graded(beneficiary_a(), TEN_VIBE, 0, 0, 40_000, 4, true).unwrap();
+        // At block 5000 (between step 0 and step 1), next unlock = 10000
+        assert_eq!(next_unlock_block(&s, 5_000), 10_000);
+        // At block 15000, next unlock = 20000
+        assert_eq!(next_unlock_block(&s, 15_000), 20_000);
+    }
+
+    #[test]
+    fn remaining_duration_at_start_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 100, 5_000, 100_000, true).unwrap();
+        assert_eq!(remaining_duration(&s, 100), 100_000);
+    }
+
+    #[test]
+    fn remaining_duration_before_start_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 100, 5_000, 100_000, true).unwrap();
+        assert_eq!(remaining_duration(&s, 50), 100_050);
+    }
+
+    #[test]
+    fn status_milestone_next_unlock_v4() {
+        let s = create_milestone(
+            beneficiary_a(),
+            TEN_VIBE,
+            0,
+            &[(1_000, 2_500), (2_000, 5_000), (3_000, 10_000)],
+            true,
+        ).unwrap();
+        let status = get_status(&s, 500);
+        assert_eq!(status.next_unlock_block, 1_000);
+        assert_eq!(status.blocks_until_next_unlock, 500);
+    }
+
+    #[test]
+    fn compute_claimable_after_partial_claim_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (_, updated) = claim(&s, 50_000).unwrap();
+        // At block 75000, vested = 75%, claimed = 50% → claimable = 25%
+        let claimable = compute_claimable(&updated, 75_000);
+        let expected = mul_div(THOUSAND_VIBE, 75_000, 100_000) - updated.claimed_amount;
+        assert_eq!(claimable, expected);
+    }
+
+    #[test]
+    fn revoke_then_claim_exactly_vested_v4() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 0, 100_000, true).unwrap();
+        let (_, _, revoked) = revoke(&s, 50_000).unwrap();
+        // After revocation at 50000, vested amount is frozen at 50%
+        let (claimed, _) = claim(&revoked, 100_000).unwrap();
+        assert_eq!(claimed, THOUSAND_VIBE / 2);
+    }
+
+    #[test]
+    fn linear_create_cliff_at_min_boundary_v4() {
+        // cliff = MIN_CLIFF_BLOCKS should succeed
+        let result = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, MIN_CLIFF_BLOCKS, 100_000, true);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn linear_create_cliff_just_below_min_v4() {
+        // cliff = MIN_CLIFF_BLOCKS - 1 should fail
+        let result = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, MIN_CLIFF_BLOCKS - 1, 100_000, true);
+        assert_eq!(result, Err(VestingError::BelowMinCliff));
+    }
+
+    #[test]
+    fn graded_vested_many_steps_exact_v4() {
+        // 100 steps, verifying vesting at step boundaries
+        let s = create_graded(beneficiary_a(), HUNDRED_VIBE, 0, 0, 100_000, 100, true).unwrap();
+        // Each step = 1000 blocks. At block 1000 = 1/100
+        assert_eq!(compute_vested(&s, 1_000), HUNDRED_VIBE / 100);
+        // At block 50000 = 50/100
+        assert_eq!(compute_vested(&s, 50_000), HUNDRED_VIBE / 2);
+    }
 }

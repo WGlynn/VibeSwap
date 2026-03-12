@@ -2153,4 +2153,269 @@ mod tests {
             assert_eq!(vw, gd.total_weight, "Mismatch at epoch {}", e);
         }
     }
+
+    // ============ Hardening Round 5 ============
+
+    #[test]
+    fn test_create_gauge_all_ff_pool_id_v5() {
+        let g = create_gauge([0xFF; 32], 999);
+        assert_eq!(g.pool_id, [0xFF; 32]);
+        assert_eq!(g.created_epoch, 999);
+        assert!(g.is_active);
+        assert_eq!(g.cumulative_emissions, 0);
+    }
+
+    #[test]
+    fn test_cast_vote_exactly_10000_bps_single_v5() {
+        let result = cast_vote(vid(1), ONE_VIBE * 50, &[(pid(1), 10_000)], 0);
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert_eq!(v.allocation_count, 1);
+        assert_eq!(v.allocations[0].weight_bps, 10_000);
+    }
+
+    #[test]
+    fn test_cast_vote_exactly_10001_bps_rejected_v5() {
+        let result = cast_vote(vid(1), ONE_VIBE * 50, &[(pid(1), 10_001)], 0);
+        assert_eq!(result, Err(GaugeError::SplitBpsExceed10000));
+    }
+
+    #[test]
+    fn test_apply_votes_empty_gauges_v5() {
+        let vote = cast_vote(vid(1), ONE_VIBE * 10, &[(pid(99), 10_000)], 0).unwrap();
+        let result = apply_votes(&[], &[vote]).unwrap();
+        // No gauges, so all zero
+        assert_eq!(result[0].total_weight, 0);
+    }
+
+    #[test]
+    fn test_finalize_epoch_three_equal_remainder_v5() {
+        // 3 gauges, 100 emission, each gets 33, remainder 1 to largest
+        let mut g1 = create_gauge(pid(1), 0);
+        let mut g2 = create_gauge(pid(2), 0);
+        let mut g3 = create_gauge(pid(3), 0);
+        g1.total_weight = 1000;
+        g2.total_weight = 1000;
+        g3.total_weight = 1000;
+
+        let result = finalize_epoch(&[g1, g2, g3], 100, 0).unwrap();
+        let mut total = 0u128;
+        for i in 0..result.gauge_count as usize {
+            total += result.gauge_emissions[i].emission_amount;
+        }
+        assert_eq!(total, 100); // Sum exactly matches total emission
+    }
+
+    #[test]
+    fn test_boost_one_percent_vp_v5() {
+        // 1% of total voting power
+        let info = compute_boost(ONE_VIBE, ONE_VIBE * 100, 5000, 1_000_000);
+        assert!(info.boosted_reward >= info.base_reward);
+        // 1% VP → small bonus above base
+        assert!(info.boost_multiplier_bps > BOOST_BASE_BPS);
+        assert!(info.boost_multiplier_bps < 5000);
+    }
+
+    #[test]
+    fn test_boost_large_base_reward_v5() {
+        let large_reward = u128::MAX / 2;
+        let info = compute_boost(ONE_VIBE * 50, ONE_VIBE * 100, 5000, large_reward);
+        assert!(info.boosted_reward >= info.base_reward);
+    }
+
+    #[test]
+    fn test_decay_single_epoch_exact_99_percent_v5() {
+        let mut g = create_gauge(pid(1), 0);
+        g.total_weight = 10_000;
+        let decayed = apply_decay(&g, 1);
+        // 10000 * 9900 / 10000 = 9900
+        assert_eq!(decayed.total_weight, 9900);
+    }
+
+    #[test]
+    fn test_decay_preserves_pool_id_v5() {
+        let mut g = create_gauge(pid(42), 5);
+        g.total_weight = 100_000;
+        g.cumulative_emissions = 999;
+        let decayed = apply_decay(&g, 10);
+        assert_eq!(decayed.pool_id, pid(42));
+        assert_eq!(decayed.cumulative_emissions, 999);
+        assert_eq!(decayed.created_epoch, 5);
+    }
+
+    #[test]
+    fn test_estimate_apr_large_tvl_small_emission_v5() {
+        let apr = estimate_apr(1, PRECISION * 1_000_000_000, PRECISION, 100);
+        assert_eq!(apr, 0); // Negligible emission relative to huge TVL
+    }
+
+    #[test]
+    fn test_vote_weight_at_epoch_max_u64_epoch_v5() {
+        let vote = cast_vote(vid(1), ONE_VIBE * 100, &[(pid(1), 10_000)], 0).unwrap();
+        // After many epochs of 1% decay, weight should be very small
+        let w = vote_weight_at_epoch(&vote, 1000);
+        // 100 * 0.99^1000 is extremely small but with fixed-point it may not be exactly 0
+        assert!(w < ONE_VIBE, "Weight should be nearly zero after 1000 epochs: {}", w);
+    }
+
+    #[test]
+    fn test_relative_weight_all_equal_three_gauges_v5() {
+        let mut g1 = create_gauge(pid(1), 0);
+        let mut g2 = create_gauge(pid(2), 0);
+        let mut g3 = create_gauge(pid(3), 0);
+        g1.total_weight = 1000;
+        g2.total_weight = 1000;
+        g3.total_weight = 1000;
+        let rw = relative_weight(&g1, 3000);
+        assert_eq!(rw, 3333); // 1000/3000 * 10000 = 3333
+    }
+
+    #[test]
+    fn test_top_gauges_preserves_weight_values_v5() {
+        let mut g1 = create_gauge(pid(1), 0);
+        let mut g2 = create_gauge(pid(2), 0);
+        g1.total_weight = 999;
+        g2.total_weight = 1001;
+        let top = top_gauges(&[g1, g2], 2);
+        assert_eq!(top[0].1, 1001);
+        assert_eq!(top[1].1, 999);
+    }
+
+    #[test]
+    fn test_kill_gauge_then_revive_at_later_epoch_v5() {
+        let g = create_gauge(pid(1), 0);
+        let killed = kill_gauge(&g).unwrap();
+        assert!(!killed.is_active);
+        let revived = revive_gauge(&killed, 50).unwrap();
+        assert!(revived.is_active);
+        assert_eq!(revived.last_emission_epoch, 50);
+    }
+
+    #[test]
+    fn test_apply_votes_large_power_split_ten_ways_v5() {
+        let mut allocs = Vec::new();
+        for i in 1..=10u8 {
+            allocs.push((pid(i), 1_000u16)); // 10 x 10% = 100%
+        }
+        let vote = cast_vote(vid(1), ONE_VIBE * 1000, &allocs, 0).unwrap();
+        assert_eq!(vote.allocation_count, 10);
+
+        // Create 10 gauges
+        let gauges: Vec<Gauge> = (1..=10u8).map(|i| create_gauge(pid(i), 0)).collect();
+        let result = apply_votes(&gauges, &[vote]).unwrap();
+
+        for i in 0..10 {
+            // Each gauge should get 10% of 1000 VIBE
+            assert_eq!(result[i].total_weight, mul_div(ONE_VIBE * 1000, 1_000, 10_000));
+        }
+    }
+
+    #[test]
+    fn test_finalize_epoch_single_active_among_killed_v5() {
+        let mut g1 = create_gauge(pid(1), 0);
+        let mut g2 = create_gauge(pid(2), 0);
+        let mut g3 = create_gauge(pid(3), 0);
+        g1.is_active = false;
+        g2.total_weight = 500;
+        g3.is_active = false;
+
+        let result = finalize_epoch(&[g1, g2, g3], 1000, 0).unwrap();
+        assert_eq!(result.gauge_count, 1);
+        assert_eq!(result.gauge_emissions[0].emission_amount, 1000);
+    }
+
+    #[test]
+    fn test_cast_vote_preserves_allocation_order_v5() {
+        let allocs = vec![(pid(3), 3000), (pid(1), 2000), (pid(7), 5000)];
+        let vote = cast_vote(vid(1), ONE_VIBE * 10, &allocs, 0).unwrap();
+        assert_eq!(vote.allocations[0].pool_id, pid(3));
+        assert_eq!(vote.allocations[1].pool_id, pid(1));
+        assert_eq!(vote.allocations[2].pool_id, pid(7));
+    }
+
+    #[test]
+    fn test_estimate_apr_overflow_safe_v5() {
+        // Very large values should not panic
+        let apr = estimate_apr(u128::MAX / 2, PRECISION, PRECISION, 1);
+        assert!(apr > 0);
+    }
+
+    #[test]
+    fn test_apply_votes_voter_count_increments_per_allocation_v5() {
+        let g = create_gauge(pid(1), 0);
+        let v1 = cast_vote(vid(1), ONE_VIBE * 10, &[(pid(1), 5000)], 0).unwrap();
+        let v2 = cast_vote(vid(2), ONE_VIBE * 10, &[(pid(1), 5000)], 0).unwrap();
+        let result = apply_votes(&[g], &[v1, v2]).unwrap();
+        assert_eq!(result[0].voter_count, 2);
+    }
+
+    #[test]
+    fn test_finalize_epoch_weight_bps_sum_near_10000_v5() {
+        let mut g1 = create_gauge(pid(1), 0);
+        let mut g2 = create_gauge(pid(2), 0);
+        g1.total_weight = 7000;
+        g2.total_weight = 3000;
+
+        let result = finalize_epoch(&[g1, g2], 10_000, 0).unwrap();
+        let bps_sum: u16 = (0..result.gauge_count as usize)
+            .map(|i| result.gauge_emissions[i].weight_bps)
+            .sum();
+        // BPS sum should be 10000 (or close due to rounding)
+        assert!(bps_sum >= 9999 && bps_sum <= 10000);
+    }
+
+    #[test]
+    fn test_boost_zero_user_nonzero_total_v5() {
+        let info = compute_boost(0, ONE_VIBE * 100, 5000, 1_000_000);
+        assert_eq!(info.boosted_reward, info.base_reward);
+        assert_eq!(info.boost_multiplier_bps, BOOST_BASE_BPS);
+    }
+
+    #[test]
+    fn test_decay_500_epochs_significantly_reduced_v5() {
+        let mut g = create_gauge(pid(1), 0);
+        let original = ONE_VIBE * 1_000_000;
+        g.total_weight = original;
+        let decayed = apply_decay(&g, 500);
+        // 500 epochs of 1% decay should reduce by >99%
+        assert!(decayed.total_weight < original / 100,
+            "Should be <1% of original: {} vs {}", decayed.total_weight, original);
+    }
+
+    #[test]
+    fn test_relative_weight_99_vs_1_v5() {
+        let mut big = create_gauge(pid(1), 0);
+        let mut small = create_gauge(pid(2), 0);
+        big.total_weight = 99_000;
+        small.total_weight = 1_000;
+
+        let rw_big = relative_weight(&big, 100_000);
+        let rw_small = relative_weight(&small, 100_000);
+        assert_eq!(rw_big, 9900);
+        assert_eq!(rw_small, 100);
+    }
+
+    #[test]
+    fn test_gauge_error_variants_distinct_v5() {
+        let variants: Vec<GaugeError> = vec![
+            GaugeError::GaugeNotFound,
+            GaugeError::GaugeAlreadyExists,
+            GaugeError::MaxGaugesReached,
+            GaugeError::InsufficientVotingPower,
+            GaugeError::TooManySplits,
+            GaugeError::SplitBpsExceed10000,
+            GaugeError::ZeroWeight,
+            GaugeError::InvalidEpoch,
+            GaugeError::EpochNotFinalized,
+            GaugeError::AlreadyVoted,
+            GaugeError::GaugeKilled,
+            GaugeError::ZeroEmission,
+            GaugeError::Overflow,
+        ];
+        for i in 0..variants.len() {
+            for j in (i + 1)..variants.len() {
+                assert_ne!(variants[i], variants[j]);
+            }
+        }
+    }
 }

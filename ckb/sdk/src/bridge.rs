@@ -2164,4 +2164,275 @@ mod tests {
         assert_eq!(src.chain_id, 3);
         assert_eq!(dest.chain_id, 1);
     }
+
+    // ============ Hardening Round 5 ============
+
+    #[test]
+    fn test_message_hash_all_zeros_v5() {
+        let msg = CrossChainMessage {
+            source_chain: 0,
+            dest_chain: 0,
+            nonce: 0,
+            sender: [0u8; 32],
+            receiver: [0u8; 32],
+            payload: vec![],
+            timestamp: 0,
+        };
+        let h = message_hash(&msg);
+        assert_ne!(h, [0u8; 32]); // Hash of zeros is not zeros
+    }
+
+    #[test]
+    fn test_message_hash_all_ff_fields_v5() {
+        let msg = CrossChainMessage {
+            source_chain: u32::MAX,
+            dest_chain: u32::MAX,
+            nonce: u64::MAX,
+            sender: [0xFF; 32],
+            receiver: [0xFF; 32],
+            payload: vec![0xFF; 100],
+            timestamp: u64::MAX,
+        };
+        let h = message_hash(&msg);
+        assert_ne!(h, [0u8; 32]);
+        assert_ne!(h, [0xFF; 32]);
+    }
+
+    #[test]
+    fn test_verify_proof_empty_proof_hash_equals_root_v5() {
+        let hash = [0xAB; 32];
+        let proof = MessageProof {
+            message_hash: hash,
+            block_number: 100,
+            proof_data: vec![],
+            root: hash,
+        };
+        assert!(verify_proof(&proof).unwrap());
+    }
+
+    #[test]
+    fn test_verify_proof_empty_proof_hash_not_root_v5() {
+        let proof = MessageProof {
+            message_hash: [0xAB; 32],
+            block_number: 100,
+            proof_data: vec![],
+            root: [0xCD; 32],
+        };
+        assert!(!verify_proof(&proof).unwrap());
+    }
+
+    #[test]
+    fn test_estimate_fee_zero_payload_relay_fee_v5() {
+        let chains = default_chains();
+        let est = estimate_bridge_fee(&chains, 2, 0).unwrap();
+        assert_eq!(est.relay_fee, 1_000_000); // BASE_RELAY_FEE only
+        assert!(est.protocol_fee > 0);
+    }
+
+    #[test]
+    fn test_estimate_fee_100_byte_payload_v5() {
+        let chains = default_chains();
+        let est = estimate_bridge_fee(&chains, 2, 100).unwrap();
+        assert_eq!(est.relay_fee, 1_000_000 + 100 * 100); // BASE + 100 * PER_BYTE
+    }
+
+    #[test]
+    fn test_validate_transfer_amount_one_v5() {
+        let transfer = make_transfer(1, 2, 1, 0, 1000);
+        let result = validate_transfer(&transfer, 500, &supported_tokens());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_transfer_exactly_at_deadline_rejected_v5() {
+        let transfer = make_transfer(1, 2, 1000, 900, 500);
+        let result = validate_transfer(&transfer, 500, &supported_tokens());
+        assert!(matches!(result, Err(BridgeError::ExpiredMessage { .. })));
+    }
+
+    #[test]
+    fn test_validate_transfer_one_block_before_deadline_v5() {
+        let transfer = make_transfer(1, 2, 1000, 900, 501);
+        let result = validate_transfer(&transfer, 500, &supported_tokens());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_calculate_min_receive_no_deductions_v5() {
+        let min = calculate_min_receive(1_000_000, 0, 0);
+        assert_eq!(min, 1_000_000);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_100_bps_fee_v5() {
+        // 1% fee on 10000 → 9900
+        let min = calculate_min_receive(10_000, 100, 0);
+        assert_eq!(min, 9_900);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_100_bps_slippage_v5() {
+        // 1% slippage on 10000 → 9900
+        let min = calculate_min_receive(10_000, 0, 100);
+        assert_eq!(min, 9_900);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_fee_and_slippage_compound_v5() {
+        // 1% fee then 1% slippage on 10000 → 9900 * 9900/10000 = 9801
+        let min = calculate_min_receive(10_000, 100, 100);
+        assert_eq!(min, 9_801);
+    }
+
+    #[test]
+    fn test_next_nonce_three_sequential_v5() {
+        assert_eq!(next_nonce(&[0, 1, 2]), 3);
+    }
+
+    #[test]
+    fn test_next_nonce_out_of_order_v5() {
+        assert_eq!(next_nonce(&[5, 2, 9, 1]), 10);
+    }
+
+    #[test]
+    fn test_message_status_pending_confirmed_zero_v5() {
+        let status = message_status(0, 50, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Pending);
+    }
+
+    #[test]
+    fn test_message_status_confirmed_v5() {
+        // confirmed at block 100, current 105, finality 10 → still confirming
+        let status = message_status(100, 105, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Confirmed);
+    }
+
+    #[test]
+    fn test_message_status_relayed_v5() {
+        // confirmed at 100, current 110, finality 10 → relayed
+        let status = message_status(100, 110, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Relayed);
+    }
+
+    #[test]
+    fn test_message_status_completed_v5() {
+        let status = message_status(100, 200, 10, true, 1000);
+        assert_eq!(status, BridgeStatus::Completed);
+    }
+
+    #[test]
+    fn test_message_status_expired_v5() {
+        let status = message_status(0, 1001, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Expired);
+    }
+
+    #[test]
+    fn test_bridge_summary_empty_v5() {
+        let summary = bridge_summary(&[], &[], &[], 100);
+        assert_eq!(summary.total_bridged_in, 0);
+        assert_eq!(summary.total_bridged_out, 0);
+        assert_eq!(summary.pending_count, 0);
+        assert_eq!(summary.avg_relay_time, 0);
+    }
+
+    #[test]
+    fn test_bridge_summary_mixed_transfers_v5() {
+        let ins = vec![(1000u128, 10u64), (2000, 20)];
+        let outs = vec![(500u128, 5u64)];
+        let summary = bridge_summary(&ins, &outs, &[100, 200], 300);
+        assert_eq!(summary.total_bridged_in, 3000);
+        assert_eq!(summary.total_bridged_out, 500);
+        assert_eq!(summary.pending_count, 2);
+        // Avg relay: (10+20+5)/3 = 11
+        assert_eq!(summary.avg_relay_time, 11);
+    }
+
+    #[test]
+    fn test_find_cheapest_path_direct_v5() {
+        let chains = default_chains();
+        let path = find_cheapest_path(&chains, 1, 2).unwrap();
+        // Direct path unless intermediate is cheaper
+        assert!(path.len() >= 2);
+        assert_eq!(path[0], 1);
+        assert_eq!(*path.last().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_find_cheapest_path_same_chain_error_v5() {
+        let chains = default_chains();
+        let result = find_cheapest_path(&chains, 1, 1);
+        assert!(matches!(result, Err(BridgeError::SameChain { .. })));
+    }
+
+    #[test]
+    fn test_payload_roundtrip_typical_v5() {
+        let token = [0xAA; 32];
+        let receiver = [0xBB; 32];
+        let amount = 1_000_000_000_000_000_000u128;
+        let payload = encode_transfer_payload(&token, amount, &receiver);
+        assert_eq!(payload.len(), TRANSFER_PAYLOAD_SIZE);
+        let (t, a, r) = decode_transfer_payload(&payload).unwrap();
+        assert_eq!(t, token);
+        assert_eq!(a, amount);
+        assert_eq!(r, receiver);
+    }
+
+    #[test]
+    fn test_payload_roundtrip_max_amount_v5() {
+        let token = [0x11; 32];
+        let receiver = [0x22; 32];
+        let payload = encode_transfer_payload(&token, u128::MAX, &receiver);
+        let (_, a, _) = decode_transfer_payload(&payload).unwrap();
+        assert_eq!(a, u128::MAX);
+    }
+
+    #[test]
+    fn test_decode_payload_wrong_size_v5() {
+        assert!(decode_transfer_payload(&[0u8; 79]).is_err());
+        assert!(decode_transfer_payload(&[0u8; 81]).is_err());
+        assert!(decode_transfer_payload(&[]).is_err());
+    }
+
+    #[test]
+    fn test_is_message_expired_boundary_v5() {
+        assert!(!is_message_expired(100, 99));  // Not expired
+        assert!(!is_message_expired(100, 100)); // At deadline = not expired
+        assert!(is_message_expired(100, 101));  // Just past = expired
+    }
+
+    #[test]
+    fn test_validate_chain_pair_both_active_v5() {
+        let chains = default_chains();
+        let (src, dest) = validate_chain_pair(&chains, 1, 4).unwrap();
+        assert_eq!(src.chain_id, 1);
+        assert_eq!(dest.chain_id, 4);
+    }
+
+    #[test]
+    fn test_validate_chain_pair_inactive_chain_v5() {
+        let mut chains = default_chains();
+        chains[2].active = false; // BSC inactive
+        let result = validate_chain_pair(&chains, 3, 1);
+        assert!(matches!(result, Err(BridgeError::ChainInactive { chain_id: 3 })));
+    }
+
+    #[test]
+    fn test_bridge_error_variants_distinct_v5() {
+        // Ensure different error variants are not equal
+        let e1 = BridgeError::ZeroAmount;
+        let e2 = BridgeError::MalformedPayload;
+        assert_ne!(e1, e2);
+    }
+
+    #[test]
+    fn test_estimate_fee_protocol_fee_proportional_v5() {
+        let chains = vec![
+            make_chain(1, "CKB", 24, 10, true),
+            make_chain(2, "ETH", 64, 100, true),
+        ];
+        let est1 = estimate_bridge_fee(&chains, 1, 10).unwrap();
+        let est2 = estimate_bridge_fee(&chains, 2, 10).unwrap();
+        // Chain with 100bps fee should have 10x the protocol fee of 10bps
+        assert_eq!(est2.protocol_fee, est1.protocol_fee * 10);
+    }
 }

@@ -541,6 +541,7 @@ export function handleCRPCRequest(path, method) {
   if (path === '/crpc/compare-reveal' && method === 'POST') return 'compare_reveal';
   if (path === '/crpc/stats' && method === 'GET') return 'stats';
   if (path === '/crpc/demo' && (method === 'POST' || method === 'GET')) return 'demo';
+  if (path === '/crpc/protocol' && method === 'GET') return 'protocol';
   return null;
 }
 
@@ -558,9 +559,81 @@ export async function processCRPCBody(handler, body) {
       return getCRPCStats();
     case 'demo':
       return await runCRPCDemo(body?.prompt);
+    case 'protocol':
+      return getCRPCProtocolSpec();
     default:
       return { error: 'Unknown CRPC handler' };
   }
+}
+
+// ============ Protocol Specification ============
+
+function getCRPCProtocolSpec() {
+  return {
+    name: 'CRPC — Commit-Reveal Pairwise Comparison',
+    version: '1.0',
+    author: 'Tim Cotton (Scrypted)',
+    implementation: 'VibeSwap / JARVIS Mind Network',
+    description: 'Off-chain fuzzy consensus protocol for non-deterministic AI agent responses. Unlike blockchain consensus (binary agree/disagree), CRPC handles subjective quality evaluation through cryptographically committed pairwise comparison.',
+    keyInnovation: 'Commitment schemes prevent both copying (work phase) and collusion (compare phase). The protocol produces a quality-ranked consensus from inherently non-deterministic AI outputs.',
+    phases: [
+      {
+        phase: 1,
+        name: 'WORK COMMIT',
+        description: 'Each shard independently generates a response to the prompt. Publishes hash(response || secret) to all peers. The commitment prevents any shard from copying another\'s answer.',
+        cryptography: 'SHA-256 commitment: hash(JSON.stringify(response) + secret)',
+        timeout: `${PHASE_TIMEOUTS[0]}ms`,
+      },
+      {
+        phase: 2,
+        name: 'WORK REVEAL',
+        description: 'Shards reveal actual responses and secrets. Peers recompute hash and verify it matches the Phase 1 commitment. Invalid reveals incur reputation penalties.',
+        verification: 'recomputed_hash === committed_hash',
+        penalty: 'Reputation loss for hash mismatch (attempted response substitution)',
+      },
+      {
+        phase: 3,
+        name: 'COMPARE COMMIT',
+        description: 'Each shard acts as validator. For every pair of revealed responses, the validator evaluates which is better and commits hash(choice || secret). Choices: A_BETTER, B_BETTER, EQUIVALENT.',
+        cryptography: 'SHA-256 commitment per pair per validator',
+        pairsFormula: 'n*(n-1)/2 pairs for n participants',
+        timeout: `${PHASE_TIMEOUTS[2]}ms`,
+      },
+      {
+        phase: 4,
+        name: 'COMPARE REVEAL',
+        description: 'Validators reveal choices and secrets. Hash verification confirms no vote was changed after seeing other validators\' commitments. Majority determines each pair\'s winner.',
+        settlement: 'Pairwise wins tallied. Most wins = consensus output. Ties broken by reputation.',
+        reputationUpdate: 'Validators aligned with majority get reputation boost.',
+      },
+    ],
+    parameters: {
+      minParticipants: MIN_PARTICIPANTS,
+      totalTimeout: `${CRPC_TIMEOUT_MS}ms`,
+      phaseTimeouts: PHASE_TIMEOUTS.map((t, i) => `Phase ${i + 1}: ${t}ms`),
+      staleTaskTimeout: `${STALE_TASK_MS}ms`,
+    },
+    useCases: [
+      'Moderation decisions — should this user be warned?',
+      'Proactive engagement — should the AI speak up in a group chat?',
+      'Knowledge promotion — is a correction worth making a permanent skill?',
+      'Dispute resolution — two users disagree, which is right?',
+      'High-stakes responses — personal disclosure, vulnerability signals',
+    ],
+    endpoints: {
+      demo: { method: 'GET|POST', path: '/crpc/demo', description: 'Run a live 4-phase CRPC round with real LLM responses' },
+      stats: { method: 'GET', path: '/crpc/stats', description: 'Current CRPC statistics and reputation scores' },
+      protocol: { method: 'GET', path: '/crpc/protocol', description: 'This specification' },
+    },
+    differentiators: [
+      'Fuzzy consensus: EQUIVALENT is a valid outcome — not everything has a "winner"',
+      'Non-deterministic: designed for AI outputs that vary on every run',
+      'Reputation-weighted: shards build trust over time through consistent quality',
+      'Commit-reveal: cryptographic guarantees against copying and collusion',
+      'Off-chain: runs between AI shards, not on a blockchain — no gas costs',
+    ],
+    liveStats: getCRPCStats(),
+  };
 }
 
 // ============ Local CRPC — Production Chat Pipeline Integration ============

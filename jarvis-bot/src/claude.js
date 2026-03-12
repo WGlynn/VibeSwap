@@ -60,8 +60,10 @@ async function withChatLock(chatId, fn) {
 }
 
 // ============ Periodic Cleanup ============
-// Evict stale entries from lastResponses and chatLocks every 30 minutes
+// Evict stale entries from lastResponses, chatLocks, and conversations every 30 minutes.
+// Without this, memory grows linearly with unique chat count — a slow leak.
 const MAX_LAST_RESPONSES = 5000;
+const MAX_CONVERSATIONS = 500; // Cap total unique chats in memory
 setInterval(() => {
   const cutoff = Date.now() - 30 * 60 * 1000;
   for (const [chatId, entry] of lastResponses) {
@@ -77,10 +79,39 @@ setInterval(() => {
       removed++;
     }
   }
+  // Cap total conversations in memory — evict oldest (smallest chat IDs tend to be oldest)
+  if (conversations.size > MAX_CONVERSATIONS) {
+    const excess = conversations.size - MAX_CONVERSATIONS;
+    let removed = 0;
+    for (const key of conversations.keys()) {
+      if (removed >= excess) break;
+      conversations.delete(key);
+      removed++;
+    }
+    conversationsDirty = true;
+    console.log(`[claude] Evicted ${removed} stale conversations (${conversations.size} remaining)`);
+  }
 }, 30 * 60 * 1000);
 
 export function getLastResponse(chatId) {
   return lastResponses.get(chatId) || null;
+}
+
+// Trim conversation cache — used by memory monitor to reduce heap pressure
+export function trimConversationCache(maxPerChat = 20) {
+  let trimmed = 0;
+  for (const [chatId, messages] of conversations) {
+    if (messages.length > maxPerChat) {
+      const excess = messages.length - maxPerChat;
+      conversations.set(chatId, messages.slice(-maxPerChat));
+      trimmed += excess;
+    }
+  }
+  if (trimmed > 0) {
+    conversationsDirty = true;
+    console.log(`[claude] Trimmed ${trimmed} messages from conversation cache`);
+  }
+  return trimmed;
 }
 
 // ============ Tool Call Circuit Breaker ============

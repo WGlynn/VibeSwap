@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "cp -r src dist",
-    "start": "node dist/index.js",
-    "dev": "node --watch src/index.js",
+    "start": "node --expose-gc --max-old-space-size=450 dist/index.js",
+    "dev": "node --expose-gc --watch src/index.js",
     "test": "node --test test/mi-bandit.test.js test/shard-learnings.test.js test/mi-manifest.test.js test/mi-host.test.js test/mi-lifecycle.test.js"
   },
   "dependencies": {

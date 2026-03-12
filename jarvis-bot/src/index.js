@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
-import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats } from './claude.js';
+import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats, trimConversationCache } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
@@ -6219,9 +6219,18 @@ async function main() {
   // Tracks when the last update was received from Telegram. If no updates
   // arrive for 5 minutes (while the process is alive), the polling connection
   // is likely broken. Auto-restarts polling to recover.
+  //
+  // ARCHITECTURE NOTE: Telegraf v4's bot.stop()/bot.launch() cycle is fragile —
+  // it can leave internal state inconsistent and cause 409 Conflicts (Telegram
+  // rejects two simultaneous getUpdates sessions). Our strategy:
+  //   1. Try soft restart: deleteWebhook (clears stuck session) → re-launch
+  //   2. Verify restart worked: call getMe() to confirm API connectivity
+  //   3. If soft restart fails twice, hard restart: exit process, let Fly.io restart us
   let lastUpdateReceived = Date.now();
   const POLLING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   const POLLING_CHECK_INTERVAL = 60 * 1000; // Check every 60s
+  let pollingRestartAttempts = 0;
+  const MAX_POLLING_RESTART_ATTEMPTS = 2; // After 2 failed soft restarts, hard restart
 
   // Middleware to track update liveness — runs on EVERY incoming update
   bot.use((ctx, next) => {
@@ -6236,25 +6245,59 @@ async function main() {
   setInterval(async () => {
     const silentMs = Date.now() - lastUpdateReceived;
     if (silentMs > POLLING_TIMEOUT_MS) {
-      console.error(`[polling-monitor] No updates for ${Math.round(silentMs / 60000)}min — polling may be dead. Restarting...`);
+      pollingRestartAttempts++;
+      console.error(`[polling-monitor] No updates for ${Math.round(silentMs / 60000)}min — attempt ${pollingRestartAttempts}/${MAX_POLLING_RESTART_ATTEMPTS}`);
+
+      // If we've already tried soft restarts and they failed, hard restart
+      if (pollingRestartAttempts > MAX_POLLING_RESTART_ATTEMPTS) {
+        console.error('[polling-monitor] Soft restarts exhausted — hard restarting process');
+        try {
+          await bot.telegram.sendMessage(config.ownerUserId,
+            `[POLLING-MONITOR] Soft restart failed ${MAX_POLLING_RESTART_ATTEMPTS} times. Hard restarting process...`
+          );
+        } catch {}
+        await persistCrashEntry('polling_hard_restart', { message: `${pollingRestartAttempts} soft restart attempts failed` });
+        // Flush critical data before exit
+        try { await saveConversations(); } catch {}
+        try { await writeHeartbeat('polling_restart'); } catch {}
+        try { await releaseInstanceLock(); } catch {}
+        // Exit with code 1 — Fly.io restart policy will bring us back
+        process.exit(1);
+      }
+
       try {
         await bot.telegram.sendMessage(config.ownerUserId,
-          `[POLLING-MONITOR] No Telegram updates received for ${Math.round(silentMs / 60000)}min. Restarting polling...`
+          `[POLLING-MONITOR] No updates for ${Math.round(silentMs / 60000)}min. Soft restart attempt ${pollingRestartAttempts}...`
         );
       } catch {}
+
       try {
+        // Step 1: Stop existing polling
         bot.stop('polling_restart');
-        // Small delay to let Telegram release the getUpdates lock
-        await new Promise(r => setTimeout(r, 3000));
+        // Step 2: Wait for Telegram to release the getUpdates session
+        await new Promise(r => setTimeout(r, 5000));
+        // Step 3: Clear any stuck webhook/session — this is the key fix
+        // deleteWebhook with drop_pending_updates clears Telegram's server-side session lock
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        await new Promise(r => setTimeout(r, 2000));
+        // Step 4: Re-launch polling
         bot.launch({ dropPendingUpdates: true });
-        lastUpdateReceived = Date.now(); // Reset timer
-        console.log('[polling-monitor] Polling restarted successfully');
-        try {
-          await bot.telegram.sendMessage(config.ownerUserId, '[POLLING-MONITOR] Polling restarted successfully.');
-        } catch {}
+        // Step 5: Verify API connectivity
+        const me = await bot.telegram.getMe();
+        if (me?.id) {
+          lastUpdateReceived = Date.now(); // Reset timer
+          pollingRestartAttempts = 0; // Reset counter on success
+          console.log(`[polling-monitor] Polling restarted successfully (bot: @${me.username})`);
+          try {
+            await bot.telegram.sendMessage(config.ownerUserId, `[POLLING-MONITOR] Polling restarted ✓ (@${me.username})`);
+          } catch {}
+        } else {
+          throw new Error('getMe() returned no data after restart');
+        }
       } catch (restartErr) {
-        console.error('[polling-monitor] Failed to restart polling:', restartErr.message);
+        console.error('[polling-monitor] Soft restart failed:', restartErr.message);
         persistCrashEntry('polling_restart_failed', restartErr);
+        // Don't reset timer — let it try again on next interval
       }
     }
   }, POLLING_CHECK_INTERVAL);
@@ -6334,7 +6377,7 @@ async function main() {
         // Receives live transcript chunks from Fireflies.ai (or any transcription service)
         // and forwards Jarvis's response to the Telegram group/DM
         let body = '';
-        req.on('data', chunk => { body += chunk; });
+        req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
         req.on('end', async () => {
           try {
             const payload = JSON.parse(body);
@@ -6420,7 +6463,7 @@ async function main() {
 
       } else if (req.url === '/fireflies' && req.method === 'POST') {
         let body = '';
-        req.on('data', chunk => { body += chunk; });
+        req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
         req.on('end', async () => {
           try {
             // Verify HMAC signature if secret is configured
@@ -6799,7 +6842,7 @@ async function main() {
         // POST /api/message — Claude Code sends message/task to JARVIS
         } else if (path === '/api/message' && req.method === 'POST') {
           let body = '';
-          req.on('data', chunk => { body += chunk; });
+          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
           req.on('end', async () => {
             try {
               const payload = JSON.parse(body);
@@ -6851,7 +6894,7 @@ async function main() {
         // POST /api/outbox/ack — Claude Code acknowledges receipt
         } else if (path === '/api/outbox/ack' && req.method === 'POST') {
           let body = '';
-          req.on('data', chunk => { body += chunk; });
+          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
           req.on('end', async () => {
             try {
               const payload = JSON.parse(body);
@@ -6875,7 +6918,7 @@ async function main() {
         // POST /api/tg/send — Send a message to Telegram via JARVIS
         } else if (path === '/api/tg/send' && req.method === 'POST') {
           let body = '';
-          req.on('data', chunk => { body += chunk; });
+          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
           req.on('end', async () => {
             try {
               const payload = JSON.parse(body);
@@ -6916,7 +6959,7 @@ async function main() {
       // Allows any shard (including primary) to process messages forwarded from peers
       } else if (req.url === '/shard/process' && req.method === 'POST') {
         let body = '';
-        req.on('data', chunk => { body += chunk; });
+        req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
         req.on('end', async () => {
           try {
             const payload = JSON.parse(body);
@@ -6944,7 +6987,7 @@ async function main() {
           res.end(JSON.stringify({ error: 'Unknown router route' }));
         } else if (routerResult.parse) {
           let body = '';
-          req.on('data', chunk => { body += chunk; });
+          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
           req.on('end', () => {
             try {
               const payload = JSON.parse(body);
@@ -6996,7 +7039,7 @@ async function main() {
             res.end(JSON.stringify(getCRPCStats()));
           } else {
             let body = '';
-            req.on('data', chunk => { body += chunk; });
+            req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
             req.on('end', () => {
               try {
                 const payload = JSON.parse(body);
@@ -7026,7 +7069,7 @@ async function main() {
           res.end(JSON.stringify({ error: 'Unknown knowledge-chain route' }));
         } else if (kcHandler === 'epoch') {
           let body = '';
-          req.on('data', chunk => { body += chunk; });
+          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
           req.on('end', async () => {
             try {
               const payload = JSON.parse(body);
@@ -7224,8 +7267,60 @@ async function main() {
   // Heartbeat: update every 5 minutes to prove we're alive
   setInterval(() => writeHeartbeat('running'), 5 * 60 * 1000);
 
-  // Status pulse DM to owner — every 3 minutes
-  const STATUS_PULSE_INTERVAL = 3 * 60 * 1000; // 3 min
+  // ============ Memory Health Monitor ============
+  // Fly.io gives us 512MB. If we approach that, we'll get OOM-killed with no warning.
+  // Monitor heap usage and take progressive action:
+  //   - 70% (358MB): Log warning, hint GC
+  //   - 80% (410MB): Alert Will, force GC if available, trim caches
+  //   - 90% (461MB): Save state and restart process cleanly (better than OOM kill)
+  const MEM_CHECK_INTERVAL = 2 * 60 * 1000; // Every 2 min
+  const MEM_LIMIT_MB = 512;
+  let lastMemAlert = 0;
+  setInterval(async () => {
+    const mem = process.memoryUsage();
+    const rssMB = Math.round(mem.rss / 1024 / 1024);
+    const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
+    const pct = Math.round(rssMB / MEM_LIMIT_MB * 100);
+
+    if (pct >= 90) {
+      // CRITICAL — save state and restart before OOM
+      console.error(`[mem-monitor] CRITICAL: ${rssMB}MB / ${MEM_LIMIT_MB}MB (${pct}%) — restarting to avoid OOM`);
+      try {
+        await bot.telegram.sendMessage(config.ownerUserId,
+          `[MEM-MONITOR] CRITICAL: ${rssMB}MB (${pct}%). Restarting to avoid OOM kill.`
+        );
+      } catch {}
+      await persistCrashEntry('mem_restart', { message: `RSS ${rssMB}MB (${pct}%)`, heap: heapMB });
+      try { await saveConversations(); } catch {}
+      try { await writeHeartbeat('mem_restart'); } catch {}
+      try { await releaseInstanceLock(); } catch {}
+      process.exit(1); // Fly.io will restart us
+    } else if (pct >= 80) {
+      // WARNING — trim caches, alert (max once per 10min)
+      if (Date.now() - lastMemAlert > 10 * 60 * 1000) {
+        console.warn(`[mem-monitor] WARNING: ${rssMB}MB / ${MEM_LIMIT_MB}MB (${pct}%)`);
+        try {
+          await bot.telegram.sendMessage(config.ownerUserId,
+            `[MEM-MONITOR] Warning: ${rssMB}MB (${pct}%). Trimming caches...`
+          );
+        } catch {}
+        lastMemAlert = Date.now();
+      }
+      // Trim conversation cache — keep only last 20 per chat instead of unlimited
+      trimConversationCache(20);
+      // Hint GC if exposed
+      if (global.gc) global.gc();
+    } else if (pct >= 70) {
+      // Hint GC proactively
+      if (global.gc) global.gc();
+    }
+  }, MEM_CHECK_INTERVAL);
+
+  // ============ Status Pulse — Smart Frequency ============
+  // Instead of spamming every 3min (480 DMs/day), pulse every 30min normally.
+  // BUT: immediately notify on state changes (degradation, memory warnings, recovery).
+  const STATUS_PULSE_INTERVAL = 30 * 60 * 1000; // 30 min (was 3 min)
+  let lastPulseState = { degraded: false, memWarning: false, pollingOk: true };
   setInterval(async () => {
     try {
       const uptime = process.uptime();
@@ -7234,17 +7329,41 @@ async function main() {
         : `${Math.floor(uptime / 60)}m`;
       const mem = process.memoryUsage();
       const memMB = Math.round(mem.rss / 1024 / 1024);
+      const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
       const provider = getProviderName();
       const model = getModelName();
       const degradation = checkDegradation();
       const shardInfo = getShardInfo();
 
-      const parts = [`JARVIS pulse | up ${uptimeStr} | ${memMB}MB | ${provider}/${model}`];
+      // Memory warning threshold — 80% of 512MB limit
+      const MEM_WARN_MB = 410;
+      const memWarning = memMB > MEM_WARN_MB;
+
+      // Detect state changes for immediate notification
+      const currentState = {
+        degraded: !!degradation?.degraded,
+        memWarning,
+        pollingOk: pollingRestartAttempts === 0,
+      };
+      const stateChanged = (
+        currentState.degraded !== lastPulseState.degraded ||
+        currentState.memWarning !== lastPulseState.memWarning ||
+        currentState.pollingOk !== lastPulseState.pollingOk
+      );
+      lastPulseState = currentState;
+
+      const parts = [`JARVIS | up ${uptimeStr} | ${memMB}MB (heap ${heapMB}MB) | ${provider}/${model}`];
       if (degradation?.degraded) {
-        parts.push(`DEGRADED: running on ${degradation.provider} (${degradation.quality}% quality)`);
+        parts.push(`DEGRADED: ${degradation.provider} (${degradation.quality}% quality)`);
+      }
+      if (memWarning) {
+        parts.push(`MEM WARNING: ${memMB}MB / 512MB (${Math.round(memMB / 512 * 100)}%)`);
       }
       if (shardInfo?.peers?.length > 0) {
         parts.push(`peers: ${shardInfo.peers.length}`);
+      }
+      if (stateChanged) {
+        parts.unshift('[STATE CHANGE]');
       }
       await bot.telegram.sendMessage(config.ownerUserId, parts.join('\n'));
     } catch {}

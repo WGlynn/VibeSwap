@@ -119,4 +119,6 @@ echo ""
 echo "============ STARTING JARVIS ============"
 
 # ============ Start Jarvis ============
-exec node /app/src/index.js
+# --expose-gc: allows memory monitor to trigger garbage collection proactively
+# --max-old-space-size=450: sets V8 heap limit below container limit (512MB) to leave room for system
+exec node --expose-gc --max-old-space-size=450 /app/src/index.js

@@ -46,6 +46,7 @@ pub mod token;
 pub mod treasury;
 pub mod upgrade;
 pub mod vesting;
+pub mod whitelist;
 
 use vibeswap_types::*;
 use vibeswap_math::PRECISION;

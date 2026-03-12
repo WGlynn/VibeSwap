@@ -36,6 +36,10 @@ const APPS = [
   { id: 'launchpad',  icon: '🚀', name: 'Launchpad',            tagline: 'Fair-launch token sales with batch auctions',       category: 'DeFi',       route: '/launch',     status: 'coming_soon', rating: 0, installs: '0',   featured: false },
   { id: 'arcade',     icon: '🎮', name: 'VibeArcade',           tagline: 'On-chain mini-games with fair Shapley rewards',     category: 'Games',      route: '/arcade',     status: 'coming_soon', rating: 0, installs: '0',   featured: false },
   { id: 'treasury',   icon: '🏛️', name: 'Treasury',             tagline: 'DAO treasury dashboard and allocations',           category: 'Governance', route: '/treasury',   status: 'coming_soon', rating: 0, installs: '0',   featured: false },
+  { id: 'perps',      icon: '📈', name: 'Perpetuals',           tagline: 'Trade perps with up to 20x leverage',              category: 'DeFi',       route: '/perps',      status: 'new',       rating: 4.4, installs: '29K',  featured: false },
+  { id: 'vibeforum',  icon: '🗨️', name: 'VibeForum',            tagline: 'Community discussions and governance debates',     category: 'Social',     route: '/forum',      status: 'installed', rating: 4.5, installs: '62K',  featured: false },
+  { id: 'mindmesh',   icon: '🌐', name: 'Mind Mesh',             tagline: 'Network topology visualizer',                      category: 'Tools',      route: '/mesh',       status: 'installed', rating: 4.2, installs: '22K',  featured: false },
+  { id: 'vibeplayer', icon: '🎵', name: 'VibePlayer',            tagline: 'Community playlist — vibe while you trade',        category: 'Tools',      route: null,          status: 'builtin',   rating: 4.7, installs: '89K',  featured: false },
 ]
 
 const CATEGORIES = ['All', 'DeFi', 'Social', 'Tools', 'Games', 'AI', 'Governance']
@@ -398,9 +402,18 @@ export default function AppStore() {
   const comingSoonCount = APPS.filter(a => a.status === 'coming_soon').length
 
   // ============ Render ============
+
   return (
     <div className="min-h-screen pb-16">
-      <PageHero title="App Store" subtitle="VSOS — The VibeSwap Operating System" category="ecosystem" badge={isConnected ? 'Connected' : undefined} badgeColor={CYAN}>
+
+      {/* ============ Page Hero ============ */}
+      <PageHero
+        title="App Store"
+        subtitle="VSOS — The VibeSwap Operating System"
+        category="ecosystem"
+        badge={isConnected ? 'Connected' : undefined}
+        badgeColor={CYAN}
+      >
         <div className="flex items-center gap-3 text-xs text-gray-500 font-mono">
           <span>{totalApps} apps</span>
           <span className="text-black-700">|</span>
@@ -410,40 +423,70 @@ export default function AppStore() {
         </div>
       </PageHero>
 
+      {/* ============ Featured App Hero ============ */}
       <FeaturedHero app={featuredApp} onOpen={handleOpen} />
 
-      {/* Search Bar */}
+      {/* ============ Search Bar with Live Filter ============ */}
       <Section className="mb-6">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="max-w-lg mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="max-w-lg mx-auto"
+        >
           <div className="relative">
             <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input type="text" placeholder="Search VSOS apps..." value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 bg-black-800/60 border border-black-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-600/50 focus:ring-1 focus:ring-cyan-600/20 transition-colors font-mono text-sm" />
+            <input
+              type="text"
+              placeholder="Search VSOS apps..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-11 pr-10 py-3 bg-black-800/60 border border-black-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-600/50 focus:ring-1 focus:ring-cyan-600/20 transition-colors font-mono text-sm"
+            />
             {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-black-700 flex items-center justify-center text-gray-400 hover:text-white">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-black-700 flex items-center justify-center text-gray-400 hover:text-white"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             )}
           </div>
         </motion.div>
       </Section>
 
-      {/* Category Tabs */}
+      {/* ============ Category Tabs ============ */}
       <Section className="mb-8">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex items-center justify-center gap-2 flex-wrap">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex items-center justify-center gap-2 flex-wrap"
+        >
           {CATEGORIES.map((cat) => (
-            <motion.button key={cat} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeCategory === cat ? 'text-black font-bold' : 'bg-black-800/60 text-gray-400 border border-black-700 hover:border-cyan-600/30 hover:text-white'}`}
-              style={activeCategory === cat ? { backgroundColor: CYAN } : {}}>
+            <motion.button
+              key={cat}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeCategory === cat
+                  ? 'text-black font-bold'
+                  : 'bg-black-800/60 text-gray-400 border border-black-700 hover:border-cyan-600/30 hover:text-white'
+              }`}
+              style={activeCategory === cat ? { backgroundColor: CYAN } : {}}
+            >
               {cat}
             </motion.button>
           ))}
         </motion.div>
       </Section>
 
-      {/* Curated Rows */}
+      {/* ============ Curated Rows (Most Popular / Trending / New) ============ */}
       {activeCategory === 'All' && !search && (
         <>
           <AppRow title="Most Popular" apps={popularApps} onOpen={handleOpen} onDetail={handleDetail} />
@@ -452,39 +495,78 @@ export default function AppStore() {
         </>
       )}
 
-      {/* Main App Grid */}
+      {/* ============ Main App Grid ============ */}
       <Section className="mb-10">
         <h2 className="text-lg font-display font-bold text-white mb-4">
-          {activeCategory === 'All' && !search ? 'All Apps' : search ? `Results for "${search}"` : activeCategory}
+          {activeCategory === 'All' && !search
+            ? 'All Apps'
+            : search
+              ? `Results for "${search}"`
+              : activeCategory}
         </h2>
-        <motion.div variants={stagger.container} initial="hidden" animate="visible" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+
+        <motion.div
+          variants={stagger.container}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+        >
           <AnimatePresence mode="popLayout">
-            {filteredApps.map((app) => <AppCard key={app.id} app={app} onOpen={handleOpen} />)}
+            {filteredApps.map((app) => (
+              <AppCard key={app.id} app={app} onOpen={handleOpen} />
+            ))}
           </AnimatePresence>
         </motion.div>
+
+        {/* Empty State */}
         {filteredApps.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-16"
+          >
             <div className="text-4xl mb-3 opacity-30">&#x1F50D;</div>
             <p className="text-gray-500 text-lg">No apps match your search.</p>
-            <button onClick={() => { setSearch(''); setActiveCategory('All') }} className="mt-3 text-sm underline hover:text-cyan-300" style={{ color: CYAN }}>Clear filters</button>
+            <button
+              onClick={() => { setSearch(''); setActiveCategory('All') }}
+              className="mt-3 text-sm underline hover:text-cyan-300"
+              style={{ color: CYAN }}
+            >
+              Clear filters
+            </button>
           </motion.div>
         )}
       </Section>
 
+      {/* ============ Submit Your App ============ */}
       <SubmitAppSection />
+
+      {/* ============ Developer SDK Promotion ============ */}
       <SDKSection />
 
-      {/* Footer Stats */}
+      {/* ============ Footer Stats ============ */}
       <Section>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-center text-gray-600 text-xs font-mono py-4 border-t border-black-700/30">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center text-gray-600 text-xs font-mono py-4 border-t border-black-700/30"
+        >
           {totalApps} apps &middot; {installedCount} installed &middot; {newCount} new &middot; {comingSoonCount} coming soon &middot; Shapley Value Compliant
         </motion.div>
       </Section>
 
-      {/* Detail Modal */}
+      {/* ============ App Detail Modal ============ */}
       <AnimatePresence>
-        {detailApp && <AppDetailModal app={detailApp} onClose={() => setDetailApp(null)} onOpen={handleOpen} />}
+        {detailApp && (
+          <AppDetailModal
+            app={detailApp}
+            onClose={() => setDetailApp(null)}
+            onOpen={handleOpen}
+          />
+        )}
       </AnimatePresence>
+
     </div>
   )
 }

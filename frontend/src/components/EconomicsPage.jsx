@@ -1,412 +1,591 @@
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useMemo } from 'react'
+import { motion } from 'framer-motion'
+import GlassCard from './ui/GlassCard'
+import PageHero from './ui/PageHero'
+import StatCard from './ui/StatCard'
+import Sparkline, { generateSparklineData } from './ui/Sparkline'
 
-// ============ The Economics ============
-// Interactive educational page visualizing the economic theses underpinning VibeSwap.
-// Each section is a collapsible card with motion animation and golden ratio stagger.
+// ============ Economics Page ============
+// Comprehensive education page for VibeSwap's "Cooperative Capitalism" model.
+// Sections: Two Forces, Fee Flow, Treasury, Cooperative/Competitive mechanisms,
+// Economic Simulation, and Key Papers.
 
 const PHI = 1.618033988749895
 
-const SECTIONS = [
-  {
-    id: 'pow-pos',
-    tag: 'Cost Equivalence',
-    title: 'The Cost Equivalence Theorem',
-    border: 'border-amber-500/50',
-    bg: 'bg-amber-500/10',
-    accent: 'text-amber-400',
-    content: (
-      <>
-        <p className="text-sm font-mono text-black-400 mb-4">
-          Gans & Gandal (NBER 2019): PoW and PoS have identical economic costs.
-          The form of the cost changes, but the magnitude does not.
-        </p>
+// Seeded PRNG — deterministic across renders
+function seededRandom(seed) {
+  let s = seed
+  return () => {
+    s = (s * 16807 + 0) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
 
-        <div className="bg-black-900/50 rounded-lg p-4 mb-4 border border-amber-500/20">
-          <p className="text-[10px] font-mono text-black-500 uppercase mb-2">Free Entry Condition</p>
-          <p className="text-base font-mono text-white text-center tracking-wider">
-            N<sub>c</sub> = eP
-          </p>
-          <p className="text-[10px] font-mono text-black-500 text-center mt-1">
-            Number of competitors = effort x Price of block reward
-          </p>
+// ============ Section Header ============
+function SectionHeader({ tag, title, delay = 0 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ delay, duration: 1 / PHI, ease: 'easeOut' }}
+      className="mb-4"
+    >
+      <span className="text-[10px] font-mono text-amber-400/70 uppercase tracking-wider">{tag}</span>
+      <h2 className="text-lg font-bold font-mono text-white tracking-wide">{title}</h2>
+    </motion.div>
+  )
+}
+
+// ============ Two Forces Balance SVG ============
+function TwoForcesSection() {
+  const cooperative = [
+    { label: 'Insurance Pools', desc: 'Mutualized IL protection' },
+    { label: 'Treasury Stabilization', desc: 'Counter-cyclical reserves' },
+    { label: 'Shapley Distribution', desc: 'Fair reward allocation' },
+  ]
+  const competitive = [
+    { label: 'Priority Auctions', desc: 'Pay for execution order' },
+    { label: 'Arbitrage', desc: 'Cross-chain price alignment' },
+    { label: 'Market Making', desc: 'LP competition for fees' },
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 1 / PHI, ease: 'easeOut' }}
+    >
+      <GlassCard glowColor="warning" className="p-5">
+        {/* Balance SVG */}
+        <div className="flex justify-center mb-5">
+          <svg width="220" height="120" viewBox="0 0 220 120" className="opacity-90">
+            {/* Fulcrum triangle */}
+            <polygon points="110,100 95,118 125,118" fill="none" stroke="rgba(245,158,11,0.5)" strokeWidth="1.5" />
+            {/* Beam */}
+            <line x1="20" y1="52" x2="200" y2="52" stroke="rgba(245,158,11,0.4)" strokeWidth="2" />
+            {/* Fulcrum line */}
+            <line x1="110" y1="52" x2="110" y2="100" stroke="rgba(245,158,11,0.4)" strokeWidth="1.5" />
+            {/* Left pan (cooperative) */}
+            <path d="M 20,52 Q 20,70 55,70 L 55,70 Q 20,70 20,52" fill="none" stroke="rgba(34,197,94,0.4)" strokeWidth="1" />
+            <rect x="15" y="52" width="80" height="2" rx="1" fill="rgba(34,197,94,0.25)" />
+            <circle cx="55" cy="40" r="16" fill="none" stroke="rgba(34,197,94,0.3)" strokeWidth="1" strokeDasharray="3,3" />
+            <text x="55" y="44" textAnchor="middle" fill="rgba(34,197,94,0.8)" fontSize="10" fontFamily="monospace">CO</text>
+            {/* Right pan (competitive) */}
+            <rect x="125" y="52" width="80" height="2" rx="1" fill="rgba(59,130,246,0.25)" />
+            <circle cx="165" cy="40" r="16" fill="none" stroke="rgba(59,130,246,0.3)" strokeWidth="1" strokeDasharray="3,3" />
+            <text x="165" y="44" textAnchor="middle" fill="rgba(59,130,246,0.8)" fontSize="10" fontFamily="monospace">CM</text>
+            {/* Center equilibrium marker */}
+            <circle cx="110" cy="52" r="4" fill="rgba(245,158,11,0.6)" />
+            <text x="110" y="26" textAnchor="middle" fill="rgba(245,158,11,0.6)" fontSize="8" fontFamily="monospace">EQUILIBRIUM</text>
+          </svg>
         </div>
 
-        <div className="bg-black-900/50 rounded-lg p-4 mb-4 border border-amber-500/20">
-          <p className="text-[10px] font-mono text-black-500 uppercase mb-2">Incentive Compatibility</p>
-          <p className="text-base font-mono text-white text-center tracking-wider">
-            A<sub>t</sub>N<sub>c</sub> - teP &ge; V(e)
-          </p>
-          <p className="text-[10px] font-mono text-black-500 text-center mt-1">
-            Attack payoff minus cost must exceed honest validation value
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 border border-amber-500/30">
-          <p className="text-xs font-mono text-amber-400">
-            Key insight: PoS doesn't save resources — it converts energy cost to illiquidity cost.
-            The capital locked in staking has an opportunity cost exactly equal to the electricity
-            that would have been burned.
-          </p>
-        </div>
-      </>
-    ),
-  },
-  {
-    id: 'bitcoin-time',
-    tag: 'Temporal Consensus',
-    title: 'The Clock That Runs The World',
-    border: 'border-blue-500/50',
-    bg: 'bg-blue-500/10',
-    accent: 'text-blue-400',
-    content: (
-      <>
-        <p className="text-sm font-mono text-black-400 mb-4">
-          "The clock, not the steam-engine, is the key-machine of the modern industrial age." — Lewis Mumford
-        </p>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-black-900/50 rounded-lg p-3 border border-blue-500/20">
-            <p className="text-[10px] font-mono text-black-500 uppercase mb-2">Tokens</p>
-            <ul className="space-y-1">
-              <li className="text-xs font-mono text-blue-400">Physical</li>
-              <li className="text-xs font-mono text-blue-400">Trustless</li>
-              <li className="text-xs font-mono text-blue-400">Timeless</li>
-            </ul>
-          </div>
-          <div className="bg-black-900/50 rounded-lg p-3 border border-blue-500/20">
-            <p className="text-[10px] font-mono text-black-500 uppercase mb-2">Ledgers</p>
-            <ul className="space-y-1">
-              <li className="text-xs font-mono text-blue-400">Informational</li>
-              <li className="text-xs font-mono text-blue-400">Require trust</li>
-              <li className="text-xs font-mono text-blue-400">Require TIME</li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 mb-3 border border-blue-500/20">
-          <p className="text-xs font-mono text-white">
-            Double-spending is fundamentally a <span className="text-blue-400 font-bold">TIME</span> problem.
-            If you could establish a universal ordering of events without trust,
-            you could prevent double-spends without a bank.
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 border border-blue-500/30">
-          <p className="text-xs font-mono text-blue-400">
-            Causality + Unpredictability = Arrow of Time.
-            Bitcoin's PoW creates an irreversible thermodynamic arrow — each block is a tick
-            of a clock that can never be wound backwards.
-          </p>
-        </div>
-      </>
-    ),
-  },
-  {
-    id: 'tragedy-commons',
-    tag: 'Game Theory',
-    title: 'Self-Interest as Public Good',
-    border: 'border-matrix-500/50',
-    bg: 'bg-matrix-500/10',
-    accent: 'text-matrix-400',
-    content: (
-      <>
-        <p className="text-sm font-mono text-black-400 mb-4">
-          Hardin's tragedy: rational actors deplete shared resources.
-          Bitcoin's breakthrough: rational actors <span className="text-matrix-400">strengthen</span> the shared resource.
-        </p>
-
-        <div className="bg-black-900/50 rounded-lg p-4 mb-4 border border-matrix-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono text-black-500 uppercase">Hardin (1968)</span>
-            <span className="text-[10px] font-mono text-red-400">TRAGEDY</span>
-          </div>
-          <p className="text-xs font-mono text-black-400">
-            Each herder adds one more cow. The pasture is destroyed.
-            "Freedom in a commons brings ruin to all."
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-4 mb-4 border border-matrix-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono text-black-500 uppercase">Satoshi (2009)</span>
-            <span className="text-[10px] font-mono text-matrix-400">SOLUTION</span>
-          </div>
-          <p className="text-xs font-mono text-black-400">
-            Each miner acts in self-interest yet inherently serves the public good.
-            More miners = more security = stronger network for everyone.
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 mb-3 border border-matrix-500/20">
-          <p className="text-xs font-mono text-white">
-            "Mutual coercion, mutually agreed upon" — but Bitcoin achieves this
-            while <span className="text-matrix-400 font-bold">preserving freedom</span>.
-            No authority forces participation. The incentives do the work.
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 border border-matrix-500/30">
-          <p className="text-xs font-mono text-matrix-400">
-            CKB extension: state rent caps the commons. Store data on-chain? Pay rent.
-            This prevents state bloat — the tragedy of the commons for blockchains.
-          </p>
-        </div>
-      </>
-    ),
-  },
-  {
-    id: 'ledgers',
-    tag: 'Institutional Economics',
-    title: 'The Institution Machine',
-    border: 'border-purple-500/50',
-    bg: 'bg-purple-500/10',
-    accent: 'text-purple-400',
-    content: (
-      <>
-        <p className="text-sm font-mono text-black-400 mb-4">
-          Every institution is, at its core, a ledger. Blockchain replaces the ledger-keeper.
-        </p>
-
-        <div className="bg-black-900/50 rounded-lg p-4 mb-4 border border-purple-500/20">
-          <p className="text-[10px] font-mono text-black-500 uppercase mb-3">Evolution of the Ledger</p>
-          {[
-            { era: '3000 BC', tech: 'Clay tablets', note: 'Sumerian temple records' },
-            { era: '1494', tech: 'Double-entry', note: 'Pacioli — birth of capitalism' },
-            { era: '1600s', tech: 'Corporate ledgers', note: 'Joint-stock companies (VOC)' },
-            { era: '1970s', tech: 'Digital databases', note: 'Centralized but fast' },
-            { era: '2009', tech: 'Blockchain', note: 'Decentralized, trustless, permanent' },
-          ].map((step, i) => (
-            <div key={step.era} className="flex items-start mb-2 last:mb-0">
-              <span className="text-[10px] font-mono text-purple-400 w-16 shrink-0">{step.era}</span>
-              <span className="text-xs font-mono text-white flex-1">{step.tech}</span>
-              <span className="text-[10px] font-mono text-black-500 text-right">{step.note}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Cooperative column */}
+          <div>
+            <div className="text-[10px] font-mono text-green-400/70 uppercase tracking-wider mb-2">
+              Cooperative Forces
             </div>
-          ))}
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 mb-3 border border-purple-500/20">
-          <p className="text-xs font-mono text-white">
-            Williamson & Coase: firms exist because markets have transaction costs.
-            Smart contracts <span className="text-purple-400 font-bold">shrink firms</span> by
-            reducing those costs to near zero.
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 border border-purple-500/30">
-          <p className="text-xs font-mono text-purple-400">
-            Blockchain doesn't just disintermediate banks. It replaces the institutional
-            need for trusted third parties — the ledger-keeper becomes code.
-          </p>
-        </div>
-      </>
-    ),
-  },
-  {
-    id: 'price-discovery',
-    tag: 'Market Design',
-    title: 'The Killer App',
-    border: 'border-matrix-400/50',
-    bg: 'bg-matrix-400/10',
-    accent: 'text-matrix-400',
-    content: (
-      <>
-        <p className="text-sm font-mono text-black-400 mb-4">
-          Not payments. Not DeFi. Not NFTs. The killer app of blockchain
-          is <span className="text-matrix-400 font-bold">price discovery</span>.
-        </p>
-
-        <div className="bg-black-900/50 rounded-lg p-4 mb-4 border border-matrix-400/20">
-          <p className="text-[10px] font-mono text-black-500 uppercase mb-2">Why Price Discovery?</p>
-          <ul className="space-y-2">
-            <li className="text-xs font-mono text-white">
-              24/7 global markets with no closing bell
-            </li>
-            <li className="text-xs font-mono text-white">
-              Permissionless participation — anyone can be a market maker
-            </li>
-            <li className="text-xs font-mono text-white">
-              Transparent order books (or AMM curves) — no hidden dark pools
-            </li>
-            <li className="text-xs font-mono text-white">
-              Programmable settlement — no T+2 waiting period
-            </li>
-          </ul>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 mb-3 border border-matrix-400/20">
-          <p className="text-xs font-mono text-white">
-            Batch auctions are <span className="text-matrix-400 font-bold">pure price discovery</span>.
-            Instead of sequential trades that leak information to MEV bots,
-            all orders in a batch resolve at a single uniform clearing price.
-          </p>
-        </div>
-
-        <div className="bg-black-900/50 rounded-lg p-3 border border-matrix-400/30">
-          <p className="text-xs font-mono text-matrix-400">
-            RWA tokenization amplifies this: real estate, equities, commodities —
-            all discoverable on-chain, 24/7, by anyone. The price oracle becomes global.
-          </p>
-        </div>
-      </>
-    ),
-  },
-  {
-    id: 'vibeswap-position',
-    tag: 'Synthesis',
-    title: 'Where We Stand',
-    border: 'border-matrix-400/70',
-    bg: 'bg-gradient-to-br from-matrix-500/10 to-matrix-400/5',
-    accent: 'text-matrix-400',
-    content: (
-      <>
-        <p className="text-sm font-mono text-black-400 mb-4">
-          VibeSwap is built on these foundations. Every design decision traces back
-          to an economic thesis.
-        </p>
-
-        <div className="space-y-3 mb-4">
-          {[
-            {
-              thesis: 'PoW = PoS',
-              application: 'Commit-reveal batch auction = temporal MEV defense. The cost of attacking is time, not energy or stake.',
-            },
-            {
-              thesis: 'Bitcoin is Time',
-              application: '10-second batches create a local clock. Commit phase (8s) + reveal phase (2s) = one tick.',
-            },
-            {
-              thesis: 'Tragedy Solved',
-              application: 'Cooperative capitalism: mutualized risk (insurance pools, treasury stabilization) + free market competition (priority auctions).',
-            },
-            {
-              thesis: 'Ledgers Down',
-              application: 'Smart contracts replace the exchange as institution. No operator, no custody, no closing hours.',
-            },
-            {
-              thesis: 'Price Discovery',
-              application: 'Uniform clearing price across all orders in a batch. MEV-free by design, not by patch.',
-            },
-            {
-              thesis: 'Abstraction',
-              application: 'Omnichain via LayerZero. Commit on any chain, settle anywhere. The chain is invisible to the user.',
-            },
-          ].map((item, i) => (
-            <div key={item.thesis} className="bg-black-900/50 rounded-lg p-3 border border-matrix-500/20">
-              <p className="text-[10px] font-mono text-matrix-400 uppercase mb-1">{item.thesis}</p>
-              <p className="text-xs font-mono text-white">{item.application}</p>
+            <div className="space-y-2">
+              {cooperative.map((item) => (
+                <div key={item.label} className="bg-black/30 rounded-lg p-2.5 border border-green-500/15">
+                  <p className="text-xs font-mono text-green-400 font-bold">{item.label}</p>
+                  <p className="text-[10px] font-mono text-black-400 mt-0.5">{item.desc}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          {/* Competitive column */}
+          <div>
+            <div className="text-[10px] font-mono text-blue-400/70 uppercase tracking-wider mb-2">
+              Competitive Forces
+            </div>
+            <div className="space-y-2">
+              {competitive.map((item) => (
+                <div key={item.label} className="bg-black/30 rounded-lg p-2.5 border border-blue-500/15">
+                  <p className="text-xs font-mono text-blue-400 font-bold">{item.label}</p>
+                  <p className="text-[10px] font-mono text-black-400 mt-0.5">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="bg-black-900/50 rounded-lg p-3 border border-matrix-400/40">
-          <p className="text-xs font-mono text-matrix-400 text-center">
-            "Cooperative Capitalism" — where self-interest and public good converge by design.
+        <div className="mt-4 bg-black/30 rounded-lg p-3 border border-amber-500/20">
+          <p className="text-xs font-mono text-amber-400/80 text-center">
+            Neither force dominates. The system finds equilibrium through mechanism design —
+            self-interest and mutual aid reinforce each other by construction.
           </p>
         </div>
-      </>
+      </GlassCard>
+    </motion.div>
+  )
+}
+
+// ============ Fee Flow Sankey Diagram ============
+function FeeFlowSection() {
+  const [hoveredPath, setHoveredPath] = useState(null)
+
+  const paths = [
+    { id: 'lp', label: 'LP Rewards', pct: 70, color: '#22c55e', y: 25 },
+    { id: 'treasury', label: 'Treasury', pct: 20, color: '#f59e0b', y: 55 },
+    { id: 'burn', label: 'Buyback & Burn', pct: 10, color: '#ef4444', y: 82 },
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 1 / PHI, ease: 'easeOut' }}
+    >
+      <GlassCard glowColor="warning" className="p-5">
+        <div className="flex justify-center">
+          <svg width="360" height="110" viewBox="0 0 360 110" className="w-full max-w-[360px]">
+            {/* Source node */}
+            <rect x="5" y="20" width="70" height="70" rx="8" fill="rgba(245,158,11,0.12)" stroke="rgba(245,158,11,0.35)" strokeWidth="1" />
+            <text x="40" y="50" textAnchor="middle" fill="rgba(245,158,11,0.9)" fontSize="9" fontFamily="monospace">0.3%</text>
+            <text x="40" y="62" textAnchor="middle" fill="rgba(245,158,11,0.6)" fontSize="7" fontFamily="monospace">SWAP FEE</text>
+
+            {/* Flow paths */}
+            {paths.map((p) => {
+              const active = hoveredPath === p.id || hoveredPath === null
+              const opacity = active ? 1 : 0.2
+              const strokeW = hoveredPath === p.id ? 3 : 2
+              return (
+                <g key={p.id}
+                  onMouseEnter={() => setHoveredPath(p.id)}
+                  onMouseLeave={() => setHoveredPath(null)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {/* Curved path */}
+                  <path
+                    d={`M 75,55 C 140,55 160,${p.y} 230,${p.y}`}
+                    fill="none"
+                    stroke={p.color}
+                    strokeWidth={strokeW}
+                    strokeOpacity={opacity * 0.6}
+                    strokeLinecap="round"
+                  />
+                  {/* Arrow head */}
+                  <circle cx="230" cy={p.y} r="3" fill={p.color} fillOpacity={opacity * 0.8} />
+                  {/* Target label */}
+                  <rect x="240" y={p.y - 14} width="110" height="28" rx="6"
+                    fill={`${p.color}11`}
+                    stroke={p.color}
+                    strokeWidth="1"
+                    strokeOpacity={opacity * 0.4}
+                  />
+                  <text x="295" y={p.y - 1} textAnchor="middle" fill={p.color} fillOpacity={opacity} fontSize="8" fontFamily="monospace" fontWeight="bold">
+                    {p.label}
+                  </text>
+                  <text x="295" y={p.y + 9} textAnchor="middle" fill={p.color} fillOpacity={opacity * 0.7} fontSize="8" fontFamily="monospace">
+                    {p.pct}%
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+        </div>
+        <p className="text-[10px] font-mono text-black-500 text-center mt-3">
+          Hover each path to highlight. Every swap distributes value across the ecosystem.
+        </p>
+      </GlassCard>
+    </motion.div>
+  )
+}
+
+// ============ Cooperative Mechanism Cards ============
+const COOPERATIVE_MECHANISMS = [
+  {
+    title: 'Shapley Distribution',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(34,197,94,0.7)" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="9" strokeDasharray="4,3" />
+        <circle cx="12" cy="12" r="3" fill="rgba(34,197,94,0.3)" />
+        <line x1="12" y1="3" x2="12" y2="9" /><line x1="12" y1="15" x2="12" y2="21" />
+        <line x1="3" y1="12" x2="9" y2="12" /><line x1="15" y1="12" x2="21" y2="12" />
+      </svg>
     ),
+    desc: 'Game-theoretic fair reward allocation. Each participant receives exactly their marginal contribution to the coalition — no more, no less. Computed via on-chain Shapley value approximation.',
+  },
+  {
+    title: 'IL Protection',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(34,197,94,0.7)" strokeWidth="1.5">
+        <path d="M12 2 L4 7 L4 14 C4 18 8 22 12 22 C16 22 20 18 20 14 L20 7 Z" />
+        <polyline points="9,12 11,14 15,10" stroke="rgba(34,197,94,0.9)" strokeWidth="2" />
+      </svg>
+    ),
+    desc: 'Mutual insurance pool funded by a portion of swap fees. LPs who suffer impermanent loss beyond a threshold receive compensation. Risk is shared across all participants, not borne alone.',
+  },
+  {
+    title: 'Circuit Breakers',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(34,197,94,0.7)" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" />
+        <line x1="12" y1="12" x2="15" y2="15" strokeWidth="2" />
+        <path d="M4 4 L8 8" stroke="rgba(239,68,68,0.5)" strokeWidth="2" />
+      </svg>
+    ),
+    desc: 'Collective safety valves that halt trading when anomalies are detected. Volume spikes, price deviations, or withdrawal surges trigger automatic pauses — protecting all users from cascading failures.',
+  },
+  {
+    title: 'Oracle Network',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(34,197,94,0.7)" strokeWidth="1.5">
+        <circle cx="12" cy="6" r="3" /><circle cx="5" cy="18" r="3" /><circle cx="19" cy="18" r="3" />
+        <line x1="12" y1="9" x2="5" y2="15" /><line x1="12" y1="9" x2="19" y2="15" />
+        <line x1="8" y1="18" x2="16" y2="18" />
+      </svg>
+    ),
+    desc: 'Shared truth infrastructure. Kalman-filter price oracle aggregates multiple sources into a single reliable feed. All participants benefit from the same accurate pricing — a public good funded collectively.',
   },
 ]
 
-export default function EconomicsPage() {
-  const [expanded, setExpanded] = useState({})
+// ============ Competitive Mechanism Cards ============
+const COMPETITIVE_MECHANISMS = [
+  {
+    title: 'Priority Bids',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(59,130,246,0.7)" strokeWidth="1.5">
+        <path d="M13 2 L3 14 L10 14 L11 22 L21 10 L14 10 Z" fill="rgba(59,130,246,0.15)" />
+      </svg>
+    ),
+    desc: 'Within each batch, traders can bid for execution priority. Unlike MEV, this is transparent and fair — the premium goes to the protocol treasury, not to anonymous front-runners.',
+  },
+  {
+    title: 'Arbitrage',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(59,130,246,0.7)" strokeWidth="1.5">
+        <polyline points="4,18 8,12 12,16 16,8 20,6" strokeWidth="2" />
+        <circle cx="4" cy="18" r="2" fill="rgba(59,130,246,0.3)" />
+        <circle cx="20" cy="6" r="2" fill="rgba(59,130,246,0.3)" />
+      </svg>
+    ),
+    desc: 'Cross-chain price alignment via LayerZero. Arbitrageurs profit by equalizing prices across chains — their self-interest produces tighter spreads and more efficient markets for everyone.',
+  },
+  {
+    title: 'Market Making',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(59,130,246,0.7)" strokeWidth="1.5">
+        <rect x="3" y="14" width="4" height="7" rx="1" fill="rgba(59,130,246,0.2)" />
+        <rect x="10" y="8" width="4" height="13" rx="1" fill="rgba(59,130,246,0.25)" />
+        <rect x="17" y="3" width="4" height="18" rx="1" fill="rgba(59,130,246,0.3)" />
+      </svg>
+    ),
+    desc: 'LPs compete for swap fees by providing deeper liquidity. Better pricing attracts more volume, more volume generates more fees. A virtuous cycle driven by competition, benefiting traders.',
+  },
+  {
+    title: 'Governance',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(59,130,246,0.7)" strokeWidth="1.5">
+        <path d="M12 2 L2 8 L2 10 L22 10 L22 8 Z" fill="rgba(59,130,246,0.15)" />
+        <line x1="5" y1="10" x2="5" y2="18" /><line x1="9" y1="10" x2="9" y2="18" />
+        <line x1="15" y1="10" x2="15" y2="18" /><line x1="19" y1="10" x2="19" y2="18" />
+        <rect x="2" y="18" width="20" height="3" rx="1" fill="rgba(59,130,246,0.1)" stroke="rgba(59,130,246,0.7)" />
+      </svg>
+    ),
+    desc: 'Proposal markets where governance token holders compete to shape protocol parameters. Fee rates, emission schedules, and treasury allocation are decided by those with skin in the game.',
+  },
+]
 
-  const toggle = (id) => {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
+// ============ Economic Simulation ============
+function EconomicSimulation() {
+  const [feeRate, setFeeRate] = useState(30)       // basis points (30 = 0.30%)
+  const [burnRate, setBurnRate] = useState(10)      // percentage of fees
+  const [emissionRate, setEmissionRate] = useState(50) // tokens/day in thousands
+  const [lpCount, setLpCount] = useState(500)       // number of LPs
+
+  const simData = useMemo(() => {
+    const rng = seededRandom(42)
+    const months = 12
+    const prices = []
+    const tvls = []
+    const treasuries = []
+
+    // Fee multiplier relative to default 0.30%
+    const feeMul = feeRate / 30
+    // Burn creates scarcity — higher burn = price tailwind
+    const burnMul = 1 + (burnRate - 10) * 0.004
+    // More emission = dilution pressure
+    const emitMul = 1 - (emissionRate - 50) * 0.002
+    // More LPs = deeper liquidity = more volume attraction
+    const lpMul = 1 + (lpCount - 500) * 0.0004
+
+    let price = 1.0
+    let tvl = 10_000_000
+    let treasury = 2_000_000
+
+    for (let m = 0; m < months; m++) {
+      const noise = (rng() - 0.45) * 0.12
+      price *= (1 + noise) * burnMul * emitMul
+      tvl *= (1 + (rng() - 0.4) * 0.08) * feeMul * lpMul
+      treasury += tvl * (feeRate / 10000) * 0.20 * (30 / 365)
+      treasury *= 1 + (rng() - 0.48) * 0.03
+
+      prices.push(Math.max(0.01, price))
+      tvls.push(Math.max(100_000, tvl))
+      treasuries.push(Math.max(10_000, treasury))
+    }
+
+    return { prices, tvls, treasuries }
+  }, [feeRate, burnRate, emissionRate, lpCount])
+
+  const finalPrice = simData.prices[simData.prices.length - 1]
+  const finalTvl = simData.tvls[simData.tvls.length - 1]
+  const finalTreasury = simData.treasuries[simData.treasuries.length - 1]
+
+  const sliders = [
+    { label: 'Fee Rate', value: feeRate, set: setFeeRate, min: 5, max: 100, unit: 'bps', display: `${(feeRate / 100).toFixed(2)}%` },
+    { label: 'Burn Rate', value: burnRate, set: setBurnRate, min: 0, max: 50, unit: '%', display: `${burnRate}%` },
+    { label: 'Emission', value: emissionRate, set: setEmissionRate, min: 10, max: 200, unit: 'k/day', display: `${emissionRate}k/day` },
+    { label: 'LP Count', value: lpCount, set: setLpCount, min: 50, max: 2000, unit: '', display: lpCount.toLocaleString() },
+  ]
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold font-mono text-white tracking-wide">
-          THE ECONOMICS
-        </h1>
-        <p className="text-black-400 text-xs font-mono mt-2">
-          The economic theses that underpin VibeSwap
-        </p>
-      </div>
-
-      {/* Sections */}
-      <div className="space-y-4">
-        {SECTIONS.map((section, i) => (
-          <motion.div
-            key={section.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * (1 / PHI), duration: 0.5, ease: 'easeOut' }}
-          >
-            <div
-              className={`rounded-xl border ${section.border} ${section.bg} overflow-hidden`}
-            >
-              {/* Header (clickable) */}
-              <button
-                onClick={() => toggle(section.id)}
-                className="w-full p-4 text-left flex items-center justify-between cursor-pointer"
-              >
-                <div>
-                  <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider block mb-1">
-                    {section.tag}
-                  </span>
-                  <span className="text-sm font-mono font-bold text-white">
-                    {section.title}
-                  </span>
-                </div>
-                <motion.span
-                  animate={{ rotate: expanded[section.id] ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  className={`text-lg font-mono ${section.accent}`}
-                >
-                  v
-                </motion.span>
-              </button>
-
-              {/* Collapsible content */}
-              <AnimatePresence initial={false}>
-                {expanded[section.id] && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-4 pb-4">
-                      {section.content}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 1 / PHI, ease: 'easeOut' }}
+    >
+      <GlassCard glowColor="warning" className="p-5">
+        {/* Sliders */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+          {sliders.map((s) => (
+            <div key={s.label}>
+              <div className="flex justify-between items-baseline mb-1">
+                <span className="text-[10px] font-mono text-black-500 uppercase">{s.label}</span>
+                <span className="text-xs font-mono text-amber-400">{s.display}</span>
+              </div>
+              <input
+                type="range"
+                min={s.min}
+                max={s.max}
+                value={s.value}
+                onChange={(e) => s.set(Number(e.target.value))}
+                className="w-full h-1 bg-black-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+              />
             </div>
-          </motion.div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Explore More */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: SECTIONS.length * (1 / PHI) + 0.3 }}
-        className="mt-10 flex flex-wrap justify-center gap-3"
-      >
-        <a href="/jul" className="text-xs font-mono px-3 py-1.5 rounded-full border border-matrix-600/30 text-matrix-400 hover:bg-matrix-600/10 transition-colors">JUL Token →</a>
-        <a href="/philosophy" className="text-xs font-mono px-3 py-1.5 rounded-full border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors">Philosophy →</a>
-        <a href="/covenants" className="text-xs font-mono px-3 py-1.5 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">Ten Covenants →</a>
-      </motion.div>
+        {/* Results with sparklines */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-black/30 rounded-lg p-3 border border-amber-500/15">
+            <p className="text-[10px] font-mono text-black-500 uppercase mb-1">Token Price (12mo)</p>
+            <p className="text-lg font-bold font-mono text-white">${finalPrice.toFixed(3)}</p>
+            <div className="mt-1">
+              <Sparkline data={simData.prices} width={80} height={20} color="#f59e0b" />
+            </div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-3 border border-amber-500/15">
+            <p className="text-[10px] font-mono text-black-500 uppercase mb-1">TVL (12mo)</p>
+            <p className="text-lg font-bold font-mono text-white">${(finalTvl / 1e6).toFixed(1)}M</p>
+            <div className="mt-1">
+              <Sparkline data={simData.tvls} width={80} height={20} color="#22c55e" />
+            </div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-3 border border-amber-500/15">
+            <p className="text-[10px] font-mono text-black-500 uppercase mb-1">Treasury (12mo)</p>
+            <p className="text-lg font-bold font-mono text-white">${(finalTreasury / 1e6).toFixed(1)}M</p>
+            <div className="mt-1">
+              <Sparkline data={simData.treasuries} width={80} height={20} color="#f59e0b" />
+            </div>
+          </div>
+        </div>
 
-      {/* Footer */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: SECTIONS.length * (1 / PHI) + 0.5 }}
-        className="text-center mt-6"
-      >
-        <p className="text-[10px] font-mono text-black-500">
-          "We are not just building software. We are building the practices, patterns,
-          and mental models that will define the future of development."
+        <p className="text-[10px] font-mono text-black-500 text-center mt-3">
+          Simulation uses seeded PRNG with parameter multipliers. Not financial advice.
         </p>
-      </motion.div>
+      </GlassCard>
+    </motion.div>
+  )
+}
+
+// ============ Key Papers ============
+const KEY_PAPERS = [
+  {
+    title: 'Economitra',
+    desc: 'Foundational economic framework for decentralized exchange mechanism design.',
+    tag: 'Mechanism Design',
+  },
+  {
+    title: 'Ergon Monetary Biology',
+    desc: 'How proof-of-work creates thermodynamic money — energy cost as value floor.',
+    tag: 'Monetary Theory',
+  },
+  {
+    title: 'Constitutional DAO Layer',
+    desc: 'Governance as constitutional law — immutable axioms with amendable parameters.',
+    tag: 'Governance',
+  },
+]
+
+// ============ Main Component ============
+export default function EconomicsPage() {
+  const treasurySparkData = useMemo(() => generateSparklineData(7701, 20, 0.025), [])
+  const runwaySparkData = useMemo(() => generateSparklineData(7702, 20, 0.015), [])
+  const stabilizerSparkData = useMemo(() => generateSparklineData(7703, 20, 0.02), [])
+  const insuranceSparkData = useMemo(() => generateSparklineData(7704, 20, 0.03), [])
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 pb-12">
+      {/* ============ Page Hero ============ */}
+      <PageHero
+        category="knowledge"
+        title="Economics"
+        subtitle="Cooperative Capitalism — mutualized risk meets free market competition"
+      />
+
+      <div className="space-y-10">
+        {/* ============ Section 1: The Two Forces ============ */}
+        <section>
+          <SectionHeader tag="Equilibrium" title="The Two Forces" delay={0.1} />
+          <TwoForcesSection />
+        </section>
+
+        {/* ============ Section 2: Fee Flow Diagram ============ */}
+        <section>
+          <SectionHeader tag="Value Distribution" title="Fee Flow" delay={0.1 / PHI} />
+          <FeeFlowSection />
+        </section>
+
+        {/* ============ Section 3: Treasury Dashboard ============ */}
+        <section>
+          <SectionHeader tag="Protocol Health" title="Treasury Dashboard" delay={0.1 / (PHI * PHI)} />
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 1 / PHI, ease: 'easeOut' }}
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+          >
+            <StatCard label="Treasury Balance" value={2_450_000} prefix="$" decimals={0} change={4.2} sparkData={treasurySparkData} size="sm" />
+            <StatCard label="Runway" value={18.5} suffix=" mo" decimals={1} change={1.8} sparkData={runwaySparkData} size="sm" />
+            <StatCard label="Stabilizer Fund" value={820_000} prefix="$" decimals={0} change={2.1} sparkData={stabilizerSparkData} size="sm" />
+            <StatCard label="Insurance Pool" value={340_000} prefix="$" decimals={0} change={6.7} sparkData={insuranceSparkData} size="sm" />
+          </motion.div>
+        </section>
+
+        {/* ============ Section 4: Cooperative Mechanisms ============ */}
+        <section>
+          <SectionHeader tag="Mutualized Risk" title="Cooperative Mechanisms" delay={0.1} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {COOPERATIVE_MECHANISMS.map((mech, i) => (
+              <motion.div
+                key={mech.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ delay: i * (0.1 / PHI), duration: 1 / PHI, ease: 'easeOut' }}
+              >
+                <GlassCard glowColor="matrix" className="p-4 h-full">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">{mech.icon}</div>
+                    <div>
+                      <h3 className="text-sm font-mono font-bold text-green-400 mb-1">{mech.title}</h3>
+                      <p className="text-[11px] font-mono text-black-400 leading-relaxed">{mech.desc}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* ============ Section 5: Competitive Mechanisms ============ */}
+        <section>
+          <SectionHeader tag="Free Market" title="Competitive Mechanisms" delay={0.1} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {COMPETITIVE_MECHANISMS.map((mech, i) => (
+              <motion.div
+                key={mech.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ delay: i * (0.1 / PHI), duration: 1 / PHI, ease: 'easeOut' }}
+              >
+                <GlassCard glowColor="terminal" className="p-4 h-full">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">{mech.icon}</div>
+                    <div>
+                      <h3 className="text-sm font-mono font-bold text-blue-400 mb-1">{mech.title}</h3>
+                      <p className="text-[11px] font-mono text-black-400 leading-relaxed">{mech.desc}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* ============ Section 6: Economic Simulation ============ */}
+        <section>
+          <SectionHeader tag="What-If Analysis" title="Economic Simulation" delay={0.1} />
+          <EconomicSimulation />
+        </section>
+
+        {/* ============ Section 7: Key Economic Papers ============ */}
+        <section>
+          <SectionHeader tag="Foundational Research" title="Key Economic Papers" delay={0.1} />
+          <div className="space-y-3">
+            {KEY_PAPERS.map((paper, i) => (
+              <motion.div
+                key={paper.title}
+                initial={{ opacity: 0, x: -12 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ delay: i * (0.1 / PHI), duration: 1 / PHI, ease: 'easeOut' }}
+              >
+                <GlassCard glowColor="warning" hover className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-sm font-mono font-bold text-amber-400">{paper.title}</h3>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500/70 border border-amber-500/20">
+                          {paper.tag}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-mono text-black-400">{paper.desc}</p>
+                    </div>
+                    <span className="text-amber-400/50 text-sm font-mono shrink-0 ml-3">PDF</span>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* ============ Explore More ============ */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2, duration: 1 / PHI }}
+          className="flex flex-wrap justify-center gap-3 pt-4"
+        >
+          <a href="/jul" className="text-xs font-mono px-3 py-1.5 rounded-full border border-matrix-600/30 text-matrix-400 hover:bg-matrix-600/10 transition-colors">JUL Token</a>
+          <a href="/philosophy" className="text-xs font-mono px-3 py-1.5 rounded-full border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors">Philosophy</a>
+          <a href="/covenants" className="text-xs font-mono px-3 py-1.5 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">Ten Covenants</a>
+        </motion.div>
+
+        {/* ============ Footer Quote ============ */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3, duration: 1 / PHI }}
+          className="text-center"
+        >
+          <p className="text-[10px] font-mono text-black-500">
+            "Cooperative Capitalism — where self-interest and public good converge by design."
+          </p>
+        </motion.div>
+      </div>
     </div>
   )
 }

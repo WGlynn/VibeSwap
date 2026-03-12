@@ -108,6 +108,18 @@ const InsurancePage = lazy(() => import('./components/InsurancePage'))
 const AggregatorPage = lazy(() => import('./components/AggregatorPage'))
 const BondsPage = lazy(() => import('./components/BondsPage'))
 const NFTPage = lazy(() => import('./components/NFTPage'))
+const CircuitBreakerPage = lazy(() => import('./components/CircuitBreakerPage'))
+const CrossChainPage = lazy(() => import('./components/CrossChainPage'))
+const AnalyticsPage = lazy(() => import('./components/AnalyticsPage'))
+const GameSwapPage = lazy(() => import('./components/GameSwapPage'))
+const OraclePage = lazy(() => import('./components/OraclePage'))
+const TokenomicsPage = lazy(() => import('./components/TokenomicsPage'))
+const RoadmapPage = lazy(() => import('./components/RoadmapPage'))
+const WhitepaperPage = lazy(() => import('./components/WhitepaperPage'))
+const SecurityPage = lazy(() => import('./components/SecurityPage'))
+const TeamPage = lazy(() => import('./components/TeamPage'))
+const FAQPage = lazy(() => import('./components/FAQPage'))
+const ChangelogPage = lazy(() => import('./components/ChangelogPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -205,6 +217,20 @@ function AnimatedRoutes() {
             <Route path="/aggregator" element={<AggregatorPage />} />
             <Route path="/bonds" element={<BondsPage />} />
             <Route path="/nft" element={<NFTPage />} />
+            {/* Protocol infrastructure */}
+            <Route path="/circuit-breaker" element={<CircuitBreakerPage />} />
+            <Route path="/crosschain" element={<CrossChainPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/oracle" element={<OraclePage />} />
+            <Route path="/tokenomics" element={<TokenomicsPage />} />
+            <Route path="/gameswap" element={<GameSwapPage />} />
+            {/* Info & meta */}
+            <Route path="/roadmap" element={<RoadmapPage />} />
+            <Route path="/whitepaper" element={<WhitepaperPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+            <Route path="/team" element={<TeamPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/changelog" element={<ChangelogPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

@@ -2257,4 +2257,295 @@ mod tests {
         let (_, fees, _, _) = historical_stats(&results);
         assert_eq!(fees, u128::MAX);
     }
+
+    // ============ Hardening Tests v6 ============
+
+    #[test]
+    fn fee_monotonically_increases_with_amount_v6() {
+        let fee1 = compute_fee(1000);
+        let fee2 = compute_fee(2000);
+        let fee3 = compute_fee(10000);
+        assert!(fee2 >= fee1);
+        assert!(fee3 >= fee2);
+    }
+
+    #[test]
+    fn fee_precision_unit_v6() {
+        // 1e18 * 9 / 10000 = 9e14
+        let fee = compute_fee(PRECISION);
+        assert_eq!(fee, PRECISION * 9 / 10000);
+    }
+
+    #[test]
+    fn repayment_always_greater_than_amount_v6() {
+        for amount in [1u128, 100, PRECISION, PRECISION * 1000] {
+            let repayment = compute_required_repayment(amount);
+            assert!(repayment >= amount, "Repayment must be >= amount");
+        }
+    }
+
+    #[test]
+    fn validate_zero_pool_id_rejected_v6() {
+        let request = make_request(1000);
+        let mut pool = default_pool_state();
+        pool.pool_id = [0u8; 32];
+        let result = validate_flash_loan(&request, &pool);
+        assert_eq!(result, Err(FlashLoanError::InvalidPool));
+    }
+
+    #[test]
+    fn validate_exactly_at_concurrent_limit_v6() {
+        let request = make_request(1000);
+        let mut pool = default_pool_state();
+        pool.active_loans = MAX_CONCURRENT_LOANS as u8;
+        let result = validate_flash_loan(&request, &pool);
+        assert_eq!(result, Err(FlashLoanError::ConcurrentLoanLimit));
+    }
+
+    #[test]
+    fn validate_one_below_concurrent_limit_v6() {
+        let request = make_request(1000);
+        let mut pool = default_pool_state();
+        pool.active_loans = (MAX_CONCURRENT_LOANS - 1) as u8;
+        let result = validate_flash_loan(&request, &pool);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_borrow_exactly_50_percent_v6() {
+        // max_safe_borrow is 50% of total_available
+        let pool = default_pool_state();
+        let max_borrow = max_safe_borrow(pool.total_available);
+        let request = make_request_with_repayment(max_borrow, max_borrow + compute_fee(max_borrow));
+        let result = validate_flash_loan(&request, &pool);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_borrow_51_percent_rejected_v6() {
+        let pool = default_pool_state();
+        let over_borrow = max_safe_borrow(pool.total_available) + 1;
+        let request = make_request_with_repayment(over_borrow, over_borrow + compute_fee(over_borrow));
+        let result = validate_flash_loan(&request, &pool);
+        assert_eq!(result, Err(FlashLoanError::ExceedsMaxBorrow));
+    }
+
+    #[test]
+    fn repayment_exact_same_block_v6() {
+        let request = make_request(PRECISION * 100);
+        let fee = compute_fee(request.amount);
+        let result = validate_repayment(&request, request.amount + fee, request.request_block);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn repayment_one_block_late_rejected_v6() {
+        let request = make_request(PRECISION * 100);
+        let fee = compute_fee(request.amount);
+        let result = validate_repayment(&request, request.amount + fee, request.request_block + 1);
+        assert_eq!(result, Err(FlashLoanError::NotRepaidInTime));
+    }
+
+    #[test]
+    fn repayment_fee_paid_calculation_v6() {
+        let request = make_request(PRECISION * 100);
+        let fee = compute_fee(request.amount);
+        let overpay = fee * 2;
+        let result = validate_repayment(&request, request.amount + overpay, request.request_block).unwrap();
+        assert_eq!(result.fee_paid, overpay);
+    }
+
+    #[test]
+    fn pool_state_borrow_increments_active_loans_v6() {
+        let pool = default_pool_state();
+        let updated = update_pool_state(&pool, 1000, true).unwrap();
+        assert_eq!(updated.active_loans, 1);
+        assert_eq!(updated.currently_borrowed, 1000);
+    }
+
+    #[test]
+    fn pool_state_repay_decrements_active_loans_v6() {
+        let pool = default_pool_state();
+        let borrowed = update_pool_state(&pool, 1000, true).unwrap();
+        let repaid = update_pool_state(&borrowed, 1000, false).unwrap();
+        assert_eq!(repaid.active_loans, 0);
+        assert_eq!(repaid.currently_borrowed, 0);
+    }
+
+    #[test]
+    fn pool_state_repay_increments_loans_served_v6() {
+        let pool = default_pool_state();
+        let borrowed = update_pool_state(&pool, 1000, true).unwrap();
+        let repaid = update_pool_state(&borrowed, 1000, false).unwrap();
+        assert_eq!(repaid.total_loans_served, 1);
+    }
+
+    #[test]
+    fn pool_state_zero_amount_fails_v6() {
+        let pool = default_pool_state();
+        let result = update_pool_state(&pool, 0, true);
+        assert_eq!(result, Err(FlashLoanError::ZeroAmount));
+    }
+
+    #[test]
+    fn detect_empty_volumes_no_threat_v6() {
+        let analysis = detect_suspicious_pattern(&[], 1000, &[]);
+        assert!(!analysis.is_suspicious);
+        assert_eq!(analysis.risk_score, 0);
+    }
+
+    #[test]
+    fn detect_zero_baseline_no_threat_v6() {
+        let analysis = detect_suspicious_pattern(&[1000], 0, &[]);
+        assert!(!analysis.is_suspicious);
+    }
+
+    #[test]
+    fn detect_below_threshold_no_threat_v6() {
+        // 5x baseline is below 10x threshold
+        let analysis = detect_suspicious_pattern(&[5000], 1000, &[0]);
+        assert!(!analysis.is_suspicious);
+    }
+
+    #[test]
+    fn detect_above_threshold_suspicious_v6() {
+        // 11x baseline is above 10x threshold
+        let analysis = detect_suspicious_pattern(&[11000], 1000, &[-500]);
+        assert!(analysis.is_suspicious);
+        assert!(analysis.risk_score > 0);
+    }
+
+    #[test]
+    fn detect_sandwich_pattern_v6() {
+        // Multiple spikes + reversal = sandwich
+        let analysis = detect_suspicious_pattern(
+            &[15000, 15000],
+            1000,
+            &[-200, 200],
+        );
+        assert!(analysis.is_suspicious);
+        assert_eq!(analysis.pattern, AttackPattern::SandwichAttack);
+    }
+
+    #[test]
+    fn detect_governance_attack_pattern_v6() {
+        // Very large spike, minimal price impact
+        let analysis = detect_suspicious_pattern(
+            &[25000],
+            1000,
+            &[5],
+        );
+        assert!(analysis.is_suspicious);
+        assert_eq!(analysis.pattern, AttackPattern::GovernanceAttack);
+    }
+
+    #[test]
+    fn eoa_commit_true_for_eoa_v6() {
+        assert!(is_eoa_commit(false, false));
+    }
+
+    #[test]
+    fn eoa_commit_false_for_contract_v6() {
+        assert!(!is_eoa_commit(true, true));
+        assert!(!is_eoa_commit(true, false));
+        assert!(!is_eoa_commit(false, true));
+    }
+
+    #[test]
+    fn vulnerability_max_all_factors_v6() {
+        // Zero TVL, no oracles, no circuit breaker
+        let score = assess_vulnerability(0, PRECISION * 1000, 0, false);
+        assert_eq!(score, 10000);
+    }
+
+    #[test]
+    fn vulnerability_min_all_factors_v6() {
+        // Large TVL, many oracles, circuit breaker
+        let score = assess_vulnerability(PRECISION * 1_000_000, 0, 4, true);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn protection_report_all_on_100_v6() {
+        let report = generate_protection_report(true, true, true, true, true);
+        assert_eq!(report.overall_protection_score, 100);
+    }
+
+    #[test]
+    fn protection_report_all_off_0_v6() {
+        let report = generate_protection_report(false, false, false, false, false);
+        assert_eq!(report.overall_protection_score, 0);
+    }
+
+    #[test]
+    fn max_borrow_half_of_pool_v6() {
+        let pool_size = PRECISION * 1000;
+        let max = max_safe_borrow(pool_size);
+        assert_eq!(max, pool_size / 2);
+    }
+
+    #[test]
+    fn max_borrow_zero_pool_v6() {
+        assert_eq!(max_safe_borrow(0), 0);
+    }
+
+    #[test]
+    fn attack_profit_positive_when_impact_exceeds_fee_v6() {
+        let profit = estimate_attack_profit(PRECISION * 1000, 100, 9);
+        assert!(profit > 0);
+    }
+
+    #[test]
+    fn attack_profit_negative_when_fee_exceeds_impact_v6() {
+        let profit = estimate_attack_profit(PRECISION * 1000, 5, 100);
+        assert!(profit < 0);
+    }
+
+    #[test]
+    fn attack_profit_zero_for_zero_borrow_v6() {
+        assert_eq!(estimate_attack_profit(0, 100, 9), 0);
+    }
+
+    #[test]
+    fn concurrent_capacity_at_max_v6() {
+        let mut pool = default_pool_state();
+        pool.active_loans = MAX_CONCURRENT_LOANS as u8;
+        assert_eq!(concurrent_loan_capacity(&pool), 0);
+    }
+
+    #[test]
+    fn concurrent_capacity_empty_v6() {
+        let pool = default_pool_state();
+        assert_eq!(concurrent_loan_capacity(&pool), MAX_CONCURRENT_LOANS as u8);
+    }
+
+    #[test]
+    fn stats_empty_list_v6() {
+        let (count, fees, volume, profitable) = historical_stats(&[]);
+        assert_eq!(count, 0);
+        assert_eq!(fees, 0);
+        assert_eq!(volume, 0);
+        assert_eq!(profitable, 0);
+    }
+
+    #[test]
+    fn stats_all_profitable_v6() {
+        let results = vec![
+            make_result(1000, 10, true),
+            make_result(2000, 20, true),
+        ];
+        let (count, _, _, profitable) = historical_stats(&results);
+        assert_eq!(count, 2);
+        assert_eq!(profitable, 2);
+    }
+
+    #[test]
+    fn stats_none_profitable_v6() {
+        let results = vec![
+            make_result(1000, 10, false),
+            make_result(2000, 20, false),
+        ];
+        let (_, _, _, profitable) = historical_stats(&results);
+        assert_eq!(profitable, 0);
+    }
 }

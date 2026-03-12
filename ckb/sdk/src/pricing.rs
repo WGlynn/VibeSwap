@@ -2271,4 +2271,396 @@ mod tests {
         assert!(result.price > 1990 * PRECISION);
         assert!(result.price < 2020 * PRECISION);
     }
+
+    // ============ Hardening Batch v4 ============
+
+    #[test]
+    fn test_twap_zero_window_v4() {
+        let observations = vec![obs(1000 * PRECISION, 100, PRECISION)];
+        let result = compute_twap(&observations, 0, 200);
+        assert_eq!(result, Err(PricingError::InvalidWindow));
+    }
+
+    #[test]
+    fn test_twap_single_observation_insufficient_v4() {
+        let observations = vec![obs(1000 * PRECISION, 100, PRECISION)];
+        let result = compute_twap(&observations, 200, 200);
+        assert_eq!(result, Err(PricingError::InsufficientObservations));
+    }
+
+    #[test]
+    fn test_twap_exactly_min_observations_v4() {
+        // Exactly MIN_OBSERVATIONS (3) within window
+        let observations = vec![
+            obs(1000 * PRECISION, 90, PRECISION),
+            obs(1010 * PRECISION, 95, PRECISION),
+            obs(1020 * PRECISION, 100, PRECISION),
+        ];
+        let result = compute_twap(&observations, 20, 100).unwrap();
+        assert!(result.twap_price > 0);
+        assert_eq!(result.observation_count, 3);
+    }
+
+    #[test]
+    fn test_twap_constant_price_v4() {
+        // All observations at same price → TWAP = spot = price, deviation = 0
+        let observations = vec![
+            obs(2000 * PRECISION, 80, PRECISION),
+            obs(2000 * PRECISION, 90, PRECISION),
+            obs(2000 * PRECISION, 100, PRECISION),
+        ];
+        let result = compute_twap(&observations, 30, 100).unwrap();
+        assert_eq!(result.twap_price, 2000 * PRECISION);
+        assert_eq!(result.spot_price, 2000 * PRECISION);
+        assert_eq!(result.deviation_bps, 0);
+        assert!(result.is_valid);
+    }
+
+    #[test]
+    fn test_twap_observations_outside_window_excluded_v4() {
+        // Two observations outside window, three inside
+        let observations = vec![
+            obs(500 * PRECISION, 10, PRECISION),  // outside (window starts at 50)
+            obs(600 * PRECISION, 40, PRECISION),  // outside
+            obs(1000 * PRECISION, 60, PRECISION), // inside
+            obs(1100 * PRECISION, 80, PRECISION), // inside
+            obs(1200 * PRECISION, 100, PRECISION),// inside
+        ];
+        let result = compute_twap(&observations, 50, 100).unwrap();
+        assert_eq!(result.observation_count, 3);
+        assert_eq!(result.spot_price, 1200 * PRECISION);
+    }
+
+    #[test]
+    fn test_validate_twap_equal_prices_v4() {
+        let result = validate_against_twap(1000 * PRECISION, 1000 * PRECISION).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_validate_twap_zero_spot_v4() {
+        let result = validate_against_twap(0, 1000 * PRECISION);
+        assert_eq!(result, Err(PricingError::ZeroPrice));
+    }
+
+    #[test]
+    fn test_validate_twap_zero_twap_v4() {
+        let result = validate_against_twap(1000 * PRECISION, 0);
+        assert_eq!(result, Err(PricingError::ZeroPrice));
+    }
+
+    #[test]
+    fn test_validate_twap_exactly_at_5_percent_v4() {
+        // Exactly 5% deviation → should be valid (500 bps <= 500 bps)
+        let twap = 1000 * PRECISION;
+        let spot = 1050 * PRECISION; // +5%
+        let result = validate_against_twap(spot, twap).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_validate_twap_just_over_5_percent_v4() {
+        // 5.01% deviation → exceeds
+        let twap = 10_000 * PRECISION;
+        let spot = 10_501 * PRECISION; // 5.01%
+        let result = validate_against_twap(spot, twap);
+        assert_eq!(result, Err(PricingError::ExceedsTwapDeviation));
+    }
+
+    #[test]
+    fn test_clearing_price_empty_orders_v4() {
+        let result = find_clearing_price(&[], &[]);
+        assert_eq!(result, Err(PricingError::NoClearing));
+    }
+
+    #[test]
+    fn test_clearing_price_no_overlap_v4() {
+        // All buys below all sells → no clearing
+        let buys = vec![(100 * PRECISION, 50 * PRECISION)];
+        let sells = vec![(200 * PRECISION, 50 * PRECISION)];
+        let result = find_clearing_price(&buys, &sells);
+        assert_eq!(result, Err(PricingError::NoClearing));
+    }
+
+    #[test]
+    fn test_clearing_price_single_match_v4() {
+        // One buy at 100, one sell at 100 → clearing at 100
+        let buys = vec![(100 * PRECISION, 50 * PRECISION)];
+        let sells = vec![(100 * PRECISION, 50 * PRECISION)];
+        let result = find_clearing_price(&buys, &sells).unwrap();
+        assert_eq!(result.price, 100 * PRECISION);
+        assert_eq!(result.matched_volume, 50 * PRECISION);
+    }
+
+    #[test]
+    fn test_vwap_single_trade_v4() {
+        let trades = vec![(2000 * PRECISION, 100 * PRECISION)];
+        let result = compute_vwap(&trades).unwrap();
+        assert_eq!(result.vwap, 2000 * PRECISION);
+        assert_eq!(result.trade_count, 1);
+    }
+
+    #[test]
+    fn test_vwap_empty_v4() {
+        let result = compute_vwap(&[]);
+        assert_eq!(result, Err(PricingError::InsufficientObservations));
+    }
+
+    #[test]
+    fn test_vwap_all_zero_volume_v4() {
+        let trades = vec![(2000 * PRECISION, 0), (3000 * PRECISION, 0)];
+        let result = compute_vwap(&trades);
+        assert_eq!(result, Err(PricingError::ZeroLiquidity));
+    }
+
+    #[test]
+    fn test_spot_price_equal_reserves_v4() {
+        let price = spot_price_from_reserves(100 * PRECISION, 100 * PRECISION).unwrap();
+        assert_eq!(price, PRECISION); // 1:1
+    }
+
+    #[test]
+    fn test_spot_price_zero_reserve_in_v4() {
+        let result = spot_price_from_reserves(0, 100 * PRECISION);
+        assert_eq!(result, Err(PricingError::ZeroLiquidity));
+    }
+
+    #[test]
+    fn test_spot_price_zero_reserve_out_v4() {
+        let result = spot_price_from_reserves(100 * PRECISION, 0);
+        assert_eq!(result, Err(PricingError::ZeroPrice));
+    }
+
+    #[test]
+    fn test_spot_price_2x_ratio_v4() {
+        let price = spot_price_from_reserves(100 * PRECISION, 200 * PRECISION).unwrap();
+        assert_eq!(price, 2 * PRECISION);
+    }
+
+    #[test]
+    fn test_price_range_single_observation_v4() {
+        let observations = vec![obs(1000 * PRECISION, 100, PRECISION)];
+        let range = price_range(&observations).unwrap();
+        assert_eq!(range.open, 1000 * PRECISION);
+        assert_eq!(range.close, 1000 * PRECISION);
+        assert_eq!(range.low, 1000 * PRECISION);
+        assert_eq!(range.high, 1000 * PRECISION);
+        assert_eq!(range.average, 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_price_range_empty_v4() {
+        let result = price_range(&[]);
+        assert_eq!(result, Err(PricingError::InsufficientObservations));
+    }
+
+    #[test]
+    fn test_price_range_multiple_v4() {
+        let observations = vec![
+            obs(1000 * PRECISION, 100, PRECISION),
+            obs(1200 * PRECISION, 110, PRECISION),
+            obs(900 * PRECISION, 120, PRECISION),
+        ];
+        let range = price_range(&observations).unwrap();
+        assert_eq!(range.open, 1000 * PRECISION);
+        assert_eq!(range.close, 900 * PRECISION);
+        assert_eq!(range.low, 900 * PRECISION);
+        assert_eq!(range.high, 1200 * PRECISION);
+    }
+
+    #[test]
+    fn test_is_price_stale_fresh_v4() {
+        assert!(!is_price_stale(500, 500));
+    }
+
+    #[test]
+    fn test_is_price_stale_exactly_at_threshold_v4() {
+        // Exactly PRICE_STALENESS_BLOCKS elapsed → NOT stale (> not >=)
+        assert!(!is_price_stale(0, PRICE_STALENESS_BLOCKS));
+    }
+
+    #[test]
+    fn test_is_price_stale_one_past_threshold_v4() {
+        assert!(is_price_stale(0, PRICE_STALENESS_BLOCKS + 1));
+    }
+
+    #[test]
+    fn test_is_price_stale_future_observation_v4() {
+        // Observation is in the future → not stale
+        assert!(!is_price_stale(200, 100));
+    }
+
+    #[test]
+    fn test_remove_outliers_single_price_v4() {
+        let prices = vec![1000 * PRECISION];
+        let filtered = remove_outliers(&prices);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0], 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_remove_outliers_empty_v4() {
+        let filtered = remove_outliers(&[]);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_remove_outliers_all_same_v4() {
+        let prices = vec![1000 * PRECISION; 5];
+        let filtered = remove_outliers(&prices);
+        assert_eq!(filtered.len(), 5);
+    }
+
+    #[test]
+    fn test_price_change_bps_no_change_v4() {
+        let change = price_change_bps(1000 * PRECISION, 1000 * PRECISION);
+        assert_eq!(change, 0);
+    }
+
+    #[test]
+    fn test_price_change_bps_increase_v4() {
+        let change = price_change_bps(1000 * PRECISION, 1100 * PRECISION);
+        assert_eq!(change, 1000); // +10%
+    }
+
+    #[test]
+    fn test_price_change_bps_decrease_v4() {
+        let change = price_change_bps(1000 * PRECISION, 900 * PRECISION);
+        assert_eq!(change, -1000); // -10%
+    }
+
+    #[test]
+    fn test_price_change_bps_zero_old_v4() {
+        let change = price_change_bps(0, 1000 * PRECISION);
+        assert_eq!(change, 0);
+    }
+
+    #[test]
+    fn test_ema_single_observation_v4() {
+        let observations = vec![obs(2000 * PRECISION, 100, PRECISION)];
+        let ema = exponential_moving_average(&observations, 5000).unwrap();
+        assert_eq!(ema, 2000 * PRECISION);
+    }
+
+    #[test]
+    fn test_ema_alpha_10000_latest_only_v4() {
+        // Alpha = 10000 → only latest price matters
+        let observations = vec![
+            obs(1000 * PRECISION, 100, PRECISION),
+            obs(2000 * PRECISION, 110, PRECISION),
+            obs(3000 * PRECISION, 120, PRECISION),
+        ];
+        let ema = exponential_moving_average(&observations, 10_000).unwrap();
+        assert_eq!(ema, 3000 * PRECISION);
+    }
+
+    #[test]
+    fn test_ema_alpha_zero_first_only_v4() {
+        // Alpha = 0 → only first price matters
+        let observations = vec![
+            obs(1000 * PRECISION, 100, PRECISION),
+            obs(2000 * PRECISION, 110, PRECISION),
+            obs(3000 * PRECISION, 120, PRECISION),
+        ];
+        let ema = exponential_moving_average(&observations, 0).unwrap();
+        assert_eq!(ema, 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_ema_empty_v4() {
+        let result = exponential_moving_average(&[], 5000);
+        assert_eq!(result, Err(PricingError::InsufficientObservations));
+    }
+
+    #[test]
+    fn test_confidence_single_price_max_v4() {
+        let prices = vec![1000 * PRECISION];
+        let conf = confidence_from_sources(&prices);
+        assert_eq!(conf, 10_000);
+    }
+
+    #[test]
+    fn test_confidence_empty_zero_v4() {
+        let conf = confidence_from_sources(&[]);
+        assert_eq!(conf, 0);
+    }
+
+    #[test]
+    fn test_confidence_identical_prices_max_v4() {
+        let prices = vec![1000 * PRECISION; 5];
+        let conf = confidence_from_sources(&prices);
+        assert_eq!(conf, 10_000);
+    }
+
+    #[test]
+    fn test_confidence_wide_spread_low_v4() {
+        // 50% spread → confidence should be very low
+        let prices = vec![1000 * PRECISION, 1500 * PRECISION];
+        let conf = confidence_from_sources(&prices);
+        // spread = 500/1250 * 10000 = 4000 bps → confidence = 6000
+        assert!(conf < 7000);
+    }
+
+    #[test]
+    fn test_liq_weighted_empty_v4() {
+        let result = liquidity_weighted_price(&[]);
+        assert_eq!(result, Err(PricingError::InsufficientObservations));
+    }
+
+    #[test]
+    fn test_liq_weighted_zero_liquidity_v4() {
+        let observations = vec![
+            obs(1000 * PRECISION, 100, 0),
+            obs(2000 * PRECISION, 110, 0),
+        ];
+        let result = liquidity_weighted_price(&observations);
+        assert_eq!(result, Err(PricingError::ZeroLiquidity));
+    }
+
+    #[test]
+    fn test_liq_weighted_single_observation_v4() {
+        let observations = vec![obs(3000 * PRECISION, 100, 500 * PRECISION)];
+        let result = liquidity_weighted_price(&observations).unwrap();
+        assert_eq!(result, 3000 * PRECISION);
+    }
+
+    #[test]
+    fn test_aggregate_all_stale_v4() {
+        let feeds = vec![
+            feed_with_id(1, 2000 * PRECISION, 9000, 0), // block 0
+        ];
+        // current_block = 1000, staleness threshold = 450
+        let result = aggregate_prices(&feeds, 1000);
+        assert_eq!(result, Err(PricingError::NoValidSources));
+    }
+
+    #[test]
+    fn test_aggregate_all_invalid_v4() {
+        let feeds = vec![
+            PriceFeed {
+                source_id: [1; 32],
+                price: 2000 * PRECISION,
+                confidence: 9000,
+                block_number: 100,
+                is_valid: false, // Invalid
+            },
+        ];
+        let result = aggregate_prices(&feeds, 100);
+        assert_eq!(result, Err(PricingError::NoValidSources));
+    }
+
+    #[test]
+    fn test_aggregate_zero_price_excluded_v4() {
+        let feeds = vec![
+            PriceFeed {
+                source_id: [1; 32],
+                price: 0, // Zero price excluded
+                confidence: 9000,
+                block_number: 100,
+                is_valid: true,
+            },
+        ];
+        let result = aggregate_prices(&feeds, 100);
+        assert_eq!(result, Err(PricingError::NoValidSources));
+    }
 }

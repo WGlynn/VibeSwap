@@ -1954,4 +1954,385 @@ mod tests {
         }
         assert_eq!(classify_cell(&[0xFF; 32], &map), CellTypeTag::Unknown);
     }
+
+    // ============ Hardening Batch v4 ============
+
+    #[test]
+    fn test_filter_capacity_empty_cells_v4() {
+        let result = filter_by_capacity(&[], 0, u64::MAX);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_capacity_exact_boundaries_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+            make_cell(3, 0, 300, 1, 0),
+        ];
+        // Exact match on boundaries
+        let result = filter_by_capacity(&cells, 100, 300);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_filter_capacity_single_value_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+        ];
+        let result = filter_by_capacity(&cells, 200, 200);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].capacity, 200);
+    }
+
+    #[test]
+    fn test_filter_capacity_no_match_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+        ];
+        let result = filter_by_capacity(&cells, 300, 400);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_data_len_no_match_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 50),
+            make_cell(2, 0, 100, 1, 100),
+        ];
+        let result = filter_by_data_len(&cells, 200, 300);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_data_len_exact_match_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 64),
+        ];
+        let result = filter_by_data_len(&cells, 64, 64);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_block_range_empty_v4() {
+        let result = filter_by_block_range(&[], 0, 100);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_block_range_exact_boundaries_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 10, 0),
+            make_cell(2, 0, 100, 20, 0),
+            make_cell(3, 0, 100, 30, 0),
+        ];
+        let result = filter_by_block_range(&cells, 10, 30);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_filter_block_range_single_block_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 10, 0),
+            make_cell(2, 0, 100, 20, 0),
+        ];
+        let result = filter_by_block_range(&cells, 10, 10);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_sort_by_capacity_asc_v4() {
+        let mut cells = vec![
+            make_cell(3, 0, 300, 1, 0),
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+        ];
+        sort_cells(&mut cells, SortBy::Capacity, SortOrder::Asc);
+        assert_eq!(cells[0].capacity, 100);
+        assert_eq!(cells[1].capacity, 200);
+        assert_eq!(cells[2].capacity, 300);
+    }
+
+    #[test]
+    fn test_sort_by_capacity_desc_v4() {
+        let mut cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(3, 0, 300, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+        ];
+        sort_cells(&mut cells, SortBy::Capacity, SortOrder::Desc);
+        assert_eq!(cells[0].capacity, 300);
+        assert_eq!(cells[1].capacity, 200);
+        assert_eq!(cells[2].capacity, 100);
+    }
+
+    #[test]
+    fn test_sort_by_block_number_v4() {
+        let mut cells = vec![
+            make_cell(1, 0, 100, 30, 0),
+            make_cell(2, 0, 100, 10, 0),
+            make_cell(3, 0, 100, 20, 0),
+        ];
+        sort_cells(&mut cells, SortBy::BlockNumber, SortOrder::Asc);
+        assert_eq!(cells[0].block_number, 10);
+        assert_eq!(cells[1].block_number, 20);
+        assert_eq!(cells[2].block_number, 30);
+    }
+
+    #[test]
+    fn test_sort_by_data_len_v4() {
+        let mut cells = vec![
+            make_cell(1, 0, 100, 1, 100),
+            make_cell(2, 0, 100, 1, 50),
+            make_cell(3, 0, 100, 1, 200),
+        ];
+        sort_cells(&mut cells, SortBy::DataLen, SortOrder::Asc);
+        assert_eq!(cells[0].data_len, 50);
+        assert_eq!(cells[1].data_len, 100);
+        assert_eq!(cells[2].data_len, 200);
+    }
+
+    #[test]
+    fn test_sort_by_index_v4() {
+        let mut cells = vec![
+            make_cell(1, 2, 100, 1, 0),
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(1, 1, 100, 1, 0),
+        ];
+        sort_cells(&mut cells, SortBy::Index, SortOrder::Asc);
+        assert_eq!(cells[0].index, 0);
+        assert_eq!(cells[1].index, 1);
+        assert_eq!(cells[2].index, 2);
+    }
+
+    #[test]
+    fn test_sort_empty_cells_v4() {
+        let mut cells: Vec<CellInfo> = vec![];
+        sort_cells(&mut cells, SortBy::Capacity, SortOrder::Asc);
+        assert!(cells.is_empty());
+    }
+
+    #[test]
+    fn test_deduplicate_no_duplicates_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 2, 0),
+            make_cell(3, 0, 300, 3, 0),
+        ];
+        let result = deduplicate(&cells);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_deduplicate_all_same_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(1, 0, 200, 2, 0), // Same tx_hash+index
+            make_cell(1, 0, 300, 3, 0), // Same tx_hash+index
+        ];
+        let result = deduplicate(&cells);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].capacity, 100); // First occurrence
+    }
+
+    #[test]
+    fn test_deduplicate_same_tx_different_index_v4() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(1, 1, 200, 2, 0), // Same tx, different index
+        ];
+        let result = deduplicate(&cells);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_deduplicate_empty_v4() {
+        let result = deduplicate(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_paginate_beyond_last_page_v4() {
+        let cells = vec![make_cell(1, 0, 100, 1, 0)];
+        let page = paginate(&cells, 100, 10);
+        assert!(page.cells.is_empty());
+        assert!(!page.has_more);
+        assert_eq!(page.total, 1);
+    }
+
+    #[test]
+    fn test_paginate_exact_page_boundary_v4() {
+        // 10 cells, page_size=5, page 1 should be cells 5-9
+        let cells: Vec<CellInfo> = (0..10u8).map(|i| make_cell(i, 0, 100, i as u64, 0)).collect();
+        let page = paginate(&cells, 1, 5);
+        assert_eq!(page.cells.len(), 5);
+        assert!(!page.has_more);
+    }
+
+    #[test]
+    fn test_paginate_page_size_exceeds_max_v4() {
+        let cells: Vec<CellInfo> = (0..5u8).map(|i| make_cell(i, 0, 100, i as u64, 0)).collect();
+        let page = paginate(&cells, 0, MAX_PAGE_SIZE + 100);
+        // Should be clamped to MAX_PAGE_SIZE, which is 1000 > 5 cells
+        assert_eq!(page.cells.len(), 5);
+    }
+
+    #[test]
+    fn test_sync_progress_fully_synced_v4() {
+        assert_eq!(sync_progress(1000, 1000), 10_000);
+    }
+
+    #[test]
+    fn test_sync_progress_ahead_of_tip_v4() {
+        assert_eq!(sync_progress(1001, 1000), 10_000);
+    }
+
+    #[test]
+    fn test_sync_progress_50_percent_v4() {
+        let p = sync_progress(500, 1000);
+        assert_eq!(p, 5000);
+    }
+
+    #[test]
+    fn test_sync_progress_zero_indexed_v4() {
+        let p = sync_progress(0, 1000);
+        assert_eq!(p, 0);
+    }
+
+    #[test]
+    fn test_is_synced_exactly_at_tolerance_v4() {
+        assert!(is_synced(990, 1000, 10));
+    }
+
+    #[test]
+    fn test_is_synced_one_past_tolerance_v4() {
+        assert!(!is_synced(989, 1000, 10));
+    }
+
+    #[test]
+    fn test_is_synced_equal_blocks_v4() {
+        assert!(is_synced(1000, 1000, 0));
+    }
+
+    #[test]
+    fn test_cell_age_current_equals_cell_v4() {
+        assert_eq!(cell_age_blocks(100, 100), 0);
+    }
+
+    #[test]
+    fn test_cell_age_cell_ahead_of_current_v4() {
+        // During reorg: cell_block > current_block
+        assert_eq!(cell_age_blocks(200, 100), 0);
+    }
+
+    #[test]
+    fn test_cell_age_normal_v4() {
+        assert_eq!(cell_age_blocks(100, 200), 100);
+    }
+
+    #[test]
+    fn test_estimate_cell_count_100_percent_v4() {
+        assert_eq!(estimate_cell_count(1000, 10_000), 1000);
+    }
+
+    #[test]
+    fn test_estimate_cell_count_0_percent_v4() {
+        assert_eq!(estimate_cell_count(1000, 0), 0);
+    }
+
+    #[test]
+    fn test_estimate_cell_count_1_percent_v4() {
+        assert_eq!(estimate_cell_count(10_000, 100), 100);
+    }
+
+    #[test]
+    fn test_estimate_cell_count_zero_total_v4() {
+        assert_eq!(estimate_cell_count(0, 5000), 0);
+    }
+
+    #[test]
+    fn test_find_pool_cells_with_match_v4() {
+        let map = make_type_map();
+        let cells = vec![
+            make_cell_with_type(1, 0, 100, 1, 0x01), // pool
+            make_cell_with_type(2, 0, 200, 2, 0x02), // commit
+            make_cell_with_type(3, 0, 300, 3, 0x01), // pool
+        ];
+        let pool_cells = find_pool_cells(&cells, &map.pool_code_hash, &map);
+        assert_eq!(pool_cells.len(), 2);
+    }
+
+    #[test]
+    fn test_find_pool_cells_no_type_hash_v4() {
+        let map = make_type_map();
+        let cells = vec![make_cell(1, 0, 100, 1, 0)]; // no type_hash
+        let pool_cells = find_pool_cells(&cells, &map.pool_code_hash, &map);
+        assert!(pool_cells.is_empty());
+    }
+
+    #[test]
+    fn test_find_user_cells_match_v4() {
+        let cells = vec![
+            make_cell_with_lock(1, 0, 100, 1, 0xAA),
+            make_cell_with_lock(2, 0, 200, 2, 0xBB),
+            make_cell_with_lock(3, 0, 300, 3, 0xAA),
+        ];
+        let user_cells = find_user_cells(&cells, &[0xAA; 32]);
+        assert_eq!(user_cells.len(), 2);
+    }
+
+    #[test]
+    fn test_find_user_cells_no_match_v4() {
+        let cells = vec![
+            make_cell_with_lock(1, 0, 100, 1, 0xAA),
+        ];
+        let user_cells = find_user_cells(&cells, &[0xBB; 32]);
+        assert!(user_cells.is_empty());
+    }
+
+    #[test]
+    fn test_merge_pages_both_empty_v4() {
+        let a = CellPage { cells: vec![], total: 0, has_more: false, cursor: None };
+        let b = CellPage { cells: vec![], total: 0, has_more: false, cursor: None };
+        let merged = merge_pages(&a, &b);
+        assert!(merged.cells.is_empty());
+        assert_eq!(merged.total, 0);
+        assert!(!merged.has_more);
+        assert!(merged.cursor.is_none());
+    }
+
+    #[test]
+    fn test_merge_pages_has_more_propagates_v4() {
+        let a = CellPage { cells: vec![], total: 5, has_more: true, cursor: None };
+        let b = CellPage { cells: vec![], total: 3, has_more: false, cursor: None };
+        let merged = merge_pages(&a, &b);
+        assert!(merged.has_more);
+        assert_eq!(merged.total, 8);
+    }
+
+    #[test]
+    fn test_stats_summary_synced_v4() {
+        let stats = make_stats(1000, 1000);
+        let (synced, progress) = stats_summary(&stats);
+        assert!(synced);
+        assert_eq!(progress, 10_000);
+    }
+
+    #[test]
+    fn test_stats_summary_behind_v4() {
+        let stats = make_stats(900, 1000);
+        let (synced, progress) = stats_summary(&stats);
+        assert!(!synced); // 100 blocks behind > SYNC_TOLERANCE_BLOCKS (10)
+        assert_eq!(progress, 9000);
+    }
+
+    #[test]
+    fn test_stats_summary_within_tolerance_v4() {
+        let stats = make_stats(995, 1000);
+        let (synced, progress) = stats_summary(&stats);
+        assert!(synced); // 5 blocks behind <= 10 tolerance
+        assert!(progress > 9900);
+    }
 }

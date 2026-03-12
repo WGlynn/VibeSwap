@@ -2237,4 +2237,341 @@ mod tests {
         // 200 = 1000 + (-800) = 200 => balanced
         assert!(validate_accounting_equation(&[a, eq, exp]));
     }
+
+    // ============ Hardening Batch v4 ============
+
+    #[test]
+    fn test_net_balance_expense_contra_v4() {
+        // Expense with credit > debit (contra expense) saturates to 0
+        let mut acct = make_expense(4, 0);
+        acct.debit_balance = 50;
+        acct.credit_balance = 200;
+        assert_eq!(net_balance(&acct), 0);
+    }
+
+    #[test]
+    fn test_net_balance_equity_contra_v4() {
+        // Equity with debit > credit (contra equity) saturates to 0
+        let mut acct = make_equity(5, 0);
+        acct.debit_balance = 9000;
+        acct.credit_balance = 1000;
+        assert_eq!(net_balance(&acct), 0);
+    }
+
+    #[test]
+    fn test_net_balance_revenue_contra_v4() {
+        // Revenue with debit > credit (contra revenue) saturates to 0
+        let mut acct = make_revenue(3, 0);
+        acct.debit_balance = 5000;
+        acct.credit_balance = 2000;
+        assert_eq!(net_balance(&acct), 0);
+    }
+
+    #[test]
+    fn test_net_balance_max_u128_saturating_v4() {
+        // Verify saturating_sub works at max boundary
+        let mut acct = make_liability(2, 0);
+        acct.credit_balance = u128::MAX;
+        acct.debit_balance = 1;
+        assert_eq!(net_balance(&acct), u128::MAX - 1);
+    }
+
+    #[test]
+    fn test_create_journal_entry_overflow_credits_v4() {
+        // Credits overflow u128
+        let result = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), u128::MAX)],
+            &[(id(2), u128::MAX), (id(3), 1)],
+        );
+        assert_eq!(result, Err(AccountingError::Overflow));
+    }
+
+    #[test]
+    fn test_create_journal_entry_five_debit_five_credit_balanced_v4() {
+        // 5x5 with different amounts that balance
+        let entry = create_journal_entry(
+            99, 500, [0xABu8; 32],
+            &[(id(1), 10), (id(2), 20), (id(3), 30), (id(4), 40), (id(5), 50)],
+            &[(id(6), 50), (id(7), 40), (id(8), 30), (id(9), 20), (id(10), 10)],
+        ).unwrap();
+        assert_eq!(entry.total_amount, 150);
+        assert_eq!(entry.debit_count, 5);
+        assert_eq!(entry.credit_count, 5);
+        assert_eq!(entry.entry_id, 99);
+        assert_eq!(entry.block_number, 500);
+    }
+
+    #[test]
+    fn test_post_entry_overflow_debit_balance_v4() {
+        // Posting a debit that overflows the account's debit_balance
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = u128::MAX;
+        let revenue = make_revenue(2, 0);
+        let entry = create_journal_entry(
+            1, 10, [0u8; 32],
+            &[(id(1), 1)],
+            &[(id(2), 1)],
+        ).unwrap();
+        let result = post_entry(&[acct, revenue], &entry);
+        assert_eq!(result, Err(AccountingError::Overflow));
+    }
+
+    #[test]
+    fn test_post_entry_overflow_credit_balance_v4() {
+        // Posting a credit that overflows the account's credit_balance
+        let asset = make_asset(1, 0);
+        let mut revenue = make_revenue(2, 0);
+        revenue.credit_balance = u128::MAX;
+        let entry = create_journal_entry(
+            1, 10, [0u8; 32],
+            &[(id(1), 1)],
+            &[(id(2), 1)],
+        ).unwrap();
+        let result = post_entry(&[asset, revenue], &entry);
+        assert_eq!(result, Err(AccountingError::Overflow));
+    }
+
+    #[test]
+    fn test_trial_balance_saturating_add_v4() {
+        // Trial balance uses saturating_add; verify it doesn't panic with large values
+        let mut a1 = make_asset(1, 0);
+        a1.debit_balance = u128::MAX / 2;
+        let mut a2 = make_asset(2, 0);
+        a2.debit_balance = u128::MAX / 2;
+        let mut r = make_revenue(3, 0);
+        r.credit_balance = u128::MAX;
+        let tb = trial_balance(&[a1, a2, r]);
+        // Debits saturated, credits = MAX → not balanced (MAX-1 vs MAX)
+        assert!(!tb.is_balanced);
+    }
+
+    #[test]
+    fn test_balance_sheet_only_revenue_v4() {
+        // Only revenue accounts → assets=0, net_income = revenue
+        let mut r = make_revenue(1, 0);
+        r.credit_balance = 5000;
+        let bs = balance_sheet(&[r]);
+        assert!(!bs.is_balanced); // 0 != 0 + 0 + 5000
+        assert_eq!(bs.total_revenue, 5000);
+        assert_eq!(bs.net_income, 5000);
+    }
+
+    #[test]
+    fn test_balance_sheet_only_expenses_v4() {
+        // Only expense accounts
+        let mut e = make_expense(1, 0);
+        e.debit_balance = 3000;
+        let bs = balance_sheet(&[e]);
+        assert!(!bs.is_balanced); // 0 != 0 + 0 + (-3000)
+        assert_eq!(bs.total_expenses, 3000);
+        assert_eq!(bs.net_income, -3000);
+    }
+
+    #[test]
+    fn test_reconcile_large_difference_v4() {
+        // Large difference between actual and expected
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = 0;
+        let result = reconcile(&acct, u128::MAX);
+        assert!(!result.is_reconciled);
+        assert_eq!(result.difference, u128::MAX);
+    }
+
+    #[test]
+    fn test_reconcile_liability_contra_v4() {
+        // Liability in contra state (debit > credit) → net balance 0
+        let mut acct = make_liability(2, 0);
+        acct.debit_balance = 5000;
+        acct.credit_balance = 1000;
+        let result = reconcile(&acct, 0);
+        assert!(result.is_reconciled);
+        assert_eq!(result.actual_balance, 0);
+    }
+
+    #[test]
+    fn test_audit_trail_liability_account_v4() {
+        // Audit trail for a liability account (normal credit balance)
+        let mut acct = make_liability(2, 0);
+        acct.credit_balance = 1500;
+        acct.debit_balance = 500;
+        let e1 = create_journal_entry(1, 10, [0u8; 32], &[(id(1), 1500)], &[(id(2), 1500)]).unwrap();
+        let e2 = create_journal_entry(2, 20, [0u8; 32], &[(id(2), 500)], &[(id(1), 500)]).unwrap();
+        let trail = audit_trail(&acct, &[e1, e2]);
+        assert_eq!(trail.closing_balance, 1000); // credit(1500) - debit(500)
+        assert_eq!(trail.total_credits, 1500);
+        assert_eq!(trail.total_debits, 500);
+        assert!(trail.is_consistent);
+    }
+
+    #[test]
+    fn test_audit_trail_equity_v4() {
+        let mut acct = make_equity(5, 0);
+        acct.credit_balance = 10000;
+        let e1 = create_journal_entry(1, 10, [0u8; 32], &[(id(1), 10000)], &[(id(5), 10000)]).unwrap();
+        let trail = audit_trail(&acct, &[e1]);
+        assert_eq!(trail.closing_balance, 10000);
+        assert_eq!(trail.opening_balance, 0);
+        assert!(trail.is_consistent);
+    }
+
+    #[test]
+    fn test_audit_trail_irrelevant_entries_v4() {
+        // Entries that don't reference this account should not contribute
+        let acct = make_asset(1, 0);
+        let e1 = create_journal_entry(1, 10, [0u8; 32], &[(id(99), 1000)], &[(id(98), 1000)]).unwrap();
+        let trail = audit_trail(&acct, &[e1]);
+        assert_eq!(trail.total_debits, 0);
+        assert_eq!(trail.total_credits, 0);
+        assert_eq!(trail.entry_count, 0);
+        assert!(trail.is_consistent);
+    }
+
+    #[test]
+    fn test_category_total_mixed_contra_v4() {
+        // Mix of normal and contra accounts in same category
+        let mut a1 = make_asset(1, 0);
+        a1.debit_balance = 1000;
+        a1.credit_balance = 0; // normal: net = 1000
+        let mut a2 = make_asset(2, 0);
+        a2.debit_balance = 100;
+        a2.credit_balance = 500; // contra: net = 0 (saturating)
+        assert_eq!(category_total(&[a1, a2], AccountCategory::Asset), 1000);
+    }
+
+    #[test]
+    fn test_record_emission_minimum_valid_amount_v4() {
+        // Smallest amount that yields all three non-zero shares
+        // With 1/1 bps split, we need at least BPS / gcd which is complex
+        // Use 5000/4999 → shapley=floor(amount*5000/10000), gauge=floor(amount*4999/10000)
+        // For amount=2: shapley=1, gauge=0 → zero gauge → fail
+        // For amount=3: shapley=1, gauge=1, staking=1 → ok with 3334/3333 split
+        let result = record_emission(
+            id(1), 3, id(2), id(3), id(4),
+            3334, 3333, 100,
+        );
+        // shapley = mul_div(3, 3334, 10000) = 1, gauge = mul_div(3, 3333, 10000) = 0 → ZeroAmount
+        assert_eq!(result, Err(AccountingError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_record_emission_bps_exactly_10000_v4() {
+        // shapley + gauge = 10000 → staking = 0 → ZeroAmount
+        let result = record_emission(
+            id(1), 10000, id(2), id(3), id(4),
+            7000, 3000, 100,
+        );
+        assert_eq!(result, Err(AccountingError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_record_fee_revenue_entry_id_preserved_v4() {
+        let entry = record_fee_revenue(id(1), id(2), 500, 10, 42).unwrap();
+        assert_eq!(entry.entry_id, 42);
+    }
+
+    #[test]
+    fn test_record_fee_revenue_block_preserved_v4() {
+        let entry = record_fee_revenue(id(1), id(2), 500, 999, 1).unwrap();
+        assert_eq!(entry.block_number, 999);
+    }
+
+    #[test]
+    fn test_period_summary_many_entries_v4() {
+        let mut entries = Vec::new();
+        for i in 0..50u64 {
+            let e = create_journal_entry(i, i * 10, [0u8; 32], &[(id(1), 100)], &[(id(2), 100)]).unwrap();
+            entries.push(e);
+        }
+        let (vol, count) = period_summary(&entries, 0, 500);
+        assert_eq!(count, 50);
+        assert_eq!(vol, 5000);
+    }
+
+    #[test]
+    fn test_find_account_duplicate_ids_returns_first_v4() {
+        // Two accounts with same id — find_account returns first occurrence
+        let a1 = make_asset(1, 10);
+        let a2 = make_asset(1, 20);
+        assert_eq!(find_account(&[a1, a2], id(1)), Some(0));
+    }
+
+    #[test]
+    fn test_full_lifecycle_with_emission_v4() {
+        // Create all 5 account types and post emission + fee entries
+        let treasury = make_expense(1, 0);
+        let shapley = make_asset(2, 0);
+        let gauge = make_asset(3, 0);
+        let staking = make_asset(4, 0);
+        let equity = make_equity(5, 0);
+        let accounts = vec![treasury, shapley, gauge, staking, equity];
+
+        // Initial equity
+        let eq_entry = create_journal_entry(1, 10, [0u8; 32], &[(id(2), 50000)], &[(id(5), 50000)]).unwrap();
+        let accounts = post_entry(&accounts, &eq_entry).unwrap();
+
+        // Emission
+        let em_entry = record_emission(id(1), 10000, id(2), id(3), id(4), 5000, 3500, 20).unwrap();
+        let accounts = post_entry(&accounts, &em_entry).unwrap();
+
+        let tb = trial_balance(&accounts);
+        assert!(tb.is_balanced);
+    }
+
+    #[test]
+    fn test_balance_sheet_large_precision_values_v4() {
+        // Use PRECISION-scaled values (realistic DeFi scenario)
+        let mut a = make_asset(1, 0);
+        a.debit_balance = 1_000_000 * PRECISION;
+        let mut l = make_liability(2, 0);
+        l.credit_balance = 300_000 * PRECISION;
+        let mut eq = make_equity(3, 0);
+        eq.credit_balance = 200_000 * PRECISION;
+        let mut rev = make_revenue(4, 0);
+        rev.credit_balance = 600_000 * PRECISION;
+        let mut exp = make_expense(5, 0);
+        exp.debit_balance = 100_000 * PRECISION;
+        // A(1M) = L(300K) + Eq(200K) + NI(600K - 100K = 500K) = 1M
+        let bs = balance_sheet(&[a, l, eq, rev, exp]);
+        assert!(bs.is_balanced);
+        assert_eq!(bs.total_assets, 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_post_entry_entry_count_increments_both_sides_v4() {
+        // Account appears on both debit and credit side of same entry
+        let accounts = vec![make_asset(1, 0), make_asset(2, 0)];
+        // Transfer between two asset accounts
+        let e1 = create_journal_entry(1, 10, [0u8; 32], &[(id(1), 100)], &[(id(2), 100)]).unwrap();
+        let result = post_entry(&accounts, &e1).unwrap();
+        assert_eq!(result[0].entry_count, 1); // debited
+        assert_eq!(result[1].entry_count, 1); // credited
+    }
+
+    #[test]
+    fn test_create_journal_entry_same_account_both_sides_v4() {
+        // Same account on both debit and credit (reclassification)
+        let entry = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 500)],
+            &[(id(1), 500)],
+        ).unwrap();
+        assert_eq!(entry.total_amount, 500);
+    }
+
+    #[test]
+    fn test_post_same_account_both_sides_v4() {
+        // Post entry where same account is debited and credited
+        let accounts = vec![make_asset(1, 0)];
+        let entry = create_journal_entry(
+            1, 10, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(1), 1000)],
+        ).unwrap();
+        let result = post_entry(&accounts, &entry).unwrap();
+        assert_eq!(result[0].debit_balance, 1000);
+        assert_eq!(result[0].credit_balance, 1000);
+        assert_eq!(net_balance(&result[0]), 0); // Net zero
+        assert_eq!(result[0].entry_count, 2); // Counted twice (debit + credit)
+    }
 }

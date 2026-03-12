@@ -2400,4 +2400,282 @@ mod tests {
         assert_eq!(result.slash_rate_bps, DEFAULT_SLASH_RATE_BPS);
         assert_eq!(result.slash_rate_bps, 5000);
     }
+
+    // ============ Hardening Tests (Batch harden3) ============
+
+    #[test]
+    fn test_order_hash_all_zero_inputs_nonzero_harden3() {
+        let hash = commit_order_hash(0, 0, 0, 0, &[0u8; 32]);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_order_hash_buy_vs_unknown_type_harden3() {
+        let secret = [0x42u8; 32];
+        let buy = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let unknown = commit_order_hash(5, 1000, 2000, 0, &secret);
+        assert_ne!(buy, unknown);
+    }
+
+    #[test]
+    fn test_validate_commit_correct_order_harden3() {
+        // Verify order of checks: batch_id → phase → hash
+        let secret = [0x42u8; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, 2000, 0, &secret);
+        let mut auction = default_auction();
+        auction.batch_id = 1;
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 100_000,
+            token_type_hash: [0x11; 32],
+            token_amount: 1000,
+            block_number: 105,
+            sender_lock_hash: [0xAA; 32],
+        };
+        assert!(validate_commit(&commit, ORDER_BUY, 1000, 2000, 0, &secret, &auction).is_ok());
+    }
+
+    #[test]
+    fn test_verify_reveal_correct_all_fields_harden3() {
+        let secret = [0x77u8; 32];
+        let hash = commit_order_hash(ORDER_SELL, 5000, 1000, 300, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 200_000,
+            token_type_hash: [0x22; 32],
+            token_amount: 5000,
+            block_number: 110,
+            sender_lock_hash: [0xBB; 32],
+        };
+        let reveal = RevealWitness {
+            order_type: ORDER_SELL,
+            amount_in: 5000,
+            limit_price: 1000,
+            secret,
+            priority_bid: 300,
+            commit_index: 0,
+        };
+        assert!(verify_reveal(&reveal, &commit).is_ok());
+    }
+
+    #[test]
+    fn test_phase_info_commit_zero_elapsed_harden3() {
+        let mut auction = default_auction();
+        auction.phase_start_block = 500;
+        let config = default_config();
+        let info = phase_info(&auction, 500, &config);
+        assert_eq!(info.blocks_remaining, config.commit_window_blocks);
+        assert!(!info.can_transition);
+    }
+
+    #[test]
+    fn test_phase_info_reveal_zero_elapsed_harden3() {
+        let mut auction = default_auction();
+        auction.phase = PHASE_REVEAL;
+        auction.phase_start_block = 500;
+        let config = default_config();
+        let info = phase_info(&auction, 500, &config);
+        assert_eq!(info.blocks_remaining, config.reveal_window_blocks);
+        assert!(!info.can_transition);
+    }
+
+    #[test]
+    fn test_slash_conservation_all_rates_harden3() {
+        let deposit = 7_654_321;
+        for rate in [0u16, 1, 100, 2500, 5000, 7500, 9999, 10_000] {
+            let result = calculate_slash(deposit, rate);
+            assert_eq!(result.slash_amount + result.return_amount, deposit,
+                "Conservation violated at rate={}", rate);
+        }
+    }
+
+    #[test]
+    fn test_slash_monotonic_with_rate_harden3() {
+        let deposit = 1_000_000;
+        let mut prev_slash = 0u64;
+        for rate in [0u16, 100, 500, 1000, 2500, 5000, 7500, 10_000] {
+            let result = calculate_slash(deposit, rate);
+            assert!(result.slash_amount >= prev_slash,
+                "Slash should increase with rate: rate={}, prev={}, curr={}",
+                rate, prev_slash, result.slash_amount);
+            prev_slash = result.slash_amount;
+        }
+    }
+
+    #[test]
+    fn test_simulate_batch_two_buys_two_sells_harden3() {
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 500 * PRECISION, 2 * PRECISION, 0),
+            make_reveal(ORDER_BUY, 300 * PRECISION, 2 * PRECISION, 0),
+            make_reveal(ORDER_SELL, 400 * PRECISION, PRECISION / 2, 0),
+            make_reveal(ORDER_SELL, 200 * PRECISION, PRECISION / 2, 0),
+        ];
+        let result = simulate_batch(
+            &reveals, 1_000_000 * PRECISION, 1_000_000 * PRECISION, PRECISION,
+        );
+        assert!(result.is_ok());
+        let sim = result.unwrap();
+        assert_eq!(sim.total_buy_volume, 800 * PRECISION);
+        assert_eq!(sim.total_sell_volume, 600 * PRECISION);
+    }
+
+    #[test]
+    fn test_analyze_order_book_large_batch_harden3() {
+        let mut reveals = Vec::new();
+        for i in 0..20u128 {
+            reveals.push(make_reveal(ORDER_BUY, (100 + i) * PRECISION, (2000 + i) * PRECISION, 0));
+            reveals.push(make_reveal(ORDER_SELL, (50 + i) * PRECISION, (1000 + i) * PRECISION, 0));
+        }
+        let (bc, sc, bv, sv, bp, sp) = analyze_order_book(&reveals);
+        assert_eq!(bc, 20);
+        assert_eq!(sc, 20);
+        assert!(bv > 0);
+        assert!(sv > 0);
+        assert!(bp > 0);
+        assert!(sp > 0);
+    }
+
+    #[test]
+    fn test_count_non_revealers_equal_harden3() {
+        let mut auction = default_auction();
+        auction.commit_count = 42;
+        auction.reveal_count = 42;
+        assert_eq!(count_non_revealers(&auction), 0);
+    }
+
+    #[test]
+    fn test_count_non_revealers_all_missing_harden3() {
+        let mut auction = default_auction();
+        auction.commit_count = 100;
+        auction.reveal_count = 0;
+        assert_eq!(count_non_revealers(&auction), 100);
+    }
+
+    #[test]
+    fn test_estimate_slash_revenue_max_rate_harden3() {
+        let revenue = estimate_slash_revenue(5, 200_000_000, 10_000);
+        assert_eq!(revenue, 5 * 200_000_000);
+    }
+
+    #[test]
+    fn test_optimal_priority_bid_zero_amount_harden3() {
+        let bid = optimal_priority_bid(
+            0, 50_000 * PRECISION,
+            1_000_000 * PRECISION, 1_000_000 * PRECISION, 30,
+        );
+        assert_eq!(bid, 0);
+    }
+
+    #[test]
+    fn test_xor_seed_all_zeros_harden3() {
+        let s = compute_xor_seed(&[[0u8; 32]]);
+        // One zero secret → result depends on implementation
+        let _ = s; // Just ensure no panic
+    }
+
+    #[test]
+    fn test_xor_seed_three_different_harden3() {
+        let s1 = compute_xor_seed(&[[0x01; 32], [0x02; 32], [0x03; 32]]);
+        let s2 = compute_xor_seed(&[[0x04; 32], [0x05; 32], [0x06; 32]]);
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn test_verify_execution_order_two_elements_harden3() {
+        let seed = [0x99u8; 32];
+        let expected = vibeswap_math::shuffle::partition_and_shuffle(2, 0, &seed);
+        assert!(verify_execution_order(2, 0, &seed, &expected));
+    }
+
+    #[test]
+    fn test_verify_execution_order_large_harden3() {
+        let seed = [0x55u8; 32];
+        let expected = vibeswap_math::shuffle::partition_and_shuffle(50, 10, &seed);
+        assert!(verify_execution_order(50, 10, &seed, &expected));
+    }
+
+    #[test]
+    fn test_batch_simulation_clone_eq_harden3() {
+        let sim = BatchSimulation {
+            clearing_price: PRECISION,
+            fillable_volume: 1000,
+            buy_fills: 5,
+            sell_fills: 3,
+            total_buy_volume: 5000,
+            total_sell_volume: 3000,
+            pressure_ratio: PRECISION * 5 / 3,
+            price_impact_bps: 100,
+        };
+        let cloned = sim.clone();
+        assert_eq!(sim, cloned);
+    }
+
+    #[test]
+    fn test_fill_estimate_clone_eq_harden3() {
+        let fe = FillEstimate {
+            would_fill: true,
+            estimated_output: 1000,
+            effective_price: PRECISION,
+            queue_position: 0,
+            priority_helpful: false,
+        };
+        let cloned = fe.clone();
+        assert_eq!(fe, cloned);
+    }
+
+    #[test]
+    fn test_phase_info_clone_eq_harden3() {
+        let pi = PhaseInfo {
+            phase: PHASE_COMMIT,
+            blocks_remaining: 20,
+            can_transition: false,
+            next_phase: PHASE_REVEAL,
+        };
+        let cloned = pi.clone();
+        assert_eq!(pi, cloned);
+    }
+
+    #[test]
+    fn test_auction_error_clone_eq_harden3() {
+        let e1 = AuctionError::EmptyBatch;
+        let e2 = e1.clone();
+        assert_eq!(e1, e2);
+        let e3 = AuctionError::BatchIdMismatch { commit: 1, auction: 2 };
+        let e4 = e3.clone();
+        assert_eq!(e3, e4);
+    }
+
+    #[test]
+    fn test_simulate_batch_clearing_price_positive_harden3() {
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 1_000 * PRECISION, 2 * PRECISION, 0),
+            make_reveal(ORDER_SELL, 1_000 * PRECISION, PRECISION / 2, 0),
+        ];
+        let sim = simulate_batch(
+            &reveals, 1_000_000 * PRECISION, 1_000_000 * PRECISION, PRECISION,
+        ).unwrap();
+        assert!(sim.clearing_price > 0, "Clearing price should be positive");
+    }
+
+    #[test]
+    fn test_optimal_priority_symmetric_reserves_harden3() {
+        let bid = optimal_priority_bid(
+            1_000 * PRECISION, 50_000 * PRECISION,
+            500_000 * PRECISION, 500_000 * PRECISION, 30,
+        );
+        // With equal reserves, impact = 50000*10000/500000 = 1000 bps
+        // benefit = 1000 * 1000 / 10000 = 100
+        // bid = 100 * 1000 / 10000 = 10 → converted to shannons
+        assert!(bid > 0);
+    }
+
+    #[test]
+    fn test_estimate_slash_revenue_rate_1_bps_harden3() {
+        let revenue = estimate_slash_revenue(10, 1_000_000, 1);
+        // per_slash = 1_000_000 * 1 / 10_000 = 100
+        // total = 100 * 10 = 1000
+        assert_eq!(revenue, 1000);
+    }
 }

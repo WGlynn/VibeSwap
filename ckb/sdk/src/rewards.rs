@@ -1894,4 +1894,363 @@ mod tests {
         let claimable = vesting_claimable(&schedule, block).unwrap();
         assert_eq!(claimable, 2_500); // 25% of 10_000
     }
+
+    // ============ Hardening Tests (Batch harden3) ============
+
+    #[test]
+    fn test_shapley_distribute_single_contributor_gets_all_harden3() {
+        let contributors = vec![
+            make_contributor(1, 1000, ContributionType::Trader),
+        ];
+        let allocs = shapley_distribute(50_000, &contributors).unwrap();
+        assert_eq!(allocs.len(), 1);
+        assert_eq!(allocs[0].amount, 50_000);
+        assert_eq!(allocs[0].share_bps, 10_000);
+    }
+
+    #[test]
+    fn test_shapley_distribute_equal_weights_harden3() {
+        let contributors = vec![
+            make_contributor(1, 100, ContributionType::LiquidityProvider),
+            make_contributor(2, 100, ContributionType::Trader),
+            make_contributor(3, 100, ContributionType::Relayer),
+            make_contributor(4, 100, ContributionType::Validator),
+        ];
+        let allocs = shapley_distribute(10_000, &contributors).unwrap();
+        // Each should get ~2500, dust goes to first max
+        let total: u128 = allocs.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 10_000, "Total must be conserved");
+        for a in &allocs {
+            assert!(a.amount >= 2_499 && a.amount <= 2_501);
+        }
+    }
+
+    #[test]
+    fn test_shapley_distribute_exceeds_max_contributors_harden3() {
+        let contributors: Vec<ContributorShare> = (0..257u16)
+            .map(|i| make_contributor(i as u8, 100, ContributionType::Trader))
+            .collect();
+        let result = shapley_distribute(1_000_000, &contributors);
+        assert_eq!(result.unwrap_err(), RewardsError::InvalidWeight);
+    }
+
+    #[test]
+    fn test_shapley_distribute_exactly_max_contributors_harden3() {
+        let contributors: Vec<ContributorShare> = (0..256u16)
+            .map(|i| make_contributor(i as u8, 100, ContributionType::Governance))
+            .collect();
+        let result = shapley_distribute(256_000, &contributors);
+        assert!(result.is_ok());
+        let allocs = result.unwrap();
+        let total: u128 = allocs.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 256_000);
+    }
+
+    #[test]
+    fn test_shapley_distribute_one_weight_dominates_harden3() {
+        let contributors = vec![
+            make_contributor(1, 999_999, ContributionType::LiquidityProvider),
+            make_contributor(2, 1, ContributionType::Trader),
+        ];
+        let allocs = shapley_distribute(1_000_000, &contributors).unwrap();
+        // Contributor 1 gets ~999999, contributor 2 gets ~1
+        assert!(allocs[0].amount > 999_990);
+        assert!(allocs[1].amount < 10);
+        let total: u128 = allocs.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 1_000_000);
+    }
+
+    #[test]
+    fn test_shapley_distribute_dust_conservation_harden3() {
+        // 3 contributors with indivisible reward → dust assigned to largest
+        let contributors = vec![
+            make_contributor(1, 100, ContributionType::Trader),
+            make_contributor(2, 100, ContributionType::Trader),
+            make_contributor(3, 100, ContributionType::Trader),
+        ];
+        let allocs = shapley_distribute(10, &contributors).unwrap();
+        let total: u128 = allocs.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 10, "Dust must be conserved");
+    }
+
+    #[test]
+    fn test_shapley_distribute_u128_max_weight_harden3() {
+        // Very large weights should not overflow
+        let contributors = vec![
+            make_contributor(1, u128::MAX / 4, ContributionType::Trader),
+            make_contributor(2, u128::MAX / 4, ContributionType::Validator),
+        ];
+        let allocs = shapley_distribute(100_000, &contributors).unwrap();
+        let total: u128 = allocs.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 100_000);
+    }
+
+    #[test]
+    fn test_vesting_claimable_partial_release_harden3() {
+        // Already released 50%, now at 75% → claimable should be 25%
+        let schedule = make_schedule(10_000, 5_000, 0, 0, 1000);
+        let claimable = vesting_claimable(&schedule, 750).unwrap();
+        assert_eq!(claimable, 2_500); // 75% of 10000 = 7500, minus 5000 released = 2500
+    }
+
+    #[test]
+    fn test_vesting_claimable_fully_released_harden3() {
+        let schedule = make_schedule(10_000, 10_000, 0, 0, 1000);
+        let result = vesting_claimable(&schedule, 500);
+        assert_eq!(result.unwrap_err(), RewardsError::VestingComplete);
+    }
+
+    #[test]
+    fn test_vesting_claimable_released_exceeds_total_harden3() {
+        // Edge: released > total should still be VestingComplete
+        let schedule = make_schedule(10_000, 15_000, 0, 0, 1000);
+        let result = vesting_claimable(&schedule, 500);
+        assert_eq!(result.unwrap_err(), RewardsError::VestingComplete);
+    }
+
+    #[test]
+    fn test_vesting_claimable_with_cliff_exactly_at_cliff_harden3() {
+        // Cliff = 200 blocks. At block 200, we've passed the cliff.
+        let schedule = make_schedule(10_000, 0, 0, 200, 1000);
+        let claimable = vesting_claimable(&schedule, 200).unwrap();
+        // elapsed=200, cliff=200, duration=1000 → vested = 10000 * 200 / 1000 = 2000
+        assert_eq!(claimable, 2_000);
+    }
+
+    #[test]
+    fn test_vesting_claimable_one_block_before_cliff_harden3() {
+        let schedule = make_schedule(10_000, 0, 0, 200, 1000);
+        let result = vesting_claimable(&schedule, 199);
+        assert_eq!(result.unwrap_err(), RewardsError::CliffNotReached);
+    }
+
+    #[test]
+    fn test_vesting_progress_at_start_block_harden3() {
+        // At exactly start_block, progress should be 0
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 100), 0);
+    }
+
+    #[test]
+    fn test_vesting_progress_before_start_block_harden3() {
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 50), 0);
+    }
+
+    #[test]
+    fn test_vesting_progress_full_duration_harden3() {
+        let schedule = make_schedule(10_000, 0, 0, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 1000), 10_000);
+    }
+
+    #[test]
+    fn test_vesting_progress_beyond_duration_harden3() {
+        let schedule = make_schedule(10_000, 0, 0, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 5000), 10_000);
+    }
+
+    #[test]
+    fn test_stake_reward_zero_base_reward_harden3() {
+        let stake = make_stake(1000, 0, 10_000);
+        let reward = stake_reward(&stake, 0, 5000);
+        assert_eq!(reward, 0);
+    }
+
+    #[test]
+    fn test_stake_reward_zero_amount_harden3() {
+        let stake = make_stake(0, 0, 10_000);
+        let reward = stake_reward(&stake, 1000, 5000);
+        assert_eq!(reward, 0);
+    }
+
+    #[test]
+    fn test_stake_reward_before_start_harden3() {
+        let stake = make_stake(1000, 100, 10_000);
+        let reward = stake_reward(&stake, 1000, 50);
+        assert_eq!(reward, 0);
+    }
+
+    #[test]
+    fn test_stake_reward_at_max_duration_harden3() {
+        let stake = make_stake(1000, 0, MAX_STAKE_DURATION);
+        let reward = stake_reward(&stake, 10_000, MAX_STAKE_DURATION);
+        // At max duration, multiplier should be MAX_MULTIPLIER_BPS (30000 = 3x)
+        assert_eq!(reward, 30_000); // 10_000 * 30_000 / 10_000
+    }
+
+    #[test]
+    fn test_time_multiplier_zero_max_duration_harden3() {
+        let m = time_weighted_multiplier(100, 0, 30_000);
+        assert_eq!(m, 10_000); // 1x when max_duration is 0
+    }
+
+    #[test]
+    fn test_time_multiplier_max_bps_10000_harden3() {
+        // max_multiplier_bps <= 10000 → always returns 10000
+        let m = time_weighted_multiplier(5000, 10_000, 10_000);
+        assert_eq!(m, 10_000);
+    }
+
+    #[test]
+    fn test_time_multiplier_exceeds_max_duration_capped_harden3() {
+        // stake_duration > max_duration should cap at max_duration
+        let m1 = time_weighted_multiplier(100_000, 50_000, 30_000);
+        let m2 = time_weighted_multiplier(50_000, 50_000, 30_000);
+        assert_eq!(m1, m2, "Duration exceeding max should cap at max");
+        assert_eq!(m1, 30_000);
+    }
+
+    #[test]
+    fn test_loyalty_tier_no_tiers_harden3() {
+        let tiers: Vec<LoyaltyTier> = vec![];
+        assert!(loyalty_tier(1000, &tiers).is_none());
+    }
+
+    #[test]
+    fn test_loyalty_tier_zero_points_matches_zero_tier_harden3() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(0, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 0);
+    }
+
+    #[test]
+    fn test_loyalty_points_max_volume_cap_harden3() {
+        // Volume bonus should cap at 500 regardless of volume
+        let points_large = loyalty_points_earned(1_000 * PRECISION, 0);
+        let points_huge = loyalty_points_earned(10_000 * PRECISION, 0);
+        // base=100, volume capped at 500
+        assert_eq!(points_large, 100 + 500);
+        assert_eq!(points_huge, 100 + 500);
+    }
+
+    #[test]
+    fn test_fee_discount_zero_discount_harden3() {
+        let tier = LoyaltyTier {
+            tier_id: 0,
+            min_points: 0,
+            fee_discount_bps: 0,
+            boost_multiplier_bps: 10_000,
+        };
+        assert_eq!(fee_discount(&tier, 1000), 1000);
+    }
+
+    #[test]
+    fn test_fee_discount_full_discount_harden3() {
+        let tier = LoyaltyTier {
+            tier_id: 3,
+            min_points: 0,
+            fee_discount_bps: 10_000,
+            boost_multiplier_bps: 10_000,
+        };
+        assert_eq!(fee_discount(&tier, 1000), 0);
+    }
+
+    #[test]
+    fn test_epoch_rewards_breakdown_zero_all_harden3() {
+        let er = epoch_rewards_breakdown(0, 0, 0, 0);
+        assert_eq!(er.total_rewards, 0);
+        assert_eq!(er.epoch, 0);
+    }
+
+    #[test]
+    fn test_epoch_rewards_total_sum_harden3() {
+        let er = epoch_rewards_breakdown(100, 200, 5, 50);
+        assert_eq!(er.total_rewards, 350);
+        assert_eq!(er.fee_rewards, 100);
+        assert_eq!(er.emission_rewards, 200);
+        assert_eq!(er.bonus_rewards, 50);
+    }
+
+    #[test]
+    fn test_reward_summary_empty_harden3() {
+        let summary = reward_summary(&[]);
+        assert_eq!(summary.total_distributed, 0);
+        assert_eq!(summary.unique_recipients, 0);
+        assert_eq!(summary.avg_reward, 0);
+        assert_eq!(summary.top_contributor_share_bps, 0);
+    }
+
+    #[test]
+    fn test_reward_summary_single_allocation_harden3() {
+        let allocs = vec![ShapleyAllocation {
+            address: addr(1),
+            amount: 5000,
+            share_bps: 10_000,
+            contribution_type: ContributionType::Trader,
+        }];
+        let summary = reward_summary(&allocs);
+        assert_eq!(summary.total_distributed, 5000);
+        assert_eq!(summary.unique_recipients, 1);
+        assert_eq!(summary.avg_reward, 5000);
+        assert_eq!(summary.top_contributor_share_bps, 10_000);
+    }
+
+    #[test]
+    fn test_merge_contributions_disjoint_harden3() {
+        let a = vec![make_contributor(1, 100, ContributionType::Trader)];
+        let b = vec![make_contributor(2, 200, ContributionType::Validator)];
+        let merged = merge_contributions(&a, &b);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn test_merge_contributions_overlapping_harden3() {
+        let a = vec![make_contributor(1, 100, ContributionType::Trader)];
+        let b = vec![make_contributor(1, 200, ContributionType::Validator)];
+        let merged = merge_contributions(&a, &b);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].weight, 300);
+        // First occurrence's type is kept
+        assert_eq!(merged[0].contribution_type, ContributionType::Trader);
+    }
+
+    #[test]
+    fn test_merge_contributions_empty_both_harden3() {
+        let merged = merge_contributions(&[], &[]);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn test_merge_contributions_empty_one_side_harden3() {
+        let a = vec![make_contributor(1, 100, ContributionType::Trader)];
+        let merged = merge_contributions(&a, &[]);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].weight, 100);
+    }
+
+    #[test]
+    fn test_validate_weights_single_valid_harden3() {
+        let c = vec![make_contributor(1, 1, ContributionType::Trader)];
+        assert!(validate_weights(&c).is_ok());
+    }
+
+    #[test]
+    fn test_validate_weights_empty_harden3() {
+        assert_eq!(validate_weights(&[]).unwrap_err(), RewardsError::NoContributions);
+    }
+
+    #[test]
+    fn test_validate_weights_zero_weight_mid_list_harden3() {
+        let c = vec![
+            make_contributor(1, 100, ContributionType::Trader),
+            make_contributor(2, 0, ContributionType::Validator),
+            make_contributor(3, 100, ContributionType::Relayer),
+        ];
+        assert_eq!(validate_weights(&c).unwrap_err(), RewardsError::InvalidWeight);
+    }
+
+    #[test]
+    fn test_shapley_allocation_share_bps_sum_harden3() {
+        // share_bps values should approximately sum to 10000
+        let contributors = vec![
+            make_contributor(1, 50, ContributionType::Trader),
+            make_contributor(2, 30, ContributionType::Validator),
+            make_contributor(3, 20, ContributionType::Relayer),
+        ];
+        let allocs = shapley_distribute(100_000, &contributors).unwrap();
+        let total_bps: u16 = allocs.iter().map(|a| a.share_bps).sum();
+        // Due to rounding, may not be exactly 10000 but should be close
+        assert!(total_bps >= 9_998 && total_bps <= 10_000,
+            "Share bps sum should be ~10000, got {}", total_bps);
+    }
 }

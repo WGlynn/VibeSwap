@@ -16,6 +16,7 @@ pub mod compliance;
 pub mod delegate;
 pub mod consensus;
 pub mod emission;
+pub mod escrow;
 pub mod fees;
 pub mod flashloan;
 pub mod gauge;

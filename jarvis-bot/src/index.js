@@ -7,7 +7,7 @@ import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
 import { generateDigest, generateWeeklyDigest } from './digest.js';
-import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats, checkGroupNorms } from './intelligence.js';
+import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats, checkGroupNorms, getScoreTrends, getScoreCalibration } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
 import { loadBehavior, getFlag, setFlag, listFlags } from './behavior.js';
 import { initLearning, processCorrection, getLearningStats, getUserKnowledgeSummary, getGroupKnowledgeSummary, getSkills, flushLearning, addGroupNorm, setGroupName, compressCKB } from './learning.js';
@@ -2450,8 +2450,23 @@ bot.command('social', async (ctx) => {
 
   if (sub === 'status') {
     const stats = getSocialStats();
-    const lines = stats.platforms.map(p => `${p.name}: ${p.enabled ? 'ON' : 'OFF'} (${p.totalPosts} posts)`);
-    ctx.reply(`Social Platforms:\n${lines.join('\n')}\nQueue: ${stats.queueLength}`);
+    const lines = stats.platforms.map(p => {
+      const status = p.enabled ? '✅ ON' : '❌ OFF';
+      return `${p.name}: ${status} (${p.totalPosts} posts)`;
+    });
+    const envHints = [];
+    if (!stats.platforms.find(p => p.key === 'twitter')?.enabled) {
+      envHints.push('X/Twitter: set TWITTER_BEARER_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET');
+    }
+    if (!stats.platforms.find(p => p.key === 'discord')?.enabled) {
+      envHints.push('Discord: set DISCORD_WEBHOOK_URL');
+    }
+    const queueInfo = stats.queueLength > 0 ? `\nQueue: ${stats.queueLength} posts waiting` : '';
+    const recentInfo = stats.recentPosts?.length > 0
+      ? '\nRecent: ' + stats.recentPosts.slice(-2).map(p => `[${p.platform}] "${(p.content || '').slice(0, 40)}..."`).join(', ')
+      : '';
+    const missing = envHints.length > 0 ? '\n\nTo activate:\n' + envHints.join('\n') : '';
+    ctx.reply(`Social Platforms:\n${lines.join('\n')}${queueInfo}${recentInfo}${missing}`);
   } else if (sub === 'flush') {
     const result = await processSocialQueue();
     ctx.reply(`Processed: ${result.processed}, Remaining: ${result.remaining}${result.errors ? '\nErrors: ' + JSON.stringify(result.errors) : ''}`);
@@ -3419,6 +3434,46 @@ bot.command('crpc', async (ctx) => {
   } catch (err) {
     await ctx.reply(`CRPC failed: ${err.message}`);
   }
+});
+
+// ============ Brain — Intelligence Loop Status ============
+// Shows the self-improvement feedback loop: score trends, calibration, inner dialogue.
+
+bot.command('brain', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+
+  const intel = getIntelligenceStats();
+  const trends = await getScoreTrends(7);
+  const calibration = await getScoreCalibration();
+
+  const lines = ['🧠 JARVIS Brain Status', ''];
+
+  // Score trends
+  if (trends && trends.count > 0) {
+    lines.push(`━━ Response Quality (${trends.count} responses, 7d) ━━`);
+    lines.push(`  Accuracy:    ${trends.accuracy}/10`);
+    lines.push(`  Relevance:   ${trends.relevance}/10`);
+    lines.push(`  Conciseness: ${trends.conciseness}/10`);
+    lines.push(`  Usefulness:  ${trends.usefulness}/10`);
+    lines.push(`  Naturalness: ${trends.naturalness}/10`);
+    lines.push(`  Composite:   ${trends.composite}/10`);
+  } else {
+    lines.push('Score trends: insufficient data (need ≥5 scored responses)');
+  }
+  lines.push('');
+
+  // Calibration
+  lines.push('━━ Self-Calibration ━━');
+  lines.push(calibration || 'No active calibration (all scores ≥7 or insufficient data)');
+  lines.push('');
+
+  // Engagement stats
+  lines.push('━━ Engagement ━━');
+  lines.push(`  This hour: ${intel.engagementsThisHour}/${intel.maxPerHour}`);
+  lines.push(`  Cooldown: ${Math.round(intel.cooldownRemaining / 1000)}s`);
+  lines.push(`  Rapport tracked: ${intel.rapportTracked} users`);
+
+  await ctx.reply(lines.join('\n'));
 });
 
 // ============ Mine — Launch Shard Miner Mini App ============

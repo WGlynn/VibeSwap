@@ -2427,4 +2427,216 @@ mod tests {
         // At block 50000 = 50/100
         assert_eq!(compute_vested(&s, 50_000), HUNDRED_VIBE / 2);
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn linear_create_zero_amount_h9() {
+        let result = create_linear(beneficiary_a(), 0, 0, 5_000, 1_000_000, true);
+        assert_eq!(result, Err(VestingError::ZeroAmount));
+    }
+
+    #[test]
+    fn linear_create_below_min_amount_h9() {
+        let result = create_linear(beneficiary_a(), MIN_VESTING_AMOUNT - 1, 0, 5_000, 1_000_000, true);
+        assert_eq!(result, Err(VestingError::BelowMinAmount));
+    }
+
+    #[test]
+    fn linear_create_exceeds_max_duration_h9() {
+        let result = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, MAX_VESTING_DURATION + 1, true);
+        assert_eq!(result, Err(VestingError::ExceedsMaxDuration));
+    }
+
+    #[test]
+    fn linear_create_cliff_exceeds_duration_h9() {
+        let result = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 200_000, 100_000, true);
+        assert_eq!(result, Err(VestingError::CliffExceedsDuration));
+    }
+
+    #[test]
+    fn linear_vested_before_start_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 100, 5_000, 1_000_000, true).unwrap();
+        assert_eq!(compute_vested(&s, 50), 0);
+    }
+
+    #[test]
+    fn linear_vested_during_cliff_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        assert_eq!(compute_vested(&s, 4_999), 0);
+    }
+
+    #[test]
+    fn linear_vested_at_cliff_end_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let vested = compute_vested(&s, 5_000);
+        // 5000/1000000 of total
+        let expected = THOUSAND_VIBE * 5_000 / 1_000_000;
+        assert_eq!(vested, expected);
+    }
+
+    #[test]
+    fn linear_fully_vested_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        assert_eq!(compute_vested(&s, 1_000_000), THOUSAND_VIBE);
+    }
+
+    #[test]
+    fn linear_vested_past_end_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        // Past end should still return total
+        assert_eq!(compute_vested(&s, 2_000_000), THOUSAND_VIBE);
+    }
+
+    #[test]
+    fn claim_nothing_available_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 100, 5_000, 1_000_000, true).unwrap();
+        let result = claim(&s, 50); // Before start
+        assert_eq!(result, Err(VestingError::NothingToClaim));
+    }
+
+    #[test]
+    fn claim_partial_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let (claimed, updated) = claim(&s, 500_000).unwrap(); // Halfway
+        assert!(claimed > 0);
+        assert_eq!(updated.claimed_amount, claimed);
+    }
+
+    #[test]
+    fn revoke_non_revocable_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, false).unwrap();
+        let result = revoke(&s, 500_000);
+        assert_eq!(result, Err(VestingError::NotRevocable));
+    }
+
+    #[test]
+    fn revoke_already_revoked_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let (_, _, updated) = revoke(&s, 500_000).unwrap();
+        let result = revoke(&updated, 600_000);
+        assert_eq!(result, Err(VestingError::AlreadyRevoked));
+    }
+
+    #[test]
+    fn revoke_penalty_deduction_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let (beneficiary_gets, returned, updated) = revoke(&s, 0).unwrap();
+        // At block 0 (start), nothing vested, all unvested
+        assert_eq!(beneficiary_gets, 0);
+        // 20% penalty on unvested
+        let unvested = THOUSAND_VIBE;
+        let penalty = unvested * EARLY_TERMINATION_PENALTY_BPS as u128 / BPS;
+        assert_eq!(returned, unvested - penalty);
+        assert!(updated.revoked);
+    }
+
+    #[test]
+    fn accelerate_zero_bps_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let result = accelerate(&s, 0);
+        assert_eq!(result, Err(VestingError::InvalidAcceleration));
+    }
+
+    #[test]
+    fn accelerate_exceeds_max_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let result = accelerate(&s, MAX_ACCELERATION_BPS + 1);
+        assert_eq!(result, Err(VestingError::InvalidAcceleration));
+    }
+
+    #[test]
+    fn accelerate_revoked_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let (_, _, revoked) = revoke(&s, 500_000).unwrap();
+        let result = accelerate(&revoked, 2500);
+        assert_eq!(result, Err(VestingError::AlreadyRevoked));
+    }
+
+    #[test]
+    fn accelerate_reduces_duration_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let updated = accelerate(&s, 2500).unwrap(); // 25% reduction
+        assert!(updated.duration_blocks < s.duration_blocks);
+        assert_eq!(updated.duration_blocks, 750_000);
+    }
+
+    #[test]
+    fn extend_zero_blocks_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let result = extend(&s, 0);
+        assert_eq!(result, Err(VestingError::ZeroDuration));
+    }
+
+    #[test]
+    fn extend_exceeds_max_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, MAX_VESTING_DURATION - 100, true).unwrap();
+        let result = extend(&s, 200);
+        assert_eq!(result, Err(VestingError::ExceedsMaxDuration));
+    }
+
+    #[test]
+    fn extend_revoked_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let (_, _, revoked) = revoke(&s, 500_000).unwrap();
+        let result = extend(&revoked, 100_000);
+        assert_eq!(result, Err(VestingError::AlreadyRevoked));
+    }
+
+    #[test]
+    fn get_status_before_start_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 100, 5_000, 1_000_000, true).unwrap();
+        let status = get_status(&s, 50);
+        assert_eq!(status.vested_amount, 0);
+        assert_eq!(status.claimable_amount, 0);
+        assert!(!status.is_fully_vested);
+    }
+
+    #[test]
+    fn summarize_empty_h9() {
+        let summary = summarize(&[], 1000);
+        assert_eq!(summary.total_allocated, 0);
+        assert_eq!(summary.active_schedules, 0);
+    }
+
+    #[test]
+    fn summarize_mixed_schedules_h9() {
+        let s1 = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let s2 = create_linear(beneficiary_b(), HUNDRED_VIBE, 0, 5_000, 100_000, true).unwrap();
+        let summary = summarize(&[s1, s2], 50_000);
+        assert_eq!(summary.total_allocated, THOUSAND_VIBE + HUNDRED_VIBE);
+        assert!(summary.total_vested > 0);
+    }
+
+    #[test]
+    fn remaining_duration_fully_vested_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        assert_eq!(remaining_duration(&s, 2_000_000), 0);
+    }
+
+    #[test]
+    fn remaining_duration_revoked_h9() {
+        let s = create_linear(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, true).unwrap();
+        let (_, _, revoked) = revoke(&s, 500_000).unwrap();
+        assert_eq!(remaining_duration(&revoked, 600_000), 0);
+    }
+
+    #[test]
+    fn milestone_create_empty_milestones_h9() {
+        let result = create_milestone(beneficiary_a(), THOUSAND_VIBE, 0, &[], true);
+        assert_eq!(result, Err(VestingError::InvalidMilestone));
+    }
+
+    #[test]
+    fn milestone_create_too_many_milestones_h9() {
+        let milestones: Vec<(u64, u16)> = (1..=11).map(|i| (i * 1000, (i * 1000) as u16)).collect();
+        let result = create_milestone(beneficiary_a(), THOUSAND_VIBE, 0, &milestones, true);
+        assert_eq!(result, Err(VestingError::TooManyMilestones));
+    }
+
+    #[test]
+    fn graded_zero_steps_h9() {
+        let result = create_graded(beneficiary_a(), THOUSAND_VIBE, 0, 5_000, 1_000_000, 0, true);
+        assert_eq!(result, Err(VestingError::ZeroDuration));
+    }
 }

@@ -2942,4 +2942,226 @@ mod tests {
         // Already exceeds quorum (40) and has majority
         assert_eq!(needed, 0);
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn test_can_propose_exact_threshold_h9() {
+        // Exactly at threshold should pass: 0.1% of 100M = 100K
+        let balance = 100_000 * PRECISION;
+        assert!(can_propose(balance, TOTAL_SUPPLY).is_ok());
+    }
+
+    #[test]
+    fn test_can_propose_one_below_threshold_h9() {
+        let balance = 100_000 * PRECISION - 1;
+        assert!(matches!(
+            can_propose(balance, TOTAL_SUPPLY),
+            Err(GovernanceError::InsufficientProposalThreshold)
+        ));
+    }
+
+    #[test]
+    fn test_create_proposal_exact_min_voting_period_h9() {
+        let result = create_proposal(
+            1, test_proposer(), test_config(), test_desc_hash(),
+            1000, MIN_VOTING_PERIOD_BLOCKS, false,
+        );
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().end_block, 1000 + MIN_VOTING_PERIOD_BLOCKS);
+    }
+
+    #[test]
+    fn test_cast_vote_on_cancelled_proposal_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        cancel_proposal(&mut p, &test_proposer(), &test_guardian()).unwrap();
+        let result = cast_vote(&mut p, test_voter(1), 100, true, 500);
+        assert_eq!(result, Err(GovernanceError::ProposalNotActive));
+    }
+
+    #[test]
+    fn test_cast_vote_after_end_block_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, MIN_VOTING_PERIOD_BLOCKS, false).unwrap();
+        let result = cast_vote(&mut p, test_voter(1), 100, true, MIN_VOTING_PERIOD_BLOCKS + 1);
+        assert_eq!(result, Err(GovernanceError::VotingEnded));
+    }
+
+    #[test]
+    fn test_cast_vote_against_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let vote = cast_vote(&mut p, test_voter(1), 500, false, 1000).unwrap();
+        assert!(!vote.support);
+        assert_eq!(p.votes_against, 500);
+        assert_eq!(p.votes_for, 0);
+    }
+
+    #[test]
+    fn test_has_quorum_emergency_higher_threshold_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, MIN_VOTING_PERIOD_BLOCKS, true).unwrap();
+        // Emergency quorum = 10% of TOTAL_SUPPLY
+        let vote_weight = TOTAL_SUPPLY * EMERGENCY_QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), vote_weight, true, 1000);
+        assert!(has_quorum(&p, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_has_quorum_just_below_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        // Quorum = 4% of TOTAL_SUPPLY = 4M * PRECISION
+        let needed = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), needed - 1, true, 1000);
+        assert!(!has_quorum(&p, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_has_passed_quorum_but_no_majority_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let needed = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        // Quorum met but more against than for
+        let _ = cast_vote(&mut p, test_voter(1), needed / 3, true, 500);
+        let _ = cast_vote(&mut p, test_voter(2), needed, false, 500);
+        assert!(!has_passed(&p, TOTAL_SUPPLY));
+    }
+
+    #[test]
+    fn test_finalize_voting_before_end_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let result = finalize_voting(&mut p, TOTAL_SUPPLY, 100);
+        assert_eq!(result, Err(GovernanceError::VotingNotEnded));
+    }
+
+    #[test]
+    fn test_finalize_voting_defeated_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        // Vote against with quorum
+        let needed = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), needed, false, 500);
+        finalize_voting(&mut p, TOTAL_SUPPLY, 100_801).unwrap();
+        assert_eq!(p.status, ProposalStatus::Defeated);
+    }
+
+    #[test]
+    fn test_execute_proposal_before_timelock_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let needed = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), needed + 1, true, 500);
+        finalize_voting(&mut p, TOTAL_SUPPLY, 100_801).unwrap();
+        let result = execute_proposal(&mut p, 100_802); // Too early
+        assert_eq!(result, Err(GovernanceError::TimelockNotExpired));
+    }
+
+    #[test]
+    fn test_execute_proposal_success_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg.clone(), test_desc_hash(), 0, 100_800, false).unwrap();
+        let needed = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), needed + 1, true, 500);
+        finalize_voting(&mut p, TOTAL_SUPPLY, 100_801).unwrap();
+        let new_cfg = execute_proposal(&mut p, 100_801 + TIMELOCK_DELAY_BLOCKS).unwrap();
+        assert_eq!(new_cfg, cfg);
+        assert!(matches!(p.status, ProposalStatus::Executed { .. }));
+    }
+
+    #[test]
+    fn test_cancel_proposal_by_guardian_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let result = cancel_proposal(&mut p, &test_guardian(), &test_guardian());
+        assert!(result.is_ok());
+        assert_eq!(p.status, ProposalStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_cancel_proposal_unauthorized_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let random = [0xBB; 32];
+        let result = cancel_proposal(&mut p, &random, &test_guardian());
+        assert_eq!(result, Err(GovernanceError::Unauthorized));
+    }
+
+    #[test]
+    fn test_cancel_executed_proposal_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let needed = TOTAL_SUPPLY * QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), needed + 1, true, 500);
+        finalize_voting(&mut p, TOTAL_SUPPLY, 100_801).unwrap();
+        let _ = execute_proposal(&mut p, 100_801 + TIMELOCK_DELAY_BLOCKS);
+        let result = cancel_proposal(&mut p, &test_proposer(), &test_guardian());
+        assert_eq!(result, Err(GovernanceError::ProposalNotActive));
+    }
+
+    #[test]
+    fn test_participation_rate_bps_zero_supply_h9() {
+        let cfg = test_config();
+        let p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        assert_eq!(participation_rate_bps(&p, 0), 0);
+    }
+
+    #[test]
+    fn test_approval_rate_bps_no_votes_h9() {
+        let cfg = test_config();
+        let p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        assert_eq!(approval_rate_bps(&p), 0);
+    }
+
+    #[test]
+    fn test_approval_rate_bps_all_for_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let _ = cast_vote(&mut p, test_voter(1), 1000, true, 500);
+        assert_eq!(approval_rate_bps(&p), 10_000);
+    }
+
+    #[test]
+    fn test_is_safe_config_change_slash_too_high_h9() {
+        let old = test_config();
+        let mut new = test_config();
+        new.slash_rate_bps = 5001; // Over 50%
+        assert!(!is_safe_config_change(&old, &new));
+    }
+
+    #[test]
+    fn test_is_safe_config_change_pow_zero_h9() {
+        let old = test_config();
+        let mut new = test_config();
+        new.min_pow_difficulty = 0;
+        assert!(!is_safe_config_change(&old, &new));
+    }
+
+    #[test]
+    fn test_votes_needed_more_against_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg, test_desc_hash(), 0, 100_800, false).unwrap();
+        let _ = cast_vote(&mut p, test_voter(1), 100, true, 500);
+        let _ = cast_vote(&mut p, test_voter(2), 300, false, 500);
+        let needed = votes_needed_to_pass(&p, TOTAL_SUPPLY);
+        // Need at least 201 more for votes to overcome against, plus quorum
+        assert!(needed > 0);
+    }
+
+    #[test]
+    fn test_emergency_proposal_shorter_timelock_h9() {
+        let cfg = test_config();
+        let mut p = create_proposal(1, test_proposer(), cfg.clone(), test_desc_hash(), 0, MIN_VOTING_PERIOD_BLOCKS, true).unwrap();
+        let needed = TOTAL_SUPPLY * EMERGENCY_QUORUM_BPS as u128 / 10_000;
+        let _ = cast_vote(&mut p, test_voter(1), needed + 1, true, 500);
+        finalize_voting(&mut p, TOTAL_SUPPLY, MIN_VOTING_PERIOD_BLOCKS + 1).unwrap();
+        match &p.status {
+            ProposalStatus::Queued { execute_after_block } => {
+                assert_eq!(*execute_after_block, MIN_VOTING_PERIOD_BLOCKS + 1 + EMERGENCY_TIMELOCK_BLOCKS);
+            }
+            _ => panic!("Expected Queued status"),
+        }
+    }
 }

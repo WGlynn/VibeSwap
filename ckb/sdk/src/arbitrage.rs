@@ -2636,4 +2636,246 @@ mod tests {
         let result = cyclic_arb_profit(&[], ONE_TOKEN);
         assert_eq!(result, Err(ArbitrageError::NoCyclicRoute));
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn test_amm_out_zero_amount_h9() {
+        let out = amm_out(0, STD_RESERVE, STD_RESERVE, STD_FEE);
+        assert_eq!(out, 0);
+    }
+
+    #[test]
+    fn test_amm_out_zero_reserve_in_h9() {
+        let out = amm_out(ONE_TOKEN, 0, STD_RESERVE, STD_FEE);
+        assert_eq!(out, 0);
+    }
+
+    #[test]
+    fn test_amm_out_zero_reserve_out_h9() {
+        let out = amm_out(ONE_TOKEN, STD_RESERVE, 0, STD_FEE);
+        assert_eq!(out, 0);
+    }
+
+    #[test]
+    fn test_amm_out_100_percent_fee_h9() {
+        // Fee = 10000 bps = 100%, should return 0
+        let out = amm_out(ONE_TOKEN, STD_RESERVE, STD_RESERVE, 10_000);
+        assert_eq!(out, 0);
+    }
+
+    #[test]
+    fn test_detect_price_discrepancy_equal_pools_h9() {
+        let disc = detect_price_discrepancy(
+            STD_RESERVE, STD_RESERVE,
+            STD_RESERVE, STD_RESERVE,
+            test_pool_id(1), test_pool_id(2),
+        );
+        assert_eq!(disc.spread_bps, 0);
+        assert_eq!(disc.arb_direction, ArbDirection::None);
+    }
+
+    #[test]
+    fn test_detect_price_discrepancy_zero_reserves_h9() {
+        let disc = detect_price_discrepancy(
+            0, 0, 0, 0,
+            test_pool_id(1), test_pool_id(2),
+        );
+        assert_eq!(disc.spread_bps, 0);
+        assert_eq!(disc.arb_direction, ArbDirection::None);
+    }
+
+    #[test]
+    fn test_detect_price_discrepancy_a_expensive_h9() {
+        let disc = detect_price_discrepancy(
+            STD_RESERVE, 2 * STD_RESERVE, // A: price = 2
+            STD_RESERVE, STD_RESERVE,       // B: price = 1
+            test_pool_id(1), test_pool_id(2),
+        );
+        assert!(disc.spread_bps > 0);
+        assert_eq!(disc.arb_direction, ArbDirection::BToA);
+    }
+
+    #[test]
+    fn test_detect_price_discrepancy_b_expensive_h9() {
+        let disc = detect_price_discrepancy(
+            STD_RESERVE, STD_RESERVE,       // A: price = 1
+            STD_RESERVE, 2 * STD_RESERVE,   // B: price = 2
+            test_pool_id(1), test_pool_id(2),
+        );
+        assert!(disc.spread_bps > 0);
+        assert_eq!(disc.arb_direction, ArbDirection::AToB);
+    }
+
+    #[test]
+    fn test_compute_arb_profit_zero_input_h9() {
+        let opp = compute_arb_profit(
+            0, STD_RESERVE, STD_RESERVE, STD_FEE,
+            STD_RESERVE, STD_RESERVE, STD_FEE,
+        );
+        assert_eq!(opp.gross_profit, 0);
+        assert!(!opp.is_profitable);
+    }
+
+    #[test]
+    fn test_compute_arb_profit_equal_pools_h9() {
+        // Equal pools = no arb opportunity
+        let opp = compute_arb_profit(
+            ONE_TOKEN, STD_RESERVE, STD_RESERVE, STD_FEE,
+            STD_RESERVE, STD_RESERVE, STD_FEE,
+        );
+        // With fees, output < input
+        assert_eq!(opp.gross_profit, 0);
+        assert!(!opp.is_profitable);
+    }
+
+    #[test]
+    fn test_optimal_arb_amount_zero_reserves_h9() {
+        let result = optimal_arb_amount(0, 0, STD_FEE, STD_RESERVE, STD_RESERVE, STD_FEE);
+        assert_eq!(result.optimal_input, 0);
+        assert_eq!(result.expected_output, 0);
+    }
+
+    #[test]
+    fn test_optimal_arb_amount_tiny_reserve_h9() {
+        // Reserve_in_a = 1, max_input = 0
+        let result = optimal_arb_amount(1, STD_RESERVE, STD_FEE, STD_RESERVE, STD_RESERVE, STD_FEE);
+        assert_eq!(result.optimal_input, 0);
+    }
+
+    #[test]
+    fn test_simulate_sandwich_zero_victim_h9() {
+        let analysis = simulate_sandwich(0, STD_RESERVE, STD_RESERVE, STD_FEE, ONE_TOKEN);
+        assert!(!analysis.is_sandwich);
+        assert_eq!(analysis.attacker_profit, 0);
+    }
+
+    #[test]
+    fn test_simulate_sandwich_zero_frontrun_h9() {
+        let analysis = simulate_sandwich(ONE_TOKEN, STD_RESERVE, STD_RESERVE, STD_FEE, 0);
+        assert!(!analysis.is_sandwich);
+    }
+
+    #[test]
+    fn test_simulate_sandwich_zero_reserves_h9() {
+        let analysis = simulate_sandwich(ONE_TOKEN, 0, STD_RESERVE, STD_FEE, ONE_TOKEN);
+        assert!(!analysis.is_sandwich);
+    }
+
+    #[test]
+    fn test_is_sandwich_profitable_loss_h9() {
+        assert!(!is_sandwich_profitable(1000, 500, 100));
+    }
+
+    #[test]
+    fn test_is_sandwich_profitable_breakeven_h9() {
+        assert!(!is_sandwich_profitable(1000, 1100, 100));
+    }
+
+    #[test]
+    fn test_is_sandwich_profitable_true_h9() {
+        assert!(is_sandwich_profitable(1000, 1200, 100));
+    }
+
+    #[test]
+    fn test_commit_reveal_blocks_sandwich_true_h9() {
+        assert!(commit_reveal_blocks_sandwich(2, 1));
+        assert!(commit_reveal_blocks_sandwich(10, 100));
+    }
+
+    #[test]
+    fn test_commit_reveal_blocks_sandwich_false_h9() {
+        assert!(!commit_reveal_blocks_sandwich(1, 1)); // batch_size < 2
+        assert!(!commit_reveal_blocks_sandwich(2, 0)); // commit_window < 1
+    }
+
+    #[test]
+    fn test_mev_protection_score_all_features_h9() {
+        let score = mev_protection_score(true, true, true, true, true);
+        assert_eq!(score, 100);
+    }
+
+    #[test]
+    fn test_mev_protection_score_no_features_h9() {
+        let score = mev_protection_score(false, false, false, false, false);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_price_impact_of_trade_zero_amount_h9() {
+        let impact = price_impact_of_trade(0, STD_RESERVE, STD_RESERVE, STD_FEE);
+        assert_eq!(impact, 0);
+    }
+
+    #[test]
+    fn test_price_impact_of_trade_zero_reserves_h9() {
+        let impact = price_impact_of_trade(ONE_TOKEN, 0, STD_RESERVE, STD_FEE);
+        assert_eq!(impact, 0);
+    }
+
+    #[test]
+    fn test_price_impact_large_trade_h9() {
+        // Trading half the reserve should create significant impact
+        let impact = price_impact_of_trade(STD_RESERVE / 2, STD_RESERVE, STD_RESERVE, STD_FEE);
+        assert!(impact > 0);
+    }
+
+    #[test]
+    fn test_is_frontrun_suspicious_both_conditions_h9() {
+        assert!(is_frontrun_suspicious(50, 1));
+        assert!(is_frontrun_suspicious(100, 0));
+    }
+
+    #[test]
+    fn test_is_frontrun_suspicious_low_impact_h9() {
+        assert!(!is_frontrun_suspicious(49, 1)); // Below threshold
+    }
+
+    #[test]
+    fn test_is_frontrun_suspicious_too_far_h9() {
+        assert!(!is_frontrun_suspicious(100, 2)); // More than 1 block away
+    }
+
+    #[test]
+    fn test_post_arb_price_zero_arb_h9() {
+        let price = post_arb_price(STD_RESERVE, STD_RESERVE, 0, STD_FEE);
+        let spot = price_from_reserves(STD_RESERVE, STD_RESERVE);
+        assert_eq!(price, spot);
+    }
+
+    #[test]
+    fn test_post_arb_price_zero_reserves_h9() {
+        let price = post_arb_price(0, STD_RESERVE, ONE_TOKEN, STD_FEE);
+        assert_eq!(price, 0);
+    }
+
+    #[test]
+    fn test_compute_mev_report_no_attacks_with_cr_h9() {
+        let report = compute_mev_report(0, 0, 0, 0, 0, 0, true);
+        assert_eq!(report.protection_score, MEV_PROTECTION_SCORE_MAX);
+        assert!(report.commit_reveal_effective);
+    }
+
+    #[test]
+    fn test_compute_mev_report_no_attacks_without_cr_h9() {
+        let report = compute_mev_report(0, 0, 0, 0, 0, 0, false);
+        assert_eq!(report.protection_score, 50);
+        assert!(!report.commit_reveal_effective);
+    }
+
+    #[test]
+    fn test_cyclic_arb_profit_exceeds_max_hops_h9() {
+        let hops: Vec<(u128, u128, u16)> = (0..5).map(|_| (STD_RESERVE, STD_RESERVE, STD_FEE)).collect();
+        let result = cyclic_arb_profit(&hops, ONE_TOKEN);
+        assert_eq!(result, Err(ArbitrageError::ExceedsMaxHops));
+    }
+
+    #[test]
+    fn test_cyclic_arb_profit_zero_amount_h9() {
+        let result = cyclic_arb_profit(
+            &[(STD_RESERVE, STD_RESERVE, STD_FEE)],
+            0,
+        );
+        assert_eq!(result, Err(ArbitrageError::ZeroAmount));
+    }
 }

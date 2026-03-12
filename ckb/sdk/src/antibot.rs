@@ -2890,4 +2890,270 @@ mod tests {
             }
         }
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn test_create_profile_initial_state_h9() {
+        let addr = [0xAA; 32];
+        let p = create_profile(addr, 500);
+        assert_eq!(p.address, addr);
+        assert_eq!(p.first_seen_block, 500);
+        assert_eq!(p.tx_count_window, 0);
+        assert_eq!(p.tx_count_total, 0);
+        assert_eq!(p.last_tx_block, 0);
+        assert_eq!(p.rate_limit_hits, 0);
+        assert!(!p.is_blocked);
+        assert_eq!(p.bot_score, 0);
+        assert_eq!(p.cooldown_until, 0);
+    }
+
+    #[test]
+    fn test_check_rate_limit_blocked_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.is_blocked = true;
+        let result = check_rate_limit(&p, 100);
+        assert!(!result.allowed);
+        assert_eq!(result.remaining_in_block, 0);
+        assert_eq!(result.remaining_in_window, 0);
+    }
+
+    #[test]
+    fn test_check_rate_limit_in_cooldown_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.cooldown_until = 200;
+        let result = check_rate_limit(&p, 100);
+        assert!(!result.allowed);
+        assert_eq!(result.cooldown_blocks, 100);
+    }
+
+    #[test]
+    fn test_check_rate_limit_fresh_profile_h9() {
+        let p = create_profile([0xAA; 32], 0);
+        let result = check_rate_limit(&p, 100);
+        assert!(result.allowed);
+        assert_eq!(result.remaining_in_block, MAX_TX_PER_BLOCK);
+        assert_eq!(result.remaining_in_window, MAX_TX_PER_WINDOW);
+    }
+
+    #[test]
+    fn test_check_rate_limit_window_maxed_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.tx_count_window = MAX_TX_PER_WINDOW;
+        p.last_tx_block = 100;
+        let result = check_rate_limit(&p, 100);
+        assert!(!result.allowed);
+        assert_eq!(result.remaining_in_window, 0);
+    }
+
+    #[test]
+    fn test_record_transaction_blocked_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.is_blocked = true;
+        let result = record_transaction(&p, 100);
+        assert_eq!(result, Err(AntiBotError::AddressBlocked));
+    }
+
+    #[test]
+    fn test_record_transaction_in_cooldown_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.cooldown_until = 200;
+        let result = record_transaction(&p, 100);
+        assert_eq!(result, Err(AntiBotError::CooldownActive));
+    }
+
+    #[test]
+    fn test_record_transaction_success_h9() {
+        let p = create_profile([0xAA; 32], 0);
+        let updated = record_transaction(&p, 100).unwrap();
+        assert_eq!(updated.tx_count_window, 1);
+        assert_eq!(updated.tx_count_total, 1);
+        assert_eq!(updated.last_tx_block, 100);
+    }
+
+    #[test]
+    fn test_record_transaction_window_auto_reset_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.tx_count_window = 50;
+        p.last_tx_block = 100;
+        // Current block is beyond monitoring window
+        let updated = record_transaction(&p, 100 + MONITORING_WINDOW_BLOCKS).unwrap();
+        // Window should have been reset, so count is 1
+        assert_eq!(updated.tx_count_window, 1);
+    }
+
+    #[test]
+    fn test_compute_progressive_fee_zero_window_h9() {
+        let fee = compute_progressive_fee(50, 0);
+        assert_eq!(fee, PROGRESSIVE_FEE_BASE_BPS);
+    }
+
+    #[test]
+    fn test_compute_progressive_fee_zero_count_h9() {
+        let fee = compute_progressive_fee(0, 100);
+        assert_eq!(fee, PROGRESSIVE_FEE_BASE_BPS);
+    }
+
+    #[test]
+    fn test_compute_progressive_fee_full_window_h9() {
+        let fee = compute_progressive_fee(MAX_TX_PER_WINDOW, MAX_TX_PER_WINDOW);
+        assert_eq!(fee, PROGRESSIVE_FEE_MAX_BPS);
+    }
+
+    #[test]
+    fn test_analyze_pattern_empty_intervals_h9() {
+        let pattern = analyze_pattern(&[], &[], 0);
+        assert_eq!(pattern.avg_interval_blocks, 0);
+        assert_eq!(pattern.interval_variance, 0);
+    }
+
+    #[test]
+    fn test_analyze_pattern_single_interval_h9() {
+        let pattern = analyze_pattern(&[10], &[1000], 5);
+        assert_eq!(pattern.avg_interval_blocks, 10);
+        assert_eq!(pattern.interval_variance, 0); // Single interval, no variance
+        assert_eq!(pattern.unique_counterparties, 5);
+    }
+
+    #[test]
+    fn test_analyze_pattern_uniform_amounts_h9() {
+        let amounts = vec![1000u128; 10];
+        let intervals = vec![10u64; 10];
+        let pattern = analyze_pattern(&intervals, &amounts, 5);
+        // All amounts identical -> low variance, high repeat ratio
+        assert_eq!(pattern.amount_variance_bps, 0);
+        assert!(pattern.repeat_amount_ratio_bps > 0);
+    }
+
+    #[test]
+    fn test_behavioral_score_human_like_h9() {
+        let pattern = TransactionPattern {
+            avg_interval_blocks: 100,
+            interval_variance: 5000,
+            amount_variance_bps: 8000,
+            unique_counterparties: 25,
+            repeat_amount_ratio_bps: 500,
+            time_clustering_score: 1000,
+        };
+        let score = compute_behavioral_score(&pattern);
+        // Human-like: high variance, many counterparties -> low score
+        assert!(!score.is_flagged);
+    }
+
+    #[test]
+    fn test_behavioral_score_bot_like_h9() {
+        let pattern = TransactionPattern {
+            avg_interval_blocks: 10,
+            interval_variance: 0,
+            amount_variance_bps: 0,
+            unique_counterparties: 1,
+            repeat_amount_ratio_bps: 9000,
+            time_clustering_score: 9000,
+        };
+        let score = compute_behavioral_score(&pattern);
+        // Bot-like: zero variance, single counterparty, high clustering
+        assert!(score.total_score > 0);
+    }
+
+    #[test]
+    fn test_is_account_mature_new_h9() {
+        let p = create_profile([0xAA; 32], 100);
+        assert!(!is_account_mature(&p, 150)); // Only 50 blocks old
+    }
+
+    #[test]
+    fn test_is_account_mature_old_h9() {
+        let p = create_profile([0xAA; 32], 100);
+        assert!(is_account_mature(&p, 100 + MIN_ACCOUNT_AGE_BLOCKS));
+    }
+
+    #[test]
+    fn test_apply_cooldown_h9() {
+        let p = create_profile([0xAA; 32], 0);
+        let updated = apply_cooldown(&p, 100);
+        assert_eq!(updated.cooldown_until, 100 + COOLDOWN_BLOCKS);
+        assert_eq!(updated.rate_limit_hits, 1);
+    }
+
+    #[test]
+    fn test_is_in_cooldown_yes_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.cooldown_until = 200;
+        assert!(is_in_cooldown(&p, 100));
+    }
+
+    #[test]
+    fn test_is_in_cooldown_no_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.cooldown_until = 200;
+        assert!(!is_in_cooldown(&p, 200));
+        assert!(!is_in_cooldown(&p, 300));
+    }
+
+    #[test]
+    fn test_block_unblock_address_h9() {
+        let p = create_profile([0xAA; 32], 0);
+        let blocked = block_address(&p);
+        assert!(blocked.is_blocked);
+        let unblocked = unblock_address(&blocked);
+        assert!(!unblocked.is_blocked);
+    }
+
+    #[test]
+    fn test_reset_window_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.tx_count_window = 50;
+        p.tx_count_total = 100;
+        let updated = reset_window(&p, 500);
+        assert_eq!(updated.tx_count_window, 0);
+        assert_eq!(updated.tx_count_total, 100); // Preserved
+    }
+
+    #[test]
+    fn test_overall_risk_new_account_h9() {
+        let p = create_profile([0xAA; 32], 0);
+        let score = BehavioralScore {
+            interval_score: 0,
+            amount_score: 0,
+            counterparty_score: 0,
+            timing_score: 0,
+            total_score: 0,
+            is_flagged: false,
+        };
+        let risk = overall_risk_assessment(&p, &score);
+        // New account with zero behavior -> moderate risk from age
+        assert!(risk > 0);
+    }
+
+    #[test]
+    fn test_overall_risk_established_account_h9() {
+        let mut p = create_profile([0xAA; 32], 0);
+        p.tx_count_total = 1000;
+        let score = BehavioralScore {
+            interval_score: 0,
+            amount_score: 0,
+            counterparty_score: 0,
+            timing_score: 0,
+            total_score: 0,
+            is_flagged: false,
+        };
+        let risk = overall_risk_assessment(&p, &score);
+        // Established account, zero behavioral score -> low risk
+        assert!(risk < 2000);
+    }
+
+    #[test]
+    fn test_detect_sybil_too_few_profiles_h9() {
+        let p = create_profile([0xAA; 32], 0);
+        let pattern = TransactionPattern {
+            avg_interval_blocks: 10,
+            interval_variance: 0,
+            amount_variance_bps: 0,
+            unique_counterparties: 1,
+            repeat_amount_ratio_bps: 0,
+            time_clustering_score: 0,
+        };
+        let result = detect_sybil(&[p], &[pattern]);
+        assert!(result.is_none());
+    }
 }

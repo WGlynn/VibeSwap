@@ -9,6 +9,7 @@ pub mod arbitrage;
 pub mod assembler;
 pub mod auction;
 pub mod batch;
+pub mod checkpoint;
 pub mod bridge;
 pub mod circuit_breaker;
 pub mod config;

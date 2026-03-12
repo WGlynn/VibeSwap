@@ -619,6 +619,8 @@ function getCRPCProtocolSpec() {
       'Knowledge promotion — is a correction worth making a permanent skill?',
       'Dispute resolution — two users disagree, which is right?',
       'High-stakes responses — personal disclosure, vulnerability signals',
+      'Content gating — "Is this post in the best interests of the project?" (agent-driven social media)',
+      'Cross-framework consensus — ElizaOS/DayDreams agents reaching agreement on shared state',
     ],
     endpoints: {
       demo: { method: 'GET|POST', path: '/crpc/demo', description: 'Run a live 4-phase CRPC round with real LLM responses' },

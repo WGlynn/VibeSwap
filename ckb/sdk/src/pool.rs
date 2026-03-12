@@ -2607,4 +2607,210 @@ mod tests {
         // Total reserves should have increased
         assert!(p.reserve_a + p.reserve_b > ra_before + rb_before);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_create_pool_identical_tokens_h8() {
+        let t = [0x11; 32];
+        let result = create_pool([0u8; 32], t, t, 30, PoolType::ConstantProduct);
+        assert_eq!(result.err(), Some(PoolError::IdenticalTokens));
+    }
+
+    #[test]
+    fn test_create_pool_max_fee_h8() {
+        let result = create_pool(pool_id(), token_a(), token_b(), 10_000, PoolType::ConstantProduct);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_pool_over_max_fee_h8() {
+        let result = create_pool(pool_id(), token_a(), token_b(), 10_001, PoolType::ConstantProduct);
+        assert_eq!(result.err(), Some(PoolError::InvalidFeeRate));
+    }
+
+    #[test]
+    fn test_validate_pool_empty_h8() {
+        let p = make_pool();
+        assert!(validate_pool(&p).is_ok());
+    }
+
+    #[test]
+    fn test_add_liquidity_zero_amount_a_h8() {
+        let mut p = make_pool();
+        let result = add_liquidity(&mut p, 0, 1000, 0);
+        assert_eq!(result.err(), Some(PoolError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_add_liquidity_zero_amount_b_h8() {
+        let mut p = make_pool();
+        let result = add_liquidity(&mut p, 1000, 0, 0);
+        assert_eq!(result.err(), Some(PoolError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_add_liquidity_slippage_protection_h8() {
+        let mut p = make_pool();
+        let result = add_liquidity(&mut p, 1_000_000, 1_000_000, u64::MAX);
+        assert_eq!(result.err(), Some(PoolError::SlippageExceeded));
+    }
+
+    #[test]
+    fn test_remove_liquidity_zero_shares_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        let result = remove_liquidity(&mut p, 0);
+        assert_eq!(result.err(), Some(PoolError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_remove_liquidity_excess_shares_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        let excess = p.total_lp_shares + 1;
+        let result = remove_liquidity(&mut p, excess);
+        assert_eq!(result.err(), Some(PoolError::InsufficientShares));
+    }
+
+    #[test]
+    fn test_amount_out_zero_inputs_h8() {
+        assert_eq!(amount_out(0, 1000, 100, 30), 0);
+        assert_eq!(amount_out(1000, 0, 100, 30), 0);
+        assert_eq!(amount_out(1000, 1000, 0, 30), 0);
+    }
+
+    #[test]
+    fn test_amount_in_for_out_zero_inputs_h8() {
+        assert_eq!(amount_in_for_out(0, 1000, 100, 30), 0);
+        assert_eq!(amount_in_for_out(1000, 0, 100, 30), 0);
+        assert_eq!(amount_in_for_out(1000, 1000, 0, 30), 0);
+    }
+
+    #[test]
+    fn test_amount_in_for_out_desired_exceeds_reserve_h8() {
+        assert_eq!(amount_in_for_out(1000, 1000, 1000, 30), 0);
+        assert_eq!(amount_in_for_out(1000, 1000, 1001, 30), 0);
+    }
+
+    #[test]
+    fn test_compute_swap_paused_pool_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        pause_pool(&mut p).unwrap();
+        let result = compute_swap(&p, 1000, true);
+        assert_eq!(result.err(), Some(PoolError::PoolPaused));
+    }
+
+    #[test]
+    fn test_execute_swap_slippage_exceeded_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        let result = execute_swap(&mut p, 1000, true, u64::MAX);
+        assert_eq!(result.err(), Some(PoolError::SlippageExceeded));
+    }
+
+    #[test]
+    fn test_spot_price_zero_reserves_h8() {
+        let p = make_pool();
+        assert_eq!(spot_price(&p, true), 0);
+        assert_eq!(spot_price(&p, false), 0);
+    }
+
+    #[test]
+    fn test_price_impact_zero_amount_h8() {
+        let p = seeded_pool(1_000_000, 1_000_000);
+        assert_eq!(price_impact(&p, 0, true), 0);
+    }
+
+    #[test]
+    fn test_price_impact_increases_with_size_h8() {
+        let p = seeded_pool(1_000_000, 1_000_000);
+        let small_impact = price_impact(&p, 1_000, true);
+        let large_impact = price_impact(&p, 100_000, true);
+        assert!(large_impact > small_impact);
+    }
+
+    #[test]
+    fn test_compute_k_empty_pool_h8() {
+        let p = make_pool();
+        assert_eq!(compute_k(&p), 0);
+    }
+
+    #[test]
+    fn test_compute_k_seeded_h8() {
+        let p = seeded_pool(1_000_000, 2_000_000);
+        assert_eq!(compute_k(&p), 1_000_000u128 * 2_000_000u128);
+    }
+
+    #[test]
+    fn test_pause_already_paused_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        pause_pool(&mut p).unwrap();
+        assert_eq!(pause_pool(&mut p).err(), Some(PoolError::PoolPaused));
+    }
+
+    #[test]
+    fn test_unpause_active_pool_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        // Already active, unpause should fail
+        assert_eq!(unpause_pool(&mut p).err(), Some(PoolError::PoolPaused));
+    }
+
+    #[test]
+    fn test_draining_allows_withdrawal_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        start_draining(&mut p).unwrap();
+        assert!(is_withdrawable(&p));
+        assert!(!is_tradeable(&p));
+        assert!(!is_depositable(&p));
+    }
+
+    #[test]
+    fn test_deprecate_pool_h8() {
+        let mut p = seeded_pool(1_000_000, 1_000_000);
+        deprecate_pool(&mut p).unwrap();
+        assert!(!is_tradeable(&p));
+        assert!(!is_withdrawable(&p));
+        assert_eq!(deprecate_pool(&mut p).err(), Some(PoolError::PoolDeprecated));
+    }
+
+    #[test]
+    fn test_reserve_ratio_balanced_h8() {
+        let p = seeded_pool(1_000_000, 1_000_000);
+        let (a_bps, b_bps) = reserve_ratio(&p);
+        assert_eq!(a_bps, 5000);
+        assert_eq!(b_bps, 5000);
+    }
+
+    #[test]
+    fn test_reserve_ratio_empty_pool_h8() {
+        let p = make_pool();
+        let (a_bps, b_bps) = reserve_ratio(&p);
+        assert_eq!(a_bps, 5000);
+        assert_eq!(b_bps, 5000);
+    }
+
+    #[test]
+    fn test_fee_apr_zero_tvl_h8() {
+        let p = make_pool();
+        assert_eq!(fee_apr(&p, 1_000_000), 0);
+    }
+
+    #[test]
+    fn test_max_swap_amount_30_percent_h8() {
+        let p = seeded_pool(1_000_000, 2_000_000);
+        let max_a_to_b = max_swap_amount(&p, true);
+        assert_eq!(max_a_to_b, 600_000); // 30% of reserve_b=2M
+    }
+
+    #[test]
+    fn test_best_pool_for_swap_h8() {
+        let p1 = seeded_pool(1_000_000, 1_000_000);
+        let p2 = seeded_pool(10_000_000, 10_000_000);
+        let pools = vec![p1, p2];
+        let best = best_pool_for_swap(&pools, 10_000, true);
+        assert_eq!(best, Some(1)); // deeper pool gives better output
+    }
+
+    #[test]
+    fn test_default_fee_rate_h8() {
+        assert_eq!(default_fee_rate(), 30);
+    }
 }

@@ -2006,4 +2006,256 @@ mod tests {
         let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps);
         assert_eq!(plan, Err(MigrationError::DataCorrupted));
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_version_compare_major_takes_precedence_h8() {
+        assert_eq!(version_compare(&v(2, 0, 0), &v(1, 9, 9)), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn test_version_compare_minor_takes_precedence_over_patch_h8() {
+        assert_eq!(version_compare(&v(1, 2, 0), &v(1, 1, 9)), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn test_version_compare_zero_versions_h8() {
+        assert_eq!(version_compare(&v(0, 0, 0), &v(0, 0, 0)), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_is_compatible_same_major_h8() {
+        assert!(is_compatible(&v(1, 0, 0), &v(1, 5, 3)));
+    }
+
+    #[test]
+    fn test_is_compatible_different_major_h8() {
+        assert!(!is_compatible(&v(1, 0, 0), &v(2, 0, 0)));
+    }
+
+    #[test]
+    fn test_compatibility_report_breaking_changes_h8() {
+        let report = compatibility_report(&v(1, 0, 0), &v(1, 1, 0), 3, 2, 5);
+        assert!(report.compatible); // same major
+        assert!(report.migration_required); // breaking > 0
+        assert_eq!(report.breaking_changes, 3);
+        assert_eq!(report.deprecations, 2);
+        assert_eq!(report.new_features, 5);
+    }
+
+    #[test]
+    fn test_create_plan_already_migrated_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 10, false)];
+        let plan = create_migration_plan(&v(1, 0, 0), &v(1, 0, 0), steps);
+        assert_eq!(plan, Err(MigrationError::AlreadyMigrated));
+    }
+
+    #[test]
+    fn test_create_plan_downgrade_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 10, false)];
+        let plan = create_migration_plan(&v(1, 0, 0), &v(0, 9, 0), steps);
+        assert_eq!(plan, Err(MigrationError::IncompatibleVersion));
+    }
+
+    #[test]
+    fn test_create_plan_version_too_old_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 10, false)];
+        let plan = create_migration_plan(&v(0, 8, 0), &v(1, 0, 0), steps);
+        assert_eq!(plan, Err(MigrationError::VersionTooOld));
+    }
+
+    #[test]
+    fn test_create_plan_version_too_new_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 10, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(2, 0, 0), steps);
+        assert_eq!(plan, Err(MigrationError::VersionTooNew));
+    }
+
+    #[test]
+    fn test_create_plan_empty_steps_h8() {
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), vec![]);
+        assert_eq!(plan, Err(MigrationError::MissingField));
+    }
+
+    #[test]
+    fn test_create_plan_estimated_cells_h8() {
+        let steps = vec![
+            make_step(0, TransformType::SchemaChange, 50, false),
+            make_step(1, TransformType::DataReformat, 150, false),
+        ];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(plan.estimated_cells, 200);
+    }
+
+    #[test]
+    fn test_estimate_migration_time_zero_cells_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 0, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(estimate_migration_time(&plan, 100), 0);
+    }
+
+    #[test]
+    fn test_estimate_migration_time_zero_throughput_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 100, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(estimate_migration_time(&plan, 0), 0);
+    }
+
+    #[test]
+    fn test_estimate_migration_time_ceiling_division_h8() {
+        let steps = vec![make_step(0, TransformType::SchemaChange, 101, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        // 101 cells / 100 per block = 2 blocks (ceiling)
+        assert_eq!(estimate_migration_time(&plan, 100), 2);
+    }
+
+    #[test]
+    fn test_validate_checkpoint_match_h8() {
+        let cs = [0xAB; 32];
+        let cp = make_checkpoint(v(1, 0, 0), cs);
+        assert!(validate_checkpoint(&cp, &cs).is_ok());
+    }
+
+    #[test]
+    fn test_validate_checkpoint_mismatch_h8() {
+        let cp = make_checkpoint(v(1, 0, 0), [0xAB; 32]);
+        assert_eq!(validate_checkpoint(&cp, &[0xCD; 32]), Err(MigrationError::ChecksumMismatch));
+    }
+
+    #[test]
+    fn test_migration_progress_not_started_h8() {
+        assert_eq!(migration_progress_bps(&MigrationStatus::NotStarted), 0);
+    }
+
+    #[test]
+    fn test_migration_progress_completed_h8() {
+        assert_eq!(migration_progress_bps(&MigrationStatus::Completed), BPS_DENOMINATOR);
+    }
+
+    #[test]
+    fn test_migration_progress_rolled_back_h8() {
+        assert_eq!(migration_progress_bps(&MigrationStatus::RolledBack), 0);
+    }
+
+    #[test]
+    fn test_migration_progress_in_progress_half_h8() {
+        let status = MigrationStatus::InProgress { completed_steps: 5, total_steps: 10 };
+        assert_eq!(migration_progress_bps(&status), 5000);
+    }
+
+    #[test]
+    fn test_migration_progress_in_progress_zero_total_h8() {
+        let status = MigrationStatus::InProgress { completed_steps: 0, total_steps: 0 };
+        assert_eq!(migration_progress_bps(&status), 0);
+    }
+
+    #[test]
+    fn test_can_rollback_in_progress_h8() {
+        assert!(can_rollback(&MigrationStatus::InProgress { completed_steps: 3, total_steps: 10 }));
+    }
+
+    #[test]
+    fn test_can_rollback_completed_h8() {
+        assert!(!can_rollback(&MigrationStatus::Completed));
+    }
+
+    #[test]
+    fn test_can_rollback_not_started_h8() {
+        assert!(!can_rollback(&MigrationStatus::NotStarted));
+    }
+
+    #[test]
+    fn test_cell_transform_summary_empty_h8() {
+        let (old, new, count) = cell_transform_summary(&[]);
+        assert_eq!(old, 0);
+        assert_eq!(new, 0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_data_size_delta_growth_h8() {
+        let transforms = vec![
+            make_transform(100, 150, 1, 0, 0),
+            make_transform(200, 300, 2, 0, 0),
+        ];
+        assert_eq!(data_size_delta(&transforms), 150);
+    }
+
+    #[test]
+    fn test_data_size_delta_shrinkage_h8() {
+        let transforms = vec![make_transform(200, 100, 0, 2, 0)];
+        assert_eq!(data_size_delta(&transforms), -100);
+    }
+
+    #[test]
+    fn test_parse_version_empty_h8() {
+        assert_eq!(parse_version(&[]), Err(MigrationError::MissingField));
+    }
+
+    #[test]
+    fn test_parse_version_invalid_format_h8() {
+        assert_eq!(parse_version(b"1.2"), Err(MigrationError::DataCorrupted));
+    }
+
+    #[test]
+    fn test_parse_version_non_numeric_h8() {
+        assert_eq!(parse_version(b"a.b.c"), Err(MigrationError::DataCorrupted));
+    }
+
+    #[test]
+    fn test_version_string_roundtrip_h8() {
+        let original = v(1, 2, 3);
+        let buf = version_string(&original);
+        let parsed = parse_version(&buf).unwrap();
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn test_needs_migration_same_version_h8() {
+        assert!(!needs_migration(&v(1, 0, 0), &v(1, 0, 0)));
+    }
+
+    #[test]
+    fn test_needs_migration_higher_target_h8() {
+        assert!(needs_migration(&v(0, 9, 0), &v(1, 0, 0)));
+    }
+
+    #[test]
+    fn test_needs_migration_lower_target_h8() {
+        assert!(!needs_migration(&v(1, 0, 0), &v(0, 9, 0)));
+    }
+
+    #[test]
+    fn test_step_completion_rate_none_done_h8() {
+        let steps = vec![
+            make_step(0, TransformType::SchemaChange, 10, false),
+            make_step(1, TransformType::DataReformat, 10, false),
+        ];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(step_completion_rate(&plan), 0);
+    }
+
+    #[test]
+    fn test_step_completion_rate_all_done_h8() {
+        let steps = vec![
+            make_step(0, TransformType::SchemaChange, 10, true),
+            make_step(1, TransformType::DataReformat, 10, true),
+        ];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(step_completion_rate(&plan), 10_000);
+    }
+
+    #[test]
+    fn test_checksum_deterministic_h8() {
+        let data = b"hello vibeswap";
+        let h1 = checksum(data);
+        let h2 = checksum(data);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_checksum_different_data_h8() {
+        assert_ne!(checksum(b"hello"), checksum(b"world"));
+    }
 }

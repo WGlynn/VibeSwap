@@ -6,6 +6,8 @@ import { useSwap } from '../hooks/useSwap'
 import { useContracts } from '../hooks/useContracts'
 import GlassCard from './ui/GlassCard'
 import InteractiveButton from './ui/InteractiveButton'
+import PageHero from './ui/PageHero'
+import Sparkline, { generateSparklineData } from './ui/Sparkline'
 import toast from 'react-hot-toast'
 
 // ============ Constants ============
@@ -15,6 +17,15 @@ const CYAN = '#06b6d4'
 const Section = ({ children, className = '' }) => (
   <div className={`max-w-7xl mx-auto px-4 ${className}`}>{children}</div>
 )
+
+// Seeded PRNG for stable mock data (doesn't shift on re-render)
+function seededRandom(seed) {
+  let s = seed
+  return () => {
+    s = (s * 16807 + 0) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
 
 // ============ Price Chart (SVG) ============
 function PriceChart({ pair, data }) {
@@ -76,21 +87,22 @@ function PriceChart({ pair, data }) {
 
 // ============ Order Book ============
 function OrderBook({ pair }) {
-  // Generate realistic mock order book
+  // Seeded order book — stable across re-renders
   const midPrice = pair === 'ETH/USDC' ? 2800 : pair === 'BTC/USDC' ? 96000 : 0.50
   const spread = midPrice * 0.001
+  const rng = useMemo(() => seededRandom(pair.length * 9973), [pair])
 
-  const asks = Array.from({ length: 8 }, (_, i) => ({
-    price: midPrice + spread * (i + 1) + Math.random() * spread * 0.5,
-    size: (Math.random() * 5 + 0.1).toFixed(4),
+  const asks = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+    price: midPrice + spread * (i + 1) + rng() * spread * 0.5,
+    size: (rng() * 5 + 0.1).toFixed(4),
     total: 0,
-  })).reverse()
+  })).reverse(), [midPrice, spread, rng])
 
-  const bids = Array.from({ length: 8 }, (_, i) => ({
-    price: midPrice - spread * (i + 1) - Math.random() * spread * 0.5,
-    size: (Math.random() * 5 + 0.1).toFixed(4),
+  const bids = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+    price: midPrice - spread * (i + 1) - rng() * spread * 0.5,
+    size: (rng() * 5 + 0.1).toFixed(4),
     total: 0,
-  }))
+  })), [midPrice, spread, rng])
 
   // Calculate cumulative totals
   let askTotal = 0
@@ -138,16 +150,19 @@ function OrderBook({ pair }) {
 function RecentTrades({ pair }) {
   const midPrice = pair === 'ETH/USDC' ? 2800 : pair === 'BTC/USDC' ? 96000 : 0.50
 
-  const trades = Array.from({ length: 12 }, (_, i) => {
-    const isBuy = Math.random() > 0.45
-    const deviation = (Math.random() - 0.5) * midPrice * 0.002
-    return {
-      price: midPrice + deviation,
-      size: (Math.random() * 3 + 0.01).toFixed(4),
-      time: new Date(Date.now() - i * (Math.random() * 30000 + 5000)).toLocaleTimeString(),
-      isBuy,
-    }
-  })
+  const trades = useMemo(() => {
+    const rng = seededRandom(pair.length * 7919)
+    return Array.from({ length: 12 }, (_, i) => {
+      const isBuy = rng() > 0.45
+      const deviation = (rng() - 0.5) * midPrice * 0.002
+      return {
+        price: midPrice + deviation,
+        size: (rng() * 3 + 0.01).toFixed(4),
+        time: new Date(Date.now() - i * 15000).toLocaleTimeString(),
+        isBuy,
+      }
+    })
+  }, [pair, midPrice])
 
   return (
     <div className="font-mono text-xs">
@@ -480,50 +495,48 @@ export default function TradingPage() {
 
   const pairs = ['ETH/USDC', 'BTC/USDC', 'ARB/USDC', 'JUL/USDC', 'SOL/USDC']
 
-  // Generate mock chart data for selected pair
+  // Generate STABLE mock chart data (seeded — won't shift on re-render)
   const chartData = useMemo(() => {
     const basePrice = selectedPair === 'ETH/USDC' ? 2800 : selectedPair === 'BTC/USDC' ? 96000 : selectedPair === 'ARB/USDC' ? 0.50 : selectedPair === 'JUL/USDC' ? 0.012 : 150
+    const seedMap = { 'ETH/USDC': 42, 'BTC/USDC': 137, 'ARB/USDC': 256, 'JUL/USDC': 618, 'SOL/USDC': 314 }
+    const tfMap = { '1M': 1, '5M': 2, '15M': 3, '1H': 4, '4H': 5, '1D': 6 }
+    const rng = seededRandom((seedMap[selectedPair] || 1) * 1000 + (tfMap[chartTimeframe] || 1))
     const points = 60
     let price = basePrice
     return Array.from({ length: points }, (_, i) => {
-      price += (Math.random() - 0.48) * basePrice * 0.003
+      price *= 1 + (rng() - 0.48) * 0.006
       return { time: i, price: Math.max(price, basePrice * 0.95) }
     })
   }, [selectedPair, chartTimeframe])
 
   return (
     <div className="min-h-screen pb-8">
-      <Section className="pt-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div>
-            <h1 className="text-2xl font-bold">Trade</h1>
-            <p className="text-sm text-black-400">MEV-protected trading via commit-reveal batch auctions</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono ${isLive ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-green-400 animate-pulse' : 'bg-amber-400'}`} />
-              {isLive ? 'Live on Base' : 'Demo Mode'}
-            </div>
-          </div>
-        </div>
+      <PageHero
+        title="Trade"
+        subtitle="MEV-protected trading via commit-reveal batch auctions"
+        category="trading"
+        badge={isLive ? 'Live on Base' : 'Demo Mode'}
+        badgeColor={isLive ? '#22c55e' : '#f59e0b'}
+      />
+      <Section>
 
         {/* Batch status bar */}
         <BatchStatus />
 
-        {/* Pair selector */}
-        <div className="flex gap-1 mt-3 mb-4 overflow-x-auto pb-1">
-          {pairs.map(pair => (
+        {/* Pair selector — with mini sparklines */}
+        <div className="flex gap-1.5 mt-3 mb-4 overflow-x-auto pb-1">
+          {pairs.map((pair, idx) => (
             <button
               key={pair}
               onClick={() => setSelectedPair(pair)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 selectedPair === pair
                   ? 'bg-black-600 text-white border border-black-500'
                   : 'text-black-400 hover:text-white hover:bg-black-700/50'
               }`}
             >
-              {pair}
+              <span>{pair}</span>
+              <Sparkline data={generateSparklineData((idx + 1) * 42)} width={32} height={10} strokeWidth={1} fill={false} />
             </button>
           ))}
         </div>

@@ -154,6 +154,8 @@ import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, l
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
 import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus, routeQuestion, addNyxMemory, getNyxMemory } from './pantheon.js';
 import { runPrimitiveGate, formatGateResult, getPrimitives, getPrimitiveManifest, getGateHistory } from './primitive-gate.js';
+import { initConstellation, handleConstellationRequest } from './constellation.js';
+import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, getLexicon, getCovenant, TEN_COVENANTS, COVENANT_HASH, issueChallenge, getChallenges, persistRosetta } from './rosetta.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -2681,6 +2683,98 @@ bot.command('gate', async (ctx) => {
     msg += `  /gate history — Recent gate results`;
     ctx.reply(msg);
   }
+});
+
+// ============ Rosetta Stone Protocol — Universal Translation ============
+
+bot.command('rosetta', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Owner only.');
+  }
+
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'translate') {
+    // /rosetta translate <from> <to> <concept>
+    const [, fromAgent, toAgent, ...conceptParts] = args;
+    const concept = conceptParts.join('_');
+    if (!fromAgent || !toAgent || !concept) {
+      return ctx.reply('Usage: /rosetta translate <from_agent> <to_agent> <concept>\nExample: /rosetta translate poseidon athena liquidity');
+    }
+    const result = translate(fromAgent, toAgent, concept);
+    if (result.error) return ctx.reply(`Error: ${result.error}`);
+    if (!result.translated) {
+      return ctx.reply(`${fromAgent}:${concept} → universal:"${result.universal}"\n${result.explanation || 'No equivalent found in ' + toAgent}`);
+    }
+    let msg = `Rosetta Translation\n━━━━━━━━━━━━━━━━\n`;
+    msg += `${result.from.agent}: "${result.from.term}" — ${result.from.desc}\n`;
+    msg += `↓ universal: ${result.universal}\n`;
+    msg += `${result.to.agent}: "${result.to.term}" — ${result.to.desc}\n`;
+    msg += `Confidence: ${(result.confidence * 100).toFixed(0)}%${result.approximate ? ' (approximate)' : ''}`;
+    ctx.reply(msg);
+
+  } else if (sub === 'all') {
+    // /rosetta all <agent> <concept>
+    const [, fromAgent, ...conceptParts] = args;
+    const concept = conceptParts.join('_');
+    if (!fromAgent || !concept) return ctx.reply('Usage: /rosetta all <agent> <concept>');
+    const result = translateToAll(fromAgent, concept);
+    let msg = `Rosetta — "${concept}" from ${fromAgent}\n━━━━━━━━━━━━━━━━\n`;
+    for (const [agent, t] of Object.entries(result.translations)) {
+      if (t.translated) msg += `${agent}: "${t.to.term}" (${(t.confidence * 100).toFixed(0)}%)\n`;
+      else msg += `${agent}: — (no equivalent)\n`;
+    }
+    ctx.reply(msg);
+
+  } else if (sub === 'lexicon') {
+    // /rosetta lexicon <agent>
+    const agentId = args[1]?.toLowerCase();
+    if (!agentId) return ctx.reply('Usage: /rosetta lexicon <agent>');
+    const lex = getLexicon(agentId);
+    if (!lex) return ctx.reply(`No lexicon for "${agentId}"`);
+    let msg = `${agentId.toUpperCase()} Lexicon — ${lex.domain}\n━━━━━━━━━━━━━━━━\n`;
+    for (const [term, mapping] of Object.entries(lex.concepts)) {
+      msg += `• ${term} → ${mapping.universal}\n  ${mapping.desc}\n`;
+    }
+    ctx.reply(msg);
+
+  } else if (sub === 'view') {
+    const view = getRosettaView();
+    let msg = `Rosetta Stone Protocol\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Agents: ${Object.keys(view.agents).length}\n`;
+    msg += `Total Terms: ${view.totalTerms}\n`;
+    msg += `Universal Concepts: ${view.universalConcepts}\n`;
+    msg += `Covenant Hash: ${view.covenantHash.slice(0, 16)}...\n`;
+    msg += `Active Challenges: ${view.activeChallenges}\n\n`;
+    for (const [id, a] of Object.entries(view.agents)) {
+      msg += `${id}: ${a.domain} (${a.termCount} terms)\n`;
+    }
+    ctx.reply(msg);
+
+  } else {
+    let msg = `Rosetta Stone Protocol — Universal Understanding\n━━━━━━━━━━━━━━━━\n`;
+    msg += `"So everyone can finally understand everyone."\n\n`;
+    msg += `Commands:\n`;
+    msg += `  /rosetta translate <from> <to> <concept>\n`;
+    msg += `  /rosetta all <agent> <concept> — Translate to ALL agents\n`;
+    msg += `  /rosetta lexicon <agent> — Show agent vocabulary\n`;
+    msg += `  /rosetta view — Full protocol status\n`;
+    msg += `  /covenants — The Ten Covenants of Tet`;
+    ctx.reply(msg);
+  }
+});
+
+bot.command('covenants', async (ctx) => {
+  let msg = `The Ten Covenants of Tet\n━━━━━━━━━━━━━━━━\n`;
+  msg += `"In the name of the builders, let these laws govern all minds."\n`;
+  msg += `Hash: ${COVENANT_HASH.slice(0, 16)}...\n\n`;
+  for (const c of TEN_COVENANTS) {
+    const icon = c.enforcement === 'hard' ? '⚖️' : c.enforcement === 'immutable' ? '🔒' : c.enforcement === 'spirit' ? '✨' : '📜';
+    msg += `${icon} ${c.number}. ${c.covenant}\n`;
+  }
+  msg += `\nEnforcement: ⚖️=hard 🔒=immutable ✨=spirit 📜=soft`;
+  ctx.reply(msg);
 });
 
 // ============ Trading — Autonomous DEX ============
@@ -6414,6 +6508,13 @@ async function main() {
         }
       }
 
+      // Constellation — Interactive Star Map (must check BEFORE generic /theai)
+      if (req.url?.startsWith('/theai/constellation')) {
+        const cUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        await handleConstellationRequest(req, res, cUrl);
+        return;
+      }
+
       // TheAI — Digital Corporation Dashboard
       if (req.url?.startsWith('/theai')) {
         const aiUrl = new URL(req.url, `http://localhost:${healthPort}`);
@@ -6636,6 +6737,10 @@ async function main() {
   initTrading();
   // Pantheon — digital corporation agent management
   initPantheon();
+  // Constellation — interactive star map visualization
+  initConstellation();
+  // Rosetta Stone Protocol — universal translation between agents
+  initRosetta();
   // TheAI — scheduled 24h prune cycle (midnight UTC)
   const schedulePrune = () => {
     const now = new Date();
@@ -7286,6 +7391,11 @@ async function main() {
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
         }
+
+      // ============ Constellation — Interactive Star Map ============
+      } else if (req.url?.startsWith('/theai/constellation')) {
+        const cUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        await handleConstellationRequest(req, res, cUrl);
 
       // ============ TheAI — Digital Corporation Dashboard ============
       } else if (req.url?.startsWith('/theai')) {

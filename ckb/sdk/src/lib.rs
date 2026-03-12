@@ -54,6 +54,7 @@ pub mod strategy;
 pub mod token;
 pub mod treasury;
 pub mod upgrade;
+pub mod validator;
 pub mod vesting;
 pub mod whitelist;
 

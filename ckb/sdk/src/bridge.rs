@@ -1886,4 +1886,282 @@ mod tests {
             assert!(est.estimated_time_blocks >= config.finality_blocks);
         }
     }
+
+    // ============ Hardening Batch: Additional Edge Cases ============
+
+    #[test]
+    fn test_message_hash_large_payload() {
+        let mut msg = make_message(1, 2, 0);
+        msg.payload = vec![0xAB; MAX_MESSAGE_SIZE as usize];
+        let hash = message_hash(&msg);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_message_hash_payload_one_byte_difference() {
+        let mut m1 = make_message(1, 2, 0);
+        let mut m2 = make_message(1, 2, 0);
+        m1.payload = vec![0x00; 100];
+        m2.payload = vec![0x00; 99];
+        m2.payload.push(0x01); // Last byte differs
+        assert_ne!(message_hash(&m1), message_hash(&m2));
+    }
+
+    #[test]
+    fn test_verify_proof_five_leaves() {
+        // Non-power-of-two > 4
+        let leaves: Vec<[u8; 32]> = (0..5)
+            .map(|i| message_hash(&make_message(1, 2, i)))
+            .collect();
+
+        let (root, proof_nodes) = build_merkle_tree(&leaves);
+
+        let proof = MessageProof {
+            message_hash: leaves[0],
+            block_number: 100,
+            proof_data: proof_nodes,
+            root,
+        };
+        assert_eq!(verify_proof(&proof), Ok(true));
+    }
+
+    #[test]
+    fn test_verify_proof_wrong_root() {
+        let leaves: Vec<[u8; 32]> = (0..4)
+            .map(|i| message_hash(&make_message(1, 2, i)))
+            .collect();
+
+        let (_root, proof_nodes) = build_merkle_tree(&leaves);
+
+        let proof = MessageProof {
+            message_hash: leaves[0],
+            block_number: 100,
+            proof_data: proof_nodes,
+            root: [0xFF; 32], // Wrong root
+        };
+        assert_eq!(verify_proof(&proof), Ok(false));
+    }
+
+    #[test]
+    fn test_estimate_fee_ckb_chain() {
+        let chains = default_chains();
+        let est = estimate_bridge_fee(&chains, 1, 50).unwrap();
+        // CKB: 10 bps fee, 24 finality blocks
+        assert_eq!(est.estimated_time_blocks, 24 + 24 / 10);
+        assert_eq!(est.relay_fee, BASE_RELAY_FEE + 50 * PER_BYTE_RELAY_FEE);
+    }
+
+    #[test]
+    fn test_estimate_fee_bsc_chain() {
+        let chains = default_chains();
+        let est = estimate_bridge_fee(&chains, 3, 200).unwrap();
+        // BSC: 20 bps, 15 finality
+        assert_eq!(est.estimated_time_blocks, 15 + 15 / 10);
+    }
+
+    #[test]
+    fn test_estimate_fee_solana_chain() {
+        let chains = default_chains();
+        let est = estimate_bridge_fee(&chains, 4, 80).unwrap();
+        // Solana: 30 bps, 32 finality
+        assert_eq!(est.estimated_time_blocks, 32 + 32 / 10);
+    }
+
+    #[test]
+    fn test_validate_transfer_min_amount_one() {
+        let transfer = make_transfer(1, 2, 1, 0, 1_000_000);
+        let tokens = supported_tokens();
+        assert!(validate_transfer(&transfer, 500_000, &tokens).is_ok());
+    }
+
+    #[test]
+    fn test_validate_transfer_max_amount() {
+        let transfer = make_transfer(1, 2, u128::MAX, 0, 1_000_000);
+        let tokens = supported_tokens();
+        assert!(validate_transfer(&transfer, 500_000, &tokens).is_ok());
+    }
+
+    #[test]
+    fn test_validate_transfer_deadline_far_future() {
+        let transfer = make_transfer(1, 2, 1000 * PRECISION, 900 * PRECISION, u64::MAX);
+        let tokens = supported_tokens();
+        assert!(validate_transfer(&transfer, u64::MAX - 1, &tokens).is_ok());
+    }
+
+    #[test]
+    fn test_calculate_min_receive_high_fee_low_slippage() {
+        // 5% fee (500 bps), 0.1% slippage (10 bps)
+        let amount = 100_000 * PRECISION;
+        let result = calculate_min_receive(amount, 500, 10);
+        let after_fee = vibeswap_math::mul_div(amount, 9500, 10_000);
+        let expected = vibeswap_math::mul_div(after_fee, 9990, 10_000);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_equal_fee_and_slippage() {
+        // Both 1% (100 bps each)
+        let amount = 1_000_000 * PRECISION;
+        let result = calculate_min_receive(amount, 100, 100);
+        // after_fee = 990K, after_slippage = 990K * 0.99 = 980.1K
+        let after_fee = vibeswap_math::mul_div(amount, 9900, 10_000);
+        let expected = vibeswap_math::mul_div(after_fee, 9900, 10_000);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_next_nonce_large_gap() {
+        assert_eq!(next_nonce(&[0, 1_000_000]), 1_000_001);
+    }
+
+    #[test]
+    fn test_next_nonce_all_same_value() {
+        assert_eq!(next_nonce(&[42, 42, 42, 42]), 43);
+    }
+
+    #[test]
+    fn test_message_status_confirmed_at_exact_block() {
+        // confirmed_block = current_block, finality > 0 → Confirmed
+        let status = message_status(100, 100, 10, false, 1000);
+        assert_eq!(status, BridgeStatus::Confirmed);
+    }
+
+    #[test]
+    fn test_message_status_completed_even_if_pending_would_apply() {
+        // Relayed flag overrides all other states
+        let status = message_status(0, 0, 100, true, 0);
+        assert_eq!(status, BridgeStatus::Completed);
+    }
+
+    #[test]
+    fn test_message_status_expired_unconfirmed() {
+        // Never confirmed (confirmed_block=0), deadline passed
+        let status = message_status(0, 200, 10, false, 100);
+        assert_eq!(status, BridgeStatus::Expired);
+    }
+
+    #[test]
+    fn test_bridge_summary_large_volumes() {
+        let transfers_in = vec![(u128::MAX / 2, 10u64)];
+        let transfers_out = vec![(u128::MAX / 2, 20u64)];
+        let summary = bridge_summary(&transfers_in, &transfers_out, &[], 100);
+        assert_eq!(summary.total_bridged_in, u128::MAX / 2);
+        assert_eq!(summary.total_bridged_out, u128::MAX / 2);
+        assert_eq!(summary.avg_relay_time, 15); // (10+20)/2
+    }
+
+    #[test]
+    fn test_bridge_summary_many_pending() {
+        let pending: Vec<u64> = (0..100).collect();
+        let summary = bridge_summary(&[], &[], &pending, 200);
+        assert_eq!(summary.pending_count, 100);
+        assert_eq!(summary.avg_relay_time, 0);
+    }
+
+    #[test]
+    fn test_find_cheapest_path_three_chains_all_active() {
+        let chains = vec![
+            make_chain(10, "X", 10, 15, true),
+            make_chain(20, "Y", 10, 25, true),
+            make_chain(30, "Z", 10, 5, true),
+        ];
+        // X -> Z direct cost = 5 (Z's fee)
+        // X -> Y -> Z = 25 + 5 = 30 (Y intermediate + Z dest)
+        // Direct wins
+        let path = find_cheapest_path(&chains, 10, 30).unwrap();
+        assert_eq!(path, vec![10, 30]);
+    }
+
+    #[test]
+    fn test_find_cheapest_path_many_intermediates() {
+        let mut chains = vec![
+            make_chain(1, "Src", 10, 10, true),
+            make_chain(100, "Dest", 10, 50, true),
+        ];
+        // Add 10 intermediate chains with high fees
+        for i in 2..12 {
+            chains.push(make_chain(i, "Mid", 10, 100, true));
+        }
+        let path = find_cheapest_path(&chains, 1, 100).unwrap();
+        assert_eq!(path, vec![1, 100]); // Direct wins (50 < 100+50)
+    }
+
+    #[test]
+    fn test_encode_payload_distinct_fields() {
+        let token = [0x01; 32];
+        let receiver = [0x02; 32];
+        let amount = 12345u128;
+
+        let encoded = encode_transfer_payload(&token, amount, &receiver);
+        // First 32 bytes = token
+        assert_eq!(&encoded[..32], &token[..]);
+        // Last 32 bytes = receiver
+        assert_eq!(&encoded[48..80], &receiver[..]);
+    }
+
+    #[test]
+    fn test_chain_pair_empty_configs_dest_error() {
+        // With empty configs, should fail on src
+        let err = validate_chain_pair(&[], 5, 10).unwrap_err();
+        assert_eq!(err, BridgeError::InvalidChainId(5));
+    }
+
+    #[test]
+    fn test_is_message_expired_deadline_one() {
+        assert!(!is_message_expired(1, 0));
+        assert!(!is_message_expired(1, 1));
+        assert!(is_message_expired(1, 2));
+    }
+
+    #[test]
+    fn test_calculate_min_receive_precision_amount() {
+        // Amount = PRECISION (1 token), 30 bps fee, 50 bps slippage
+        let result = calculate_min_receive(PRECISION, 30, 50);
+        let after_fee = vibeswap_math::mul_div(PRECISION, 9970, 10_000);
+        let expected = vibeswap_math::mul_div(after_fee, 9950, 10_000);
+        assert_eq!(result, expected);
+        assert!(result > 0);
+        assert!(result < PRECISION);
+    }
+
+    #[test]
+    fn test_message_hash_max_chain_ids() {
+        let msg = CrossChainMessage {
+            source_chain: u32::MAX,
+            dest_chain: u32::MAX - 1,
+            nonce: 0,
+            sender: [0; 32],
+            receiver: [0; 32],
+            payload: vec![],
+            timestamp: 0,
+        };
+        let hash = message_hash(&msg);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_validate_transfer_second_supported_token() {
+        // Use the second token from supported list
+        let tokens = supported_tokens();
+        let mut transfer = make_transfer(1, 2, 1000 * PRECISION, 900 * PRECISION, 1_000_000);
+        transfer.token_hash = tokens[1]; // [0x22; 32]
+        assert!(validate_transfer(&transfer, 500_000, &tokens).is_ok());
+    }
+
+    #[test]
+    fn test_bridge_summary_single_transfer_out() {
+        let summary = bridge_summary(&[], &[(1_000 * PRECISION, 50)], &[], 200);
+        assert_eq!(summary.total_bridged_in, 0);
+        assert_eq!(summary.total_bridged_out, 1_000 * PRECISION);
+        assert_eq!(summary.avg_relay_time, 50);
+    }
+
+    #[test]
+    fn test_validate_chain_pair_swapped_src_dest() {
+        let chains = default_chains();
+        // Verify both orderings work
+        let (src, dest) = validate_chain_pair(&chains, 3, 1).unwrap();
+        assert_eq!(src.chain_id, 3);
+        assert_eq!(dest.chain_id, 1);
+    }
 }

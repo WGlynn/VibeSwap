@@ -1699,4 +1699,292 @@ mod tests {
         assert_eq!(e1, e2);
         assert_ne!(ComplianceError::KycRequired, ComplianceError::SanctionedAddress);
     }
+
+    // ============ Hardening Batch: Additional Edge Cases ============
+
+    #[test]
+    fn test_kyc_none_insufficient_for_all_levels() {
+        assert!(!kyc_level_sufficient(&KycLevel::None, &KycLevel::Basic));
+        assert!(!kyc_level_sufficient(&KycLevel::None, &KycLevel::Enhanced));
+        assert!(!kyc_level_sufficient(&KycLevel::None, &KycLevel::Institutional));
+    }
+
+    #[test]
+    fn test_kyc_basic_sufficient_for_none_and_basic() {
+        assert!(kyc_level_sufficient(&KycLevel::Basic, &KycLevel::None));
+        assert!(kyc_level_sufficient(&KycLevel::Basic, &KycLevel::Basic));
+        assert!(!kyc_level_sufficient(&KycLevel::Basic, &KycLevel::Enhanced));
+    }
+
+    #[test]
+    fn test_kyc_enhanced_covers_basic_and_none() {
+        assert!(kyc_level_sufficient(&KycLevel::Enhanced, &KycLevel::None));
+        assert!(kyc_level_sufficient(&KycLevel::Enhanced, &KycLevel::Basic));
+        assert!(kyc_level_sufficient(&KycLevel::Enhanced, &KycLevel::Enhanced));
+    }
+
+    #[test]
+    fn test_kyc_expired_one_block_before() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 1000);
+        assert!(!is_kyc_expired(&kyc, 999));
+    }
+
+    #[test]
+    fn test_kyc_expired_one_block_after() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 1000);
+        assert!(is_kyc_expired(&kyc, 1001));
+    }
+
+    #[test]
+    fn test_kyc_renewal_at_exact_warning_boundary_minus_one() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 10_000);
+        // warning starts at 8000, current = 7999 → not needed yet
+        assert!(!kyc_renewal_needed(&kyc, 7999, 2000));
+    }
+
+    #[test]
+    fn test_kyc_renewal_one_block_before_expiry() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 10_000);
+        // current = 9999, not expired yet, within any warning window
+        assert!(kyc_renewal_needed(&kyc, 9999, 100));
+    }
+
+    #[test]
+    fn test_check_limits_exact_at_per_tx_plus_one() {
+        let limits = make_limits(1000, 5000, 100_000, 10);
+        assert_eq!(
+            check_limits(1001, 0, &limits),
+            Err(ComplianceError::TransactionLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn test_check_limits_daily_exactly_full() {
+        // daily_volume + amount = daily_max exactly
+        let limits = make_limits(5000, 10_000, 100_000, 10);
+        assert_eq!(check_limits(3_000, 7_000, &limits), Ok(()));
+    }
+
+    #[test]
+    fn test_check_limits_daily_one_over() {
+        let limits = make_limits(5000, 10_000, 100_000, 10);
+        assert_eq!(
+            check_limits(3_001, 7_000, &limits),
+            Err(ComplianceError::DailyLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn test_sanctioned_zero_address() {
+        let address = [0x00; 32];
+        let sanctioned = vec![[0x00; 32]];
+        assert!(is_sanctioned(&address, &sanctioned));
+    }
+
+    #[test]
+    fn test_sanctioned_max_address() {
+        let address = [0xFF; 32];
+        let sanctioned = vec![[0xFF; 32]];
+        assert!(is_sanctioned(&address, &sanctioned));
+    }
+
+    #[test]
+    fn test_jurisdiction_zero_value() {
+        assert!(is_restricted_jurisdiction(0, &[0, 100, 200]));
+        assert!(!is_restricted_jurisdiction(0, &[100, 200]));
+    }
+
+    #[test]
+    fn test_compliance_basic_at_exact_tx_limit() {
+        let kyc = make_kyc(KycLevel::Basic, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        // Exact per-tx limit should pass
+        let amount = BASIC_TX_LIMIT;
+        let result = check_compliance(&kyc, &rule, amount, 0, 500, &[]);
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_compliance_basic_one_over_tx_limit() {
+        let kyc = make_kyc(KycLevel::Basic, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let amount = BASIC_TX_LIMIT + 1;
+        let result = check_compliance(&kyc, &rule, amount, 0, 500, &[]);
+        assert!(!result.passed);
+        assert!(!result.limits_ok);
+    }
+
+    #[test]
+    fn test_compliance_enhanced_at_exact_daily_limit() {
+        let kyc = make_kyc(KycLevel::Enhanced, 840);
+        let rule = make_rule(KycLevel::Enhanced, vec![]);
+        // Send 1M (within per-tx), daily already at 4M → total 5M = daily limit
+        let amount = ENHANCED_TX_LIMIT; // 1M
+        let daily = ENHANCED_DAILY_LIMIT - amount;
+        let result = check_compliance(&kyc, &rule, amount, daily, 500, &[]);
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_risk_score_max_diversity_no_penalty() {
+        // 10 txs, 10 unique counterparties = 100% diversity → no diversity penalty
+        let score = address_risk_score(10, 10, 100 * PRECISION, 1_000_000);
+        // diversity = 10*10000/10 = 10000 → no penalty
+        // frequency = 10*1000/1000000 = 0 → no penalty
+        // avg < 1M → no penalty
+        // age >= 100000 → no penalty
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_risk_score_zero_tx_count() {
+        // No transactions at all
+        let score = address_risk_score(0, 0, 0, 1_000_000);
+        // frequency = 0 (zero txs means mul_div result is 0)
+        // no diversity check (tx_count == 0)
+        // avg = 0, no amount penalty
+        // age >= 100000 → no age penalty
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_risk_score_one_tx_one_counterparty() {
+        let score = address_risk_score(1, 1, 500 * PRECISION, 500_000);
+        // frequency = 1*1000/500000 = 0 → no freq
+        // diversity = 1*10000/1 = 10000 → no diversity
+        // avg 500 < 1M → no amount
+        // age 500K >= 100K → no age
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_compliance_report_ten_checks_mixed() {
+        let mut checks = Vec::new();
+        for i in 0..10 {
+            if i < 6 {
+                checks.push(ComplianceCheck {
+                    passed: true, kyc_ok: true, limits_ok: true,
+                    sanctions_ok: true, jurisdiction_ok: true, reason: None,
+                });
+            } else {
+                checks.push(ComplianceCheck {
+                    passed: false, kyc_ok: false, limits_ok: true,
+                    sanctions_ok: true, jurisdiction_ok: true,
+                    reason: Some(ComplianceError::KycRequired),
+                });
+            }
+        }
+        let report = compliance_report(&checks);
+        assert_eq!(report.total_checked, 10);
+        assert_eq!(report.passed, 6);
+        assert_eq!(report.failed, 4);
+        assert_eq!(report.kyc_failures, 4);
+        assert_eq!(report.limit_failures, 0);
+        assert_eq!(report.sanction_hits, 0);
+    }
+
+    #[test]
+    fn test_remaining_daily_limit_half_used() {
+        let limits = make_limits(10_000, 100_000, 1_000_000, 100);
+        assert_eq!(remaining_daily_limit(&limits, 50_000), 50_000);
+    }
+
+    #[test]
+    fn test_address_hash_same_address_same_salt() {
+        let addr = [0x42; 32];
+        let salt = [0x99; 32];
+        let h1 = address_hash(&addr, &salt);
+        let h2 = address_hash(&addr, &salt);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_address_hash_different_addr_bytes_produce_different_hashes() {
+        let salt = [0x00; 32];
+        let mut addr1 = [0x00; 32];
+        let mut addr2 = [0x00; 32];
+        addr1[31] = 1;
+        addr2[31] = 2;
+        assert_ne!(address_hash(&addr1, &salt), address_hash(&addr2, &salt));
+    }
+
+    #[test]
+    fn test_compliance_enhanced_user_basic_rule_passes() {
+        // Higher KYC level user accessing lower-tier rule should pass
+        let kyc = make_kyc(KycLevel::Enhanced, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let amount = 5_000 * PRECISION;
+        let result = check_compliance(&kyc, &rule, amount, 0, 500, &[]);
+        assert!(result.passed);
+        assert!(result.kyc_ok);
+    }
+
+    #[test]
+    fn test_compliance_institutional_user_none_rule_passes() {
+        let kyc = make_kyc(KycLevel::Institutional, 840);
+        let rule = make_rule(KycLevel::None, vec![]);
+        let result = check_compliance(&kyc, &rule, 0, 0, 500, &[]);
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_limits_none_monthly_zero() {
+        let limits = limits_for_kyc_level(&KycLevel::None);
+        assert_eq!(limits.monthly_max, 0);
+    }
+
+    #[test]
+    fn test_risk_score_diversity_below_five_percent() {
+        // 1000 txs, only 4 counterparties = 0.4% diversity → +3000
+        let score = address_risk_score(1000, 4, 100 * PRECISION, 1_000_000);
+        // diversity = 4*10000/1000 = 40 < 500 → +3000
+        // freq = 1000*1000/1000000 = 1 → no freq
+        assert_eq!(score, 3000);
+    }
+
+    #[test]
+    fn test_compliance_check_all_fields_are_set() {
+        let kyc = make_kyc(KycLevel::Enhanced, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let result = check_compliance(&kyc, &rule, 100 * PRECISION, 0, 500, &[]);
+
+        // All fields should be properly set for a passing check
+        assert!(result.passed);
+        assert!(result.kyc_ok);
+        assert!(result.limits_ok);
+        assert!(result.sanctions_ok);
+        assert!(result.jurisdiction_ok);
+        assert!(result.reason.is_none());
+    }
+
+    #[test]
+    fn test_compliance_expired_but_sufficient_level() {
+        // KYC level is sufficient but expired → should fail with ExpiredVerification
+        let kyc = make_kyc_with_expiry(KycLevel::Institutional, 500);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let result = check_compliance(&kyc, &rule, 100 * PRECISION, 0, 1000, &[]);
+        assert!(!result.passed);
+        assert!(!result.kyc_ok);
+        assert_eq!(result.reason, Some(ComplianceError::ExpiredVerification));
+    }
+
+    #[test]
+    fn test_risk_score_moderate_frequency_boundary() {
+        // frequency = 50 * 1000 / 1000 = 50, NOT > 50 → +1000 (not +2000)
+        let score = address_risk_score(50, 50, 100 * PRECISION, 1000);
+        // freq = 50 → +1000
+        // diversity = 50*10000/50 = 10000 → no penalty
+        // age < 10000 → +1500
+        assert_eq!(score, 2500);
+    }
+
+    #[test]
+    fn test_risk_score_exactly_100_frequency() {
+        // frequency = 100 * 1000 / 1000 = 100, NOT > 100 → +2000
+        let score = address_risk_score(100, 100, 100 * PRECISION, 1000);
+        // freq = 100, > 50 but not > 100 → +2000
+        // diversity = 100*10000/100 = 10000 → no penalty
+        // age < 10000 → +1500
+        assert_eq!(score, 3500);
+    }
 }

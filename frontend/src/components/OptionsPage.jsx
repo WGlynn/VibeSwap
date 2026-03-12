@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
@@ -9,7 +9,21 @@ import { useDeviceWallet } from '../hooks/useDeviceWallet'
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
 const CURRENT_PRICE = 3420.50
-const EXPIRIES = [{ label: '1D', days: 1 }, { label: '7D', days: 7 }, { label: '30D', days: 30 }, { label: '90D', days: 90 }]
+const RISK_FREE = 0.05
+
+const EXPIRIES = [
+  { label: '1D', days: 1 }, { label: '7D', days: 7 },
+  { label: '14D', days: 14 }, { label: '30D', days: 30 },
+  { label: '60D', days: 60 }, { label: '90D', days: 90 },
+]
+
+const STRATEGIES = {
+  single: { name: 'Single Option', legs: [] },
+  coveredCall: { name: 'Covered Call', legs: [{ type: 'stock', qty: 1 }, { type: 'call', qty: -1, dK: 100 }], desc: 'Long underlying + short OTM call. Earns premium, caps upside.' },
+  protectivePut: { name: 'Protective Put', legs: [{ type: 'stock', qty: 1 }, { type: 'put', qty: 1, dK: -100 }], desc: 'Long underlying + long OTM put. Insures downside risk.' },
+  straddle: { name: 'Straddle', legs: [{ type: 'call', qty: 1, dK: 0 }, { type: 'put', qty: 1, dK: 0 }], desc: 'Long ATM call + long ATM put. Profits from large moves either direction.' },
+  ironCondor: { name: 'Iron Condor', legs: [{ type: 'put', qty: 1, dK: -200 }, { type: 'put', qty: -1, dK: -100 }, { type: 'call', qty: -1, dK: 100 }, { type: 'call', qty: 1, dK: 200 }], desc: 'Sell OTM strangle + buy further OTM wings. Profits from low volatility.' },
+}
 
 const MOCK_POSITIONS = [
   { id: 1, type: 'Call', strike: 3400, expiry: '2026-04-12', size: 2.0, currentValue: 418.60, pnl: 106.20 },
@@ -38,7 +52,7 @@ function bsPrice(S, K, T, r, v, isCall) {
 }
 
 function bsGreeks(S, K, T, r, v, isCall) {
-  if (T <= 0 || v <= 0) return { delta: isCall ? 1 : -1, gamma: 0, theta: 0, vega: 0 }
+  if (T <= 0 || v <= 0) return { delta: isCall ? 1 : -1, gamma: 0, theta: 0, vega: 0, rho: 0 }
   const sqT = Math.sqrt(T), d1 = (Math.log(S / K) + (r + v * v / 2) * T) / (v * sqT)
   const d2 = d1 - v * sqT, nd1 = normalPDF(d1)
   return {
@@ -48,6 +62,9 @@ function bsGreeks(S, K, T, r, v, isCall) {
       ? -(S * nd1 * v) / (2 * sqT) - r * K * Math.exp(-r * T) * normalCDF(d2)
       : -(S * nd1 * v) / (2 * sqT) + r * K * Math.exp(-r * T) * normalCDF(-d2)) / 365,
     vega: S * nd1 * sqT / 100,
+    rho: isCall
+      ? K * T * Math.exp(-r * T) * normalCDF(d2) / 100
+      : -K * T * Math.exp(-r * T) * normalCDF(-d2) / 100,
   }
 }
 
@@ -57,12 +74,15 @@ function generateStrikes(price, count = 5, step = 50) {
   const base = Math.round(price / step) * step
   return Array.from({ length: count * 2 + 1 }, (_, idx) => {
     const i = idx - count, strike = base + i * step, iv = 0.55 + Math.abs(i) * 0.02
-    const cp = bsPrice(price, strike, 30 / 365, 0.05, iv, true)
-    const pp = bsPrice(price, strike, 30 / 365, 0.05, iv, false)
+    const T30 = 30 / 365
+    const cp = bsPrice(price, strike, T30, RISK_FREE, iv, true)
+    const pp = bsPrice(price, strike, T30, RISK_FREE, iv, false)
+    const cGreeks = bsGreeks(price, strike, T30, RISK_FREE, iv, true)
+    const pGreeks = bsGreeks(price, strike, T30, RISK_FREE, iv, false)
     return {
       strike, iv,
-      call: { bid: Math.max(0.01, cp * 0.97).toFixed(2), ask: (cp * 1.03).toFixed(2), vol: Math.floor(Math.random() * 500 + 50), oi: Math.floor(Math.random() * 2000 + 200) },
-      put: { bid: Math.max(0.01, pp * 0.97).toFixed(2), ask: (pp * 1.03).toFixed(2), vol: Math.floor(Math.random() * 400 + 30), oi: Math.floor(Math.random() * 1800 + 150) },
+      call: { bid: Math.max(0.01, cp * 0.97).toFixed(2), ask: (cp * 1.03).toFixed(2), vol: Math.floor(Math.random() * 500 + 50), oi: Math.floor(Math.random() * 2000 + 200), delta: cGreeks.delta },
+      put: { bid: Math.max(0.01, pp * 0.97).toFixed(2), ask: (pp * 1.03).toFixed(2), vol: Math.floor(Math.random() * 400 + 30), oi: Math.floor(Math.random() * 1800 + 150), delta: pGreeks.delta },
       itm: { call: price > strike, put: price < strike },
     }
   })
@@ -75,6 +95,26 @@ function generateIVSurface() {
     return 0.5 + 0.1 * Math.sqrt(e / 365) + m * 1.2 + (Math.random() * 0.02 - 0.01)
   }))
   return { strikes, expiries, surface }
+}
+
+// ============ Strategy Payoff Calculator ============
+
+function strategyPayoff(price, strike, T, iv, strategy, size) {
+  const legs = STRATEGIES[strategy]?.legs || []
+  if (legs.length === 0) return null
+  let total = 0
+  for (const leg of legs) {
+    const K = strike + (leg.dK || 0)
+    if (leg.type === 'stock') {
+      total += leg.qty * (price - CURRENT_PRICE) * size
+    } else {
+      const isCall = leg.type === 'call'
+      const prem = bsPrice(CURRENT_PRICE, K, T, RISK_FREE, iv, isCall)
+      const intrinsic = Math.max(0, isCall ? price - K : K - price)
+      total += leg.qty * (intrinsic - prem) * size
+    }
+  }
+  return total
 }
 
 // ============ Section Wrapper ============
@@ -92,26 +132,93 @@ function Section({ num, title, delay = 0, children }) {
 
 // ============ Payoff Diagram (SVG) ============
 
-function PayoffDiagram({ strike, isCall, premium, size }) {
-  const W = 360, H = 160, P = 30, lo = strike - 400, hi = strike + 400
-  const pts = Array.from({ length: 61 }, (_, i) => {
-    const price = lo + (hi - lo) * (i / 60)
-    return { price, pay: (Math.max(0, isCall ? price - strike : strike - price) - premium) * size }
+function PayoffDiagram({ strike, isCall, premium, size, strategy, T, iv }) {
+  const W = 360, H = 180, P = 30, lo = strike - 400, hi = strike + 400
+  const isStrategy = strategy && strategy !== 'single'
+
+  const pts = Array.from({ length: 81 }, (_, i) => {
+    const price = lo + (hi - lo) * (i / 80)
+    let pay
+    if (isStrategy) {
+      pay = strategyPayoff(price, strike, T, iv, strategy, size)
+    } else {
+      pay = (Math.max(0, isCall ? price - strike : strike - price) - premium) * size
+    }
+    return { price, pay }
   })
+
   const maxP = Math.max(...pts.map(p => p.pay)), minP = Math.min(...pts.map(p => p.pay)), rng = maxP - minP || 1
   const x = (pr) => P + ((pr - lo) / (hi - lo)) * (W - 2 * P)
   const y = (pf) => H - P - ((pf - minP) / rng) * (H - 2 * P)
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.price).toFixed(1)},${y(p.pay).toFixed(1)}`).join(' ')
   const zy = y(0)
+
+  // Split path into profit (above zero) and loss (below zero) for coloring
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.price).toFixed(1)},${y(p.pay).toFixed(1)}`).join(' ')
+
+  // Gradient areas
+  const profitPts = pts.filter(p => p.pay >= 0)
+  const lossPts = pts.filter(p => p.pay < 0)
+
+  const breakeven = isStrategy ? null : (isCall ? strike + premium : strike - premium)
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-36">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
+      <defs>
+        <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+        </linearGradient>
+        <linearGradient id="lossGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.02" />
+          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.3" />
+        </linearGradient>
+      </defs>
+      {/* Zero line */}
       <line x1={P} y1={zy} x2={W - P} y2={zy} stroke="#444" strokeWidth="1" strokeDasharray="4,4" />
-      <line x1={x(strike)} y1={P} x2={x(strike)} y2={H - P} stroke={CYAN} strokeWidth="1" strokeDasharray="3,3" opacity="0.5" />
-      <line x1={x(CURRENT_PRICE)} y1={P} x2={x(CURRENT_PRICE)} y2={H - P} stroke="#fbbf24" strokeWidth="1" strokeDasharray="3,3" opacity="0.5" />
-      <path d={d} fill="none" stroke={CYAN} strokeWidth="2" />
-      <circle cx={x(isCall ? strike + premium : strike - premium)} cy={zy} r="3" fill="#fbbf24" />
-      <text x={x(strike)} y={H - 6} fill="#888" fontSize="9" textAnchor="middle">K={strike}</text>
+      {/* Strike line */}
+      <line x1={x(strike)} y1={P - 5} x2={x(strike)} y2={H - P} stroke={CYAN} strokeWidth="1" strokeDasharray="3,3" opacity="0.5" />
+      {/* Spot line */}
+      <line x1={x(CURRENT_PRICE)} y1={P - 5} x2={x(CURRENT_PRICE)} y2={H - P} stroke="#fbbf24" strokeWidth="1" strokeDasharray="3,3" opacity="0.5" />
+      {/* Payoff curve */}
+      <path d={d} fill="none" stroke={CYAN} strokeWidth="2.5" strokeLinejoin="round" />
+      {/* Profit fill */}
+      {profitPts.length > 1 && (() => {
+        const segs = []
+        let seg = []
+        pts.forEach((p, i) => {
+          if (p.pay >= 0) { seg.push(p) } else { if (seg.length > 1) segs.push(seg); seg = [] }
+        })
+        if (seg.length > 1) segs.push(seg)
+        return segs.map((s, si) => {
+          const fillD = s.map((p, i) => `${i ? 'L' : 'M'}${x(p.price).toFixed(1)},${y(p.pay).toFixed(1)}`).join(' ')
+            + `L${x(s[s.length - 1].price).toFixed(1)},${zy.toFixed(1)}L${x(s[0].price).toFixed(1)},${zy.toFixed(1)}Z`
+          return <path key={`pf${si}`} d={fillD} fill="url(#profitGrad)" />
+        })
+      })()}
+      {/* Loss fill */}
+      {lossPts.length > 1 && (() => {
+        const segs = []
+        let seg = []
+        pts.forEach((p) => {
+          if (p.pay < 0) { seg.push(p) } else { if (seg.length > 1) segs.push(seg); seg = [] }
+        })
+        if (seg.length > 1) segs.push(seg)
+        return segs.map((s, si) => {
+          const fillD = s.map((p, i) => `${i ? 'L' : 'M'}${x(p.price).toFixed(1)},${y(p.pay).toFixed(1)}`).join(' ')
+            + `L${x(s[s.length - 1].price).toFixed(1)},${zy.toFixed(1)}L${x(s[0].price).toFixed(1)},${zy.toFixed(1)}Z`
+          return <path key={`lf${si}`} d={fillD} fill="url(#lossGrad)" />
+        })
+      })()}
+      {/* Breakeven dot */}
+      {breakeven && breakeven > lo && breakeven < hi && (
+        <circle cx={x(breakeven)} cy={zy} r="3.5" fill="#fbbf24" stroke="#000" strokeWidth="1" />
+      )}
+      {/* Labels */}
+      <text x={x(strike)} y={H - 4} fill="#888" fontSize="9" textAnchor="middle">K={strike}</text>
       <text x={x(CURRENT_PRICE)} y={12} fill="#fbbf24" fontSize="8" textAnchor="middle">Spot</text>
+      <text x={W - P} y={zy - 4} fill="#555" fontSize="7" textAnchor="end">$0</text>
+      <text x={P} y={P - 2} fill="#10b981" fontSize="7">Profit</text>
+      <text x={P} y={H - P + 10} fill="#ef4444" fontSize="7">Loss</text>
     </svg>
   )
 }
@@ -122,7 +229,7 @@ function IVSurfaceHeatmap({ data }) {
   const { strikes, expiries, surface } = data, W = 360, H = 140, P = 40
   const cW = (W - 2 * P) / strikes.length, cH = (H - 2 * P) / expiries.length
   const flat = surface.flat(), lo = Math.min(...flat), hi = Math.max(...flat), rng = hi - lo || 0.01
-  const clr = (v) => { const t = (v - lo) / rng; return `rgb(${20 + t * 200|0},${80 + (1 - Math.abs(t - .5) * 2) * 140|0},${200 - t * 160|0})` }
+  const clr = (v) => { const t = (v - lo) / rng; return `rgb(${20 + t * 200 | 0},${80 + (1 - Math.abs(t - .5) * 2) * 140 | 0},${200 - t * 160 | 0})` }
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-36">
       {surface.map((row, ei) => row.map((iv, si) => (
@@ -166,6 +273,105 @@ function PremiumTicker() {
   )
 }
 
+// ============ Expiry Selector Tabs ============
+
+function ExpiryTabs({ expiryIdx, setExpiryIdx }) {
+  return (
+    <div className="flex gap-1 rounded-xl bg-black-800 p-1">
+      {EXPIRIES.map((exp, i) => {
+        const active = expiryIdx === i
+        return (
+          <button key={exp.label} onClick={() => setExpiryIdx(i)}
+            className={`relative flex-1 py-2 px-1 rounded-lg text-xs font-mono transition-all ${active ? 'text-cyan-400' : 'text-black-400 hover:text-black-200'}`}>
+            {active && (
+              <motion.div layoutId="expiryTab" className="absolute inset-0 rounded-lg bg-cyan-500/15 border border-cyan-500/30"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+            )}
+            <span className="relative z-10 flex flex-col items-center">
+              <span className="font-semibold">{exp.label}</span>
+              <span className="text-[9px] mt-0.5 opacity-70">{exp.days}d left</span>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ============ Strategy Builder ============
+
+function StrategyBuilder({ strategy, setStrategy }) {
+  const keys = Object.keys(STRATEGIES)
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-5 gap-1.5">
+        {keys.map(k => {
+          const s = STRATEGIES[k], active = strategy === k
+          return (
+            <button key={k} onClick={() => setStrategy(k)}
+              className={`py-2 px-1 rounded-lg text-[11px] font-semibold transition-all text-center leading-tight
+                ${active ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-black-700 text-black-400 border border-black-600 hover:text-black-200'}`}>
+              {s.name}
+            </button>
+          )
+        })}
+      </div>
+      <AnimatePresence mode="wait">
+        {strategy !== 'single' && STRATEGIES[strategy] && (
+          <motion.div key={strategy} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden">
+            <div className="rounded-lg bg-black-900/60 p-3 space-y-2">
+              <p className="text-xs text-black-300">{STRATEGIES[strategy].desc}</p>
+              <div className="flex flex-wrap gap-2">
+                {STRATEGIES[strategy].legs.map((leg, i) => (
+                  <span key={i} className={`px-2 py-1 rounded text-[10px] font-mono font-semibold
+                    ${leg.qty > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                    {leg.qty > 0 ? '+' : ''}{leg.qty} {leg.type.toUpperCase()}{leg.dK !== undefined && leg.dK !== 0 ? ` (K${leg.dK > 0 ? '+' : ''}${leg.dK})` : leg.dK === 0 ? ' (ATM)' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ============ Greeks Display (Full) ============
+
+function GreeksPanel({ greeks, isCall }) {
+  const items = [
+    { l: 'Delta', v: greeks.delta.toFixed(4), d: 'Price sensitivity', c: '#06b6d4', bar: Math.abs(greeks.delta) },
+    { l: 'Gamma', v: greeks.gamma.toFixed(6), d: 'Delta change rate', c: '#a855f7', bar: Math.min(1, greeks.gamma * 1000) },
+    { l: 'Theta', v: greeks.theta.toFixed(4), d: 'Time decay/day', c: '#ef4444', bar: Math.min(1, Math.abs(greeks.theta) * 10) },
+    { l: 'Vega', v: greeks.vega.toFixed(4), d: 'Vol sensitivity', c: '#10b981', bar: Math.min(1, greeks.vega / 5) },
+    { l: 'Rho', v: greeks.rho.toFixed(4), d: 'Rate sensitivity', c: '#f59e0b', bar: Math.min(1, Math.abs(greeks.rho) * 10) },
+  ]
+  return (
+    <div className="grid grid-cols-1 gap-2">
+      {items.map(g => (
+        <div key={g.l} className="rounded-lg bg-black-800 p-2.5 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-xs font-semibold" style={{ color: g.c }}>{g.l}</span>
+              <span className="text-lg font-mono font-bold text-white">{g.v}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 rounded-full bg-black-700 overflow-hidden">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${g.bar * 100}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  className="h-full rounded-full" style={{ background: g.c }} />
+              </div>
+              <span className="text-[9px] text-black-500 w-20 text-right">{g.d}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ============ Main Component ============
 
 export default function OptionsPage() {
@@ -175,17 +381,33 @@ export default function OptionsPage() {
 
   const [isCall, setIsCall] = useState(true)
   const [strikeIdx, setStrikeIdx] = useState(5)
-  const [expiryIdx, setExpiryIdx] = useState(2)
+  const [expiryIdx, setExpiryIdx] = useState(3) // default 30D
   const [optSize, setOptSize] = useState('1.0')
   const [exercising, setExercising] = useState(null)
+  const [strategy, setStrategy] = useState('single')
 
   const strikes = useMemo(() => generateStrikes(CURRENT_PRICE), [])
   const ivSurface = useMemo(() => generateIVSurface(), [])
   const sel = strikes[strikeIdx]
   const T = EXPIRIES[expiryIdx].days / 365
-  const premium = bsPrice(CURRENT_PRICE, sel.strike, T, 0.05, sel.iv, isCall)
-  const greeks = bsGreeks(CURRENT_PRICE, sel.strike, T, 0.05, sel.iv, isCall)
+  const premium = bsPrice(CURRENT_PRICE, sel.strike, T, RISK_FREE, sel.iv, isCall)
+  const greeks = bsGreeks(CURRENT_PRICE, sel.strike, T, RISK_FREE, sel.iv, isCall)
   const totalCost = premium * (parseFloat(optSize) || 0)
+
+  // Recalculate chain data for selected expiry
+  const chainData = useMemo(() => {
+    return strikes.map(row => {
+      const cg = bsGreeks(CURRENT_PRICE, row.strike, T, RISK_FREE, row.iv, true)
+      const pg = bsGreeks(CURRENT_PRICE, row.strike, T, RISK_FREE, row.iv, false)
+      const cp = bsPrice(CURRENT_PRICE, row.strike, T, RISK_FREE, row.iv, true)
+      const pp = bsPrice(CURRENT_PRICE, row.strike, T, RISK_FREE, row.iv, false)
+      return {
+        ...row,
+        call: { ...row.call, bid: Math.max(0.01, cp * 0.97).toFixed(2), ask: (cp * 1.03).toFixed(2), delta: cg.delta },
+        put: { ...row.put, bid: Math.max(0.01, pp * 0.97).toFixed(2), ask: (pp * 1.03).toFixed(2), delta: pg.delta },
+      }
+    })
+  }, [strikes, T])
 
   const stats = [
     { label: 'Total Volume', value: '$48.2M', sub: '24h', color: CYAN },
@@ -223,10 +445,9 @@ export default function OptionsPage() {
         <p className="text-black-400">European-style DeFi options with TWAP settlement</p>
       </motion.div>
 
-      {/* 12. Premium Ticker */}
       <PremiumTicker />
 
-      {/* 1. Overview */}
+      {/* 01. Overview */}
       <Section num="01" title="Overview" delay={0.1 * PHI}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {stats.map((s) => (
@@ -239,28 +460,35 @@ export default function OptionsPage() {
         </div>
       </Section>
 
-      {/* 2. Options Chain */}
-      <Section num="02" title="Options Chain — ETH/USD" delay={0.2 * PHI}>
+      {/* 02. Expiry Selector */}
+      <Section num="02" title="Expiry" delay={0.15 * PHI}>
+        <ExpiryTabs expiryIdx={expiryIdx} setExpiryIdx={setExpiryIdx} />
+      </Section>
+
+      {/* 03. Options Chain */}
+      <Section num="03" title="Options Chain — ETH/USD" delay={0.2 * PHI}>
         <GlassCard glowColor="terminal" className="overflow-x-auto">
           <table className="w-full text-xs font-mono">
             <thead>
               <tr className="border-b border-black-700">
-                <th colSpan={4} className="py-2 px-2 text-center text-emerald-400 bg-emerald-500/5">CALLS</th>
+                <th colSpan={6} className="py-2 px-2 text-center text-emerald-400 bg-emerald-500/5">CALLS</th>
                 <th className="py-2 px-3 text-center text-black-400 border-x border-black-700">STRIKE</th>
-                <th colSpan={4} className="py-2 px-2 text-center text-red-400 bg-red-500/5">PUTS</th>
+                <th colSpan={6} className="py-2 px-2 text-center text-red-400 bg-red-500/5">PUTS</th>
               </tr>
               <tr className="border-b border-black-700 text-black-500">
-                {['Bid', 'Ask', 'Vol', 'OI'].map(h => <th key={`c${h}`} className="py-1.5 px-2 text-right">{h}</th>)}
+                {['\u0394', 'IV', 'Bid', 'Ask', 'Vol', 'OI'].map(h => <th key={`c${h}`} className="py-1.5 px-2 text-right">{h}</th>)}
                 <th className="py-1.5 px-3 border-x border-black-700" />
-                {['Bid', 'Ask', 'Vol', 'OI'].map(h => <th key={`p${h}`} className="py-1.5 px-2 text-right">{h}</th>)}
+                {['Bid', 'Ask', 'Vol', 'OI', 'IV', '\u0394'].map(h => <th key={`p${h}`} className="py-1.5 px-2 text-right">{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {strikes.map((row, idx) => {
+              {chainData.map((row, idx) => {
                 const atm = Math.abs(row.strike - CURRENT_PRICE) < 25, active = idx === strikeIdx
                 return (
                   <tr key={row.strike} onClick={() => setStrikeIdx(idx)}
                     className={`border-b border-black-800 cursor-pointer transition-colors ${active ? 'bg-cyan-500/10' : 'hover:bg-black-800/50'} ${atm ? 'border-l-2 border-l-yellow-500' : ''}`}>
+                    <td className="py-1.5 px-2 text-right text-cyan-400/70">{row.call.delta.toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right text-black-500">{(row.iv * 100).toFixed(0)}%</td>
                     <td className={`py-1.5 px-2 text-right ${row.itm.call ? 'text-emerald-400' : 'text-black-300'}`}>{row.call.bid}</td>
                     <td className={`py-1.5 px-2 text-right ${row.itm.call ? 'text-emerald-400' : 'text-black-300'}`}>{row.call.ask}</td>
                     <td className="py-1.5 px-2 text-right text-black-400">{row.call.vol}</td>
@@ -270,20 +498,29 @@ export default function OptionsPage() {
                     <td className={`py-1.5 px-2 text-right ${row.itm.put ? 'text-red-400' : 'text-black-300'}`}>{row.put.ask}</td>
                     <td className="py-1.5 px-2 text-right text-black-400">{row.put.vol}</td>
                     <td className="py-1.5 px-2 text-right text-black-500">{row.put.oi}</td>
+                    <td className="py-1.5 px-2 text-right text-black-500">{(row.iv * 100).toFixed(0)}%</td>
+                    <td className="py-1.5 px-2 text-right text-cyan-400/70">{row.put.delta.toFixed(2)}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
           <div className="px-3 py-1.5 text-[10px] text-black-500 border-t border-black-800 flex justify-between">
-            <span>Spot: ${CURRENT_PRICE.toLocaleString()}</span><span>Click row to select strike</span>
+            <span>Spot: ${CURRENT_PRICE.toLocaleString()} | Expiry: {EXPIRIES[expiryIdx].days}D</span><span>Click row to select strike</span>
           </div>
         </GlassCard>
       </Section>
 
-      {/* 3. Trade + 4. Payoff + 5. Greeks */}
+      {/* 04. Strategy Builder */}
+      <Section num="04" title="Strategy Builder" delay={0.3 * PHI}>
+        <GlassCard glowColor="terminal" className="p-4">
+          <StrategyBuilder strategy={strategy} setStrategy={setStrategy} />
+        </GlassCard>
+      </Section>
+
+      {/* 05. Trade + 06. Payoff + 07. Greeks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section num="03" title="Trade Options" delay={0.3 * PHI}>
+        <Section num="05" title="Trade Options" delay={0.35 * PHI}>
           <GlassCard glowColor="terminal" className="p-4 space-y-4">
             <div className="flex rounded-xl bg-black-800 p-1">
               {[true, false].map(c => (
@@ -303,17 +540,6 @@ export default function OptionsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-black-400 mb-1 block">Expiry</label>
-              <div className="grid grid-cols-4 gap-2">
-                {EXPIRIES.map((exp, i) => (
-                  <button key={exp.label} onClick={() => setExpiryIdx(i)}
-                    className={`py-2 rounded-lg text-sm font-mono transition-all ${expiryIdx === i ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-black-700 text-black-300 border border-black-600'}`}>
-                    {exp.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
               <label className="text-xs text-black-400 mb-1 block">Size (ETH)</label>
               <input type="number" value={optSize} onChange={e => setOptSize(e.target.value)} placeholder="1.0" min="0.01" step="0.1"
                 className="w-full bg-black-700 rounded-xl px-3 py-2.5 text-white text-sm outline-none border border-black-600 focus:border-cyan-500/50 font-mono" />
@@ -324,6 +550,7 @@ export default function OptionsPage() {
                 ['Total Cost', `$${totalCost.toFixed(2)}`, ''],
                 ['Implied Vol', `${(sel.iv * 100).toFixed(1)}%`, 'text-black-300'],
                 ['Breakeven', `$${(isCall ? sel.strike + premium : sel.strike - premium).toFixed(2)}`, 'text-yellow-400'],
+                ['Days to Expiry', `${EXPIRIES[expiryIdx].days}`, 'text-black-300'],
               ].map(([l, v, c]) => (
                 <div key={l} className="flex justify-between text-sm">
                   <span className="text-black-400">{l}</span>
@@ -339,43 +566,29 @@ export default function OptionsPage() {
         </Section>
 
         <div className="space-y-6">
-          {/* 4. Payoff Diagram */}
-          <Section num="04" title="Payoff Diagram" delay={0.4 * PHI}>
+          {/* 06. Payoff Diagram */}
+          <Section num="06" title={`Payoff — ${strategy === 'single' ? (isCall ? 'Call' : 'Put') : STRATEGIES[strategy].name}`} delay={0.4 * PHI}>
             <GlassCard glowColor="terminal" className="p-4">
-              <PayoffDiagram strike={sel.strike} isCall={isCall} premium={premium} size={parseFloat(optSize) || 1} />
+              <PayoffDiagram strike={sel.strike} isCall={isCall} premium={premium} size={parseFloat(optSize) || 1}
+                strategy={strategy} T={T} iv={sel.iv} />
               <div className="flex justify-between text-[10px] text-black-500 mt-2 px-1">
-                <span>{isCall ? 'Call' : 'Put'} @ ${sel.strike}</span>
-                <span>Max loss: ${(premium * (parseFloat(optSize) || 1)).toFixed(2)}</span>
+                <span>{strategy === 'single' ? `${isCall ? 'Call' : 'Put'} @ $${sel.strike}` : STRATEGIES[strategy].name}</span>
+                <span>Max loss: ${strategy === 'single' ? (premium * (parseFloat(optSize) || 1)).toFixed(2) : 'see curve'}</span>
               </div>
             </GlassCard>
           </Section>
 
-          {/* 5. Greeks */}
-          <Section num="05" title="Greeks" delay={0.5 * PHI}>
+          {/* 07. Greeks */}
+          <Section num="07" title="Greeks" delay={0.5 * PHI}>
             <GlassCard glowColor="terminal" className="p-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { l: 'Delta', v: greeks.delta.toFixed(4), d: 'Price sensitivity', c: '#06b6d4' },
-                  { l: 'Gamma', v: greeks.gamma.toFixed(6), d: 'Delta change rate', c: '#a855f7' },
-                  { l: 'Theta', v: greeks.theta.toFixed(4), d: 'Time decay/day', c: '#ef4444' },
-                  { l: 'Vega', v: greeks.vega.toFixed(4), d: 'Vol sensitivity', c: '#10b981' },
-                ].map(g => (
-                  <div key={g.l} className="rounded-lg bg-black-800 p-3">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-black-400">{g.l}</span>
-                      <span className="text-[10px] text-black-500">{g.d}</span>
-                    </div>
-                    <div className="text-lg font-mono font-bold mt-1" style={{ color: g.c }}>{g.v}</div>
-                  </div>
-                ))}
-              </div>
+              <GreeksPanel greeks={greeks} isCall={isCall} />
             </GlassCard>
           </Section>
         </div>
       </div>
 
-      {/* 6. Positions + 10. Exercise */}
-      <Section num="06" title="Your Positions" delay={0.6 * PHI}>
+      {/* 08. Positions */}
+      <Section num="08" title="Your Positions" delay={0.6 * PHI}>
         <GlassCard glowColor="terminal" className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -417,8 +630,8 @@ export default function OptionsPage() {
         </GlassCard>
       </Section>
 
-      {/* 7. IV Surface */}
-      <Section num="07" title="Implied Volatility Surface" delay={0.7 * PHI}>
+      {/* 09. IV Surface */}
+      <Section num="09" title="Implied Volatility Surface" delay={0.7 * PHI}>
         <GlassCard glowColor="terminal" className="p-4">
           <IVSurfaceHeatmap data={ivSurface} />
           <div className="flex items-center justify-between mt-3 text-[10px] text-black-500 px-1">
@@ -429,9 +642,9 @@ export default function OptionsPage() {
         </GlassCard>
       </Section>
 
-      {/* 8. Pricing + 9. Settlement */}
+      {/* 10. Pricing + 11. Settlement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section num="08" title="Pricing Model" delay={0.8 * PHI}>
+        <Section num="10" title="Pricing Model" delay={0.8 * PHI}>
           <GlassCard glowColor="terminal" className="p-4 space-y-3">
             <p className="text-sm text-black-300">VibeSwap uses a modified <span className="text-cyan-400 font-semibold">Black-Scholes model</span> with on-chain IV from TWAP oracle and commit-reveal auction data.</p>
             <div className="rounded-lg bg-black-900/60 p-3 font-mono text-xs text-black-300">
@@ -449,7 +662,7 @@ export default function OptionsPage() {
           </GlassCard>
         </Section>
 
-        <Section num="09" title="TWAP Settlement" delay={0.9 * PHI}>
+        <Section num="11" title="TWAP Settlement" delay={0.9 * PHI}>
           <GlassCard glowColor="terminal" className="p-4 space-y-3">
             <p className="text-sm text-black-300">Options settle against <span className="text-yellow-400 font-semibold">TWAP oracle</span> price at expiry — <span className="text-cyan-400">MEV-resistant</span> by design.</p>
             <div className="space-y-2">
@@ -469,8 +682,8 @@ export default function OptionsPage() {
         </Section>
       </div>
 
-      {/* 11. Market Maker Rewards */}
-      <Section num="10" title="Market Maker Rewards" delay={1.0 * PHI}>
+      {/* 12. Market Maker Rewards */}
+      <Section num="12" title="Market Maker Rewards" delay={1.0 * PHI}>
         <GlassCard glowColor="terminal" className="p-4">
           <div className="grid grid-cols-3 gap-4 mb-4">
             {[['18.4%', 'Avg APY for Writers', CYAN], ['$2.4M', 'Total Premiums Earned', '#10b981'], ['142', 'Active Market Makers', '#a855f7']].map(([v, l, c]) => (

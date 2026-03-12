@@ -85,6 +85,80 @@ function PriceChart({ pair, data }) {
   )
 }
 
+// ============ Depth Chart (SVG) ============
+function DepthChart({ pair }) {
+  const width = 600
+  const height = 160
+  const padding = 30
+  const midPrice = pair === 'ETH/USDC' ? 2800 : pair === 'BTC/USDC' ? 96000 : 0.50
+
+  const { bidPoints, askPoints, maxCum } = useMemo(() => {
+    const rng = seededRandom(pair.length * 6173)
+    const levels = 20
+    const step = midPrice * 0.0008
+
+    let bidCum = 0
+    const bids = Array.from({ length: levels }, (_, i) => {
+      bidCum += rng() * 8 + 1
+      return { price: midPrice - step * (i + 1), cumSize: bidCum }
+    })
+
+    let askCum = 0
+    const asks = Array.from({ length: levels }, (_, i) => {
+      askCum += rng() * 8 + 1
+      return { price: midPrice + step * (i + 1), cumSize: askCum }
+    })
+
+    const maxC = Math.max(bidCum, askCum)
+    return { bidPoints: bids, askPoints: asks, maxCum: maxC }
+  }, [pair, midPrice])
+
+  const midX = width / 2
+  const chartH = height - padding * 2
+
+  // Build SVG path strings for bid/ask areas
+  const bidPath = bidPoints.map((b, i) => {
+    const x = midX - ((midPrice - b.price) / (midPrice * 0.02)) * (midX - padding)
+    const y = height - padding - (b.cumSize / maxCum) * chartH
+    return `${x},${y}`
+  })
+  const bidArea = `${midX},${height - padding} ${bidPath.join(' ')} ${padding},${bidPoints.length ? height - padding - (bidPoints[bidPoints.length - 1].cumSize / maxCum) * chartH : height - padding} ${padding},${height - padding}`
+
+  const askPath = askPoints.map((a, i) => {
+    const x = midX + ((a.price - midPrice) / (midPrice * 0.02)) * (midX - padding)
+    const y = height - padding - (a.cumSize / maxCum) * chartH
+    return `${x},${y}`
+  })
+  const askArea = `${midX},${height - padding} ${askPath.join(' ')} ${width - padding},${askPoints.length ? height - padding - (askPoints[askPoints.length - 1].cumSize / maxCum) * chartH : height - padding} ${width - padding},${height - padding}`
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-36">
+      <defs>
+        <linearGradient id={`depthBid-${pair}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#22c55e" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#22c55e" stopOpacity="0.05" />
+        </linearGradient>
+        <linearGradient id={`depthAsk-${pair}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      {/* Bid area (green, left) */}
+      <polygon points={bidArea} fill={`url(#depthBid-${pair})`} />
+      <polyline points={bidPath.join(' ')} fill="none" stroke="#22c55e" strokeWidth="1.5" />
+      {/* Ask area (red, right) */}
+      <polygon points={askArea} fill={`url(#depthAsk-${pair})`} />
+      <polyline points={askPath.join(' ')} fill="none" stroke="#ef4444" strokeWidth="1.5" />
+      {/* Midpoint line */}
+      <line x1={midX} y1={padding} x2={midX} y2={height - padding} stroke={CYAN} strokeWidth="1" strokeDasharray="4,3" opacity="0.6" />
+      <text x={midX} y={padding - 6} fill={CYAN} fontSize="9" textAnchor="middle" fontFamily="monospace">${midPrice.toLocaleString()}</text>
+      {/* Axis labels */}
+      <text x={padding} y={height - 8} fill="rgba(255,255,255,0.25)" fontSize="8" fontFamily="monospace">Bids</text>
+      <text x={width - padding} y={height - 8} fill="rgba(255,255,255,0.25)" fontSize="8" textAnchor="end" fontFamily="monospace">Asks</text>
+    </svg>
+  )
+}
+
 // ============ Order Book ============
 function OrderBook({ pair }) {
   // Seeded order book — stable across re-renders
@@ -165,19 +239,126 @@ function RecentTrades({ pair }) {
   }, [pair, midPrice])
 
   return (
-    <div className="font-mono text-xs">
-      <div className="grid grid-cols-3 gap-2 px-2 py-1 text-black-500 border-b border-black-700/50">
+    <div className="font-mono text-xs max-h-64 overflow-y-auto">
+      <div className="grid grid-cols-3 gap-2 px-2 py-1 text-black-500 border-b border-black-700/50 sticky top-0 bg-black-900/90 backdrop-blur-sm">
         <span>Price</span>
         <span className="text-right">Size</span>
         <span className="text-right">Time</span>
       </div>
       {trades.map((t, i) => (
-        <div key={i} className="grid grid-cols-3 gap-2 px-2 py-0.5 hover:bg-black-700/30">
+        <motion.div
+          key={i}
+          initial={i === 0 ? { opacity: 0, x: -8 } : false}
+          animate={{ opacity: 1, x: 0 }}
+          className="grid grid-cols-3 gap-2 px-2 py-0.5 hover:bg-black-700/30"
+        >
           <span className={t.isBuy ? 'text-green-400' : 'text-red-400'}>{t.price.toFixed(2)}</span>
           <span className="text-right">{t.size}</span>
           <span className="text-right text-black-500">{t.time}</span>
-        </div>
+        </motion.div>
       ))}
+    </div>
+  )
+}
+
+// ============ Order Types Panel ============
+function OrderTypesPanel({ orderType, setOrderType, side, toToken, limitPrice, setLimitPrice, stopPrice, setStopPrice, twapSlices, setTwapSlices, twapInterval, setTwapInterval }) {
+  const tabs = ['market', 'limit', 'stop-loss', 'twap']
+
+  return (
+    <div className="space-y-3">
+      {/* Tabs */}
+      <div className="flex gap-1 p-0.5 rounded-lg bg-black-800/60">
+        {tabs.map(type => (
+          <button
+            key={type}
+            onClick={() => setOrderType(type)}
+            className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+              orderType === type
+                ? 'bg-black-600 text-white shadow-sm'
+                : 'text-black-400 hover:text-white'
+            }`}
+          >
+            {type === 'stop-loss' ? 'Stop' : type === 'twap' ? 'TWAP' : type.charAt(0).toUpperCase() + type.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Limit price field */}
+      {orderType === 'limit' && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-1">
+          <label className="text-xs text-black-500">Limit Price (USDC per {toToken?.symbol})</label>
+          <input
+            type="number"
+            value={limitPrice}
+            onChange={(e) => setLimitPrice(e.target.value)}
+            placeholder="0.00"
+            className="w-full bg-black-800/80 border border-black-600 rounded-lg px-3 py-2.5 font-mono focus:border-cyan-500/50 focus:outline-none transition-colors"
+          />
+        </motion.div>
+      )}
+
+      {/* Stop-loss fields */}
+      {orderType === 'stop-loss' && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
+          <div className="space-y-1">
+            <label className="text-xs text-black-500">Trigger Price (USDC)</label>
+            <input
+              type="number"
+              value={stopPrice}
+              onChange={(e) => setStopPrice(e.target.value)}
+              placeholder="0.00"
+              className="w-full bg-black-800/80 border border-red-500/30 rounded-lg px-3 py-2.5 font-mono focus:border-red-400/50 focus:outline-none transition-colors"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-black-500">Limit Price (optional)</label>
+            <input
+              type="number"
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+              placeholder="Market on trigger"
+              className="w-full bg-black-800/80 border border-black-600 rounded-lg px-3 py-2 font-mono text-sm focus:border-cyan-500/50 focus:outline-none transition-colors"
+            />
+          </div>
+        </motion.div>
+      )}
+
+      {/* TWAP fields */}
+      {orderType === 'twap' && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-black-500">Slices</label>
+              <input
+                type="number"
+                value={twapSlices}
+                onChange={(e) => setTwapSlices(e.target.value)}
+                placeholder="10"
+                min="2"
+                max="100"
+                className="w-full bg-black-800/80 border border-black-600 rounded-lg px-3 py-2 font-mono text-sm focus:border-cyan-500/50 focus:outline-none transition-colors"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-black-500">Interval</label>
+              <select
+                value={twapInterval}
+                onChange={(e) => setTwapInterval(e.target.value)}
+                className="w-full bg-black-800/80 border border-black-600 rounded-lg px-3 py-2 font-mono text-sm focus:border-cyan-500/50 focus:outline-none transition-colors"
+              >
+                <option value="1">1 batch</option>
+                <option value="3">3 batches</option>
+                <option value="6">6 batches</option>
+                <option value="12">12 batches</option>
+              </select>
+            </div>
+          </div>
+          <div className="text-[10px] text-black-500">
+            Splits order across {twapSlices || 10} batches, every {twapInterval || 1} batch{(twapInterval || 1) > 1 ? 'es' : ''} ({((twapSlices || 10) * (twapInterval || 1) * 10)}s total)
+          </div>
+        </motion.div>
+      )}
     </div>
   )
 }
@@ -185,11 +366,14 @@ function RecentTrades({ pair }) {
 // ============ Trade Form ============
 function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isConnected, connect }) {
   const [side, setSide] = useState('buy') // buy or sell
-  const [orderType, setOrderType] = useState('market') // market or limit
+  const [orderType, setOrderType] = useState('market')
   const [fromIdx, setFromIdx] = useState(1) // USDC
   const [toIdx, setToIdx] = useState(0) // ETH
   const [amount, setAmount] = useState('')
   const [limitPrice, setLimitPrice] = useState('')
+  const [stopPrice, setStopPrice] = useState('')
+  const [twapSlices, setTwapSlices] = useState('10')
+  const [twapInterval, setTwapInterval] = useState('1')
 
   const fromToken = tokens[side === 'buy' ? fromIdx : toIdx]
   const toToken = tokens[side === 'buy' ? toIdx : fromIdx]
@@ -207,6 +391,10 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast.error('Enter an amount')
+      return
+    }
+    if (orderType === 'stop-loss' && !stopPrice) {
+      toast.error('Set a trigger price')
       return
     }
     try {
@@ -233,6 +421,12 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
     failed: 'Failed',
   }
 
+  const buttonLabel = orderType === 'twap'
+    ? `TWAP ${side === 'buy' ? 'Buy' : 'Sell'} ${toToken?.symbol || 'ETH'}`
+    : orderType === 'stop-loss'
+      ? `Set Stop-Loss ${toToken?.symbol || 'ETH'}`
+      : `${side === 'buy' ? 'Buy' : 'Sell'} ${toToken?.symbol || 'ETH'}`
+
   return (
     <div className="space-y-3">
       {/* Buy/Sell toggle */}
@@ -255,20 +449,21 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
         </button>
       </div>
 
-      {/* Order type */}
-      <div className="flex gap-2">
-        {['market', 'limit'].map(type => (
-          <button
-            key={type}
-            onClick={() => setOrderType(type)}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-              orderType === type ? 'bg-black-600 text-white' : 'text-black-400 hover:text-white'
-            }`}
-          >
-            {type.charAt(0).toUpperCase() + type.slice(1)}
-          </button>
-        ))}
-      </div>
+      {/* Order Types Panel */}
+      <OrderTypesPanel
+        orderType={orderType}
+        setOrderType={setOrderType}
+        side={side}
+        toToken={toToken}
+        limitPrice={limitPrice}
+        setLimitPrice={setLimitPrice}
+        stopPrice={stopPrice}
+        setStopPrice={setStopPrice}
+        twapSlices={twapSlices}
+        setTwapSlices={setTwapSlices}
+        twapInterval={twapInterval}
+        setTwapInterval={setTwapInterval}
+      />
 
       {/* Token pair info */}
       <div className="flex items-center justify-between text-sm">
@@ -311,20 +506,6 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
           ))}
         </div>
       </div>
-
-      {/* Limit price (only for limit orders) */}
-      {orderType === 'limit' && (
-        <div className="space-y-1">
-          <label className="text-xs text-black-500">Limit Price (USDC per {toToken?.symbol})</label>
-          <input
-            type="number"
-            value={limitPrice}
-            onChange={(e) => setLimitPrice(e.target.value)}
-            placeholder="0.00"
-            className="w-full bg-black-800/80 border border-black-600 rounded-lg px-3 py-2.5 font-mono focus:border-cyan-500/50 focus:outline-none transition-colors"
-          />
-        </div>
-      )}
 
       {/* Quote preview */}
       {quote && amount && (
@@ -374,7 +555,7 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
           disabled={isLoading || !amount || parseFloat(amount) <= 0}
           className="w-full py-3 rounded-lg font-medium"
         >
-          {isLoading ? 'Processing...' : `${side === 'buy' ? 'Buy' : 'Sell'} ${toToken?.symbol || 'ETH'}`}
+          {isLoading ? 'Processing...' : buttonLabel}
         </InteractiveButton>
       ) : (
         <InteractiveButton
@@ -394,14 +575,35 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
   )
 }
 
-// ============ Positions Table ============
-function OpenPositions({ isConnected }) {
+// ============ Position Summary ============
+function PositionSummary({ isConnected }) {
   if (!isConnected) return null
 
-  const positions = [
-    { pair: 'ETH/USDC', side: 'Long', size: '1.5 ETH', entry: '$2,780', pnl: '+$30.00', pnlPct: '+1.08%', isProfit: true },
-    { pair: 'ARB/USDC', side: 'Long', size: '500 ARB', entry: '$0.48', pnl: '+$10.00', pnlPct: '+4.17%', isProfit: true },
-  ]
+  const positions = useMemo(() => {
+    const rng = seededRandom(31337)
+    return [
+      { pair: 'ETH/USDC', side: 'Long', size: '1.5 ETH', entry: 2780, current: 2800 + (rng() - 0.3) * 40 },
+      { pair: 'ARB/USDC', side: 'Long', size: '500 ARB', entry: 0.48, current: 0.50 + (rng() - 0.4) * 0.03 },
+      { pair: 'BTC/USDC', side: 'Short', size: '0.05 BTC', entry: 96200, current: 96000 - (rng() - 0.5) * 300 },
+    ].map(p => {
+      const sizeNum = parseFloat(p.size)
+      const pnl = p.side === 'Long'
+        ? (p.current - p.entry) * sizeNum
+        : (p.entry - p.current) * sizeNum
+      const pnlPct = ((p.current - p.entry) / p.entry * 100) * (p.side === 'Long' ? 1 : -1)
+      return { ...p, pnl, pnlPct, isProfit: pnl >= 0 }
+    })
+  }, [])
+
+  const [closingIdx, setClosingIdx] = useState(null)
+
+  const handleClose = (idx) => {
+    setClosingIdx(idx)
+    setTimeout(() => {
+      toast.success(`Closed ${positions[idx].pair} position`)
+      setClosingIdx(null)
+    }, 800)
+  }
 
   return (
     <div>
@@ -414,20 +616,37 @@ function OpenPositions({ isConnected }) {
               <th className="text-left py-1.5 px-2">Side</th>
               <th className="text-right py-1.5 px-2">Size</th>
               <th className="text-right py-1.5 px-2">Entry</th>
+              <th className="text-right py-1.5 px-2">Current</th>
               <th className="text-right py-1.5 px-2">P&L</th>
+              <th className="text-right py-1.5 px-2"></th>
             </tr>
           </thead>
           <tbody>
             {positions.map((p, i) => (
-              <tr key={i} className="border-b border-black-800/50 hover:bg-black-700/30">
+              <motion.tr
+                key={i}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: closingIdx === i ? 0.3 : 1 }}
+                className="border-b border-black-800/50 hover:bg-black-700/30"
+              >
                 <td className="py-2 px-2 text-white">{p.pair}</td>
-                <td className="py-2 px-2 text-green-400">{p.side}</td>
+                <td className={`py-2 px-2 ${p.side === 'Long' ? 'text-green-400' : 'text-red-400'}`}>{p.side}</td>
                 <td className="py-2 px-2 text-right">{p.size}</td>
-                <td className="py-2 px-2 text-right text-black-300">{p.entry}</td>
+                <td className="py-2 px-2 text-right text-black-300">${p.entry.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-2 text-right text-black-200">${p.current.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
                 <td className={`py-2 px-2 text-right ${p.isProfit ? 'text-green-400' : 'text-red-400'}`}>
-                  {p.pnl} <span className="text-black-500">({p.pnlPct})</span>
+                  {p.isProfit ? '+' : ''}{p.pnl < 0 ? '-' : ''}${Math.abs(p.pnl).toFixed(2)} <span className="text-black-500">({p.isProfit ? '+' : ''}{p.pnlPct.toFixed(2)}%)</span>
                 </td>
-              </tr>
+                <td className="py-2 px-2 text-right">
+                  <button
+                    onClick={() => handleClose(i)}
+                    disabled={closingIdx === i}
+                    className="px-2 py-0.5 rounded text-[10px] bg-black-700/60 text-black-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    {closingIdx === i ? '...' : 'Close'}
+                  </button>
+                </td>
+              </motion.tr>
             ))}
           </tbody>
         </table>
@@ -436,48 +655,82 @@ function OpenPositions({ isConnected }) {
   )
 }
 
-// ============ Batch Status ============
-function BatchStatus() {
+// ============ Batch Info ============
+function BatchInfo() {
   const [phase, setPhase] = useState('commit')
   const [timeLeft, setTimeLeft] = useState(6.2)
+  const [batchNum, setBatchNum] = useState(8641)
+  const [ordersInBatch, setOrdersInBatch] = useState(11)
 
   useEffect(() => {
+    const rng = seededRandom(Date.now() % 10000)
     const interval = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 0.1) {
-          setPhase(p => p === 'commit' ? 'reveal' : p === 'reveal' ? 'settle' : 'commit')
-          return p => p === 'commit' ? 8.0 : p === 'reveal' ? 2.0 : 8.0
+          setPhase(p => {
+            if (p === 'commit') return 'reveal'
+            if (p === 'reveal') {
+              setBatchNum(n => n + 1)
+              setOrdersInBatch(Math.floor(rng() * 20) + 5)
+              return 'settle'
+            }
+            return 'commit'
+          })
+          // Return new time based on NEXT phase
+          return phase === 'commit' ? 2.0 : phase === 'reveal' ? 0.5 : 8.0
         }
         return prev - 0.1
       })
+      // Randomly increment orders during commit
+      if (phase === 'commit' && Math.random() < 0.15) {
+        setOrdersInBatch(o => o + 1)
+      }
     }, 100)
     return () => clearInterval(interval)
-  }, [])
+  }, [phase])
 
   const phaseConfig = {
-    commit: { label: 'COMMIT', color: '#22c55e', max: 8 },
-    reveal: { label: 'REVEAL', color: CYAN, max: 2 },
-    settle: { label: 'SETTLE', color: '#f59e0b', max: 0.5 },
+    commit: { label: 'COMMIT', color: '#22c55e', max: 8, desc: 'Submitting hashed orders' },
+    reveal: { label: 'REVEAL', color: CYAN, max: 2, desc: 'Revealing order details' },
+    settle: { label: 'SETTLE', color: '#f59e0b', max: 0.5, desc: 'Computing clearing price' },
   }
 
   const cfg = phaseConfig[phase]
-  const pct = (timeLeft / cfg.max) * 100
+  const pct = Math.max(0, (timeLeft / cfg.max) * 100)
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-black-800/60 border border-black-700/50">
-      <div className="flex items-center gap-1.5">
-        <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: cfg.color }} />
-        <span className="text-xs font-mono font-medium" style={{ color: cfg.color }}>{cfg.label}</span>
+    <GlassCard glowColor="terminal" className="p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: cfg.color }} />
+          <span className="text-xs font-mono font-medium" style={{ color: cfg.color }}>{cfg.label}</span>
+          <span className="text-[10px] text-black-500">{cfg.desc}</span>
+        </div>
+        <span className="text-xs font-mono text-black-400">{timeLeft.toFixed(1)}s</span>
       </div>
-      <div className="flex-1 h-1.5 bg-black-700 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-black-700 rounded-full overflow-hidden mb-2">
         <motion.div
           className="h-full rounded-full"
           style={{ backgroundColor: cfg.color, width: `${pct}%` }}
           transition={{ duration: 0.1 }}
         />
       </div>
-      <span className="text-xs font-mono text-black-400">{timeLeft.toFixed(1)}s</span>
-    </div>
+      <div className="flex items-center justify-between text-[11px] font-mono">
+        <div className="flex gap-3">
+          <span className="text-black-500">Batch <span className="text-black-300">#{batchNum}</span></span>
+          <span className="text-black-500">Orders <span className="text-black-300">{ordersInBatch}</span></span>
+        </div>
+        <div className="flex gap-1">
+          {['commit', 'reveal', 'settle'].map(p => (
+            <div
+              key={p}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${phase === p ? '' : 'opacity-30'}`}
+              style={{ backgroundColor: phaseConfig[p].color }}
+            />
+          ))}
+        </div>
+      </div>
+    </GlassCard>
   )
 }
 
@@ -491,7 +744,7 @@ export default function TradingPage() {
 
   const [selectedPair, setSelectedPair] = useState('ETH/USDC')
   const [chartTimeframe, setChartTimeframe] = useState('1H')
-  const [rightPanel, setRightPanel] = useState('book') // book | trades
+  const [chartView, setChartView] = useState('price') // price | depth
 
   const pairs = ['ETH/USDC', 'BTC/USDC', 'ARB/USDC', 'JUL/USDC', 'SOL/USDC']
 
@@ -520,8 +773,8 @@ export default function TradingPage() {
       />
       <Section>
 
-        {/* Batch status bar */}
-        <BatchStatus />
+        {/* Batch info bar */}
+        <BatchInfo />
 
         {/* Pair selector — with mini sparklines */}
         <div className="flex gap-1.5 mt-3 mb-4 overflow-x-auto pb-1">
@@ -543,30 +796,57 @@ export default function TradingPage() {
 
         {/* Main trading grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Left: Chart (8 cols on lg) */}
+          {/* Left: Chart + order book/trades (8 cols on lg) */}
           <div className="lg:col-span-8 space-y-4">
-            {/* Price chart */}
+            {/* Price / Depth chart */}
             <GlassCard glowColor="terminal" className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium text-black-300">{selectedPair}</h2>
-                <div className="flex gap-1">
-                  {['1M', '5M', '15M', '1H', '4H', '1D'].map(tf => (
-                    <button
-                      key={tf}
-                      onClick={() => setChartTimeframe(tf)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                        chartTimeframe === tf ? 'bg-black-600 text-white' : 'text-black-500 hover:text-white'
-                      }`}
-                    >
-                      {tf}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-3">
+                  <h2 className="text-sm font-medium text-black-300">{selectedPair}</h2>
+                  <div className="flex gap-1 p-0.5 rounded bg-black-800/60">
+                    {[{ key: 'price', label: 'Price' }, { key: 'depth', label: 'Depth' }].map(v => (
+                      <button
+                        key={v.key}
+                        onClick={() => setChartView(v.key)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          chartView === v.key ? 'bg-black-600 text-white' : 'text-black-500 hover:text-white'
+                        }`}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                {chartView === 'price' && (
+                  <div className="flex gap-1">
+                    {['1M', '5M', '15M', '1H', '4H', '1D'].map(tf => (
+                      <button
+                        key={tf}
+                        onClick={() => setChartTimeframe(tf)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                          chartTimeframe === tf ? 'bg-black-600 text-white' : 'text-black-500 hover:text-white'
+                        }`}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <PriceChart pair={selectedPair} data={chartData} />
+              <AnimatePresence mode="wait">
+                {chartView === 'price' ? (
+                  <motion.div key="price" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <PriceChart pair={selectedPair} data={chartData} />
+                  </motion.div>
+                ) : (
+                  <motion.div key="depth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <DepthChart pair={selectedPair} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </GlassCard>
 
-            {/* Order book / Recent trades (side by side on desktop, tabbed on mobile) */}
+            {/* Order book / Recent trades (side by side on desktop) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <GlassCard glowColor="terminal" className="p-3">
                 <h3 className="text-xs font-medium text-black-400 mb-2">Order Book</h3>
@@ -578,9 +858,9 @@ export default function TradingPage() {
               </GlassCard>
             </div>
 
-            {/* Positions */}
+            {/* Position Summary */}
             <GlassCard glowColor="terminal" className="p-4">
-              <OpenPositions isConnected={isConnected} />
+              <PositionSummary isConnected={isConnected} />
               {!isConnected && (
                 <div className="text-center py-6 text-black-500 text-sm">
                   Connect wallet to view positions

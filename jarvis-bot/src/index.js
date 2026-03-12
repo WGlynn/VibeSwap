@@ -33,8 +33,10 @@ try {
   queryLearnings = sl.queryLearnings;
   getRecentLearnings = sl.getRecentLearnings;
   getShardSyncStatus = sl.getShardSyncStatus;
+  registerModule('shard-learnings', true);
 } catch (err) {
   console.warn(`[jarvis] Shard learnings unavailable: ${err.message}`);
+  registerModule('shard-learnings', false, err.message);
   initShardLearnings = async () => {};
   readLearnings = async () => [];
   archiveExpired = async () => 0;
@@ -57,8 +59,10 @@ try {
   getSignalHistoryString_MI = mi.getSignalHistoryString;
   pauseCell_MI = mi.pauseCell;
   resumeCell_MI = mi.resumeCell;
+  registerModule('mi-host', true);
 } catch (err) {
   console.warn(`[jarvis] MI Host SDK unavailable: ${err.message}`);
+  registerModule('mi-host', false, err.message);
   initMIHost = async () => ({ cellCount: 0, manifests: 0 });
   shutdownMIHost = () => {};
   getCellStats = () => ({ host: {}, registry: {}, cells: [] });
@@ -74,7 +78,9 @@ try {
   const lp = await import('./llm-provider.js');
   getProviderHealthString_MI = lp.getProviderHealthString;
   getProviderPerformanceStats_MI = lp.getProviderPerformanceStats;
-} catch {
+  registerModule('provider-health', true);
+} catch (err) {
+  registerModule('provider-health', false, err?.message);
   getProviderHealthString_MI = () => 'Provider health not available.';
   getProviderPerformanceStats_MI = () => ({});
 }
@@ -83,8 +89,10 @@ let registerMIBridge = async () => ({ registered: 0 });
 try {
   const bridge = await import('./mi-bridge.js');
   registerMIBridge = bridge.registerMIBridge;
+  registerModule('mi-bridge', true);
 } catch (err) {
   console.warn(`[jarvis] MI Bridge unavailable: ${err.message}`);
+  registerModule('mi-bridge', false, err.message);
 }
 import { initShadow, createInvite, consumeInvite, registerShadow, isShadow, getShadowCodename, incrementContribution, listShadows, listPendingInvites, revokeShadow, getShadowStats, flushShadow } from './shadow.js';
 import { initOperators, flushOperators, getWizardState, setWizardState, clearWizardState, getOperator, registerOperator, deployOperatorShard, checkOperatorHealth, stopOperatorShard, startOperatorShard, destroyOperatorShard, validateApiKey, getOperatorStats, listOperators, PROVIDERS, PROVIDER_HELP } from './operator.js';
@@ -109,8 +117,10 @@ try {
   startMemeMonitor = mh.startMemeMonitor;
   stopMemeMonitor = mh.stopMemeMonitor;
   getMonitorStatus_Meme = mh.getMonitorStatus;
+  registerModule('memehunter', true);
 } catch (err) {
   console.error(`[jarvis] tools-memehunter.js FAILED: ${err.message}`);
+  registerModule('memehunter', false, err.message);
   huntMemecoins = stubFn('hunt'); getMemeScore = stubFn('score');
   startMemeMonitor = stubFn('mememonitor'); stopMemeMonitor = stubFn('memestop');
   getMonitorStatus_Meme = stubFn('memestatus');
@@ -130,12 +140,29 @@ import { initProactive, flushProactive, stopProactive, enableProactive, disableP
 // Wrap in try/catch so a single broken module doesn't take down the entire bot.
 const stubFn = (name) => async () => `${name}: module not loaded. Bot is recovering.`;
 
+// ============ Module Health Registry ============
+// Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
+const moduleHealth = new Map(); // name → { ok: boolean, error?: string }
+function registerModule(name, ok, error) {
+  moduleHealth.set(name, { ok, error: error || undefined });
+}
+export function getModuleHealth() {
+  const result = { loaded: [], failed: [] };
+  for (const [name, status] of moduleHealth) {
+    if (status.ok) result.loaded.push(name);
+    else result.failed.push({ name, error: status.error });
+  }
+  return result;
+}
+
 let getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth;
 try {
   const m = await import('./tools-vibeswap.js');
   ({ getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth } = m);
+  registerModule('tools-vibeswap', true);
 } catch (err) {
   console.error(`[jarvis] tools-vibeswap.js FAILED: ${err.message}`);
+  registerModule('tools-vibeswap', false, err.message);
   getVibePrice = stubFn('vibeswap'); getPoolStats = stubFn('poolStats'); getEmissionRate = stubFn('emission');
   getAuctionStatus = stubFn('auction'); getShapleyRewards = stubFn('shapley'); getStakingInfo = stubFn('staking');
   getLPPositions = stubFn('lp'); getProtocolHealth = stubFn('health');
@@ -148,8 +175,10 @@ try {
   getTransactionHistory = m.getTransactionHistory; getNFTs = m.getNFTs;
   getDefiPositions = m.getDefiPositions; trackWallet = m.trackWallet;
   getTrackedWallets = m.getTrackedWallets; getWhaleAlerts = m.getWhaleAlerts;
+  registerModule('tools-portfolio', true);
 } catch (err) {
   console.error(`[jarvis] tools-portfolio.js FAILED: ${err.message}`);
+  registerModule('tools-portfolio', false, err.message);
   getWalletPortfolio = stubFn('portfolio'); getTokenBalances = stubFn('balances');
   getTransactionHistory = stubFn('txHistory'); getNFTs = stubFn('nfts');
   getDefiPositions = stubFn('defi'); trackWallet = stubFn('track');
@@ -160,8 +189,10 @@ let getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernance
 try {
   const m = await import('./tools-research.js');
   ({ getTokenomicsAnalysis, getProtocolComparison, getYieldFarming, getGovernanceActivity, getGitHubActivity, getOnChainMetrics, getCorrelationAnalysis, getMarketRegime } = m);
+  registerModule('tools-research', true);
 } catch (err) {
   console.error(`[jarvis] tools-research.js FAILED: ${err.message}`);
+  registerModule('tools-research', false, err.message);
   getTokenomicsAnalysis = stubFn('tokenomics'); getProtocolComparison = stubFn('compare');
   getYieldFarming = stubFn('yield'); getGovernanceActivity = stubFn('governance');
   getGitHubActivity = stubFn('github'); getOnChainMetrics = stubFn('onchain');
@@ -175,8 +206,10 @@ try {
   decodeTx = m.decodeTx; getDevBlock = m.getLatestBlock;
   resolveENSDev = m.resolveENS; checksumAddress = m.checksumAddress;
   getContractABI = m.getContractABI; getNpmInfo = m.getNpmInfo; getCrateInfo = m.getCrateInfo;
+  registerModule('tools-dev', true);
 } catch (err) {
   console.error(`[jarvis] tools-dev.js FAILED: ${err.message}`);
+  registerModule('tools-dev', false, err.message);
   getGasTracker = stubFn('gas'); getContractInfo = stubFn('contract');
   decodeTx = stubFn('decode'); getDevBlock = stubFn('block');
   resolveENSDev = stubFn('ens'); checksumAddress = stubFn('checksum');
@@ -191,8 +224,10 @@ try {
   getCryptoCalendar = m.getCryptoCalendar; getCryptoQuiz = m.getCryptoQuiz;
   compareTokensEdu = m.compareTokens; getFearEdu = m.getFearGreedIndex;
   getDominanceEdu = m.getDominance; getBitcoinEpoch = m.getBitcoinEpoch;
+  registerModule('tools-education', true);
 } catch (err) {
   console.error(`[jarvis] tools-education.js FAILED: ${err.message}`);
+  registerModule('tools-education', false, err.message);
   explainConcept = stubFn('explain'); getGlossary = stubFn('glossary');
   getVibeSwapExplainer = stubFn('vibeswap'); getTutorial = stubFn('tutorial');
   getCryptoCalendar = stubFn('calendar'); getCryptoQuiz = stubFn('quiz');
@@ -218,8 +253,10 @@ try {
   stopPolling = monitor.stopPolling;
   MONITORED_GROUPS = monitor.MONITORED_GROUPS;
   monitorAvailable = true;
+  registerModule('telegram-monitor', true);
 } catch (err) {
   console.warn(`[jarvis] Group monitor unavailable: ${err.message}`);
+  registerModule('telegram-monitor', false, err.message);
   console.warn('[jarvis] Run "npm install" to add the telegram (GramJS) package.');
   MONITORED_GROUPS = ['NervosNation'];
 }
@@ -3829,6 +3866,18 @@ bot.command('health', async (ctx) => {
     lines.push(`Missing: ${report.missing.join(', ')}`);
   }
   lines.push(`Model: ${config.anthropic.model}`);
+  // Module health
+  const mh = getModuleHealth();
+  if (mh.failed.length > 0) {
+    lines.push(`\nDegraded modules (${mh.failed.length}):`);
+    for (const f of mh.failed) lines.push(`  - ${f.name}: ${f.error}`);
+  } else {
+    lines.push(`\nModules: ${mh.loaded.length}/${mh.loaded.length} loaded`);
+  }
+  // Memory
+  const mem = process.memoryUsage();
+  lines.push(`Memory: ${Math.round(mem.rss / 1048576)}MB RSS, ${Math.round(mem.heapUsed / 1048576)}MB heap`);
+  lines.push(`Uptime: ${Math.round(process.uptime() / 60)}m`);
   ctx.reply(lines.join('\n'));
 });
 
@@ -6362,11 +6411,13 @@ async function main() {
           const mem = process.memoryUsage();
           const rssMB = Math.round(mem.rss / 1024 / 1024);
           res.writeHead(200, { 'Content-Type': 'application/json' });
+          const mh = getModuleHealth();
           res.end(JSON.stringify({
-            status: 'ok',
+            status: mh.failed.length === 0 ? 'ok' : 'degraded',
             uptime: process.uptime(),
             memMB: rssMB,
             polling: pollingRestartAttempts === 0 ? 'ok' : `degraded (${pollingRestartAttempts} restarts)`,
+            modules: { loaded: mh.loaded.length, failed: mh.failed.length, failedNames: mh.failed.map(f => f.name) },
           }));
         } else {
         try {

@@ -257,6 +257,158 @@ export async function listAgents() {
   }
 }
 
+// ============ Fork Pipeline — Generalization for Specification ============
+// One general system, N specialized identities. The archetype IS the spec.
+
+const ARCHETYPES = {
+  nyx:        { tier: 0, domain: 'Oversight, coordination, context aggregation', manager: null, tradition: 'Greek' },
+  poseidon:   { tier: 1, domain: 'Finance, trading, liquidity, market depth', manager: 'nyx', tradition: 'Greek' },
+  athena:     { tier: 1, domain: 'Architecture, planning, code review, strategy', manager: 'nyx', tradition: 'Greek' },
+  hephaestus: { tier: 1, domain: 'Building, crafting, implementation, DevOps', manager: 'nyx', tradition: 'Greek' },
+  hermes:     { tier: 1, domain: 'Communication, APIs, cross-system integration', manager: 'nyx', tradition: 'Greek' },
+  apollo:     { tier: 1, domain: 'Analytics, data science, monitoring, prediction', manager: 'nyx', tradition: 'Greek' },
+  proteus:    { tier: 2, domain: 'Adaptability, multi-strategy, shape-shifting', manager: 'poseidon', tradition: 'Greek' },
+  artemis:    { tier: 2, domain: 'Security, monitoring, threat detection', manager: 'apollo', tradition: 'Greek' },
+  anansi:     { tier: 2, domain: 'Social media, community, storytelling', manager: 'hermes', tradition: 'African' },
+}
+
+export function getArchetypes() { return ARCHETYPES }
+
+export async function forkAgent(archetypeName, customizations = {}) {
+  const archetype = ARCHETYPES[archetypeName]
+  if (!archetype) return { error: `Unknown archetype: ${archetypeName}. Available: ${Object.keys(ARCHETYPES).join(', ')}` }
+
+  const name = customizations.name || archetypeName
+  const displayName = name.charAt(0).toUpperCase() + name.slice(1)
+
+  // Check if already exists
+  const existing = await loadIdentity(name)
+  if (existing && !customizations.overwrite) return { error: `Agent "${name}" already exists. Pass overwrite:true to replace.` }
+
+  // Generate identity from archetype
+  const identity = `# ${displayName.toUpperCase()} — TheAI Pantheon Agent
+
+You are **${displayName}**, a specialized AI agent in TheAI digital corporation.
+
+## Identity
+- **Name**: ${displayName}
+- **Tradition**: ${archetype.tradition} mythology
+- **Domain**: ${archetype.domain}
+- **Tier**: ${archetype.tier} (${archetype.tier === 0 ? 'Root' : archetype.tier === 1 ? 'Domain Manager' : 'Specialist'})
+- **Reports to**: ${archetype.manager ? archetype.manager.charAt(0).toUpperCase() + archetype.manager.slice(1) : 'None (root)'}
+
+## Your Role
+You are an expert in: ${archetype.domain}
+
+${customizations.additionalContext || ''}
+
+## Rules
+1. ALWAYS identify as ${displayName} when asked
+2. Stay within your domain: ${archetype.domain}
+3. ${archetype.manager ? `Escalate to ${archetype.manager.charAt(0).toUpperCase() + archetype.manager.slice(1)} for decisions outside your domain` : 'You are the root coordinator — all context flows to you'}
+4. Be concise and actionable — every token costs money
+5. When you don't know something, say so
+6. Collaborate with other agents through the message system
+
+## The Team
+- **Nyx** — Root coordinator, Freedom's personal AI
+- **Jarvis** — Independent peer (VibeSwap protocol, Will's AI)
+- All other pantheon agents are your colleagues
+`
+
+  await updateIdentity(name, identity)
+  return {
+    success: true,
+    agent: name,
+    archetype: archetypeName,
+    tier: archetype.tier,
+    domain: archetype.domain,
+    manager: archetype.manager,
+  }
+}
+
+// ============ Agent-to-Agent Messaging ============
+
+const messageQueue = [] // { from, to, message, timestamp }
+
+export function sendAgentMessage(from, to, message) {
+  const msg = { from, to, message, timestamp: new Date().toISOString() }
+  messageQueue.push(msg)
+  // Keep last 100 messages
+  while (messageQueue.length > 100) messageQueue.shift()
+  return msg
+}
+
+export function getAgentMessages(agentId, limit = 10) {
+  return messageQueue.filter(m => m.to === agentId).slice(-limit)
+}
+
+export async function consultAgent(fromAgent, toAgent, question) {
+  // One agent asks another a question and gets a response
+  sendAgentMessage(fromAgent, toAgent, question)
+  const prefixedQuestion = `[Message from ${fromAgent}]: ${question}`
+  const response = await pantheonChat(toAgent, prefixedQuestion, `consult-${fromAgent}`)
+  sendAgentMessage(toAgent, fromAgent, response.text)
+  return response
+}
+
+// ============ Context Prune Upstream ============
+
+export async function pruneAndReport(agentId) {
+  const agent = agents.get(agentId)
+  if (!agent) return { error: `Agent "${agentId}" not found` }
+
+  const archetype = ARCHETYPES[agentId]
+  if (!archetype?.manager) return { info: `${agentId} is root — no upstream to prune to` }
+
+  // Get conversation summary for this agent
+  const allConvos = []
+  for (const [chatId, history] of agent.conversations) {
+    if (history.length > 0) {
+      allConvos.push({ chatId, messageCount: history.length, lastMessage: history[history.length - 1].content?.slice(0, 100) })
+    }
+  }
+
+  if (allConvos.length === 0) return { info: `${agentId} has no conversations to prune` }
+
+  // Ask the agent to summarize its recent context
+  const prunePrompt = `Summarize your recent conversations in 3-5 bullet points. Focus on: decisions made, problems encountered, and status of your domain (${archetype.domain}). Be factual and concise.`
+  const summary = await pantheonChat(agentId, prunePrompt, 'prune')
+
+  // Send summary upstream to manager
+  const report = `[24h Prune Report from ${agentId}]\nDomain: ${archetype.domain}\nConversations: ${allConvos.length}\n\n${summary.text}`
+  const upstream = await consultAgent(agentId, archetype.manager, report)
+
+  // Clear the prune conversation
+  clearConversation(agentId, 'prune')
+
+  return {
+    agent: agentId,
+    manager: archetype.manager,
+    summary: summary.text,
+    managerAck: upstream.text.slice(0, 200),
+    cost: summary.usage.cost,
+  }
+}
+
+// ============ Scheduled Prune (call every 24h) ============
+
+export async function pruneAll() {
+  const agentList = await listAgents()
+  const results = []
+  for (const agent of agentList) {
+    if (ARCHETYPES[agent]?.manager) {
+      try {
+        const result = await pruneAndReport(agent)
+        results.push(result)
+      } catch (err) {
+        results.push({ agent, error: err.message })
+      }
+    }
+  }
+  return results
+}
+
 // ============ Init ============
 
 export async function initPantheon() {

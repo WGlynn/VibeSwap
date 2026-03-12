@@ -36,6 +36,7 @@ pub mod pricing;
 pub mod rewards;
 pub mod risk;
 pub mod router;
+pub mod settlement;
 pub mod simulator;
 pub mod staking;
 pub mod strategy;

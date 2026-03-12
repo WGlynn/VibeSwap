@@ -3356,7 +3356,11 @@ bot.command('network', async (ctx) => {
   lines.push(`Archive nodes: ${archives.running}/${archives.minimum} minimum (${archives.healthy ? 'healthy' : 'BELOW MINIMUM'})`);
   lines.push('');
   lines.push(`BFT Consensus: ${consensus.enabled ? 'ENABLED' : 'single-shard'} | ${consensus.committedTotal} committed | ${consensus.pendingProposals} pending`);
-  lines.push(`CRPC: ${crpc.enabled ? 'ENABLED' : 'disabled'} | ${crpc.completedTasks} rounds | avg confidence: ${crpc.avgConfidence}`);
+  lines.push(`CRPC: ${crpc.completedTasks} rounds | avg confidence: ${crpc.avgConfidence} | local+multi mode`);
+  if (crpc.recentTasks?.length > 0) {
+    const recent = crpc.recentTasks[crpc.recentTasks.length - 1];
+    lines.push(`  Last round: ${recent.taskId?.slice(0, 20)}... | confidence: ${(recent.confidence * 100).toFixed(0)}% | ${recent.participants} shards`);
+  }
   lines.push(`Knowledge Chain: height ${kchain.height} | ${kchain.pendingChanges} pending changes`);
   if (kchain.head) {
     lines.push(`  Head: ${kchain.head.hash.slice(0, 12)}... | cumVD: ${kchain.head.cumulativeValueDensity.toFixed(3)}`);

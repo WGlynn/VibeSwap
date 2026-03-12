@@ -18,6 +18,7 @@ pub mod config;
 pub mod collector;
 pub mod compliance;
 pub mod cross_chain;
+pub mod data_feed;
 pub mod dao_voting;
 pub mod delegate;
 pub mod consensus;

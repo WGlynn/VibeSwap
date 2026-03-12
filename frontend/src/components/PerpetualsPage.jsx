@@ -28,8 +28,6 @@ const sectionV = {
 
 // ============ Market Data Hook ============
 
-const LEVERAGE_OPTIONS = [1, 2, 5, 10, 20]
-
 function usePerpMarkets() {
   const { getPrice, getChange } = usePriceFeed(['ETH', 'BTC', 'SOL', 'JUL'])
 
@@ -46,62 +44,334 @@ function usePerpMarkets() {
   }
 
   return [
-    { pair: 'ETH/USD', asset: 'ETH', price: formatPrice(getPrice('ETH')), rawPrice: getPrice('ETH') || 0, change: formatChange(getChange('ETH')), funding: '+0.0042%', oi: '$4.2M', volume24h: '$12.8M', positive: (getChange('ETH') || 0) >= 0, maxLeverage: 20 },
-    { pair: 'BTC/USD', asset: 'BTC', price: formatPrice(getPrice('BTC')), rawPrice: getPrice('BTC') || 0, change: formatChange(getChange('BTC')), funding: '+0.0031%', oi: '$8.1M', volume24h: '$24.5M', positive: (getChange('BTC') || 0) >= 0, maxLeverage: 20 },
-    { pair: 'SOL/USD', asset: 'SOL', price: formatPrice(getPrice('SOL')), rawPrice: getPrice('SOL') || 0, change: formatChange(getChange('SOL')), funding: '-0.0018%', oi: '$1.8M', volume24h: '$5.4M', positive: (getChange('SOL') || 0) >= 0, maxLeverage: 10 },
-    { pair: 'JUL/USD', asset: 'JUL', price: formatPrice(getPrice('JUL')), rawPrice: getPrice('JUL') || 0, change: formatChange(getChange('JUL')), funding: '+0.0012%', oi: '$420K', volume24h: '$1.1M', positive: (getChange('JUL') || 0) >= 0, maxLeverage: 5 },
+    { pair: 'ETH/USD', asset: 'ETH', price: formatPrice(getPrice('ETH')), rawPrice: getPrice('ETH') || 0, change: formatChange(getChange('ETH')), funding: '+0.0042%', rawFunding: 0.0042, oi: '$4.2M', volume24h: '$12.8M', positive: (getChange('ETH') || 0) >= 0, maxLeverage: 50 },
+    { pair: 'BTC/USD', asset: 'BTC', price: formatPrice(getPrice('BTC')), rawPrice: getPrice('BTC') || 0, change: formatChange(getChange('BTC')), funding: '+0.0031%', rawFunding: 0.0031, oi: '$8.1M', volume24h: '$24.5M', positive: (getChange('BTC') || 0) >= 0, maxLeverage: 50 },
+    { pair: 'SOL/USD', asset: 'SOL', price: formatPrice(getPrice('SOL')), rawPrice: getPrice('SOL') || 0, change: formatChange(getChange('SOL')), funding: '-0.0018%', rawFunding: -0.0018, oi: '$1.8M', volume24h: '$5.4M', positive: (getChange('SOL') || 0) >= 0, maxLeverage: 20 },
+    { pair: 'JUL/USD', asset: 'JUL', price: formatPrice(getPrice('JUL')), rawPrice: getPrice('JUL') || 0, change: formatChange(getChange('JUL')), funding: '+0.0012%', rawFunding: 0.0012, oi: '$420K', volume24h: '$1.1M', positive: (getChange('JUL') || 0) >= 0, maxLeverage: 10 },
   ]
 }
 
 // ============ Mock Positions ============
 
 const MOCK_POSITIONS = [
-  { pair: 'ETH/USD', side: 'long', size: '2.5 ETH', entry: '$3,420', pnl: '+$182.50', pnlPct: '+5.3%', leverage: '10x', liqPrice: '$3,078', positive: true },
-  { pair: 'BTC/USD', side: 'short', size: '0.15 BTC', entry: '$68,200', pnl: '-$45.00', pnlPct: '-0.4%', leverage: '5x', liqPrice: '$81,840', positive: false },
+  { pair: 'ETH/USD', side: 'long', size: '2.5 ETH', entry: '$3,420', entryRaw: 3420, markRaw: 3602.50, margin: 855, pnl: '+$182.50', pnlPct: '+5.3%', leverage: '10x', liqPrice: '$3,078', marginRatio: 28.4, positive: true },
+  { pair: 'BTC/USD', side: 'short', size: '0.15 BTC', entry: '$68,200', entryRaw: 68200, markRaw: 68500, margin: 2046, pnl: '-$45.00', pnlPct: '-0.4%', leverage: '5x', liqPrice: '$81,840', marginRatio: 62.1, positive: false },
 ]
 
-// ============ Funding Rate History ============
+// ============ Funding Rate History (per pair) ============
 
-const FUNDING_HISTORY = [
-  { time: '00:00', rate: 0.0042 },
-  { time: '08:00', rate: 0.0038 },
-  { time: '16:00', rate: 0.0045 },
-  { time: '00:00', rate: 0.0051 },
-  { time: '08:00', rate: 0.0033 },
-  { time: '16:00', rate: 0.0028 },
-  { time: '00:00', rate: 0.0042 },
+const TIMES_7 = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '00:00']
+const mkFH = (rates) => rates.map((r, i) => ({ time: TIMES_7[i], rate: r }))
+const FUNDING_HISTORY = {
+  'ETH/USD': mkFH([0.0042, 0.0038, 0.0045, 0.0051, 0.0033, 0.0028, 0.0042]),
+  'BTC/USD': mkFH([0.0031, 0.0029, 0.0035, 0.0040, 0.0027, 0.0022, 0.0031]),
+  'SOL/USD': mkFH([-0.0018, -0.0022, -0.0015, -0.0010, -0.0025, -0.0020, -0.0018]),
+  'JUL/USD': mkFH([0.0012, 0.0015, 0.0008, 0.0018, 0.0010, 0.0014, 0.0012]),
+}
+
+// ============ Mark vs Index Price Data ============
+
+const mkMI = (pairs) => pairs.map(([m, idx], t) => ({ t, mark: m, index: idx }))
+const MARK_INDEX_DATA = {
+  'ETH/USD': mkMI([[3598,3600],[3610,3605],[3604,3602],[3615,3608],[3607,3606],[3601,3603],[3612,3610],[3605,3604],[3609,3607],[3603,3602]]),
+  'BTC/USD': mkMI([[68180,68200],[68350,68280],[68250,68260],[68420,68320],[68300,68310],[68190,68220],[68380,68340],[68270,68280],[68330,68310],[68210,68230]]),
+  'SOL/USD': mkMI([[142.5,142.8],[143.1,142.9],[142.7,142.85],[143.3,143.0],[142.9,142.95],[142.6,142.75],[143.2,143.05],[142.8,142.9],[143.0,142.95],[142.7,142.8]]),
+  'JUL/USD': mkMI([[.0821,.082],[.0825,.0822],[.0819,.0821],[.0828,.0823],[.0822,.0822],[.0818,.082],[.0826,.0824],[.082,.0821],[.0824,.0823],[.0819,.082]]),
+}
+
+// ============ Recent Liquidations ============
+
+const RECENT_LIQUIDATIONS = [
+  { pair: 'ETH/USD', side: 'long', size: '$42,800', price: '$3,128', time: '2m ago' },
+  { pair: 'BTC/USD', side: 'short', size: '$18,500', price: '$69,420', time: '8m ago' },
+  { pair: 'SOL/USD', side: 'long', size: '$6,200', price: '$131.40', time: '14m ago' },
 ]
 
 // ============ Mini Funding Chart ============
 
-function FundingChart({ data }) {
+function FundingChart({ data, height = 60 }) {
   const max = Math.max(...data.map(d => d.rate))
   const min = Math.min(...data.map(d => d.rate))
   const range = max - min || 0.001
   const w = 280
-  const h = 60
+  const h = height
   const points = data.map((d, i) => {
     const x = (i / (data.length - 1)) * w
     const y = h - ((d.rate - min) / range) * h * 0.8 - h * 0.1
     return `${x},${y}`
   }).join(' ')
 
+  const zeroY = min >= 0 ? h : (max <= 0 ? 0 : h - ((0 - min) / range) * h * 0.8 - h * 0.1)
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: 60 }}>
-      <polyline
-        points={points}
-        fill="none"
-        stroke={CYAN}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: h }}>
+      {min < 0 && max > 0 && <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" strokeDasharray="4,3" />}
+      <polyline points={points} fill="none" stroke={CYAN} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       {data.map((d, i) => {
-        const x = (i / (data.length - 1)) * w
-        const y = h - ((d.rate - min) / range) * h * 0.8 - h * 0.1
+        const x = (i / (data.length - 1)) * w, y = h - ((d.rate - min) / range) * h * 0.8 - h * 0.1
         return <circle key={i} cx={x} cy={y} r="2.5" fill={CYAN} opacity="0.6" />
       })}
     </svg>
+  )
+}
+
+// ============ Mark vs Index SVG Chart ============
+
+function MarkIndexChart({ data, pair }) {
+  const w = 320
+  const h = 100
+  const allVals = data.flatMap(d => [d.mark, d.index])
+  const max = Math.max(...allVals)
+  const min = Math.min(...allVals)
+  const range = max - min || 1
+  const pad = 0.1
+
+  const toY = (v) => h - ((v - min) / range) * h * (1 - pad * 2) - h * pad
+  const toX = (i) => (i / (data.length - 1)) * w
+
+  const markPoints = data.map((d, i) => `${toX(i)},${toY(d.mark)}`).join(' ')
+  const indexPoints = data.map((d, i) => `${toX(i)},${toY(d.index)}`).join(' ')
+
+  // Basis spread (mark - index) as filled area
+  const basisPath = data.map((d, i) => {
+    const x = toX(i)
+    const yMark = toY(d.mark)
+    const yIndex = toY(d.index)
+    return { x, yMark, yIndex }
+  })
+  const basisFill = `M${basisPath[0].x},${basisPath[0].yMark} ` +
+    basisPath.slice(1).map(p => `L${p.x},${p.yMark}`).join(' ') +
+    ` L${basisPath[basisPath.length - 1].x},${basisPath[basisPath.length - 1].yIndex} ` +
+    basisPath.slice(0, -1).reverse().map(p => `L${p.x},${p.yIndex}`).join(' ') +
+    ' Z'
+
+  const lastMark = data[data.length - 1].mark
+  const lastIndex = data[data.length - 1].index
+  const basisBps = (((lastMark - lastIndex) / lastIndex) * 10000).toFixed(1)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 rounded-full" style={{ background: CYAN }} />
+            <span className="text-[9px] font-mono text-black-400">Mark</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 rounded-full" style={{ background: '#a855f7' }} />
+            <span className="text-[9px] font-mono text-black-400">Index</span>
+          </div>
+        </div>
+        <span className={`text-[10px] font-mono font-bold ${parseFloat(basisBps) >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
+          Basis: {basisBps} bps
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: h }}>
+        {/* Basis spread fill */}
+        <path d={basisFill} fill={`${CYAN}10`} />
+        {/* Index line */}
+        <polyline points={indexPoints} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+        {/* Mark line */}
+        <polyline points={markPoints} fill="none" stroke={CYAN} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* End dots */}
+        <circle cx={toX(data.length - 1)} cy={toY(lastMark)} r="3" fill={CYAN} />
+        <circle cx={toX(data.length - 1)} cy={toY(lastIndex)} r="3" fill="#a855f7" opacity="0.7" />
+      </svg>
+    </div>
+  )
+}
+
+// ============ Leverage Slider ============
+
+function LeverageSlider({ value, onChange, max = 50 }) {
+  const stops = [1, 2, 5, 10, 20, 50].filter(s => s <= max)
+  const pct = ((value - 1) / (max - 1)) * 100
+
+  const riskColor = value <= 5 ? '#22c55e' : value <= 20 ? '#f59e0b' : '#ef4444'
+  const riskLabel = value <= 5 ? 'Low' : value <= 20 ? 'Medium' : 'High'
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Leverage</p>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ background: `${riskColor}15`, color: riskColor, border: `1px solid ${riskColor}30` }}>
+            {riskLabel} Risk
+          </span>
+          <span className="text-sm font-mono font-bold" style={{ color: CYAN }}>{value}x</span>
+        </div>
+      </div>
+      <div className="relative h-8 flex items-center">
+        <div className="absolute inset-x-0 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <motion.div
+            className="h-full rounded-full"
+            style={{ width: `${pct}%`, background: `linear-gradient(90deg, #22c55e, ${CYAN}, #f59e0b, #ef4444)` }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.15 }}
+          />
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={max}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(parseInt(e.target.value))}
+          className="absolute inset-x-0 w-full h-8 opacity-0 cursor-pointer"
+          style={{ zIndex: 2 }}
+        />
+        <motion.div
+          className="absolute w-4 h-4 rounded-full border-2"
+          style={{
+            left: `calc(${pct}% - 8px)`,
+            background: '#0f0f0f',
+            borderColor: CYAN,
+            boxShadow: `0 0 8px ${CYAN}40`,
+            zIndex: 1,
+          }}
+          animate={{ left: `calc(${pct}% - 8px)` }}
+          transition={{ duration: 0.15 }}
+        />
+      </div>
+      <div className="flex justify-between mt-1">
+        {stops.map((s) => (
+          <button
+            key={s}
+            onClick={() => onChange(s)}
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-all ${
+              value === s ? 'text-cyan-400 font-bold' : 'text-black-500 hover:text-black-300'
+            }`}
+          >
+            {s}x
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============ Position Manager ============
+
+const DetailCell = ({ label, value, color = 'text-black-300' }) => (
+  <div>
+    <p className="text-[8px] font-mono text-black-500 uppercase">{label}</p>
+    <p className={`text-[10px] font-mono ${color}`}>{value}</p>
+  </div>
+)
+
+function PositionManager({ positions }) {
+  const totalPnl = positions.reduce((sum, p) => {
+    const val = parseFloat(p.pnl.replace(/[^-\d.]/g, ''))
+    return sum + (p.pnl.startsWith('-') ? -Math.abs(val) : val)
+  }, 0)
+  const totalPositive = totalPnl >= 0
+  const marginColor = (r) => r > 50 ? '#22c55e' : r > 20 ? '#f59e0b' : '#ef4444'
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3 pb-3" style={{ borderBottom: `1px solid ${CYAN}10` }}>
+        <div>
+          <p className="text-[9px] font-mono text-black-500 uppercase tracking-wider">Total Unrealized PnL</p>
+          <p className={`text-sm font-mono font-bold ${totalPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {totalPositive ? '+' : ''}${totalPnl.toFixed(2)}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[9px] font-mono text-black-500 uppercase tracking-wider">Positions</p>
+          <p className="text-sm font-mono font-bold text-white">{positions.length}</p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {positions.map((pos, i) => (
+          <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
+            className="rounded-lg p-3" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${pos.positive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-white">{pos.pair}</span>
+                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${pos.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                  {pos.side.toUpperCase()} {pos.leverage}
+                </span>
+              </div>
+              <div className="text-right">
+                <p className={`text-xs font-mono font-bold ${pos.positive ? 'text-green-400' : 'text-red-400'}`}>{pos.pnl}</p>
+                <p className={`text-[9px] font-mono ${pos.positive ? 'text-green-400/60' : 'text-red-400/60'}`}>{pos.pnlPct}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <DetailCell label="Entry" value={pos.entry} />
+              <DetailCell label="Mark" value={`$${pos.markRaw.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} color="text-white" />
+              <DetailCell label="Liq. Price" value={pos.liqPrice} color="text-red-400" />
+              <DetailCell label="Margin" value={`${pos.marginRatio}%`} color={`text-[${marginColor(pos.marginRatio)}]`} />
+            </div>
+            <div className="mt-2 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pos.marginRatio, 100)}%`, background: marginColor(pos.marginRatio) }} />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============ Insurance Fund Status ============
+
+function InsuranceFundStatus() {
+  const sources = [
+    { name: 'Liquidation Surplus', pct: 45, color: '#22c55e' },
+    { name: 'Trading Fees (10%)', pct: 30, color: CYAN },
+    { name: 'Treasury Allocation', pct: 15, color: '#a855f7' },
+    { name: 'Penalty Fees', pct: 10, color: '#f59e0b' },
+  ]
+  const stats = [
+    { value: '$2.4M', label: 'Balance', color: 'text-white' },
+    { value: '98.2%', label: 'Coverage', color: 'text-green-400' },
+    { value: '$67.5K', label: '24h Claims', color: 'text-white' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3 text-center">
+        {stats.map(s => (
+          <div key={s.label}>
+            <p className={`text-lg font-mono font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-[8px] font-mono text-black-500 uppercase tracking-wider">{s.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {sources.map((s, i) => (
+          <motion.div key={s.name} initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
+            transition={{ delay: 0.2 + i * 0.1, duration: 0.4, ease }} style={{ transformOrigin: 'left' }}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-mono text-black-300">{s.name}</span>
+              <span className="text-[10px] font-mono font-bold" style={{ color: s.color }}>{s.pct}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-black-800">
+              <div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color, opacity: 0.7 }} />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+      <div>
+        <p className="text-[9px] font-mono text-black-500 uppercase tracking-wider mb-2">Recent Liquidations</p>
+        <div className="space-y-1">
+          {RECENT_LIQUIDATIONS.map((liq, i) => (
+            <motion.div key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + i * 0.08 }} className="flex items-center justify-between rounded-md px-2.5 py-1.5"
+              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(239,68,68,0.1)' }}>
+              <div className="flex items-center gap-2">
+                <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${
+                  liq.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+                }`}>{liq.side.toUpperCase()}</span>
+                <span className="text-[10px] font-mono text-white">{liq.pair}</span>
+              </div>
+              <span className="text-[10px] font-mono text-red-400">{liq.size}</span>
+              <span className="text-[9px] font-mono text-black-500">{liq.time}</span>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -145,43 +415,6 @@ function PIDExplainer() {
   )
 }
 
-// ============ Insurance Fund Visual ============
-
-function InsuranceFund() {
-  const sources = [
-    { name: 'Liquidation Surplus', pct: 45, color: '#22c55e' },
-    { name: 'Trading Fees (10%)', pct: 30, color: CYAN },
-    { name: 'Treasury Allocation', pct: 15, color: '#a855f7' },
-    { name: 'Penalty Fees', pct: 10, color: '#f59e0b' },
-  ]
-
-  return (
-    <div className="space-y-3">
-      <div className="text-center mb-4">
-        <p className="text-2xl font-mono font-bold text-white">$2.4M</p>
-        <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Insurance Fund Balance</p>
-      </div>
-      {sources.map((s, i) => (
-        <motion.div
-          key={s.name}
-          initial={{ opacity: 0, scaleX: 0 }}
-          animate={{ opacity: 1, scaleX: 1 }}
-          transition={{ delay: 0.2 + i * 0.1, duration: 0.4, ease }}
-          style={{ transformOrigin: 'left' }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-mono text-black-300">{s.name}</span>
-            <span className="text-[11px] font-mono font-bold" style={{ color: s.color }}>{s.pct}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-black-800">
-            <div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color, opacity: 0.7 }} />
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  )
-}
-
 // ============ MEV Protection Badge ============
 
 function MEVProtection() {
@@ -216,6 +449,38 @@ function MEVProtection() {
   )
 }
 
+// ============ Funding Rate Display ============
+
+function FundingRateDisplay({ markets, selectedMarket, onSelect }) {
+  return (
+    <div className="space-y-2">
+      {markets.map((m, i) => {
+        const isNeg = m.rawFunding < 0
+        return (
+          <motion.div
+            key={m.pair}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06 }}
+            onClick={() => onSelect(i)}
+            className={`flex items-center justify-between rounded-lg p-2.5 cursor-pointer transition-all ${
+              selectedMarket === i ? 'ring-1 ring-cyan-500/30' : ''
+            }`}
+            style={{ background: selectedMarket === i ? `${CYAN}08` : 'rgba(0,0,0,0.25)', border: `1px solid ${selectedMarket === i ? `${CYAN}20` : 'transparent'}` }}
+          >
+            <span className="text-xs font-mono font-bold text-white w-20">{m.pair}</span>
+            <span className={`text-xs font-mono font-bold ${isNeg ? 'text-red-400' : 'text-green-400'}`}>{m.funding}</span>
+            <span className="text-[9px] font-mono text-black-500">/8h</span>
+            <div className="w-20">
+              <FundingChart data={FUNDING_HISTORY[m.pair] || []} height={24} />
+            </div>
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ============ Main Component ============
 
 export default function PerpetualsPage() {
@@ -227,7 +492,6 @@ export default function PerpetualsPage() {
   const [side, setSide] = useState('long')
   const [leverage, setLeverage] = useState(5)
   const [amount, setAmount] = useState('')
-  const [showPositions, setShowPositions] = useState(false)
   const [infoTab, setInfoTab] = useState('protection')
 
   const market = MARKETS_DATA[selectedMarket]
@@ -244,6 +508,14 @@ export default function PerpetualsPage() {
       ? `$${(p * (1 - 0.9 / leverage)).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
       : `$${(p * (1 + 0.9 / leverage)).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   }, [market.rawPrice, amount, leverage, side])
+
+  const liqPriceFormatted = useMemo(() => {
+    if (!market.rawPrice || !amount || parseFloat(amount) <= 0) return null
+    const p = market.rawPrice
+    const lp = side === 'long' ? p * (1 - 0.9 / leverage) : p * (1 + 0.9 / leverage)
+    const distPct = Math.abs(((lp - p) / p) * 100).toFixed(1)
+    return { price: liqPrice, distPct }
+  }, [market.rawPrice, amount, leverage, side, liqPrice])
 
   return (
     <div className="min-h-screen pb-20">
@@ -273,7 +545,7 @@ export default function PerpetualsPage() {
             <span style={{ color: CYAN }}>PERP</span><span className="text-white">ETUALS</span>
           </h1>
           <p className="text-sm text-black-300 font-mono">
-            Trade perpetual futures with up to 20x leverage. PID-controlled funding. MEV-free.
+            Trade perpetual futures with up to 50x leverage. PID-controlled funding. MEV-free.
           </p>
         </motion.div>
 
@@ -354,24 +626,9 @@ export default function PerpetualsPage() {
                   </button>
                 </div>
 
-                {/* Leverage */}
+                {/* Leverage Slider */}
                 <div className="mb-4">
-                  <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider mb-2">Leverage</p>
-                  <div className="flex gap-1">
-                    {LEVERAGE_OPTIONS.filter(l => l <= market.maxLeverage).map((l) => (
-                      <button
-                        key={l}
-                        onClick={() => setLeverage(l)}
-                        className={`flex-1 py-2 text-xs font-mono rounded-lg border transition-all ${
-                          leverage === l
-                            ? 'border-cyan-500/60 bg-cyan-500/10 text-cyan-400 font-bold'
-                            : 'border-black-700 text-black-400 hover:border-black-600'
-                        }`}
-                      >
-                        {l}x
-                      </button>
-                    ))}
-                  </div>
+                  <LeverageSlider value={leverage} onChange={setLeverage} max={market.maxLeverage} />
                 </div>
 
                 {/* Amount */}
@@ -395,7 +652,7 @@ export default function PerpetualsPage() {
                   </div>
                 </div>
 
-                {/* Position Details */}
+                {/* Position Details + Liquidation Price */}
                 <AnimatePresence>
                   {amount && parseFloat(amount) > 0 && (
                     <motion.div
@@ -411,7 +668,12 @@ export default function PerpetualsPage() {
                       </div>
                       <div className="flex justify-between text-xs font-mono">
                         <span className="text-black-400">Liquidation Price</span>
-                        <span className="text-red-400">{liqPrice}</span>
+                        <div className="text-right">
+                          <span className="text-red-400">{liqPrice}</span>
+                          {liqPriceFormatted && (
+                            <span className="text-[9px] font-mono text-black-500 ml-1.5">({liqPriceFormatted.distPct}% away)</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex justify-between text-xs font-mono">
                         <span className="text-black-400">Funding Rate</span>
@@ -421,6 +683,14 @@ export default function PerpetualsPage() {
                         <span className="text-black-400">Fee (0.05%)</span>
                         <span className="text-black-300">{(parseFloat(positionSize) * 0.0005).toFixed(6)} {market.asset}</span>
                       </div>
+                      {/* Liquidation warning */}
+                      {leverage >= 20 && (
+                        <div className="mt-1 rounded-md p-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                          <p className="text-[9px] font-mono text-red-400 text-center">
+                            High leverage — liquidation at {liqPriceFormatted?.distPct || '--'}% from entry
+                          </p>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -456,58 +726,34 @@ export default function PerpetualsPage() {
                 ))}
               </div>
 
-              {/* Funding Rate Chart */}
+              {/* Mark vs Index Price Chart */}
               <GlassCard glowColor="terminal">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Funding Rate History</h3>
-                    <span className="text-[10px] font-mono text-black-400">Last 24h</span>
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Mark vs Index Price</h3>
+                    <span className="text-[10px] font-mono text-black-400">Last 10 batches</span>
                   </div>
-                  <FundingChart data={FUNDING_HISTORY} />
-                  <div className="flex justify-between mt-2">
-                    {FUNDING_HISTORY.map((d, i) => (
-                      <span key={i} className="text-[8px] font-mono text-black-600">{d.time}</span>
-                    ))}
-                  </div>
+                  <MarkIndexChart data={MARK_INDEX_DATA[market.pair] || MARK_INDEX_DATA['ETH/USD']} pair={market.pair} />
                 </div>
               </GlassCard>
 
-              {/* Positions */}
+              {/* Funding Rate Display */}
+              <GlassCard glowColor="terminal">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Funding Rates</h3>
+                    <span className="text-[10px] font-mono text-black-400">Current + 24h</span>
+                  </div>
+                  <FundingRateDisplay markets={MARKETS_DATA} selectedMarket={selectedMarket} onSelect={setSelectedMarket} />
+                </div>
+              </GlassCard>
+
+              {/* Positions (connected only) */}
               {isConnected && (
                 <GlassCard glowColor="terminal">
                   <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Your Positions</h3>
-                      <span className="text-[10px] font-mono text-black-400">{MOCK_POSITIONS.length} open</span>
-                    </div>
-                    <div className="space-y-2">
-                      {MOCK_POSITIONS.map((pos, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.08 }}
-                          className="flex items-center justify-between rounded-lg p-3"
-                          style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${pos.positive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}` }}
-                        >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono font-bold text-white">{pos.pair}</span>
-                              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
-                                pos.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
-                              }`}>
-                                {pos.side.toUpperCase()} {pos.leverage}
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-mono text-black-500">{pos.size} @ {pos.entry}</span>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-xs font-mono font-bold ${pos.positive ? 'text-green-400' : 'text-red-400'}`}>{pos.pnl}</p>
-                            <p className={`text-[10px] font-mono ${pos.positive ? 'text-green-400/60' : 'text-red-400/60'}`}>{pos.pnlPct}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider mb-3" style={{ color: CYAN }}>Your Positions</h3>
+                    <PositionManager positions={MOCK_POSITIONS} />
                   </div>
                 </GlassCard>
               )}
@@ -591,13 +837,13 @@ export default function PerpetualsPage() {
                 {infoTab === 'insurance' && (
                   <motion.div key="insurance" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                     <h3 className="text-sm font-mono font-bold uppercase tracking-wider mb-4" style={{ color: CYAN }}>
-                      Insurance Fund
+                      Insurance Fund Status
                     </h3>
                     <p className="text-xs font-mono text-black-400 mb-4 leading-relaxed">
                       The insurance fund backstops liquidation losses and ensures counterparty solvency.
                       Funded through multiple revenue streams for redundancy.
                     </p>
-                    <InsuranceFund />
+                    <InsuranceFundStatus />
                   </motion.div>
                 )}
               </AnimatePresence>

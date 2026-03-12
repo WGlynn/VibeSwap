@@ -2223,4 +2223,206 @@ mod tests {
     fn test_high_risk_threshold_below_max_v5() {
         assert!(HIGH_RISK_THRESHOLD < MAX_RISK_SCORE);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_check_compliance_all_pass_h8() {
+        let kyc = make_kyc(KycLevel::Enhanced, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let result = check_compliance(&kyc, &rule, PRECISION, 0, 500, &[]);
+        assert!(result.passed);
+        assert!(result.kyc_ok);
+        assert!(result.limits_ok);
+        assert!(result.sanctions_ok);
+        assert!(result.jurisdiction_ok);
+        assert!(result.reason.is_none());
+    }
+
+    #[test]
+    fn test_check_compliance_sanctioned_address_h8() {
+        let kyc = make_kyc(KycLevel::Institutional, 840);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let sanctioned = vec![[0xAA; 32]]; // matches kyc address
+        let result = check_compliance(&kyc, &rule, PRECISION, 0, 500, &sanctioned);
+        assert!(!result.passed);
+        assert!(!result.sanctions_ok);
+        assert_eq!(result.reason, Some(ComplianceError::SanctionedAddress));
+    }
+
+    #[test]
+    fn test_check_compliance_expired_kyc_h8() {
+        let kyc = make_kyc_with_expiry(KycLevel::Enhanced, 400);
+        let rule = make_rule(KycLevel::Basic, vec![]);
+        let result = check_compliance(&kyc, &rule, PRECISION, 0, 500, &[]);
+        assert!(!result.passed);
+        assert!(!result.kyc_ok);
+    }
+
+    #[test]
+    fn test_check_compliance_restricted_jurisdiction_h8() {
+        let kyc = make_kyc(KycLevel::Enhanced, 408); // North Korea
+        let rule = make_rule(KycLevel::Basic, vec![408, 364]);
+        let result = check_compliance(&kyc, &rule, PRECISION, 0, 500, &[]);
+        assert!(!result.passed);
+        assert!(!result.jurisdiction_ok);
+        assert_eq!(result.reason, Some(ComplianceError::InvalidJurisdiction));
+    }
+
+    #[test]
+    fn test_check_limits_below_minimum_h8() {
+        let limits = make_limits(1000, 5000, 100000, 100);
+        let result = check_limits(50, 0, &limits);
+        assert_eq!(result, Err(ComplianceError::AmountBelowMinimum));
+    }
+
+    #[test]
+    fn test_check_limits_exceeds_per_tx_h8() {
+        let limits = make_limits(1000, 5000, 100000, 10);
+        let result = check_limits(1001, 0, &limits);
+        assert_eq!(result, Err(ComplianceError::TransactionLimitExceeded));
+    }
+
+    #[test]
+    fn test_check_limits_exceeds_daily_h8() {
+        let limits = make_limits(1000, 5000, 100000, 10);
+        let result = check_limits(500, 4600, &limits);
+        assert_eq!(result, Err(ComplianceError::DailyLimitExceeded));
+    }
+
+    #[test]
+    fn test_check_limits_exact_boundary_h8() {
+        let limits = make_limits(1000, 5000, 100000, 10);
+        let result = check_limits(1000, 4000, &limits);
+        assert!(result.is_ok()); // 4000 + 1000 = 5000 == daily_max
+    }
+
+    #[test]
+    fn test_is_sanctioned_empty_list_h8() {
+        assert!(!is_sanctioned(&[0xAA; 32], &[]));
+    }
+
+    #[test]
+    fn test_is_sanctioned_not_in_list_h8() {
+        let list = vec![[0xBB; 32], [0xCC; 32]];
+        assert!(!is_sanctioned(&[0xAA; 32], &list));
+    }
+
+    #[test]
+    fn test_is_restricted_jurisdiction_empty_h8() {
+        assert!(!is_restricted_jurisdiction(840, &[]));
+    }
+
+    #[test]
+    fn test_limits_for_none_kyc_zero_h8() {
+        let limits = limits_for_kyc_level(&KycLevel::None);
+        assert_eq!(limits.per_tx_max, 0);
+        assert_eq!(limits.daily_max, 0);
+        assert_eq!(limits.monthly_max, 0);
+    }
+
+    #[test]
+    fn test_limits_for_basic_consistent_h8() {
+        let limits = limits_for_kyc_level(&KycLevel::Basic);
+        assert_eq!(limits.per_tx_max, BASIC_TX_LIMIT);
+        assert_eq!(limits.daily_max, BASIC_DAILY_LIMIT);
+        assert_eq!(limits.monthly_max, BASIC_DAILY_LIMIT * 30);
+        assert_eq!(limits.min_amount, PRECISION);
+    }
+
+    #[test]
+    fn test_limits_tier_ordering_h8() {
+        let basic = limits_for_kyc_level(&KycLevel::Basic);
+        let enhanced = limits_for_kyc_level(&KycLevel::Enhanced);
+        let institutional = limits_for_kyc_level(&KycLevel::Institutional);
+        assert!(basic.per_tx_max < enhanced.per_tx_max);
+        assert!(enhanced.per_tx_max < institutional.per_tx_max);
+        assert!(basic.daily_max < enhanced.daily_max);
+        assert!(enhanced.daily_max < institutional.daily_max);
+    }
+
+    #[test]
+    fn test_address_risk_score_zero_age_h8() {
+        let score = address_risk_score(10, 5, PRECISION, 0);
+        // Zero age with txns = suspicious: frequency=5000 (>100 => +3000) + age<10000 (+1500) = 4500+
+        assert!(score >= 4000);
+    }
+
+    #[test]
+    fn test_address_risk_score_low_diversity_h8() {
+        // 1000 txs but only 2 counterparties
+        let score = address_risk_score(1000, 2, PRECISION, 1_000_000);
+        assert!(score > 0);
+    }
+
+    #[test]
+    fn test_address_risk_score_clamped_to_max_h8() {
+        // Extreme values that should push score above MAX
+        let score = address_risk_score(10000, 1, 100_000_000 * PRECISION, 100);
+        assert!(score <= MAX_RISK_SCORE);
+    }
+
+    #[test]
+    fn test_address_risk_score_safe_address_h8() {
+        // Old account, low frequency, many counterparties, normal amounts
+        let score = address_risk_score(100, 80, 1000 * PRECISION, 5_000_000);
+        assert!(score < HIGH_RISK_THRESHOLD);
+    }
+
+    #[test]
+    fn test_remaining_daily_limit_at_limit_h8() {
+        let limits = make_limits(1000, 5000, 100000, 10);
+        assert_eq!(remaining_daily_limit(&limits, 5000), 0);
+    }
+
+    #[test]
+    fn test_remaining_daily_limit_over_limit_h8() {
+        let limits = make_limits(1000, 5000, 100000, 10);
+        assert_eq!(remaining_daily_limit(&limits, 6000), 0); // saturating
+    }
+
+    #[test]
+    fn test_address_hash_deterministic_h8() {
+        let addr = [0xAA; 32];
+        let salt = [0xBB; 32];
+        let h1 = address_hash(&addr, &salt);
+        let h2 = address_hash(&addr, &salt);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_address_hash_different_salt_h8() {
+        let addr = [0xAA; 32];
+        let h1 = address_hash(&addr, &[0x01; 32]);
+        let h2 = address_hash(&addr, &[0x02; 32]);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_kyc_renewal_already_expired_h8() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 1000);
+        assert!(!kyc_renewal_needed(&kyc, 1001, KYC_WARNING_BLOCKS));
+    }
+
+    #[test]
+    fn test_kyc_renewal_not_yet_in_window_h8() {
+        let kyc = make_kyc_with_expiry(KycLevel::Basic, 1_000_000);
+        assert!(!kyc_renewal_needed(&kyc, 100, KYC_WARNING_BLOCKS));
+    }
+
+    #[test]
+    fn test_compliance_report_all_pass_h8() {
+        let pass = ComplianceCheck { passed: true, kyc_ok: true, limits_ok: true, sanctions_ok: true, jurisdiction_ok: true, reason: None };
+        let report = compliance_report(&[pass.clone(), pass.clone(), pass]);
+        assert_eq!(report.total_checked, 3);
+        assert_eq!(report.passed, 3);
+        assert_eq!(report.failed, 0);
+    }
+
+    #[test]
+    fn test_compliance_report_empty_h8() {
+        let report = compliance_report(&[]);
+        assert_eq!(report.total_checked, 0);
+        assert_eq!(report.passed, 0);
+    }
 }

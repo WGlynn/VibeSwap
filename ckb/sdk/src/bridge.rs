@@ -2435,4 +2435,242 @@ mod tests {
         // Chain with 100bps fee should have 10x the protocol fee of 10bps
         assert_eq!(est2.protocol_fee, est1.protocol_fee * 10);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_message_hash_empty_payload_h8() {
+        let msg = CrossChainMessage {
+            source_chain: 1,
+            dest_chain: 2,
+            nonce: 0,
+            sender: [0u8; 32],
+            receiver: [0u8; 32],
+            payload: vec![],
+            timestamp: 0,
+        };
+        let h = message_hash(&msg);
+        assert_ne!(h, [0u8; 32]); // Empty payload still produces non-zero hash
+    }
+
+    #[test]
+    fn test_message_hash_max_payload_h8() {
+        let msg = CrossChainMessage {
+            source_chain: u32::MAX,
+            dest_chain: u32::MAX,
+            nonce: u64::MAX,
+            sender: [0xFF; 32],
+            receiver: [0xFF; 32],
+            payload: vec![0xFF; MAX_MESSAGE_SIZE as usize],
+            timestamp: u64::MAX,
+        };
+        let h = message_hash(&msg);
+        assert_ne!(h, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_message_hash_differs_by_timestamp_h8() {
+        let m1 = CrossChainMessage {
+            source_chain: 1, dest_chain: 2, nonce: 0,
+            sender: [0xAA; 32], receiver: [0xBB; 32],
+            payload: vec![1], timestamp: 100,
+        };
+        let m2 = CrossChainMessage { timestamp: 101, ..m1.clone() };
+        assert_ne!(message_hash(&m1), message_hash(&m2));
+    }
+
+    #[test]
+    fn test_verify_proof_single_element_mismatch_h8() {
+        let proof = MessageProof {
+            message_hash: [0x11; 32],
+            block_number: 1,
+            proof_data: vec![],
+            root: [0x22; 32],
+        };
+        assert_eq!(verify_proof(&proof).unwrap(), false);
+    }
+
+    #[test]
+    fn test_verify_proof_single_element_match_h8() {
+        let hash = [0x42; 32];
+        let proof = MessageProof {
+            message_hash: hash,
+            block_number: 1,
+            proof_data: vec![],
+            root: hash,
+        };
+        assert_eq!(verify_proof(&proof).unwrap(), true);
+    }
+
+    #[test]
+    fn test_estimate_fee_zero_payload_h8() {
+        let chains = vec![make_chain(1, "CKB", 24, 10, true)];
+        let est = estimate_bridge_fee(&chains, 1, 0).unwrap();
+        assert_eq!(est.relay_fee, BASE_RELAY_FEE); // No per-byte charge
+    }
+
+    #[test]
+    fn test_estimate_fee_inactive_chain_h8() {
+        let chains = vec![make_chain(1, "CKB", 24, 10, false)];
+        let result = estimate_bridge_fee(&chains, 1, 10);
+        assert!(matches!(result, Err(BridgeError::ChainInactive { chain_id: 1 })));
+    }
+
+    #[test]
+    fn test_estimate_fee_unknown_chain_h8() {
+        let chains = vec![make_chain(1, "CKB", 24, 10, true)];
+        let result = estimate_bridge_fee(&chains, 99, 10);
+        assert!(matches!(result, Err(BridgeError::InvalidChainId(99))));
+    }
+
+    #[test]
+    fn test_estimate_fee_oversized_payload_h8() {
+        let chains = vec![make_chain(1, "CKB", 24, 10, true)];
+        let result = estimate_bridge_fee(&chains, 1, MAX_MESSAGE_SIZE + 1);
+        assert!(matches!(result, Err(BridgeError::MessageTooLarge { .. })));
+    }
+
+    #[test]
+    fn test_validate_transfer_zero_amount_h8() {
+        let t = make_transfer(1, 2, 0, 0, 1000);
+        let result = validate_transfer(&t, 500, &[[0x11; 32]]);
+        assert_eq!(result, Err(BridgeError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_validate_transfer_same_chain_h8() {
+        let t = make_transfer(1, 1, 100, 90, 1000);
+        let result = validate_transfer(&t, 500, &[[0x11; 32]]);
+        assert_eq!(result, Err(BridgeError::SameChain { chain_id: 1 }));
+    }
+
+    #[test]
+    fn test_validate_transfer_expired_deadline_h8() {
+        let t = make_transfer(1, 2, 100, 90, 500);
+        let result = validate_transfer(&t, 500, &[[0x11; 32]]);
+        assert_eq!(result, Err(BridgeError::ExpiredMessage { deadline: 500, current: 500 }));
+    }
+
+    #[test]
+    fn test_validate_transfer_unsupported_token_h8() {
+        let t = make_transfer(1, 2, 100, 90, 1000);
+        let result = validate_transfer(&t, 500, &[[0x99; 32]]); // Different token hash
+        assert!(matches!(result, Err(BridgeError::UnsupportedToken { .. })));
+    }
+
+    #[test]
+    fn test_calculate_min_receive_zero_amount_h8() {
+        assert_eq!(calculate_min_receive(0, 30, 50), 0);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_zero_fees_and_slippage_h8() {
+        let result = calculate_min_receive(10_000, 0, 0);
+        assert_eq!(result, 10_000);
+    }
+
+    #[test]
+    fn test_calculate_min_receive_max_fee_h8() {
+        // 10000 bps fee = 100% fee, should yield 0
+        let result = calculate_min_receive(10_000, 10_000, 0);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_next_nonce_empty_h8() {
+        assert_eq!(next_nonce(&[]), 0);
+    }
+
+    #[test]
+    fn test_next_nonce_unordered_h8() {
+        assert_eq!(next_nonce(&[5, 2, 8, 1]), 9);
+    }
+
+    #[test]
+    fn test_message_status_relayed_takes_priority_h8() {
+        // Even if expired, relayed=true should return Completed
+        let status = message_status(100, 10000, 10, true, 50);
+        assert_eq!(status, BridgeStatus::Completed);
+    }
+
+    #[test]
+    fn test_message_status_confirmed_block_zero_h8() {
+        let status = message_status(0, 100, 10, false, 200);
+        assert_eq!(status, BridgeStatus::Pending);
+    }
+
+    #[test]
+    fn test_message_status_just_before_finality_h8() {
+        // confirmed_block=100, current=109, finality=10 => not yet final
+        let status = message_status(100, 109, 10, false, 200);
+        assert_eq!(status, BridgeStatus::Confirmed);
+    }
+
+    #[test]
+    fn test_message_status_exactly_at_finality_h8() {
+        // confirmed_block=100, current=110, finality=10 => final
+        let status = message_status(100, 110, 10, false, 200);
+        assert_eq!(status, BridgeStatus::Relayed);
+    }
+
+    #[test]
+    fn test_bridge_summary_empty_inputs_h8() {
+        let s = bridge_summary(&[], &[], &[], 100);
+        assert_eq!(s.total_bridged_in, 0);
+        assert_eq!(s.total_bridged_out, 0);
+        assert_eq!(s.pending_count, 0);
+        assert_eq!(s.avg_relay_time, 0);
+    }
+
+    #[test]
+    fn test_bridge_summary_pending_count_h8() {
+        let s = bridge_summary(&[], &[], &[1, 2, 3, 4, 5], 100);
+        assert_eq!(s.pending_count, 5);
+    }
+
+    #[test]
+    fn test_encode_decode_roundtrip_h8() {
+        let token = [0xAB; 32];
+        let amount = u128::MAX;
+        let receiver = [0xCD; 32];
+        let payload = encode_transfer_payload(&token, amount, &receiver);
+        let (t, a, r) = decode_transfer_payload(&payload).unwrap();
+        assert_eq!(t, token);
+        assert_eq!(a, amount);
+        assert_eq!(r, receiver);
+    }
+
+    #[test]
+    fn test_decode_payload_wrong_size_h8() {
+        assert_eq!(decode_transfer_payload(&[0u8; 79]), Err(BridgeError::MalformedPayload));
+        assert_eq!(decode_transfer_payload(&[0u8; 81]), Err(BridgeError::MalformedPayload));
+    }
+
+    #[test]
+    fn test_find_cheapest_path_same_chain_h8() {
+        let chains = default_chains();
+        let result = find_cheapest_path(&chains, 1, 1);
+        assert_eq!(result, Err(BridgeError::SameChain { chain_id: 1 }));
+    }
+
+    #[test]
+    fn test_find_cheapest_path_direct_cheapest_h8() {
+        let chains = default_chains();
+        let path = find_cheapest_path(&chains, 1, 3).unwrap(); // CKB->BSC, BSC=20bps
+        assert_eq!(path, vec![1, 3]);
+    }
+
+    #[test]
+    fn test_is_message_expired_exact_boundary_h8() {
+        assert!(!is_message_expired(100, 100)); // At deadline = not expired
+        assert!(is_message_expired(100, 101));   // Past deadline = expired
+        assert!(!is_message_expired(100, 99));   // Before = not expired
+    }
+
+    #[test]
+    fn test_validate_chain_pair_same_chain_h8() {
+        let chains = default_chains();
+        let result = validate_chain_pair(&chains, 1, 1);
+        assert_eq!(result, Err(BridgeError::SameChain { chain_id: 1 }));
+    }
 }

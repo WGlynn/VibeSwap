@@ -2640,4 +2640,351 @@ mod tests {
         let v = volatility(&[1, 10000, 1, 10000]);
         assert!(v > 5000);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_create_monitor_custom_h8() {
+        let m = create_monitor(500, 30_000);
+        assert_eq!(m.max_samples, 500);
+        assert_eq!(m.check_interval_ms, 30_000);
+        assert!(m.samples.is_empty());
+        assert!(m.thresholds.is_empty());
+        assert!(m.alerts.is_empty());
+    }
+
+    #[test]
+    fn test_default_monitor_h8() {
+        let m = default_monitor();
+        assert_eq!(m.max_samples, DEFAULT_MAX_SAMPLES);
+        assert_eq!(m.check_interval_ms, DEFAULT_CHECK_INTERVAL_MS);
+    }
+
+    #[test]
+    fn test_add_threshold_valid_h8() {
+        let mut m = default_monitor();
+        let t = make_threshold(MetricType::Tvl);
+        assert!(add_threshold(&mut m, t).is_ok());
+        assert_eq!(m.thresholds.len(), 1);
+    }
+
+    #[test]
+    fn test_add_threshold_invalid_critical_below_warning_h8() {
+        let mut m = default_monitor();
+        let t = AlertThreshold {
+            metric_type: MetricType::Tvl,
+            warning_above: Some(100),
+            warning_below: None,
+            critical_above: Some(50), // critical < warning = invalid
+            critical_below: None,
+            cooldown_ms: 1000,
+            last_triggered: 0,
+        };
+        assert_eq!(add_threshold(&mut m, t), Err(MonitorError::InvalidThreshold));
+    }
+
+    #[test]
+    fn test_add_threshold_replaces_existing_h8() {
+        let mut m = default_monitor();
+        let t1 = make_threshold(MetricType::Tvl);
+        let mut t2 = make_threshold(MetricType::Tvl);
+        t2.warning_above = Some(9999);
+        add_threshold(&mut m, t1).unwrap();
+        add_threshold(&mut m, t2).unwrap();
+        assert_eq!(m.thresholds.len(), 1);
+        assert_eq!(m.thresholds[0].warning_above, Some(9999));
+    }
+
+    #[test]
+    fn test_remove_threshold_not_found_h8() {
+        let mut m = default_monitor();
+        let result = remove_threshold(&mut m, &MetricType::Tvl);
+        assert_eq!(result, Err(MonitorError::ThresholdNotFound));
+    }
+
+    #[test]
+    fn test_record_sample_trims_h8() {
+        let mut m = create_monitor(3, 1000);
+        for i in 0..5 {
+            record_value(&mut m, MetricType::Tvl, i * 100, src(), i);
+        }
+        assert_eq!(m.samples.len(), 3); // Trimmed to max_samples
+    }
+
+    #[test]
+    fn test_latest_sample_h8() {
+        let mut m = default_monitor();
+        record_value(&mut m, MetricType::Tvl, 100, src(), 1);
+        record_value(&mut m, MetricType::Tvl, 200, src(), 2);
+        record_value(&mut m, MetricType::Volume, 300, src(), 3);
+        let latest = latest_sample(&m, &MetricType::Tvl).unwrap();
+        assert_eq!(latest.value, 200);
+    }
+
+    #[test]
+    fn test_latest_sample_not_found_h8() {
+        let m = default_monitor();
+        assert!(latest_sample(&m, &MetricType::Price).is_none());
+    }
+
+    #[test]
+    fn test_samples_for_metric_h8() {
+        let mut m = default_monitor();
+        record_value(&mut m, MetricType::Tvl, 100, src(), 1);
+        record_value(&mut m, MetricType::Volume, 200, src(), 2);
+        record_value(&mut m, MetricType::Tvl, 300, src(), 3);
+        assert_eq!(samples_for(&m, &MetricType::Tvl).len(), 2);
+        assert_eq!(samples_for(&m, &MetricType::Volume).len(), 1);
+    }
+
+    #[test]
+    fn test_samples_in_range_h8() {
+        let mut m = default_monitor();
+        record_value(&mut m, MetricType::Tvl, 100, src(), 10);
+        record_value(&mut m, MetricType::Tvl, 200, src(), 20);
+        record_value(&mut m, MetricType::Tvl, 300, src(), 30);
+        let range = samples_in_range(&m, &MetricType::Tvl, 15, 25);
+        assert_eq!(range.len(), 1);
+        assert_eq!(range[0].value, 200);
+    }
+
+    #[test]
+    fn test_sample_count_h8() {
+        let mut m = default_monitor();
+        record_value(&mut m, MetricType::Tvl, 100, src(), 1);
+        record_value(&mut m, MetricType::Tvl, 200, src(), 2);
+        assert_eq!(sample_count(&m, &MetricType::Tvl), 2);
+        assert_eq!(sample_count(&m, &MetricType::Price), 0);
+    }
+
+    #[test]
+    fn test_evaluate_sample_critical_above_h8() {
+        let s = make_sample(MetricType::Tvl, 20000, 100);
+        let t = make_threshold(MetricType::Tvl); // critical_above=15000
+        let alert = evaluate_sample(&s, &t, 100).unwrap();
+        assert_eq!(alert.status, HealthStatus::Critical);
+    }
+
+    #[test]
+    fn test_evaluate_sample_warning_below_h8() {
+        let s = make_sample(MetricType::Tvl, 500, 100);
+        let t = make_threshold(MetricType::Tvl); // warning_below=1000
+        let alert = evaluate_sample(&s, &t, 100).unwrap();
+        assert_eq!(alert.status, HealthStatus::Warning);
+    }
+
+    #[test]
+    fn test_evaluate_sample_no_alert_h8() {
+        let s = make_sample(MetricType::Tvl, 5000, 100);
+        let t = make_threshold(MetricType::Tvl);
+        assert!(evaluate_sample(&s, &t, 100).is_none());
+    }
+
+    #[test]
+    fn test_acknowledge_alert_h8() {
+        let mut m = default_monitor();
+        let a = Alert {
+            alert_id: 0, metric_type: MetricType::Tvl,
+            status: HealthStatus::Warning, value: 500, threshold: 1000,
+            timestamp: 100, source: src(), acknowledged: false,
+        };
+        let id = trigger_alert(&mut m, a);
+        assert!(acknowledge_alert(&mut m, id).is_ok());
+        assert!(m.alerts[0].acknowledged);
+    }
+
+    #[test]
+    fn test_acknowledge_alert_not_found_h8() {
+        let mut m = default_monitor();
+        assert_eq!(acknowledge_alert(&mut m, 999), Err(MonitorError::AlertNotFound));
+    }
+
+    #[test]
+    fn test_resolve_alert_h8() {
+        let mut m = default_monitor();
+        let a = Alert {
+            alert_id: 0, metric_type: MetricType::Tvl,
+            status: HealthStatus::Warning, value: 500, threshold: 1000,
+            timestamp: 100, source: src(), acknowledged: false,
+        };
+        let id = trigger_alert(&mut m, a);
+        assert!(resolve_alert(&mut m, id).is_ok());
+        assert!(m.alerts.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_alert_not_found_h8() {
+        let mut m = default_monitor();
+        assert_eq!(resolve_alert(&mut m, 999), Err(MonitorError::AlertNotFound));
+    }
+
+    #[test]
+    fn test_detect_anomaly_empty_h8() {
+        let result = detect_anomaly(&[], 100);
+        assert!(!result.is_anomaly);
+        assert_eq!(result.expected, 0);
+    }
+
+    #[test]
+    fn test_detect_anomaly_single_sample_h8() {
+        let result = detect_anomaly(&[100], 200);
+        assert!(!result.is_anomaly); // Not enough samples for z-score
+        assert_eq!(result.expected, 100);
+    }
+
+    #[test]
+    fn test_detect_anomaly_normal_value_h8() {
+        let samples = vec![100, 102, 98, 101, 99, 100, 103, 97];
+        let result = detect_anomaly(&samples, 101);
+        assert!(!result.is_anomaly);
+    }
+
+    #[test]
+    fn test_moving_average_empty_h8() {
+        assert!(moving_average(&[], 3).is_empty());
+        assert!(moving_average(&[1, 2, 3], 0).is_empty());
+    }
+
+    #[test]
+    fn test_moving_average_window_one_h8() {
+        let result = moving_average(&[10, 20, 30], 1);
+        assert_eq!(result, vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn test_exponential_moving_average_alpha_over_bps_h8() {
+        let result = exponential_moving_average(&[100, 200], BPS + 1);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_rate_of_change_h8() {
+        let result = rate_of_change(&[100, 150, 120]);
+        assert_eq!(result, vec![50, -30]);
+    }
+
+    #[test]
+    fn test_rate_of_change_single_h8() {
+        assert!(rate_of_change(&[100]).is_empty());
+    }
+
+    #[test]
+    fn test_is_trending_up_h8() {
+        assert!(is_trending_up(&[1, 2, 3, 4, 5], 3));
+        assert!(!is_trending_up(&[1, 2, 5, 4, 5], 3)); // 4 < 5 then 5 > 4, but 4 < 5 breaks
+    }
+
+    #[test]
+    fn test_is_trending_down_h8() {
+        assert!(is_trending_down(&[5, 4, 3, 2, 1], 3));
+        assert!(!is_trending_down(&[5, 4, 1, 2, 1], 3)); // 2 > 1 breaks
+    }
+
+    #[test]
+    fn test_composite_score_all_healthy_h8() {
+        let score = composite_score(10000, 10000, 10000, 10000);
+        assert_eq!(score, 10000);
+    }
+
+    #[test]
+    fn test_composite_score_weighted_h8() {
+        // pool=40%, oracle=30%, gov=15%, network=15%
+        let score = composite_score(10000, 0, 0, 0);
+        assert_eq!(score, 4000);
+    }
+
+    #[test]
+    fn test_status_from_score_h8() {
+        assert_eq!(status_from_score(9500), HealthStatus::Healthy);
+        assert_eq!(status_from_score(8000), HealthStatus::Degraded);
+        assert_eq!(status_from_score(6000), HealthStatus::Warning);
+        assert_eq!(status_from_score(3500), HealthStatus::Critical);
+        assert_eq!(status_from_score(2000), HealthStatus::Down);
+    }
+
+    #[test]
+    fn test_worst_status_h8() {
+        let statuses = vec![HealthStatus::Healthy, HealthStatus::Warning, HealthStatus::Degraded];
+        assert_eq!(worst_status(&statuses), HealthStatus::Warning);
+    }
+
+    #[test]
+    fn test_worst_status_empty_h8() {
+        assert_eq!(worst_status(&[]), HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_trim_samples_h8() {
+        let mut m = default_monitor();
+        record_value(&mut m, MetricType::Tvl, 100, src(), 10);
+        record_value(&mut m, MetricType::Tvl, 200, src(), 20);
+        record_value(&mut m, MetricType::Tvl, 300, src(), 30);
+        let removed = trim_samples(&mut m, 15, 30);
+        assert_eq!(removed, 1); // sample at t=10 removed
+        assert_eq!(m.samples.len(), 2);
+    }
+
+    #[test]
+    fn test_clear_resolved_alerts_h8() {
+        let mut m = default_monitor();
+        let a1 = Alert {
+            alert_id: 0, metric_type: MetricType::Tvl,
+            status: HealthStatus::Warning, value: 0, threshold: 0,
+            timestamp: 100, source: src(), acknowledged: true,
+        };
+        let a2 = Alert {
+            alert_id: 0, metric_type: MetricType::Volume,
+            status: HealthStatus::Critical, value: 0, threshold: 0,
+            timestamp: 100, source: src(), acknowledged: false,
+        };
+        trigger_alert(&mut m, a1);
+        trigger_alert(&mut m, a2);
+        let removed = clear_resolved_alerts(&mut m);
+        assert_eq!(removed, 1);
+        assert_eq!(m.alerts.len(), 1);
+    }
+
+    #[test]
+    fn test_recommend_action_h8() {
+        assert_eq!(recommend_action(&HealthStatus::Healthy), "no action needed");
+        assert_eq!(recommend_action(&HealthStatus::Down), "emergency protocol: halt operations, escalate");
+    }
+
+    #[test]
+    fn test_detect_spike_h8() {
+        let samples = vec![100, 100, 500, 100]; // 400% jump at index 2
+        let spikes = detect_spike(&samples, 1000); // 10% threshold
+        assert!(spikes.contains(&2));
+        assert!(spikes.contains(&3));
+    }
+
+    #[test]
+    fn test_detect_spike_no_spikes_h8() {
+        let samples = vec![100, 101, 102, 103];
+        let spikes = detect_spike(&samples, 500); // 5% threshold
+        assert!(spikes.is_empty());
+    }
+
+    #[test]
+    fn test_correlation_identical_series_h8() {
+        let a = vec![1, 2, 3, 4, 5];
+        let corr = correlation(&a, &a);
+        assert!(corr >= 9900); // ~1.0
+    }
+
+    #[test]
+    fn test_correlation_different_lengths_h8() {
+        assert_eq!(correlation(&[1, 2, 3], &[1, 2]), 0);
+    }
+
+    #[test]
+    fn test_volatility_constant_h8() {
+        let v = volatility(&[100, 100, 100, 100]);
+        assert_eq!(v, 0);
+    }
+
+    #[test]
+    fn test_volatility_single_sample_h8() {
+        assert_eq!(volatility(&[100]), 0);
+    }
 }

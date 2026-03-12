@@ -2788,4 +2788,239 @@ mod tests {
         let r2 = fee_revenue_projection(&pool, 1_000_000 * PRECISION, 20);
         assert_eq!(r2, r1 * 2);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_spot_price_zero_reserve0_h8() {
+        let pool = make_pool(0, 1_000_000, 30, 1000);
+        assert_eq!(spot_price(&pool), 0);
+    }
+
+    #[test]
+    fn test_spot_price_zero_reserve1_h8() {
+        let pool = make_pool(1_000_000, 0, 30, 1000);
+        assert_eq!(spot_price(&pool), 0);
+    }
+
+    #[test]
+    fn test_simulate_swap_zero_amount_h8() {
+        let pool = standard_pool();
+        let result = simulate_swap(&pool, 0, true);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_simulate_swap_empty_pool_h8() {
+        let pool = make_pool(0, 0, 30, 0);
+        let result = simulate_swap(&pool, 1000, true);
+        assert_eq!(result.err(), Some(SimError::EmptyPool));
+    }
+
+    #[test]
+    fn test_simulate_swap_below_min_liquidity_h8() {
+        let pool = make_pool(500, 500, 30, 100); // Below MIN_LIQUIDITY=1000
+        let result = simulate_swap(&pool, 100, true);
+        assert_eq!(result.err(), Some(SimError::InsufficientLiquidity));
+    }
+
+    #[test]
+    fn test_simulate_swap_preserves_k_invariant_h8() {
+        // Use small pool to avoid u128 overflow in k calculation
+        let pool = make_pool(1_000_000, 1_000_000, 30, 1_000_000);
+        let k_before = pool.reserve0 * pool.reserve1;
+        let result = simulate_swap(&pool, 10_000, true).unwrap();
+        let k_after = result.new_reserve0 * result.new_reserve1;
+        // After fee, k should increase (fees add to reserves)
+        assert!(k_after >= k_before);
+    }
+
+    #[test]
+    fn test_simulate_swap_fee_deducted_h8() {
+        let pool = standard_pool();
+        let result = simulate_swap(&pool, 10_000 * PRECISION, true).unwrap();
+        assert!(result.fee_paid > 0);
+        let expected_fee = vibeswap_math::mul_div(10_000 * PRECISION, 30, 10_000);
+        assert_eq!(result.fee_paid, expected_fee);
+    }
+
+    #[test]
+    fn test_simulate_swap_token1_in_h8() {
+        let pool = standard_pool();
+        let result = simulate_swap(&pool, 10_000 * PRECISION, false).unwrap();
+        assert!(result.amount_out > 0);
+        // Token1 in: reserve0 decreases, reserve1 increases
+        assert!(result.new_reserve0 < pool.reserve0);
+        assert!(result.new_reserve1 > pool.reserve1);
+    }
+
+    #[test]
+    fn test_pool_after_swap_updates_reserves_h8() {
+        let pool = standard_pool();
+        let result = simulate_swap(&pool, 10_000 * PRECISION, true).unwrap();
+        let new_pool = pool_after_swap(&pool, &result, true);
+        assert_eq!(new_pool.reserve0, result.new_reserve0);
+        assert_eq!(new_pool.reserve1, result.new_reserve1);
+        assert_eq!(new_pool.fee_rate_bps, pool.fee_rate_bps);
+    }
+
+    #[test]
+    fn test_simulate_add_liquidity_zero_amounts_h8() {
+        let pool = standard_pool();
+        let result = simulate_add_liquidity(&pool, 0, 1000);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_simulate_add_liquidity_first_deposit_h8() {
+        let pool = make_pool(0, 0, 30, 0);
+        let result = simulate_add_liquidity(&pool, 1_000_000, 1_000_000).unwrap();
+        assert!(result.lp_minted > 0);
+        assert_eq!(result.new_reserve0, 1_000_000);
+        assert_eq!(result.new_reserve1, 1_000_000);
+    }
+
+    #[test]
+    fn test_simulate_add_liquidity_first_deposit_too_small_h8() {
+        let pool = make_pool(0, 0, 30, 0);
+        let result = simulate_add_liquidity(&pool, 1, 1);
+        assert_eq!(result.err(), Some(SimError::InsufficientLiquidity));
+    }
+
+    #[test]
+    fn test_simulate_remove_liquidity_zero_lp_h8() {
+        let pool = standard_pool();
+        let result = simulate_remove_liquidity(&pool, 0);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_simulate_remove_liquidity_excess_h8() {
+        let pool = standard_pool();
+        let result = simulate_remove_liquidity(&pool, pool.total_lp + 1);
+        assert_eq!(result.err(), Some(SimError::InsufficientLiquidity));
+    }
+
+    #[test]
+    fn test_simulate_remove_liquidity_half_h8() {
+        let pool = standard_pool();
+        let half_lp = pool.total_lp / 2;
+        let result = simulate_remove_liquidity(&pool, half_lp).unwrap();
+        // Should get roughly half of each reserve
+        let expected_0 = vibeswap_math::mul_div(pool.reserve0, half_lp, pool.total_lp);
+        assert_eq!(result.amount0_out, expected_0);
+    }
+
+    #[test]
+    fn test_simulate_multi_hop_empty_pools_h8() {
+        let result = simulate_multi_hop(&[], &[[0u8; 32]], 1000);
+        assert_eq!(result.err(), Some(SimError::NoPath));
+    }
+
+    #[test]
+    fn test_simulate_multi_hop_wrong_path_len_h8() {
+        let pool = standard_pool();
+        let result = simulate_multi_hop(&[pool], &[[0u8; 32]], 1000);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_simulate_multi_hop_zero_amount_h8() {
+        let pool = standard_pool();
+        let result = simulate_multi_hop(&[pool], &[[0u8; 32], [1u8; 32]], 0);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_simulate_batch_auction_empty_h8() {
+        let result = simulate_batch_auction(&[], &[]);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_simulate_batch_auction_only_buys_h8() {
+        let buys = vec![(1000, PRECISION)];
+        let result = simulate_batch_auction(&buys, &[]).unwrap();
+        assert_eq!(result.total_volume, 0); // No sells to match
+        assert_eq!(result.clearing_price, PRECISION);
+    }
+
+    #[test]
+    fn test_simulate_price_impact_zero_amount_h8() {
+        let pool = standard_pool();
+        assert_eq!(simulate_price_impact(&pool, 0, true), 0);
+    }
+
+    #[test]
+    fn test_simulate_price_impact_empty_pool_h8() {
+        let pool = make_pool(0, 0, 30, 0);
+        assert_eq!(simulate_price_impact(&pool, 1000, true), 0);
+    }
+
+    #[test]
+    fn test_arb_profit_zero_amount_h8() {
+        let pool = standard_pool();
+        let result = simulate_arb_profit(&pool, &pool, 0);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_liquidation_cascade_empty_vaults_h8() {
+        let pool = standard_pool();
+        let result = simulate_liquidation_cascade(&[], 500, &pool);
+        assert_eq!(result.liquidations_triggered, 0);
+        assert_eq!(result.cascade_depth, 0);
+    }
+
+    #[test]
+    fn test_liquidation_cascade_zero_drop_h8() {
+        let pool = standard_pool();
+        let vaults = vec![(1000 * PRECISION, 500 * PRECISION, 15000)];
+        let result = simulate_liquidation_cascade(&vaults, 0, &pool);
+        assert_eq!(result.liquidations_triggered, 0);
+    }
+
+    #[test]
+    fn test_optimal_swap_amount_zero_price_h8() {
+        let pool = standard_pool();
+        let result = optimal_swap_amount(&pool, 0);
+        assert_eq!(result.err(), Some(SimError::InvalidPrice));
+    }
+
+    #[test]
+    fn test_optimal_swap_amount_empty_pool_h8() {
+        let pool = make_pool(0, 0, 30, 0);
+        let result = optimal_swap_amount(&pool, PRECISION);
+        assert_eq!(result.err(), Some(SimError::EmptyPool));
+    }
+
+    #[test]
+    fn test_sandwich_profit_zero_victim_h8() {
+        let pool = standard_pool();
+        let result = sandwich_profit(&pool, 0, true, 1000);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_sandwich_profit_zero_attacker_h8() {
+        let pool = standard_pool();
+        let result = sandwich_profit(&pool, 1000, true, 0);
+        assert_eq!(result.err(), Some(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_impermanent_loss_zero_initial_price_h8() {
+        let (lp, hodl, il) = impermanent_loss_sim(0, PRECISION, 1_000_000);
+        assert_eq!(lp, 0);
+        assert_eq!(hodl, 0);
+        assert_eq!(il, 0);
+    }
+
+    #[test]
+    fn test_impermanent_loss_2x_price_h8() {
+        let (lp_val, hodl_val, il_bps) = impermanent_loss_sim(PRECISION, 2 * PRECISION, 1_000_000 * PRECISION);
+        // At 2x price, IL should be ~5.72% = ~572 bps
+        assert!(il_bps > 500 && il_bps < 650);
+        assert!(hodl_val > lp_val);
+    }
 }

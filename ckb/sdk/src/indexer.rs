@@ -2335,4 +2335,246 @@ mod tests {
         assert!(synced); // 5 blocks behind <= 10 tolerance
         assert!(progress > 9900);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_build_type_filter_preserves_code_hash_h8() {
+        let hash = [0xFF; 32];
+        let filter = build_type_filter(&hash, None);
+        assert_eq!(filter.code_hash, [0xFF; 32]);
+        assert_eq!(filter.hash_type, 1);
+    }
+
+    #[test]
+    fn test_build_lock_filter_preserves_code_hash_h8() {
+        let hash = [0x00; 32];
+        let filter = build_lock_filter(&hash, Some(&[1, 2, 3]));
+        assert_eq!(filter.code_hash, [0x00; 32]);
+        assert_eq!(filter.hash_type, 0);
+        assert_eq!(filter.args_prefix.unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_classify_cell_pool_h8() {
+        let map = make_type_map();
+        assert_eq!(classify_cell(&[0x01; 32], &map), CellTypeTag::Pool);
+    }
+
+    #[test]
+    fn test_classify_cell_commit_h8() {
+        let map = make_type_map();
+        assert_eq!(classify_cell(&[0x02; 32], &map), CellTypeTag::Commit);
+    }
+
+    #[test]
+    fn test_classify_cell_unknown_h8() {
+        let map = make_type_map();
+        assert_eq!(classify_cell(&[0xFF; 32], &map), CellTypeTag::Unknown);
+    }
+
+    #[test]
+    fn test_classify_cell_all_types_h8() {
+        let map = make_type_map();
+        assert_eq!(classify_cell(&[0x03; 32], &map), CellTypeTag::LpPosition);
+        assert_eq!(classify_cell(&[0x04; 32], &map), CellTypeTag::LendingPool);
+        assert_eq!(classify_cell(&[0x05; 32], &map), CellTypeTag::Vault);
+        assert_eq!(classify_cell(&[0x06; 32], &map), CellTypeTag::Insurance);
+        assert_eq!(classify_cell(&[0x07; 32], &map), CellTypeTag::Prediction);
+        assert_eq!(classify_cell(&[0x08; 32], &map), CellTypeTag::Oracle);
+        assert_eq!(classify_cell(&[0x09; 32], &map), CellTypeTag::Knowledge);
+        assert_eq!(classify_cell(&[0x0A; 32], &map), CellTypeTag::Config);
+    }
+
+    #[test]
+    fn test_filter_by_capacity_empty_h8() {
+        let result = filter_by_capacity(&[], 0, u64::MAX);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_by_capacity_inclusive_h8() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+            make_cell(3, 0, 300, 1, 0),
+        ];
+        let result = filter_by_capacity(&cells, 100, 200);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_by_data_len_h8() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 50),
+            make_cell(2, 0, 200, 1, 100),
+            make_cell(3, 0, 300, 1, 200),
+        ];
+        let result = filter_by_data_len(&cells, 50, 100);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_by_block_range_h8() {
+        let cells = vec![
+            make_cell(1, 0, 100, 10, 0),
+            make_cell(2, 0, 200, 20, 0),
+            make_cell(3, 0, 300, 30, 0),
+        ];
+        let result = filter_by_block_range(&cells, 15, 25);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].block_number, 20);
+    }
+
+    #[test]
+    fn test_sort_cells_by_capacity_asc_h8() {
+        let mut cells = vec![
+            make_cell(1, 0, 300, 1, 0),
+            make_cell(2, 0, 100, 1, 0),
+            make_cell(3, 0, 200, 1, 0),
+        ];
+        sort_cells(&mut cells, SortBy::Capacity, SortOrder::Asc);
+        assert_eq!(cells[0].capacity, 100);
+        assert_eq!(cells[2].capacity, 300);
+    }
+
+    #[test]
+    fn test_sort_cells_by_block_desc_h8() {
+        let mut cells = vec![
+            make_cell(1, 0, 100, 10, 0),
+            make_cell(2, 0, 100, 30, 0),
+            make_cell(3, 0, 100, 20, 0),
+        ];
+        sort_cells(&mut cells, SortBy::BlockNumber, SortOrder::Desc);
+        assert_eq!(cells[0].block_number, 30);
+        assert_eq!(cells[2].block_number, 10);
+    }
+
+    #[test]
+    fn test_paginate_first_page_h8() {
+        let cells: Vec<CellInfo> = (0..25).map(|i| make_cell(i as u8, 0, 100, 1, 0)).collect();
+        let page = paginate(&cells, 0, 10);
+        assert_eq!(page.cells.len(), 10);
+        assert!(page.has_more);
+        assert_eq!(page.total, 25);
+    }
+
+    #[test]
+    fn test_paginate_last_page_h8() {
+        let cells: Vec<CellInfo> = (0..25).map(|i| make_cell(i as u8, 0, 100, 1, 0)).collect();
+        let page = paginate(&cells, 2, 10);
+        assert_eq!(page.cells.len(), 5);
+        assert!(!page.has_more);
+    }
+
+    #[test]
+    fn test_paginate_zero_page_size_h8() {
+        let cells: Vec<CellInfo> = (0..5).map(|i| make_cell(i as u8, 0, 100, 1, 0)).collect();
+        let page = paginate(&cells, 0, 0);
+        // Should use DEFAULT_PAGE_SIZE
+        assert_eq!(page.cells.len(), 5); // All fit in default page
+    }
+
+    #[test]
+    fn test_paginate_beyond_end_h8() {
+        let cells: Vec<CellInfo> = (0..5).map(|i| make_cell(i as u8, 0, 100, 1, 0)).collect();
+        let page = paginate(&cells, 100, 10);
+        assert!(page.cells.is_empty());
+        assert!(!page.has_more);
+    }
+
+    #[test]
+    fn test_deduplicate_no_dupes_h8() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(2, 0, 200, 1, 0),
+        ];
+        let result = deduplicate(&cells);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_deduplicate_with_dupes_h8() {
+        let cells = vec![
+            make_cell(1, 0, 100, 1, 0),
+            make_cell(1, 0, 100, 1, 0), // same tx_hash and index
+            make_cell(2, 0, 200, 1, 0),
+        ];
+        let result = deduplicate(&cells);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_find_user_cells_h8() {
+        let cells = vec![
+            make_cell_with_lock(1, 0, 100, 1, 0xAA),
+            make_cell_with_lock(2, 0, 200, 1, 0xBB),
+            make_cell_with_lock(3, 0, 300, 1, 0xAA),
+        ];
+        let result = find_user_cells(&cells, &[0xAA; 32]);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_sync_progress_fully_synced_h8() {
+        assert_eq!(sync_progress(1000, 1000), 10_000);
+    }
+
+    #[test]
+    fn test_sync_progress_zero_tip_h8() {
+        assert_eq!(sync_progress(0, 0), 10_000);
+    }
+
+    #[test]
+    fn test_sync_progress_half_h8() {
+        assert_eq!(sync_progress(500, 1000), 5000);
+    }
+
+    #[test]
+    fn test_is_synced_exact_h8() {
+        assert!(is_synced(1000, 1000, 10));
+    }
+
+    #[test]
+    fn test_is_synced_within_tolerance_h8() {
+        assert!(is_synced(990, 1000, 10));
+    }
+
+    #[test]
+    fn test_is_synced_outside_tolerance_h8() {
+        assert!(!is_synced(989, 1000, 10));
+    }
+
+    #[test]
+    fn test_cell_age_blocks_h8() {
+        assert_eq!(cell_age_blocks(100, 200), 100);
+        assert_eq!(cell_age_blocks(200, 100), 0); // saturating
+    }
+
+    #[test]
+    fn test_estimate_cell_count_zero_selectivity_h8() {
+        assert_eq!(estimate_cell_count(10_000, 0), 0);
+    }
+
+    #[test]
+    fn test_estimate_cell_count_full_selectivity_h8() {
+        assert_eq!(estimate_cell_count(10_000, 10_000), 10_000);
+    }
+
+    #[test]
+    fn test_estimate_cell_count_one_percent_h8() {
+        assert_eq!(estimate_cell_count(10_000, 100), 100);
+    }
+
+    #[test]
+    fn test_merge_pages_both_non_empty_h8() {
+        let c1 = make_cell(1, 0, 100, 1, 0);
+        let c2 = make_cell(2, 0, 200, 1, 0);
+        let a = CellPage { cells: vec![c1], total: 1, has_more: false, cursor: None };
+        let b = CellPage { cells: vec![c2], total: 1, has_more: false, cursor: Some(5) };
+        let merged = merge_pages(&a, &b);
+        assert_eq!(merged.cells.len(), 2);
+        assert_eq!(merged.total, 2);
+        assert_eq!(merged.cursor, Some(5));
+    }
 }

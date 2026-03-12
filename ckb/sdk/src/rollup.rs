@@ -2649,4 +2649,308 @@ mod tests {
         assert_eq!(isqrt(8), 2);
         assert_eq!(isqrt(15), 3);
     }
+
+    // ============ Hardening Round 8 ============
+
+    #[test]
+    fn test_default_config_daily_h8() {
+        let c = default_config(RollupPeriod::Daily);
+        assert_eq!(c.period, RollupPeriod::Daily);
+        assert!(c.max_records_per_rollup > 0);
+    }
+
+    #[test]
+    fn test_period_duration_hourly_h8() {
+        assert_eq!(period_duration_ms(&RollupPeriod::Hourly), HOUR_MS);
+    }
+
+    #[test]
+    fn test_period_duration_daily_h8() {
+        assert_eq!(period_duration_ms(&RollupPeriod::Daily), DAY_MS);
+    }
+
+    #[test]
+    fn test_period_duration_weekly_h8() {
+        assert_eq!(period_duration_ms(&RollupPeriod::Weekly), WEEK_MS);
+    }
+
+    #[test]
+    fn test_period_duration_custom_h8() {
+        assert_eq!(period_duration_ms(&RollupPeriod::Custom(12345)), 12345);
+    }
+
+    #[test]
+    fn test_validate_config_zero_records_h8() {
+        let mut c = default_config(RollupPeriod::Hourly);
+        c.max_records_per_rollup = 0;
+        assert_eq!(validate_config(&c), Err(RollupError::ConfigError));
+    }
+
+    #[test]
+    fn test_validate_config_custom_zero_period_h8() {
+        let c = default_config(RollupPeriod::Custom(0));
+        assert_eq!(validate_config(&c), Err(RollupError::InvalidPeriod));
+    }
+
+    #[test]
+    fn test_rollup_records_empty_h8() {
+        let result = rollup_records(&[], &RollupPeriod::Hourly);
+        assert!(matches!(result, Err(RollupError::EmptyRecords)));
+    }
+
+    #[test]
+    fn test_create_summary_empty_h8() {
+        let result = create_summary(&[], 0, HOUR_MS, RollupPeriod::Hourly);
+        assert!(matches!(result, Err(RollupError::EmptyRecords)));
+    }
+
+    #[test]
+    fn test_create_summary_single_record_h8() {
+        let records = vec![make_record(100, 1000, 2000, true)];
+        let summary = create_summary(&records, 0, HOUR_MS, RollupPeriod::Hourly).unwrap();
+        assert_eq!(summary.tx_count, 1);
+        assert_eq!(summary.buy_count, 1);
+        assert_eq!(summary.sell_count, 0);
+        assert_eq!(summary.total_volume_in, 1000);
+    }
+
+    #[test]
+    fn test_merge_summaries_overlap_h8() {
+        let a = make_summary(0, HOUR_MS, RollupPeriod::Hourly, 5, 1000);
+        let b = make_summary(HOUR_MS / 2, HOUR_MS + HOUR_MS / 2, RollupPeriod::Hourly, 5, 2000);
+        let result = merge_summaries(&a, &b);
+        assert!(matches!(result, Err(RollupError::OverlapDetected)));
+    }
+
+    #[test]
+    fn test_merge_summaries_valid_h8() {
+        let a = make_hourly_summary(0, 1000);
+        let b = make_hourly_summary(1, 2000);
+        let merged = merge_summaries(&a, &b).unwrap();
+        assert_eq!(merged.total_volume_in, 3000);
+        assert_eq!(merged.period_start, a.period_start);
+        assert_eq!(merged.period_end, b.period_end);
+    }
+
+    #[test]
+    fn test_period_for_timestamp_h8() {
+        let (start, end) = period_for_timestamp(HOUR_MS + 500, &RollupPeriod::Hourly);
+        assert_eq!(start, HOUR_MS);
+        assert_eq!(end, 2 * HOUR_MS);
+    }
+
+    #[test]
+    fn test_compute_vwap_empty_h8() {
+        assert_eq!(compute_vwap(&[]), 0);
+    }
+
+    #[test]
+    fn test_compute_vwap_zero_amount_in_h8() {
+        let records = vec![make_record(100, 0, 1000, true)];
+        assert_eq!(compute_vwap(&records), 0);
+    }
+
+    #[test]
+    fn test_compute_ohlc_single_record_h8() {
+        let records = vec![make_record(100, 1000, 2000, true)];
+        let (open, high, low, close) = compute_ohlc(&records);
+        assert_eq!(open, close); // single record: open==close
+        assert_eq!(high, low);   // single record: high==low
+    }
+
+    #[test]
+    fn test_price_from_amounts_zero_in_h8() {
+        assert_eq!(price_from_amounts(0, 1000), 0);
+    }
+
+    #[test]
+    fn test_price_from_amounts_valid_h8() {
+        let price = price_from_amounts(1000, 2000);
+        assert_eq!(price, (2000u128 * PRICE_SCALE / 1000) as u64);
+    }
+
+    #[test]
+    fn test_total_volume_empty_h8() {
+        assert_eq!(total_volume(&[]), 0);
+    }
+
+    #[test]
+    fn test_avg_volume_per_period_empty_h8() {
+        assert_eq!(avg_volume_per_period(&[]), 0);
+    }
+
+    #[test]
+    fn test_volume_trend_single_h8() {
+        assert_eq!(volume_trend(&[make_hourly_summary(0, 1000)]), 0);
+    }
+
+    #[test]
+    fn test_volume_trend_increasing_h8() {
+        let summaries = vec![
+            make_hourly_summary(0, 1000),
+            make_hourly_summary(1, 1000),
+            make_hourly_summary(2, 2000),
+            make_hourly_summary(3, 2000),
+        ];
+        assert!(volume_trend(&summaries) > 0);
+    }
+
+    #[test]
+    fn test_peak_volume_period_h8() {
+        let summaries = vec![
+            make_hourly_summary(0, 1000),
+            make_hourly_summary(1, 5000),
+            make_hourly_summary(2, 3000),
+        ];
+        assert_eq!(peak_volume_period(&summaries), Some(1));
+    }
+
+    #[test]
+    fn test_peak_volume_period_empty_h8() {
+        assert_eq!(peak_volume_period(&[]), None);
+    }
+
+    #[test]
+    fn test_unique_traders_h8() {
+        let records = vec![
+            make_record_with_sender(100, 1000, 2000, true, [1u8; 32]),
+            make_record_with_sender(200, 1000, 2000, true, [2u8; 32]),
+            make_record_with_sender(300, 1000, 2000, true, [1u8; 32]),
+        ];
+        assert_eq!(unique_traders(&records), 2);
+    }
+
+    #[test]
+    fn test_buy_sell_ratio_balanced_h8() {
+        let s = make_summary(0, HOUR_MS, RollupPeriod::Hourly, 10, 1000);
+        let (buy_bps, sell_bps) = buy_sell_ratio(&s);
+        assert_eq!(buy_bps + sell_bps, 10000);
+    }
+
+    #[test]
+    fn test_buy_sell_ratio_zero_count_h8() {
+        let mut s = make_summary(0, HOUR_MS, RollupPeriod::Hourly, 0, 0);
+        s.buy_count = 0;
+        s.sell_count = 0;
+        let (buy_bps, sell_bps) = buy_sell_ratio(&s);
+        assert_eq!(buy_bps, 5000);
+        assert_eq!(sell_bps, 5000);
+    }
+
+    #[test]
+    fn test_avg_trade_size_zero_tx_h8() {
+        let mut s = make_hourly_summary(0, 1000);
+        s.tx_count = 0;
+        assert_eq!(avg_trade_size(&s), 0);
+    }
+
+    #[test]
+    fn test_compression_ratio_zero_summaries_h8() {
+        assert_eq!(compression_ratio(100, 0), 0);
+    }
+
+    #[test]
+    fn test_compression_ratio_valid_h8() {
+        assert_eq!(compression_ratio(1000, 10), 1_000_000); // 100x
+    }
+
+    #[test]
+    fn test_validate_summary_bad_period_h8() {
+        let mut s = make_hourly_summary(0, 1000);
+        s.period_end = s.period_start; // Invalid: end <= start
+        assert_eq!(validate_summary(&s), Err(RollupError::InvalidPeriod));
+    }
+
+    #[test]
+    fn test_validate_sequence_empty_h8() {
+        assert_eq!(validate_sequence(&[]), Err(RollupError::EmptyRecords));
+    }
+
+    #[test]
+    fn test_is_contiguous_h8() {
+        let summaries = vec![make_hourly_summary(0, 1000), make_hourly_summary(1, 2000)];
+        assert!(is_contiguous(&summaries));
+    }
+
+    #[test]
+    fn test_detect_gaps_no_gaps_h8() {
+        let summaries = vec![make_hourly_summary(0, 1000), make_hourly_summary(1, 2000)];
+        assert!(detect_gaps(&summaries).is_empty());
+    }
+
+    #[test]
+    fn test_create_pool_rollup_h8() {
+        let rollup = create_pool_rollup([0xAA; 32]);
+        assert_eq!(rollup.pool_id, [0xAA; 32]);
+        assert!(rollup.summaries.is_empty());
+        assert_eq!(rollup.total_tx_count, 0);
+    }
+
+    #[test]
+    fn test_add_summary_to_rollup_h8() {
+        let mut rollup = create_pool_rollup([0xAA; 32]);
+        let s = make_hourly_summary(0, 1000);
+        assert!(add_summary(&mut rollup, s).is_ok());
+        assert_eq!(rollup.summaries.len(), 1);
+        assert_eq!(rollup.total_volume, 1000);
+    }
+
+    #[test]
+    fn test_add_summary_overlap_h8() {
+        let mut rollup = create_pool_rollup([0xAA; 32]);
+        let s1 = make_hourly_summary(0, 1000);
+        let s2 = make_hourly_summary(0, 2000); // Same period = overlap
+        add_summary(&mut rollup, s1).unwrap();
+        assert!(matches!(add_summary(&mut rollup, s2), Err(RollupError::OverlapDetected)));
+    }
+
+    #[test]
+    fn test_pool_time_span_empty_h8() {
+        let rollup = create_pool_rollup([0xAA; 32]);
+        assert_eq!(pool_time_span_ms(&rollup), 0);
+    }
+
+    #[test]
+    fn test_to_candlestick_h8() {
+        let s = make_hourly_summary(0, 1000);
+        let c = to_candlestick(&s);
+        assert_eq!(c.timestamp, s.period_start);
+        assert_eq!(c.open, s.open_price);
+        assert_eq!(c.high, s.high_price);
+        assert_eq!(c.low, s.low_price);
+        assert_eq!(c.close, s.close_price);
+    }
+
+    #[test]
+    fn test_candlestick_series_len_h8() {
+        let summaries = vec![make_hourly_summary(0, 1000), make_hourly_summary(1, 2000)];
+        let series = candlestick_series(&summaries);
+        assert_eq!(series.len(), 2);
+    }
+
+    #[test]
+    fn test_volume_distribution_even_h8() {
+        let summaries = vec![
+            make_hourly_summary(0, 1000),
+            make_hourly_summary(1, 1000),
+        ];
+        let dist = volume_distribution(&summaries);
+        assert_eq!(dist[0], 5000);
+        assert_eq!(dist[1], 5000);
+    }
+
+    #[test]
+    fn test_summaries_fit_in_cell_h8() {
+        let summaries = vec![make_hourly_summary(0, 1000), make_hourly_summary(1, 2000)];
+        // Each summary is SUMMARY_BYTES=256
+        let fits = summaries_fit_in_cell(&summaries, 300);
+        assert_eq!(fits, 1); // Only 1 fits in 300 bytes
+    }
+
+    #[test]
+    fn test_summaries_fit_in_cell_all_fit_h8() {
+        let summaries = vec![make_hourly_summary(0, 1000), make_hourly_summary(1, 2000)];
+        let fits = summaries_fit_in_cell(&summaries, 1000);
+        assert_eq!(fits, 2);
+    }
 }

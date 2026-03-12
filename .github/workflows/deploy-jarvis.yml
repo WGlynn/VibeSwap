@@ -1,0 +1,32 @@
+name: Deploy Jarvis
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'jarvis-bot/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jarvis-bot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Verify health
+        run: |
+          sleep 20
+          HEALTH=$(curl -sf https://jarvis-vibeswap.fly.dev/health || echo '{"status":"FAILED"}')
+          echo "Health: $HEALTH"
+          echo "$HEALTH" | grep -q '"status":"ok"' || echo "::warning::Health check returned non-ok status"

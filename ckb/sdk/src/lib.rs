@@ -35,6 +35,7 @@ pub mod math_ext;
 pub mod metrics;
 pub mod migration;
 pub mod miner;
+pub mod monitoring;
 pub mod multisig;
 pub mod notify;
 pub mod orderbook;

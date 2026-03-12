@@ -7297,7 +7297,7 @@ async function main() {
           if (digest) {
             await bot.telegram.sendMessage(config.communityGroupId, digest);
           }
-        } catch {}
+        } catch (err) { console.warn(`[digest] Failed: ${err.message}`); }
       }
     }
   }, 60 * 1000); // Check every minute
@@ -7312,13 +7312,13 @@ async function main() {
           // Re-read shard learnings after git pull brings new entries
           await readLearnings();
         }
-      } catch {}
+      } catch (err) { console.warn(`[auto-sync] Failed: ${err.message}`); }
     }, config.autoSyncInterval);
   }
 
   if (config.autoBackupInterval > 0) {
     setInterval(async () => {
-      try { await backupData(); } catch {}
+      try { await backupData(); } catch (err) { console.warn(`[auto-backup] Failed: ${err.message}`); }
     }, config.autoBackupInterval);
   }
 
@@ -7334,7 +7334,7 @@ async function main() {
         }
       }
       await flushReputation();
-    } catch {}
+    } catch (err) { console.warn(`[reputation] Refresh failed: ${err.message}`); }
   }, 10 * 60 * 1000);
 
   // Heartbeat: update every 5 minutes to prove we're alive

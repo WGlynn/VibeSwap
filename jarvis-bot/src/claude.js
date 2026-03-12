@@ -18,6 +18,8 @@ import { processConversation as processCKBConversation, getUserCKB } from './ckb
 import { gate as verificationGate, auditResponse } from './verification-gate.js';
 import { createTask, DEFER_TASK_TOOL, TASK_TOOL_GROUP_NAME, TASK_TOOL_NAMES } from './task-queue.js';
 import { WALLET_TOOLS, WALLET_TOOL_NAMES, handleWalletTool } from './wallet.js';
+import { TRADING_TOOLS, handleTradingTool } from './trading.js';
+const TRADING_TOOL_NAMES = TRADING_TOOLS.map(t => t.name);
 import { SOCIAL_TOOLS, SOCIAL_TOOL_NAMES, handleSocialTool } from './social.js';
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 import { runLocalCRPC } from './crpc.js';
@@ -1590,6 +1592,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     DEFER_TASK_TOOL,
     // ============ Sovereign Wallet — On-Chain Agency ============
     ...WALLET_TOOLS,
+    // ============ Trading — Autonomous DEX Trading ============
+    ...TRADING_TOOLS,
     // ============ Social Presence — Outbound Voice ============
     ...SOCIAL_TOOLS,
     // ============ Proactive Engine — Autonomous Actions ============
@@ -2131,6 +2135,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           console.log('[claude] Tool: crypto_quiz');
         } else if (WALLET_TOOL_NAMES.includes(tb.name)) {
           result = await handleWalletTool(tb.name, tb.input);
+          console.log(`[claude] Tool: ${tb.name}`);
+        } else if (TRADING_TOOL_NAMES.includes(tb.name)) {
+          result = await handleTradingTool(tb.name, tb.input);
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (SOCIAL_TOOL_NAMES.includes(tb.name)) {
           result = await handleSocialTool(tb.name, tb.input);

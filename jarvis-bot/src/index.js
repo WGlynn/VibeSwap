@@ -153,6 +153,7 @@ import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, ge
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
 import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus } from './pantheon.js';
+import { runPrimitiveGate, formatGateResult, getPrimitives, getPrimitiveManifest, getGateHistory } from './primitive-gate.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -1184,6 +1185,12 @@ THEAI PANTHEON (owner-only)
   /pantheon costs — LLM + infra cost breakdown
   /pantheon prune — 24h context prune upstream
   /pantheon clear <agent> — Reset conversation
+
+PRIMITIVE GATE (owner-only)
+  /gate — Values validation dashboard
+  /gate run — CRPC validate HEAD against all primitives
+  /gate primitives — Show manifest + primitive hash
+  /gate history — Recent gate results
 
 SOCIAL PRESENCE (owner-only)
   /social status — Platform status
@@ -2586,6 +2593,62 @@ bot.command('pantheon', async (ctx) => {
     msg += `  /pantheon costs — Cost breakdown\n`;
     msg += `  /pantheon prune — Run 24h context prune\n`;
     msg += `  /pantheon clear <agent> — Clear conversation`;
+    ctx.reply(msg);
+  }
+});
+
+// ============ Primitive Gate — CRPC Values Validation ============
+
+bot.command('gate', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Owner only.');
+  }
+
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'run') {
+    // Run gate against last commit's diff
+    ctx.reply('Running primitive gate against HEAD...');
+    try {
+      const { execSync } = await import('child_process');
+      const repoPath = process.env.VIBESWAP_REPO || '.';
+      const diff = execSync(`git -C ${repoPath} diff HEAD~1 HEAD`, { encoding: 'utf-8', maxBuffer: 1024 * 1024 });
+      if (!diff.trim()) return ctx.reply('No diff found in last commit.');
+      const commitHash = execSync(`git -C ${repoPath} rev-parse --short HEAD`, { encoding: 'utf-8' }).trim();
+      const result = await runPrimitiveGate(diff, { commitHash });
+      ctx.reply(formatGateResult(result));
+    } catch (err) {
+      ctx.reply(`Gate error: ${err.message}`);
+    }
+
+  } else if (sub === 'primitives') {
+    const manifest = getPrimitiveManifest();
+    let msg = `Primitive Manifest\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Hash: ${manifest.hash.slice(0, 16)}...\n`;
+    msg += `Count: ${manifest.count} | Total weight: ${manifest.totalWeight}\n\n`;
+    for (const p of manifest.primitives) {
+      msg += `${p.id} (w=${p.weight}): ${p.name}\n`;
+    }
+    ctx.reply(msg);
+
+  } else if (sub === 'history') {
+    const history = await getGateHistory(5);
+    if (history.length === 0) return ctx.reply('No gate history yet.');
+    let msg = `Gate History (last ${history.length})\n━━━━━━━━━━━━━━━━\n`;
+    for (const h of history) {
+      const emoji = h.decision === 'PASS' ? '✅' : h.decision === 'WARN' ? '⚠️' : '🚫';
+      msg += `${emoji} ${h.commitHash} — ${h.alignmentScore}% (${h.passed}/${h.totalPrimitives}) ${h.timestamp.slice(0, 10)}\n`;
+    }
+    ctx.reply(msg);
+
+  } else {
+    let msg = `Primitive Gate — Values Validation\n━━━━━━━━━━━━━━━━\n`;
+    msg += `"The code can represent our values mathematically"\n\n`;
+    msg += `Commands:\n`;
+    msg += `  /gate run — Validate HEAD against all primitives\n`;
+    msg += `  /gate primitives — Show manifest + hash\n`;
+    msg += `  /gate history — Recent gate results`;
     ctx.reply(msg);
   }
 });

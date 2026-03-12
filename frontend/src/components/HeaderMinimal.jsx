@@ -264,7 +264,10 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-black-700">
-          <span className="font-semibold">Menu</span>
+          <div>
+            <span className="font-semibold">Menu</span>
+            <span className="ml-2 text-[9px] font-mono text-black-500">Ctrl+Shift+K to search</span>
+          </div>
           <button onClick={onClose} className="p-2 hover:bg-black-700 rounded-lg">
             <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

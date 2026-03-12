@@ -3365,6 +3365,58 @@ bot.command('network', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
+// ============ CRPC Demo — Live Consensus Round ============
+// Triggers a full 4-phase CRPC round and posts the result in chat.
+// Usage: /crpc [prompt] — default prompt if none provided.
+
+bot.command('crpc', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const customPrompt = ctx.message.text.replace(/^\/crpc\s*/, '').trim() || null;
+  await ctx.reply('Running CRPC consensus round — 3 shards generating independently...');
+
+  try {
+    const trace = await runCRPCDemo(customPrompt);
+
+    const lines = [
+      `CRPC CONSENSUS COMPLETE`,
+      `Protocol: Tim Cotton's Commit-Reveal Pairwise Comparison`,
+      `Duration: ${trace.totalDurationMs}ms`,
+      '',
+      'PHASE 1 — WORK COMMIT',
+      ...trace.phases[0].commits.map(c => `  ${c.shardId}: ${c.commitHash.slice(0, 16)}...`),
+      '',
+      'PHASE 2 — WORK REVEAL (all hashes verified)',
+      ...trace.phases[1].reveals.map(r => `  ${r.shardId}: "${r.response.slice(0, 80)}..."`),
+      '',
+      'PHASE 3+4 — PAIRWISE COMPARISON',
+      ...trace.phases[3].pairwiseResults.map(pr =>
+        `  ${pr.pairId}: A=${pr.votes.A_BETTER} B=${pr.votes.B_BETTER} EQ=${pr.votes.EQUIVALENT} → ${pr.winner}`
+      ),
+      '',
+      'RANKINGS:',
+      ...trace.rankings.map((r, i) => `  ${i + 1}. ${r.shardId} (${r.pairwiseWins} wins)`),
+      '',
+      `Winner: ${trace.consensusWinner}`,
+      `Confidence: ${(trace.confidence * 100).toFixed(0)}%`,
+      '',
+      'CONSENSUS RESPONSE:',
+      trace.consensusResponse,
+    ];
+
+    // Split into multiple messages if too long
+    const output = lines.join('\n');
+    if (output.length > 4000) {
+      await ctx.reply(output.slice(0, 4000));
+      await ctx.reply(output.slice(4000));
+    } else {
+      await ctx.reply(output);
+    }
+  } catch (err) {
+    await ctx.reply(`CRPC failed: ${err.message}`);
+  }
+});
+
 // ============ Mine — Launch Shard Miner Mini App ============
 
 bot.command('mine', async (ctx) => {

@@ -196,6 +196,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
     { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
     { path: '/inversion', label: 'Graceful Inversion', icon: '∿' },
+    { path: '/commit-reveal', label: 'Commit-Reveal', icon: '#' },
     { path: '/research', label: 'Research', icon: '~' },
     { path: '/status', label: 'System Status', icon: '|' },
     { path: '/about', label: 'About', icon: 'i' },

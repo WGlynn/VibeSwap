@@ -1248,6 +1248,11 @@ REMOTE (Owner Only)
   /relay <instruction> — Send command to active code session
   /relay_status — View pending relay commands
 
+MIND NETWORK
+  /crpc [prompt] — Run live CRPC consensus round
+  /brain — Intelligence loop: scores, calibration, engagement
+  /network — Shard topology, CRPC stats, knowledge chain
+
 SYSTEM
   /mi_status — MI cell status & telemetry
   /mi_signals [N] — Recent signal history

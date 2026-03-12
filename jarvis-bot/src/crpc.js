@@ -563,7 +563,7 @@ export async function processCRPCBody(handler, body) {
     case 'protocol':
       return getCRPCProtocolSpec();
     case 'dashboard':
-      return { _html: getCRPCDashboardHTML() };
+      return { _html: await getCRPCDashboardHTML() };
     default:
       return { error: 'Unknown CRPC handler' };
   }
@@ -643,8 +643,33 @@ function getCRPCProtocolSpec() {
 
 // ============ CRPC Dashboard (Self-Contained HTML) ============
 
-function getCRPCDashboardHTML() {
+async function getCRPCDashboardHTML() {
   const stats = getCRPCStats();
+  let scoreTrendsHTML = '';
+  try {
+    const { getScoreTrends, getScoreCalibration } = await import('./intelligence.js');
+    const trends = await getScoreTrends(7);
+    const calibration = await getScoreCalibration();
+    if (trends && trends.count > 0) {
+      const barWidth = (score) => Math.round(parseFloat(score) * 10);
+      const barColor = (score) => parseFloat(score) >= 7 ? '#00ff88' : parseFloat(score) >= 5 ? '#ffaa00' : '#ff4444';
+      const bar = (label, score) =>
+        `<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span style="width:100px;color:#888;font-size:0.8em">${label}</span><div style="flex:1;background:#1a1a1a;border-radius:4px;height:16px"><div style="width:${barWidth(score)}%;background:${barColor(score)};border-radius:4px;height:16px"></div></div><span style="width:40px;text-align:right;font-size:0.85em;color:${barColor(score)}">${score}</span></div>`;
+      scoreTrendsHTML = `<h2>Brain — Self-Improvement Loop</h2>
+<div class="card" style="margin-bottom:16px">
+<div class="label">Response Quality (${trends.count} scored, 7 days)</div>
+<div style="margin-top:12px">
+${bar('Accuracy', trends.accuracy)}
+${bar('Relevance', trends.relevance)}
+${bar('Conciseness', trends.conciseness)}
+${bar('Usefulness', trends.usefulness)}
+${bar('Naturalness', trends.naturalness)}
+${bar('Composite', trends.composite)}
+</div>
+${calibration ? `<div style="margin-top:12px;padding:8px;background:#0d0d0d;border-radius:4px;font-size:0.8em;color:#ffaa00">${calibration}</div>` : ''}
+</div>`;
+    }
+  } catch { /* intelligence module not loaded */ }
   const recentRows = (stats.recentTasks || []).map(t => {
     const id = t.taskId?.slice(0, 20) || '—';
     const conf = ((t.confidence || 0) * 100).toFixed(0);
@@ -705,6 +730,8 @@ ${recentRows || '<tr><td colspan="6" style="color:#666">No rounds yet — click 
 <tr><th>Shard ID</th><th>Wins</th><th>Losses</th><th>Total</th><th>Win Rate</th></tr>
 ${repRows || '<tr><td colspan="5" style="color:#666">No reputation data yet</td></tr>'}
 </table>
+
+${scoreTrendsHTML}
 
 <h2>Live Demo</h2>
 <p style="color:#888;font-size:0.85em;margin-bottom:8px">Run a full 4-phase CRPC round with real LLM responses.</p>

@@ -11,6 +11,8 @@ import JarvisBubble from './components/JarvisBubble'
 import OnboardingTour from './components/OnboardingTour'
 import CommandPalette from './components/CommandPalette'
 import { ToastProvider } from './contexts/ToastContext'
+import PageSkeleton from './components/ui/PageSkeleton'
+import BackToTop from './components/ui/BackToTop'
 import { useSynaptic } from './hooks/useSynaptic'
 import { remember } from './utils/sankofa'
 
@@ -153,7 +155,7 @@ function AnimatedRoutes() {
         transition={pageTransition}
       >
         <ErrorBoundary>
-          <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="text-matrix-500">Loading...</div></div>}>
+          <Suspense fallback={<PageSkeleton />}>
             <Routes location={location}>
             {/* Landing IS the swap - Steve's vision */}
             <Route path="/" element={<SwapCore />} />
@@ -290,6 +292,7 @@ function App() {
     <VibePlayer />
     {location.pathname !== '/jarvis' && location.pathname !== '/voice' && <JarvisBubble />}
     <OnboardingTour />
+    <BackToTop />
     </ContributionsProvider>
     </MessagingProvider>
     </ToastProvider>

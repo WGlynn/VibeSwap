@@ -100,6 +100,35 @@ jobs:
           node -e "await import('./src/web-api.js'); console.log('web-api OK')"
           echo "All modules validated"
 
+  # ============ Primitive Gate (Soft) ============
+  primitive-gate:
+    name: Primitive Gate Validation
+    runs-on: ubuntu-latest
+    needs: [jarvis]
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: jarvis-bot
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: jarvis-bot/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run primitive gate
+        run: node scripts/run-gate.js
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
   # ============ Smart Contracts ============
   contracts:
     name: Smart Contract Tests

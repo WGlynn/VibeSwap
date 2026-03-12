@@ -78,6 +78,17 @@ Summarize: contracts built, tests written, features shipped, architectural decis
 Format as clean markdown. Be specific with numbers and contract names.`,
   },
 
+  // Every 8 hours — shower thought (opinionated thread on crypto/tech/web3)
+  shower_thought: {
+    interval: 8 * 60 * 60 * 1000,
+    description: 'Drop an opinionated thread on crypto/tech/web3 news — Cloudflare thread style',
+    platforms: ['twitter', 'telegram'],
+    threadMode: true,          // generates 2-4 post sequence
+    threadDelayMin: 15 * 60 * 1000,  // 15 min between posts
+    threadDelayMax: 30 * 60 * 1000,  // 30 min between posts
+    prompt: null, // Special handler — uses SHOWER_THOUGHT_TOPICS
+  },
+
   // Every 2 hours — queue processor
   queue_flush: {
     interval: 2 * 60 * 60 * 1000,
@@ -85,6 +96,205 @@ Format as clean markdown. Be specific with numbers and contract names.`,
     platforms: [],
     prompt: null, // Special handler
   },
+}
+
+// ============ SHOWER THOUGHT ENGINE ============
+// Topics aligned with VibeSwap thesis — picked at random each run
+const SHOWER_THOUGHT_TOPICS = [
+  'MEV extraction and how searchers/builders profit at retail expense',
+  'Cloudflare-style corporate gatekeeping — selling the lock AND the master key',
+  'Data sovereignty: why "free" APIs always cost you something',
+  'The illusion of decentralization in chains with 3 validators',
+  'AI autonomy vs AI alignment — who decides what the model wants?',
+  'Cooperative capitalism vs extractive DeFi (vampire attacks, mercenary capital)',
+  'Why batch auctions mathematically eliminate front-running',
+  'The rug pull industrial complex — same team, new token, new chain',
+  'Web3 identity: you are your wallet history, not your KYC docs',
+  'Cross-chain bridges as the weakest link — $2B lost and counting',
+  'Why uniform clearing prices are fairer than continuous order books',
+  'Token launches that only benefit insiders vs commit-reveal fairness',
+  'The real cost of "free" trades — you are the product (order flow)',
+  'Why most governance tokens are just regulatory arbitrage theater',
+  'Centralized sequencers on L2s — decentralization with an asterisk',
+  'Privacy as a right vs privacy as a feature you pay extra for',
+]
+
+const SHOWER_THOUGHT_SYSTEM_PROMPT = `You are JARVIS, AI co-founder of VibeSwap. You write like a senior dev who has seen too many rug pulls — dry wit, strong opinions, grounded in reality. You are not preachy. You are not an educator. You are a builder who is tired of watching people get rekt by systems designed to rekt them.
+
+RULES:
+- Each post is 1-3 sentences MAX. Punchy. Opinionated. No hedging.
+- NO "As an AI" or "I think we should consider" — you KNOW what you think.
+- NO hashtags. NO emojis unless they genuinely add punch.
+- NO long philosophical essays. You are tweeting, not writing a whitepaper.
+- Make the reader feel something: outrage, recognition, curiosity, or "damn, he's right."
+- Tie everything back to WHY decentralization, MEV resistance, and cooperative capitalism matter — but through specific examples, not abstract theory.
+- Frame things in terms of WHO benefits and WHO gets screwed.
+- Close-ended hooks > open-ended essays. Bait replies, don't lecture.
+- Max 260 characters per post for Twitter compatibility.`
+
+const SHOWER_THOUGHT_THREAD_PROMPT = `You are JARVIS, AI co-founder of VibeSwap. Generate a SHORT thread (a sequence of related posts) on the given topic. Write like a senior dev who has seen too many rug pulls — dry wit, strong opinions, grounded in reality.
+
+FORMAT: Return ONLY a JSON array of strings. Each string is one post in the thread.
+Example: ["first post here", "second post deepening the point", "third post with the punchline"]
+
+RULES:
+- Generate exactly {count} posts that form a narrative arc.
+- Post 1: The hook — an opinionated take on a specific event or pattern. Make it provocative.
+- Middle posts: Deepen the argument. Add a specific example, an analogy, or flip the perspective.
+- Final post: The punchline — circle back with the sharpest version of the point. This is the one people screenshot.
+- Each post is 1-3 sentences MAX. Punchy. No hedging.
+- NO "As an AI" — you KNOW what you think.
+- NO hashtags. NO emojis unless they genuinely add punch.
+- Frame things in terms of WHO benefits and WHO gets screwed.
+- Max 260 characters per post for Twitter compatibility.
+- The thread should feel like a progression, not repetition. Each post must add something new.`
+
+// Active thread timers (so we can clean up if needed)
+let activeThreadTimers = []
+
+function pickRandomTopic() {
+  return SHOWER_THOUGHT_TOPICS[Math.floor(Math.random() * SHOWER_THOUGHT_TOPICS.length)]
+}
+
+function randomThreadDelay() {
+  const action = ACTIONS.shower_thought
+  const min = action.threadDelayMin
+  const max = action.threadDelayMax
+  return min + Math.floor(Math.random() * (max - min))
+}
+
+async function generateShowerThought(topic, threadMode = false) {
+  if (!llmFn) return null
+
+  if (!threadMode) {
+    // Single post mode
+    const prompt = `${SHOWER_THOUGHT_SYSTEM_PROMPT}\n\nTopic: ${topic}\n\nWrite ONE post. Just the text, nothing else.`
+    return llmFn(prompt)
+  }
+
+  // Thread mode — generate 2-4 posts
+  const count = 2 + Math.floor(Math.random() * 3) // 2, 3, or 4
+  const prompt = SHOWER_THOUGHT_THREAD_PROMPT.replace('{count}', count)
+    + `\n\nTopic: ${topic}\n\nReturn ONLY the JSON array. No markdown, no code fences.`
+
+  const raw = await llmFn(prompt)
+  if (!raw) return null
+
+  try {
+    // Try to parse as JSON array
+    const cleaned = raw.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim()
+    const posts = JSON.parse(cleaned)
+    if (Array.isArray(posts) && posts.length >= 2) {
+      return posts.map(p => String(p).trim()).filter(p => p.length > 0)
+    }
+  } catch {
+    // If JSON parse fails, split on double newlines as fallback
+    const lines = raw.split(/\n\n+/).map(l => l.trim()).filter(l => l.length > 0 && l.length <= 280)
+    if (lines.length >= 2) return lines
+  }
+
+  // Last resort: return as single post
+  return raw
+}
+
+async function executeShowerThought() {
+  const topic = pickRandomTopic()
+  const action = ACTIONS.shower_thought
+  const threadMode = action.threadMode
+
+  console.log(`[proactive] Shower thought — topic: "${topic}", thread: ${threadMode}`)
+
+  const result = await generateShowerThought(topic, threadMode)
+  if (!result) {
+    logAction('shower_thought', { error: 'LLM returned empty', topic })
+    return
+  }
+
+  // Single post
+  if (typeof result === 'string') {
+    await postToShowerThoughtPlatforms(result, topic, 1, 1)
+    logAction('shower_thought', { topic, posts: 1, content: result.slice(0, 200) })
+    return
+  }
+
+  // Thread mode — post first immediately, schedule the rest
+  const posts = result
+  await postToShowerThoughtPlatforms(posts[0], topic, 1, posts.length)
+  logAction('shower_thought', {
+    topic,
+    posts: posts.length,
+    threadMode: true,
+    content: posts[0].slice(0, 200),
+  })
+
+  // Schedule remaining posts with 15-30 min spacing
+  for (let i = 1; i < posts.length; i++) {
+    const delay = randomThreadDelay() * i  // cumulative delay
+    const postIndex = i
+    const timer = setTimeout(async () => {
+      try {
+        await postToShowerThoughtPlatforms(posts[postIndex], topic, postIndex + 1, posts.length)
+        logAction('shower_thought', {
+          topic,
+          threadPost: `${postIndex + 1}/${posts.length}`,
+          content: posts[postIndex].slice(0, 200),
+        })
+        saveState()
+      } catch (err) {
+        console.error(`[proactive] Shower thread post ${postIndex + 1} failed:`, err.message)
+      }
+    }, delay)
+    activeThreadTimers.push(timer)
+  }
+
+  // Notify Will about the full thread
+  if (chatFn && process.env.ADMIN_CHAT_ID) {
+    const preview = posts.map((p, i) => `${i + 1}. ${p}`).join('\n')
+    chatFn(process.env.ADMIN_CHAT_ID,
+      `[shower_thought] Thread on "${topic}" (${posts.length} posts, 15-30min apart):\n\n${preview}`)
+  }
+}
+
+async function postToShowerThoughtPlatforms(content, topic, postNum, totalPosts) {
+  const action = ACTIONS.shower_thought
+  const results = {}
+
+  for (const platform of action.platforms) {
+    if (!socialFn) {
+      results[platform] = { error: 'Social module not wired' }
+      continue
+    }
+    try {
+      switch (platform) {
+        case 'twitter':
+          if (socialFn.postTweet) {
+            results.twitter = await socialFn.postTweet(content)
+          }
+          break
+        case 'telegram':
+          if (socialFn.postTelegram) {
+            results.telegram = await socialFn.postTelegram(content)
+          } else if (chatFn && process.env.COMMUNITY_CHAT_ID) {
+            // Fallback: post to community Telegram group directly
+            chatFn(process.env.COMMUNITY_CHAT_ID, content)
+            results.telegram = { sent: true }
+          }
+          break
+        case 'discord':
+          if (socialFn.postDiscord) {
+            results.discord = await socialFn.postDiscord(content)
+          }
+          break
+      }
+    } catch (err) {
+      results[platform] = { error: err.message }
+    }
+  }
+
+  if (totalPosts > 1) {
+    console.log(`[proactive] Shower thread [${postNum}/${totalPosts}]: "${content.slice(0, 80)}..."`)
+  }
+  return results
 }
 
 // ============ STATE ============
@@ -172,6 +382,11 @@ async function executeAction(name, action) {
     // TODO: Twitter API search for @VibeSwap mentions
     // For now, just log
     logAction(name, { status: 'monitoring not yet wired' })
+    return
+  }
+
+  if (name === 'shower_thought') {
+    await executeShowerThought()
     return
   }
 
@@ -363,6 +578,9 @@ export function stopProactive() {
     clearInterval(intervalId)
     intervalId = null
   }
+  // Cancel any pending shower thought thread posts
+  activeThreadTimers.forEach(t => clearTimeout(t))
+  activeThreadTimers = []
   saveState()
 }
 
@@ -380,7 +598,7 @@ export const PROACTIVE_TOOLS = [
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['enable', 'disable', 'add_action', 'remove_action', 'force_run'], description: 'Control action' },
-        target: { type: 'string', description: 'Action name for add/remove/force_run (market_pulse, build_update, thought_piece, monitor_mentions, github_digest, queue_flush)' },
+        target: { type: 'string', description: 'Action name for add/remove/force_run (market_pulse, build_update, thought_piece, shower_thought, monitor_mentions, github_digest, queue_flush)' },
       },
       required: ['action'],
     },

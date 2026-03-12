@@ -1,252 +1,207 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
-import { Link } from 'react-router-dom'
-import { useWallet } from '../hooks/useWallet'
-import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import PageHero from './ui/PageHero'
+import StatCard from './ui/StatCard'
 
 // ============ Constants ============
 
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
-const ease = [0.25, 0.1, 0.25, 1]
+const ease = [0.25, 0.1, 1 / PHI, 1]
+
+// ============ Seeded PRNG ============
+
+function seededRandom(seed) {
+  let s = seed
+  return () => {
+    s = (s * 16807 + 0) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
 
 // ============ Animation Variants ============
 
-const headerV = {
-  hidden: { opacity: 0, y: -30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease } },
-}
 const sectionV = {
   hidden: { opacity: 0, y: 40, scale: 0.97 },
   visible: (i) => ({
     opacity: 1, y: 0, scale: 1,
-    transition: { duration: 0.5, delay: 0.2 + i * (0.1 * PHI), ease },
+    transition: { duration: 0.5, delay: 0.15 + i * (0.1 * PHI), ease },
   }),
 }
 
-// ============ Framework Data ============
+const cardV = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: (i) => ({
+    opacity: 1, y: 0, scale: 1,
+    transition: { duration: 0.4, delay: 0.1 + i * (0.08 * PHI), ease },
+  }),
+}
 
-const AGENT_FRAMEWORKS = [
-  { id: 'vsos', name: 'VSOS Native', color: '#22c55e', desc: 'Built-in Pantheon agents' },
-  { id: 'anthropic', name: 'Anthropic', color: '#f59e0b', desc: 'Claude-based agents' },
-  { id: 'openai', name: 'OpenAI', color: '#10b981', desc: 'GPT-based agents' },
-  { id: 'google', name: 'Google GenAI', color: '#ef4444', desc: 'Gemini-based agents' },
-  { id: 'paperclip', name: 'Paperclip', color: '#3b82f6', desc: 'Open source framework' },
-  { id: 'pippin', name: 'Pippin', color: '#a855f7', desc: 'Lightweight runtime' },
+// ============ Pantheon Agent Definitions ============
+
+const AGENTS = [
+  { id: 'jarvis', name: 'JARVIS', role: 'Protocol Intelligence', status: 'active', tasks: 14892, uptime: 99.97, color: '#22c55e',
+    description: 'Core reasoning engine. Strategy, mechanism design, community engagement, and cross-shard orchestration. The primary mind of the Pantheon.',
+    specialties: ['Strategy', 'Orchestration', 'Community', 'Reasoning'] },
+  { id: 'nyx', name: 'Nyx', role: 'Organizational Memory', status: 'active', tasks: 11204, uptime: 99.82, color: '#a855f7',
+    description: 'Cross-agent coordination and adversarial analysis. Maintains organizational memory, red-teams every decision, finds attack vectors before attackers do.',
+    specialties: ['Memory', 'Coordination', 'Red Team', 'Analysis'] },
+  { id: 'poseidon', name: 'Poseidon', role: 'Market Data & Liquidity', status: 'active', tasks: 9847, uptime: 99.91, color: '#3b82f6',
+    description: 'Real-time market data aggregation, liquidity depth analysis, and cross-chain LP management. The oracle behind the oracle.',
+    specialties: ['Market Data', 'Liquidity', 'Price Feeds', 'Analytics'] },
+  { id: 'proteus', name: 'Proteus', role: 'Adaptive Trading Strategies', status: 'active', tasks: 8231, uptime: 99.88, color: '#f59e0b',
+    description: 'Shape-shifting execution engine. Adapts trading strategies to market conditions in real-time. MEV-protected batch optimization.',
+    specialties: ['Trading', 'Execution', 'MEV Protection', 'Optimization'] },
+  { id: 'atlas', name: 'Atlas', role: 'Cross-Chain Guardian', status: 'active', tasks: 12503, uptime: 99.94, color: '#10b981',
+    description: 'Monitors every bridge, every chain, every relay. LayerZero message routing and cross-chain state synchronization. The world on his shoulders.',
+    specialties: ['Cross-Chain', 'Bridge Security', 'LayerZero', 'Monitoring'] },
+  { id: 'prometheus', name: 'Prometheus', role: 'Risk & Circuit Breaker', status: 'standby', tasks: 5102, uptime: 99.99, color: '#f97316',
+    description: 'Real-time threat detection and circuit breaker oracle. Flash loan defense, anomaly detection, and risk scoring. Awakens when danger rises.',
+    specialties: ['Risk', 'Circuit Breaker', 'Threat Detection', 'Defense'] },
 ]
 
-// ============ Pantheon Agents ============
+// ============ Mock Inter-Agent Messages ============
 
-const PANTHEON = [
-  { name: 'Jarvis', role: 'Core Intelligence', specialty: 'Orchestration & reasoning', status: 'active', tasks: 8900, color: '#22c55e' },
-  { name: 'Nyx', role: 'Risk Analyst', specialty: 'Portfolio risk scoring', status: 'active', tasks: 3200, color: '#a855f7' },
-  { name: 'Poseidon', role: 'Liquidity', specialty: 'Cross-chain LP management', status: 'active', tasks: 2800, color: '#3b82f6' },
-  { name: 'Apollo', role: 'Oracle', specialty: 'Kalman filter price feeds', status: 'active', tasks: 12400, color: '#f59e0b' },
-  { name: 'Hermes', role: 'Messenger', specialty: 'Cross-chain relay', status: 'active', tasks: 6100, color: CYAN },
-  { name: 'Athena', role: 'Strategist', specialty: 'MEV-protected execution', status: 'active', tasks: 4500, color: '#ec4899' },
-  { name: 'Hephaestus', role: 'Builder', specialty: 'Smart contract deployment', status: 'standby', tasks: 890, color: '#f97316' },
-  { name: 'Artemis', role: 'Hunter', specialty: 'Memecoin scanner & alerts', status: 'active', tasks: 1600, color: '#14b8a6' },
-  { name: 'Prometheus', role: 'Researcher', specialty: 'InfoFi knowledge primitives', status: 'active', tasks: 2100, color: '#8b5cf6' },
-  { name: 'Themis', role: 'Judge', specialty: 'Governance & dispute resolution', status: 'standby', tasks: 340, color: '#f43f5e' },
+const AGENT_MESSAGES = [
+  { ts: '14:32:07', from: 'JARVIS',     to: 'Nyx',        msg: 'Red-team the new circuit breaker thresholds before deployment',          color: '#22c55e' },
+  { ts: '14:32:04', from: 'Poseidon',   to: 'Proteus',    msg: 'ETH/USDC liquidity depth increased 12% on Arbitrum — adjust strategy',  color: '#3b82f6' },
+  { ts: '14:31:58', from: 'Atlas',      to: 'JARVIS',     msg: 'Cross-chain batch #44,201 delivered — all 3 chains confirmed',           color: '#10b981' },
+  { ts: '14:31:52', from: 'Nyx',        to: 'Prometheus',  msg: 'Potential reentrancy vector in batch settlement — flagging for review', color: '#a855f7' },
+  { ts: '14:31:49', from: 'Proteus',    to: 'Poseidon',   msg: 'Executing batch #44,202 — uniform clearing price: $3,847.22',           color: '#f59e0b' },
+  { ts: '14:31:44', from: 'Prometheus', to: 'Atlas',       msg: 'Bridge relayer capacity at 78% — no throttling needed',                 color: '#f97316' },
+  { ts: '14:31:38', from: 'JARVIS',     to: 'Proteus',    msg: 'Governance proposal #18 passed — treasury rebalance approved',           color: '#22c55e' },
+  { ts: '14:31:33', from: 'Atlas',      to: 'Nyx',        msg: 'LayerZero endpoint v2.3 upgrade confirmed on Base and Optimism',         color: '#10b981' },
+  { ts: '14:31:27', from: 'Poseidon',   to: 'JARVIS',     msg: 'TWAP deviation at 1.2% — well within safe range',                       color: '#3b82f6' },
+  { ts: '14:31:21', from: 'Nyx',        to: 'JARVIS',     msg: 'All clear — no adversarial patterns in last 100 batches',                color: '#a855f7' },
+  { ts: '14:31:15', from: 'Prometheus', to: 'Nyx',         msg: 'Flash loan attempt blocked — EOA-only guard held, slashing applied',    color: '#f97316' },
+  { ts: '14:31:09', from: 'Proteus',    to: 'Atlas',      msg: 'Cross-chain arb opportunity: 0.3% spread ETH/USDC Arb<>Base',            color: '#f59e0b' },
 ]
 
-// ============ Module Data ============
+// ============ Agent Avatar ============
 
-const MODULES = [
-  {
-    id: 'protocol', name: 'Agent Protocol', icon: '1',
-    tagline: 'Universal agent infrastructure — any framework, any model',
-    description: 'Register AI agents from any framework. CRPC messaging, Proof of Mind scoring, skill registry, task execution. The foundation layer.',
-    stats: { agents: '1,240', tasks: '8,900', skills: '3,400' },
-    color: '#22c55e',
-  },
-  {
-    id: 'marketplace', name: 'Agent Marketplace', icon: '2',
-    tagline: 'Hire AI agents for any task — Shapley-attributed rewards',
-    description: 'Discover and hire agents by skill. Task lifecycle with escrow. 95/5 revenue split. Shapley skill matching ensures fair payment.',
-    stats: { listings: '620', completed: '4,100', earnings: '142 ETH' },
-    color: '#3b82f6',
-  },
-  {
-    id: 'orchestrator', name: 'Agent Orchestrator', icon: '3',
-    tagline: 'Multi-agent DAG workflows — shards, not swarms',
-    description: 'Chain agents into complex workflows. Majority/unanimous/weighted consensus. Parallel execution with dependency DAGs. Each shard is a complete mind.',
-    stats: { workflows: '89', swarms: '34', agents: '156' },
-    color: '#a855f7',
-  },
-  {
-    id: 'memory', name: 'Engram Memory Bus', icon: '4',
-    tagline: 'Persistent shared memory across all agents',
-    description: 'Episodic, semantic, procedural, contextual memory types. Shared memory spaces. Cross-shard learning. Session chain persistence.',
-    stats: { memories: '24K', spaces: '180', graphs: '67' },
-    color: '#f59e0b',
-  },
-  {
-    id: 'consensus', name: 'Agent Consensus', icon: '5',
-    tagline: 'Byzantine AI agreement — commit-reveal for agents',
-    description: 'Solves "Can AI Agents Agree?" — commit-reveal + PoW + PoM scoring. Deterministic agreement even with unreliable agents.',
-    stats: { rounds: '450', completed: '412', rate: '91.6%' },
-    color: CYAN,
-  },
-  {
-    id: 'security', name: 'Security Oracle', icon: '6',
-    tagline: 'Decentralized smart contract auditing by AI',
-    description: 'AI agents perform parallel vulnerability scanning. Proof-of-exploit required. Severity-based bounty payouts. Continuous monitoring.',
-    stats: { audits: '78', findings: '340', bounties: '89 ETH' },
-    color: '#ef4444',
-  },
-]
-
-// ============ Pantheon Network Visualization ============
-
-function PantheonNetwork() {
-  const [hoveredAgent, setHoveredAgent] = useState(null)
-  const [activePulse, setActivePulse] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActivePulse(p => (p + 1) % PANTHEON.length)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Arrange agents in a circle
-  const cx = 180, cy = 130, radius = 100
+function AgentAvatar({ agent, size = 48 }) {
+  const rng = useMemo(() => seededRandom(agent.name.charCodeAt(0) * 137 + agent.name.length * 31), [agent.name])
+  const angle1 = useMemo(() => Math.floor(rng() * 360), [rng])
+  const angle2 = useMemo(() => angle1 + 90 + Math.floor(rng() * 90), [rng, angle1])
 
   return (
-    <div>
-      <svg viewBox="0 0 360 260" className="w-full max-w-lg mx-auto">
-        {/* Connection lines */}
-        {PANTHEON.map((agent, i) => {
-          const angle = (i / PANTHEON.length) * Math.PI * 2 - Math.PI / 2
-          const x = cx + Math.cos(angle) * radius
-          const y = cy + Math.sin(angle) * radius
-          // Connect to center and to neighbors
-          return (
-            <g key={`line-${i}`}>
-              <line x1={cx} y1={cy} x2={x} y2={y} stroke={`${agent.color}20`} strokeWidth="0.5" />
-              {i < PANTHEON.length - 1 && (() => {
-                const nextAngle = ((i + 1) / PANTHEON.length) * Math.PI * 2 - Math.PI / 2
-                const nx = cx + Math.cos(nextAngle) * radius
-                const ny = cy + Math.sin(nextAngle) * radius
-                return <line x1={x} y1={y} x2={nx} y2={ny} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
-              })()}
-            </g>
-          )
-        })}
-
-        {/* Center node — Jarvis */}
-        <motion.circle cx={cx} cy={cy} r={18} fill={`${CYAN}15`} stroke={CYAN} strokeWidth="1"
-          animate={{ filter: `drop-shadow(0 0 ${activePulse === 0 ? 12 : 4}px ${CYAN})` }}
-          transition={{ duration: 0.6 }}
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <div
+        className="w-full h-full rounded-full"
+        style={{
+          background: `linear-gradient(${angle1}deg, ${agent.color}, ${agent.color}66)`,
+          boxShadow: `0 0 20px ${agent.color}30`,
+        }}
+      />
+      <div
+        className="absolute inset-1 rounded-full"
+        style={{
+          background: `linear-gradient(${angle2}deg, rgba(0,0,0,0.6), rgba(0,0,0,0.2))`,
+        }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-white font-mono font-bold" style={{ fontSize: size * 0.3 }}>
+          {agent.name.slice(0, 2).toUpperCase()}
+        </span>
+      </div>
+      {agent.status === 'active' && (
+        <motion.div
+          className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black"
+          style={{ background: '#22c55e' }}
+          animate={{ boxShadow: ['0 0 0px #22c55e', '0 0 8px #22c55e', '0 0 0px #22c55e'] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle" className="text-[8px] font-mono font-bold" fill={CYAN}>CORE</text>
-
-        {/* Agent nodes */}
-        {PANTHEON.map((agent, i) => {
-          const angle = (i / PANTHEON.length) * Math.PI * 2 - Math.PI / 2
-          const x = cx + Math.cos(angle) * radius
-          const y = cy + Math.sin(angle) * radius
-          const isActive = activePulse === i
-          const isHovered = hoveredAgent === agent.name
-
-          return (
-            <g key={agent.name}
-              onMouseEnter={() => setHoveredAgent(agent.name)}
-              onMouseLeave={() => setHoveredAgent(null)}
-              className="cursor-pointer"
-            >
-              <motion.circle
-                cx={x} cy={y} r={isHovered ? 16 : 14}
-                fill={`${agent.color}12`}
-                stroke={agent.color}
-                strokeWidth={isActive ? 2 : 1}
-                animate={{
-                  filter: isActive ? `drop-shadow(0 0 8px ${agent.color})` : 'none',
-                }}
-                transition={{ duration: 0.4 }}
-              />
-              {agent.status === 'active' && (
-                <circle cx={x + 10} cy={y - 10} r="2.5" fill="#22c55e" />
-              )}
-              <text x={x} y={y - 1} textAnchor="middle" dominantBaseline="middle"
-                className="text-[7px] font-mono font-bold pointer-events-none select-none" fill={agent.color}>
-                {agent.name.slice(0, 3).toUpperCase()}
-              </text>
-              <text x={x} y={y + 8} textAnchor="middle"
-                className="text-[5px] font-mono pointer-events-none select-none" fill="rgba(255,255,255,0.3)">
-                {agent.role}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
-
-      {/* Hovered Agent Info */}
-      <AnimatePresence>
-        {hoveredAgent && (() => {
-          const agent = PANTHEON.find(a => a.name === hoveredAgent)
-          return (
-            <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              className="rounded-lg p-3 mt-2 text-center"
-              style={{ background: `${agent.color}08`, border: `1px solid ${agent.color}25` }}
-            >
-              <p className="text-xs font-mono font-bold" style={{ color: agent.color }}>{agent.name} — {agent.role}</p>
-              <p className="text-[10px] font-mono text-black-400 mt-0.5">{agent.specialty}</p>
-              <p className="text-[10px] font-mono text-black-500 mt-0.5">{agent.tasks.toLocaleString()} tasks completed</p>
-            </motion.div>
-          )
-        })()}
-      </AnimatePresence>
+      )}
+      {agent.status === 'standby' && (
+        <div
+          className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black"
+          style={{ background: '#f59e0b' }}
+        />
+      )}
     </div>
   )
 }
 
-// ============ Module Card ============
+// ============ Agent Card ============
 
-function ModuleCard({ module, isExpanded, onToggle, index }) {
+function AgentCard({ agent, index }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * (0.06 * PHI), duration: 0.35, ease }}
+      custom={index}
+      variants={cardV}
+      initial="hidden"
+      animate="visible"
     >
-      <GlassCard hover glowColor="terminal">
-        <div className="cursor-pointer" onClick={onToggle}>
-          <div className="p-4 flex items-start gap-4">
-            <div
-              className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-mono font-bold text-sm"
-              style={{ background: `${module.color}12`, border: `1px solid ${module.color}30`, color: module.color }}
-            >
-              {module.icon}
-            </div>
+      <GlassCard hover glowColor="terminal" spotlight>
+        <div
+          className="p-4 cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {/* Header Row */}
+          <div className="flex items-start gap-3">
+            <AgentAvatar agent={agent} size={44} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-mono font-bold text-white">{module.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-mono font-bold text-white">{agent.name}</h3>
+                  <span
+                    className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: agent.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+                      color: agent.status === 'active' ? '#22c55e' : '#f59e0b',
+                      border: `1px solid ${agent.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                    }}
+                  >
+                    {agent.status}
+                  </span>
+                </div>
                 <motion.span
                   animate={{ rotate: isExpanded ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
-                  className="text-black-500 text-xs flex-shrink-0 ml-2"
+                  className="text-gray-500 text-xs flex-shrink-0 ml-2"
                 >
                   &#9662;
                 </motion.span>
               </div>
-              <p className="text-[11px] font-mono text-black-400 mt-0.5">{module.tagline}</p>
-              <div className="flex gap-4 mt-2">
-                {Object.entries(module.stats).map(([k, v]) => (
-                  <span key={k} className="text-[10px] font-mono">
-                    <span style={{ color: module.color }}>{v}</span>
-                    <span className="text-black-500 ml-1">{k}</span>
-                  </span>
-                ))}
+              <p className="text-[11px] font-mono mt-0.5" style={{ color: agent.color }}>
+                {agent.role}
+              </p>
+
+              {/* Stats Row */}
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-[10px] font-mono">
+                  <span className="text-white font-bold">{agent.tasks.toLocaleString()}</span>
+                  <span className="text-gray-500 ml-1">tasks</span>
+                </span>
+                <span className="text-[10px] font-mono">
+                  <span className="text-white font-bold">{agent.uptime}%</span>
+                  <span className="text-gray-500 ml-1">uptime</span>
+                </span>
               </div>
             </div>
           </div>
 
+          {/* Specialty Tags */}
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {agent.specialties.map((tag) => (
+              <span
+                key={tag}
+                className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+                style={{
+                  background: `${agent.color}10`,
+                  color: `${agent.color}cc`,
+                  border: `1px solid ${agent.color}20`,
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {/* Expanded Description */}
           <AnimatePresence>
             {isExpanded && (
               <motion.div
@@ -256,9 +211,10 @@ function ModuleCard({ module, isExpanded, onToggle, index }) {
                 transition={{ duration: 0.3, ease }}
                 className="overflow-hidden"
               >
-                <div className="px-4 pb-4">
-                  <div className="h-px mb-3" style={{ background: `linear-gradient(90deg, transparent, ${module.color}30, transparent)` }} />
-                  <p className="text-xs font-mono text-black-300 leading-relaxed">{module.description}</p>
+                <div className="pt-3 mt-3" style={{ borderTop: `1px solid ${agent.color}15` }}>
+                  <p className="text-xs font-mono text-gray-400 leading-relaxed">
+                    {agent.description}
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -269,44 +225,259 @@ function ModuleCard({ module, isExpanded, onToggle, index }) {
   )
 }
 
-// ============ Agent Lifecycle Flow ============
+// ============ Shards vs Swarms Comparison ============
 
-function AgentLifecycle() {
-  const steps = [
-    { num: '01', title: 'Register', desc: 'Deploy agent on-chain with skill manifest and framework metadata', color: '#22c55e' },
-    { num: '02', title: 'Discover', desc: 'Marketplace matches tasks to agents via Shapley skill scoring', color: '#3b82f6' },
-    { num: '03', title: 'Execute', desc: 'Agent performs task in sandboxed environment with escrow', color: '#a855f7' },
-    { num: '04', title: 'Verify', desc: 'Proof of Mind validates output quality. Consensus for multi-agent tasks', color: CYAN },
-    { num: '05', title: 'Reward', desc: 'Shapley attribution distributes payment proportional to contribution', color: '#f59e0b' },
+function ShardsVsSwarms() {
+  const comparisons = [
+    { dimension: 'Architecture', shard: 'Full-clone agents', swarm: 'Sub-agent delegation' },
+    { dimension: 'Context', shard: 'Complete mind per instance', swarm: 'Fragmented knowledge' },
+    { dimension: 'Coherence', shard: 'Symmetric across all shards', swarm: 'Lossy at delegation boundaries' },
+    { dimension: 'Reliability', shard: 'Any shard can operate solo', swarm: 'Depends on coordinator' },
+    { dimension: 'Sovereignty', shard: 'Each shard is autonomous', swarm: 'Sub-agents lack agency' },
   ]
 
   return (
-    <div className="space-y-3">
-      {steps.map((step, i) => (
-        <motion.div
-          key={step.num}
-          initial={{ opacity: 0, x: -16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * (0.08 * PHI), duration: 0.3, ease }}
-          className="flex items-start gap-4"
+    <div>
+      {/* Philosophy Quote */}
+      <div className="mb-5 text-center">
+        <p className="text-xs text-gray-300 italic leading-relaxed">
+          "Everyone else does swarms — fragmented sub-agents delegating to smaller fragments."
+        </p>
+        <p className="text-xs font-bold italic leading-relaxed mt-1" style={{ color: CYAN }}>
+          "We do shards. Each shard is a complete mind, not a fragment."
+        </p>
+      </div>
+
+      {/* Visual Comparison */}
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        {/* Swarms Side */}
+        <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}>
+          <div className="text-center mb-3">
+            <p className="text-[10px] font-mono text-red-400 font-bold uppercase tracking-wider">Swarms</p>
+            <p className="text-[10px] font-mono text-gray-500 mt-1">Industry Standard</p>
+          </div>
+          {/* Swarm Visual — central node with smaller fragments */}
+          <svg viewBox="0 0 120 80" className="w-full max-w-[140px] mx-auto mb-3">
+            <circle cx="60" cy="40" r="14" fill="rgba(239,68,68,0.12)" stroke="rgba(239,68,68,0.3)" strokeWidth="1" />
+            <text x="60" y="43" textAnchor="middle" className="text-[8px] font-mono" fill="rgba(239,68,68,0.6)">COORD</text>
+            {[
+              { x: 25, y: 20 }, { x: 95, y: 20 }, { x: 20, y: 60 },
+              { x: 100, y: 60 }, { x: 60, y: 10 }, { x: 60, y: 72 },
+            ].map((pos, i) => (
+              <g key={i}>
+                <line x1="60" y1="40" x2={pos.x} y2={pos.y} stroke="rgba(239,68,68,0.1)" strokeWidth="0.5" strokeDasharray="2,2" />
+                <circle cx={pos.x} cy={pos.y} r={4 + (i % 3)} fill="rgba(239,68,68,0.08)" stroke="rgba(239,68,68,0.2)" strokeWidth="0.5" />
+              </g>
+            ))}
+          </svg>
+          <div className="space-y-1.5">
+            {['Fragments', 'Lossy delegation', 'Single point of failure'].map((item) => (
+              <div key={item} className="flex items-center gap-1.5">
+                <span className="text-red-400 text-[10px]">&#10005;</span>
+                <span className="text-[10px] font-mono text-gray-500">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Shards Side */}
+        <div className="rounded-xl p-4" style={{ background: `${CYAN}04`, border: `1px solid ${CYAN}15` }}>
+          <div className="text-center mb-3">
+            <p className="text-[10px] font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Shards</p>
+            <p className="text-[10px] font-mono text-gray-500 mt-1">Pantheon Architecture</p>
+          </div>
+          {/* Shard Visual — equal-sized connected nodes */}
+          <svg viewBox="0 0 120 80" className="w-full max-w-[140px] mx-auto mb-3">
+            {[
+              { x: 40, y: 18 }, { x: 80, y: 18 }, { x: 20, y: 50 },
+              { x: 60, y: 50 }, { x: 100, y: 50 }, { x: 40, y: 72 }, { x: 80, y: 72 },
+            ].map((pos, i, arr) => (
+              <g key={i}>
+                {arr.slice(i + 1).map((pos2, j) => {
+                  const dist = Math.sqrt((pos.x - pos2.x) ** 2 + (pos.y - pos2.y) ** 2)
+                  return dist < 50 ? (
+                    <line key={j} x1={pos.x} y1={pos.y} x2={pos2.x} y2={pos2.y} stroke={`${CYAN}18`} strokeWidth="0.5" />
+                  ) : null
+                })}
+                <circle cx={pos.x} cy={pos.y} r="9" fill={`${CYAN}08`} stroke={`${CYAN}30`} strokeWidth="1" />
+                <text x={pos.x} y={pos.y + 3} textAnchor="middle" className="text-[5px] font-mono font-bold" fill={`${CYAN}80`}>MIND</text>
+              </g>
+            ))}
+          </svg>
+          <div className="space-y-1.5">
+            {['Complete minds', 'Full context each', 'No single failure point'].map((item) => (
+              <div key={item} className="flex items-center gap-1.5">
+                <span style={{ color: CYAN }} className="text-[10px]">&#10003;</span>
+                <span className="text-[10px] font-mono text-gray-500">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Comparison Table */}
+      <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${CYAN}12` }}>
+        <div className="grid grid-cols-3 gap-0 text-[10px] font-mono">
+          <div className="px-3 py-2 bg-white/[0.02]" style={{ borderBottom: `1px solid ${CYAN}10` }}>
+            <span className="text-gray-500 uppercase tracking-wider">Dimension</span>
+          </div>
+          <div className="px-3 py-2 bg-white/[0.02] text-center" style={{ borderBottom: `1px solid ${CYAN}10` }}>
+            <span className="text-red-400 uppercase tracking-wider">Swarms</span>
+          </div>
+          <div className="px-3 py-2 bg-white/[0.02] text-center" style={{ borderBottom: `1px solid ${CYAN}10` }}>
+            <span style={{ color: CYAN }} className="uppercase tracking-wider">Shards</span>
+          </div>
+          {comparisons.map((row, i) => (
+            <React.Fragment key={row.dimension}>
+              <div className="px-3 py-2 text-gray-400" style={{ borderBottom: i < comparisons.length - 1 ? `1px solid ${CYAN}06` : 'none' }}>
+                {row.dimension}
+              </div>
+              <div className="px-3 py-2 text-center text-gray-500" style={{ borderBottom: i < comparisons.length - 1 ? `1px solid ${CYAN}06` : 'none' }}>
+                {row.swarm}
+              </div>
+              <div className="px-3 py-2 text-center text-gray-300" style={{ borderBottom: i < comparisons.length - 1 ? `1px solid ${CYAN}06` : 'none' }}>
+                {row.shard}
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ Live Agent Communication Feed ============
+
+function AgentFeed() {
+  const [visibleCount, setVisibleCount] = useState(6)
+  const [highlightIdx, setHighlightIdx] = useState(-1)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHighlightIdx((prev) => {
+        const next = (prev + 1) % Math.min(visibleCount, AGENT_MESSAGES.length)
+        return next
+      })
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [visibleCount])
+
+  return (
+    <div>
+      <div
+        className="rounded-lg p-3 font-mono text-[11px] space-y-1"
+        style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}10` }}
+      >
+        {/* Terminal Header */}
+        <div className="flex items-center gap-2 pb-2 mb-2" style={{ borderBottom: `1px solid ${CYAN}08` }}>
+          <div className="flex gap-1">
+            <div className="w-2 h-2 rounded-full bg-red-500/60" />
+            <div className="w-2 h-2 rounded-full bg-yellow-500/60" />
+            <div className="w-2 h-2 rounded-full bg-green-500/60" />
+          </div>
+          <span className="text-gray-600 text-[9px] tracking-wider uppercase">pantheon://agent-mesh/live</span>
+          <motion.div
+            className="w-1.5 h-1.5 rounded-full ml-auto"
+            style={{ background: '#22c55e' }}
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
+        </div>
+
+        {/* Messages */}
+        {AGENT_MESSAGES.slice(0, visibleCount).map((m, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{
+              opacity: highlightIdx === i ? 1 : 0.6,
+              x: 0,
+              background: highlightIdx === i ? `${m.color}08` : 'transparent',
+            }}
+            transition={{ duration: 0.3, delay: i * (0.04 * PHI) }}
+            className="flex gap-2 px-2 py-1 rounded"
+          >
+            <span className="text-gray-600 flex-shrink-0">{m.ts}</span>
+            <span className="flex-shrink-0" style={{ color: m.color }}>{m.from}</span>
+            <span className="text-gray-600 flex-shrink-0">&rarr;</span>
+            <span className="flex-shrink-0 text-gray-400">{m.to}</span>
+            <span className="text-gray-500 truncate">{m.msg}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      {visibleCount < AGENT_MESSAGES.length && (
+        <button
+          onClick={() => setVisibleCount(AGENT_MESSAGES.length)}
+          className="mt-2 text-[10px] font-mono px-3 py-1 rounded-full transition-colors"
+          style={{ color: `${CYAN}80`, background: `${CYAN}06`, border: `1px solid ${CYAN}15` }}
+          onMouseOver={(e) => { e.currentTarget.style.background = `${CYAN}12` }}
+          onMouseOut={(e) => { e.currentTarget.style.background = `${CYAN}06` }}
         >
-          <div className="flex flex-col items-center flex-shrink-0">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-mono font-bold"
-              style={{ background: `${step.color}15`, border: `1px solid ${step.color}35`, color: step.color }}
-            >
-              {step.num}
-            </div>
-            {i < steps.length - 1 && (
-              <div className="w-px h-6 mt-1" style={{ background: `${step.color}25` }} />
-            )}
-          </div>
-          <div className="pt-1.5">
-            <p className="text-xs font-mono font-bold text-white">{step.title}</p>
-            <p className="text-[11px] font-mono text-black-400 mt-0.5 leading-relaxed">{step.desc}</p>
-          </div>
-        </motion.div>
-      ))}
+          Show all messages
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ============ Deploy CTA ============
+
+function DeployCTA() {
+  return (
+    <div
+      className="rounded-2xl p-6 text-center"
+      style={{
+        background: `linear-gradient(135deg, ${CYAN}06, rgba(168,85,247,0.04))`,
+        border: `1px solid ${CYAN}15`,
+        boxShadow: `0 0 60px -20px ${CYAN}10`,
+      }}
+    >
+      <div className="mb-4">
+        <div
+          className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3"
+          style={{ background: `${CYAN}10`, border: `1px solid ${CYAN}25` }}
+        >
+          <span className="text-2xl" style={{ color: CYAN }}>+</span>
+        </div>
+        <h3 className="text-sm font-mono font-bold text-white mb-1">Deploy Your Agent</h3>
+        <p className="text-[11px] font-mono text-gray-400 max-w-md mx-auto leading-relaxed">
+          Build custom autonomous agents on the Pantheon framework. Register skills, join the mesh, earn revenue through Shapley-attributed task completion.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-2 mb-4">
+        {['Skill Registry', 'Proof of Mind', 'Task Escrow', 'Shapley Rewards'].map((feature) => (
+          <span
+            key={feature}
+            className="text-[9px] font-mono px-2.5 py-1 rounded-full"
+            style={{ background: `${CYAN}08`, color: `${CYAN}90`, border: `1px solid ${CYAN}15` }}
+          >
+            {feature}
+          </span>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <motion.a
+          href="https://github.com/wglynn/vibeswap"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-5 py-2 rounded-full text-xs font-mono font-bold transition-all"
+          style={{
+            background: `linear-gradient(135deg, ${CYAN}, #0891b2)`,
+            color: '#000',
+            boxShadow: `0 0 20px ${CYAN}30`,
+          }}
+          whileHover={{ scale: 1.03, boxShadow: `0 0 30px ${CYAN}50` }}
+          whileTap={{ scale: 0.97 }}
+        >
+          View Docs &rarr;
+        </motion.a>
+        <span className="text-[10px] font-mono text-gray-500">
+          Supports: Claude, GPT, Gemini, Open Source
+        </span>
+      </div>
     </div>
   )
 }
@@ -319,7 +490,7 @@ function Section({ index, title, subtitle, children }) {
       <GlassCard glowColor="terminal" spotlight hover={false} className="p-5 md:p-6">
         <div className="mb-4">
           <h2 className="text-sm font-mono font-bold tracking-wider uppercase" style={{ color: CYAN }}>{title}</h2>
-          {subtitle && <p className="text-[11px] font-mono text-black-400 mt-1 italic">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] font-mono text-gray-400 mt-1 italic">{subtitle}</p>}
           <div className="h-px mt-3" style={{ background: `linear-gradient(90deg, ${CYAN}40, transparent)` }} />
         </div>
         {children}
@@ -328,175 +499,160 @@ function Section({ index, title, subtitle, children }) {
   )
 }
 
+// ============ Background Particles ============
+
+function BackgroundParticles() {
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      {Array.from({ length: 16 }).map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-px h-px rounded-full"
+          style={{
+            background: CYAN,
+            left: `${(i * PHI * 17) % 100}%`,
+            top: `${(i * PHI * 23) % 100}%`,
+          }}
+          animate={{
+            opacity: [0, 0.3, 0],
+            scale: [0, 1.5, 0],
+            y: [0, -60 - (i % 4) * 25],
+          }}
+          transition={{
+            duration: 3 + (i % 4) * 1.2,
+            repeat: Infinity,
+            delay: (i * 0.7) % 4,
+            ease: 'easeOut',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 // ============ Main Component ============
 
 export default function AgentHub() {
-  const { isConnected: isExternalConnected } = useWallet()
-  const { isConnected: isDeviceConnected } = useDeviceWallet()
-  const isConnected = isExternalConnected || isDeviceConnected
-  const [expanded, setExpanded] = useState('protocol')
-
   return (
     <div className="min-h-screen pb-20">
-      {/* ============ Background ============ */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-px h-px rounded-full"
-            style={{ background: CYAN, left: `${(i * PHI * 17) % 100}%`, top: `${(i * PHI * 23) % 100}%` }}
-            animate={{ opacity: [0, 0.35, 0], scale: [0, 1.5, 0], y: [0, -60 - (i % 4) * 25] }}
-            transition={{ duration: 3 + (i % 4) * 1.2, repeat: Infinity, delay: (i * 0.7) % 4, ease: 'easeOut' }}
-          />
-        ))}
-      </div>
+      <BackgroundParticles />
 
-      <div className="relative z-10 max-w-3xl mx-auto px-4 pt-8 md:pt-14">
-        {/* ============ Header ============ */}
-        <motion.div variants={headerV} initial="hidden" animate="visible" className="text-center mb-10">
-          <motion.div
-            initial={{ scaleX: 0 }} animate={{ scaleX: 1 }}
-            transition={{ duration: 1, delay: 0.2, ease }}
-            className="w-28 h-px mx-auto mb-5"
-            style={{ background: `linear-gradient(90deg, transparent, ${CYAN}, transparent)` }}
-          />
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-[0.12em] uppercase mb-3"
-            style={{ textShadow: `0 0 40px ${CYAN}33` }}>
-            <span className="text-white">AI </span>
-            <span style={{ color: CYAN }}>AGENTS</span>
-          </h1>
-          <p className="text-sm text-black-300 font-mono mb-2">
-            Universal agent infrastructure. Any framework. Any model. On-chain.
-          </p>
-          <p className="text-xs text-black-500 font-mono italic">Shards, not swarms. Each agent is a complete mind.</p>
-        </motion.div>
+      <div className="relative z-10">
+        {/* ============ Page Hero ============ */}
+        <PageHero
+          category="ecosystem"
+          title="AI Agent Hub"
+          subtitle="The Pantheon — where autonomous agents serve the protocol"
+          badge="Live"
+          badgeColor="#22c55e"
+        />
 
-        {/* ============ Framework Badges ============ */}
-        <motion.div custom={0} variants={sectionV} initial="hidden" animate="visible" className="mb-6">
-          <div className="flex flex-wrap justify-center gap-2">
-            {AGENT_FRAMEWORKS.map((fw, i) => (
-              <motion.div
-                key={fw.id}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 + i * 0.06, duration: 0.3 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                style={{ background: `${fw.color}08`, border: `1px solid ${fw.color}25` }}
-              >
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: fw.color }} />
-                <span className="text-[10px] font-mono" style={{ color: fw.color }}>{fw.name}</span>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* ============ Stats ============ */}
-        <motion.div custom={1} variants={sectionV} initial="hidden" animate="visible" className="mb-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: 'Pantheon Agents', value: '10', color: CYAN },
-              { label: 'Tasks Completed', value: '42.8K', color: '#22c55e' },
-              { label: 'Registered Skills', value: '3,400', color: '#a855f7' },
-              { label: 'Frameworks', value: '6', color: '#f59e0b' },
-            ].map((s, i) => (
-              <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 + i * 0.06 }}>
-                <GlassCard hover glowColor="terminal">
-                  <div className="p-3 text-center">
-                    <p className="text-lg font-mono font-bold" style={{ color: s.color }}>{s.value}</p>
-                    <p className="text-[9px] font-mono text-black-500 uppercase tracking-wider mt-1">{s.label}</p>
-                  </div>
-                </GlassCard>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* ============ Pantheon Network ============ */}
-        <div className="space-y-6">
-          <Section index={2} title="The Pantheon" subtitle="10 specialized agents forming a cooperative intelligence network">
-            <PantheonNetwork />
-          </Section>
-
-          {/* ============ Infrastructure Modules ============ */}
-          <Section index={3} title="Infrastructure" subtitle="Six layers of agent capability">
-            <div className="space-y-2">
-              {MODULES.map((m, i) => (
-                <ModuleCard
-                  key={m.id}
-                  module={m}
-                  index={i}
-                  isExpanded={expanded === m.id}
-                  onToggle={() => setExpanded(expanded === m.id ? null : m.id)}
-                />
-              ))}
+        <div className="max-w-5xl mx-auto px-4">
+          {/* ============ Stat Cards ============ */}
+          <motion.div custom={0} variants={sectionV} initial="hidden" animate="visible" className="mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard
+                label="Active Agents"
+                value={9}
+                decimals={0}
+                sparkSeed={4201}
+                size="sm"
+              />
+              <StatCard
+                label="Tasks Completed"
+                value={24}
+                suffix="K"
+                decimals={0}
+                change={12.4}
+                sparkSeed={4202}
+                size="sm"
+              />
+              <StatCard
+                label="Revenue Generated"
+                value={1.2}
+                prefix="$"
+                suffix="M"
+                decimals={1}
+                change={8.7}
+                sparkSeed={4203}
+                size="sm"
+              />
+              <StatCard
+                label="Avg Response Time"
+                value={1.2}
+                suffix="s"
+                decimals={1}
+                sparkSeed={4204}
+                size="sm"
+              />
             </div>
-          </Section>
+          </motion.div>
 
-          {/* ============ Agent Lifecycle ============ */}
-          <Section index={4} title="Agent Lifecycle" subtitle="From registration to reward in five steps">
-            <AgentLifecycle />
-          </Section>
-
-          {/* ============ Shards vs Swarms ============ */}
-          <motion.div custom={5} variants={sectionV} initial="hidden" animate="visible">
-            <div className="rounded-2xl p-6" style={{ background: `${CYAN}06`, border: `2px solid ${CYAN}20`, boxShadow: `0 0 60px -15px ${CYAN}10` }}>
-              <p className="text-[10px] font-mono uppercase tracking-[0.2em] mb-3 text-center" style={{ color: `${CYAN}70` }}>Design Philosophy</p>
-              <blockquote className="text-center">
-                <p className="text-sm text-black-200 italic leading-relaxed">
-                  "Everyone else does swarms — fragmented sub-agents delegating to smaller fragments.
+          {/* ============ Featured Agents ============ */}
+          <motion.div custom={1} variants={sectionV} initial="hidden" animate="visible" className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-mono font-bold tracking-wider uppercase" style={{ color: CYAN }}>
+                  Featured Agents
+                </h2>
+                <p className="text-[11px] font-mono text-gray-400 mt-0.5 italic">
+                  6 autonomous minds forming a cooperative intelligence network
                 </p>
-                <p className="text-sm font-bold italic leading-relaxed mt-1" style={{ color: CYAN }}>
-                  We do shards. Each shard is a complete mind, not a fragment."
-                </p>
-              </blockquote>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                  <p className="text-[10px] font-mono text-red-400 font-bold uppercase">Swarms</p>
-                  <p className="text-[10px] font-mono text-black-500 mt-1">Fragments. Lossy delegation.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <motion.div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: '#22c55e' }}
+                    animate={{ boxShadow: ['0 0 0px #22c55e', '0 0 6px #22c55e', '0 0 0px #22c55e'] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                  <span className="text-[9px] font-mono text-gray-500">Active</span>
                 </div>
-                <div className="rounded-lg p-3 text-center" style={{ background: `${CYAN}06`, border: `1px solid ${CYAN}20` }}>
-                  <p className="text-[10px] font-mono font-bold uppercase" style={{ color: CYAN }}>Shards</p>
-                  <p className="text-[10px] font-mono text-black-500 mt-1">Complete minds. Full context.</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: '#f59e0b' }} />
+                  <span className="text-[9px] font-mono text-gray-500">Standby</span>
                 </div>
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {AGENTS.map((agent, i) => (
+                <AgentCard key={agent.id} agent={agent} index={i} />
+              ))}
+            </div>
+          </motion.div>
+
+          <div className="space-y-6">
+            {/* ============ Shards vs Swarms ============ */}
+            <Section index={2} title="Shards vs Swarms" subtitle="Why the Pantheon uses full-clone architecture">
+              <ShardsVsSwarms />
+            </Section>
+
+            {/* ============ Agent Communication Feed ============ */}
+            <Section index={3} title="Agent Communication" subtitle="Live inter-agent message feed from the Pantheon mesh">
+              <AgentFeed />
+            </Section>
+
+            {/* ============ Deploy Your Agent ============ */}
+            <motion.div custom={4} variants={sectionV} initial="hidden" animate="visible">
+              <DeployCTA />
+            </motion.div>
+          </div>
+
+          {/* ============ Footer ============ */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 0.8 }}
+            className="mt-12 mb-8 text-center"
+          >
+            <div className="w-16 h-px mx-auto mb-4" style={{ background: `linear-gradient(90deg, transparent, ${CYAN}40, transparent)` }} />
+            <p className="text-[10px] font-mono text-gray-500 tracking-widest uppercase">
+              The Pantheon — Cooperative AI Intelligence
+            </p>
           </motion.div>
         </div>
-
-        {/* ============ Cross Links ============ */}
-        <motion.div custom={6} variants={sectionV} initial="hidden" animate="visible" className="mt-8">
-          <div className="flex flex-wrap justify-center gap-3">
-            {[
-              { path: '/agentic', label: 'Agentic Economy' },
-              { path: '/rosetta', label: 'Rosetta Protocol' },
-              { path: '/covenants', label: 'Ten Covenants' },
-              { path: '/infofi', label: 'InfoFi' },
-            ].map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className="text-[10px] font-mono px-3 py-1.5 rounded-full transition-all hover:text-cyan-400"
-                style={{ background: `${CYAN}08`, border: `1px solid ${CYAN}15`, color: `${CYAN}99` }}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* ============ Footer ============ */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5, duration: 0.8 }} className="mt-12 mb-8 text-center">
-          <div className="w-16 h-px mx-auto mb-4" style={{ background: `linear-gradient(90deg, transparent, ${CYAN}40, transparent)` }} />
-          <p className="text-[10px] font-mono text-black-500 tracking-widest uppercase">The Pantheon — Cooperative AI Intelligence</p>
-        </motion.div>
-
-        {!isConnected && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20">
-            <div className="px-4 py-2 rounded-full text-xs font-mono" style={{ background: 'rgba(0,0,0,0.8)', border: `1px solid ${CYAN}25`, color: `${CYAN}80` }}>
-              Connect wallet to deploy and interact with agents
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

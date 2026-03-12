@@ -22,6 +22,7 @@ import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, process
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
+import { handleNyxRequest } from './nyx.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
 // ============ Module Health Registry ============
 // Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
@@ -6073,6 +6074,13 @@ async function main() {
         }
       }
 
+      // Nyx — Agent Interface (worker nodes too)
+      if (req.url?.startsWith('/nyx')) {
+        const nyxUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        await handleNyxRequest(req, res, nyxUrl);
+        return;
+      }
+
       res.writeHead(404);
       res.end('Not found');
     }).listen(healthPort, () => {
@@ -6903,6 +6911,12 @@ async function main() {
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
         }
+
+      // ============ Nyx — Agent Interface ============
+      // Freedom's per-node interface: chat + file browser + editor + terminal
+      } else if (req.url?.startsWith('/nyx')) {
+        const nyxUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        await handleNyxRequest(req, res, nyxUrl);
 
       // ============ Mini App Static Files ============
       // Serves the built Jarvis Shard Miner webapp at /app/*

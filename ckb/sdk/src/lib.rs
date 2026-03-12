@@ -46,6 +46,7 @@ pub mod rate_limiter;
 pub mod rewards;
 pub mod risk;
 pub mod rollup;
+pub mod scheduler;
 pub mod router;
 pub mod settlement;
 pub mod simulator;

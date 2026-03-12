@@ -32,6 +32,7 @@ pub mod orderbook;
 pub mod oracle;
 pub mod portfolio;
 pub mod prediction;
+pub mod pricing;
 pub mod rewards;
 pub mod risk;
 pub mod router;

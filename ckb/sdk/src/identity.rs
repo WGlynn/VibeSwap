@@ -2544,4 +2544,257 @@ mod tests {
         let id = create_identity(test_hash(1), 0).unwrap();
         assert_eq!(find_address(&id, test_hash(1)), Some(0));
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn test_create_identity_zero_hash_h9() {
+        let result = create_identity([0u8; 32], 100);
+        assert_eq!(result, Err(IdentityError::ZeroHash));
+    }
+
+    #[test]
+    fn test_create_identity_initial_state_h9() {
+        let id = create_identity(test_hash(1), 500).unwrap();
+        assert_eq!(id.reputation, INITIAL_REPUTATION);
+        assert_eq!(id.address_count, 1);
+        assert_eq!(id.created_block, 500);
+        assert_eq!(id.last_active_block, 500);
+        assert_eq!(id.total_trades, 0);
+        assert_eq!(id.total_lp_actions, 0);
+        assert_eq!(id.total_governance_votes, 0);
+        assert_eq!(id.total_penalties, 0);
+    }
+
+    #[test]
+    fn test_link_address_duplicate_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let result = link_address(&id, test_hash(1), LinkType::Device, 100);
+        assert_eq!(result, Err(IdentityError::AddressAlreadyLinked));
+    }
+
+    #[test]
+    fn test_link_address_success_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let updated = link_address(&id, test_hash(2), LinkType::Device, 100).unwrap();
+        assert_eq!(updated.address_count, 2);
+        assert_eq!(find_address(&updated, test_hash(2)), Some(1));
+    }
+
+    #[test]
+    fn test_link_address_max_reached_h9() {
+        let id = fully_linked_identity();
+        let result = link_address(&id, test_hash(99), LinkType::Recovery, 100);
+        assert_eq!(result, Err(IdentityError::MaxAddressesReached));
+    }
+
+    #[test]
+    fn test_unlink_primary_fails_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let result = unlink_address(&id, test_hash(1));
+        assert_eq!(result, Err(IdentityError::AddressNotFound));
+    }
+
+    #[test]
+    fn test_unlink_nonexistent_fails_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let result = unlink_address(&id, test_hash(99));
+        assert_eq!(result, Err(IdentityError::AddressNotFound));
+    }
+
+    #[test]
+    fn test_unlink_address_shifts_remaining_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let id = link_address(&id, test_hash(2), LinkType::Device, 100).unwrap();
+        let id = link_address(&id, test_hash(3), LinkType::Hardware, 200).unwrap();
+        let updated = unlink_address(&id, test_hash(2)).unwrap();
+        assert_eq!(updated.address_count, 2);
+        assert_eq!(find_address(&updated, test_hash(3)), Some(1));
+    }
+
+    #[test]
+    fn test_record_activity_trade_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let (updated, change) = record_activity(&id, ActivityType::Trade, 100).unwrap();
+        assert_eq!(updated.reputation, INITIAL_REPUTATION + REPUTATION_BOOST_TRADE);
+        assert_eq!(updated.total_trades, 1);
+        assert_eq!(change.old_reputation, INITIAL_REPUTATION);
+        assert_eq!(change.new_reputation, INITIAL_REPUTATION + REPUTATION_BOOST_TRADE);
+    }
+
+    #[test]
+    fn test_record_activity_lp_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::LiquidityProvision, 100).unwrap();
+        assert_eq!(updated.reputation, INITIAL_REPUTATION + REPUTATION_BOOST_LP);
+        assert_eq!(updated.total_lp_actions, 1);
+    }
+
+    #[test]
+    fn test_record_activity_governance_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::GovernanceVote, 100).unwrap();
+        assert_eq!(updated.reputation, INITIAL_REPUTATION + REPUTATION_BOOST_GOVERNANCE);
+        assert_eq!(updated.total_governance_votes, 1);
+    }
+
+    #[test]
+    fn test_record_activity_failed_reveal_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::FailedReveal, 100).unwrap();
+        assert_eq!(updated.reputation, INITIAL_REPUTATION - REPUTATION_PENALTY_FAILED_REVEAL);
+        assert_eq!(updated.total_penalties, 1);
+    }
+
+    #[test]
+    fn test_record_activity_reputation_capped_h9() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.reputation = MAX_REPUTATION - 5;
+        let (updated, _) = record_activity(&id, ActivityType::Trade, 100).unwrap();
+        assert_eq!(updated.reputation, MAX_REPUTATION); // Capped
+    }
+
+    #[test]
+    fn test_record_activity_reputation_floor_zero_h9() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.reputation = 50;
+        let (updated, _) = record_activity(&id, ActivityType::Liquidated, 100).unwrap();
+        assert_eq!(updated.reputation, 0); // 50 - 200 saturates to 0
+    }
+
+    #[test]
+    fn test_record_activity_neutral_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::StakeCreated, 100).unwrap();
+        assert_eq!(updated.reputation, INITIAL_REPUTATION); // No change
+    }
+
+    #[test]
+    fn test_apply_decay_zero_epochs_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let decayed = apply_decay(&id, 0);
+        assert_eq!(decayed.reputation, id.reputation);
+    }
+
+    #[test]
+    fn test_apply_decay_single_epoch_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let decayed = apply_decay(&id, 1);
+        // 0.5% decay: 1000 - 5 = 995
+        assert_eq!(decayed.reputation, 995);
+    }
+
+    #[test]
+    fn test_apply_decay_many_epochs_to_zero_h9() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let decayed = apply_decay(&id, 10_000);
+        assert_eq!(decayed.reputation, 0);
+    }
+
+    #[test]
+    fn test_compute_reputation_tier_boundaries_h9() {
+        assert_eq!(compute_reputation_tier(0), ReputationTier::Newcomer);
+        assert_eq!(compute_reputation_tier(999), ReputationTier::Newcomer);
+        assert_eq!(compute_reputation_tier(1_000), ReputationTier::Participant);
+        assert_eq!(compute_reputation_tier(2_999), ReputationTier::Participant);
+        assert_eq!(compute_reputation_tier(3_000), ReputationTier::Contributor);
+        assert_eq!(compute_reputation_tier(5_000), ReputationTier::Veteran);
+        assert_eq!(compute_reputation_tier(7_500), ReputationTier::Elder);
+        assert_eq!(compute_reputation_tier(MAX_REPUTATION), ReputationTier::Legend);
+    }
+
+    #[test]
+    fn test_has_priority_access_h9() {
+        assert!(!has_priority_access(&identity_with_reputation(4_999)));
+        assert!(has_priority_access(&identity_with_reputation(5_000)));
+        assert!(has_priority_access(&identity_with_reputation(10_000)));
+    }
+
+    #[test]
+    fn test_compute_trust_level_new_identity_h9() {
+        let id = create_identity(test_hash(1), 1000).unwrap();
+        let trust = compute_trust_level(&id, 1000);
+        // Rep component: 1000/10000 * 5000 = 500
+        // Age component: 0/100000 * 3000 = 0
+        // Activity: 0 -> 0
+        assert_eq!(trust, 500);
+    }
+
+    #[test]
+    fn test_compute_activity_score_h9() {
+        let id = identity_with_all_activities(10, 5, 2);
+        let score = compute_activity_score(&id);
+        // 10*1 + 5*3 + 2*5 = 10+15+10 = 35
+        assert_eq!(score, 35);
+    }
+
+    #[test]
+    fn test_is_active_within_window_h9() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.last_active_block = 500;
+        assert!(is_active(&id, 500 + ACTIVITY_WINDOW_BLOCKS));
+        assert!(!is_active(&id, 500 + ACTIVITY_WINDOW_BLOCKS + 1));
+    }
+
+    #[test]
+    fn test_build_profile_h9() {
+        let id = identity_with_reputation(5_000);
+        let profile = build_profile(&id, 2000);
+        assert_eq!(profile.reputation_tier, ReputationTier::Veteran);
+    }
+
+    #[test]
+    fn test_merge_identities_reputation_capped_h9() {
+        let a = identity_with_reputation(8_000);
+        let b = identity_with_reputation(8_000);
+        let merged = merge_identities(&a, &b).unwrap();
+        assert_eq!(merged.reputation, MAX_REPUTATION);
+    }
+
+    #[test]
+    fn test_merge_identities_addresses_combined_h9() {
+        let a = create_identity(test_hash(1), 0).unwrap();
+        let b = create_identity(test_hash(2), 0).unwrap();
+        let merged = merge_identities(&a, &b).unwrap();
+        // a has hash(1), b has hash(2) -> merged has both
+        assert_eq!(merged.address_count, 2);
+        assert!(find_address(&merged, test_hash(1)).is_some());
+        assert!(find_address(&merged, test_hash(2)).is_some());
+    }
+
+    #[test]
+    fn test_reputation_to_fee_discount_zero_h9() {
+        assert_eq!(reputation_to_fee_discount_bps(0), 0);
+    }
+
+    #[test]
+    fn test_reputation_to_fee_discount_max_h9() {
+        assert_eq!(reputation_to_fee_discount_bps(MAX_REPUTATION), MAX_FEE_DISCOUNT_BPS);
+    }
+
+    #[test]
+    fn test_reputation_to_fee_discount_mid_h9() {
+        let discount = reputation_to_fee_discount_bps(5_000);
+        // 5000/10000 * 500 = 250
+        assert_eq!(discount, 250);
+    }
+
+    #[test]
+    fn test_build_leaderboard_empty_h9() {
+        let lb = build_leaderboard(&[], 10);
+        assert!(lb.is_empty());
+    }
+
+    #[test]
+    fn test_build_leaderboard_sorted_h9() {
+        let a = identity_with_reputation(500);
+        let b = identity_with_reputation(9_000);
+        let c = identity_with_reputation(3_000);
+        let lb = build_leaderboard(&[a, b, c], 10);
+        assert_eq!(lb.len(), 3);
+        assert_eq!(lb[0].reputation, 9_000);
+        assert_eq!(lb[1].reputation, 3_000);
+        assert_eq!(lb[2].reputation, 500);
+        assert_eq!(lb[0].rank, 1);
+    }
 }

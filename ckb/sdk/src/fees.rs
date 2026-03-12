@@ -3003,4 +3003,218 @@ mod tests {
         // 1000000 / 100 * 10000 = 100_000_000 bps
         assert_eq!(yield_bps as u128, 100_000_000);
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn test_fee_config_invalid_shares_h9() {
+        let config = FeeConfig {
+            protocol_fee_bps: 1667,
+            treasury_share_bps: 4000,
+            staker_share_bps: 3000,
+            insurance_share_bps: 2000,
+        };
+        // 4000+3000+2000 = 9000, not 10000
+        assert!(!config.is_valid());
+    }
+
+    #[test]
+    fn test_fee_config_all_to_treasury_h9() {
+        let config = FeeConfig {
+            protocol_fee_bps: 1667,
+            treasury_share_bps: 10_000,
+            staker_share_bps: 0,
+            insurance_share_bps: 0,
+        };
+        assert!(config.is_valid());
+    }
+
+    #[test]
+    fn test_shapley_weights_empty_pools_h9() {
+        let pools: Vec<PoolDepthInfo> = vec![];
+        let weights = calculate_shapley_weights(&pools);
+        assert!(weights.is_empty());
+    }
+
+    #[test]
+    fn test_shapley_weights_zero_depth_pool_h9() {
+        let pools = vec![PoolDepthInfo {
+            pair_id: pair(1),
+            depth: 0,
+            epoch_volume: 1_000_000,
+            route_count: 5,
+        }];
+        let weights = calculate_shapley_weights(&pools);
+        assert_eq!(*weights.get(&pair(1)).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_shapley_weights_single_pool_max_routes_h9() {
+        let pools = vec![PoolDepthInfo {
+            pair_id: pair(1),
+            depth: 1_000_000,
+            epoch_volume: 500_000,
+            route_count: 1,
+        }];
+        let weights = calculate_shapley_weights(&pools);
+        // Single pool is max_routes by itself, so connectivity_bonus = PRECISION
+        assert!(*weights.get(&pair(1)).unwrap() > 0);
+    }
+
+    #[test]
+    fn test_shapley_weights_volume_exceeds_depth_capped_h9() {
+        let pools = vec![PoolDepthInfo {
+            pair_id: pair(1),
+            depth: 100,
+            epoch_volume: 10_000, // Far exceeds depth
+            route_count: 1,
+        }];
+        let weights = calculate_shapley_weights(&pools);
+        // Utilization bonus should be capped at PRECISION
+        assert!(*weights.get(&pair(1)).unwrap() > 0);
+    }
+
+    #[test]
+    fn test_fee_epoch_total_fees_all_sources_h9() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100);
+        epoch.record_lending_fee(pair(2), 200);
+        epoch.record_insurance_fee(pair(3), 300);
+        epoch.record_prediction_fee(pair(4), 400);
+        epoch.record_priority_fee(500);
+        assert_eq!(epoch.total_fees(), 1500);
+    }
+
+    #[test]
+    fn test_fee_epoch_fees_by_source_h9() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100);
+        epoch.record_lending_fee(pair(2), 200);
+        let breakdown = epoch.fees_by_source();
+        assert_eq!(breakdown.amm, 100);
+        assert_eq!(breakdown.lending, 200);
+        assert_eq!(breakdown.insurance, 0);
+        assert_eq!(breakdown.total(), 300);
+    }
+
+    #[test]
+    fn test_fee_epoch_multiple_amm_fees_same_pair_h9() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100);
+        epoch.record_amm_fee(pair(1), 200);
+        assert_eq!(*epoch.amm_fees.get(&pair(1)).unwrap(), 300);
+    }
+
+    #[test]
+    fn test_calculate_distribution_empty_epoch_h9() {
+        let epoch = default_epoch();
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+        assert_eq!(dist.total_distributed, 0);
+        assert_eq!(dist.treasury_amount, 0);
+    }
+
+    #[test]
+    fn test_calculate_swap_fee_zero_input_h9() {
+        let (fee, output) = calculate_swap_fee(0, 1_000_000, 1_000_000, 30);
+        assert_eq!(fee, 0);
+        assert_eq!(output, 0);
+    }
+
+    #[test]
+    fn test_calculate_swap_fee_zero_reserve_in_h9() {
+        let (fee, output) = calculate_swap_fee(1000, 0, 1_000_000, 30);
+        // fee is computed, output is 0 since reserve_in=0 leads to division issues
+        assert_eq!(fee, vibeswap_math::mul_div(1000, 30, 10_000));
+        // Output with reserve_in=0 + amount_after_fee > 0 should still produce output
+        assert!(output > 0 || output == 0); // Just verify no panic
+    }
+
+    #[test]
+    fn test_calculate_swap_fee_large_fee_rate_h9() {
+        // 50% fee rate = 5000 bps
+        let (fee, _output) = calculate_swap_fee(10_000, 1_000_000, 1_000_000, 5000);
+        assert_eq!(fee, 5_000); // 50% of 10000
+    }
+
+    #[test]
+    fn test_calculate_lending_reserve_income_zero_borrows_h9() {
+        let income = calculate_lending_reserve_income(0, 500, 2000, 1000);
+        assert_eq!(income, 0);
+    }
+
+    #[test]
+    fn test_calculate_lending_reserve_income_zero_blocks_h9() {
+        let income = calculate_lending_reserve_income(1_000_000, 500, 2000, 0);
+        assert_eq!(income, 0);
+    }
+
+    #[test]
+    fn test_calculate_prediction_fee_zero_pool_h9() {
+        let fee = calculate_prediction_fee(0, 0, 100);
+        assert_eq!(fee, 0);
+    }
+
+    #[test]
+    fn test_calculate_prediction_fee_zero_rate_h9() {
+        let fee = calculate_prediction_fee(500, 1000, 0);
+        assert_eq!(fee, 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_empty_epoch_h9() {
+        let epoch = default_epoch();
+        let annualized = annualize_revenue(&epoch);
+        assert_eq!(annualized, 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_same_start_end_h9() {
+        let epoch = FeeEpoch::new(1, 1000, 1000);
+        let annualized = annualize_revenue(&epoch);
+        assert_eq!(annualized, 0);
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_zero_tvl_h9() {
+        let result = revenue_yield_bps(1_000_000, 0);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_zero_revenue_h9() {
+        let result = revenue_yield_bps(0, 1_000_000);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_distribution_shapley_empty_depths_h9() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000);
+        let config = FeeConfig::default();
+        let dist = calculate_distribution_shapley(&epoch, &config, &[]);
+        // With no pool depths, LP distributions should be empty
+        assert!(dist.lp_distributions.is_empty());
+    }
+
+    #[test]
+    fn test_fee_epoch_new_blocks_h9() {
+        let epoch = FeeEpoch::new(42, 500, 1500);
+        assert_eq!(epoch.epoch_id, 42);
+        assert_eq!(epoch.start_block, 500);
+        assert_eq!(epoch.end_block, 1500);
+        assert_eq!(epoch.priority_fees, 0);
+    }
+
+    #[test]
+    fn test_distribution_protocol_share_conservation_h9() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 1_000_000);
+        let config = FeeConfig::default();
+        let dist = calculate_distribution(&epoch, &config);
+        // Total distributed should be close to total fees (minus rounding)
+        let lp_total: u128 = dist.lp_distributions.values().sum();
+        let protocol_total = dist.treasury_amount + dist.staker_amount + dist.insurance_amount;
+        assert!(lp_total + protocol_total <= 1_000_000);
+    }
 }

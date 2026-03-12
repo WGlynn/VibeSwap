@@ -3301,4 +3301,208 @@ mod tests {
         let result = g.effective_price(&hops, 1_000);
         assert!(result.is_none());
     }
+
+    // ============ Hardening Round 9 ============
+
+    #[test]
+    fn test_find_best_route_zero_input_h9() {
+        let g = graph_two_pools();
+        let result = g.find_best_route(&token(1), &token(3), 0);
+        assert_eq!(result, Err(RouterError::ZeroInput));
+    }
+
+    #[test]
+    fn test_find_best_route_same_token_h9() {
+        let g = graph_two_pools();
+        let result = g.find_best_route(&token(1), &token(1), 1000);
+        assert_eq!(result, Err(RouterError::SameToken));
+    }
+
+    #[test]
+    fn test_find_best_route_empty_graph_h9() {
+        let g = PoolGraph::new();
+        let result = g.find_best_route(&token(1), &token(2), 1000);
+        assert_eq!(result, Err(RouterError::EmptyGraph));
+    }
+
+    #[test]
+    fn test_find_best_route_no_route_h9() {
+        let mut g = PoolGraph::new();
+        g.add_pool(pool(1, 2, 1_000_000, 1_000_000));
+        // Token 3 is not connected
+        let result = g.find_best_route(&token(1), &token(3), 1000);
+        assert_eq!(result, Err(RouterError::NoRouteFound));
+    }
+
+    #[test]
+    fn test_find_all_routes_same_token_h9() {
+        let g = graph_two_pools();
+        let result = g.find_all_routes(&token(1), &token(1), 4);
+        assert_eq!(result, Err(RouterError::SameToken));
+    }
+
+    #[test]
+    fn test_find_all_routes_empty_graph_h9() {
+        let g = PoolGraph::new();
+        let result = g.find_all_routes(&token(1), &token(2), 4);
+        assert_eq!(result, Err(RouterError::EmptyGraph));
+    }
+
+    #[test]
+    fn test_find_all_routes_triangle_multiple_paths_h9() {
+        let g = graph_triangle();
+        let routes = g.find_all_routes(&token(1), &token(3), 4).unwrap();
+        // Should find at least 2 routes: A->C direct, A->B->C
+        assert!(routes.len() >= 2);
+    }
+
+    #[test]
+    fn test_simulate_route_single_hop_h9() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        let output = g.simulate_route(&hops, 1_000_000);
+        assert!(output.is_some());
+        assert!(output.unwrap() > 0);
+    }
+
+    #[test]
+    fn test_simulate_route_zero_input_h9() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        let output = g.simulate_route(&hops, 0);
+        // Zero input may produce None or Some(0)
+        assert!(output.is_none() || output == Some(0));
+    }
+
+    #[test]
+    fn test_estimate_price_impact_zero_input_h9() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        let impact = g.estimate_price_impact(&hops, 0);
+        assert_eq!(impact, 0);
+    }
+
+    #[test]
+    fn test_estimate_price_impact_large_trade_h9() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        // Trade half the pool -> significant price impact
+        let impact = g.estimate_price_impact(&hops, 500_000e18 as u128);
+        assert!(impact > 0);
+    }
+
+    #[test]
+    fn test_spot_price_token0_to_token1_h9() {
+        let p = pool(1, 2, 1_000_000, 2_000_000);
+        let price = PoolGraph::spot_price(&p, &token(1));
+        // token1 / token0 * PRECISION = 2_000_000 / 1_000_000 * PRECISION = 2*PRECISION
+        assert_eq!(price, 2 * vibeswap_math::PRECISION);
+    }
+
+    #[test]
+    fn test_spot_price_token1_to_token0_h9() {
+        let p = pool(1, 2, 1_000_000, 2_000_000);
+        let price = PoolGraph::spot_price(&p, &token(2));
+        // Reversed: token0/token1 * PRECISION = 1M/2M * PRECISION = PRECISION/2
+        assert_eq!(price, vibeswap_math::PRECISION / 2);
+    }
+
+    #[test]
+    fn test_spot_price_zero_reserve_in_h9() {
+        let p = pool(1, 2, 0, 2_000_000);
+        let price = PoolGraph::spot_price(&p, &token(1));
+        assert_eq!(price, 0);
+    }
+
+    #[test]
+    fn test_min_output_with_slippage_h9() {
+        let result = PoolGraph::min_output_with_slippage(10_000, 50); // 0.5% slippage
+        assert_eq!(result, 9_950);
+    }
+
+    #[test]
+    fn test_min_output_with_slippage_zero_h9() {
+        let result = PoolGraph::min_output_with_slippage(10_000, 0);
+        assert_eq!(result, 10_000);
+    }
+
+    #[test]
+    fn test_min_output_with_slippage_100_percent_h9() {
+        let result = PoolGraph::min_output_with_slippage(10_000, 10_000);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_effective_price_single_hop_h9() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        let price = g.effective_price(&hops, 1_000_000);
+        assert!(price.is_some());
+        assert!(price.unwrap() > 0);
+    }
+
+    #[test]
+    fn test_effective_price_zero_input_h9() {
+        let g = graph_two_pools();
+        let hops = vec![SwapHop {
+            pool_index: 0, pair_id: pair(1, 2),
+            token_in: token(1), token_out: token(2),
+        }];
+        let result = g.effective_price(&hops, 0);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_required_input_empty_hops_h9() {
+        let g = graph_two_pools();
+        let result = g.required_input(&[], 1000);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_neighbors_unknown_token_h9() {
+        let g = graph_two_pools();
+        let n = g.neighbors(&token(99));
+        assert!(n.is_empty());
+    }
+
+    #[test]
+    fn test_from_pools_constructor_h9() {
+        let edge = pool(1, 2, 1_000_000, 1_000_000);
+        let g = PoolGraph::from_pools(&[(edge,)]);
+        assert_eq!(g.pool_count(), 1);
+        assert_eq!(g.token_count(), 2);
+    }
+
+    #[test]
+    fn test_find_split_route_zero_input_h9() {
+        let g = graph_triangle();
+        let result = g.find_split_route(&token(1), &token(3), 0);
+        assert_eq!(result, Err(RouterError::ZeroInput));
+    }
+
+    #[test]
+    fn test_find_best_route_two_hop_h9() {
+        let g = graph_two_pools();
+        let route = g.find_best_route(&token(1), &token(3), 1_000_000e18 as u128);
+        assert!(route.is_ok());
+        let r = route.unwrap();
+        assert_eq!(r.hops.len(), 2); // A->B->C
+        assert!(r.expected_output > 0);
+    }
 }

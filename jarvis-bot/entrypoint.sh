@@ -85,6 +85,11 @@ export VIBESWAP_REPO="$REPO_DIR"
 # Ensure it exists even if no volume is mounted
 mkdir -p /app/data
 
+# Clean stale instance lock from previous container lifecycle.
+# In a container, if we're running this entrypoint, we are definitionally the only instance.
+# The lock file persists on the volume across hard kills and restarts, causing PID-reuse false positives.
+rm -f /app/data/jarvis.lock 2>/dev/null
+
 # If the repo has existing data files, seed them into the data dir (first boot only)
 if [ -d "$REPO_DIR/jarvis-bot/data" ]; then
     for f in contributions.json users.json interactions.json moderation.json threads.json spam-log.json behavior.json; do

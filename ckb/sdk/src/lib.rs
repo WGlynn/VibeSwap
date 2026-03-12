@@ -67,6 +67,7 @@ pub mod snapshot;
 pub mod staking;
 pub mod strategy;
 pub mod testing;
+pub mod token_economics;
 pub mod token;
 pub mod treasury;
 pub mod upgrade;

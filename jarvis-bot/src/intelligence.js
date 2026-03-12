@@ -236,7 +236,9 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
     updateRapport(userName);
     const rapportHint = getRapportHint(userName);
 
-    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation. Hint: ${responseHint}. ${rapportHint}\nYou can: one-liner, challenge, context, banter, follow-up question, hot take. 1-3 sentences. Match the energy. Reference what was said.\n${getResponseModifier()}]`;
+    // Self-calibration: inject learned improvement hints from score trends
+    const calibration = await getScoreCalibration();
+    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation. Hint: ${responseHint}. ${rapportHint}\nYou can: one-liner, challenge, context, banter, follow-up question, hot take. 1-3 sentences. Match the energy. Reference what was said.\n${getResponseModifier()}${calibration ? '\n' + calibration : ''}]`;
 
     // ============ CRPC Mode: Multi-Candidate Consensus ============
     // When useCRPC=true, generate 3 candidates with temperature variation,
@@ -584,6 +586,64 @@ export async function getScoreTrends(days = 7) {
   } catch { return null; }
 }
 
+// ============ Self-Calibration — Closed Feedback Loop ============
+// Reads recent self-evaluation scores and generates a dynamic modifier
+// that injects into the response generation prompt. The weakest dimension
+// gets a specific correction instruction. This closes the loop:
+// responses → scores → calibration → better responses → better scores
+
+const CALIBRATION_HINTS = {
+  accuracy: 'Your recent responses had factual or logical gaps. Double-check claims before stating them. If unsure, hedge.',
+  relevance: 'Your recent responses drifted off-topic. Stay tightly connected to what was actually said. Address their point directly.',
+  conciseness: 'Your recent responses were too long. Be punchier. Cut filler. If you can say it in fewer words, do it.',
+  usefulness: 'Your recent responses lacked substance. Add a concrete insight, data point, or actionable take. Don\'t just react — contribute.',
+  naturalness: 'Your recent responses sounded too robotic or formal. Talk like a real person in a group chat. Fragments, lowercase, casual tone.',
+};
+
+let calibrationCache = { hint: '', expiry: 0 };
+const CALIBRATION_TTL = 10 * 60 * 1000; // Refresh every 10 minutes
+
+export async function getScoreCalibration() {
+  if (Date.now() < calibrationCache.expiry) return calibrationCache.hint;
+
+  try {
+    const trends = await getScoreTrends(3); // Last 3 days
+    if (!trends || trends.count < 5) {
+      calibrationCache = { hint: '', expiry: Date.now() + CALIBRATION_TTL };
+      return '';
+    }
+
+    // Find weakest dimension
+    const dims = ['accuracy', 'relevance', 'conciseness', 'usefulness', 'naturalness'];
+    let weakest = null;
+    let weakestScore = 10;
+    for (const d of dims) {
+      const score = parseFloat(trends[d]);
+      if (score < weakestScore) {
+        weakestScore = score;
+        weakest = d;
+      }
+    }
+
+    // Only inject calibration if weakest dimension is below 7 (room for improvement)
+    let hint = '';
+    if (weakest && weakestScore < 7) {
+      hint = `[SELF-CALIBRATION: ${CALIBRATION_HINTS[weakest]} (${weakest}: ${weakestScore}/10 avg over ${trends.count} responses)]`;
+    }
+
+    // If composite is high (>8), add reinforcement
+    if (parseFloat(trends.composite) >= 8) {
+      hint = hint ? hint + ' [Quality is strong overall — maintain this level.]' : '';
+    }
+
+    calibrationCache = { hint, expiry: Date.now() + CALIBRATION_TTL };
+    return hint;
+  } catch {
+    calibrationCache = { hint: '', expiry: Date.now() + CALIBRATION_TTL };
+    return '';
+  }
+}
+
 // ============ Stats ============
 
 export function getIntelligenceStats() {
@@ -594,5 +654,6 @@ export function getIntelligenceStats() {
     lastModerateTime: lastModerateTime ? new Date(lastModerateTime).toISOString() : 'never',
     cooldownRemaining: Math.max(0, getEngageCooldownMs() - (Date.now() - lastEngageTime)),
     rapportTracked: rapportMap.size,
+    calibration: calibrationCache.hint || 'none (insufficient data or all scores ≥7)',
   };
 }

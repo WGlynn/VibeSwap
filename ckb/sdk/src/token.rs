@@ -3470,4 +3470,382 @@ mod tests {
         let (tx, _) = mint_batch(&config, test_lock(0x10), &recipients, test_input(0x20));
         assert_eq!(tx.inputs.len(), 1);
     }
+
+    // ============ Hardening Tests (Round 6) ============
+
+    #[test]
+    fn test_token_info_roundtrip_with_emoji_description() {
+        let info = TokenInfo {
+            name: "TestToken".to_string(),
+            symbol: "TT".to_string(),
+            decimals: 8,
+            description: "A token with special chars: @#$%".to_string(),
+            max_supply: 1_000_000,
+        };
+        let data = info.serialize();
+        let restored = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(restored.name, "TestToken");
+        assert_eq!(restored.symbol, "TT");
+        assert_eq!(restored.decimals, 8);
+        assert_eq!(restored.description, "A token with special chars: @#$%");
+        assert_eq!(restored.max_supply, 1_000_000);
+    }
+
+    #[test]
+    fn test_token_info_roundtrip_empty_description() {
+        let info = TokenInfo {
+            name: "X".to_string(),
+            symbol: "X".to_string(),
+            decimals: 0,
+            description: "".to_string(),
+            max_supply: 0,
+        };
+        let data = info.serialize();
+        let restored = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(restored.description, "");
+        assert_eq!(restored.max_supply, 0);
+    }
+
+    #[test]
+    fn test_token_info_serialize_length_predictable() {
+        let info = TokenInfo {
+            name: "ABC".to_string(),
+            symbol: "AB".to_string(),
+            decimals: 18,
+            description: "Hello".to_string(),
+            max_supply: 100,
+        };
+        let data = info.serialize();
+        // 1 (decimals) + 2 (name_len) + 3 (name) + 2 (sym_len) + 2 (sym) + 2 (desc_len) + 5 (desc) + 16 (supply) = 33
+        assert_eq!(data.len(), 33);
+    }
+
+    #[test]
+    fn test_token_info_deserialize_extra_trailing_bytes_ok() {
+        let info = TokenInfo {
+            name: "T".to_string(),
+            symbol: "T".to_string(),
+            decimals: 1,
+            description: "D".to_string(),
+            max_supply: 42,
+        };
+        let mut data = info.serialize();
+        data.extend_from_slice(&[0xFF, 0xFF, 0xFF]); // extra trailing bytes
+        let restored = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(restored.name, "T");
+        assert_eq!(restored.max_supply, 42);
+    }
+
+    #[test]
+    fn test_parse_token_amount_le_byte_order() {
+        // 1 in little-endian u128 is [1, 0, 0, ..., 0]
+        let mut data = [0u8; 16];
+        data[0] = 1;
+        let amount = parse_token_amount(&data).unwrap();
+        assert_eq!(amount, 1);
+    }
+
+    #[test]
+    fn test_parse_token_amount_large_value_le() {
+        let val: u128 = 999_999_999_999_999_999;
+        let data = val.to_le_bytes();
+        let parsed = parse_token_amount(&data).unwrap();
+        assert_eq!(parsed, val);
+    }
+
+    #[test]
+    fn test_build_xudt_args_flags_at_end() {
+        let hash = [0x42u8; 32];
+        let args = build_xudt_args(&hash);
+        assert_eq!(&args[32..36], &XUDT_FLAGS_PLAIN);
+    }
+
+    #[test]
+    fn test_build_xudt_args_lock_hash_at_start() {
+        let hash = [0x42u8; 32];
+        let args = build_xudt_args(&hash);
+        assert_eq!(&args[0..32], &hash);
+    }
+
+    #[test]
+    fn test_transfer_produces_two_outputs_with_change() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let tx = transfer_token(
+            &config, type_script, test_lock(0x01), test_lock(0x02),
+            50, vec![(test_input(0x10), 100)],
+        ).unwrap();
+        assert_eq!(tx.outputs.len(), 2);
+        // First output: recipient with 50
+        let recipient_amount = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(recipient_amount, 50);
+        // Second output: sender change with 50
+        let change_amount = parse_token_amount(&tx.outputs[1].data).unwrap();
+        assert_eq!(change_amount, 50);
+    }
+
+    #[test]
+    fn test_transfer_exact_amount_one_output() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let tx = transfer_token(
+            &config, type_script, test_lock(0x01), test_lock(0x02),
+            100, vec![(test_input(0x10), 100)],
+        ).unwrap();
+        assert_eq!(tx.outputs.len(), 1);
+    }
+
+    #[test]
+    fn test_transfer_insufficient_balance_error() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let result = transfer_token(
+            &config, type_script, test_lock(0x01), test_lock(0x02),
+            200, vec![(test_input(0x10), 100)],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_burn_partial_leaves_remainder() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let tx = burn_token(
+            &config, type_script, 30, test_lock(0x01),
+            vec![(test_input(0x10), 100)],
+        ).unwrap();
+        assert_eq!(tx.outputs.len(), 1);
+        let remaining = parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(remaining, 70);
+    }
+
+    #[test]
+    fn test_burn_all_no_output() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let tx = burn_token(
+            &config, type_script, 100, test_lock(0x01),
+            vec![(test_input(0x10), 100)],
+        ).unwrap();
+        assert_eq!(tx.outputs.len(), 0);
+    }
+
+    #[test]
+    fn test_burn_insufficient_error() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let result = burn_token(
+            &config, type_script, 200, test_lock(0x01),
+            vec![(test_input(0x10), 100)],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mint_token_output_has_token_cell_capacity() {
+        let config = test_xudt_config();
+        let (tx, _) = mint_token(&config, test_lock(0x01), test_lock(0x02), 100, test_input(0x10));
+        assert_eq!(tx.outputs[0].capacity, TOKEN_CELL_CAPACITY);
+    }
+
+    #[test]
+    fn test_create_token_info_output_has_info_cell_capacity() {
+        let config = test_xudt_config();
+        let info = TokenInfo {
+            name: "Test".to_string(),
+            symbol: "TST".to_string(),
+            decimals: 8,
+            description: "desc".to_string(),
+            max_supply: 0,
+        };
+        let tx = create_token_info(&config, [0xCC; 32], &info, test_lock(0x01), test_input(0x10));
+        assert_eq!(tx.outputs[0].capacity, TOKEN_INFO_CELL_CAPACITY);
+    }
+
+    #[test]
+    fn test_compute_token_type_hash_same_inputs_same_result() {
+        let hash1 = compute_token_type_hash(
+            &[0xAA; 32], &super::super::HashType::Data1, &[0x01; 32],
+        );
+        let hash2 = compute_token_type_hash(
+            &[0xAA; 32], &super::super::HashType::Data1, &[0x01; 32],
+        );
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_compute_token_type_hash_different_issuer_different_result() {
+        let hash1 = compute_token_type_hash(
+            &[0xAA; 32], &super::super::HashType::Data1, &[0x01; 32],
+        );
+        let hash2 = compute_token_type_hash(
+            &[0xAA; 32], &super::super::HashType::Data1, &[0x02; 32],
+        );
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hash_type_byte_data_is_0() {
+        assert_eq!(hash_type_byte(&super::super::HashType::Data), 0);
+    }
+
+    #[test]
+    fn test_hash_type_byte_type_is_1() {
+        assert_eq!(hash_type_byte(&super::super::HashType::Type), 1);
+    }
+
+    #[test]
+    fn test_hash_type_byte_data1_is_2() {
+        assert_eq!(hash_type_byte(&super::super::HashType::Data1), 2);
+    }
+
+    #[test]
+    fn test_hash_type_byte_data2_is_4() {
+        assert_eq!(hash_type_byte(&super::super::HashType::Data2), 4);
+    }
+
+    #[test]
+    fn test_token_info_decimals_boundary_0() {
+        let info = TokenInfo {
+            name: "A".to_string(),
+            symbol: "A".to_string(),
+            decimals: 0,
+            description: "".to_string(),
+            max_supply: 0,
+        };
+        let data = info.serialize();
+        assert_eq!(data[0], 0);
+        let restored = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(restored.decimals, 0);
+    }
+
+    #[test]
+    fn test_token_info_decimals_boundary_255() {
+        let info = TokenInfo {
+            name: "A".to_string(),
+            symbol: "A".to_string(),
+            decimals: 255,
+            description: "".to_string(),
+            max_supply: 0,
+        };
+        let data = info.serialize();
+        assert_eq!(data[0], 255);
+        let restored = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(restored.decimals, 255);
+    }
+
+    #[test]
+    fn test_token_info_max_supply_u128_max_roundtrip() {
+        let info = TokenInfo {
+            name: "A".to_string(),
+            symbol: "A".to_string(),
+            decimals: 18,
+            description: "".to_string(),
+            max_supply: u128::MAX,
+        };
+        let data = info.serialize();
+        let restored = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(restored.max_supply, u128::MAX);
+    }
+
+    #[test]
+    fn test_transfer_multiple_inputs_summed_correctly() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: [0xAA; 32],
+            hash_type: super::super::HashType::Data1,
+            args: vec![0x01; 36],
+        };
+        let tx = transfer_token(
+            &config, type_script, test_lock(0x01), test_lock(0x02),
+            100,
+            vec![
+                (test_input(0x10), 40),
+                (test_input(0x11), 30),
+                (test_input(0x12), 50),
+            ],
+        ).unwrap();
+        // 40+30+50=120, transfer 100, change 20
+        assert_eq!(tx.outputs.len(), 2);
+        let change = parse_token_amount(&tx.outputs[1].data).unwrap();
+        assert_eq!(change, 20);
+    }
+
+    #[test]
+    fn test_mint_batch_output_count_matches_recipients() {
+        let config = test_xudt_config();
+        let recipients = vec![
+            (test_lock(0x01), 100),
+            (test_lock(0x02), 200),
+            (test_lock(0x03), 300),
+        ];
+        let (tx, _) = mint_batch(&config, test_lock(0x10), &recipients, test_input(0x20));
+        assert_eq!(tx.outputs.len(), 3);
+    }
+
+    #[test]
+    fn test_mint_batch_each_output_amount_matches() {
+        let config = test_xudt_config();
+        let recipients = vec![
+            (test_lock(0x01), 111),
+            (test_lock(0x02), 222),
+        ];
+        let (tx, _) = mint_batch(&config, test_lock(0x10), &recipients, test_input(0x20));
+        let a0 = parse_token_amount(&tx.outputs[0].data).unwrap();
+        let a1 = parse_token_amount(&tx.outputs[1].data).unwrap();
+        assert_eq!(a0, 111);
+        assert_eq!(a1, 222);
+    }
+
+    #[test]
+    fn test_parse_token_amount_exactly_16_zeros() {
+        let data = [0u8; 16];
+        let amount = parse_token_amount(&data).unwrap();
+        assert_eq!(amount, 0);
+    }
+
+    #[test]
+    fn test_parse_token_amount_15_bytes_too_short() {
+        let data = [0u8; 15];
+        assert!(parse_token_amount(&data).is_none());
+    }
+
+    #[test]
+    fn test_token_info_deserialize_empty_returns_none() {
+        assert!(TokenInfo::deserialize(&[]).is_none());
+    }
+
+    #[test]
+    fn test_xudt_flags_plain_all_zeros() {
+        assert_eq!(XUDT_FLAGS_PLAIN, [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_token_cell_capacity_vs_info_capacity() {
+        assert!(TOKEN_INFO_CELL_CAPACITY > TOKEN_CELL_CAPACITY);
+    }
 }

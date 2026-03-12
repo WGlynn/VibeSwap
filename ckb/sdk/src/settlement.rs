@@ -2880,4 +2880,334 @@ mod tests {
         // 20000 * 5000 / 10000 = 10000
         assert_eq!(lp, BPS);
     }
+
+    // ============ Hardening Tests (Round 6) ============
+
+    #[test]
+    fn test_xor_seed_identity_element() {
+        // XOR with zero is identity
+        let secret = [0xABu8; 32];
+        let seed = compute_xor_seed(&[secret, [0u8; 32]]);
+        assert_eq!(seed, secret);
+    }
+
+    #[test]
+    fn test_xor_seed_self_inverse() {
+        // XOR of a value with itself is zero
+        let secret = [0xCDu8; 32];
+        let seed = compute_xor_seed(&[secret, secret]);
+        assert_eq!(seed, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_xor_seed_five_secrets_associative() {
+        let s1 = [1u8; 32];
+        let s2 = [2u8; 32];
+        let s3 = [3u8; 32];
+        let s4 = [4u8; 32];
+        let s5 = [5u8; 32];
+        let seed_a = compute_xor_seed(&[s1, s2, s3, s4, s5]);
+        let seed_b = compute_xor_seed(&[s5, s4, s3, s2, s1]);
+        // XOR is commutative and associative
+        assert_eq!(seed_a, seed_b);
+    }
+
+    #[test]
+    fn test_shuffle_two_orders_deterministic() {
+        let secrets = vec![[0xAA; 32], [0xBB; 32]];
+        let r1 = fisher_yates_shuffle(&secrets, 2);
+        let r2 = fisher_yates_shuffle(&secrets, 2);
+        assert_eq!(r1.order[..2], r2.order[..2]);
+    }
+
+    #[test]
+    fn test_shuffle_all_indices_present() {
+        let secrets = vec![[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
+        let result = fisher_yates_shuffle(&secrets, 5);
+        let mut indices: Vec<u16> = result.order[..5].to_vec();
+        indices.sort();
+        assert_eq!(indices, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_is_fillable_buy_one_below_clearing() {
+        let order = make_buy(PRECISION, PRECISION - 1);
+        assert!(!is_fillable(&order, PRECISION));
+    }
+
+    #[test]
+    fn test_is_fillable_sell_one_above_clearing() {
+        let order = make_sell(PRECISION, PRECISION + 1);
+        assert!(!is_fillable(&order, PRECISION));
+    }
+
+    #[test]
+    fn test_is_fillable_buy_exact_dust_threshold() {
+        let mut order = make_buy_market(PRECISION);
+        order.amount = DUST_THRESHOLD;
+        assert!(is_fillable(&order, PRECISION));
+    }
+
+    #[test]
+    fn test_is_fillable_buy_one_below_dust_threshold() {
+        let mut order = make_buy_market(PRECISION);
+        order.amount = DUST_THRESHOLD - 1;
+        assert!(!is_fillable(&order, PRECISION));
+    }
+
+    #[test]
+    fn test_compute_proceeds_buy_at_precision() {
+        // Buying at exactly PRECISION price: tokens = amount * PRECISION / PRECISION = amount
+        let proceeds = compute_proceeds(1_000_000, PRECISION, &OrderType::Buy);
+        assert_eq!(proceeds, 1_000_000);
+    }
+
+    #[test]
+    fn test_compute_proceeds_sell_at_precision() {
+        // Selling at exactly PRECISION price: quote = amount * PRECISION / PRECISION = amount
+        let proceeds = compute_proceeds(1_000_000, PRECISION, &OrderType::Sell);
+        assert_eq!(proceeds, 1_000_000);
+    }
+
+    #[test]
+    fn test_compute_proceeds_buy_at_double_precision() {
+        // Buying at 2*PRECISION: tokens = amount * PRECISION / (2*PRECISION) = amount/2
+        let proceeds = compute_proceeds(1_000_000, 2 * PRECISION, &OrderType::Buy);
+        assert_eq!(proceeds, 500_000);
+    }
+
+    #[test]
+    fn test_compute_proceeds_sell_at_double_precision() {
+        // Selling at 2*PRECISION: quote = amount * 2*PRECISION / PRECISION = 2*amount
+        let proceeds = compute_proceeds(1_000_000, 2 * PRECISION, &OrderType::Sell);
+        assert_eq!(proceeds, 2_000_000);
+    }
+
+    #[test]
+    fn test_distribute_fees_protocol_fee_on_matched_volume() {
+        // SETTLEMENT_FEE_BPS = 5 (0.05%)
+        let (_, protocol) = distribute_fees(0, 10_000_000);
+        // 10_000_000 * 5 / 10000 = 5000
+        assert_eq!(protocol, 5000);
+    }
+
+    #[test]
+    fn test_distribute_fees_lp_share_50_percent() {
+        let (lp, _) = distribute_fees(1_000_000, 0);
+        // 1_000_000 * 5000 / 10000 = 500_000
+        assert_eq!(lp, 500_000);
+    }
+
+    #[test]
+    fn test_validate_batch_exactly_max_orders() {
+        let orders: Vec<RevealedOrder> = (0..MAX_ORDERS_PER_BATCH)
+            .map(|i| make_buy_with_index(PRECISION, PRECISION, i as u16))
+            .collect();
+        assert!(validate_batch(&orders).is_ok());
+    }
+
+    #[test]
+    fn test_validate_batch_one_over_max_orders() {
+        let orders: Vec<RevealedOrder> = (0..=MAX_ORDERS_PER_BATCH)
+            .map(|i| make_buy_with_index(PRECISION, PRECISION, i as u16))
+            .collect();
+        assert_eq!(validate_batch(&orders), Err(SettlementError::TooManyOrders));
+    }
+
+    #[test]
+    fn test_validate_batch_zero_secret_rejected() {
+        let mut order = make_buy(PRECISION, PRECISION);
+        order.secret = [0u8; 32];
+        assert_eq!(validate_batch(&[order]), Err(SettlementError::InvalidSecret));
+    }
+
+    #[test]
+    fn test_validate_batch_zero_amount_rejected() {
+        let mut order = make_buy(PRECISION, PRECISION);
+        order.amount = 0;
+        assert_eq!(validate_batch(&[order]), Err(SettlementError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_match_orders_zero_clearing_price_error() {
+        let orders = vec![make_buy(PRECISION, PRECISION)];
+        let result = match_orders(&orders, 0);
+        assert_eq!(result, Err(SettlementError::ZeroPrice));
+    }
+
+    #[test]
+    fn test_match_orders_single_buy_no_sell_all_unfilled() {
+        let orders = vec![make_buy(PRECISION, PRECISION)];
+        let result = match_orders(&orders, PRECISION).unwrap();
+        assert_eq!(result.total_sell_volume, 0);
+        assert_eq!(result.matched_volume, 0);
+    }
+
+    #[test]
+    fn test_match_orders_balanced_buy_sell() {
+        let orders = vec![
+            make_buy(PRECISION, PRECISION),
+            make_sell(PRECISION, PRECISION / 2),
+        ];
+        let result = match_orders(&orders, PRECISION).unwrap();
+        assert_eq!(result.fill_count, 2);
+        assert_eq!(result.total_buy_volume, PRECISION);
+        assert_eq!(result.total_sell_volume, PRECISION);
+    }
+
+    #[test]
+    fn test_estimate_clearing_price_single_pair() {
+        let buys = vec![(PRECISION, 100u128)];
+        let sells = vec![(PRECISION, 100u128)];
+        let price = estimate_clearing_price(&buys, &sells).unwrap();
+        assert_eq!(price, PRECISION);
+    }
+
+    #[test]
+    fn test_estimate_clearing_price_no_buys_error() {
+        let sells = vec![(PRECISION, 100u128)];
+        let result = estimate_clearing_price(&[], &sells);
+        assert_eq!(result, Err(SettlementError::NoMatchingOrders));
+    }
+
+    #[test]
+    fn test_estimate_clearing_price_no_sells_error() {
+        let buys = vec![(PRECISION, 100u128)];
+        let result = estimate_clearing_price(&buys, &[]);
+        assert_eq!(result, Err(SettlementError::NoMatchingOrders));
+    }
+
+    #[test]
+    fn test_partial_fill_zero_remaining_returns_zero() {
+        let order = make_buy_market(PRECISION);
+        let fill = partial_fill_amount(&order, PRECISION, 0);
+        assert_eq!(fill, 0);
+    }
+
+    #[test]
+    fn test_partial_fill_remaining_less_than_order() {
+        let order = make_buy_market(PRECISION);
+        let remaining = PRECISION / 2;
+        let fill = partial_fill_amount(&order, PRECISION, remaining);
+        assert_eq!(fill, remaining);
+    }
+
+    #[test]
+    fn test_partial_fill_remaining_greater_than_order() {
+        let order = make_buy_market(PRECISION);
+        let fill = partial_fill_amount(&order, PRECISION, PRECISION * 2);
+        assert_eq!(fill, PRECISION);
+    }
+
+    #[test]
+    fn test_settlement_quality_perfect_match() {
+        let result = SettlementResult {
+            clearing_price: PRECISION,
+            total_buy_volume: PRECISION,
+            total_sell_volume: PRECISION,
+            matched_volume: PRECISION,
+            fill_count: 2,
+            unfilled_count: 0,
+            total_priority_fees: 0,
+            lp_fee_share: 0,
+            protocol_fee: 0,
+            fills: [Fill::default(); 256],
+            fill_count_actual: 2,
+        };
+        let quality = settlement_quality(&result, PRECISION);
+        assert_eq!(quality, 10000);
+    }
+
+    #[test]
+    fn test_settlement_quality_zero_fills() {
+        let result = SettlementResult {
+            clearing_price: PRECISION,
+            total_buy_volume: 0,
+            total_sell_volume: 0,
+            matched_volume: 0,
+            fill_count: 0,
+            unfilled_count: 2,
+            total_priority_fees: 0,
+            lp_fee_share: 0,
+            protocol_fee: 0,
+            fills: [Fill::default(); 256],
+            fill_count_actual: 0,
+        };
+        let quality = settlement_quality(&result, PRECISION);
+        // 0 fill rate, but 5000 for price accuracy
+        assert_eq!(quality, 5000);
+    }
+
+    #[test]
+    fn test_batch_summary_fill_rate_100_percent() {
+        let result = SettlementResult {
+            clearing_price: PRECISION,
+            total_buy_volume: PRECISION,
+            total_sell_volume: PRECISION,
+            matched_volume: PRECISION,
+            fill_count: 2,
+            unfilled_count: 0,
+            total_priority_fees: 0,
+            lp_fee_share: 0,
+            protocol_fee: 0,
+            fills: [Fill::default(); 256],
+            fill_count_actual: 2,
+        };
+        let summary = batch_summary(1, &result, PRECISION);
+        assert_eq!(summary.fill_rate_bps, 10000);
+    }
+
+    #[test]
+    fn test_priority_ordering_preserves_count() {
+        let orders = vec![
+            make_buy_with_priority(PRECISION, 0, 100),
+            make_sell_with_priority(PRECISION, 0, 50),
+            make_buy_with_priority(PRECISION, 0, 200),
+        ];
+        let secrets = vec![[1; 32], [2; 32], [3; 32]];
+        let shuffle = fisher_yates_shuffle(&secrets, 3);
+        let prio = priority_ordering(&orders, &shuffle);
+        // All 3 indices should be present in first 3 slots
+        let mut indices: Vec<u16> = prio[..3].to_vec();
+        indices.sort();
+        assert_eq!(indices, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn test_compute_fill_unfillable_has_zero_proceeds() {
+        let order = make_buy(PRECISION, PRECISION / 2); // limit below clearing
+        let fill = compute_fill(&order, PRECISION);
+        assert_eq!(fill.filled_amount, 0);
+        assert_eq!(fill.proceeds, 0);
+        assert!(!fill.is_fully_filled);
+    }
+
+    #[test]
+    fn test_compute_fill_fillable_has_nonzero_proceeds() {
+        let order = make_buy(PRECISION, PRECISION * 2); // limit above clearing
+        let fill = compute_fill(&order, PRECISION);
+        assert_eq!(fill.filled_amount, PRECISION);
+        assert!(fill.proceeds > 0);
+        assert!(fill.is_fully_filled);
+    }
+
+    #[test]
+    fn test_discover_clearing_price_empty_fails() {
+        let result = discover_clearing_price(&[]);
+        assert_eq!(result, Err(SettlementError::EmptyBatch));
+    }
+
+    #[test]
+    fn test_discover_clearing_price_only_buys_fails() {
+        let orders = vec![make_buy(PRECISION, PRECISION)];
+        let result = discover_clearing_price(&orders);
+        assert_eq!(result, Err(SettlementError::NoMatchingOrders));
+    }
+
+    #[test]
+    fn test_discover_clearing_price_only_sells_fails() {
+        let orders = vec![make_sell(PRECISION, PRECISION)];
+        let result = discover_clearing_price(&orders);
+        assert_eq!(result, Err(SettlementError::NoMatchingOrders));
+    }
 }

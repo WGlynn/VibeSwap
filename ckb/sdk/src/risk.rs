@@ -3247,4 +3247,495 @@ mod tests {
         let debug = format!("{:?}", level);
         assert_eq!(debug, "Low");
     }
+
+    // ============ Hardening Tests (Round 6) ============
+
+    #[test]
+    fn test_classify_risk_level_exact_boundaries_harden6() {
+        assert_eq!(classify_risk_level(0), RiskLevel::Low);
+        assert_eq!(classify_risk_level(20), RiskLevel::Low);
+        assert_eq!(classify_risk_level(21), RiskLevel::Medium);
+        assert_eq!(classify_risk_level(50), RiskLevel::Medium);
+        assert_eq!(classify_risk_level(51), RiskLevel::High);
+        assert_eq!(classify_risk_level(75), RiskLevel::High);
+        assert_eq!(classify_risk_level(76), RiskLevel::Critical);
+        assert_eq!(classify_risk_level(100), RiskLevel::Critical);
+    }
+
+    #[test]
+    fn test_risk_score_zero_vaults_all_zero() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 0,
+            tier_counts: TierCounts::default(),
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_risk_score_max_utilization_25_points() {
+        let health = ProtocolHealth {
+            total_tvl: 1_000_000,
+            total_borrows: 950_000,
+            utilization_bps: 9500,
+            vaults_assessed: 10,
+            tier_counts: TierCounts { safe: 10, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // utilization > 9000 = 25 points, insurance > 2000 = 0, all safe = 0, worst HF max = 0
+        assert_eq!(score, 25);
+    }
+
+    #[test]
+    fn test_risk_score_no_insurance_25_points() {
+        let health = ProtocolHealth {
+            total_tvl: 1_000_000,
+            total_borrows: 500_000,
+            utilization_bps: 4000,
+            vaults_assessed: 10,
+            tier_counts: TierCounts { safe: 10, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 0,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // utilization < 5000 = 0, insurance = 0 → 25, all safe = 0, worst HF max = 0
+        assert_eq!(score, 25);
+    }
+
+    #[test]
+    fn test_risk_score_worst_hf_below_precision_25_points() {
+        let health = ProtocolHealth {
+            total_tvl: 1_000_000,
+            total_borrows: 500_000,
+            utilization_bps: 4000,
+            vaults_assessed: 10,
+            tier_counts: TierCounts { safe: 9, hard_liquidation: 1, ..Default::default() },
+            worst_health_factor: PRECISION - 1,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // utilization < 5000 = 0, insurance > 2000 = 0, 10% at risk → 5, worst HF < PRECISION → 25
+        assert_eq!(score, 30);
+    }
+
+    #[test]
+    fn test_risk_score_all_at_risk_25_points() {
+        let health = ProtocolHealth {
+            total_tvl: 1_000_000,
+            total_borrows: 500_000,
+            utilization_bps: 4000,
+            vaults_assessed: 10,
+            tier_counts: TierCounts { warning: 10, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 100% at risk → 25
+        assert_eq!(score, 25);
+    }
+
+    #[test]
+    fn test_risk_score_combined_max_100() {
+        let health = ProtocolHealth {
+            total_tvl: 1_000_000,
+            total_borrows: 950_000,
+            utilization_bps: 9500,
+            vaults_assessed: 10,
+            tier_counts: TierCounts { hard_liquidation: 10, ..Default::default() },
+            worst_health_factor: PRECISION / 2,
+            insurance_coverage_bps: 0,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 25 + 25 + 25 + 25 = 100
+        assert_eq!(score, 100);
+    }
+
+    #[test]
+    fn test_health_factor_to_priority_boundaries_harden6() {
+        // HF < PRECISION → 0
+        assert_eq!(health_factor_to_priority(0), 0);
+        assert_eq!(health_factor_to_priority(PRECISION - 1), 0);
+        // HF = PRECISION → 100
+        assert_eq!(health_factor_to_priority(PRECISION), 100);
+        // HF = 1.1 * PRECISION → 200
+        assert_eq!(health_factor_to_priority(PRECISION * 110 / 100), 200);
+        // HF = 1.3 * PRECISION → 300
+        assert_eq!(health_factor_to_priority(PRECISION * 130 / 100), 300);
+        // HF = 1.5 * PRECISION → 1000
+        assert_eq!(health_factor_to_priority(PRECISION * 150 / 100), 1000);
+    }
+
+    #[test]
+    fn test_risk_score_utilization_boundary_5000() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 5000,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 5000 is not > 5000, so = 0
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_risk_score_utilization_boundary_5001() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 5001,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 5001 > 5000 → 5 points
+        assert_eq!(score, 5);
+    }
+
+    #[test]
+    fn test_risk_score_utilization_boundary_8000() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 8000,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 8000 is not > 8000, so > 5000 → 5
+        assert_eq!(score, 5);
+    }
+
+    #[test]
+    fn test_risk_score_utilization_boundary_8001() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 8001,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 8001 > 8000 → 15
+        assert_eq!(score, 15);
+    }
+
+    #[test]
+    fn test_risk_score_insurance_boundary_500() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 500,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 500 is not < 500, so < 1000 → 10
+        assert_eq!(score, 10);
+    }
+
+    #[test]
+    fn test_risk_score_insurance_boundary_499() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 499,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 499 < 500 → 20
+        assert_eq!(score, 20);
+    }
+
+    #[test]
+    fn test_risk_score_insurance_boundary_1000() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 1000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 1000 is not < 1000, so < 2000 → 5
+        assert_eq!(score, 5);
+    }
+
+    #[test]
+    fn test_risk_score_insurance_boundary_2000() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 2000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 2000 is not < 2000 → 0
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_risk_score_worst_hf_at_exact_1_1x() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: PRECISION * 110 / 100,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // HF = 1.1 PRECISION, not < 1.1, so < 1.3 → 10
+        assert_eq!(score, 10);
+    }
+
+    #[test]
+    fn test_risk_score_worst_hf_at_exact_1_3x() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: PRECISION * 130 / 100,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // HF = 1.3, not < 1.3, so < 1.5 → 5
+        assert_eq!(score, 5);
+    }
+
+    #[test]
+    fn test_risk_score_worst_hf_at_exact_1_5x() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { safe: 1, ..Default::default() },
+            worst_health_factor: PRECISION * 150 / 100,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // HF = 1.5, not < 1.5 → 0
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_risk_score_vault_distribution_11_percent_at_risk() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 100,
+            tier_counts: TierCounts { safe: 89, warning: 11, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 11% > 10% → 10 points
+        assert_eq!(score, 10);
+    }
+
+    #[test]
+    fn test_risk_score_vault_distribution_26_percent_at_risk() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 100,
+            tier_counts: TierCounts { safe: 74, warning: 26, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 26% > 25% → 15 points
+        assert_eq!(score, 15);
+    }
+
+    #[test]
+    fn test_risk_score_vault_distribution_51_percent_at_risk() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 100,
+            tier_counts: TierCounts { safe: 49, warning: 51, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 51% > 50% → 25 points
+        assert_eq!(score, 25);
+    }
+
+    #[test]
+    fn test_risk_level_all_variants_debug() {
+        assert_eq!(format!("{:?}", RiskLevel::Low), "Low");
+        assert_eq!(format!("{:?}", RiskLevel::Medium), "Medium");
+        assert_eq!(format!("{:?}", RiskLevel::High), "High");
+        assert_eq!(format!("{:?}", RiskLevel::Critical), "Critical");
+    }
+
+    #[test]
+    fn test_protocol_health_clone_harden6() {
+        let health = ProtocolHealth {
+            total_tvl: 100,
+            total_borrows: 50,
+            utilization_bps: 5000,
+            vaults_assessed: 1,
+            tier_counts: TierCounts::default(),
+            worst_health_factor: PRECISION,
+            insurance_coverage_bps: 5000,
+            pending_actions: vec![],
+        };
+        let cloned = health.clone();
+        assert_eq!(cloned.total_tvl, 100);
+        assert_eq!(cloned.total_borrows, 50);
+    }
+
+    #[test]
+    fn test_tier_counts_sum_all_fields() {
+        let tc = TierCounts {
+            safe: 5,
+            warning: 3,
+            auto_deleverage: 2,
+            soft_liquidation: 1,
+            hard_liquidation: 1,
+        };
+        let total = tc.safe + tc.warning + tc.auto_deleverage + tc.soft_liquidation + tc.hard_liquidation;
+        assert_eq!(total, 12);
+    }
+
+    #[test]
+    fn test_pending_action_priority_ordering() {
+        let a1 = PendingAction {
+            vault_index: 0,
+            action: KeeperAction::Warn { health_factor: PRECISION, vault_owner: [0u8; 32] },
+            health_factor: PRECISION,
+            priority: 100,
+        };
+        let a2 = PendingAction {
+            vault_index: 1,
+            action: KeeperAction::Warn { health_factor: PRECISION / 2, vault_owner: [0u8; 32] },
+            health_factor: PRECISION / 2,
+            priority: 0,
+        };
+        // Lower priority = more urgent
+        assert!(a2.priority < a1.priority);
+    }
+
+    #[test]
+    fn test_health_factor_to_priority_at_zero() {
+        assert_eq!(health_factor_to_priority(0), 0);
+    }
+
+    #[test]
+    fn test_health_factor_to_priority_at_u128_max() {
+        assert_eq!(health_factor_to_priority(u128::MAX), 1000);
+    }
+
+    #[test]
+    fn test_risk_score_never_exceeds_100() {
+        // Even with absurd values
+        let health = ProtocolHealth {
+            total_tvl: u128::MAX,
+            total_borrows: u128::MAX,
+            utilization_bps: u64::MAX,
+            vaults_assessed: 1,
+            tier_counts: TierCounts { hard_liquidation: 1, ..Default::default() },
+            worst_health_factor: 0,
+            insurance_coverage_bps: 0,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        assert!(score <= 100);
+    }
+
+    #[test]
+    fn test_classify_risk_level_at_u64_max() {
+        assert_eq!(classify_risk_level(u64::MAX), RiskLevel::Critical);
+    }
+
+    #[test]
+    fn test_risk_score_auto_deleverage_counted_in_at_risk() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 10,
+            tier_counts: TierCounts { safe: 5, auto_deleverage: 5, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 50% at risk → 25 points (>50% check is 50, which is not >50, so >25 → 15)
+        // Actually 5/10 = 50%, which is not > 50 → >25 → 15
+        assert_eq!(score, 15);
+    }
+
+    #[test]
+    fn test_risk_score_soft_liquidation_counted_in_at_risk() {
+        let health = ProtocolHealth {
+            total_tvl: 0,
+            total_borrows: 0,
+            utilization_bps: 0,
+            vaults_assessed: 100,
+            tier_counts: TierCounts { safe: 95, soft_liquidation: 5, ..Default::default() },
+            worst_health_factor: u128::MAX,
+            insurance_coverage_bps: 10000,
+            pending_actions: vec![],
+        };
+        let score = risk_score(&health);
+        // 5% > 0% → 5 points
+        assert_eq!(score, 5);
+    }
 }

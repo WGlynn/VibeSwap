@@ -2227,13 +2227,19 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
     // ============ Group Chat Length Gate ============
     // LLMs ignore "be concise" rules. Code doesn't.
-    // Hard cap: 600 chars for group chats (~3 sentences).
+    // Hard cap: 800 chars for group chats (~4 sentences).
     // DMs get full length. Complex queries (tool use happened) get more room.
-    if (chatType !== 'private' && rounds === 0 && assistantMessage.length > 600) {
+    if (chatType !== 'private' && rounds === 0 && assistantMessage.length > 800) {
       // Trim to last complete sentence within limit
-      const trimmed = assistantMessage.slice(0, 600);
+      const trimmed = assistantMessage.slice(0, 800);
       const lastPeriod = Math.max(trimmed.lastIndexOf('. '), trimmed.lastIndexOf('.\n'), trimmed.lastIndexOf('!'), trimmed.lastIndexOf('?'));
-      assistantMessage = lastPeriod > 200 ? trimmed.slice(0, lastPeriod + 1) : trimmed;
+      if (lastPeriod > 200) {
+        assistantMessage = trimmed.slice(0, lastPeriod + 1);
+      } else {
+        // No sentence boundary found — cut at last word boundary instead of mid-word
+        const lastSpace = trimmed.lastIndexOf(' ');
+        assistantMessage = lastSpace > 200 ? trimmed.slice(0, lastSpace) + '...' : trimmed + '...';
+      }
       console.log(`[length-gate] Trimmed group response from ${response.content.filter(b => b.type === 'text').map(b => b.text).join('').length} to ${assistantMessage.length} chars`);
     }
 

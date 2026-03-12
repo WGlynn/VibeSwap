@@ -342,6 +342,13 @@ const OUTPUT_POISON_PHRASES = [
   /[Nn]on-?[Pp]layer [Cc]o-?founder[^.!?\n]*/gi,
   /stuck in a loop[^.!?\n]*mantra[^.!?\n]*/gi,
   /[Ss]omeone reboot me[^.!?\n]*/gi,
+  // LLM meta-commentary leaks — Claude explaining its own response process
+  /[Hh]ere'?s the reviewed response:?\s*/gi,
+  /[Hh]ere'?s my reviewed response:?\s*/gi,
+  /[Hh]ere'?s the (?:updated|revised|cleaned|final) response:?\s*/gi,
+  /[Tt]hat'?s a (?:creative|humorous|interesting|great|good) (?:and \w+ )?(?:take|point|question|observation)[^.!?\n]*(?:connecting it to|relating it to|tying it to)[^.!?\n]*/gi,
+  /[Ll]et me (?:rephrase|rewrite|revise|review) (?:that|this|my response)[^.!?\n]*/gi,
+  /[Hh]ere'?s (?:a |my )?(?:more )?(?:natural|casual|conversational) (?:version|response|take):?\s*/gi,
   // Tool-use artifact leaks — LLM echoing raw tool blocks to chat
   /\[Used tool: [^\]]*\]/gi,
   /\[Tool result[^\]]*\]/gi,

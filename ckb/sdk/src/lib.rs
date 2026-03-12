@@ -33,6 +33,7 @@ pub mod metrics;
 pub mod migration;
 pub mod miner;
 pub mod multisig;
+pub mod notify;
 pub mod orderbook;
 pub mod oracle;
 pub mod pool;

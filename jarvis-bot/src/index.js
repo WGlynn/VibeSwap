@@ -5513,8 +5513,12 @@ bot.on('text', async (ctx) => {
             return;
           }
 
+          // High-confidence signals (personal disclosure, vulnerability, complex questions)
+          // get CRPC treatment — 3 candidates compared pairwise for best response.
+          const useCRPC = analysis.confidence >= 0.9;
           const proactiveReply = await generateProactiveResponse(
-            msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx
+            msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx,
+            { useCRPC }
           );
           if (proactiveReply) {
             let cleanReply = stripGroupMarkdown(proactiveReply);

@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { llmChat } from './llm-provider.js';
 import { recordUsage } from './compute-economics.js';
 import { getTriageModifier, getResponseModifier } from './persona.js';
+import { runLocalCRPC } from './crpc.js';
 
 // ============ Proactive Intelligence ============
 // Jarvis analyzes group messages and decides autonomously when to contribute.
@@ -225,7 +226,7 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 // Two-phase orchestrator: cheap model drafts, Haiku quality-gates.
 // "I M J A R V I S" — Claude reasoning on every response, cheap models do grunt work.
 
-export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext) {
+export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, { useCRPC = false } = {}) {
   try {
     const contextBlock = recentContext
       ? `<recent_conversation>\n${recentContext}\n</recent_conversation>\n\n`
@@ -236,6 +237,41 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
     const rapportHint = getRapportHint(userName);
 
     const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation. Hint: ${responseHint}. ${rapportHint}\nYou can: one-liner, challenge, context, banter, follow-up question, hot take. 1-3 sentences. Match the energy. Reference what was said.\n${getResponseModifier()}]`;
+
+    // ============ CRPC Mode: Multi-Candidate Consensus ============
+    // When useCRPC=true, generate 3 candidates with temperature variation,
+    // run pairwise comparison, and use the consensus winner instead of a single draft.
+    // This is Tim Cotton's CRPC protocol running in the production chat pipeline.
+    if (useCRPC) {
+      try {
+        console.log('[intelligence] CRPC mode — generating consensus response');
+        const crpcResult = await runLocalCRPC(systemPrompt, [{ role: 'user', content: prompt }], {
+          maxTokens: 400,
+          type: 'proactive',
+        });
+
+        if (crpcResult?.consensusResponse) {
+          const crpcText = crpcResult.consensusResponse.trim();
+          console.log(`[intelligence] CRPC consensus: winner=${crpcResult.winner}, confidence=${crpcResult.confidence.toFixed(2)}, duration=${crpcResult.durationMs}ms`);
+
+          // Still apply hallucination gate
+          if (containsEcosystemClaim(crpcText)) {
+            console.warn(`[intelligence] CRPC ECOSYSTEM CLAIM BLOCKED: "${crpcText.slice(0, 100)}..."`);
+            return null;
+          }
+
+          recordEngagement();
+          evaluateOwnResponse(crpcText, text, 'group')
+            .then(scores => { if (scores) appendScoreLog(null, scores); })
+            .catch(() => {});
+
+          return crpcText;
+        }
+      } catch (crpcErr) {
+        console.warn(`[intelligence] CRPC failed, falling back to standard pipeline: ${crpcErr.message}`);
+        // Fall through to standard pipeline
+      }
+    }
 
     // Phase 1: Cheap model drafts the response (smart router picks cheapest provider)
     const draft = await llmChat({

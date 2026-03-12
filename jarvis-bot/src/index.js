@@ -6429,12 +6429,15 @@ async function main() {
           const rssMB = Math.round(mem.rss / 1024 / 1024);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           const mh = getModuleHealth();
+          const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
           res.end(JSON.stringify({
             status: mh.failed.length === 0 ? 'ok' : 'degraded',
             uptime: process.uptime(),
             memMB: rssMB,
+            heapMB,
             polling: pollingRestartAttempts === 0 ? 'ok' : `degraded (${pollingRestartAttempts} restarts)`,
             modules: { loaded: mh.loaded.length, failed: mh.failed.length, failedNames: mh.failed.map(f => f.name) },
+            maps: { rateLimits: rateLimitMap.size, cmdRateLimits: commandRateLimits.size, botExchanges: global._botExchanges?.size || 0 },
           }));
         } else {
         try {

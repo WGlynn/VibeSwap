@@ -3003,4 +3003,248 @@ mod tests {
             assert!(at.tier_counts.hard_liquidation + at.tier_counts.soft_liquidation > 0);
         }
     }
+
+    // ============ Hardening Round 5 ============
+
+    #[test]
+    fn test_assess_protocol_single_vault_huge_collateral_v5() {
+        let pool = test_pool();
+        // Large collateral, small debt → very safe
+        let vaults = vec![safe_vault(10_000 * PRECISION, 1_000 * PRECISION)];
+        let health = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        assert_eq!(health.vaults_assessed, 1);
+        assert_eq!(health.tier_counts.safe, 1);
+    }
+
+    #[test]
+    fn test_assess_protocol_worst_hf_single_vault_v5() {
+        let pool = test_pool();
+        let vaults = vec![safe_vault(10 * PRECISION, 25_000 * PRECISION)];
+        let health = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        assert!(health.worst_health_factor < PRECISION); // Under-collateralized
+    }
+
+    #[test]
+    fn test_simulate_price_drop_2500_bps_v5() {
+        let pool = test_pool();
+        let vaults = vec![safe_vault(10 * PRECISION, 15_000 * PRECISION)];
+        let result = simulate_price_drop(&vaults, &pool, None, 3000 * PRECISION, PRECISION, 2500);
+        // 25% drop: price = 2250, collateral_value = 10*2250*0.8=18000, debt=15000 → HF=1.2
+        assert_eq!(result.vaults_assessed, 1);
+    }
+
+    #[test]
+    fn test_risk_score_zero_utilization_high_insurance_v5() {
+        let pool = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 0,
+            ..test_pool()
+        };
+        let insurance = InsurancePoolCellData {
+            total_deposits: 500_000 * PRECISION,
+            ..test_insurance()
+        };
+        let health = assess_protocol(&[], &pool, Some(&insurance), 3000 * PRECISION, PRECISION);
+        let score = risk_score(&health);
+        assert_eq!(score, 0); // Perfectly safe
+    }
+
+    #[test]
+    fn test_risk_level_low_boundary_v5() {
+        assert_eq!(classify_risk_level(0), RiskLevel::Low);
+        assert_eq!(classify_risk_level(20), RiskLevel::Low);
+    }
+
+    #[test]
+    fn test_risk_level_medium_boundary_v5() {
+        assert_eq!(classify_risk_level(21), RiskLevel::Medium);
+        assert_eq!(classify_risk_level(50), RiskLevel::Medium);
+    }
+
+    #[test]
+    fn test_risk_level_high_boundary_v5() {
+        assert_eq!(classify_risk_level(51), RiskLevel::High);
+        assert_eq!(classify_risk_level(75), RiskLevel::High);
+    }
+
+    #[test]
+    fn test_risk_level_critical_boundary_v5() {
+        assert_eq!(classify_risk_level(76), RiskLevel::Critical);
+        assert_eq!(classify_risk_level(100), RiskLevel::Critical);
+    }
+
+    #[test]
+    fn test_priority_exactly_at_precision_v5() {
+        // HF == 1.0 exactly → priority 100 (just above critical)
+        let p = health_factor_to_priority(PRECISION);
+        assert_eq!(p, 100);
+    }
+
+    #[test]
+    fn test_priority_at_1_1x_v5() {
+        // HF == 1.1 exactly → priority 200
+        let p = health_factor_to_priority(PRECISION * 110 / 100);
+        assert_eq!(p, 200);
+    }
+
+    #[test]
+    fn test_priority_at_1_3x_v5() {
+        let p = health_factor_to_priority(PRECISION * 130 / 100);
+        assert_eq!(p, 300);
+    }
+
+    #[test]
+    fn test_priority_at_1_5x_v5() {
+        let p = health_factor_to_priority(PRECISION * 150 / 100);
+        assert_eq!(p, 1000);
+    }
+
+    #[test]
+    fn test_insurance_coverage_half_of_borrows_v5() {
+        let pool = test_pool(); // 500K borrows
+        let insurance = InsurancePoolCellData {
+            total_deposits: 250_000 * PRECISION,
+            ..test_insurance()
+        };
+        let health = assess_protocol(&[], &pool, Some(&insurance), 3000 * PRECISION, PRECISION);
+        assert_eq!(health.insurance_coverage_bps, 5000); // 50%
+    }
+
+    #[test]
+    fn test_utilization_75_percent_v5() {
+        let pool = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 750_000 * PRECISION,
+            ..test_pool()
+        };
+        let health = assess_protocol(&[], &pool, None, 3000 * PRECISION, PRECISION);
+        assert_eq!(health.utilization_bps, 7500);
+    }
+
+    #[test]
+    fn test_assess_protocol_five_vaults_all_same_v5() {
+        let pool = test_pool();
+        let vaults: Vec<VaultCellData> = (0..5)
+            .map(|_| safe_vault(100 * PRECISION, 5_000 * PRECISION))
+            .collect();
+        let health = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        assert_eq!(health.vaults_assessed, 5);
+        assert_eq!(health.tier_counts.safe, 5);
+        assert!(health.pending_actions.is_empty());
+    }
+
+    #[test]
+    fn test_simulate_price_drop_zero_bps_no_change_v5() {
+        let pool = test_pool();
+        let vaults = vec![safe_vault(100 * PRECISION, 5_000 * PRECISION)];
+        let normal = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        let zero_drop = simulate_price_drop(&vaults, &pool, None, 3000 * PRECISION, PRECISION, 0);
+        assert_eq!(normal.worst_health_factor, zero_drop.worst_health_factor);
+    }
+
+    #[test]
+    fn test_find_liquidation_threshold_highly_collateralized_v5() {
+        let pool = test_pool();
+        // HF is extremely high
+        let vaults = vec![safe_vault(1000 * PRECISION, 1_000 * PRECISION)];
+        let threshold = find_liquidation_threshold(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        // Should require massive drop, if found at all
+        if let Some(bps) = threshold {
+            assert!(bps > 9000, "Highly collateralized vault needs >90% drop, got {}", bps);
+        }
+    }
+
+    #[test]
+    fn test_risk_score_moderate_utilization_v5() {
+        let pool = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 600_000 * PRECISION,
+            ..test_pool()
+        };
+        let health = assess_protocol(&[], &pool, Some(&test_insurance()), 3000 * PRECISION, PRECISION);
+        let score = risk_score(&health);
+        // 60% utilization = 5pts, insurance should help, no vaults at risk
+        assert!(score <= 10);
+    }
+
+    #[test]
+    fn test_pending_actions_sorted_critical_first_v5() {
+        let pool = test_pool();
+        let vaults = vec![
+            safe_vault(10 * PRECISION, 30_000 * PRECISION), // HF < 1 → critical
+            safe_vault(100 * PRECISION, 5_000 * PRECISION),  // HF high → safe
+            safe_vault(10 * PRECISION, 22_000 * PRECISION), // HF ~ 1.09 → warning
+        ];
+        let health = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        if health.pending_actions.len() >= 2 {
+            assert!(health.pending_actions[0].priority <= health.pending_actions[1].priority);
+        }
+    }
+
+    #[test]
+    fn test_risk_score_insurance_coverage_caps_at_10000_v5() {
+        let pool = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 100 * PRECISION,
+            ..test_pool()
+        };
+        let insurance = InsurancePoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            ..test_insurance()
+        };
+        let health = assess_protocol(&[], &pool, Some(&insurance), 3000 * PRECISION, PRECISION);
+        assert_eq!(health.insurance_coverage_bps, 10000);
+    }
+
+    #[test]
+    fn test_assess_protocol_total_borrows_matches_pool_v5() {
+        let pool = test_pool(); // 500_000 * PRECISION borrows
+        let health = assess_protocol(&[], &pool, None, 3000 * PRECISION, PRECISION);
+        assert_eq!(health.total_borrows, pool.total_borrows);
+    }
+
+    #[test]
+    fn test_risk_score_max_is_100_v5() {
+        // Create worst case scenario
+        let pool = LendingPoolCellData {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 999_000 * PRECISION,
+            ..test_pool()
+        };
+        let vaults: Vec<VaultCellData> = (0..10)
+            .map(|_| safe_vault(1 * PRECISION, 30_000 * PRECISION))
+            .collect();
+        let health = assess_protocol(&vaults, &pool, None, 3000 * PRECISION, PRECISION);
+        let score = risk_score(&health);
+        assert!(score <= 100);
+    }
+
+    #[test]
+    fn test_simulate_progressive_drops_hf_monotonically_decreases_v5() {
+        let pool = test_pool();
+        let vaults = vec![safe_vault(10 * PRECISION, 10_000 * PRECISION)];
+        let mut prev_hf = u128::MAX;
+        for bps in [0, 1000, 2000, 3000, 5000, 7000] {
+            let result = simulate_price_drop(&vaults, &pool, None, 3000 * PRECISION, PRECISION, bps);
+            assert!(result.worst_health_factor <= prev_hf);
+            prev_hf = result.worst_health_factor;
+        }
+    }
+
+    #[test]
+    fn test_tier_counts_default_all_zero_v5() {
+        let tc = TierCounts::default();
+        assert_eq!(tc.safe, 0);
+        assert_eq!(tc.warning, 0);
+        assert_eq!(tc.auto_deleverage, 0);
+        assert_eq!(tc.soft_liquidation, 0);
+        assert_eq!(tc.hard_liquidation, 0);
+    }
+
+    #[test]
+    fn test_risk_level_debug_impl_v5() {
+        let level = RiskLevel::Low;
+        let debug = format!("{:?}", level);
+        assert_eq!(debug, "Low");
+    }
 }

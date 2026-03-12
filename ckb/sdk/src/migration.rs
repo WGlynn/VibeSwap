@@ -1723,4 +1723,287 @@ mod tests {
         assert_eq!(t.fields_removed, 0);
         assert_eq!(t.fields_modified, 0);
     }
+
+    // ============ Hardening Round 5 ============
+
+    #[test]
+    fn test_version_compare_all_zero_v5() {
+        assert_eq!(version_compare(&v(0, 0, 0), &v(0, 0, 0)), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_version_compare_max_u16_all_v5() {
+        assert_eq!(
+            version_compare(&v(u16::MAX, u16::MAX, u16::MAX), &v(u16::MAX, u16::MAX, u16::MAX)),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn test_version_compare_major_only_diff_v5() {
+        assert_eq!(version_compare(&v(1, 999, 999), &v(2, 0, 0)), std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn test_is_compatible_zero_to_zero_v5() {
+        assert!(is_compatible(&v(0, 0, 0), &v(0, 99, 99)));
+    }
+
+    #[test]
+    fn test_compatibility_report_many_breaking_changes_v5() {
+        let report = compatibility_report(&v(1, 0, 0), &v(1, 5, 0), 100, 50, 200);
+        assert!(report.compatible);
+        assert!(report.migration_required); // has breaking changes
+        assert_eq!(report.breaking_changes, 100);
+        assert_eq!(report.deprecations, 50);
+        assert_eq!(report.new_features, 200);
+    }
+
+    #[test]
+    fn test_create_migration_plan_two_steps_v5() {
+        let steps = vec![
+            make_step(1, TransformType::SchemaChange, 500, false),
+            make_step(2, TransformType::DataReformat, 300, false),
+        ];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(plan.estimated_cells, 800);
+        assert_eq!(plan.steps.len(), 2);
+    }
+
+    #[test]
+    fn test_estimate_migration_time_exact_division_v5() {
+        let steps = vec![make_step(1, TransformType::SchemaChange, 1000, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        let time = estimate_migration_time(&plan, 100);
+        assert_eq!(time, 10);
+    }
+
+    #[test]
+    fn test_estimate_migration_time_ceiling_v5() {
+        let steps = vec![make_step(1, TransformType::SchemaChange, 101, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        let time = estimate_migration_time(&plan, 100);
+        assert_eq!(time, 2); // ceil(101/100) = 2
+    }
+
+    #[test]
+    fn test_validate_checkpoint_identical_v5() {
+        let cs = checksum(b"test data");
+        let cp = make_checkpoint(v(1, 0, 0), cs);
+        assert!(validate_checkpoint(&cp, &cs).is_ok());
+    }
+
+    #[test]
+    fn test_validate_checkpoint_off_by_one_bit_v5() {
+        let cs = checksum(b"test data");
+        let mut wrong = cs;
+        wrong[0] ^= 1;
+        let cp = make_checkpoint(v(1, 0, 0), cs);
+        assert_eq!(validate_checkpoint(&cp, &wrong), Err(MigrationError::ChecksumMismatch));
+    }
+
+    #[test]
+    fn test_migration_progress_exact_half_v5() {
+        let status = MigrationStatus::InProgress { completed_steps: 50, total_steps: 100 };
+        assert_eq!(migration_progress_bps(&status), 5000);
+    }
+
+    #[test]
+    fn test_migration_progress_one_of_three_v5() {
+        let status = MigrationStatus::InProgress { completed_steps: 1, total_steps: 3 };
+        let bps = migration_progress_bps(&status);
+        assert_eq!(bps, 3333);
+    }
+
+    #[test]
+    fn test_can_rollback_only_in_progress_v5() {
+        assert!(!can_rollback(&MigrationStatus::NotStarted));
+        assert!(can_rollback(&MigrationStatus::InProgress { completed_steps: 0, total_steps: 1 }));
+        assert!(!can_rollback(&MigrationStatus::Completed));
+        assert!(!can_rollback(&MigrationStatus::RolledBack));
+        assert!(!can_rollback(&MigrationStatus::Failed { step: 0, reason: [0u8; 64] }));
+    }
+
+    #[test]
+    fn test_cell_transform_summary_ten_transforms_v5() {
+        let transforms: Vec<CellTransform> = (0..10)
+            .map(|i| make_transform(100, 150, i as u16, 0, 0))
+            .collect();
+        let (old, new, count) = cell_transform_summary(&transforms);
+        assert_eq!(old, 1000);
+        assert_eq!(new, 1500);
+        assert_eq!(count, 10);
+    }
+
+    #[test]
+    fn test_version_string_zero_zero_zero_v5() {
+        let buf = version_string(&v(0, 0, 0));
+        let s = std::str::from_utf8(&buf).unwrap().trim_end_matches('\0');
+        assert_eq!(s, "0.0.0");
+    }
+
+    #[test]
+    fn test_parse_version_valid_formats_v5() {
+        assert_eq!(parse_version(b"1.2.3\0\0\0").unwrap(), v(1, 2, 3));
+        assert_eq!(parse_version(b"0.0.0\0\0\0").unwrap(), v(0, 0, 0));
+        assert_eq!(parse_version(b"99.88.77\0").unwrap(), v(99, 88, 77));
+    }
+
+    #[test]
+    fn test_parse_version_invalid_two_parts_v5() {
+        assert!(parse_version(b"1.2\0\0\0\0\0").is_err());
+    }
+
+    #[test]
+    fn test_parse_version_invalid_four_parts_v5() {
+        assert!(parse_version(b"1.2.3.4\0\0").is_err());
+    }
+
+    #[test]
+    fn test_checksum_deterministic_v5() {
+        let d1 = checksum(b"hello vibeswap");
+        let d2 = checksum(b"hello vibeswap");
+        assert_eq!(d1, d2);
+    }
+
+    #[test]
+    fn test_checksum_sensitivity_v5() {
+        let d1 = checksum(b"hello vibeswap");
+        let d2 = checksum(b"hello VibeSwap");
+        assert_ne!(d1, d2);
+    }
+
+    #[test]
+    fn test_needs_migration_patch_bump_v5() {
+        assert!(needs_migration(&v(1, 0, 0), &v(1, 0, 1)));
+    }
+
+    #[test]
+    fn test_needs_migration_same_version_v5() {
+        assert!(!needs_migration(&v(1, 0, 0), &v(1, 0, 0)));
+    }
+
+    #[test]
+    fn test_needs_migration_downgrade_v5() {
+        assert!(!needs_migration(&v(2, 0, 0), &v(1, 0, 0)));
+    }
+
+    #[test]
+    fn test_step_completion_rate_empty_plan_v5() {
+        let plan = MigrationPlan {
+            from_version: v(0, 9, 0),
+            to_version: v(1, 0, 0),
+            steps: vec![],
+            estimated_cells: 0,
+            estimated_blocks: 0,
+        };
+        assert_eq!(step_completion_rate(&plan), 0);
+    }
+
+    #[test]
+    fn test_step_completion_rate_all_completed_v5() {
+        let plan = MigrationPlan {
+            from_version: v(0, 9, 0),
+            to_version: v(1, 0, 0),
+            steps: vec![
+                make_step(1, TransformType::SchemaChange, 10, true),
+                make_step(2, TransformType::DataReformat, 10, true),
+            ],
+            estimated_cells: 20,
+            estimated_blocks: 1,
+        };
+        assert_eq!(step_completion_rate(&plan), 10_000);
+    }
+
+    #[test]
+    fn test_data_size_delta_mixed_grows_and_shrinks_v5() {
+        let transforms = vec![
+            make_transform(100, 200, 1, 0, 0), // +100
+            make_transform(200, 50, 0, 2, 0),  // -150
+            make_transform(50, 50, 0, 0, 1),   // 0
+        ];
+        let delta = data_size_delta(&transforms);
+        assert_eq!(delta, -50);
+    }
+
+    #[test]
+    fn test_data_size_delta_large_values_v5() {
+        let transforms = vec![
+            make_transform(u32::MAX, 0, 0, 10, 0),
+        ];
+        let delta = data_size_delta(&transforms);
+        assert_eq!(delta, -(u32::MAX as i64));
+    }
+
+    #[test]
+    fn test_migration_error_variants_distinct_v5() {
+        let variants: Vec<MigrationError> = vec![
+            MigrationError::IncompatibleVersion,
+            MigrationError::MigrationInProgress,
+            MigrationError::AlreadyMigrated,
+            MigrationError::DataCorrupted,
+            MigrationError::RollbackFailed,
+            MigrationError::InvalidCheckpoint,
+            MigrationError::VersionTooOld,
+            MigrationError::VersionTooNew,
+            MigrationError::MissingField,
+            MigrationError::ChecksumMismatch,
+        ];
+        for i in 0..variants.len() {
+            for j in (i + 1)..variants.len() {
+                assert_ne!(variants[i], variants[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_transform_type_clone_eq_v5() {
+        let types = vec![
+            TransformType::SchemaChange,
+            TransformType::DataReformat,
+            TransformType::IndexRebuild,
+            TransformType::ScriptUpgrade,
+            TransformType::ParameterUpdate,
+        ];
+        for t in &types {
+            assert_eq!(t.clone(), *t);
+        }
+        assert_ne!(TransformType::SchemaChange, TransformType::DataReformat);
+    }
+
+    #[test]
+    fn test_version_string_roundtrip_large_v5() {
+        let original = v(999, 888, 777);
+        let buf = version_string(&original);
+        let parsed = parse_version(&buf).unwrap();
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn test_cell_transform_summary_single_huge_v5() {
+        let t = make_transform(u32::MAX, u32::MAX, u16::MAX, u16::MAX, u16::MAX);
+        let (old, new, count) = cell_transform_summary(&[t]);
+        assert_eq!(old, u32::MAX as u64);
+        assert_eq!(new, u32::MAX as u64);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_create_migration_plan_exact_max_steps_v5() {
+        let steps: Vec<MigrationStep> = (0..MAX_MIGRATION_STEPS as u32)
+            .map(|i| make_step(i, TransformType::SchemaChange, 1, false))
+            .collect();
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps);
+        assert!(plan.is_ok());
+        assert_eq!(plan.unwrap().steps.len(), MAX_MIGRATION_STEPS);
+    }
+
+    #[test]
+    fn test_create_migration_plan_one_over_max_steps_v5() {
+        let steps: Vec<MigrationStep> = (0..=MAX_MIGRATION_STEPS as u32)
+            .map(|i| make_step(i, TransformType::SchemaChange, 1, false))
+            .collect();
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps);
+        assert_eq!(plan, Err(MigrationError::DataCorrupted));
+    }
 }

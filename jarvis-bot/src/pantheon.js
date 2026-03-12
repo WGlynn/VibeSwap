@@ -99,12 +99,18 @@ export async function pantheonChat(agentId, message, chatId = 'default') {
   const ollamaUrl = process.env.OLLAMA_URL
   const model = process.env.PANTHEON_MODEL || (ollamaUrl ? 'qwen2.5:7b' : 'claude-sonnet-4-5-20250929')
 
+  // Nyx gets her organizational memory appended to identity
+  let systemContent = agent.identity
+  if (agentId === 'nyx') {
+    try { systemContent += await getNyxContextSuffix() } catch {}
+  }
+
   let text, usage
   if (ollamaUrl || model.includes('qwen') || model.includes('llama') || model.includes('mistral')) {
     // ============ Ollama (zero cost) ============
     const url = ollamaUrl || 'http://localhost:11434'
     const ollamaMessages = [
-      { role: 'system', content: agent.identity },
+      { role: 'system', content: systemContent },
       ...history,
     ]
     const res = await fetch(`${url}/api/chat`, {
@@ -122,7 +128,7 @@ export async function pantheonChat(agentId, message, chatId = 'default') {
     const response = await client.messages.create({
       model,
       max_tokens: 2048,
-      system: agent.identity,
+      system: systemContent,
       messages: history,
     })
     text = response.content.map(b => b.text || '').join('')
@@ -529,6 +535,68 @@ export async function handlePantheonTool(name, input) {
     return JSON.stringify({ agent: targetAgent, response: response.text, cost: response.usage.cost })
   }
   return JSON.stringify({ error: `Unknown tool: ${name}` })
+}
+
+// ============ Nyx's Organizational Memory ============
+// Nyx holds the complete context picture. This is her persistent memory —
+// decisions, project states, team context that survives restarts.
+
+const NYX_MEMORY_FILE = join(DATA_DIR, 'nyx-memory.json')
+
+export async function getNyxMemory() {
+  try {
+    const data = await readFile(NYX_MEMORY_FILE, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return { decisions: [], projects: {}, notes: [], lastUpdated: null }
+  }
+}
+
+export async function addNyxMemory(type, content) {
+  const memory = await getNyxMemory()
+  const entry = { type, content, timestamp: new Date().toISOString() }
+
+  if (type === 'decision') {
+    memory.decisions.push(entry)
+    // Keep last 50 decisions
+    while (memory.decisions.length > 50) memory.decisions.shift()
+  } else if (type === 'project') {
+    memory.projects[content.name] = { ...content, updated: entry.timestamp }
+  } else {
+    memory.notes.push(entry)
+    while (memory.notes.length > 100) memory.notes.shift()
+  }
+
+  memory.lastUpdated = entry.timestamp
+  await writeFile(NYX_MEMORY_FILE, JSON.stringify(memory, null, 2))
+  return entry
+}
+
+// Inject org memory into Nyx's context when she chats
+async function getNyxContextSuffix() {
+  const memory = await getNyxMemory()
+  if (!memory.lastUpdated) return ''
+
+  let ctx = '\n\n## Your Organizational Memory\n'
+  if (memory.decisions.length > 0) {
+    ctx += '\nRecent decisions:\n'
+    for (const d of memory.decisions.slice(-10)) {
+      ctx += `- [${d.timestamp.slice(0, 10)}] ${d.content}\n`
+    }
+  }
+  if (Object.keys(memory.projects).length > 0) {
+    ctx += '\nProject states:\n'
+    for (const [name, p] of Object.entries(memory.projects)) {
+      ctx += `- ${name}: ${p.status || 'active'} (updated ${p.updated?.slice(0, 10)})\n`
+    }
+  }
+  if (memory.notes.length > 0) {
+    ctx += '\nRecent notes:\n'
+    for (const n of memory.notes.slice(-5)) {
+      ctx += `- ${n.content}\n`
+    }
+  }
+  return ctx
 }
 
 // ============ Init ============

@@ -151,6 +151,7 @@ import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedu
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
+import { initPantheon, getAllCosts, getInfraCosts, listAgents } from './pantheon.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -1171,6 +1172,10 @@ TRADING (owner-only)
   /trade sell <eth> — Sell ETH for USDC
   /trade history — Recent trades
   /trade pnl — P&L breakdown
+
+PANTHEON (owner-only)
+  /pantheon — List agents
+  /pantheon costs — LLM + infra cost breakdown
 
 SOCIAL PRESENCE (owner-only)
   /social status — Platform status
@@ -2450,6 +2455,34 @@ bot.command('wallet', async (ctx) => {
     } else {
       ctx.reply(`Address: ${info.address}\nUnlocked: ${info.unlocked}\nPaused: ${info.paused}\nDaily: ${info.today?.spent} / ${info.limits?.dailyCap}\nTx today: ${info.today?.txCount} / ${info.limits?.dailyTxLimit}\nTotal tx: ${info.totalTx}\nChains: ${info.chains?.join(', ')}`);
     }
+  }
+});
+
+// ============ Pantheon — Agent Cost Tracking ============
+
+bot.command('pantheon', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Pantheon commands are owner-only.');
+  }
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'costs' || sub === 'cost') {
+    const costs = await getAllCosts();
+    const infra = getInfraCosts();
+    let msg = `Pantheon Costs\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Total LLM: ${costs.totalUsd} (${costs.totalCalls} calls)\n\n`;
+    for (const [agent, data] of Object.entries(costs.agents)) {
+      msg += `${agent}: ${data.formatted} (${data.calls} calls, avg ${data.perCall})\n`;
+    }
+    msg += `\nInfra Estimates:\n`;
+    msg += `Headless: ${infra.estimate.headless}\n`;
+    msg += `Desktop: ${infra.estimate.desktop}`;
+    ctx.reply(msg);
+  } else {
+    const agentList = await listAgents();
+    const costs = await getAllCosts();
+    ctx.reply(`Pantheon Agents: ${agentList.length ? agentList.join(', ') : 'none'}\nTotal LLM cost: ${costs.totalUsd}\nUse /pantheon costs for breakdown`);
   }
 });
 
@@ -6397,6 +6430,8 @@ async function main() {
   initWallet();
   // Trading — autonomous DEX trading on Base
   initTrading();
+  // Pantheon — digital corporation agent management
+  initPantheon();
   // Social outbound presence — X, Discord, GitHub
   initSocialOutbound();
   // Proactive engine — autonomous scheduled actions

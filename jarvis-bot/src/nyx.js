@@ -220,12 +220,11 @@ export async function handleNyxRequest(req, res, url) {
         res.end(JSON.stringify({ error: 'message required' }));
         return;
       }
-      const { chat } = await import('./claude.js');
-      const response = await chat(
-        body.chatId || 'nyx',
-        body.userName || 'nyx-user',
+      const { pantheonChat } = await import('./pantheon.js');
+      const response = await pantheonChat(
+        'nyx',
         body.message,
-        'private'
+        body.chatId || 'default'
       );
       const shard = getShardInfo();
       res.writeHead(200, { 'Content-Type': 'application/json' });

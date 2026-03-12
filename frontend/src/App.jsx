@@ -13,6 +13,7 @@ import CommandPalette from './components/CommandPalette'
 import { ToastProvider } from './contexts/ToastContext'
 import PageSkeleton from './components/ui/PageSkeleton'
 import BackToTop from './components/ui/BackToTop'
+import NetworkBanner from './components/ui/NetworkBanner'
 import { useSynaptic } from './hooks/useSynaptic'
 import { remember } from './utils/sankofa'
 
@@ -265,6 +266,7 @@ function App() {
       <AmbientBackground />
       <div className="noise-overlay" />
       <CommandPalette />
+      <NetworkBanner />
       {isVoicePage ? (
         // Voice page: full screen, no header, no nav
         <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>

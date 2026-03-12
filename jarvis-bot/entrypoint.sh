@@ -28,6 +28,8 @@ GIT_TIMEOUT=60  # Max seconds for any single git operation
 if [ -d "$REPO_DIR/.git" ]; then
     echo "Repository exists at $REPO_DIR — pulling latest..."
     cd "$REPO_DIR"
+    # Clean up stale lock files from hard kills
+    rm -f "$REPO_DIR/.git/index.lock" "$REPO_DIR/.git/shallow.lock" 2>/dev/null
     timeout $GIT_TIMEOUT git pull origin master 2>&1 || echo "[WARN] Pull failed — using existing state"
     cd /app
 else

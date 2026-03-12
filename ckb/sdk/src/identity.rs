@@ -2239,4 +2239,309 @@ mod tests {
         // First unique addr (20) fits (10), second (21) would be 11 -> error
         assert_eq!(result, Err(IdentityError::MaxAddressesReached));
     }
+
+    // ============ Hardening Tests v6 ============
+
+    #[test]
+    fn test_create_identity_sets_counters_to_zero_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        assert_eq!(id.total_trades, 0);
+        assert_eq!(id.total_lp_actions, 0);
+        assert_eq!(id.total_governance_votes, 0);
+        assert_eq!(id.total_penalties, 0);
+    }
+
+    #[test]
+    fn test_create_identity_block_zero_v6() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        assert_eq!(id.created_block, 0);
+        assert_eq!(id.last_active_block, 0);
+    }
+
+    #[test]
+    fn test_create_identity_max_block_v6() {
+        let id = create_identity(test_hash(1), u64::MAX).unwrap();
+        assert_eq!(id.created_block, u64::MAX);
+    }
+
+    #[test]
+    fn test_link_address_zero_hash_v6() {
+        // Linking a zero hash — should succeed (zero is a valid address hash, just unusual)
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let result = link_address(&id, [0u8; 32], LinkType::Device, 100);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_link_all_types_distinct_v6() {
+        let mut id = create_identity(test_hash(1), 100).unwrap();
+        id = link_address(&id, test_hash(2), LinkType::Device, 100).unwrap();
+        id = link_address(&id, test_hash(3), LinkType::Hardware, 100).unwrap();
+        id = link_address(&id, test_hash(4), LinkType::Multisig, 100).unwrap();
+        id = link_address(&id, test_hash(5), LinkType::Recovery, 100).unwrap();
+        assert_eq!(id.address_count, 5);
+    }
+
+    #[test]
+    fn test_unlink_middle_address_shifts_correctly_v6() {
+        let mut id = create_identity(test_hash(1), 100).unwrap();
+        id = link_address(&id, test_hash(2), LinkType::Device, 100).unwrap();
+        id = link_address(&id, test_hash(3), LinkType::Hardware, 100).unwrap();
+        id = link_address(&id, test_hash(4), LinkType::Recovery, 100).unwrap();
+        // Unlink middle (test_hash(3))
+        id = unlink_address(&id, test_hash(3)).unwrap();
+        assert_eq!(id.address_count, 3);
+        assert_eq!(find_address(&id, test_hash(4)), Some(2));
+    }
+
+    #[test]
+    fn test_record_trade_increments_counter_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::Trade, 200).unwrap();
+        assert_eq!(updated.total_trades, 1);
+    }
+
+    #[test]
+    fn test_record_lp_increments_counter_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::LiquidityProvision, 200).unwrap();
+        assert_eq!(updated.total_lp_actions, 1);
+    }
+
+    #[test]
+    fn test_record_governance_increments_counter_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::GovernanceVote, 200).unwrap();
+        assert_eq!(updated.total_governance_votes, 1);
+    }
+
+    #[test]
+    fn test_record_failed_reveal_increments_penalties_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::FailedReveal, 200).unwrap();
+        assert_eq!(updated.total_penalties, 1);
+    }
+
+    #[test]
+    fn test_record_liquidated_increments_penalties_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, _) = record_activity(&id, ActivityType::Liquidated, 200).unwrap();
+        assert_eq!(updated.total_penalties, 1);
+    }
+
+    #[test]
+    fn test_record_stake_created_no_rep_change_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, change) = record_activity(&id, ActivityType::StakeCreated, 200).unwrap();
+        assert_eq!(change.old_reputation, change.new_reputation);
+        assert_eq!(updated.reputation, INITIAL_REPUTATION);
+    }
+
+    #[test]
+    fn test_record_stake_withdrawn_no_rep_change_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let (updated, change) = record_activity(&id, ActivityType::StakeWithdrawn, 200).unwrap();
+        assert_eq!(change.old_reputation, change.new_reputation);
+        assert_eq!(updated.reputation, INITIAL_REPUTATION);
+    }
+
+    #[test]
+    fn test_decay_preserves_address_count_v6() {
+        let mut id = create_identity(test_hash(1), 100).unwrap();
+        id = link_address(&id, test_hash(2), LinkType::Device, 100).unwrap();
+        let decayed = apply_decay(&id, 5);
+        assert_eq!(decayed.address_count, 2);
+    }
+
+    #[test]
+    fn test_decay_100_epochs_from_initial_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let decayed = apply_decay(&id, 100);
+        assert!(decayed.reputation < INITIAL_REPUTATION);
+        assert!(decayed.reputation > 0, "100 epochs of 0.5% decay shouldn't reach zero from 1000");
+    }
+
+    #[test]
+    fn test_decay_1000_epochs_reaches_zero_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let decayed = apply_decay(&id, 10000);
+        assert_eq!(decayed.reputation, 0);
+    }
+
+    #[test]
+    fn test_tier_boundaries_exact_v6() {
+        assert_eq!(compute_reputation_tier(0), ReputationTier::Newcomer);
+        assert_eq!(compute_reputation_tier(999), ReputationTier::Newcomer);
+        assert_eq!(compute_reputation_tier(1000), ReputationTier::Participant);
+        assert_eq!(compute_reputation_tier(2999), ReputationTier::Participant);
+        assert_eq!(compute_reputation_tier(3000), ReputationTier::Contributor);
+        assert_eq!(compute_reputation_tier(4999), ReputationTier::Contributor);
+        assert_eq!(compute_reputation_tier(5000), ReputationTier::Veteran);
+        assert_eq!(compute_reputation_tier(7499), ReputationTier::Veteran);
+        assert_eq!(compute_reputation_tier(7500), ReputationTier::Elder);
+        assert_eq!(compute_reputation_tier(9999), ReputationTier::Elder);
+        assert_eq!(compute_reputation_tier(10000), ReputationTier::Legend);
+    }
+
+    #[test]
+    fn test_trust_level_zero_everything_v6() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.reputation = 0;
+        let trust = compute_trust_level(&id, 0);
+        assert_eq!(trust, 0);
+    }
+
+    #[test]
+    fn test_trust_level_max_reputation_only_v6() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.reputation = MAX_REPUTATION;
+        // At block 0, age is 0, activity is 0
+        let trust = compute_trust_level(&id, 0);
+        assert_eq!(trust, 5000); // 50% from reputation only
+    }
+
+    #[test]
+    fn test_has_priority_at_exactly_threshold_v6() {
+        let mut id = create_identity(test_hash(1), 100).unwrap();
+        id.reputation = MIN_REPUTATION_FOR_PRIORITY;
+        assert!(has_priority_access(&id));
+    }
+
+    #[test]
+    fn test_has_priority_one_below_threshold_v6() {
+        let mut id = create_identity(test_hash(1), 100).unwrap();
+        id.reputation = MIN_REPUTATION_FOR_PRIORITY - 1;
+        assert!(!has_priority_access(&id));
+    }
+
+    #[test]
+    fn test_is_active_at_exact_boundary_v6() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.last_active_block = 0;
+        // At block == ACTIVITY_WINDOW_BLOCKS, should still be active
+        assert!(is_active(&id, ACTIVITY_WINDOW_BLOCKS));
+        // One more block — inactive
+        assert!(!is_active(&id, ACTIVITY_WINDOW_BLOCKS + 1));
+    }
+
+    #[test]
+    fn test_activity_score_all_max_u64_v6() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.total_trades = u64::MAX;
+        id.total_lp_actions = u64::MAX;
+        id.total_governance_votes = u64::MAX;
+        // Should saturate, not overflow
+        let score = compute_activity_score(&id);
+        assert_eq!(score, u64::MAX);
+    }
+
+    #[test]
+    fn test_merge_preserves_primary_id_hash_v6() {
+        let id1 = create_identity(test_hash(1), 0).unwrap();
+        let id2 = create_identity(test_hash(2), 0).unwrap();
+        let merged = merge_identities(&id1, &id2).unwrap();
+        assert_eq!(merged.id_hash, test_hash(1));
+    }
+
+    #[test]
+    fn test_merge_sums_trades_v6() {
+        let mut id1 = create_identity(test_hash(1), 0).unwrap();
+        let mut id2 = create_identity(test_hash(2), 0).unwrap();
+        id1.total_trades = 100;
+        id2.total_trades = 200;
+        let merged = merge_identities(&id1, &id2).unwrap();
+        assert_eq!(merged.total_trades, 300);
+    }
+
+    #[test]
+    fn test_merge_keeps_earlier_created_v6() {
+        let id1 = create_identity(test_hash(1), 100).unwrap();
+        let id2 = create_identity(test_hash(2), 50).unwrap();
+        let merged = merge_identities(&id1, &id2).unwrap();
+        assert_eq!(merged.created_block, 50);
+    }
+
+    #[test]
+    fn test_merge_keeps_later_active_v6() {
+        let mut id1 = create_identity(test_hash(1), 0).unwrap();
+        let mut id2 = create_identity(test_hash(2), 0).unwrap();
+        id1.last_active_block = 500;
+        id2.last_active_block = 1000;
+        let merged = merge_identities(&id1, &id2).unwrap();
+        assert_eq!(merged.last_active_block, 1000);
+    }
+
+    #[test]
+    fn test_leaderboard_correct_rank_assignment_v6() {
+        let mut id1 = create_identity(test_hash(1), 0).unwrap();
+        let mut id2 = create_identity(test_hash(2), 0).unwrap();
+        let mut id3 = create_identity(test_hash(3), 0).unwrap();
+        id1.reputation = 9000;
+        id2.reputation = 5000;
+        id3.reputation = 7000;
+        let lb = build_leaderboard(&[id1, id2, id3], 10);
+        assert_eq!(lb[0].rank, 1);
+        assert_eq!(lb[0].reputation, 9000);
+        assert_eq!(lb[1].rank, 2);
+        assert_eq!(lb[1].reputation, 7000);
+        assert_eq!(lb[2].rank, 3);
+        assert_eq!(lb[2].reputation, 5000);
+    }
+
+    #[test]
+    fn test_leaderboard_top_1_v6() {
+        let mut id1 = create_identity(test_hash(1), 0).unwrap();
+        let mut id2 = create_identity(test_hash(2), 0).unwrap();
+        id1.reputation = 9000;
+        id2.reputation = 5000;
+        let lb = build_leaderboard(&[id1, id2], 1);
+        assert_eq!(lb.len(), 1);
+        assert_eq!(lb[0].reputation, 9000);
+    }
+
+    #[test]
+    fn test_build_profile_returns_correct_tier_v6() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.reputation = 7500;
+        let profile = build_profile(&id, 100);
+        assert_eq!(profile.reputation_tier, ReputationTier::Elder);
+    }
+
+    #[test]
+    fn test_build_profile_is_active_flag_v6() {
+        let id = create_identity(test_hash(1), 100).unwrap();
+        let profile = build_profile(&id, 100);
+        assert!(profile.is_active);
+        let profile_inactive = build_profile(&id, 100 + ACTIVITY_WINDOW_BLOCKS + 1);
+        assert!(!profile_inactive.is_active);
+    }
+
+    #[test]
+    fn test_reputation_change_records_block_v6() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        let (_, change) = record_activity(&id, ActivityType::Trade, 999).unwrap();
+        assert_eq!(change.block_number, 999);
+    }
+
+    #[test]
+    fn test_multiple_penalties_floor_at_zero_v6() {
+        let mut id = create_identity(test_hash(1), 0).unwrap();
+        id.reputation = 150; // Below one FailedReveal penalty
+        let (updated, _) = record_activity(&id, ActivityType::FailedReveal, 100).unwrap();
+        assert_eq!(updated.reputation, 50);
+        let (updated2, _) = record_activity(&updated, ActivityType::FailedReveal, 200).unwrap();
+        assert_eq!(updated2.reputation, 0);
+    }
+
+    #[test]
+    fn test_find_address_returns_none_for_unlisted_v6() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        assert_eq!(find_address(&id, test_hash(99)), None);
+    }
+
+    #[test]
+    fn test_find_address_returns_zero_for_primary_v6() {
+        let id = create_identity(test_hash(1), 0).unwrap();
+        assert_eq!(find_address(&id, test_hash(1)), Some(0));
+    }
 }

@@ -1790,4 +1790,320 @@ mod tests {
             assert!(vp <= initial_vp, "VP at block {} exceeded initial", block);
         }
     }
+
+    // ============ Hardening Tests v6 ============
+
+    #[test]
+    fn voting_power_half_amount_half_lock_v6() {
+        let vp = calculate_voting_power(MIN_STAKE_AMOUNT, MAX_LOCK_DURATION / 2, MAX_LOCK_DURATION);
+        assert_eq!(vp, MIN_STAKE_AMOUNT / 2);
+    }
+
+    #[test]
+    fn voting_power_tiny_duration_v6() {
+        // Minimum lock duration
+        let vp = calculate_voting_power(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, MAX_LOCK_DURATION);
+        assert!(vp > 0);
+        assert!(vp < MIN_STAKE_AMOUNT);
+    }
+
+    #[test]
+    fn voting_power_all_zero_v6() {
+        assert_eq!(calculate_voting_power(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn vp_at_block_one_block_before_expiry_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let vp = voting_power_at_block(&pos, 999, MAX_LOCK_DURATION);
+        assert!(vp > 0, "Should have minimal VP one block before expiry");
+    }
+
+    #[test]
+    fn vp_at_block_at_start_equals_initial_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MAX_LOCK_DURATION, 100).unwrap();
+        let vp = voting_power_at_block(&pos, 100, MAX_LOCK_DURATION);
+        assert_eq!(vp, pos.voting_power);
+    }
+
+    #[test]
+    fn vp_at_block_at_expiry_is_zero_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 100).unwrap();
+        let vp = voting_power_at_block(&pos, pos.lock_end, MAX_LOCK_DURATION);
+        assert_eq!(vp, 0);
+    }
+
+    #[test]
+    fn vp_at_block_well_after_expiry_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 100).unwrap();
+        let vp = voting_power_at_block(&pos, pos.lock_end + 1_000_000, MAX_LOCK_DURATION);
+        assert_eq!(vp, 0);
+    }
+
+    #[test]
+    fn stake_zero_amount_v6() {
+        assert_eq!(stake(0, MIN_LOCK_DURATION, 0), Err(StakingError::ZeroAmount));
+    }
+
+    #[test]
+    fn stake_below_min_amount_v6() {
+        assert_eq!(stake(MIN_STAKE_AMOUNT - 1, MIN_LOCK_DURATION, 0), Err(StakingError::InsufficientStake));
+    }
+
+    #[test]
+    fn stake_below_min_duration_v6() {
+        assert_eq!(stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION - 1, 0), Err(StakingError::InvalidDuration));
+    }
+
+    #[test]
+    fn stake_above_max_duration_v6() {
+        assert_eq!(stake(MIN_STAKE_AMOUNT, MAX_LOCK_DURATION + 1, 0), Err(StakingError::ExceedsMaxLock));
+    }
+
+    #[test]
+    fn stake_lock_end_correct_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, 5000, 1000).unwrap();
+        assert_eq!(pos.lock_end, 6000);
+        assert_eq!(pos.lock_start, 1000);
+    }
+
+    #[test]
+    fn stake_initial_rewards_zero_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0).unwrap();
+        assert_eq!(pos.accumulated_rewards, 0);
+    }
+
+    #[test]
+    fn unstake_after_expiry_no_penalty_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let result = calculate_unstake(&pos, 1000, 5000).unwrap();
+        assert_eq!(result.penalty, 0);
+        assert_eq!(result.net_received, MIN_STAKE_AMOUNT);
+    }
+
+    #[test]
+    fn unstake_at_start_maximum_penalty_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let result = calculate_unstake(&pos, 0, 5000).unwrap();
+        // Full remaining = full lock, max penalty at 50%
+        assert_eq!(result.penalty, MIN_STAKE_AMOUNT / 2);
+    }
+
+    #[test]
+    fn unstake_at_midpoint_half_penalty_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let result = calculate_unstake(&pos, 500, 5000).unwrap();
+        // 50% of lock remaining * 50% max penalty = 25% of stake
+        assert_eq!(result.penalty, MIN_STAKE_AMOUNT / 4);
+    }
+
+    #[test]
+    fn unstake_zero_penalty_bps_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let result = calculate_unstake(&pos, 0, 0).unwrap();
+        assert_eq!(result.penalty, 0);
+        assert_eq!(result.net_received, MIN_STAKE_AMOUNT);
+    }
+
+    #[test]
+    fn unstake_penalty_plus_received_equals_amount_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT * 10, 0, 10000);
+        for block in [0, 2500, 5000, 7500, 9999, 10000] {
+            let result = calculate_unstake(&pos, block, 5000).unwrap();
+            assert_eq!(result.penalty + result.net_received, result.amount);
+        }
+    }
+
+    #[test]
+    fn early_exit_penalty_zero_remaining_v6() {
+        assert_eq!(early_exit_penalty(MIN_STAKE_AMOUNT, 0, 1000, 5000), 0);
+    }
+
+    #[test]
+    fn early_exit_penalty_zero_total_lock_v6() {
+        assert_eq!(early_exit_penalty(MIN_STAKE_AMOUNT, 500, 0, 5000), 0);
+    }
+
+    #[test]
+    fn early_exit_penalty_capped_at_max_v6() {
+        // Even with penalty_bps > MAX, it should be capped
+        let penalty_with_max = early_exit_penalty(MIN_STAKE_AMOUNT, 1000, 1000, MAX_EARLY_EXIT_PENALTY_BPS);
+        let penalty_over_max = early_exit_penalty(MIN_STAKE_AMOUNT, 1000, 1000, MAX_EARLY_EXIT_PENALTY_BPS + 1000);
+        assert_eq!(penalty_with_max, penalty_over_max);
+    }
+
+    #[test]
+    fn pending_rewards_zero_amount_v6() {
+        let pos = make_position(0, 0, 1000);
+        let pool = make_pool(MIN_STAKE_AMOUNT, PRECISION, 0);
+        assert_eq!(pending_rewards(&pos, &pool, 100), 0);
+    }
+
+    #[test]
+    fn pending_rewards_zero_total_staked_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let pool = make_pool(0, PRECISION, 0);
+        assert_eq!(pending_rewards(&pos, &pool, 100), 0);
+    }
+
+    #[test]
+    fn update_rpt_zero_staked_unchanged_v6() {
+        let pool = make_pool(0, PRECISION, 0);
+        let rpt = update_reward_per_token(&pool, 100);
+        assert_eq!(rpt, pool.reward_per_token_stored);
+    }
+
+    #[test]
+    fn update_rpt_same_block_unchanged_v6() {
+        let pool = make_pool(MIN_STAKE_AMOUNT, PRECISION, 100);
+        let rpt = update_reward_per_token(&pool, 100);
+        assert_eq!(rpt, pool.reward_per_token_stored);
+    }
+
+    #[test]
+    fn update_rpt_increases_over_time_v6() {
+        let pool = make_pool(MIN_STAKE_AMOUNT, PRECISION, 0);
+        let rpt1 = update_reward_per_token(&pool, 10);
+        let rpt2 = update_reward_per_token(&pool, 100);
+        assert!(rpt2 > rpt1);
+    }
+
+    #[test]
+    fn reward_apy_zero_staked_v6() {
+        assert_eq!(reward_apy(PRECISION, 0, BLOCKS_PER_YEAR), 0);
+    }
+
+    #[test]
+    fn reward_apy_zero_rate_v6() {
+        assert_eq!(reward_apy(0, MIN_STAKE_AMOUNT, BLOCKS_PER_YEAR), 0);
+    }
+
+    #[test]
+    fn extend_lock_already_expired_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let result = extend_lock(&pos, 500, MAX_LOCK_DURATION, 1000);
+        assert_eq!(result, Err(StakingError::LockNotExpired));
+    }
+
+    #[test]
+    fn extend_lock_zero_blocks_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        let result = extend_lock(&pos, 0, MAX_LOCK_DURATION, 500);
+        assert_eq!(result, Err(StakingError::InvalidDuration));
+    }
+
+    #[test]
+    fn extend_lock_exceeds_max_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MAX_LOCK_DURATION - 100, 0).unwrap();
+        let result = extend_lock(&pos, 200, MAX_LOCK_DURATION, 50);
+        assert_eq!(result, Err(StakingError::ExceedsMaxLock));
+    }
+
+    #[test]
+    fn extend_lock_increases_voting_power_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0).unwrap();
+        let extended = extend_lock(&pos, MIN_LOCK_DURATION, MAX_LOCK_DURATION, 500).unwrap();
+        assert!(extended.voting_power > pos.voting_power);
+    }
+
+    #[test]
+    fn increase_stake_zero_additional_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0).unwrap();
+        let result = increase_stake(&pos, 0, 500, MAX_LOCK_DURATION);
+        assert_eq!(result, Err(StakingError::ZeroAmount));
+    }
+
+    #[test]
+    fn increase_stake_overflow_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0).unwrap();
+        let result = increase_stake(&pos, u128::MAX, 500, MAX_LOCK_DURATION);
+        assert_eq!(result, Err(StakingError::OverflowError));
+    }
+
+    #[test]
+    fn increase_stake_adds_to_amount_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0).unwrap();
+        let increased = increase_stake(&pos, MIN_STAKE_AMOUNT, 500, MAX_LOCK_DURATION).unwrap();
+        assert_eq!(increased.amount, MIN_STAKE_AMOUNT * 2);
+    }
+
+    #[test]
+    fn increase_stake_preserves_lock_end_v6() {
+        let pos = stake(MIN_STAKE_AMOUNT, MIN_LOCK_DURATION, 0).unwrap();
+        let increased = increase_stake(&pos, MIN_STAKE_AMOUNT, 500, MAX_LOCK_DURATION).unwrap();
+        assert_eq!(increased.lock_end, pos.lock_end);
+    }
+
+    #[test]
+    fn governance_weight_sole_staker_v6() {
+        assert_eq!(governance_weight(1000, 1000), 10000);
+    }
+
+    #[test]
+    fn governance_weight_zero_total_v6() {
+        assert_eq!(governance_weight(1000, 0), 0);
+    }
+
+    #[test]
+    fn governance_weight_zero_power_v6() {
+        assert_eq!(governance_weight(0, 1000), 0);
+    }
+
+    #[test]
+    fn governance_weight_50_percent_v6() {
+        assert_eq!(governance_weight(500, 1000), 5000);
+    }
+
+    #[test]
+    fn is_lock_expired_before_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        assert!(!is_lock_expired(&pos, 999));
+    }
+
+    #[test]
+    fn is_lock_expired_at_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        assert!(is_lock_expired(&pos, 1000));
+    }
+
+    #[test]
+    fn is_lock_expired_after_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        assert!(is_lock_expired(&pos, 2000));
+    }
+
+    #[test]
+    fn time_to_unlock_during_lock_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        assert_eq!(time_to_unlock(&pos, 400), 600);
+    }
+
+    #[test]
+    fn time_to_unlock_after_expiry_v6() {
+        let pos = make_position(MIN_STAKE_AMOUNT, 0, 1000);
+        assert_eq!(time_to_unlock(&pos, 1500), 0);
+    }
+
+    #[test]
+    fn staking_stats_zero_supply_v6() {
+        let pool = make_pool(MIN_STAKE_AMOUNT, PRECISION, 0);
+        let stats = staking_stats(&pool, 0);
+        assert_eq!(stats.utilization_bps, 0);
+    }
+
+    #[test]
+    fn staking_stats_full_utilization_v6() {
+        let supply = MIN_STAKE_AMOUNT * 100;
+        let pool = make_pool(supply, PRECISION, 0);
+        let stats = staking_stats(&pool, supply);
+        assert_eq!(stats.utilization_bps, 10000);
+    }
+
+    #[test]
+    fn staking_stats_half_utilization_v6() {
+        let supply = MIN_STAKE_AMOUNT * 100;
+        let pool = make_pool(supply / 2, PRECISION, 0);
+        let stats = staking_stats(&pool, supply);
+        assert_eq!(stats.utilization_bps, 5000);
+    }
 }

@@ -542,6 +542,7 @@ export function handleCRPCRequest(path, method) {
   if (path === '/crpc/stats' && method === 'GET') return 'stats';
   if (path === '/crpc/demo' && (method === 'POST' || method === 'GET')) return 'demo';
   if (path === '/crpc/protocol' && method === 'GET') return 'protocol';
+  if (path === '/crpc/dashboard' && method === 'GET') return 'dashboard';
   return null;
 }
 
@@ -561,6 +562,8 @@ export async function processCRPCBody(handler, body) {
       return await runCRPCDemo(body?.prompt);
     case 'protocol':
       return getCRPCProtocolSpec();
+    case 'dashboard':
+      return { _html: getCRPCDashboardHTML() };
     default:
       return { error: 'Unknown CRPC handler' };
   }
@@ -636,6 +639,115 @@ function getCRPCProtocolSpec() {
     ],
     liveStats: getCRPCStats(),
   };
+}
+
+// ============ CRPC Dashboard (Self-Contained HTML) ============
+
+function getCRPCDashboardHTML() {
+  const stats = getCRPCStats();
+  const recentRows = (stats.recentTasks || []).map(t => {
+    const id = t.taskId?.slice(0, 20) || '—';
+    const conf = ((t.confidence || 0) * 100).toFixed(0);
+    const rankings = (t.rankings || []).map(r => `${r.shardId} (${r.wins}w)`).join(', ');
+    return `<tr><td>${id}</td><td>${t.type || '—'}</td><td>${t.participants || 0}</td><td>${conf}%</td><td>${rankings}</td><td>${t.settledAt || '—'}</td></tr>`;
+  }).join('');
+
+  const repRows = Object.entries(stats.reputations || {}).map(([id, rep]) => {
+    const winRate = rep.total > 0 ? ((rep.wins / rep.total) * 100).toFixed(0) : '—';
+    return `<tr><td>${id}</td><td>${rep.wins}</td><td>${rep.losses}</td><td>${rep.total}</td><td>${winRate}%</td></tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRPC Dashboard — JARVIS Mind Network</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'SF Mono',Monaco,Consolas,monospace;background:#0a0a0a;color:#e0e0e0;padding:24px;max-width:1200px;margin:0 auto}
+h1{color:#00ff88;font-size:1.5em;margin-bottom:4px}
+.subtitle{color:#666;font-size:0.85em;margin-bottom:24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.card{background:#141414;border:1px solid #222;border-radius:8px;padding:16px}
+.card .label{color:#888;font-size:0.75em;text-transform:uppercase;letter-spacing:1px}
+.card .value{color:#00ff88;font-size:2em;font-weight:700;margin-top:4px}
+.card .value.warn{color:#ffaa00}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th{text-align:left;color:#888;font-size:0.7em;text-transform:uppercase;letter-spacing:1px;padding:8px 12px;border-bottom:1px solid #333}
+td{padding:8px 12px;border-bottom:1px solid #1a1a1a;font-size:0.85em}
+tr:hover td{background:#1a1a1a}
+h2{color:#ccc;font-size:1.1em;margin:24px 0 8px}
+.demo-btn{background:#00ff88;color:#000;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;font-size:0.9em;margin-top:16px}
+.demo-btn:hover{background:#00cc66}
+.demo-btn:disabled{background:#333;color:#666;cursor:wait}
+#demo-output{background:#0d0d0d;border:1px solid #222;border-radius:8px;padding:16px;margin-top:16px;white-space:pre-wrap;font-size:0.8em;max-height:500px;overflow-y:auto;display:none}
+.phase{color:#00aaff}.winner{color:#00ff88;font-weight:700}
+a{color:#00ff88;text-decoration:none}a:hover{text-decoration:underline}
+</style>
+</head><body>
+<h1>CRPC Dashboard</h1>
+<div class="subtitle">Tim Cotton's Commit-Reveal Pairwise Comparison — Live on JARVIS Mind Network</div>
+
+<div class="grid">
+<div class="card"><div class="label">Completed Rounds</div><div class="value">${stats.completedTasks}</div></div>
+<div class="card"><div class="label">Active Tasks</div><div class="value ${stats.activeTasks > 0 ? 'warn' : ''}">${stats.activeTasks}</div></div>
+<div class="card"><div class="label">Avg Confidence</div><div class="value">${stats.avgConfidence}</div></div>
+<div class="card"><div class="label">Mode</div><div class="value" style="font-size:1em">${stats.enabled ? 'Multi-Shard' : 'Local CRPC'}</div></div>
+</div>
+
+<h2>Recent Rounds</h2>
+<table>
+<tr><th>Task ID</th><th>Type</th><th>Shards</th><th>Confidence</th><th>Rankings</th><th>Settled</th></tr>
+${recentRows || '<tr><td colspan="6" style="color:#666">No rounds yet — click "Run Demo" below</td></tr>'}
+</table>
+
+<h2>Shard Reputations</h2>
+<table>
+<tr><th>Shard ID</th><th>Wins</th><th>Losses</th><th>Total</th><th>Win Rate</th></tr>
+${repRows || '<tr><td colspan="5" style="color:#666">No reputation data yet</td></tr>'}
+</table>
+
+<h2>Live Demo</h2>
+<p style="color:#888;font-size:0.85em;margin-bottom:8px">Run a full 4-phase CRPC round with real LLM responses.</p>
+<input id="demo-prompt" type="text" placeholder="Custom prompt (or leave empty for default)" style="width:100%;padding:8px 12px;background:#141414;border:1px solid #333;border-radius:6px;color:#e0e0e0;font-family:inherit;font-size:0.85em;margin-bottom:8px">
+<button class="demo-btn" onclick="runDemo()">Run CRPC Demo</button>
+<div id="demo-output"></div>
+
+<div style="margin-top:32px;color:#444;font-size:0.75em">
+<a href="/crpc/protocol">Protocol Spec</a> | <a href="/crpc/stats">Stats API</a> | <a href="/crpc/demo">Demo API</a>
+</div>
+
+<script>
+async function runDemo(){
+const btn=document.querySelector('.demo-btn');
+const out=document.getElementById('demo-output');
+const prompt=document.getElementById('demo-prompt').value.trim();
+btn.disabled=true;btn.textContent='Running CRPC round...';
+out.style.display='block';out.textContent='Phase 1: Generating independent shard responses...\\n';
+try{
+const body=prompt?JSON.stringify({prompt}):undefined;
+const resp=await fetch('/crpc/demo',{method:prompt?'POST':'GET',headers:prompt?{'Content-Type':'application/json'}:{},body});
+const data=await resp.json();
+if(data.error){out.textContent='Error: '+data.error;return}
+let log='CRPC CONSENSUS COMPLETE\\n';
+log+='Duration: '+data.totalDurationMs+'ms\\n\\n';
+for(const phase of data.phases){
+log+='--- Phase '+phase.phase+': '+phase.name+' ('+phase.durationMs+'ms) ---\\n';
+log+=phase.description+'\\n';
+if(phase.commits)phase.commits.forEach(c=>log+='  '+c.shardId+': '+c.commitHash.slice(0,16)+'...\\n');
+if(phase.reveals)phase.reveals.forEach(r=>log+='  '+r.shardId+' [hash:'+((r.hashVerified)?'OK':'FAIL')+']: '+r.response.slice(0,100)+'...\\n');
+if(phase.pairwiseResults)phase.pairwiseResults.forEach(pr=>log+='  '+pr.pairId+': A='+pr.votes.A_BETTER+' B='+pr.votes.B_BETTER+' EQ='+pr.votes.EQUIVALENT+' -> '+pr.winner+'\\n');
+log+='\\n';
+}
+log+='RANKINGS:\\n';
+data.rankings.forEach((r,i)=>log+='  '+(i+1)+'. '+r.shardId+' ('+r.pairwiseWins+' wins)\\n');
+log+='\\nWINNER: '+data.consensusWinner+' (confidence: '+(data.confidence*100).toFixed(0)+'%)\\n';
+log+='\\nCONSENSUS RESPONSE:\\n'+data.consensusResponse;
+out.textContent=log;
+}catch(e){out.textContent='Error: '+e.message}
+finally{btn.disabled=false;btn.textContent='Run CRPC Demo'}
+}
+</script>
+</body></html>`;
 }
 
 // ============ Local CRPC — Production Chat Pipeline Integration ============

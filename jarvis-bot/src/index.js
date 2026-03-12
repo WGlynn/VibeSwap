@@ -6009,10 +6009,15 @@ async function main() {
         }
         const crpcHandler = handleCRPCRequest(path, req.method);
         if (crpcHandler) {
-          if (crpcHandler === 'stats' || crpcHandler === 'protocol') {
+          if (crpcHandler === 'stats' || crpcHandler === 'protocol' || crpcHandler === 'dashboard') {
             const data = await processCRPCBody(crpcHandler);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(data, null, 2));
+            if (data?._html) {
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+              res.end(data._html);
+            } else {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data, null, 2));
+            }
           } else if (crpcHandler === 'demo') {
             try {
               let prompt = null;
@@ -7206,10 +7211,15 @@ async function main() {
         // CRPC endpoints
         const crpcHandler = handleCRPCRequest(path, req.method);
         if (crpcHandler) {
-          if (crpcHandler === 'stats' || crpcHandler === 'protocol') {
+          if (crpcHandler === 'stats' || crpcHandler === 'protocol' || crpcHandler === 'dashboard') {
             const data = await processCRPCBody(crpcHandler);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(data, null, 2));
+            if (data?._html) {
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+              res.end(data._html);
+            } else {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data, null, 2));
+            }
           } else if (crpcHandler === 'demo') {
             // Demo endpoint — runs full 4-phase CRPC with real LLM calls
             // Supports GET (default prompt) and POST { prompt: "..." }

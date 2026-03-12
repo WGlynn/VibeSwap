@@ -172,8 +172,15 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
   const categories = [
     { label: 'DeFi', items: [
       { path: '/perps', label: 'Perpetuals', icon: '📈' },
+      { path: '/options', label: 'Options', icon: '⚖' },
+      { path: '/yield', label: 'Yield', icon: '🌱' },
+      { path: '/aggregator', label: 'Aggregator', icon: '⚡' },
+      { path: '/bonds', label: 'Bonds', icon: '🔗' },
+      { path: '/dca', label: 'Auto-Buy (DCA)', icon: '🔄' },
+      { path: '/insurance', label: 'Insurance', icon: '🛡' },
       { path: '/predict', label: 'Predictions', icon: '🔮' },
       { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
+      { path: '/launchpad', label: 'Launchpad', icon: '🚀' },
       { path: '/rewards', label: 'Rewards', icon: '🎁' },
       { path: '/mine', label: 'Mine JUL', icon: '⛏' },
     ]},

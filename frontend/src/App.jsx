@@ -100,6 +100,13 @@ const GracefulInversionPage = lazy(() => import('./components/GracefulInversionP
 const MemehunterPage = lazy(() => import('./components/MemehunterPage'))
 const CommitRevealPage = lazy(() => import('./components/CommitRevealPage'))
 const TradingPage = lazy(() => import('./components/TradingPage'))
+const OptionsPage = lazy(() => import('./components/OptionsPage'))
+const YieldPage = lazy(() => import('./components/YieldPage'))
+const LaunchpadPage = lazy(() => import('./components/LaunchpadPage'))
+const DCAPage = lazy(() => import('./components/DCAPage'))
+const InsurancePage = lazy(() => import('./components/InsurancePage'))
+const AggregatorPage = lazy(() => import('./components/AggregatorPage'))
+const BondsPage = lazy(() => import('./components/BondsPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -188,6 +195,14 @@ function AnimatedRoutes() {
             <Route path="/memehunter" element={<MemehunterPage />} />
             <Route path="/commit-reveal" element={<CommitRevealPage />} />
             <Route path="/trade" element={<TradingPage />} />
+            {/* New DeFi primitives */}
+            <Route path="/options" element={<OptionsPage />} />
+            <Route path="/yield" element={<YieldPage />} />
+            <Route path="/launchpad" element={<LaunchpadPage />} />
+            <Route path="/dca" element={<DCAPage />} />
+            <Route path="/insurance" element={<InsurancePage />} />
+            <Route path="/aggregator" element={<AggregatorPage />} />
+            <Route path="/bonds" element={<BondsPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

@@ -2347,4 +2347,291 @@ mod tests {
             !matches!(v, MonotonicityViolation::ActionCountDecreased { .. })
         ));
     }
+
+    // ============ Hardening Tests v3 ============
+
+    #[test]
+    fn test_quantize_utilization_boundary_5000_v3() {
+        assert_eq!(quantize_utilization(5000), UtilizationTier::Low);
+    }
+
+    #[test]
+    fn test_quantize_utilization_boundary_5001_v3() {
+        assert_eq!(quantize_utilization(5001), UtilizationTier::Moderate);
+    }
+
+    #[test]
+    fn test_quantize_utilization_boundary_8000_v3() {
+        assert_eq!(quantize_utilization(8000), UtilizationTier::Moderate);
+    }
+
+    #[test]
+    fn test_quantize_utilization_boundary_8001_v3() {
+        assert_eq!(quantize_utilization(8001), UtilizationTier::High);
+    }
+
+    #[test]
+    fn test_quantize_utilization_boundary_9000_v3() {
+        assert_eq!(quantize_utilization(9000), UtilizationTier::High);
+    }
+
+    #[test]
+    fn test_quantize_utilization_boundary_9001_v3() {
+        assert_eq!(quantize_utilization(9001), UtilizationTier::Critical);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_0_v3() {
+        assert_eq!(quantize_coverage(0), CoverageTier::None);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_1_v3() {
+        assert_eq!(quantize_coverage(1), CoverageTier::Minimal);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_500_v3() {
+        assert_eq!(quantize_coverage(500), CoverageTier::Minimal);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_501_v3() {
+        assert_eq!(quantize_coverage(501), CoverageTier::Partial);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_1000_v3() {
+        assert_eq!(quantize_coverage(1000), CoverageTier::Partial);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_1001_v3() {
+        assert_eq!(quantize_coverage(1001), CoverageTier::Adequate);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_2000_v3() {
+        assert_eq!(quantize_coverage(2000), CoverageTier::Adequate);
+    }
+
+    #[test]
+    fn test_quantize_coverage_boundary_2001_v3() {
+        assert_eq!(quantize_coverage(2001), CoverageTier::Strong);
+    }
+
+    #[test]
+    fn test_median_three_values_v3() {
+        assert_eq!(compute_median(&[300, 100, 200]), 200);
+    }
+
+    #[test]
+    fn test_median_four_values_v3() {
+        // Even count: avg of middle two
+        assert_eq!(compute_median(&[100, 200, 300, 400]), 200 / 2 + 300 / 2);
+    }
+
+    #[test]
+    fn test_median_already_sorted_v3() {
+        assert_eq!(compute_median(&[10, 20, 30, 40, 50]), 30);
+    }
+
+    #[test]
+    fn test_median_reverse_sorted_v3() {
+        assert_eq!(compute_median(&[50, 40, 30, 20, 10]), 30);
+    }
+
+    #[test]
+    fn test_monotonicity_risk_level_critical_to_high_is_violation_v3() {
+        let d1 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Critical,
+            risk_score: 80,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::Critical,
+            coverage_tier: CoverageTier::None,
+        };
+        let d2 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::High,
+            risk_score: 60,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::High,
+            coverage_tier: CoverageTier::None,
+        };
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(!result.is_monotonic);
+        assert!(result.violations.len() >= 2); // both risk score and level
+    }
+
+    #[test]
+    fn test_monotonicity_increasing_risk_is_valid_v3() {
+        let d1 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Low,
+            risk_score: 10,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::Low,
+            coverage_tier: CoverageTier::Strong,
+        };
+        let d2 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Critical,
+            risk_score: 90,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::Critical,
+            coverage_tier: CoverageTier::None,
+        };
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(result.is_monotonic);
+    }
+
+    #[test]
+    fn test_risk_level_ordinal_completeness_v3() {
+        assert_eq!(risk_level_ordinal(&RiskLevel::Low), 0);
+        assert_eq!(risk_level_ordinal(&RiskLevel::Medium), 1);
+        assert_eq!(risk_level_ordinal(&RiskLevel::High), 2);
+        assert_eq!(risk_level_ordinal(&RiskLevel::Critical), 3);
+    }
+
+    #[test]
+    fn test_utilization_tier_ordering_v3() {
+        assert!(UtilizationTier::Low < UtilizationTier::Moderate);
+        assert!(UtilizationTier::Moderate < UtilizationTier::High);
+        assert!(UtilizationTier::High < UtilizationTier::Critical);
+    }
+
+    #[test]
+    fn test_coverage_tier_ordering_v3() {
+        assert!(CoverageTier::None < CoverageTier::Minimal);
+        assert!(CoverageTier::Minimal < CoverageTier::Partial);
+        assert!(CoverageTier::Partial < CoverageTier::Adequate);
+        assert!(CoverageTier::Adequate < CoverageTier::Strong);
+    }
+
+    #[test]
+    fn test_tier_changed_identical_single_vaults_v3() {
+        let d1 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Low,
+            risk_score: 10,
+            actions: vec![],
+            vault_tiers: vec![VaultTier {
+                owner_lock_hash: [0xAA; 32],
+                health_factor: 2 * PRECISION,
+                tier: RiskTier::Safe,
+                action: KeeperAction::Safe { health_factor: 2 * PRECISION },
+            }],
+            oracle_valid: true,
+            oracle_agreement_count: 1,
+            utilization_tier: UtilizationTier::Low,
+            coverage_tier: CoverageTier::None,
+        };
+        let d2 = d1.clone();
+        assert!(!tier_changed(&d1, &d2));
+    }
+
+    #[test]
+    fn test_quantize_oracle_three_identical_all_agree_v3() {
+        let snap = ProtocolSnapshot {
+            oracle_data: vec![
+                test_oracle(1000 * PRECISION, 90, 100),
+                test_oracle(1000 * PRECISION, 90, 100),
+                test_oracle(1000 * PRECISION, 90, 100),
+            ],
+            current_block: 100,
+            vaults: vec![],
+            pool: test_pool(),
+            insurance: Some(test_insurance()),
+            collateral_price: 500 * PRECISION,
+            debt_price: PRECISION,
+        };
+        let decision = quantize(&snap);
+        assert!(decision.oracle_valid);
+        assert_eq!(decision.oracle_agreement_count, 3);
+        assert_eq!(decision.validated_price, 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_quantize_no_oracle_uses_fallback_v3() {
+        let snap = ProtocolSnapshot {
+            oracle_data: vec![],
+            current_block: 100,
+            vaults: vec![],
+            pool: test_pool(),
+            insurance: Some(test_insurance()),
+            collateral_price: 777 * PRECISION,
+            debt_price: PRECISION,
+        };
+        let decision = quantize(&snap);
+        assert!(!decision.oracle_valid);
+        assert_eq!(decision.validated_price, 777 * PRECISION);
+    }
+
+    #[test]
+    fn test_simulate_price_stress_50_percent_drop_v3() {
+        let snap = test_snapshot();
+        let (_before, after) = simulate_price_stress(&snap, 5000);
+        // Price should be halved
+        let expected = vibeswap_math::mul_div(snap.collateral_price, 5000, 10_000);
+        assert_eq!(after.validated_price, expected);
+    }
+
+    #[test]
+    fn test_monotonicity_utilization_decreases_is_violation_v3() {
+        let d1 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Medium,
+            risk_score: 50,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::High,
+            coverage_tier: CoverageTier::None,
+        };
+        let d2 = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Medium,
+            risk_score: 50,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::Low,
+            coverage_tier: CoverageTier::None,
+        };
+        let result = verify_monotonicity(&d1, &d2);
+        assert!(!result.is_monotonic);
+        assert!(result.violations.iter().any(|v| matches!(v, MonotonicityViolation::UtilizationImproved)));
+    }
+
+    #[test]
+    fn test_monotonicity_result_is_monotonic_matches_empty_violations_v3() {
+        let d = ConsensusDecision {
+            validated_price: PRECISION,
+            risk_level: RiskLevel::Low,
+            risk_score: 10,
+            actions: vec![],
+            vault_tiers: vec![],
+            oracle_valid: true,
+            oracle_agreement_count: 3,
+            utilization_tier: UtilizationTier::Low,
+            coverage_tier: CoverageTier::Strong,
+        };
+        let result = verify_monotonicity(&d, &d);
+        assert_eq!(result.is_monotonic, result.violations.is_empty());
+    }
 }

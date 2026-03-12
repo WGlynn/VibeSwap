@@ -2117,4 +2117,276 @@ mod tests {
         };
         let _ = format!("{:?}", bd);
     }
+
+    // ============ Hardening Tests v3 ============
+
+    #[test]
+    fn snapshot_large_order_count_per_level_v3() {
+        // Many orders at the same price should aggregate
+        let mut orders = Vec::new();
+        for i in 0..50 {
+            orders.push(make_bid(i, P1, 10, i));
+        }
+        let snap = build_snapshot(&orders);
+        assert_eq!(snap.bids.len(), 1);
+        assert_eq!(snap.bids[0].total_amount, 500);
+        assert_eq!(snap.bids[0].order_count, 50);
+    }
+
+    #[test]
+    fn snapshot_mixed_filled_and_unfilled_v3() {
+        let orders = vec![
+            make_bid(1, P1, 100, 1),
+            make_partially_filled_bid(2, P1, 200, 150), // 50 remaining
+            make_partially_filled_bid(3, P1, 100, 100),  // 0 remaining (fully filled)
+        ];
+        let snap = build_snapshot(&orders);
+        assert_eq!(snap.bids.len(), 1);
+        assert_eq!(snap.bids[0].total_amount, 150); // 100 + 50 + 0
+    }
+
+    #[test]
+    fn match_all_bids_filled_asks_remain_v3() {
+        let bids = vec![make_bid(1, P2, 50, 1)];
+        let asks = vec![make_ask(2, P1, 200, 1)];
+        let results = match_orders(&bids, &asks);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].amount, 50); // limited by bid
+    }
+
+    #[test]
+    fn match_all_asks_filled_bids_remain_v3() {
+        let bids = vec![make_bid(1, P2, 200, 1)];
+        let asks = vec![make_ask(2, P1, 50, 1)];
+        let results = match_orders(&bids, &asks);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].amount, 50); // limited by ask
+    }
+
+    #[test]
+    fn simulate_buy_exactly_first_level_boundary_v3() {
+        let orders = vec![
+            make_ask(1, P1, 100, 1),
+            make_ask(2, P2, 100, 2),
+        ];
+        let snap = build_snapshot(&orders);
+        let fill = simulate_market_order(&snap, Side::Bid, 100).unwrap();
+        assert_eq!(fill.filled_amount, 100);
+        assert_eq!(fill.avg_price, P1); // Only consumed first level
+    }
+
+    #[test]
+    fn simulate_sell_exactly_first_level_boundary_v3() {
+        let orders = vec![
+            make_bid(1, P2, 100, 1),
+            make_bid(2, P1, 100, 2),
+        ];
+        let snap = build_snapshot(&orders);
+        let fill = simulate_market_order(&snap, Side::Ask, 100).unwrap();
+        assert_eq!(fill.filled_amount, 100);
+        assert_eq!(fill.avg_price, P2);
+    }
+
+    #[test]
+    fn vwap_single_unit_amount_v3() {
+        let levels = vec![
+            PriceLevel { price: P1, total_amount: 1000, order_count: 5, side: Side::Ask },
+        ];
+        let result = vwap(&levels, 1).unwrap();
+        assert_eq!(result.vwap, P1);
+        assert_eq!(result.total_volume, 1);
+        assert_eq!(result.levels_consumed, 1);
+    }
+
+    #[test]
+    fn impact_buy_one_unit_minimal_v3() {
+        let orders = vec![make_ask(1, P1, 1000, 1)];
+        let snap = build_snapshot(&orders);
+        let result = price_impact(&snap, Side::Bid, 1);
+        assert!(result.is_ok());
+        let impact = result.unwrap();
+        assert_eq!(impact, 0); // 1 unit has zero impact against 1000
+    }
+
+    #[test]
+    fn best_bid_partially_filled_still_counts_v3() {
+        let orders = vec![
+            make_partially_filled_bid(1, P2, 100, 50), // 50 remaining
+            make_bid(2, P1, 100, 1),
+        ];
+        let bb = best_bid(&orders);
+        assert_eq!(bb, Some(P2)); // P2 still has remaining amount
+    }
+
+    #[test]
+    fn best_ask_partially_filled_still_counts_v3() {
+        let orders = vec![
+            make_partially_filled_ask(1, P1, 100, 50), // 50 remaining
+            make_ask(2, P2, 100, 1),
+        ];
+        let ba = best_ask(&orders);
+        assert_eq!(ba, Some(P1)); // P1 still has remaining amount
+    }
+
+    #[test]
+    fn spread_very_wide_v3() {
+        // bid=1, ask=10000
+        let bps = spread_bps(PRECISION, 10000 * PRECISION);
+        assert!(bps > 0);
+    }
+
+    #[test]
+    fn midpoint_overflow_safe_v3() {
+        // Large values should not overflow in midpoint
+        let mid = midpoint(u128::MAX / 2, u128::MAX / 2 + 2);
+        assert!(mid >= u128::MAX / 2);
+    }
+
+    #[test]
+    fn depth_at_price_ask_side_v3() {
+        let orders = vec![
+            make_ask(1, P1, 100, 1),
+            make_ask(2, P1, 200, 2),
+            make_ask(3, P2, 300, 3),
+        ];
+        assert_eq!(depth_at_price(&orders, P1, Side::Ask), 300);
+        assert_eq!(depth_at_price(&orders, P2, Side::Ask), 300);
+        assert_eq!(depth_at_price(&orders, P1, Side::Bid), 0); // wrong side
+    }
+
+    #[test]
+    fn cumulative_depth_bids_multiple_levels_v3() {
+        let levels = vec![
+            PriceLevel { price: 3 * PRECISION, total_amount: 100, order_count: 1, side: Side::Bid },
+            PriceLevel { price: 2 * PRECISION, total_amount: 200, order_count: 1, side: Side::Bid },
+            PriceLevel { price: PRECISION, total_amount: 300, order_count: 1, side: Side::Bid },
+        ];
+        // Bids: sum levels >= up_to_price
+        assert_eq!(cumulative_depth(&levels, 2 * PRECISION, Side::Bid), 300); // 100 + 200
+        assert_eq!(cumulative_depth(&levels, PRECISION, Side::Bid), 600); // all
+    }
+
+    #[test]
+    fn imbalance_extreme_bid_heavy_v3() {
+        let bps = order_imbalance_bps(10000, 1);
+        assert!(bps > 9000); // Extremely bid-heavy
+    }
+
+    #[test]
+    fn imbalance_extreme_ask_heavy_v3() {
+        let bps = order_imbalance_bps(1, 10000);
+        assert!(bps < -9000); // Extremely ask-heavy
+    }
+
+    #[test]
+    fn cancel_middle_order_v3() {
+        let mut orders = vec![
+            make_bid(1, P1, 100, 1),
+            make_bid(2, P2, 200, 2),
+            make_bid(3, 3 * PRECISION, 300, 3),
+        ];
+        let removed = cancel_order(&mut orders, 2).unwrap();
+        assert_eq!(removed.price, P2);
+        assert_eq!(orders.len(), 2);
+    }
+
+    #[test]
+    fn sort_bids_stable_equal_price_equal_time_v3() {
+        let mut orders = vec![
+            make_bid(1, P1, 100, 5),
+            make_bid(2, P1, 200, 5),
+            make_bid(3, P1, 300, 5),
+        ];
+        sort_orders_price_time(&mut orders, Side::Bid);
+        // All same price and time — order should be deterministic
+        assert_eq!(orders[0].price, P1);
+        assert_eq!(orders[1].price, P1);
+        assert_eq!(orders[2].price, P1);
+    }
+
+    #[test]
+    fn sort_asks_many_prices_v3() {
+        let mut orders = vec![
+            make_ask(1, 5 * PRECISION, 100, 1),
+            make_ask(2, PRECISION, 100, 2),
+            make_ask(3, 3 * PRECISION, 100, 3),
+            make_ask(4, 2 * PRECISION, 100, 4),
+            make_ask(5, 4 * PRECISION, 100, 5),
+        ];
+        sort_orders_price_time(&mut orders, Side::Ask);
+        // Should be ascending
+        for i in 0..4 {
+            assert!(orders[i].price <= orders[i + 1].price);
+        }
+    }
+
+    #[test]
+    fn match_three_bids_two_asks_partial_v3() {
+        let bids = vec![
+            make_bid(1, 3 * PRECISION, 100, 1),
+            make_bid(2, 2 * PRECISION, 100, 2),
+            make_bid(3, PRECISION, 100, 3),
+        ];
+        let asks = vec![
+            make_ask(4, PRECISION, 150, 1),
+            make_ask(5, 2 * PRECISION, 150, 2),
+        ];
+        let results = match_orders(&bids, &asks);
+        let total_matched: u128 = results.iter().map(|r| r.amount).sum();
+        assert!(total_matched > 0);
+        assert!(total_matched <= 300); // Can't exceed total bid volume
+    }
+
+    #[test]
+    fn snapshot_bid_ask_ordering_correct_v3() {
+        let orders = vec![
+            make_bid(1, 3 * PRECISION, 100, 1),
+            make_bid(2, PRECISION, 100, 2),
+            make_bid(3, 2 * PRECISION, 100, 3),
+            make_ask(4, 4 * PRECISION, 100, 4),
+            make_ask(5, 6 * PRECISION, 100, 5),
+            make_ask(6, 5 * PRECISION, 100, 6),
+        ];
+        let snap = build_snapshot(&orders);
+        // Bids should be descending
+        for i in 0..snap.bids.len().saturating_sub(1) {
+            assert!(snap.bids[i].price >= snap.bids[i + 1].price);
+        }
+        // Asks should be ascending
+        for i in 0..snap.asks.len().saturating_sub(1) {
+            assert!(snap.asks[i].price <= snap.asks[i + 1].price);
+        }
+    }
+
+    #[test]
+    fn vwap_exactly_two_full_levels_v3() {
+        let levels = vec![
+            PriceLevel { price: P1, total_amount: 100, order_count: 1, side: Side::Ask },
+            PriceLevel { price: P2, total_amount: 100, order_count: 1, side: Side::Ask },
+        ];
+        let result = vwap(&levels, 200).unwrap();
+        // VWAP = (100*P1 + 100*P2) / 200 = (P1 + P2) / 2
+        let expected = mul_div(P1 + P2, PRECISION, 2 * PRECISION);
+        // Use mul_div-based expected: (100*P1 + 100*P2) / 200
+        let expected_vwap = mul_div(100 * P1 + 100 * P2, 1, 200);
+        assert_eq!(result.vwap, expected_vwap);
+        assert_eq!(result.levels_consumed, 2);
+    }
+
+    #[test]
+    fn remaining_amount_zero_filled_v3() {
+        let order = make_bid(1, P1, 500, 1);
+        assert_eq!(order.remaining(), 500);
+        assert_eq!(order.filled, 0);
+    }
+
+    #[test]
+    fn book_depth_empty_snapshot_v3() {
+        let snap = build_snapshot(&[]);
+        let depth = book_depth(&snap);
+        assert_eq!(depth.bid_depth, 0);
+        assert_eq!(depth.ask_depth, 0);
+        assert_eq!(depth.total_depth, 0);
+        assert_eq!(depth.levels, 0);
+    }
 }

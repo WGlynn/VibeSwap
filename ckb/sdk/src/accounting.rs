@@ -2574,4 +2574,375 @@ mod tests {
         assert_eq!(net_balance(&result[0]), 0); // Net zero
         assert_eq!(result[0].entry_count, 2); // Counted twice (debit + credit)
     }
+
+    // ============ Hardening Round 5 Tests ============
+
+    #[test]
+    fn test_create_account_all_categories_have_zero_balances_h5() {
+        for cat in [AccountCategory::Asset, AccountCategory::Liability,
+                    AccountCategory::Revenue, AccountCategory::Expense,
+                    AccountCategory::Equity] {
+            let acct = create_account(id(1), id(2), cat, 0);
+            assert_eq!(acct.debit_balance, 0);
+            assert_eq!(acct.credit_balance, 0);
+            assert_eq!(net_balance(&acct), 0);
+        }
+    }
+
+    #[test]
+    fn test_net_balance_asset_large_debit_h5() {
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = 1_000_000 * PRECISION;
+        acct.credit_balance = 500_000 * PRECISION;
+        assert_eq!(net_balance(&acct), 500_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_net_balance_liability_large_credit_h5() {
+        let mut acct = make_liability(1, 0);
+        acct.credit_balance = 1_000_000;
+        acct.debit_balance = 300_000;
+        assert_eq!(net_balance(&acct), 700_000);
+    }
+
+    #[test]
+    fn test_net_balance_revenue_zero_both_h5() {
+        let acct = make_revenue(1, 0);
+        assert_eq!(net_balance(&acct), 0);
+    }
+
+    #[test]
+    fn test_create_journal_entry_one_debit_one_credit_h5() {
+        let entry = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 5000)],
+            &[(id(2), 5000)],
+        ).unwrap();
+        assert_eq!(entry.total_amount, 5000);
+        assert_eq!(entry.debit_count, 1);
+        assert_eq!(entry.credit_count, 1);
+    }
+
+    #[test]
+    fn test_create_journal_entry_two_debits_one_credit_h5() {
+        let entry = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 3000), (id(2), 2000)],
+            &[(id(3), 5000)],
+        ).unwrap();
+        assert_eq!(entry.total_amount, 5000);
+        assert_eq!(entry.debit_count, 2);
+        assert_eq!(entry.credit_count, 1);
+    }
+
+    #[test]
+    fn test_create_journal_entry_zero_debit_amount_fails_h5() {
+        let result = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 0)],
+            &[(id(2), 0)],
+        );
+        assert_eq!(result, Err(AccountingError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_create_journal_entry_unbalanced_by_one_h5() {
+        let result = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 1001)],
+            &[(id(2), 1000)],
+        );
+        assert_eq!(result, Err(AccountingError::UnbalancedEntry));
+    }
+
+    #[test]
+    fn test_create_journal_entry_six_debits_fails_h5() {
+        let result = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 100), (id(2), 100), (id(3), 100),
+              (id(4), 100), (id(5), 100), (id(6), 100)],
+            &[(id(7), 600)],
+        );
+        assert_eq!(result, Err(AccountingError::MaxEntriesReached));
+    }
+
+    #[test]
+    fn test_post_entry_updates_last_entry_block_h5() {
+        let accounts = vec![make_asset(1, 0), make_revenue(2, 0)];
+        let entry = create_journal_entry(
+            1, 500, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(2), 1000)],
+        ).unwrap();
+        let result = post_entry(&accounts, &entry).unwrap();
+        assert_eq!(result[0].last_entry_block, 500);
+        assert_eq!(result[1].last_entry_block, 500);
+    }
+
+    #[test]
+    fn test_post_entry_increments_entry_count_h5() {
+        let accounts = vec![make_asset(1, 0), make_liability(2, 0)];
+        let entry = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(2), 1000)],
+        ).unwrap();
+        let result = post_entry(&accounts, &entry).unwrap();
+        assert_eq!(result[0].entry_count, 1);
+        assert_eq!(result[1].entry_count, 1);
+    }
+
+    #[test]
+    fn test_post_entry_missing_debit_account_h5() {
+        let accounts = vec![make_revenue(2, 0)]; // Only credit account exists
+        let entry = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(2), 1000)],
+        ).unwrap();
+        let result = post_entry(&accounts, &entry);
+        assert_eq!(result, Err(AccountingError::AccountNotFound));
+    }
+
+    #[test]
+    fn test_trial_balance_two_balanced_accounts_h5() {
+        let accounts = vec![make_asset(1, 0), make_revenue(2, 0)];
+        let accounts = post_simple(&accounts, id(1), id(2), 5000, 100);
+        let tb = trial_balance(&accounts);
+        assert!(tb.is_balanced);
+        assert_eq!(tb.difference, 0);
+        assert_eq!(tb.account_count, 2);
+    }
+
+    #[test]
+    fn test_trial_balance_empty_accounts_h5() {
+        let tb = trial_balance(&[]);
+        assert!(tb.is_balanced);
+        assert_eq!(tb.total_debits, 0);
+        assert_eq!(tb.total_credits, 0);
+        assert_eq!(tb.account_count, 0);
+    }
+
+    #[test]
+    fn test_balance_sheet_asset_equals_equity_h5() {
+        let accounts = vec![make_asset(1, 0), make_equity(2, 0)];
+        let accounts = post_simple(&accounts, id(1), id(2), 10_000, 100);
+        let sheet = balance_sheet(&accounts);
+        assert_eq!(sheet.total_assets, 10_000);
+        assert_eq!(sheet.total_equity, 10_000);
+        assert!(sheet.is_balanced);
+    }
+
+    #[test]
+    fn test_balance_sheet_revenue_and_expense_h5() {
+        let accounts = vec![
+            make_asset(1, 0),
+            make_revenue(2, 0),
+            make_expense(3, 0),
+            make_asset(4, 0),
+        ];
+        let accounts = post_simple(&accounts, id(1), id(2), 5000, 100);
+        let accounts = post_simple(&accounts, id(3), id(4), 2000, 200);
+        let sheet = balance_sheet(&accounts);
+        assert_eq!(sheet.total_revenue, 5000);
+        assert_eq!(sheet.total_expenses, 2000);
+        assert_eq!(sheet.net_income, 3000);
+    }
+
+    #[test]
+    fn test_reconcile_exact_match_h5() {
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = 5000;
+        let result = reconcile(&acct, 5000);
+        assert!(result.is_reconciled);
+        assert_eq!(result.difference, 0);
+    }
+
+    #[test]
+    fn test_reconcile_off_by_one_within_tolerance_h5() {
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = 5001;
+        let result = reconcile(&acct, 5000);
+        assert!(result.is_reconciled); // Within RECONCILIATION_TOLERANCE of 1
+        assert_eq!(result.difference, 1);
+    }
+
+    #[test]
+    fn test_reconcile_off_by_two_fails_h5() {
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = 5002;
+        let result = reconcile(&acct, 5000);
+        assert!(!result.is_reconciled);
+        assert_eq!(result.difference, 2);
+    }
+
+    #[test]
+    fn test_audit_trail_no_entries_h5() {
+        let acct = make_asset(1, 0);
+        let trail = audit_trail(&acct, &[]);
+        assert_eq!(trail.entry_count, 0);
+        assert_eq!(trail.total_debits, 0);
+        assert_eq!(trail.total_credits, 0);
+        assert!(trail.is_consistent);
+    }
+
+    #[test]
+    fn test_audit_trail_single_debit_entry_h5() {
+        let mut acct = make_asset(1, 0);
+        acct.debit_balance = 1000;
+        let entry = create_journal_entry(
+            1, 100, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(2), 1000)],
+        ).unwrap();
+        let trail = audit_trail(&acct, &[entry]);
+        assert_eq!(trail.total_debits, 1000);
+        assert_eq!(trail.total_credits, 0);
+        assert_eq!(trail.entry_count, 1);
+    }
+
+    #[test]
+    fn test_validate_equation_empty_accounts_h5() {
+        assert!(validate_accounting_equation(&[]));
+    }
+
+    #[test]
+    fn test_validate_equation_balanced_h5() {
+        let accounts = vec![make_asset(1, 0), make_equity(2, 0)];
+        let accounts = post_simple(&accounts, id(1), id(2), 1000, 100);
+        assert!(validate_accounting_equation(&accounts));
+    }
+
+    #[test]
+    fn test_find_account_exists_h5() {
+        let accounts = vec![make_asset(1, 0), make_asset(2, 0)];
+        assert_eq!(find_account(&accounts, id(1)), Some(0));
+        assert_eq!(find_account(&accounts, id(2)), Some(1));
+    }
+
+    #[test]
+    fn test_find_account_not_found_h5() {
+        let accounts = vec![make_asset(1, 0)];
+        assert_eq!(find_account(&accounts, id(99)), None);
+    }
+
+    #[test]
+    fn test_category_total_mixed_h5() {
+        let mut a1 = make_asset(1, 0);
+        a1.debit_balance = 5000;
+        let mut a2 = make_asset(2, 0);
+        a2.debit_balance = 3000;
+        let mut l1 = make_liability(3, 0);
+        l1.credit_balance = 2000;
+        let total = category_total(&[a1, a2, l1], AccountCategory::Asset);
+        assert_eq!(total, 8000);
+    }
+
+    #[test]
+    fn test_record_fee_revenue_basic_h5() {
+        let entry = record_fee_revenue(id(1), id(2), 1000, 100, 1).unwrap();
+        assert_eq!(entry.total_amount, 1000);
+        assert_eq!(entry.debit_count, 1);
+        assert_eq!(entry.credit_count, 1);
+    }
+
+    #[test]
+    fn test_record_fee_revenue_zero_fails_h5() {
+        let result = record_fee_revenue(id(1), id(2), 0, 100, 1);
+        assert_eq!(result, Err(AccountingError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_record_emission_valid_split_h5() {
+        let entry = record_emission(
+            id(1), 10_000, id(2), id(3), id(4),
+            3000, 3000, 100, // 30% shapley, 30% gauge, 40% staking
+        ).unwrap();
+        assert_eq!(entry.total_amount, 10_000);
+        assert_eq!(entry.debit_count, 1);
+        assert_eq!(entry.credit_count, 3);
+    }
+
+    #[test]
+    fn test_record_emission_zero_amount_fails_h5() {
+        let result = record_emission(id(1), 0, id(2), id(3), id(4), 3000, 3000, 100);
+        assert_eq!(result, Err(AccountingError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_record_emission_bps_exceed_10000_fails_h5() {
+        let result = record_emission(id(1), 10_000, id(2), id(3), id(4), 6000, 5000, 100);
+        assert_eq!(result, Err(AccountingError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_period_summary_all_entries_in_range_h5() {
+        let e1 = create_journal_entry(1, 100, [0u8; 32], &[(id(1), 500)], &[(id(2), 500)]).unwrap();
+        let e2 = create_journal_entry(2, 200, [0u8; 32], &[(id(1), 300)], &[(id(2), 300)]).unwrap();
+        let (vol, count) = period_summary(&[e1, e2], 50, 250);
+        assert_eq!(vol, 800);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_period_summary_partial_range_h5() {
+        let e1 = create_journal_entry(1, 100, [0u8; 32], &[(id(1), 500)], &[(id(2), 500)]).unwrap();
+        let e2 = create_journal_entry(2, 200, [0u8; 32], &[(id(1), 300)], &[(id(2), 300)]).unwrap();
+        let (vol, count) = period_summary(&[e1, e2], 150, 250);
+        assert_eq!(vol, 300);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_period_summary_no_entries_in_range_h5() {
+        let e1 = create_journal_entry(1, 100, [0u8; 32], &[(id(1), 500)], &[(id(2), 500)]).unwrap();
+        let (vol, count) = period_summary(&[e1], 200, 300);
+        assert_eq!(vol, 0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_net_balance_expense_contra_position_h5() {
+        // Expense account with more credits than debits → saturating_sub → 0
+        let mut acct = make_expense(1, 0);
+        acct.debit_balance = 100;
+        acct.credit_balance = 500;
+        assert_eq!(net_balance(&acct), 0);
+    }
+
+    #[test]
+    fn test_net_balance_equity_contra_position_h5() {
+        // Equity with more debits than credits → saturating_sub → 0
+        let mut acct = make_equity(1, 0);
+        acct.debit_balance = 500;
+        acct.credit_balance = 100;
+        assert_eq!(net_balance(&acct), 0);
+    }
+
+    #[test]
+    fn test_balance_sheet_empty_is_balanced_h5() {
+        let sheet = balance_sheet(&[]);
+        assert!(sheet.is_balanced);
+        assert_eq!(sheet.net_income, 0);
+    }
+
+    #[test]
+    fn test_create_journal_entry_preserves_entry_id_h5() {
+        let entry = create_journal_entry(
+            42, 100, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(2), 1000)],
+        ).unwrap();
+        assert_eq!(entry.entry_id, 42);
+    }
+
+    #[test]
+    fn test_create_journal_entry_preserves_block_h5() {
+        let entry = create_journal_entry(
+            1, 9999, [0u8; 32],
+            &[(id(1), 1000)],
+            &[(id(2), 1000)],
+        ).unwrap();
+        assert_eq!(entry.block_number, 9999);
+    }
 }

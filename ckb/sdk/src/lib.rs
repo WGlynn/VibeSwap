@@ -31,6 +31,7 @@ pub mod keeper;
 pub mod knowledge;
 pub mod lending;
 pub mod liquidity;
+pub mod math_ext;
 pub mod metrics;
 pub mod migration;
 pub mod miner;

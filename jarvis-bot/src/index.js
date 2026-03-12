@@ -6317,21 +6317,13 @@ async function main() {
     return next();
   });
 
-  // Launch with retry — if Telegram is unreachable at boot, retry up to 3 times
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await bot.launch({ dropPendingUpdates: true });
-      break;
-    } catch (launchErr) {
-      console.error(`[jarvis] bot.launch() attempt ${attempt}/3 failed: ${launchErr.message}`);
-      if (attempt === 3) {
-        console.error('[jarvis] All launch attempts failed — polling monitor will handle recovery');
-        persistCrashEntry('launch_failed', launchErr);
-      } else {
-        await new Promise(r => setTimeout(r, 5000 * attempt)); // 5s, 10s backoff
-      }
-    }
-  }
+  // Fire-and-forget launch — must NOT block startup or the HTTP health server won't start.
+  // If Telegram is unreachable, the polling liveness monitor (below) handles recovery.
+  bot.launch({ dropPendingUpdates: true }).catch(launchErr => {
+    console.error(`[jarvis] bot.launch() failed: ${launchErr.message}`);
+    persistCrashEntry('launch_failed', launchErr);
+    // Polling monitor will detect silence and attempt restart
+  });
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
 
   // Polling liveness checker — restarts polling if no updates for 5 min

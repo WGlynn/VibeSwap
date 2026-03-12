@@ -168,39 +168,53 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/apps', label: 'App Store', icon: '🏪', description: 'Apps for VSOS' },
   ]
 
-  const secondaryItems = [
-    { path: '/agents', label: 'AI Agents', icon: '🤖' },
-    { path: '/depin', label: 'DePIN Network', icon: '📡' },
-    { path: '/rwa', label: 'Real World Assets', icon: '🏠' },
-    { path: '/infofi', label: 'InfoFi', icon: '💡' },
-    { path: '/govern', label: 'Governance', icon: '🗳️' },
-    { path: '/perps', label: 'Perpetuals', icon: '📈' },
-    { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
-    { path: '/predict', label: 'Predictions', icon: '🔮' },
-    { path: '/feed', label: 'VibeFeed', icon: '📡' },
-    { path: '/wiki', label: 'VibeWiki', icon: '📚' },
-    { path: '/mine', label: 'Mine JUL', icon: '⛏' },
-    { path: '/rewards', label: 'Rewards', icon: '🎁' },
-    { path: '/board', label: 'Discussions', icon: '💬' },
-    { path: '/forum', label: 'Community', icon: '🗨️' },
-    { path: '/prompts', label: 'Prompt Feed', icon: '>' },
-    { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
-    { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
-    { path: '/docs', label: 'Learn', icon: '📖' },
-    { path: '/economics', label: 'Economics', icon: '$' },
-    { path: '/jul', label: 'JUL Token', icon: 'J' },
-    { path: '/philosophy', label: 'Philosophy', icon: '∞' },
-    { path: '/covenants', label: 'Ten Covenants', icon: 'X' },
-    { path: '/rosetta', label: 'Rosetta Protocol', icon: '⟷' },
-    { path: '/trust', label: 'Trust Network', icon: '⊗' },
-    { path: '/gametheory', label: 'Game Theory', icon: '∑' },
-    { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
-    { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
-    { path: '/inversion', label: 'Graceful Inversion', icon: '∿' },
-    { path: '/commit-reveal', label: 'Commit-Reveal', icon: '#' },
-    { path: '/research', label: 'Research', icon: '~' },
-    { path: '/status', label: 'System Status', icon: '|' },
-    { path: '/about', label: 'About', icon: 'i' },
+  // Categorized secondary navigation — collapsible groups for flow
+  const categories = [
+    { label: 'DeFi', items: [
+      { path: '/perps', label: 'Perpetuals', icon: '📈' },
+      { path: '/predict', label: 'Predictions', icon: '🔮' },
+      { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
+      { path: '/rewards', label: 'Rewards', icon: '🎁' },
+      { path: '/mine', label: 'Mine JUL', icon: '⛏' },
+    ]},
+    { label: 'Ecosystem', items: [
+      { path: '/agents', label: 'AI Agents', icon: '🤖' },
+      { path: '/depin', label: 'DePIN Network', icon: '📡' },
+      { path: '/rwa', label: 'Real World Assets', icon: '🏠' },
+      { path: '/infofi', label: 'InfoFi', icon: '💡' },
+      { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
+      { path: '/govern', label: 'Governance', icon: '🗳️' },
+    ]},
+    { label: 'Community', items: [
+      { path: '/feed', label: 'VibeFeed', icon: '📡' },
+      { path: '/wiki', label: 'VibeWiki', icon: '📚' },
+      { path: '/board', label: 'Discussions', icon: '💬' },
+      { path: '/forum', label: 'Community', icon: '🗨️' },
+      { path: '/prompts', label: 'Prompt Feed', icon: '>' },
+      { path: '/live', label: 'Live', icon: '🔴' },
+    ]},
+    { label: 'Intelligence', items: [
+      { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
+      { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
+      { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
+    ]},
+    { label: 'Knowledge', items: [
+      { path: '/docs', label: 'Learn', icon: '📖' },
+      { path: '/economics', label: 'Economics', icon: '$' },
+      { path: '/jul', label: 'JUL Token', icon: 'J' },
+      { path: '/philosophy', label: 'Philosophy', icon: '∞' },
+      { path: '/covenants', label: 'Ten Covenants', icon: 'X' },
+      { path: '/rosetta', label: 'Rosetta Protocol', icon: '⟷' },
+      { path: '/trust', label: 'Trust Network', icon: '⊗' },
+      { path: '/gametheory', label: 'Game Theory', icon: '∑' },
+      { path: '/commit-reveal', label: 'Commit-Reveal', icon: '#' },
+      { path: '/inversion', label: 'Graceful Inversion', icon: '∿' },
+      { path: '/research', label: 'Research', icon: '~' },
+    ]},
+    { label: 'System', items: [
+      { path: '/status', label: 'System Status', icon: '|' },
+      { path: '/about', label: 'About', icon: 'i' },
+    ]},
   ]
 
   // Admin items - TODO: Add proper role check
@@ -289,24 +303,39 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         {/* Divider */}
         <div className="mx-4 h-px bg-black-700" />
 
-        {/* Secondary navigation */}
+        {/* Categorized navigation — collapsible groups */}
         <div className="p-2">
-          <div className="px-4 py-2 text-xs text-black-500 uppercase">More</div>
-          {secondaryItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={onClose}
-              className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
-                location.pathname === item.path
-                  ? 'bg-black-700 text-white'
-                  : 'hover:bg-black-700/50 text-black-400'
-              }`}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {categories.map((cat) => {
+            // Auto-open category if current page is in it
+            const isActive = cat.items.some(item => item.path === location.pathname)
+            return (
+              <details key={cat.label} open={isActive} className="group mb-1">
+                <summary className="flex items-center justify-between px-4 py-2 cursor-pointer text-xs text-black-500 uppercase hover:text-black-300 transition-colors list-none select-none">
+                  <span>{cat.label}</span>
+                  <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </summary>
+                <div className="pb-1">
+                  {cat.items.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={onClose}
+                      className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+                        location.pathname === item.path
+                          ? 'bg-black-700 text-white'
+                          : 'hover:bg-black-700/50 text-black-400'
+                      }`}
+                    >
+                      <span className="text-sm">{item.icon}</span>
+                      <span className="text-sm">{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </details>
+            )
+          })}
         </div>
 
         {/* Security Section - Account Protection */}

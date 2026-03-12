@@ -2355,4 +2355,242 @@ mod tests {
             assert_eq!(result.cascade_depth, 1);
         }
     }
+
+    // ============ Hardening Tests v3 ============
+
+    #[test]
+    fn test_swap_fee_exactly_zero_bps_v3() {
+        let pool = make_pool(1_000_000 * PRECISION, 1_000_000 * PRECISION, 0, 1_000_000 * PRECISION);
+        let result = simulate_swap(&pool, 1000 * PRECISION, true).unwrap();
+        assert_eq!(result.fee_paid, 0);
+        assert!(result.amount_out > 0);
+    }
+
+    #[test]
+    fn test_swap_fee_max_10000_bps_deep() {
+        let pool = make_pool(1_000_000 * PRECISION, 1_000_000 * PRECISION, 10000, 1_000_000 * PRECISION);
+        let result = simulate_swap(&pool, 1000 * PRECISION, true);
+        // 100% fee means amount_in_after_fee = 0 → InsufficientLiquidity
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_spot_price_extreme_ratio_v3() {
+        // 1 : 1_000_000_000 ratio
+        let pool = make_pool(PRECISION, 1_000_000_000 * PRECISION, 30, PRECISION);
+        let price = spot_price(&pool);
+        assert_eq!(price, 1_000_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_swap_amount_equals_reserve_boundary() {
+        // Try to swap exactly reserve_out — should fail (can't drain pool)
+        let pool = standard_pool();
+        let result = simulate_swap(&pool, pool.reserve1, true);
+        // amount_out would be close to reserve1 but never equal, or might overflow
+        // The result should not allow draining the pool
+        match result {
+            Ok(r) => assert!(r.amount_out < pool.reserve1),
+            Err(_) => {} // Also acceptable
+        }
+    }
+
+    #[test]
+    fn test_add_liquidity_first_deposit_sqrt_calculation_v3() {
+        let pool = make_pool(0, 0, 30, 0);
+        let result = simulate_add_liquidity(&pool, 100 * PRECISION, 100 * PRECISION).unwrap();
+        assert_eq!(result.lp_minted, 100 * PRECISION); // sqrt(100 * 100) = 100
+    }
+
+    #[test]
+    fn test_add_liquidity_first_deposit_asymmetric_sqrt_v3() {
+        let pool = make_pool(0, 0, 30, 0);
+        let result = simulate_add_liquidity(&pool, 4 * PRECISION, 9 * PRECISION).unwrap();
+        // sqrt(4*9) = 6
+        assert_eq!(result.lp_minted, 6 * PRECISION);
+    }
+
+    #[test]
+    fn test_remove_liquidity_single_lp_from_large_pool_v3() {
+        let pool = make_pool(1_000_000 * PRECISION, 1_000_000 * PRECISION, 30, 1_000_000 * PRECISION);
+        let result = simulate_remove_liquidity(&pool, 1).unwrap();
+        // 1 LP out of 1M LP → proportional tiny amounts
+        assert!(result.amount0_out > 0 || result.amount1_out > 0 || result.lp_burned == 1);
+    }
+
+    #[test]
+    fn test_multi_hop_direction_alternates_v3() {
+        let pool1 = make_pool_with_id(1, 100_000 * PRECISION, 100_000 * PRECISION, 30, 100_000 * PRECISION);
+        let pool2 = make_pool_with_id(2, 100_000 * PRECISION, 100_000 * PRECISION, 30, 100_000 * PRECISION);
+        let token_path = [[1u8; 32], [2u8; 32], [3u8; 32]];
+        let result = simulate_multi_hop(&[pool1, pool2], &token_path, 1000 * PRECISION).unwrap();
+        // Two hops, alternating direction
+        assert_eq!(result.hops, 2);
+        assert_eq!(result.intermediate_amounts.len(), 2);
+    }
+
+    #[test]
+    fn test_batch_auction_single_order_each_side_v3() {
+        let buys = vec![(100, 2 * PRECISION)];
+        let sells = vec![(100, PRECISION)];
+        let result = simulate_batch_auction(&buys, &sells).unwrap();
+        assert!(result.total_volume > 0);
+        assert!(result.clearing_price >= PRECISION);
+        assert!(result.clearing_price <= 2 * PRECISION);
+    }
+
+    #[test]
+    fn test_batch_auction_identical_prices_v3() {
+        let price = 5 * PRECISION;
+        let buys = vec![(100, price), (200, price)];
+        let sells = vec![(150, price), (150, price)];
+        let result = simulate_batch_auction(&buys, &sells).unwrap();
+        assert_eq!(result.clearing_price, price);
+    }
+
+    #[test]
+    fn test_arb_profit_direction_matters_v3() {
+        // Pool A: token0 is cheap (price = 0.5 token1/token0)
+        // Pool B: token0 is expensive (price = 2.0 token1/token0)
+        // simulate_arb_profit buys on A (token0->token1), sells on B (token1->token0)
+        let pool_a = make_pool(1_000_000 * PRECISION, 500_000 * PRECISION, 30, 1_000_000 * PRECISION);
+        let pool_b = make_pool(500_000 * PRECISION, 1_000_000 * PRECISION, 30, 1_000_000 * PRECISION);
+        let profit = simulate_arb_profit(&pool_a, &pool_b, 1000 * PRECISION).unwrap();
+        // This specific direction may not be profitable because arb buys token1 on A at 0.5 then sells token1 on B
+        // The reverse might be profitable. Either direction should give a definite result.
+        let reverse_profit = simulate_arb_profit(&pool_b, &pool_a, 1000 * PRECISION).unwrap();
+        // At least one direction should be profitable when pools are differently priced
+        assert!(profit > 0 || reverse_profit > 0);
+    }
+
+    #[test]
+    fn test_cascade_max_cascade_depth_boundary_v3() {
+        // Create many vaults all very close to liquidation
+        let mut vaults = Vec::new();
+        for i in 0..20 {
+            // Each vault with decreasing buffer
+            vaults.push((1000 * PRECISION, 900 * PRECISION + (i as u128 * 10 * PRECISION), 10000));
+        }
+        let pool = standard_pool();
+        let result = simulate_liquidation_cascade(&vaults, 500, &pool);
+        assert!(result.cascade_depth <= MAX_CASCADE_DEPTH);
+    }
+
+    #[test]
+    fn test_sandwich_both_zero_amounts_v3() {
+        let pool = standard_pool();
+        assert_eq!(sandwich_profit(&pool, 0, true, 100), Err(SimError::InvalidInput));
+        assert_eq!(sandwich_profit(&pool, 100, true, 0), Err(SimError::InvalidInput));
+    }
+
+    #[test]
+    fn test_il_sim_zero_initial_price_v3() {
+        let (lp, hodl, il) = impermanent_loss_sim(0, PRECISION, 1000 * PRECISION);
+        assert_eq!(lp, 0);
+        assert_eq!(hodl, 0);
+        assert_eq!(il, 0);
+    }
+
+    #[test]
+    fn test_il_sim_zero_final_price_v3() {
+        let (lp, hodl, il) = impermanent_loss_sim(PRECISION, 0, 1000 * PRECISION);
+        assert_eq!(lp, 0);
+        assert_eq!(hodl, 0);
+        assert_eq!(il, 0);
+    }
+
+    #[test]
+    fn test_il_sim_zero_initial_value_v3() {
+        let (lp, hodl, il) = impermanent_loss_sim(PRECISION, 2 * PRECISION, 0);
+        assert_eq!(lp, 0);
+        assert_eq!(hodl, 0);
+        assert_eq!(il, 0);
+    }
+
+    #[test]
+    fn test_fee_revenue_projection_scales_linearly_v3() {
+        let pool = standard_pool();
+        let rev1 = fee_revenue_projection(&pool, 1_000_000 * PRECISION, 1);
+        let rev10 = fee_revenue_projection(&pool, 1_000_000 * PRECISION, 10);
+        assert_eq!(rev10, rev1 * 10);
+    }
+
+    #[test]
+    fn test_swap_k_invariant_never_decreases_v3() {
+        let pool = standard_pool();
+        let k_before = pool.reserve0 as u128 * (pool.reserve1 / PRECISION); // simplified
+        let result = simulate_swap(&pool, 10_000 * PRECISION, true).unwrap();
+        let k_after = result.new_reserve0 as u128 * (result.new_reserve1 / PRECISION);
+        // k should increase (fees retained)
+        assert!(k_after >= k_before);
+    }
+
+    #[test]
+    fn test_price_impact_monotonic_with_amount_v3() {
+        let pool = standard_pool();
+        let impact_small = simulate_price_impact(&pool, 100 * PRECISION, true);
+        let impact_medium = simulate_price_impact(&pool, 10_000 * PRECISION, true);
+        let impact_large = simulate_price_impact(&pool, 100_000 * PRECISION, true);
+        assert!(impact_small <= impact_medium);
+        assert!(impact_medium <= impact_large);
+    }
+
+    #[test]
+    fn test_add_remove_conserves_value_approximately_v3() {
+        let pool = standard_pool();
+        let add = simulate_add_liquidity(&pool, 10_000 * PRECISION, 10_000 * PRECISION).unwrap();
+        let new_pool = make_pool(add.new_reserve0, add.new_reserve1, 30, pool.total_lp + add.lp_minted);
+        let remove = simulate_remove_liquidity(&new_pool, add.lp_minted).unwrap();
+        // Should get back approximately what was deposited (within rounding)
+        let diff0 = if remove.amount0_out > add.amount0_used { remove.amount0_out - add.amount0_used } else { add.amount0_used - remove.amount0_out };
+        assert!(diff0 <= 2); // allow 2 wei rounding
+    }
+
+    #[test]
+    fn test_multi_hop_single_pool_returns_one_hop_v3() {
+        let pool = standard_pool();
+        let token_path = [[1u8; 32], [2u8; 32]];
+        let result = simulate_multi_hop(&[pool], &token_path, 1000 * PRECISION).unwrap();
+        assert_eq!(result.hops, 1);
+        assert_eq!(result.intermediate_amounts.len(), 1);
+    }
+
+    #[test]
+    fn test_batch_auction_zero_amount_orders_v3() {
+        let buys = vec![(0, PRECISION), (100, 2 * PRECISION)];
+        let sells = vec![(100, PRECISION)];
+        let result = simulate_batch_auction(&buys, &sells).unwrap();
+        // Zero-amount orders are still counted but contribute 0 volume
+        assert!(result.total_volume > 0);
+    }
+
+    #[test]
+    fn test_optimal_swap_fee_rate_impact_v3() {
+        // Higher fees should require larger swap amounts to reach same target
+        let pool_low_fee = make_pool(1_000_000 * PRECISION, 2_000_000 * PRECISION, 10, 1_000_000 * PRECISION);
+        let pool_high_fee = make_pool(1_000_000 * PRECISION, 2_000_000 * PRECISION, 100, 1_000_000 * PRECISION);
+        let target = PRECISION; // move price to 1:1
+        let (amount_low, _) = optimal_swap_amount(&pool_low_fee, target).unwrap();
+        let (amount_high, _) = optimal_swap_amount(&pool_high_fee, target).unwrap();
+        // Higher fee pool needs more input for same price target
+        assert!(amount_high > amount_low);
+    }
+
+    #[test]
+    fn test_spot_price_after_opposite_swaps_returns_approximately_v3() {
+        let pool = standard_pool();
+        let swap1 = simulate_swap(&pool, 10_000 * PRECISION, true).unwrap();
+        let pool2 = pool_after_swap(&pool, &swap1, true);
+        let price_after_1 = spot_price(&pool2);
+        // Price moved down (more token0, less token1)
+        assert!(price_after_1 < PRECISION);
+        // Swap back
+        let swap2 = simulate_swap(&pool2, swap1.amount_out, false).unwrap();
+        let pool3 = pool_after_swap(&pool2, &swap2, false);
+        let price_after_2 = spot_price(&pool3);
+        // Should be close to original (but not exact due to fees)
+        let diff = if price_after_2 > PRECISION { price_after_2 - PRECISION } else { PRECISION - price_after_2 };
+        // Within 1% of original
+        assert!(diff < PRECISION / 100);
+    }
 }

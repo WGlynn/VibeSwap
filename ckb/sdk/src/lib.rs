@@ -40,6 +40,7 @@ pub mod risk;
 pub mod router;
 pub mod settlement;
 pub mod simulator;
+pub mod snapshot;
 pub mod staking;
 pub mod strategy;
 pub mod token;

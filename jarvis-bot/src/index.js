@@ -23,6 +23,7 @@ import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
 import { handleNyxRequest } from './nyx.js';
+import { handleTheAIRequest } from './theai-dashboard.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
 // ============ Module Health Registry ============
 // Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
@@ -6293,6 +6294,13 @@ async function main() {
         }
       }
 
+      // TheAI — Digital Corporation Dashboard
+      if (req.url?.startsWith('/theai')) {
+        const aiUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        await handleTheAIRequest(req, res, aiUrl);
+        return;
+      }
+
       // Nyx — Agent Interface (worker nodes too)
       if (req.url?.startsWith('/nyx')) {
         const nyxUrl = new URL(req.url, `http://localhost:${healthPort}`);
@@ -6508,6 +6516,26 @@ async function main() {
   initTrading();
   // Pantheon — digital corporation agent management
   initPantheon();
+  // TheAI — scheduled 24h prune cycle (midnight UTC)
+  const schedulePrune = () => {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setUTCHours(24, 0, 0, 0); // Next midnight UTC
+    const msUntilMidnight = midnight - now;
+    setTimeout(async () => {
+      console.log('[theai] Running scheduled 24h prune...');
+      try {
+        const results = await pruneAll();
+        console.log(`[theai] Prune complete: ${results.length} agents processed`);
+      } catch (err) { console.warn(`[theai] Prune failed: ${err.message}`); }
+      // Schedule next prune in 24h
+      setInterval(async () => {
+        try { await pruneAll(); } catch {}
+      }, 24 * 60 * 60 * 1000);
+    }, msUntilMidnight);
+    console.log(`[theai] Next prune in ${Math.round(msUntilMidnight / 60000)}min (midnight UTC)`);
+  };
+  schedulePrune();
   // Social outbound presence — X, Discord, GitHub
   initSocialOutbound();
   // Proactive engine — autonomous scheduled actions
@@ -7134,6 +7162,11 @@ async function main() {
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
         }
+
+      // ============ TheAI — Digital Corporation Dashboard ============
+      } else if (req.url?.startsWith('/theai')) {
+        const aiUrl = new URL(req.url, `http://localhost:${healthPort}`);
+        await handleTheAIRequest(req, res, aiUrl);
 
       // ============ Nyx — Agent Interface ============
       // Freedom's per-node interface: chat + file browser + editor + terminal

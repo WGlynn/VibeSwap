@@ -1808,4 +1808,269 @@ mod tests {
         // Sanity: each block ~4 seconds, so ~21600 blocks/day
         assert_eq!(BLOCKS_PER_DAY, 86_400 / 4);
     }
+
+    // ============ Hardening Batch: Additional Edge Cases ============
+
+    #[test]
+    fn protocol_metrics_single_pool_zero_everything() {
+        let pools = vec![make_pool(0x01, 0, 0, 0, 0)];
+        let m = protocol_metrics(&pools, 0, 0, 0);
+        assert_eq!(m.total_tvl, 0);
+        assert_eq!(m.total_volume_24h, 0);
+        assert_eq!(m.total_pools, 1);
+        assert_eq!(m.avg_batch_size, 0);
+    }
+
+    #[test]
+    fn protocol_metrics_revenue_preserved() {
+        let pools = vec![make_pool(0x01, 100, 50, 30, 10)];
+        let m = protocol_metrics(&pools, 42_000 * PRECISION, 5, 20);
+        assert_eq!(m.protocol_revenue, 42_000 * PRECISION);
+    }
+
+    #[test]
+    fn pool_ranking_two_pools_same_tvl_different_volume() {
+        let pools = vec![
+            make_pool(0x01, 500, 100, 300, 10),
+            make_pool(0x02, 500, 200, 100, 5),
+        ];
+        // By TVL: tied, so index 0 comes first
+        let ranked = pool_ranking(&pools, SortBy::Tvl);
+        assert_eq!(ranked[0].0, 0);
+        assert_eq!(ranked[1].0, 1);
+        // By Volume: pool 0x02 wins
+        let ranked_v = pool_ranking(&pools, SortBy::Volume);
+        assert_eq!(ranked_v[0].0, 1);
+    }
+
+    #[test]
+    fn pool_ranking_large_number_of_pools() {
+        let pools: Vec<PoolMetrics> = (0..50u8)
+            .map(|i| make_pool(i, (i as u128 + 1) * 100, 50, 100, 10))
+            .collect();
+        let ranked = pool_ranking(&pools, SortBy::Tvl);
+        assert_eq!(ranked.len(), 50);
+        // Highest TVL is last pool (index 49, tvl = 5000)
+        assert_eq!(ranked[0].0, 49);
+    }
+
+    #[test]
+    fn volume_ma_all_zero_volumes() {
+        let snaps = make_snapshots(&[0, 0, 0, 0]);
+        let ma = volume_moving_average(&snaps, 1000).unwrap();
+        assert_eq!(ma, 0);
+    }
+
+    #[test]
+    fn volume_ma_single_large_volume() {
+        let snaps = vec![VolumeSnapshot { block: 100, volume: u128::MAX }];
+        let ma = volume_moving_average(&snaps, 200).unwrap();
+        assert_eq!(ma, u128::MAX);
+    }
+
+    #[test]
+    fn trend_analysis_six_points_sharp_decline() {
+        let series = make_series(&[1000, 800, 600, 400, 200, 100]);
+        let t = trend_analysis(&series).unwrap();
+        assert_eq!(t.direction, TrendDirection::Down);
+        assert_eq!(t.data_points, 6);
+        assert!(t.change_bps > 5000, "Sharp decline should be > 50% change");
+    }
+
+    #[test]
+    fn trend_analysis_v_shaped_recovery() {
+        // Down then up: overall trend depends on first third vs last third
+        let series = make_series(&[500, 200, 100, 100, 200, 500]);
+        let t = trend_analysis(&series).unwrap();
+        // first_third = [500, 200], avg=350; last_third = [200, 500], avg=350 → flat
+        assert_eq!(t.direction, TrendDirection::Flat);
+    }
+
+    #[test]
+    fn trend_analysis_ten_points_monotonic() {
+        let values: Vec<u128> = (1..=10).map(|i| i * 100).collect();
+        let series = make_series(&values);
+        let t = trend_analysis(&series).unwrap();
+        assert_eq!(t.direction, TrendDirection::Up);
+        assert_eq!(t.confidence_bps, 10_000); // Perfectly monotonic
+        assert_eq!(t.data_points, 10);
+    }
+
+    #[test]
+    fn tvl_composition_precision_values() {
+        // Use PRECISION-scaled TVLs
+        let pools = vec![
+            make_pool(0x01, 7 * PRECISION, 0, 0, 0),
+            make_pool(0x02, 3 * PRECISION, 0, 0, 0),
+        ];
+        let comp = tvl_composition(&pools);
+        assert_eq!(comp[0], (0, 7_000)); // 70%
+        assert_eq!(comp[1], (1, 3_000)); // 30%
+    }
+
+    #[test]
+    fn tvl_composition_single_tiny_pool() {
+        let pools = vec![make_pool(0x01, 1, 0, 0, 0)];
+        let comp = tvl_composition(&pools);
+        assert_eq!(comp[0], (0, 10_000)); // 100%
+    }
+
+    #[test]
+    fn fee_apr_one_block_high_fee_on_small_tvl() {
+        // Extreme annualization: should cap at u16::MAX
+        let apr = fee_apr(1000, 1, 1, BLOCKS_PER_YEAR);
+        assert_eq!(apr, u16::MAX);
+    }
+
+    #[test]
+    fn fee_apr_realistic_scenario() {
+        // Pool with $1M TVL, earning $10K fees over 30 days
+        let fees = 10_000 * PRECISION;
+        let tvl = 1_000_000 * PRECISION;
+        let blocks = 30 * BLOCKS_PER_DAY;
+        let apr = fee_apr(fees, tvl, blocks as u64, BLOCKS_PER_YEAR);
+        // 1% per month ≈ 12% per year ≈ 1200 bps
+        assert!(apr > 1100 && apr < 1300, "APR should be ~1217 bps, got {}", apr);
+    }
+
+    #[test]
+    fn retention_equal_to_max_u32() {
+        // Large values should not overflow
+        let rate = user_retention_rate(u32::MAX, u32::MAX, 0);
+        assert_eq!(rate, 10_000);
+    }
+
+    #[test]
+    fn retention_half_retained() {
+        // 200 prev, 150 current, 50 new → 100 returning → 50%
+        let rate = user_retention_rate(200, 150, 50);
+        assert_eq!(rate, 5_000);
+    }
+
+    #[test]
+    fn leaderboard_exact_top_n() {
+        // top_n == number of users
+        let users = vec![
+            make_user(0x01, 100, 1),
+            make_user(0x02, 200, 2),
+        ];
+        let lb = leaderboard(&users, 2);
+        assert_eq!(lb.len(), 2);
+        assert_eq!(lb[0].address, [0x02; 32]);
+        assert_eq!(lb[1].address, [0x01; 32]);
+    }
+
+    #[test]
+    fn leaderboard_single_user_top_zero() {
+        let users = vec![make_user(0x01, 100, 1)];
+        let lb = leaderboard(&users, 0);
+        assert!(lb.is_empty());
+    }
+
+    #[test]
+    fn concentration_three_equal_pools() {
+        let index = concentration_index(&[333, 333, 334]);
+        // shares: ~3333, ~3333, ~3334 bps
+        // HHI ≈ 3 * (3333^2 / 10000) ≈ 3333
+        assert!(index > 3300 && index < 3400, "3-pool HHI should be ~3333, got {}", index);
+    }
+
+    #[test]
+    fn concentration_one_pool_with_dust() {
+        // Dominant pool + dust → nearly monopoly
+        let index = concentration_index(&[1_000_000, 1]);
+        assert!(index >= 9990, "Near-monopoly HHI should be ~10000, got {}", index);
+    }
+
+    #[test]
+    fn volume_tvl_large_volume_small_tvl() {
+        // Capital efficiency > 1.0 → high ratio
+        let ratio = volume_to_tvl_ratio(10 * PRECISION, PRECISION);
+        assert_eq!(ratio, 10 * PRECISION);
+    }
+
+    #[test]
+    fn growth_rate_quarter_decline() {
+        // 100 → 75 = -25%
+        let rate = growth_rate_bps(100, 75);
+        assert_eq!(rate, -2_500);
+    }
+
+    #[test]
+    fn growth_rate_ten_percent_increase() {
+        // 1000 → 1100 = +10%
+        let rate = growth_rate_bps(1000, 1100);
+        assert_eq!(rate, 1_000);
+    }
+
+    #[test]
+    fn growth_rate_near_zero_values() {
+        // 1 → 1 = 0% change
+        let rate = growth_rate_bps(1, 1);
+        assert_eq!(rate, 0);
+    }
+
+    #[test]
+    fn protocol_health_all_flat_no_risk() {
+        let tvl = make_series(&[1000, 1000, 1000]);
+        let vol = make_series(&[500, 500, 500]);
+        let h = protocol_health(&tvl, &vol, 100, 100, &[5000], 6000).unwrap();
+        assert_eq!(h.tvl_trend, TrendDirection::Flat);
+        assert_eq!(h.volume_trend, TrendDirection::Flat);
+        assert_eq!(h.user_growth_bps, 0);
+        // Insurance at 6000 > 5000 threshold, utilization at 5000 < 8000 → no risk
+        assert_eq!(h.risk_score, 0);
+    }
+
+    #[test]
+    fn protocol_health_extreme_user_growth() {
+        let tvl = make_series(&[100, 200, 300]);
+        let vol = make_series(&[50, 60, 70]);
+        // 1 prev user, 10000 current → massive growth, caps at u16::MAX if needed
+        let h = protocol_health(&tvl, &vol, 1, 10_000, &[5000], 7000).unwrap();
+        assert!(h.user_growth_bps > 0);
+    }
+
+    #[test]
+    fn volume_ma_duplicate_block_numbers() {
+        // Multiple snapshots at same block → all included in window
+        let snaps = vec![
+            VolumeSnapshot { block: 100, volume: 50 },
+            VolumeSnapshot { block: 100, volume: 150 },
+            VolumeSnapshot { block: 100, volume: 100 },
+        ];
+        let ma = volume_moving_average(&snaps, 1).unwrap();
+        assert_eq!(ma, 100); // (50+150+100)/3
+    }
+
+    #[test]
+    fn trend_analysis_confidence_half_consistent() {
+        // Alternating: up, down, up, down, up (3/4 pairs don't go same direction for down)
+        let series = make_series(&[100, 200, 150, 250, 200]);
+        let t = trend_analysis(&series).unwrap();
+        // Overall direction determined by first_third vs last_third averages
+        // Confidence should reflect the inconsistency
+        assert!(t.confidence_bps < 10_000, "Volatile series should have < 100% confidence");
+    }
+
+    #[test]
+    fn fee_apr_blocks_per_year_one() {
+        // blocks_per_year = 1 → no annualization scaling beyond the ratio
+        let apr = fee_apr(100, 10_000, 1, 1);
+        // (100/10000) * 10000 * (1/1) = 100 bps
+        assert_eq!(apr, 100);
+    }
+
+    #[test]
+    fn concentration_single_zero_value_pool() {
+        let index = concentration_index(&[0]);
+        assert_eq!(index, 0);
+    }
+
+    #[test]
+    fn growth_rate_massive_decline() {
+        // u128::MAX → 1 → should be near -100% = -9999 or -10000 (rounding)
+        let rate = growth_rate_bps(u128::MAX, 1);
+        assert!(rate <= -9999, "Massive decline should be near -10000, got {}", rate);
+    }
 }

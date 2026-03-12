@@ -6,6 +6,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 
+const HTTP_TIMEOUT = 15000 // 15s — social APIs should respond fast
+
 const DATA_DIR = process.env.DATA_DIR || './data'
 const SOCIAL_FILE = join(DATA_DIR, 'social-state.json')
 
@@ -166,6 +168,7 @@ async function postTweet(content, replyToId = null) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
     })
 
     if (!res.ok) {
@@ -213,6 +216,7 @@ async function postDiscord(content, username = 'JARVIS') {
         content: content.slice(0, 2000),
         avatar_url: 'https://frontend-jade-five-87.vercel.app/jarvis-avatar.png',
       }),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
     })
 
     if (!res.ok) {
@@ -255,6 +259,7 @@ async function postGitHubComment(issueNumber, body) {
         'X-GitHub-Api-Version': '2022-11-28',
       },
       body: JSON.stringify({ body }),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
     })
 
     if (!res.ok) {
@@ -295,6 +300,7 @@ async function createGitHubIssue(title, body, labels = []) {
         'X-GitHub-Api-Version': '2022-11-28',
       },
       body: JSON.stringify({ title, body, labels }),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
     })
 
     if (!res.ok) return { error: `GitHub API error: ${res.status}` }

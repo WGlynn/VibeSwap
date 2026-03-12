@@ -540,10 +540,11 @@ export function handleCRPCRequest(path, method) {
   if (path === '/crpc/compare-commit' && method === 'POST') return 'compare_commit';
   if (path === '/crpc/compare-reveal' && method === 'POST') return 'compare_reveal';
   if (path === '/crpc/stats' && method === 'GET') return 'stats';
+  if (path === '/crpc/demo' && (method === 'POST' || method === 'GET')) return 'demo';
   return null;
 }
 
-export function processCRPCBody(handler, body) {
+export async function processCRPCBody(handler, body) {
   switch (handler) {
     case 'work_commit':
       return { success: submitWorkCommit(body.taskId, body.shardId, body.commitHash) };
@@ -555,9 +556,307 @@ export function processCRPCBody(handler, body) {
       return { success: revealComparison(body.taskId, body.shardId, body.pairId, body.choice, body.secret) };
     case 'stats':
       return getCRPCStats();
+    case 'demo':
+      return await runCRPCDemo(body?.prompt);
     default:
       return { error: 'Unknown CRPC handler' };
   }
+}
+
+// ============ CRPC Demo — Full 4-Phase Simulation ============
+//
+// Simulates a complete CRPC round with 3 virtual shards generating real LLM
+// responses. Shows the full commit-reveal pairwise comparison protocol:
+//   Phase 1: WORK COMMIT — 3 shards independently generate + commit
+//   Phase 2: WORK REVEAL — reveal responses, verify hashes
+//   Phase 3: COMPARE COMMIT — validator shards compare all pairs
+//   Phase 4: COMPARE REVEAL — tally votes, rank, determine consensus winner
+//
+// This is a self-contained demonstration — no actual multi-shard deployment needed.
+// Tim Cotton's CRPC protocol running with real LLM responses and real crypto.
+
+const DEMO_SHARDS = [
+  { id: 'shard-alpha', temperature: 0.3, persona: 'analytical and precise' },
+  { id: 'shard-beta', temperature: 0.7, persona: 'balanced and thoughtful' },
+  { id: 'shard-gamma', temperature: 1.0, persona: 'creative and bold' },
+];
+
+const DEFAULT_DEMO_PROMPT = 'What makes AI agent consensus fundamentally different from blockchain consensus, and why does it matter?';
+
+export async function runCRPCDemo(prompt) {
+  const { llmChat } = await import('./llm-provider.js');
+  const taskId = `crpc-demo-${Date.now()}-${randomBytes(4).toString('hex')}`;
+  const demoPrompt = prompt || DEFAULT_DEMO_PROMPT;
+  const trace = {
+    taskId,
+    protocol: 'CRPC (Commit-Reveal Pairwise Comparison)',
+    author: 'Tim Cotton — adapted for AI shard consensus by VibeSwap',
+    prompt: demoPrompt,
+    shards: DEMO_SHARDS.map(s => ({ id: s.id, temperature: s.temperature, persona: s.persona })),
+    phases: [],
+    pairwiseResults: [],
+    rankings: [],
+    consensusResponse: null,
+    confidence: 0,
+    totalDurationMs: 0,
+    reputations: {},
+  };
+
+  const overallStart = Date.now();
+
+  // ============ Phase 1: WORK COMMIT ============
+  // Each shard independently generates a response and commits hash(response || secret)
+  // Commitment prevents copying — no shard can see another's answer before committing.
+  const phase1Start = Date.now();
+  const workItems = []; // { shardId, response, secret, commitHash }
+
+  const phase1Promises = DEMO_SHARDS.map(async (shard) => {
+    const secret = randomBytes(16).toString('hex');
+    const response = await llmChat({
+      system: `You are ${shard.id}, an AI shard with a ${shard.persona} style. Answer concisely in 2-3 sentences. Your perspective should reflect your persona.`,
+      messages: [{ role: 'user', content: demoPrompt }],
+      max_tokens: 300,
+      temperature: shard.temperature,
+      _background: true,
+    });
+
+    const responseText = response.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('');
+
+    const commitHash = hashCommit(responseText, secret);
+    return { shardId: shard.id, response: responseText, secret, commitHash };
+  });
+
+  const results = await Promise.all(phase1Promises);
+  workItems.push(...results);
+
+  const phase1Commits = workItems.map(w => ({
+    shardId: w.shardId,
+    commitHash: w.commitHash,
+    // Response is hidden at this point — only the hash is published
+  }));
+
+  trace.phases.push({
+    phase: 1,
+    name: 'WORK COMMIT',
+    description: 'Shards independently generate responses and publish commitment hashes. No shard can see others\' answers.',
+    durationMs: Date.now() - phase1Start,
+    commits: phase1Commits,
+  });
+
+  // ============ Phase 2: WORK REVEAL ============
+  // Shards reveal their actual responses + secrets. Peers verify hash matches commitment.
+  const phase2Start = Date.now();
+  const reveals = [];
+  let allValid = true;
+
+  for (const item of workItems) {
+    const recomputedHash = hashCommit(item.response, item.secret);
+    const valid = recomputedHash === item.commitHash;
+    if (!valid) allValid = false;
+
+    reveals.push({
+      shardId: item.shardId,
+      response: item.response,
+      secret: item.secret,
+      hashVerified: valid,
+      commitHash: item.commitHash,
+      recomputedHash: recomputedHash,
+    });
+  }
+
+  trace.phases.push({
+    phase: 2,
+    name: 'WORK REVEAL',
+    description: 'Shards reveal responses + secrets. Hash verification proves no response was changed after seeing others.',
+    durationMs: Date.now() - phase2Start,
+    reveals: reveals.map(r => ({
+      shardId: r.shardId,
+      response: r.response,
+      hashVerified: r.hashVerified,
+    })),
+    allHashesValid: allValid,
+  });
+
+  // ============ Phase 3: COMPARE COMMIT ============
+  // Each shard acts as validator and compares every pair.
+  // Commits hash(choice || secret) before seeing other validators' opinions.
+  const phase3Start = Date.now();
+  const pairs = [];
+  for (let i = 0; i < workItems.length; i++) {
+    for (let j = i + 1; j < workItems.length; j++) {
+      pairs.push({
+        id: `${workItems[i].shardId}-vs-${workItems[j].shardId}`,
+        a: workItems[i],
+        b: workItems[j],
+      });
+    }
+  }
+
+  // Each shard evaluates all pairs via LLM
+  const compareItems = []; // { validatorId, pairId, choice, secret, commitHash }
+
+  const phase3Promises = DEMO_SHARDS.map(async (validator) => {
+    const validatorResults = [];
+    for (const pair of pairs) {
+      const secret = randomBytes(16).toString('hex');
+      const comparisonResult = await llmChat({
+        system: `You are a validator shard evaluating two AI responses. Compare them for quality, accuracy, and insight. Reply with EXACTLY one of: A_BETTER, B_BETTER, or EQUIVALENT. Nothing else.`,
+        messages: [{
+          role: 'user',
+          content: `Question: ${demoPrompt}\n\nResponse A (${pair.a.shardId}):\n${pair.a.response}\n\nResponse B (${pair.b.shardId}):\n${pair.b.response}\n\nWhich response is better? Reply A_BETTER, B_BETTER, or EQUIVALENT.`,
+        }],
+        max_tokens: 20,
+        temperature: 0.1, // Low temperature for consistent evaluation
+        _background: true,
+      });
+
+      const choiceRaw = comparisonResult.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('')
+        .trim()
+        .toUpperCase();
+
+      // Parse choice — accept fuzzy matches
+      let choice = CHOICES.EQUIVALENT;
+      if (choiceRaw.includes('A_BETTER') || choiceRaw.startsWith('A')) choice = CHOICES.A_BETTER;
+      else if (choiceRaw.includes('B_BETTER') || choiceRaw.startsWith('B')) choice = CHOICES.B_BETTER;
+
+      const commitHash = hashCommit(choice, secret);
+      validatorResults.push({
+        validatorId: validator.id,
+        pairId: pair.id,
+        choice,
+        secret,
+        commitHash,
+      });
+    }
+    return validatorResults;
+  });
+
+  const allCompareResults = await Promise.all(phase3Promises);
+  for (const batch of allCompareResults) {
+    compareItems.push(...batch);
+  }
+
+  trace.phases.push({
+    phase: 3,
+    name: 'COMPARE COMMIT',
+    description: 'Validator shards compare every pair and commit their votes (hash protected). Prevents vote collusion.',
+    durationMs: Date.now() - phase3Start,
+    pairs: pairs.map(p => p.id),
+    totalCommits: compareItems.length,
+    commitsPerValidator: pairs.length,
+    commits: compareItems.map(c => ({
+      validatorId: c.validatorId,
+      pairId: c.pairId,
+      commitHash: c.commitHash,
+    })),
+  });
+
+  // ============ Phase 4: COMPARE REVEAL ============
+  // Validators reveal their votes. Tally determines pairwise winners.
+  const phase4Start = Date.now();
+  const pairwiseResults = [];
+
+  for (const pair of pairs) {
+    const votes = { A_BETTER: 0, B_BETTER: 0, EQUIVALENT: 0 };
+    const voterDetails = [];
+
+    for (const item of compareItems) {
+      if (item.pairId !== pair.id) continue;
+
+      // Verify hash
+      const recomputedHash = hashCommit(item.choice, item.secret);
+      const valid = recomputedHash === item.commitHash;
+
+      votes[item.choice]++;
+      voterDetails.push({
+        validatorId: item.validatorId,
+        choice: item.choice,
+        hashVerified: valid,
+      });
+    }
+
+    const winner = votes.A_BETTER > votes.B_BETTER ? pair.a.shardId
+      : votes.B_BETTER > votes.A_BETTER ? pair.b.shardId
+      : 'equivalent';
+
+    pairwiseResults.push({
+      pairId: pair.id,
+      votes,
+      winner,
+      voters: voterDetails,
+    });
+  }
+
+  trace.phases.push({
+    phase: 4,
+    name: 'COMPARE REVEAL',
+    description: 'Validators reveal votes + secrets. Hash verification confirms no vote was changed. Majority determines each pair\'s winner.',
+    durationMs: Date.now() - phase4Start,
+    pairwiseResults,
+  });
+
+  // ============ Settlement ============
+  // Count pairwise wins per shard. Most wins = consensus winner.
+  const winCounts = new Map();
+  for (const shard of DEMO_SHARDS) winCounts.set(shard.id, 0);
+
+  for (const result of pairwiseResults) {
+    if (result.winner !== 'equivalent') {
+      winCounts.set(result.winner, (winCounts.get(result.winner) || 0) + 1);
+    }
+  }
+
+  const rankings = workItems
+    .map(w => ({
+      shardId: w.shardId,
+      response: w.response,
+      pairwiseWins: winCounts.get(w.shardId) || 0,
+    }))
+    .sort((a, b) => b.pairwiseWins - a.pairwiseWins);
+
+  const confidence = rankings[0].pairwiseWins / Math.max(1, pairs.length);
+
+  // Update reputation scores (persisted across demos)
+  for (const r of rankings) {
+    updateReputation(r.shardId, r.pairwiseWins > 0);
+  }
+
+  trace.rankings = rankings;
+  trace.consensusResponse = rankings[0].response;
+  trace.consensusWinner = rankings[0].shardId;
+  trace.confidence = parseFloat(confidence.toFixed(3));
+  trace.totalDurationMs = Date.now() - overallStart;
+  trace.reputations = Object.fromEntries(reputationScores);
+
+  // Archive into completed tasks
+  completedTasks.push({
+    taskId,
+    type: 'demo',
+    consensusResponse: rankings[0].response,
+    confidence,
+    rankings: rankings.map(r => ({
+      shardId: r.shardId,
+      wins: r.pairwiseWins,
+      responsePreview: r.response.slice(0, 100),
+    })),
+    participants: DEMO_SHARDS.length,
+    comparisons: pairwiseResults.length,
+    settledAt: new Date().toISOString(),
+  });
+  if (completedTasks.length > MAX_HISTORY) completedTasks.shift();
+
+  // Persist reputation
+  flushCRPC().catch(() => {});
+
+  console.log(`[crpc-demo] Completed ${taskId}: winner=${rankings[0].shardId}, confidence=${confidence.toFixed(2)}, duration=${trace.totalDurationMs}ms`);
+
+  return trace;
 }
 
 export function stopCRPC() {

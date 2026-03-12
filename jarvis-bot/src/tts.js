@@ -37,6 +37,7 @@ async function elevenLabsTTS(text, outputPath) {
         speed: 1.05,           // Slightly brisk — JARVIS is efficient
       },
     }),
+    signal: AbortSignal.timeout(15000), // 15s — TTS generation can be slow but shouldn't hang
   });
 
   if (!res.ok) {

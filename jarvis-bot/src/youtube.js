@@ -43,7 +43,9 @@ export async function fetchVideoContext(videoId) {
     // Fetch basic metadata via oEmbed (no API key needed)
     let title = null;
     try {
-      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, {
+        signal: AbortSignal.timeout(5000),
+      });
       if (res.ok) {
         const data = await res.json();
         title = data.title;
@@ -61,7 +63,9 @@ export async function fetchVideoContext(videoId) {
     console.warn(`[youtube] Failed to fetch transcript for ${videoId}: ${err.message}`);
     // Try metadata-only fallback
     try {
-      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, {
+        signal: AbortSignal.timeout(5000),
+      });
       if (res.ok) {
         const data = await res.json();
         return {

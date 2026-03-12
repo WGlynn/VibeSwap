@@ -2771,4 +2771,250 @@ mod tests {
         assert_eq!(reg.assignments[0].expires_at, Some(999));
         assert_eq!(reg.assignments[1].expires_at, Some(300)); // Unchanged
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_create_registry_empty_h7() {
+        let reg = create_registry(false, 100);
+        assert!(reg.roles.is_empty());
+        assert!(reg.assignments.is_empty());
+        assert!(reg.action_log.is_empty());
+        assert!(!reg.require_two_admin);
+    }
+
+    #[test]
+    fn test_register_duplicate_role_fails_h7() {
+        let mut reg = create_registry(false, 100);
+        let role1 = Role {
+            role_type: RoleType::Viewer,
+            permissions: vec![Permission::ViewAnalytics],
+            max_holders: 0,
+            requires_multisig: false,
+            time_limited: false,
+        };
+        let role2 = Role {
+            role_type: RoleType::Viewer,
+            permissions: vec![Permission::CreatePool],
+            max_holders: 0,
+            requires_multisig: false,
+            time_limited: false,
+        };
+        register_role(&mut reg, role1).unwrap();
+        let res = register_role(&mut reg, role2);
+        assert_eq!(res, Err(PermissionError::InvalidRole));
+    }
+
+    #[test]
+    fn test_grant_role_not_found_h7() {
+        let mut reg = create_registry(false, 100);
+        let res = grant_role(&mut reg, addr(1), RoleType::Operator, addr(0), 100, None);
+        assert_eq!(res, Err(PermissionError::RoleNotFound));
+    }
+
+    #[test]
+    fn test_grant_role_already_assigned_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Operator, addr(0), 100, None).unwrap();
+        let res = grant_role(&mut reg, addr(1), RoleType::Operator, addr(0), 100, None);
+        assert_eq!(res, Err(PermissionError::AlreadyAssigned));
+    }
+
+    #[test]
+    fn test_grant_role_max_holders_exceeded_h7() {
+        let mut reg = create_registry(false, 100);
+        let role = Role {
+            role_type: RoleType::Viewer,
+            permissions: vec![Permission::ViewAnalytics],
+            max_holders: 1,
+            requires_multisig: false,
+            time_limited: false,
+        };
+        register_role(&mut reg, role).unwrap();
+        grant_role(&mut reg, addr(1), RoleType::Viewer, addr(0), 100, None).unwrap();
+        let res = grant_role(&mut reg, addr(2), RoleType::Viewer, addr(0), 100, None);
+        assert_eq!(res, Err(PermissionError::MaxHoldersReached));
+    }
+
+    #[test]
+    fn test_revoke_last_admin_fails_h7() {
+        let mut reg = setup_with_two_admins();
+        // Revoke one admin first
+        revoke_role(&mut reg, &addr(2), &RoleType::Admin).unwrap();
+        // Now only addr(1) is SuperAdmin. Cannot revoke last admin.
+        let res = revoke_role(&mut reg, &addr(1), &RoleType::SuperAdmin);
+        assert_eq!(res, Err(PermissionError::CannotRevokeLastAdmin));
+    }
+
+    #[test]
+    fn test_revoke_nonexistent_assignment_h7() {
+        let mut reg = setup_registry();
+        let res = revoke_role(&mut reg, &addr(99), &RoleType::Viewer);
+        assert_eq!(res, Err(PermissionError::AssignmentNotFound));
+    }
+
+    #[test]
+    fn test_revoke_all_roles_h7() {
+        let mut reg = setup_with_two_admins();
+        grant_role(&mut reg, addr(3), RoleType::Viewer, addr(1), 100, None).unwrap();
+        grant_role(&mut reg, addr(3), RoleType::Operator, addr(1), 100, None).unwrap();
+        let count = revoke_all_roles(&mut reg, &addr(3));
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_has_permission_superadmin_has_all_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::SuperAdmin, addr(0), 100, None).unwrap();
+        assert!(has_permission(&reg, &addr(1), &Permission::CreatePool, 100));
+        assert!(has_permission(&reg, &addr(1), &Permission::UpgradeProtocol, 100));
+        assert!(has_permission(&reg, &addr(1), &Permission::ManageTreasury, 100));
+    }
+
+    #[test]
+    fn test_has_permission_expired_role_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Operator, addr(0), 100, Some(200)).unwrap();
+        assert!(has_permission(&reg, &addr(1), &Permission::CreatePool, 150));
+        assert!(!has_permission(&reg, &addr(1), &Permission::CreatePool, 250));
+    }
+
+    #[test]
+    fn test_has_permission_unauthorized_h7() {
+        let reg = setup_registry();
+        assert!(!has_permission(&reg, &addr(99), &Permission::CreatePool, 100));
+    }
+
+    #[test]
+    fn test_check_permission_details_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Operator, addr(0), 100, Some(500)).unwrap();
+        let check = check_permission(&reg, &addr(1), &Permission::CreatePool, 200);
+        assert!(check.has_permission);
+        assert_eq!(check.role, Some(RoleType::Operator));
+        assert_eq!(check.expires_at, Some(500));
+    }
+
+    #[test]
+    fn test_check_permission_no_match_h7() {
+        let reg = setup_registry();
+        let check = check_permission(&reg, &addr(99), &Permission::CreatePool, 100);
+        assert!(!check.has_permission);
+        assert!(check.role.is_none());
+    }
+
+    #[test]
+    fn test_effective_permissions_viewer_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Viewer, addr(0), 100, None).unwrap();
+        let perms = effective_permissions(&reg, &addr(1), 100);
+        assert_eq!(perms.len(), 1);
+        assert!(perms.contains(&Permission::ViewAnalytics));
+    }
+
+    #[test]
+    fn test_role_holders_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Viewer, addr(0), 100, None).unwrap();
+        grant_role(&mut reg, addr(2), RoleType::Viewer, addr(0), 100, None).unwrap();
+        let holders = role_holders(&reg, &RoleType::Viewer, 100);
+        assert_eq!(holders.len(), 2);
+    }
+
+    #[test]
+    fn test_is_admin_h7() {
+        let mut reg = setup_with_two_admins();
+        assert!(is_admin(&reg, &addr(1), 100));
+        assert!(is_admin(&reg, &addr(2), 100));
+        assert!(!is_admin(&reg, &addr(99), 100));
+    }
+
+    #[test]
+    fn test_is_superadmin_h7() {
+        let mut reg = setup_with_two_admins();
+        assert!(is_superadmin(&reg, &addr(1), 100));
+        assert!(!is_superadmin(&reg, &addr(2), 100)); // addr(2) is Admin, not SuperAdmin
+    }
+
+    #[test]
+    fn test_has_any_role_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Viewer, addr(0), 100, None).unwrap();
+        assert!(has_any_role(&reg, &addr(1), 100));
+        assert!(!has_any_role(&reg, &addr(99), 100));
+    }
+
+    #[test]
+    fn test_expire_assignments_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Viewer, addr(0), 100, Some(200)).unwrap();
+        grant_role(&mut reg, addr(2), RoleType::Viewer, addr(0), 100, None).unwrap();
+        let expired_count = expire_assignments(&mut reg, 300);
+        assert_eq!(expired_count, 1);
+    }
+
+    #[test]
+    fn test_log_action_h7() {
+        let mut reg = create_registry(false, 100);
+        for role in default_roles() {
+            register_role(&mut reg, role).unwrap();
+        }
+        log_action(&mut reg, addr(1), Permission::CreatePool, 100, true, None).unwrap();
+        assert_eq!(reg.action_log.len(), 1);
+        assert!(reg.action_log[0].approved);
+    }
+
+    #[test]
+    fn test_role_level_ordering_h7() {
+        assert!(role_level(&RoleType::SuperAdmin) > role_level(&RoleType::Admin));
+        assert!(role_level(&RoleType::Admin) > role_level(&RoleType::Operator));
+        assert!(role_level(&RoleType::Operator) > role_level(&RoleType::Guardian));
+        assert!(role_level(&RoleType::Viewer) < role_level(&RoleType::Keeper));
+    }
+
+    #[test]
+    fn test_is_higher_role_h7() {
+        assert!(is_higher_role(&RoleType::SuperAdmin, &RoleType::Admin));
+        assert!(!is_higher_role(&RoleType::Viewer, &RoleType::Admin));
+    }
+
+    #[test]
+    fn test_admin_count_h7() {
+        let reg = setup_with_two_admins();
+        assert_eq!(admin_count(&reg, 100), 2);
+    }
+
+    #[test]
+    fn test_transfer_role_h7() {
+        let mut reg = setup_registry();
+        grant_role(&mut reg, addr(1), RoleType::Operator, addr(0), 100, None).unwrap();
+        transfer_role(&mut reg, &addr(1), addr(2), &RoleType::Operator, 200).unwrap();
+        assert!(!has_any_role(&reg, &addr(1), 200));
+        assert!(has_any_role(&reg, &addr(2), 200));
+    }
+
+    #[test]
+    fn test_extend_role_nonexistent_h7() {
+        let mut reg = setup_registry();
+        let res = extend_role(&mut reg, &addr(99), &RoleType::Viewer, 1000);
+        assert_eq!(res, Err(PermissionError::AssignmentNotFound));
+    }
+
+    #[test]
+    fn test_permission_count_h7() {
+        let roles = default_roles();
+        let viewer = roles.iter().find(|r| r.role_type == RoleType::Viewer).unwrap();
+        assert_eq!(permission_count(viewer), 1);
+    }
+
+    #[test]
+    fn test_cleanup_inactive_removes_revoked_h7() {
+        let mut reg = setup_with_two_admins();
+        grant_role(&mut reg, addr(3), RoleType::Viewer, addr(1), 100, None).unwrap();
+        revoke_role(&mut reg, &addr(3), &RoleType::Viewer).unwrap();
+        let before = reg.assignments.len();
+        let removed = cleanup_inactive(&mut reg);
+        assert!(removed > 0);
+        assert!(reg.assignments.len() < before);
+    }
 }

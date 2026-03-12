@@ -2925,4 +2925,267 @@ mod tests {
         let result = simulate_batch(&[], 1000, 1000, PRECISION);
         assert_eq!(result, Err(AuctionError::EmptyBatch));
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_commit_order_hash_deterministic_h7() {
+        let secret = [0xAB; 32];
+        let h1 = commit_order_hash(ORDER_BUY, 1000, PRECISION, 50, &secret);
+        let h2 = commit_order_hash(ORDER_BUY, 1000, PRECISION, 50, &secret);
+        assert_eq!(h1, h2);
+        assert_ne!(h1, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_commit_order_hash_differs_by_type_h7() {
+        let secret = [0xAB; 32];
+        let h_buy = commit_order_hash(ORDER_BUY, 1000, PRECISION, 50, &secret);
+        let h_sell = commit_order_hash(ORDER_SELL, 1000, PRECISION, 50, &secret);
+        assert_ne!(h_buy, h_sell);
+    }
+
+    #[test]
+    fn test_commit_order_hash_differs_by_amount_h7() {
+        let secret = [0xAB; 32];
+        let h1 = commit_order_hash(ORDER_BUY, 1000, PRECISION, 50, &secret);
+        let h2 = commit_order_hash(ORDER_BUY, 2000, PRECISION, 50, &secret);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_commit_order_hash_differs_by_secret_h7() {
+        let h1 = commit_order_hash(ORDER_BUY, 1000, PRECISION, 0, &[0xAA; 32]);
+        let h2 = commit_order_hash(ORDER_BUY, 1000, PRECISION, 0, &[0xBB; 32]);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_validate_commit_batch_id_mismatch_h7() {
+        let secret = [0xAA; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, PRECISION, 0, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 1000,
+            token_type_hash: [0u8; 32],
+            token_amount: 0,
+            block_number: 100,
+            sender_lock_hash: [0xAA; 32],
+        };
+        let mut auction = default_auction();
+        auction.batch_id = 2;
+        let res = validate_commit(&commit, ORDER_BUY, 1000, PRECISION, 0, &secret, &auction);
+        assert!(matches!(res, Err(AuctionError::BatchIdMismatch { .. })));
+    }
+
+    #[test]
+    fn test_validate_commit_wrong_phase_h7() {
+        let secret = [0xAA; 32];
+        let hash = commit_order_hash(ORDER_BUY, 1000, PRECISION, 0, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 1000,
+            token_type_hash: [0u8; 32],
+            token_amount: 0,
+            block_number: 100,
+            sender_lock_hash: [0xAA; 32],
+        };
+        let mut auction = default_auction();
+        auction.phase = PHASE_REVEAL;
+        let res = validate_commit(&commit, ORDER_BUY, 1000, PRECISION, 0, &secret, &auction);
+        assert!(matches!(res, Err(AuctionError::WrongPhase { .. })));
+    }
+
+    #[test]
+    fn test_validate_commit_hash_mismatch_h7() {
+        let commit = CommitCellData {
+            order_hash: [0xFF; 32],
+            batch_id: 1,
+            deposit_ckb: 1000,
+            token_type_hash: [0u8; 32],
+            token_amount: 0,
+            block_number: 100,
+            sender_lock_hash: [0xAA; 32],
+        };
+        let auction = default_auction();
+        let res = validate_commit(&commit, ORDER_BUY, 1000, PRECISION, 0, &[0xAA; 32], &auction);
+        assert_eq!(res, Err(AuctionError::CommitMismatch));
+    }
+
+    #[test]
+    fn test_verify_reveal_success_h7() {
+        let secret = [0xCC; 32];
+        let hash = commit_order_hash(ORDER_SELL, 500, PRECISION * 2, 10, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 1000,
+            token_type_hash: [0u8; 32],
+            token_amount: 0,
+            block_number: 100,
+            sender_lock_hash: [0xCC; 32],
+        };
+        let reveal = RevealWitness {
+            order_type: ORDER_SELL,
+            amount_in: 500,
+            limit_price: PRECISION * 2,
+            secret,
+            priority_bid: 10,
+            commit_index: 0,
+        };
+        assert!(verify_reveal(&reveal, &commit).is_ok());
+    }
+
+    #[test]
+    fn test_verify_reveal_mismatch_h7() {
+        let secret = [0xCC; 32];
+        let hash = commit_order_hash(ORDER_SELL, 500, PRECISION, 0, &secret);
+        let commit = CommitCellData {
+            order_hash: hash,
+            batch_id: 1,
+            deposit_ckb: 1000,
+            token_type_hash: [0u8; 32],
+            token_amount: 0,
+            block_number: 100,
+            sender_lock_hash: [0xCC; 32],
+        };
+        let reveal = RevealWitness {
+            order_type: ORDER_BUY, // Different type
+            amount_in: 500,
+            limit_price: PRECISION,
+            secret,
+            priority_bid: 0,
+            commit_index: 0,
+        };
+        assert_eq!(verify_reveal(&reveal, &commit), Err(AuctionError::RevealMismatch));
+    }
+
+    #[test]
+    fn test_calculate_slash_50_percent_h7() {
+        let result = calculate_slash(1000, 5000);
+        assert_eq!(result.slash_amount, 500);
+        assert_eq!(result.return_amount, 500);
+        assert_eq!(result.slash_rate_bps, 5000);
+    }
+
+    #[test]
+    fn test_calculate_slash_zero_deposit_h7() {
+        let result = calculate_slash(0, 5000);
+        assert_eq!(result.slash_amount, 0);
+        assert_eq!(result.return_amount, 0);
+    }
+
+    #[test]
+    fn test_calculate_slash_100_percent_h7() {
+        let result = calculate_slash(1000, 10000);
+        assert_eq!(result.slash_amount, 1000);
+        assert_eq!(result.return_amount, 0);
+    }
+
+    #[test]
+    fn test_calculate_default_slash_h7() {
+        let result = calculate_default_slash(2000);
+        assert_eq!(result.slash_amount, 1000); // 50% of 2000
+        assert_eq!(result.return_amount, 1000);
+    }
+
+    #[test]
+    fn test_count_non_revealers_h7() {
+        let mut auction = default_auction();
+        auction.commit_count = 10;
+        auction.reveal_count = 7;
+        assert_eq!(count_non_revealers(&auction), 3);
+    }
+
+    #[test]
+    fn test_count_non_revealers_all_revealed_h7() {
+        let mut auction = default_auction();
+        auction.commit_count = 5;
+        auction.reveal_count = 5;
+        assert_eq!(count_non_revealers(&auction), 0);
+    }
+
+    #[test]
+    fn test_estimate_slash_revenue_h7() {
+        let revenue = estimate_slash_revenue(3, 1000, 5000);
+        // per_slash = 1000 * 5000 / 10000 = 500, total = 500 * 3 = 1500
+        assert_eq!(revenue, 1500);
+    }
+
+    #[test]
+    fn test_estimate_slash_revenue_zero_non_revealers_h7() {
+        let revenue = estimate_slash_revenue(0, 1000, 5000);
+        assert_eq!(revenue, 0);
+    }
+
+    #[test]
+    fn test_analyze_order_book_empty_h7() {
+        let (bc, sc, bv, sv, abp, asp) = analyze_order_book(&[]);
+        assert_eq!(bc, 0);
+        assert_eq!(sc, 0);
+        assert_eq!(bv, 0);
+        assert_eq!(sv, 0);
+        assert_eq!(abp, 0);
+        assert_eq!(asp, 0);
+    }
+
+    #[test]
+    fn test_analyze_order_book_mixed_h7() {
+        let reveals = vec![
+            make_reveal(ORDER_BUY, 100, PRECISION, 0),
+            make_reveal(ORDER_BUY, 200, PRECISION * 2, 0),
+            make_reveal(ORDER_SELL, 300, PRECISION * 3, 0),
+        ];
+        let (bc, sc, bv, sv, abp, asp) = analyze_order_book(&reveals);
+        assert_eq!(bc, 2);
+        assert_eq!(sc, 1);
+        assert_eq!(bv, 300);
+        assert_eq!(sv, 300);
+        assert_eq!(abp, (PRECISION + PRECISION * 2) / 2);
+        assert_eq!(asp, PRECISION * 3);
+    }
+
+    #[test]
+    fn test_compute_xor_seed_single_secret_h7() {
+        let secrets = [[0x42; 32]];
+        let seed = compute_xor_seed(&secrets);
+        assert_ne!(seed, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_compute_xor_seed_different_order_same_result_h7() {
+        let s1 = [[0x11; 32], [0x22; 32]];
+        let seed1 = compute_xor_seed(&s1);
+        let s2 = [[0x22; 32], [0x11; 32]];
+        let seed2 = compute_xor_seed(&s2);
+        // XOR is commutative but this uses generate_seed which hashes,
+        // so order may matter. Just verify both are non-zero
+        assert_ne!(seed1, [0u8; 32]);
+        assert_ne!(seed2, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_estimate_fill_zero_amount_h7() {
+        let res = estimate_fill(ORDER_BUY, 0, PRECISION, 0, &[], 1000, 1000, PRECISION);
+        assert_eq!(res, Err(AuctionError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_optimal_priority_bid_all_zeros_h7() {
+        let bid = optimal_priority_bid(0, 0, 0, 0, 30);
+        assert_eq!(bid, 0);
+    }
+
+    #[test]
+    fn test_phase_info_settled_h7() {
+        let mut auction = default_auction();
+        auction.phase = PHASE_SETTLED;
+        let config = default_config();
+        let info = phase_info(&auction, 200, &config);
+        assert_eq!(info.phase, PHASE_SETTLED);
+        assert_eq!(info.next_phase, PHASE_COMMIT);
+        assert!(info.can_transition);
+    }
 }

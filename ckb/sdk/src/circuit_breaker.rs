@@ -3065,4 +3065,266 @@ mod tests {
         let debug_str = format!("{:?}", report);
         assert!(debug_str.contains("Volume"));
     }
+
+    // ============ Hardening Round 10 ============
+
+    #[test]
+    fn test_custom_config_price_above_10000_h10() {
+        let result = custom_config(10_001, 3000, 1500, 50, 300, 5);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidThreshold));
+    }
+
+    #[test]
+    fn test_custom_config_withdrawal_above_10000_h10() {
+        let result = custom_config(500, 3000, 10_001, 50, 300, 5);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidThreshold));
+    }
+
+    #[test]
+    fn test_custom_config_zero_cooldown_h10() {
+        let result = custom_config(500, 3000, 1500, 0, 300, 5);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidWindow));
+    }
+
+    #[test]
+    fn test_custom_config_zero_window_h10() {
+        let result = custom_config(500, 3000, 1500, 50, 0, 5);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidWindow));
+    }
+
+    #[test]
+    fn test_custom_config_zero_max_trips_h10() {
+        let result = custom_config(500, 3000, 1500, 50, 300, 0);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidThreshold));
+    }
+
+    #[test]
+    fn test_trip_during_grace_period_h10() {
+        let state = price_breaker(100);
+        let report = default_trip_report(BreakerType::Price, 105);
+        // Block 105 is within grace period (100 + 10 = 110)
+        let result = trip_breaker(&state, 105, &report);
+        assert_eq!(result, Err(CircuitBreakerError::GracePeriodActive));
+    }
+
+    #[test]
+    fn test_trip_at_exact_grace_boundary_h10() {
+        let state = price_breaker(100);
+        let report = default_trip_report(BreakerType::Price, 110);
+        // Block 110 = deployment_block + GRACE_PERIOD_BLOCKS = exact boundary
+        let result = trip_breaker(&state, 110, &report);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_trip_already_tripped_h10() {
+        let state = price_breaker(0);
+        let report = default_trip_report(BreakerType::Price, 20);
+        let tripped = trip_breaker(&state, 20, &report).unwrap();
+        let result = trip_breaker(&tripped, 30, &report);
+        assert_eq!(result, Err(CircuitBreakerError::AlreadyTripped));
+    }
+
+    #[test]
+    fn test_auto_recover_not_tripped_h10() {
+        let state = price_breaker(0);
+        let cfg = default_config();
+        let result = auto_recover(&state, 200, &cfg);
+        assert_eq!(result, Err(CircuitBreakerError::NotTripped));
+    }
+
+    #[test]
+    fn test_auto_recover_cooldown_not_elapsed_h10() {
+        let state = price_breaker(0);
+        let report = default_trip_report(BreakerType::Price, 20);
+        let cfg = default_config();
+        let tripped = trip_breaker(&state, 20, &report).unwrap();
+        let result = auto_recover(&tripped, 20 + cfg.cooldown_blocks - 1, &cfg);
+        assert_eq!(result, Err(CircuitBreakerError::CooldownActive));
+    }
+
+    #[test]
+    fn test_manual_reset_not_tripped_h10() {
+        let state = price_breaker(0);
+        let result = manual_reset(&state, 200);
+        assert_eq!(result, Err(CircuitBreakerError::NotTripped));
+    }
+
+    #[test]
+    fn test_manual_reset_clears_consecutive_h10() {
+        let state = price_breaker(0);
+        let report = default_trip_report(BreakerType::Price, 20);
+        let cfg = default_config();
+        let mut s = trip_breaker(&state, 20, &report).unwrap();
+        s = auto_recover(&s, 20 + cfg.cooldown_blocks, &cfg).unwrap();
+        s = trip_breaker(&s, 200, &report).unwrap();
+        assert_eq!(s.consecutive_trips, 2);
+        let reset = manual_reset(&s, 300).unwrap();
+        assert_eq!(reset.consecutive_trips, 0);
+        assert!(!reset.is_tripped);
+        assert!(!reset.manual_reset_required);
+    }
+
+    #[test]
+    fn test_can_operate_during_grace_period_h10() {
+        let state = price_breaker(100);
+        // During grace period, should allow operation even though breaker exists
+        assert!(can_operate(&state, 105));
+    }
+
+    #[test]
+    fn test_can_operate_after_grace_h10() {
+        let state = price_breaker(0);
+        assert!(can_operate(&state, 100));
+    }
+
+    #[test]
+    fn test_can_operate_when_tripped_h10() {
+        let state = price_breaker(0);
+        let report = default_trip_report(BreakerType::Price, 20);
+        let tripped = trip_breaker(&state, 20, &report).unwrap();
+        assert!(!can_operate(&tripped, 50));
+    }
+
+    #[test]
+    fn test_compute_price_deviation_zero_window_h10() {
+        let obs = stable_prices(1000, 10, 0);
+        let result = compute_price_deviation(&obs, 0, 10);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidWindow));
+    }
+
+    #[test]
+    fn test_compute_price_deviation_insufficient_obs_h10() {
+        let obs = make_price_obs(&[(1000, 5), (1100, 6)]);
+        // Only 2 observations, need MIN_OBSERVATION_COUNT = 5
+        let result = compute_price_deviation(&obs, 600, 10);
+        assert_eq!(result, Err(CircuitBreakerError::InsufficientObservations));
+    }
+
+    #[test]
+    fn test_compute_price_deviation_zero_price_h10() {
+        let obs = make_price_obs(&[(1000, 1), (0, 2), (1000, 3), (1000, 4), (1000, 5)]);
+        let result = compute_price_deviation(&obs, 600, 10);
+        assert_eq!(result, Err(CircuitBreakerError::ZeroValue));
+    }
+
+    #[test]
+    fn test_compute_price_deviation_stable_h10() {
+        let obs = stable_prices(1000, 10, 0);
+        let dev = compute_price_deviation(&obs, 600, 10).unwrap();
+        assert_eq!(dev, 0);
+    }
+
+    #[test]
+    fn test_compute_volume_ratio_zero_window_h10() {
+        let obs = make_volume_obs(&[(100, 1)]);
+        let result = compute_volume_ratio(&obs, 0, 10);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidWindow));
+    }
+
+    #[test]
+    fn test_compute_withdrawal_rate_zero_window_h10() {
+        let obs = make_withdrawal_obs(&[(100, 1000, 1)]);
+        let result = compute_withdrawal_rate(&obs, 0, 10);
+        assert_eq!(result, Err(CircuitBreakerError::InvalidWindow));
+    }
+
+    #[test]
+    fn test_compute_withdrawal_rate_zero_tvl_h10() {
+        let obs = make_withdrawal_obs(&[(100, 0, 1), (100, 0, 2), (100, 0, 3), (100, 0, 4), (100, 0, 5)]);
+        let result = compute_withdrawal_rate(&obs, 600, 10);
+        assert_eq!(result, Err(CircuitBreakerError::ZeroValue));
+    }
+
+    #[test]
+    fn test_time_to_recovery_not_tripped_h10() {
+        let state = price_breaker(0);
+        let cfg = default_config();
+        assert_eq!(time_to_recovery(&state, 100, &cfg), 0);
+    }
+
+    #[test]
+    fn test_time_to_recovery_manual_required_h10() {
+        let state = price_breaker(0);
+        let report = default_trip_report(BreakerType::Price, 20);
+        let cfg = default_config();
+        let mut s = state;
+        // Trip 3 times to require manual reset
+        s = trip_breaker(&s, 20, &report).unwrap();
+        s = auto_recover(&s, 20 + cfg.cooldown_blocks, &cfg).unwrap();
+        s = trip_breaker(&s, 200, &report).unwrap();
+        s = auto_recover(&s, 200 + cfg.cooldown_blocks, &cfg).unwrap();
+        s = trip_breaker(&s, 400, &report).unwrap();
+        assert!(s.manual_reset_required);
+        assert_eq!(time_to_recovery(&s, 450, &cfg), 0);
+    }
+
+    #[test]
+    fn test_assess_system_all_clear_h10() {
+        let breakers = vec![price_breaker(0), volume_breaker(0)];
+        let cfg = default_config();
+        let status = assess_system(&breakers, 100, &cfg);
+        assert!(status.all_clear);
+        assert!(!status.manual_intervention_needed);
+    }
+
+    #[test]
+    fn test_assess_system_one_tripped_h10() {
+        let report = default_trip_report(BreakerType::Price, 20);
+        let tripped = trip_breaker(&price_breaker(0), 20, &report).unwrap();
+        let breakers = vec![tripped, volume_breaker(0)];
+        let cfg = default_config();
+        let status = assess_system(&breakers, 50, &cfg);
+        assert!(!status.all_clear);
+        assert_eq!(status.highest_severity, Severity::Critical);
+    }
+
+    #[test]
+    fn test_assess_system_two_tripped_emergency_h10() {
+        let report = default_trip_report(BreakerType::Price, 20);
+        let tripped1 = trip_breaker(&price_breaker(0), 20, &report).unwrap();
+        let report2 = default_trip_report(BreakerType::Volume, 25);
+        let tripped2 = trip_breaker(&volume_breaker(0), 25, &report2).unwrap();
+        let breakers = vec![tripped1, tripped2];
+        let cfg = default_config();
+        let status = assess_system(&breakers, 50, &cfg);
+        assert_eq!(status.highest_severity, Severity::Emergency);
+    }
+
+    #[test]
+    fn test_should_warn_zero_threshold_h10() {
+        assert_eq!(should_warn(100, 0), None);
+    }
+
+    #[test]
+    fn test_should_warn_below_50_pct_h10() {
+        assert_eq!(should_warn(49, 100), None);
+    }
+
+    #[test]
+    fn test_should_warn_at_50_pct_h10() {
+        assert_eq!(should_warn(50, 100), Some(Severity::Warning));
+    }
+
+    #[test]
+    fn test_should_warn_at_75_pct_h10() {
+        assert_eq!(should_warn(75, 100), Some(Severity::Critical));
+    }
+
+    #[test]
+    fn test_should_warn_at_100_pct_h10() {
+        assert_eq!(should_warn(100, 100), Some(Severity::Emergency));
+    }
+
+    #[test]
+    fn test_total_trips_increments_h10() {
+        let state = price_breaker(0);
+        let report = default_trip_report(BreakerType::Price, 20);
+        let cfg = default_config();
+        let s1 = trip_breaker(&state, 20, &report).unwrap();
+        assert_eq!(s1.total_trips, 1);
+        let s2 = auto_recover(&s1, 20 + cfg.cooldown_blocks, &cfg).unwrap();
+        let s3 = trip_breaker(&s2, 200, &report).unwrap();
+        assert_eq!(s3.total_trips, 2);
+    }
 }

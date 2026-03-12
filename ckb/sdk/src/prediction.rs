@@ -3164,4 +3164,247 @@ mod tests {
         let settled = settle_market(&resolved, resolved.dispute_end_block).unwrap();
         assert_eq!(settled.status, MARKET_SETTLED);
     }
+
+    // ============ Hardening Round 10 ============
+
+    #[test]
+    fn test_create_market_too_few_tiers_h10() {
+        let lock = test_lock();
+        let params = CreateMarketParams {
+            question_hash: [0xBB; 32], oracle_pair_id: [0xCC; 32],
+            num_tiers: 1, settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 1000, dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+            fee_rate_bps: DEFAULT_MARKET_FEE_BPS, creator_lock: lock,
+            creator_input: CellInput { tx_hash: [0; 32], index: 0, since: 0 },
+            current_block: 100,
+        };
+        assert!(create_market(&params).is_err());
+    }
+
+    #[test]
+    fn test_create_market_too_many_tiers_h10() {
+        let lock = test_lock();
+        let params = CreateMarketParams {
+            question_hash: [0xBB; 32], oracle_pair_id: [0xCC; 32],
+            num_tiers: 9, settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 1000, dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+            fee_rate_bps: DEFAULT_MARKET_FEE_BPS, creator_lock: lock,
+            creator_input: CellInput { tx_hash: [0; 32], index: 0, since: 0 },
+            current_block: 100,
+        };
+        assert!(create_market(&params).is_err());
+    }
+
+    #[test]
+    fn test_create_market_resolution_in_past_h10() {
+        let lock = test_lock();
+        let params = CreateMarketParams {
+            question_hash: [0xBB; 32], oracle_pair_id: [0xCC; 32],
+            num_tiers: 2, settlement_mode: SETTLEMENT_WINNER_TAKES_ALL,
+            resolution_block: 50, dispute_window_blocks: DEFAULT_DISPUTE_WINDOW_BLOCKS,
+            fee_rate_bps: DEFAULT_MARKET_FEE_BPS, creator_lock: lock,
+            creator_input: CellInput { tx_hash: [0; 32], index: 0, since: 0 },
+            current_block: 100,
+        };
+        assert!(create_market(&params).is_err());
+    }
+
+    #[test]
+    fn test_place_bet_invalid_tier_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = place_bet(&market, 5, MINIMUM_BET_AMOUNT, [0x11; 32], 200);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_place_bet_below_minimum_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT - 1, [0x11; 32], 200);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_place_bet_after_resolution_block_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = place_bet(&market, 0, MINIMUM_BET_AMOUNT, [0x11; 32], 1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_before_resolution_block_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = resolve_market(&market, 0, 500);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_already_resolved_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let resolved = resolve_market(&market, 0, 1000).unwrap();
+        // Try to resolve again
+        let result = resolve_market(&resolved, 0, 1001);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_value_to_tier_zero_num_tiers_h10() {
+        assert_eq!(value_to_tier(PRECISION / 2, 0), 0);
+    }
+
+    #[test]
+    fn test_value_to_tier_boundary_values_h10() {
+        // 4 tiers: each bucket = PRECISION/4
+        assert_eq!(value_to_tier(0, 4), 0);
+        assert_eq!(value_to_tier(PRECISION / 4 - 1, 4), 0);
+        assert_eq!(value_to_tier(PRECISION / 4, 4), 1);
+        assert_eq!(value_to_tier(PRECISION - 1, 4), 3);
+        assert_eq!(value_to_tier(PRECISION, 4), 3); // >= PRECISION maps to last
+    }
+
+    #[test]
+    fn test_value_to_tier_large_value_h10() {
+        assert_eq!(value_to_tier(PRECISION * 10, 4), 3); // clamped to last tier
+    }
+
+    #[test]
+    fn test_cancel_market_not_creator_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let non_creator = [0xFF; 32];
+        let result = cancel_market(&market, &non_creator);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cancel_market_with_bets_h10() {
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL, &[(0, MINIMUM_BET_AMOUNT)]);
+        let result = cancel_market(&market, &market.creator_lock_hash);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cancel_market_success_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = cancel_market(&market, &market.creator_lock_hash);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().status, MARKET_CANCELLED);
+    }
+
+    #[test]
+    fn test_implied_odds_empty_market_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        assert_eq!(implied_odds_bps(&market, 0), 0);
+    }
+
+    #[test]
+    fn test_implied_odds_invalid_tier_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        assert_eq!(implied_odds_bps(&market, 10), 0);
+    }
+
+    #[test]
+    fn test_implied_odds_balanced_bets_h10() {
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL,
+            &[(0, MINIMUM_BET_AMOUNT), (1, MINIMUM_BET_AMOUNT)]);
+        let odds_0 = implied_odds_bps(&market, 0);
+        let odds_1 = implied_odds_bps(&market, 1);
+        assert_eq!(odds_0, 5000); // 50%
+        assert_eq!(odds_1, 5000); // 50%
+    }
+
+    #[test]
+    fn test_potential_multiplier_no_bets_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        assert_eq!(potential_multiplier(&market, 0), 0); // sentinel for infinite
+    }
+
+    #[test]
+    fn test_potential_multiplier_invalid_tier_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        assert_eq!(potential_multiplier(&market, 10), 0);
+    }
+
+    #[test]
+    fn test_market_depth_empty_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let (min_p, max_p, imbalance) = market_depth(&market);
+        assert_eq!(max_p, 0);
+    }
+
+    #[test]
+    fn test_market_depth_balanced_h10() {
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL,
+            &[(0, MINIMUM_BET_AMOUNT), (1, MINIMUM_BET_AMOUNT)]);
+        let (min_p, max_p, imbalance) = market_depth(&market);
+        assert_eq!(min_p, max_p);
+        assert_eq!(imbalance, 0);
+    }
+
+    #[test]
+    fn test_settle_market_not_resolved_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let result = settle_market(&market, 2000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_settle_market_before_dispute_end_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let resolved = resolve_market(&market, 0, 1000).unwrap();
+        let result = settle_market(&resolved, resolved.dispute_end_block - 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_settleable_false_when_active_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        assert!(!is_settleable(&market, 5000));
+    }
+
+    #[test]
+    fn test_derive_market_id_deterministic_h10() {
+        let q = [0xBB; 32];
+        let c = [0xAA; 32];
+        let id1 = derive_market_id(&q, &c, 100);
+        let id2 = derive_market_id(&q, &c, 100);
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_derive_market_id_different_blocks_h10() {
+        let q = [0xBB; 32];
+        let c = [0xAA; 32];
+        let id1 = derive_market_id(&q, &c, 100);
+        let id2 = derive_market_id(&q, &c, 101);
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_calculate_payout_wrong_market_id_h10() {
+        let market = market_with_bets(2, SETTLEMENT_WINNER_TAKES_ALL,
+            &[(0, MINIMUM_BET_AMOUNT)]);
+        let resolved = resolve_market(&market, 0, 1000).unwrap();
+        let position = PredictionPositionCellData {
+            market_id: [0xFF; 32], // wrong market ID
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let result = calculate_payout(&resolved, &position);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_calculate_payout_not_resolved_h10() {
+        let market = test_market(2, SETTLEMENT_WINNER_TAKES_ALL);
+        let position = PredictionPositionCellData {
+            market_id: market.market_id,
+            owner_lock_hash: [0x11; 32],
+            tier_index: 0,
+            amount: MINIMUM_BET_AMOUNT,
+            created_block: 200,
+        };
+        let result = calculate_payout(&market, &position);
+        assert!(result.is_err());
+    }
 }

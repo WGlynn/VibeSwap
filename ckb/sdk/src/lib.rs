@@ -13,6 +13,7 @@ pub mod bridge;
 pub mod circuit_breaker;
 pub mod collector;
 pub mod compliance;
+pub mod delegate;
 pub mod consensus;
 pub mod emission;
 pub mod fees;

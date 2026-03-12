@@ -20,6 +20,7 @@ import { createTask, DEFER_TASK_TOOL, TASK_TOOL_GROUP_NAME, TASK_TOOL_NAMES } fr
 import { WALLET_TOOLS, WALLET_TOOL_NAMES, handleWalletTool } from './wallet.js';
 import { SOCIAL_TOOLS, SOCIAL_TOOL_NAMES, handleSocialTool } from './social.js';
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
+import { runLocalCRPC } from './crpc.js';
 
 const REPO_PATH = config.repo.path;
 

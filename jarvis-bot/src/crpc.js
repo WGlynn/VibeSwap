@@ -563,6 +563,154 @@ export async function processCRPCBody(handler, body) {
   }
 }
 
+// ============ Local CRPC — Production Chat Pipeline Integration ============
+//
+// Runs CRPC locally within a single shard for high-stakes messages.
+// Uses the caller's system prompt and message history (full Jarvis context).
+// Generates 3 candidate responses with temperature variation, then uses
+// pairwise LLM comparison to select the best one.
+//
+// This is NOT the demo — this is production CRPC running inside the chat pipeline.
+// When multi-shard mode is active, requestConsensusResponse() handles real shards.
+// When single-shard, runLocalCRPC() simulates the protocol locally.
+
+const LOCAL_CRPC_TEMPERATURES = [0.3, 0.7, 1.0];
+
+export async function runLocalCRPC(systemPrompt, messages, opts = {}) {
+  const { llmChat } = await import('./llm-provider.js');
+  const taskId = `crpc-local-${Date.now()}-${randomBytes(4).toString('hex')}`;
+  const maxTokens = opts.maxTokens || 1024;
+
+  console.log(`[crpc-local] Starting local CRPC round: ${taskId}`);
+  const startTime = Date.now();
+
+  // ============ Phase 1+2: Generate + Commit (combined locally) ============
+  // 3 candidates with different temperatures — simulates independent shards
+  const candidates = await Promise.all(
+    LOCAL_CRPC_TEMPERATURES.map(async (temp, i) => {
+      const shardId = `local-shard-${i}`;
+      const secret = randomBytes(16).toString('hex');
+
+      const response = await llmChat({
+        system: systemPrompt,
+        messages,
+        max_tokens: maxTokens,
+        temperature: temp,
+        _background: true,
+      });
+
+      const responseText = response.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('');
+
+      const commitHash = hashCommit(responseText, secret);
+      return { shardId, temperature: temp, response: responseText, secret, commitHash, usage: response.usage };
+    })
+  );
+
+  const genDuration = Date.now() - startTime;
+
+  // ============ Phase 3+4: Pairwise Comparison (combined locally) ============
+  // Each candidate pair is evaluated by a single LLM call (validator)
+  const pairs = [];
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      pairs.push({ a: candidates[i], b: candidates[j] });
+    }
+  }
+
+  // Extract the user's question for comparison context
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  const questionText = !lastUserMsg ? '' :
+    typeof lastUserMsg.content === 'string' ? lastUserMsg.content :
+    Array.isArray(lastUserMsg.content) ? lastUserMsg.content.filter(b => b.type === 'text').map(b => b.text).join(' ') : '';
+
+  const comparisonResults = await Promise.all(
+    pairs.map(async (pair) => {
+      const result = await llmChat({
+        system: 'You are evaluating two AI responses for quality, accuracy, helpfulness, and naturalness. Reply with EXACTLY one word: A_BETTER, B_BETTER, or EQUIVALENT.',
+        messages: [{
+          role: 'user',
+          content: `Question: ${questionText.slice(0, 500)}\n\nResponse A:\n${pair.a.response.slice(0, 800)}\n\nResponse B:\n${pair.b.response.slice(0, 800)}\n\nWhich is better?`,
+        }],
+        max_tokens: 10,
+        temperature: 0.1,
+        _background: true,
+      });
+
+      const choiceRaw = result.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('')
+        .trim()
+        .toUpperCase();
+
+      let choice = CHOICES.EQUIVALENT;
+      if (choiceRaw.includes('A_BETTER') || choiceRaw.startsWith('A')) choice = CHOICES.A_BETTER;
+      else if (choiceRaw.includes('B_BETTER') || choiceRaw.startsWith('B')) choice = CHOICES.B_BETTER;
+
+      return { a: pair.a.shardId, b: pair.b.shardId, choice };
+    })
+  );
+
+  // Tally pairwise wins
+  const winCounts = new Map();
+  for (const c of candidates) winCounts.set(c.shardId, 0);
+
+  for (const cr of comparisonResults) {
+    if (cr.choice === CHOICES.A_BETTER) winCounts.set(cr.a, (winCounts.get(cr.a) || 0) + 1);
+    else if (cr.choice === CHOICES.B_BETTER) winCounts.set(cr.b, (winCounts.get(cr.b) || 0) + 1);
+  }
+
+  // Rank and select winner
+  const ranked = candidates
+    .map(c => ({ ...c, wins: winCounts.get(c.shardId) || 0 }))
+    .sort((a, b) => b.wins - a.wins);
+
+  const winner = ranked[0];
+  const confidence = winner.wins / Math.max(1, pairs.length);
+  const totalDuration = Date.now() - startTime;
+
+  // Update reputation
+  for (const r of ranked) {
+    updateReputation(r.shardId, r.wins > 0);
+  }
+
+  // Archive
+  completedTasks.push({
+    taskId,
+    type: opts.type || 'local-crpc',
+    consensusResponse: winner.response,
+    confidence,
+    rankings: ranked.map(r => ({
+      shardId: r.shardId,
+      wins: r.wins,
+      responsePreview: r.response.slice(0, 100),
+    })),
+    participants: candidates.length,
+    comparisons: comparisonResults.length,
+    settledAt: new Date().toISOString(),
+  });
+  if (completedTasks.length > MAX_HISTORY) completedTasks.shift();
+
+  console.log(`[crpc-local] Settled ${taskId}: winner=${winner.shardId} (temp=${winner.temperature}), confidence=${confidence.toFixed(2)}, gen=${genDuration}ms, total=${totalDuration}ms`);
+
+  return {
+    taskId,
+    consensusResponse: winner.response,
+    confidence,
+    winner: winner.shardId,
+    winnerTemperature: winner.temperature,
+    rankings: ranked.map(r => ({ shardId: r.shardId, wins: r.wins, temperature: r.temperature })),
+    durationMs: totalDuration,
+    totalUsage: {
+      input_tokens: candidates.reduce((sum, c) => sum + (c.usage?.input_tokens || 0), 0),
+      output_tokens: candidates.reduce((sum, c) => sum + (c.usage?.output_tokens || 0), 0),
+    },
+  };
+}
+
 // ============ CRPC Demo — Full 4-Phase Simulation ============
 //
 // Simulates a complete CRPC round with 3 virtual shards generating real LLM

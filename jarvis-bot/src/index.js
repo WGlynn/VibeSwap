@@ -152,7 +152,7 @@ import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedu
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
-import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus, routeQuestion } from './pantheon.js';
+import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus, routeQuestion, addNyxMemory, getNyxMemory } from './pantheon.js';
 import { runPrimitiveGate, formatGateResult, getPrimitives, getPrimitiveManifest, getGateHistory } from './primitive-gate.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
@@ -2552,6 +2552,30 @@ bot.command('pantheon', async (ctx) => {
     if (!agentName) return ctx.reply('Usage: /pantheon clear <agent>');
     clearConversation(agentName, `tg-${ctx.from.id}`);
     ctx.reply(`Conversation with ${agentName} cleared.`);
+
+  } else if (sub === 'remember') {
+    const type = args[1]?.toLowerCase(); // decision, project, note
+    const content = args.slice(2).join(' ');
+    if (!type || !content || !['decision', 'project', 'note'].includes(type)) {
+      return ctx.reply('Usage: /pantheon remember <decision|project|note> <content>\nStores in Nyx\'s organizational memory.');
+    }
+    const entry = await addNyxMemory(type, type === 'project' ? { name: content.split(' ')[0], status: content.split(' ').slice(1).join(' ') || 'active' } : content);
+    ctx.reply(`Nyx remembers: [${type}] ${typeof entry.content === 'string' ? entry.content : entry.content.name}`);
+
+  } else if (sub === 'memory') {
+    const memory = await getNyxMemory();
+    let msg = `Nyx's Memory\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Decisions: ${memory.decisions.length}\n`;
+    msg += `Projects: ${Object.keys(memory.projects).length}\n`;
+    msg += `Notes: ${memory.notes.length}\n`;
+    if (memory.lastUpdated) msg += `Last updated: ${memory.lastUpdated.slice(0, 16)}\n`;
+    if (memory.decisions.length > 0) {
+      msg += `\nRecent decisions:\n`;
+      for (const d of memory.decisions.slice(-5)) {
+        msg += `  [${d.timestamp.slice(0, 10)}] ${d.content.slice(0, 80)}\n`;
+      }
+    }
+    ctx.reply(msg);
 
   } else if (sub === 'route') {
     const question = args.slice(1).join(' ');

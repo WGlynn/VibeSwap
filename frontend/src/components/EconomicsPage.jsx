@@ -383,12 +383,24 @@ export default function EconomicsPage() {
         ))}
       </div>
 
+      {/* Explore More */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: SECTIONS.length * (1 / PHI) + 0.3 }}
+        className="mt-10 flex flex-wrap justify-center gap-3"
+      >
+        <a href="/jul" className="text-xs font-mono px-3 py-1.5 rounded-full border border-matrix-600/30 text-matrix-400 hover:bg-matrix-600/10 transition-colors">JUL Token →</a>
+        <a href="/philosophy" className="text-xs font-mono px-3 py-1.5 rounded-full border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors">Philosophy →</a>
+        <a href="/covenants" className="text-xs font-mono px-3 py-1.5 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">Ten Covenants →</a>
+      </motion.div>
+
       {/* Footer */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: SECTIONS.length * (1 / PHI) + 0.5 }}
-        className="text-center mt-10"
+        className="text-center mt-6"
       >
         <p className="text-[10px] font-mono text-black-500">
           "We are not just building software. We are building the practices, patterns,

@@ -2292,4 +2292,236 @@ mod tests {
         assert!(AlertLevel::Watch < AlertLevel::Warning);
         assert!(AlertLevel::Warning < AlertLevel::Critical);
     }
+
+    // ============ Hardening Batch 7: Deep Edge Cases & Coverage Expansion ============
+
+    #[test]
+    fn test_arb_three_pools_all_equal() {
+        let pool = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 30);
+        let pools = vec![(id(1), &pool), (id(2), &pool), (id(3), &pool)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty(), "Three equal-priced pools should produce no arb");
+    }
+
+    #[test]
+    fn test_arb_two_pools_one_empty_reserve0() {
+        let pool_a = make_pool_data(0, 1_000_000 * PRECISION, 30);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 30);
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty(), "Pool with zero reserve0 should be skipped");
+    }
+
+    #[test]
+    fn test_arb_spread_calculation_matches_manual() {
+        // Pool A: price = 1.0, Pool B: price = 1.1 → spread = 10% = 1000 bps
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 0);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_100_000 * PRECISION, 0);
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert_eq!(arbs.len(), 1);
+        // spread_bps = (sell - buy) * 10000 / buy = 0.1 * 10000 = 1000
+        assert!(arbs[0].spread_bps >= 990 && arbs[0].spread_bps <= 1010,
+            "Spread should be ~1000 bps, got {}", arbs[0].spread_bps);
+    }
+
+    #[test]
+    fn test_rebalance_3x_price_move() {
+        // Price tripled → ~5.7% IL at 2x, even more at 3x
+        let signal = check_rebalance(
+            PRECISION,
+            3 * PRECISION,
+            100_000 * PRECISION,
+            0,
+            500,
+            2000,
+        ).unwrap();
+        // IL from 3x ≈ 13.4% → above 5% threshold but below 20% exit
+        assert!(signal.current_il_bps > 500);
+        assert!(signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::ReenterAtCurrentPrice);
+    }
+
+    #[test]
+    fn test_rebalance_50x_price_extreme() {
+        // Price 50x → extreme IL, must recommend exit
+        let signal = check_rebalance(
+            PRECISION,
+            50 * PRECISION,
+            100_000 * PRECISION,
+            0,
+            500,
+            2000,
+        ).unwrap();
+        assert!(signal.current_il_bps > 2000);
+        assert!(signal.should_rebalance);
+        assert_eq!(signal.action, RebalanceAction::ExitPosition);
+    }
+
+    #[test]
+    fn test_rebalance_add_liquidity_requires_fees() {
+        // Low IL + fees > 0 → AddLiquidity
+        // Low IL + fees = 0 → Hold
+        let with_fees = check_rebalance(
+            PRECISION, PRECISION, 100_000 * PRECISION,
+            1_000 * PRECISION, 500, 2000,
+        ).unwrap();
+        let without_fees = check_rebalance(
+            PRECISION, PRECISION, 100_000 * PRECISION,
+            0, 500, 2000,
+        ).unwrap();
+        assert_eq!(with_fees.action, RebalanceAction::AddLiquidity);
+        assert_eq!(without_fees.action, RebalanceAction::Hold);
+    }
+
+    #[test]
+    fn test_yield_two_sources_same_everything() {
+        // Two sources with identical params → both rank equal
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 500, tvl: 1_000_000, risk_score: 20 },
+            YieldSource { source_id: id(2), source_type: YieldType::LPFees, apy_bps: 500, tvl: 1_000_000, risk_score: 20 },
+        ];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.ranked_sources.len(), 2);
+        assert_eq!(rec.ranked_sources[0].2, rec.ranked_sources[1].2,
+            "Identical sources should have equal risk-adjusted scores");
+    }
+
+    #[test]
+    fn test_yield_risk_score_1() {
+        // Minimal risk (risk_score = 1) → very small penalty
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 1000, tvl: 1_000_000, risk_score: 1 },
+        ];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        // risk_penalty = PRECISION + 1 * PRECISION / 100 = 1.01 * PRECISION
+        // adjusted ≈ 1000 * PRECISION / 1.01 ≈ 990 * PRECISION
+        assert!(rec.risk_adjusted_score > 900 * PRECISION);
+    }
+
+    #[test]
+    fn test_liquidation_single_underwater_zero_gas() {
+        let vaults = vec![(50_000 * PRECISION, 100_000 * PRECISION, 8000u128)];
+        let opps = find_liquidations(&vaults, 500, 0);
+        assert_eq!(opps.len(), 1);
+        assert!(opps[0].estimated_profit > 0);
+        assert!(opps[0].urgency > 50);
+    }
+
+    #[test]
+    fn test_liquidation_very_high_incentive() {
+        // 50% incentive (5000 bps) — seizable capped by collateral
+        let vaults = vec![(80_000 * PRECISION, 100_000 * PRECISION, 8000u128)];
+        let opps = find_liquidations(&vaults, 5000, 0);
+        assert_eq!(opps.len(), 1);
+        // seizable = debt * 1.5 = 150K, but capped at collateral 80K
+        assert!(opps[0].seizable_collateral <= 80_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_liquidation_threshold_1_bps() {
+        // Very low threshold (1 bps = 0.01%) → HF = col * 1 * P / (debt * 10000)
+        // = 80K * 1 / (100K * 10000) ≈ 0.00000008 → deeply underwater
+        let vaults = vec![(80_000 * PRECISION, 100_000 * PRECISION, 1u128)];
+        let opps = find_liquidations(&vaults, 500, 0);
+        assert_eq!(opps.len(), 1);
+        assert!(opps[0].health_factor < PRECISION / 1000);
+        assert!(opps[0].urgency > 90);
+    }
+
+    #[test]
+    fn test_alerts_large_number_of_positions() {
+        // 50 positions across all alert levels
+        let positions: Vec<([u8; 32], u64, AlertReason)> = (0..50u8).map(|i| {
+            let metric = (i as u64) * 200; // 0, 200, 400, ..., 9800
+            (id(i), metric, AlertReason::HighUtilization)
+        }).collect();
+        let alerts = check_risk_alerts(&positions, 3000, 6000, 9000);
+        // Only positions with metric >= 3000 should be included
+        let expected = positions.iter().filter(|p| p.1 >= 3000).count();
+        assert_eq!(alerts.len(), expected);
+    }
+
+    #[test]
+    fn test_alerts_all_watch_level() {
+        let positions = vec![
+            (id(1), 3000u64, AlertReason::HighUtilization),
+            (id(2), 4000u64, AlertReason::LowHealthFactor),
+            (id(3), 5999u64, AlertReason::HighConcentration),
+        ];
+        let alerts = check_risk_alerts(&positions, 3000, 6000, 9000);
+        assert_eq!(alerts.len(), 3);
+        for alert in &alerts {
+            assert_eq!(alert.level, AlertLevel::Watch);
+        }
+    }
+
+    #[test]
+    fn test_alerts_all_warning_level() {
+        let positions = vec![
+            (id(1), 6000u64, AlertReason::HighUtilization),
+            (id(2), 7000u64, AlertReason::LowHealthFactor),
+            (id(3), 8999u64, AlertReason::HighConcentration),
+        ];
+        let alerts = check_risk_alerts(&positions, 3000, 6000, 9000);
+        assert_eq!(alerts.len(), 3);
+        for alert in &alerts {
+            assert_eq!(alert.level, AlertLevel::Warning);
+        }
+    }
+
+    #[test]
+    fn test_arb_equal_reserves_different_fees() {
+        // Same reserves → same price → no arb regardless of fees
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 5);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 50);
+        let pools = vec![(id(1), &pool_a), (id(2), &pool_b)];
+        let arbs = find_arbitrage(&pools, 0);
+        assert!(arbs.is_empty(), "Same price should produce no arb regardless of fee differences");
+    }
+
+    #[test]
+    fn test_yield_type_variants_used() {
+        // All four yield types should work
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 100, tvl: 1_000_000, risk_score: 10 },
+            YieldSource { source_id: id(2), source_type: YieldType::LendingDeposit, apy_bps: 200, tvl: 1_000_000, risk_score: 10 },
+            YieldSource { source_id: id(3), source_type: YieldType::InsurancePremium, apy_bps: 300, tvl: 1_000_000, risk_score: 10 },
+            YieldSource { source_id: id(4), source_type: YieldType::StakingRewards, apy_bps: 400, tvl: 1_000_000, risk_score: 10 },
+        ];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.ranked_sources.len(), 4);
+    }
+
+    #[test]
+    fn test_liquidation_ten_vaults_mixed() {
+        // 10 vaults: 5 healthy, 5 underwater
+        let mut vaults = Vec::new();
+        for i in 0..5 {
+            vaults.push((200_000 * PRECISION, 100_000 * PRECISION, 8000u128)); // healthy
+        }
+        for i in 0..5 {
+            vaults.push(((50_000 + i as u128 * 5_000) * PRECISION, 100_000 * PRECISION, 8000u128)); // underwater
+        }
+        let opps = find_liquidations(&vaults, 500, 10 * PRECISION);
+        assert_eq!(opps.len(), 5, "Exactly 5 underwater vaults should be liquidatable");
+        for w in opps.windows(2) {
+            assert!(w[0].estimated_profit >= w[1].estimated_profit);
+        }
+    }
+
+    #[test]
+    fn test_rebalance_signal_position_value_matches_il_lp_value() {
+        // RebalanceSignal.position_value should equal the IL calculation's lp_value
+        let signal = check_rebalance(
+            PRECISION,
+            3 * PRECISION,
+            100_000 * PRECISION,
+            5_000 * PRECISION,
+            500,
+            2000,
+        ).unwrap();
+        // rebalanced_value = position_value + accrued_fees
+        assert_eq!(signal.rebalanced_value, signal.position_value + 5_000 * PRECISION);
+    }
 }

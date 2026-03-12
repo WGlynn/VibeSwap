@@ -26,6 +26,7 @@ pub mod flashloan;
 pub mod gauge;
 pub mod governance;
 pub mod identity;
+pub mod incentive;
 pub mod indexer;
 pub mod insurance;
 pub mod keeper;

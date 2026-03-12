@@ -71,10 +71,10 @@ services:
     # No ports exposed externally — only accessible within Docker network
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -173,7 +173,7 @@ services:
       - mind-network
     depends_on:
       ollama:
-        condition: service_healthy
+        condition: service_started  # Soft dep — shard falls back to Claude API if Ollama unhealthy
     logging:
       driver: json-file
       options:
@@ -211,8 +211,10 @@ services:
     networks:
       - mind-network
     depends_on:
-      - shard-0
-      - ollama
+      shard-0:
+        condition: service_started
+      ollama:
+        condition: service_started  # Soft dep — falls back to API if Ollama unavailable
     logging:
       driver: json-file
       options:

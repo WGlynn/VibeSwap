@@ -35,7 +35,7 @@ else
     # Shallow sparse clone — downloads only what Jarvis needs (~5MB vs 338MB)
     timeout $GIT_TIMEOUT git clone --depth=1 --filter=blob:none --sparse "$REPO_URL" "$REPO_DIR" 2>&1 && {
         cd "$REPO_DIR"
-        git sparse-checkout set CLAUDE.md .claude/ jarvis-bot/memory jarvis-bot/data 2>&1 || true
+        git sparse-checkout set --skip-checks CLAUDE.md .claude/ jarvis-bot/memory jarvis-bot/data 2>&1 || true
         cd /app
         echo "Sparse checkout configured — only context files downloaded"
     } || {

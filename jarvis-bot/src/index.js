@@ -23,6 +23,22 @@ import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
+// ============ Module Health Registry ============
+// Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
+// MUST be before all dynamic imports so registerModule() is available in catch blocks
+const moduleHealth = new Map(); // name → { ok: boolean, error?: string }
+function registerModule(name, ok, error) {
+  moduleHealth.set(name, { ok, error: error || undefined });
+}
+export function getModuleHealth() {
+  const result = { loaded: [], failed: [] };
+  for (const [name, status] of moduleHealth) {
+    if (status.ok) result.loaded.push(name);
+    else result.failed.push({ name, error: status.error });
+  }
+  return result;
+}
+
 // Shard learnings — graceful fallback if module fails to load
 let initShardLearnings, readLearnings, archiveExpired, queryLearnings, getRecentLearnings, getShardSyncStatus;
 try {
@@ -139,21 +155,6 @@ import { initProactive, flushProactive, stopProactive, enableProactive, disableP
 // These modules were written by background agents and have crashed the bot on import.
 // Wrap in try/catch so a single broken module doesn't take down the entire bot.
 const stubFn = (name) => async () => `${name}: module not loaded. Bot is recovering.`;
-
-// ============ Module Health Registry ============
-// Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
-const moduleHealth = new Map(); // name → { ok: boolean, error?: string }
-function registerModule(name, ok, error) {
-  moduleHealth.set(name, { ok, error: error || undefined });
-}
-export function getModuleHealth() {
-  const result = { loaded: [], failed: [] };
-  for (const [name, status] of moduleHealth) {
-    if (status.ok) result.loaded.push(name);
-    else result.failed.push({ name, error: status.error });
-  }
-  return result;
-}
 
 let getVibePrice, getPoolStats, getEmissionRate, getAuctionStatus, getShapleyRewards, getStakingInfo, getLPPositions, getProtocolHealth;
 try {

@@ -435,43 +435,23 @@ export default function RewardsPage() {
                 </div>
               )}
 
-              {/* All tiers */}
               <div className="space-y-2">
                 {loyaltyTiers.map((tier, i) => {
                   const isActive = tier.name === currentTier
                   const isPast = i < currentTierIndex
-
+                  const bg = isActive ? 'bg-yellow-500/10 border-yellow-500/30' : isPast ? 'bg-green-500/5 border-green-500/15' : 'bg-black/20 border-black-700/30'
                   return (
-                    <motion.div
-                      key={tier.name}
-                      initial={{ opacity: 0, x: -12 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: i * (0.08 / PHI), duration: 1 / PHI }}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
-                        isActive
-                          ? 'bg-yellow-500/10 border-yellow-500/30'
-                          : isPast
-                          ? 'bg-green-500/5 border-green-500/15'
-                          : 'bg-black/20 border-black-700/30'
-                      }`}
-                    >
+                    <motion.div key={tier.name} initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * (0.08 / PHI), duration: 1 / PHI }} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${bg}`}>
                       <div className="flex items-center gap-3">
                         <TierBadge tier={tier.name} size="sm" />
                         <div>
-                          <p className={`text-xs font-mono font-bold ${isActive ? 'text-yellow-400' : isPast ? 'text-green-400/70' : 'text-black-400'}`}>
-                            {tier.name}
-                          </p>
+                          <p className={`text-xs font-mono font-bold ${isActive ? 'text-yellow-400' : isPast ? 'text-green-400/70' : 'text-black-400'}`}>{tier.name}</p>
                           <p className="text-[10px] font-mono text-black-500">{tier.benefits}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className={`text-sm font-mono font-bold ${isActive ? 'text-yellow-400' : 'text-black-400'}`}>
-                          {tier.multiplier.toFixed(1)}x
-                        </span>
-                        <p className="text-[10px] font-mono text-black-500">
-                          {tier.minDays === 0 ? 'Start' : `${tier.minDays}+ days`}
-                        </p>
+                        <span className={`text-sm font-mono font-bold ${isActive ? 'text-yellow-400' : 'text-black-400'}`}>{tier.multiplier.toFixed(1)}x</span>
+                        <p className="text-[10px] font-mono text-black-500">{tier.minDays === 0 ? 'Start' : `${tier.minDays}+ days`}</p>
                       </div>
                     </motion.div>
                   )

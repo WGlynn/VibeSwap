@@ -34,6 +34,7 @@ import { getGraphStats, getAuthorAttribution } from './passive-attribution.js';
 import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStructured, getMyBets, getPredictorLeaderboard, getLeaderboardStructured } from './tools-predictions.js';
 import { createHmac } from 'crypto';
 import { getRosettaView, translate, translateToAll, getLexicon, TEN_COVENANTS, COVENANT_HASH } from './rosetta.js';
+import { createPrimitive, getPrimitive, listPrimitives, citePrimitive, viewPrimitive, getInfoFiStats, getAuthorStats, searchPrimitives } from './infofi.js';
 
 // ============ Rate Limiter ============
 
@@ -1216,6 +1217,89 @@ export async function handleWebRequest(req, res, pathname) {
       hash: COVENANT_HASH,
       count: TEN_COVENANTS.length,
     });
+    return true;
+  }
+
+  // ============ GET /web/infofi/stats ============
+  if (pathname === '/web/infofi/stats' && req.method === 'GET') {
+    try {
+      jsonResponse(res, 200, getInfoFiStats());
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  // ============ GET /web/infofi/primitives ============
+  if (pathname === '/web/infofi/primitives' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const type = url.searchParams.get('type') || undefined;
+      const author = url.searchParams.get('author') || undefined;
+      const limit = parseInt(url.searchParams.get('limit')) || 20;
+      const offset = parseInt(url.searchParams.get('offset')) || 0;
+      // Normalize sort values from frontend
+      let sort = url.searchParams.get('sort') || 'newest';
+      const sortMap = { most_cited: 'citations', highest_price: 'price', most_viewed: 'views', newest: 'newest' };
+      sort = sortMap[sort] || sort;
+      jsonResponse(res, 200, listPrimitives({ type, author, sort, limit, offset }));
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  // ============ POST /web/infofi/primitives ============
+  if (pathname === '/web/infofi/primitives' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const result = createPrimitive(body);
+      jsonResponse(res, 201, result);
+    } catch (err) {
+      jsonResponse(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  // ============ POST /web/infofi/cite ============
+  if (pathname === '/web/infofi/cite' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      if (!body.primitiveId || !body.citingAuthor) {
+        jsonResponse(res, 400, { error: 'Missing primitiveId or citingAuthor' });
+        return true;
+      }
+      const result = citePrimitive(body.primitiveId, body.citingAuthor);
+      jsonResponse(res, 200, result);
+    } catch (err) {
+      jsonResponse(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  // ============ GET /web/infofi/search ============
+  if (pathname === '/web/infofi/search' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const q = url.searchParams.get('q') || '';
+      const limit = parseInt(url.searchParams.get('limit')) || 20;
+      const offset = parseInt(url.searchParams.get('offset')) || 0;
+      const results = searchPrimitives(q);
+      jsonResponse(res, 200, { primitives: results.slice(offset, offset + limit), total: results.length });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  // ============ GET /web/infofi/author/:author ============
+  if (pathname.startsWith('/web/infofi/author/') && req.method === 'GET') {
+    try {
+      const author = decodeURIComponent(pathname.slice('/web/infofi/author/'.length));
+      jsonResponse(res, 200, getAuthorStats(author));
+    } catch (err) {
+      jsonResponse(res, 500, { error: err.message });
+    }
     return true;
   }
 

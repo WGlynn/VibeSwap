@@ -273,6 +273,7 @@ import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markP
 import { handleWebRequest } from './web-api.js';
 import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo, getUserTier, checkTieredBudget } from './compute-economics.js';
 import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner, getTotalSupply, getEscapeVelocity, getHashCostIndex } from './mining.js';
+import { initInfoFi, shutdownInfoFi } from './infofi.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
@@ -6785,6 +6786,7 @@ async function main() {
   initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
   await initComputeEconomics();
   await initMining();
+  await initInfoFi();
   await initDeepStorage();
   await initHell();
   await initUserMemory();

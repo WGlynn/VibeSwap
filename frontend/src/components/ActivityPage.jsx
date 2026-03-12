@@ -1,439 +1,557 @@
-import { useState, useEffect } from 'react'
-import { useWallet } from '../hooks/useWallet'
-import { useDeviceWallet } from '../hooks/useDeviceWallet'
-import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
+import { useState, useMemo } from 'react'
+import { motion } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
-import PulseIndicator from './ui/PulseIndicator'
+import PageHero from './ui/PageHero'
+import StatCard from './ui/StatCard'
 
 /**
- * Activity/Transaction History Page
- * Shows transaction history from block explorers
- * Currently displays demo data for demonstration purposes
+ * ActivityPage — Polished transaction history with date grouping,
+ * filter tabs, stat overview, and CSV export placeholder.
+ * Uses seeded PRNG for deterministic mock data across renders.
  *
- * @version 1.0.0
+ * @version 2.0.0
  */
 
-// Demo transaction history for demonstration
-const DEMO_TRANSACTIONS = [
-  {
-    id: 'tx-001',
-    hash: '0x1234...abcd',
-    fullHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-    type: 'swap',
-    from: 'ETH',
-    to: 'USDC',
-    fromAmount: '0.5',
-    toAmount: '1,245.50',
-    status: 'confirmed',
-    timestamp: Date.now() - 1000 * 60 * 15, // 15 mins ago
-    gasUsed: '0.002 ETH',
-    blockNumber: 19234567,
-    chain: 'Ethereum',
-    explorerUrl: 'https://etherscan.io/tx/0x1234567890abcdef',
-  },
-  {
-    id: 'tx-002',
-    hash: '0x5678...efgh',
-    fullHash: '0x567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234',
-    type: 'swap',
-    from: 'USDC',
-    to: 'ARB',
-    fromAmount: '500.00',
-    toAmount: '312.45',
-    status: 'confirmed',
-    timestamp: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
-    gasUsed: '0.0008 ETH',
-    blockNumber: 19234123,
-    chain: 'Arbitrum',
-    explorerUrl: 'https://arbiscan.io/tx/0x567890abcdef',
-  },
-  {
-    id: 'tx-003',
-    hash: '0x9abc...ijkl',
-    fullHash: '0x9abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678',
-    type: 'receive',
-    from: 'External',
-    to: 'ETH',
-    fromAmount: null,
-    toAmount: '1.25',
-    status: 'confirmed',
-    timestamp: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-    gasUsed: null,
-    blockNumber: 19230000,
-    chain: 'Ethereum',
-    explorerUrl: 'https://etherscan.io/tx/0x9abcdef12345',
-  },
-  {
-    id: 'tx-004',
-    hash: '0xdef0...mnop',
-    fullHash: '0xdef01234567890abcdef1234567890abcdef1234567890abcdef1234567890ab',
-    type: 'send',
-    from: 'USDC',
-    to: '0x742d...3abc',
-    fromAmount: '100.00',
-    toAmount: null,
-    status: 'confirmed',
-    timestamp: Date.now() - 1000 * 60 * 60 * 24 * 3, // 3 days ago
-    gasUsed: '0.0005 ETH',
-    blockNumber: 19220000,
-    chain: 'Base',
-    explorerUrl: 'https://basescan.org/tx/0xdef0123456',
-  },
-  {
-    id: 'tx-005',
-    hash: '0x1111...2222',
-    fullHash: '0x11112222333344445555666677778888999900001111222233334444555566667777',
-    type: 'swap',
-    from: 'ETH',
-    to: 'WBTC',
-    fromAmount: '2.0',
-    toAmount: '0.085',
-    status: 'pending',
-    timestamp: Date.now() - 1000 * 60 * 2, // 2 mins ago
-    gasUsed: null,
-    blockNumber: null,
-    chain: 'Ethereum',
-    explorerUrl: 'https://etherscan.io/tx/0x111122223333',
-  },
+// ============ Constants ============
+
+const PHI = 1.618033988749895
+const STAGGER_STEP = 1 / (PHI * PHI * PHI * PHI)  // ~0.146s
+const FADE_DURATION = 1 / (PHI * PHI)               // ~0.382s
+
+const FILTER_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'swap', label: 'Swaps' },
+  { id: 'bridge', label: 'Bridges' },
+  { id: 'lp', label: 'LP' },
+  { id: 'governance', label: 'Governance' },
+  { id: 'reward', label: 'Rewards' },
 ]
 
-// Chain explorer URLs
+const CHAINS = ['Ethereum', 'Arbitrum', 'Base', 'Optimism']
 const EXPLORERS = {
-  'Ethereum': 'https://etherscan.io',
-  'Arbitrum': 'https://arbiscan.io',
-  'Optimism': 'https://optimistic.etherscan.io',
-  'Base': 'https://basescan.org',
-  'Polygon': 'https://polygonscan.com',
+  Ethereum: 'https://etherscan.io/tx/',
+  Arbitrum: 'https://arbiscan.io/tx/',
+  Base: 'https://basescan.org/tx/',
+  Optimism: 'https://optimistic.etherscan.io/tx/',
 }
 
-const LIVE_FEED_ITEMS = [
-  { user: '0x7a2d...f1c3', action: 'swapped', detail: '2.5 ETH for 6,230 USDC', chain: 'Ethereum', time: '2s ago' },
-  { user: '0xb4e1...9a02', action: 'swapped', detail: '1,000 USDC for 625 ARB', chain: 'Arbitrum', time: '5s ago' },
-  { user: '0xf392...c7d8', action: 'added liquidity', detail: '5 ETH + 12,500 USDC', chain: 'Base', time: '8s ago' },
-  { user: '0x1d5c...e4b6', action: 'bridged', detail: '3,000 USDC to Optimism', chain: 'Ethereum', time: '12s ago' },
-  { user: '0x93af...2d71', action: 'swapped', detail: '0.15 WBTC for 4.2 ETH', chain: 'Ethereum', time: '15s ago' },
-  { user: '0xc8d4...5f09', action: 'removed liquidity', detail: '2.1 ETH + 5,250 USDC', chain: 'Arbitrum', time: '18s ago' },
-]
+const STATUS_OPTIONS = ['confirmed', 'confirmed', 'confirmed', 'confirmed', 'confirmed', 'confirmed', 'pending', 'failed']
 
-function LiveActivityTicker() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+const TOKEN_PAIRS = {
+  swap: [
+    { from: 'ETH', to: 'USDC', fromAmt: 1.25, toAmt: 3112.50, usd: 3112.50 },
+    { from: 'USDC', to: 'ARB', fromAmt: 500.00, toAmt: 412.30, usd: 500.00 },
+    { from: 'WBTC', to: 'ETH', fromAmt: 0.085, toAmt: 2.34, usd: 5832.00 },
+    { from: 'ETH', to: 'OP', fromAmt: 0.75, toAmt: 615.20, usd: 1868.25 },
+    { from: 'ARB', to: 'USDC', fromAmt: 200.00, toAmt: 242.80, usd: 242.80 },
+  ],
+  bridge: [
+    { from: 'ETH', to: 'ETH', fromAmt: 2.00, toAmt: 2.00, usd: 4980.00 },
+    { from: 'USDC', to: 'USDC', fromAmt: 1000.00, toAmt: 1000.00, usd: 1000.00 },
+  ],
+  lp: [
+    { from: 'ETH', to: 'USDC', fromAmt: 1.50, toAmt: 3735.00, usd: 7470.00 },
+    { from: 'WBTC', to: 'ETH', fromAmt: 0.10, toAmt: 2.75, usd: 13720.00 },
+  ],
+  governance: [
+    { from: 'VIBE', to: null, fromAmt: 5000, toAmt: null, usd: 0 },
+    { from: 'VIBE', to: null, fromAmt: 12000, toAmt: null, usd: 0 },
+  ],
+  reward: [
+    { from: null, to: 'VIBE', fromAmt: null, toAmt: 245.80, usd: 245.80 },
+    { from: null, to: 'USDC', fromAmt: null, toAmt: 18.42, usd: 18.42 },
+  ],
+}
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % LIVE_FEED_ITEMS.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [])
+const ACTION_LABELS = {
+  swap: 'Swap',
+  bridge: 'Bridge',
+  lp: 'Add Liquidity',
+  governance: 'Vote',
+  reward: 'Claim Reward',
+}
 
-  const item = LIVE_FEED_ITEMS[currentIndex]
+// ============ Seeded PRNG ============
+
+function seededRandom(seed) {
+  let s = seed
+  return () => {
+    s = (s * 16807) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
+
+// ============ Mock Transaction Generator ============
+
+function generateMockTransactions() {
+  const rng = seededRandom(314159)
+  const now = Date.now()
+  const types = ['swap', 'swap', 'swap', 'swap', 'swap', 'bridge', 'bridge', 'lp', 'lp', 'governance', 'reward']
+  const txs = []
+
+  // Time offsets in ms to distribute across Today, Yesterday, This Week, Earlier
+  const timeOffsets = [
+    1000 * 60 * 8,              // 8 min ago — Today
+    1000 * 60 * 45,             // 45 min ago — Today
+    1000 * 60 * 60 * 3,        // 3 hours ago — Today
+    1000 * 60 * 60 * 7,        // 7 hours ago — Today
+    1000 * 60 * 60 * 26,       // ~1 day ago — Yesterday
+    1000 * 60 * 60 * 30,       // ~1.25 days ago — Yesterday
+    1000 * 60 * 60 * 38,       // ~1.6 days ago — Yesterday
+    1000 * 60 * 60 * 72,       // 3 days ago — This Week
+    1000 * 60 * 60 * 96,       // 4 days ago — This Week
+    1000 * 60 * 60 * 120,      // 5 days ago — This Week
+    1000 * 60 * 60 * 148,      // ~6 days ago — This Week
+    1000 * 60 * 60 * 24 * 9,   // 9 days ago — Earlier
+    1000 * 60 * 60 * 24 * 14,  // 14 days ago — Earlier
+    1000 * 60 * 60 * 24 * 21,  // 21 days ago — Earlier
+    1000 * 60 * 60 * 24 * 30,  // 30 days ago — Earlier
+  ]
+
+  for (let i = 0; i < 15; i++) {
+    const type = types[Math.floor(rng() * types.length)]
+    const pairs = TOKEN_PAIRS[type]
+    const pair = pairs[Math.floor(rng() * pairs.length)]
+    const chain = CHAINS[Math.floor(rng() * CHAINS.length)]
+    const status = STATUS_OPTIONS[Math.floor(rng() * STATUS_OPTIONS.length)]
+    const batchNum = type === 'swap' ? 18400 + Math.floor(rng() * 600) : null
+    const hash = '0x' + Array.from({ length: 64 }, () =>
+      '0123456789abcdef'[Math.floor(rng() * 16)]
+    ).join('')
+
+    txs.push({
+      id: `tx-${String(i + 1).padStart(3, '0')}`,
+      type,
+      hash,
+      shortHash: hash.slice(0, 6) + '...' + hash.slice(-4),
+      from: pair.from,
+      to: pair.to,
+      fromAmount: pair.fromAmt,
+      toAmount: pair.toAmt,
+      usd: pair.usd * (0.85 + rng() * 0.3),
+      status,
+      timestamp: now - timeOffsets[i],
+      chain,
+      batchNumber: batchNum,
+      explorerUrl: EXPLORERS[chain] + hash,
+    })
+  }
+
+  return txs
+}
+
+// ============ Helpers ============
+
+function formatTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000)
+  if (seconds < 60) return 'Just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
+  return new Date(timestamp).toLocaleDateString()
+}
+
+function getDateGroup(timestamp) {
+  const now = new Date()
+  const date = new Date(timestamp)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterdayStart = todayStart - 86400000
+  const weekStart = todayStart - 6 * 86400000
+
+  if (timestamp >= todayStart) return 'Today'
+  if (timestamp >= yesterdayStart) return 'Yesterday'
+  if (timestamp >= weekStart) return 'This Week'
+  return 'Earlier'
+}
+
+function formatUSD(value) {
+  if (value >= 10000) return '$' + (value / 1000).toFixed(1) + 'k'
+  if (value >= 1) return '$' + value.toFixed(2)
+  return '$0.00'
+}
+
+// ============ Type Icons ============
+
+function TypeIcon({ type }) {
+  const configs = {
+    swap: {
+      bg: 'bg-green-500/10',
+      color: 'text-green-400',
+      path: 'M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4',
+    },
+    bridge: {
+      bg: 'bg-cyan-500/10',
+      color: 'text-cyan-400',
+      path: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4',
+    },
+    lp: {
+      bg: 'bg-purple-500/10',
+      color: 'text-purple-400',
+      path: 'M12 6v6m0 0v6m0-6h6m-6 0H6',
+    },
+    governance: {
+      bg: 'bg-amber-500/10',
+      color: 'text-amber-400',
+      path: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+    },
+    reward: {
+      bg: 'bg-yellow-500/10',
+      color: 'text-yellow-400',
+      path: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    },
+  }
+  const c = configs[type] || configs.swap
 
   return (
-    <div className="mb-4 px-3 py-2 rounded-lg bg-black-800/80 border border-black-700 overflow-hidden">
-      <div className="flex items-center gap-2 text-xs">
-        <span className="flex-shrink-0 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-matrix-500 animate-pulse" />
-          <span className="text-matrix-400 font-semibold">LIVE</span>
-        </span>
-        <span className="text-black-400 truncate">
-          <span className="text-black-300 font-mono">{item.user}</span>
-          {' '}{item.action}{' '}
-          <span className="text-white">{item.detail}</span>
-          {' on '}
-          <span className="text-terminal-400">{item.chain}</span>
-          {' \u00B7 '}
-          <span className="text-black-500">{item.time}</span>
-        </span>
-      </div>
+    <div className={`w-10 h-10 rounded-full ${c.bg} flex items-center justify-center flex-shrink-0`}>
+      <svg className={`w-5 h-5 ${c.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={c.path} />
+      </svg>
     </div>
   )
 }
 
-function ActivityPage() {
-  const { isConnected: isExternalConnected, address: externalAddress } = useWallet()
-  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
+// ============ Status Badge ============
 
-  const isConnected = isExternalConnected || isDeviceConnected
-  const address = externalAddress || deviceAddress
-
-  const [transactions, setTransactions] = useState(DEMO_TRANSACTIONS)
-  const [filter, setFilter] = useState('all') // all, swaps, sends, receives
-  const [isLoading, setIsLoading] = useState(false)
-
-  // Filter transactions
-  const filteredTransactions = transactions.filter(tx => {
-    if (filter === 'all') return true
-    if (filter === 'swaps') return tx.type === 'swap'
-    if (filter === 'sends') return tx.type === 'send'
-    if (filter === 'receives') return tx.type === 'receive'
-    return true
-  })
-
-  // Format relative time
-  const formatTime = (timestamp) => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000)
-
-    if (seconds < 60) return 'Just now'
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
-    return new Date(timestamp).toLocaleDateString()
+function StatusBadge({ status }) {
+  const configs = {
+    confirmed: { bg: 'bg-green-500/15', text: 'text-green-400', dot: 'bg-green-400', label: 'Confirmed' },
+    pending: { bg: 'bg-yellow-500/15', text: 'text-yellow-400', dot: 'bg-yellow-400 animate-pulse', label: 'Pending' },
+    failed: { bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-400', label: 'Failed' },
   }
-
-  // Get status badge
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return (
-          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 text-xs rounded-full bg-matrix-500/20 text-matrix-400">
-            <PulseIndicator color="matrix" size="sm" active={false} />
-            <span>Confirmed</span>
-          </span>
-        )
-      case 'pending':
-        return (
-          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
-            <PulseIndicator color="warning" size="sm" />
-            <span>Pending</span>
-          </span>
-        )
-      case 'failed':
-        return (
-          <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
-            Failed
-          </span>
-        )
-      default:
-        return null
-    }
-  }
-
-  // Get transaction icon
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'swap':
-        return (
-          <div className="w-10 h-10 rounded-full bg-matrix-500/10 flex items-center justify-center">
-            <svg className="w-5 h-5 text-matrix-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-          </div>
-        )
-      case 'send':
-        return (
-          <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-            </svg>
-          </div>
-        )
-      case 'receive':
-        return (
-          <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-            <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-            </svg>
-          </div>
-        )
-      default:
-        return (
-          <div className="w-10 h-10 rounded-full bg-black-700 flex items-center justify-center">
-            <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-        )
-    }
-  }
-
-  if (!isConnected) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black-800 flex items-center justify-center">
-            <svg className="w-8 h-8 text-black-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-white mb-2">No Wallet Connected</h2>
-          <p className="text-black-400">Connect your wallet to view transaction history</p>
-        </div>
-      </div>
-    )
-  }
+  const c = configs[status] || configs.confirmed
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Live Activity Feed Ticker */}
-      <LiveActivityTicker />
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono rounded-full ${c.bg} ${c.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
+    </span>
+  )
+}
 
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1 text-5d">Activity</h1>
-        <p className="text-black-400 text-sm">Your transaction history</p>
-      </div>
+// ============ Transaction Row ============
 
-      {/* Demo Notice */}
-      <div className="mb-4 p-3 rounded-lg bg-terminal-500/10 border border-terminal-500/20">
-        <div className="flex items-start space-x-2">
-          <svg className="w-5 h-5 text-terminal-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+function TransactionRow({ tx, index }) {
+  const description = useMemo(() => {
+    switch (tx.type) {
+      case 'swap':
+        return `${tx.fromAmount} ${tx.from} → ${tx.toAmount?.toFixed(2)} ${tx.to}`
+      case 'bridge':
+        return `${tx.fromAmount} ${tx.from} → ${tx.chain}`
+      case 'lp':
+        return `${tx.fromAmount} ${tx.from} + ${tx.toAmount?.toFixed(2)} ${tx.to}`
+      case 'governance':
+        return `${tx.fromAmount?.toLocaleString()} ${tx.from} delegated`
+      case 'reward':
+        return `+${tx.toAmount?.toFixed(2)} ${tx.to} claimed`
+      default:
+        return ''
+    }
+  }, [tx])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * STAGGER_STEP, duration: FADE_DURATION, ease: [0.25, 0.1, 1 / PHI, 1] }}
+    >
+      <GlassCard className="p-3 sm:p-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Type Icon */}
+          <TypeIcon type={tx.type} />
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-semibold text-white">{ACTION_LABELS[tx.type]}</span>
+              <StatusBadge status={tx.status} />
+              {tx.batchNumber && (
+                <span className="hidden sm:inline text-[10px] font-mono text-black-500 bg-black-800 px-1.5 py-0.5 rounded">
+                  Batch #{tx.batchNumber}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-black-400 truncate">{description}</p>
+            <div className="flex items-center gap-2 mt-1 text-[10px] text-black-500">
+              <span className="font-mono">{tx.chain}</span>
+              <span className="w-0.5 h-0.5 rounded-full bg-black-600" />
+              <span>{formatTimeAgo(tx.timestamp)}</span>
+              {tx.batchNumber && (
+                <span className="sm:hidden">
+                  <span className="w-0.5 h-0.5 rounded-full bg-black-600 inline-block mx-1" />
+                  Batch #{tx.batchNumber}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Right Side: Value + Explorer Link */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="text-right">
+              <div className="text-sm font-mono font-semibold text-white">
+                {tx.usd > 0 ? formatUSD(tx.usd) : '--'}
+              </div>
+              <div className="text-[10px] font-mono text-black-500">
+                {tx.shortHash}
+              </div>
+            </div>
+            <a
+              href={tx.explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg hover:bg-black-700/60 transition-colors"
+              title="View on Explorer"
+            >
+              <svg className="w-4 h-4 text-black-500 hover:text-black-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </GlassCard>
+    </motion.div>
+  )
+}
+
+// ============ Empty State ============
+
+function EmptyState({ filter }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: FADE_DURATION }}
+    >
+      <GlassCard className="py-16 px-6 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black-800 flex items-center justify-center">
+          <svg className="w-8 h-8 text-black-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <div>
-            <p className="text-sm text-terminal-400">Demo Mode</p>
-            <p className="text-xs text-black-400 mt-0.5">
-              Showing sample transactions. Real transaction history from block explorers coming soon.
-            </p>
-          </div>
         </div>
-      </div>
+        <h3 className="text-lg font-semibold text-white mb-1">No transactions found</h3>
+        <p className="text-sm text-black-500 max-w-xs mx-auto">
+          {filter === 'all'
+            ? 'Your transaction history will appear here once you start trading.'
+            : `No ${filter} transactions yet. Try a different filter or start trading.`}
+        </p>
+      </GlassCard>
+    </motion.div>
+  )
+}
 
-      {/* Filter Tabs */}
-      <div className="flex space-x-2 mb-4 overflow-x-auto pb-2">
-        {[
-          { id: 'all', label: 'All' },
-          { id: 'swaps', label: 'Swaps' },
-          { id: 'sends', label: 'Sent' },
-          { id: 'receives', label: 'Received' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setFilter(tab.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === tab.id
-                ? 'bg-matrix-500/20 text-matrix-400'
-                : 'bg-black-800 text-black-400 hover:bg-black-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+// ============ Main Component ============
 
-      {/* Transaction List */}
-      <StaggerContainer className="space-y-3">
+function ActivityPage() {
+  const [activeFilter, setActiveFilter] = useState('all')
+
+  // Generate deterministic mock transactions once
+  const allTransactions = useMemo(() => generateMockTransactions(), [])
+
+  // Filter transactions
+  const filteredTransactions = useMemo(() => {
+    if (activeFilter === 'all') return allTransactions
+    return allTransactions.filter(tx => tx.type === activeFilter)
+  }, [allTransactions, activeFilter])
+
+  // Group by date
+  const groupedTransactions = useMemo(() => {
+    const groups = {}
+    const order = ['Today', 'Yesterday', 'This Week', 'Earlier']
+    for (const label of order) groups[label] = []
+    for (const tx of filteredTransactions) {
+      const group = getDateGroup(tx.timestamp)
+      groups[group].push(tx)
+    }
+    return order.map(label => ({ label, txs: groups[label] })).filter(g => g.txs.length > 0)
+  }, [filteredTransactions])
+
+  // Compute stats from all transactions (not filtered)
+  const stats = useMemo(() => {
+    const confirmed = allTransactions.filter(t => t.status === 'confirmed')
+    const swaps = confirmed.filter(t => t.type === 'swap')
+    const totalVolume = confirmed.reduce((s, t) => s + (t.usd || 0), 0)
+    const mevSaved = swaps.length * 12.40  // Avg MEV prevented per batch swap
+    const uniqueDays = new Set(
+      confirmed.map(t => new Date(t.timestamp).toDateString())
+    ).size
+    return {
+      totalTrades: confirmed.length,
+      volume: totalVolume,
+      feesSaved: mevSaved,
+      activeDays: uniqueDays,
+    }
+  }, [allTransactions])
+
+  // CSV export placeholder
+  const handleExportCSV = () => {
+    const header = 'Date,Type,From,To,Amount (USD),Status,Chain,Hash'
+    const rows = allTransactions.map(tx =>
+      [
+        new Date(tx.timestamp).toISOString(),
+        tx.type,
+        tx.from || '',
+        tx.to || '',
+        tx.usd?.toFixed(2) || '0',
+        tx.status,
+        tx.chain,
+        tx.hash,
+      ].join(',')
+    )
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'vibeswap-activity.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Running index for stagger across groups
+  let globalIndex = 0
+
+  return (
+    <div className="min-h-screen">
+      {/* ============ Page Hero ============ */}
+      <PageHero
+        category="defi"
+        title="Activity"
+        subtitle="Your complete transaction history"
+        badge="Live"
+        badgeColor="#22c55e"
+      >
+        <button
+          onClick={handleExportCSV}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-black-800/60 border border-black-700/50 text-black-400 hover:text-white hover:border-black-600 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
+      </PageHero>
+
+      <div className="max-w-4xl mx-auto px-4 pb-12">
+        {/* ============ Stat Cards ============ */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: FADE_DURATION, delay: STAGGER_STEP, ease: [0.25, 0.1, 1 / PHI, 1] }}
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8"
+        >
+          <StatCard
+            label="Total Trades"
+            value={stats.totalTrades}
+            prefix=""
+            suffix=""
+            decimals={0}
+            sparkSeed={42}
+            size="sm"
+          />
+          <StatCard
+            label="Volume"
+            value={stats.volume}
+            prefix="$"
+            suffix=""
+            decimals={0}
+            sparkSeed={137}
+            size="sm"
+          />
+          <StatCard
+            label="MEV Prevented"
+            value={stats.feesSaved}
+            prefix="$"
+            suffix=""
+            decimals={2}
+            sparkSeed={256}
+            size="sm"
+          />
+          <StatCard
+            label="Active Days"
+            value={stats.activeDays}
+            prefix=""
+            suffix=""
+            decimals={0}
+            sparkSeed={512}
+            size="sm"
+          />
+        </motion.div>
+
+        {/* ============ Filter Tabs ============ */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: FADE_DURATION, delay: STAGGER_STEP * 2 }}
+          className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide"
+        >
+          {FILTER_TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveFilter(tab.id)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                activeFilter === tab.id
+                  ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                  : 'bg-black-800/60 text-black-500 border border-transparent hover:bg-black-800 hover:text-black-300'
+              }`}
+            >
+              {tab.label}
+              {activeFilter === tab.id && tab.id !== 'all' && (
+                <span className="ml-1.5 text-[10px] opacity-60">
+                  {filteredTransactions.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </motion.div>
+
+        {/* ============ Transaction List ============ */}
         {filteredTransactions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-black-400">No transactions found</p>
-          </div>
+          <EmptyState filter={activeFilter} />
         ) : (
-          filteredTransactions.map(tx => (
-            <StaggerItem key={tx.id}>
-              <GlassCard className="p-3 sm:p-4 depth-card">
-                {/* Desktop layout */}
-                <div className="hidden sm:flex items-center space-x-4">
-                  {getTypeIcon(tx.type)}
+          <div className="space-y-6">
+            {groupedTransactions.map(group => {
+              const groupItems = group.txs.map((tx, i) => {
+                const idx = globalIndex++
+                return <TransactionRow key={tx.id} tx={tx} index={idx} />
+              })
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-white capitalize">{tx.type}</span>
-                        {getStatusBadge(tx.status)}
-                      </div>
-                      <span className="text-sm text-black-400">{formatTime(tx.timestamp)}</span>
-                    </div>
-
-                    <div className="text-sm">
-                      {tx.type === 'swap' ? (
-                        <span className="text-black-300">
-                          {tx.fromAmount} {tx.from} → {tx.toAmount} {tx.to}
-                        </span>
-                      ) : tx.type === 'send' ? (
-                        <span className="text-black-300">
-                          -{tx.fromAmount} {tx.from} to {tx.to}
-                        </span>
-                      ) : (
-                        <span className="text-black-300">
-                          +{tx.toAmount} {tx.to}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center space-x-3 mt-2 text-xs text-black-500">
-                      <span>{tx.chain}</span>
-                      {tx.gasUsed && <span>Gas: {tx.gasUsed}</span>}
-                      {tx.blockNumber && <span>Block: {tx.blockNumber.toLocaleString()}</span>}
-                    </div>
+              return (
+                <div key={group.label}>
+                  {/* Date Group Header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-black-500">
+                      {group.label}
+                    </span>
+                    <div className="flex-1 h-px bg-black-800" />
+                    <span className="text-[10px] font-mono text-black-600">
+                      {group.txs.length} {group.txs.length === 1 ? 'tx' : 'txs'}
+                    </span>
                   </div>
 
-                  {/* Explorer Link */}
-                  <a
-                    href={tx.explorerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-lg hover:bg-black-700 transition-colors"
-                    title="View on Explorer"
-                  >
-                    <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
-
-                {/* Mobile card layout */}
-                <div className="sm:hidden">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-3">
-                      {getTypeIcon(tx.type)}
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-white capitalize">{tx.type}</span>
-                          {getStatusBadge(tx.status)}
-                        </div>
-                        <span className="text-xs text-black-400">{formatTime(tx.timestamp)}</span>
-                      </div>
-                    </div>
-                    <a
-                      href={tx.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg hover:bg-black-700 transition-colors flex-shrink-0"
-                      title="View on Explorer"
-                    >
-                      <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </a>
-                  </div>
-
-                  <div className="text-sm ml-[52px]">
-                    {tx.type === 'swap' ? (
-                      <span className="text-black-300">
-                        {tx.fromAmount} {tx.from} → {tx.toAmount} {tx.to}
-                      </span>
-                    ) : tx.type === 'send' ? (
-                      <span className="text-black-300">
-                        -{tx.fromAmount} {tx.from} to {tx.to}
-                      </span>
-                    ) : (
-                      <span className="text-black-300">
-                        +{tx.toAmount} {tx.to}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 ml-[52px] text-xs text-black-500">
-                    <span>{tx.chain}</span>
-                    {tx.gasUsed && <span>Gas: {tx.gasUsed}</span>}
-                    {tx.blockNumber && <span>Block: {tx.blockNumber.toLocaleString()}</span>}
+                  {/* Transaction Cards */}
+                  <div className="space-y-2">
+                    {groupItems}
                   </div>
                 </div>
-              </GlassCard>
-            </StaggerItem>
-          ))
+              )
+            })}
+          </div>
         )}
-      </StaggerContainer>
 
-      {/* Load More (disabled for demo) */}
-      {filteredTransactions.length > 0 && (
-        <div className="mt-6 text-center">
-          <button
-            disabled
-            className="px-6 py-2 rounded-lg bg-black-800 text-black-500 text-sm cursor-not-allowed"
+        {/* ============ Footer Note ============ */}
+        {filteredTransactions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: globalIndex * STAGGER_STEP + 0.2, duration: FADE_DURATION }}
+            className="mt-8 text-center"
           >
-            Load More (Demo)
-          </button>
-        </div>
-      )}
+            <p className="text-[11px] font-mono text-black-600">
+              Batch auctions eliminate MEV by design — no frontrunning, no sandwich attacks.
+            </p>
+          </motion.div>
+        )}
+      </div>
     </div>
   )
 }

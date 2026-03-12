@@ -358,6 +358,49 @@ function readBody(req) {
 }
 
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
+const LOCK_FILE = join(config.dataDir, 'jarvis.lock');
+
+// ============ Instance Lock — Prevent Dual Processes ============
+// Writes PID to a lock file at startup. If another instance is already running
+// (PID exists and is alive), the new instance logs a warning and exits.
+// The lock is cleaned up on graceful shutdown. Stale locks (dead PID) are overwritten.
+async function acquireInstanceLock() {
+  try {
+    await mkdir(config.dataDir, { recursive: true });
+    try {
+      const existing = await readFile(LOCK_FILE, 'utf-8');
+      const lockData = JSON.parse(existing);
+      // Check if the PID is still alive
+      try {
+        process.kill(lockData.pid, 0); // Signal 0 = existence check, doesn't kill
+        // PID is alive — another instance is running
+        console.error(`[jarvis] INSTANCE LOCK — Another instance is already running (PID ${lockData.pid}, started ${lockData.iso})`);
+        console.error(`[jarvis] Delete ${LOCK_FILE} manually if this is stale.`);
+        process.exit(1);
+      } catch {
+        // PID is dead — stale lock, safe to overwrite
+        console.warn(`[jarvis] Stale lock found (PID ${lockData.pid} is dead) — overwriting`);
+      }
+    } catch {
+      // No lock file exists — fresh start
+    }
+    // Write our PID
+    await writeFile(LOCK_FILE, JSON.stringify({
+      pid: process.pid,
+      timestamp: Date.now(),
+      iso: new Date().toISOString(),
+    }, null, 2));
+    console.log(`[jarvis] Instance lock acquired (PID ${process.pid})`);
+  } catch (err) {
+    console.warn(`[jarvis] Could not acquire instance lock: ${err.message}`);
+  }
+}
+
+async function releaseInstanceLock() {
+  try {
+    await unlink(LOCK_FILE);
+  } catch {}
+}
 
 // ============ Mode Detection ============
 // Primary mode: full JARVIS with Telegram bot + all features
@@ -540,6 +583,10 @@ function isUnlimitedUser(ctx) {
 
 function friendlyError(error) {
   const msg = error.message || '';
+  // Network-level failure — fetch itself failed (DNS, TCP, TLS)
+  if (/fetch failed|econnreset|enotfound|socket hang up|network/i.test(msg)) {
+    return 'Network issue — couldn\'t reach any AI provider. Retrying shortly.';
+  }
   // Cascade exhausted — all LLM providers down
   if (/all.*exhaust|cascade.*fail|fallback.*fail/i.test(msg) || (msg.includes('HTTP') && /5\d\d/.test(msg))) {
     return 'All AI providers are temporarily unavailable. I\'ll be back shortly — try again in a minute.';
@@ -5577,7 +5624,34 @@ bot.on('text', async (ctx) => {
       messageForLLM = `${messageForLLM}\n\n${memCtx}`;
     }
 
-    const response = await chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id });
+    // ============ Resilient LLM Call — Retry on Network Failure ============
+    // The Wardenclyffe cascade handles provider-level retries, but if the entire
+    // network is down (all providers unreachable), the cascade exhausts and throws.
+    // This outer retry catches that case and waits for network recovery before
+    // giving up entirely. Prevents "Something went wrong: fetch failed" on transient
+    // network blips (which the logs showed happening around the 40hr uptime mark).
+    let response;
+    const MSG_MAX_RETRIES = 2;
+    for (let msgAttempt = 0; msgAttempt <= MSG_MAX_RETRIES; msgAttempt++) {
+      try {
+        response = await chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id });
+        break; // Success — exit retry loop
+      } catch (chatErr) {
+        const errMsg = (chatErr?.message || '').toLowerCase();
+        const isNetworkError = errMsg.includes('fetch failed') || errMsg.includes('econnreset')
+          || errMsg.includes('socket hang up') || errMsg.includes('network')
+          || errMsg.includes('enotfound') || errMsg.includes('all providers exhausted');
+        if (isNetworkError && msgAttempt < MSG_MAX_RETRIES) {
+          const retryDelay = 3000 * (msgAttempt + 1); // 3s, 6s
+          console.warn(`[resilience] Network error on chat() attempt ${msgAttempt + 1}/${MSG_MAX_RETRIES + 1}, retrying in ${retryDelay}ms: ${chatErr.message?.slice(0, 80)}`);
+          await new Promise(r => setTimeout(r, retryDelay));
+          // Keep typing indicator alive
+          ctx.sendChatAction('typing').catch(() => {});
+          continue;
+        }
+        throw chatErr; // Non-network error or retries exhausted — propagate to outer catch
+      }
+    }
 
     clearInterval(typingInterval);
 
@@ -5941,13 +6015,34 @@ async function main() {
   // ============ Primary Mode Startup ============
   console.log('[jarvis] ============ STARTUP ============');
 
-  // Step 1: Pull latest from git BEFORE loading context
+  // Step 0: Acquire instance lock — prevent dual processes
+  await acquireInstanceLock();
+
+  // Step 1: Pull latest from git BEFORE loading context (with retry)
+  // Git pull can fail on network blips — retry with backoff to ensure
+  // context files are up-to-date. Missing context = lobotomized bot.
   console.log('[jarvis] Step 1: Syncing from git...');
-  try {
-    const pullResult = await gitPull();
-    console.log(`[jarvis] Git: ${pullResult}`);
-  } catch (err) {
-    console.warn(`[jarvis] Git pull failed (will use local files): ${err.message}`);
+  {
+    const GIT_MAX_RETRIES = 3;
+    let gitPulled = false;
+    for (let gitAttempt = 0; gitAttempt < GIT_MAX_RETRIES; gitAttempt++) {
+      try {
+        const pullResult = await gitPull();
+        console.log(`[jarvis] Git: ${pullResult}`);
+        gitPulled = true;
+        break;
+      } catch (err) {
+        console.warn(`[jarvis] Git pull attempt ${gitAttempt + 1}/${GIT_MAX_RETRIES} failed: ${err.message}`);
+        if (gitAttempt < GIT_MAX_RETRIES - 1) {
+          const delay = 2000 * (gitAttempt + 1);
+          console.log(`[jarvis] Retrying git pull in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+    if (!gitPulled) {
+      console.warn('[jarvis] All git pull attempts failed — using local files');
+    }
   }
 
   // Step 2: Initialize privacy engine BEFORE loading any CKBs
@@ -6058,11 +6153,33 @@ async function main() {
   registerConsensusHandlers();
   await initReputation();
 
-  // Step 4: Context diagnosis
-  const report = await diagnoseContext();
+  // Step 4: Context diagnosis — verify critical files loaded
+  // If context is empty (0 chars), the bot is effectively lobotomized.
+  // Retry git pull + context reload to recover from transient failures.
+  let report = await diagnoseContext();
   console.log(`[jarvis] Context: ${report.loaded.length} files loaded (${report.totalChars} chars)`);
   if (report.missing.length > 0) {
     console.warn(`[jarvis] WARNING — Missing context files: ${report.missing.join(', ')}`);
+  }
+  if (report.totalChars === 0 && report.missing.length > 0) {
+    console.error('[jarvis] CRITICAL — Zero context loaded! Attempting recovery...');
+    for (let ctxRetry = 0; ctxRetry < 3; ctxRetry++) {
+      await new Promise(r => setTimeout(r, 3000 * (ctxRetry + 1)));
+      try {
+        const retryPull = await gitPull();
+        console.log(`[jarvis] Recovery git pull: ${retryPull}`);
+      } catch {}
+      await reloadSystemPrompt();
+      report = await diagnoseContext();
+      console.log(`[jarvis] Recovery attempt ${ctxRetry + 1}: ${report.loaded.length} files (${report.totalChars} chars)`);
+      if (report.totalChars > 0) {
+        console.log('[jarvis] Context recovered successfully');
+        break;
+      }
+    }
+    if (report.totalChars === 0) {
+      console.error('[jarvis] FAILED to recover context after 3 attempts — bot will run with degraded context');
+    }
   }
 
   // Step 5: Check for unclean shutdown
@@ -7139,6 +7256,7 @@ async function main() {
     stopGroupContext();
     stopCRPC();
     await writeHeartbeat('stopped');
+    await releaseInstanceLock();
     clearTimeout(shutdownTimer);
     bot.stop(signal);
   }

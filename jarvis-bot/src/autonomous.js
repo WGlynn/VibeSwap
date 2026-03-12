@@ -78,7 +78,11 @@ export function initAutonomous(sendFunction, chatIds) {
     for (const id of chatIds) targetChats.add(id);
   }
   const timings = getTimings();
-  autonomousInterval = setInterval(() => autonomousTick(), timings.tickInterval);
+  autonomousInterval = setInterval(() => {
+    autonomousTick().catch(err => {
+      console.error('[autonomous] Tick error:', err.message);
+    });
+  }, timings.tickInterval);
   console.log(`[autonomous] Initialized — persona: ${getActivePersonaId()}, tick: ${timings.tickInterval / 1000}s, impulse: ${timings.impulseChance * 100}%`);
 }
 

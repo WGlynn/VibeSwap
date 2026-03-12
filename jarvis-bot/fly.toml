@@ -34,7 +34,7 @@ primary_region = 'iad'
     type = 'http'
     interval = '10s'
     timeout = '5s'
-    grace_period = '30s'
+    grace_period = '120s'
     path = '/health'
 
 [[restart]]

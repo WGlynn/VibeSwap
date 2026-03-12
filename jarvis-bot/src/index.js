@@ -6203,8 +6203,61 @@ async function main() {
   console.log(`[jarvis] Model: ${config.anthropic.model}`);
   console.log('[jarvis] Step 7: Starting Telegram bot...');
 
-  bot.launch();
+  // ============ Telegraf Error Handler — CRITICAL ============
+  // Without bot.catch(), Telegraf polling errors become unhandled rejections.
+  // The process survives (due to our global handler), but the polling loop
+  // may silently stop receiving updates — heartbeat works but bot is dead.
+  // This is the exact failure mode observed at the 40hr mark.
+  bot.catch((err, ctx) => {
+    const chatInfo = ctx?.chat?.id || 'unknown';
+    console.error(`[telegraf] Error in chat ${chatInfo}:`, err.message);
+    // Log but don't crash — Telegraf will continue polling
+    persistCrashEntry('telegraf_error', err);
+  });
+
+  // ============ Polling Liveness Monitor ============
+  // Tracks when the last update was received from Telegram. If no updates
+  // arrive for 5 minutes (while the process is alive), the polling connection
+  // is likely broken. Auto-restarts polling to recover.
+  let lastUpdateReceived = Date.now();
+  const POLLING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+  const POLLING_CHECK_INTERVAL = 60 * 1000; // Check every 60s
+
+  // Middleware to track update liveness — runs on EVERY incoming update
+  bot.use((ctx, next) => {
+    lastUpdateReceived = Date.now();
+    return next();
+  });
+
+  bot.launch({ dropPendingUpdates: true });
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
+
+  // Polling liveness checker — restarts polling if no updates for 5 min
+  setInterval(async () => {
+    const silentMs = Date.now() - lastUpdateReceived;
+    if (silentMs > POLLING_TIMEOUT_MS) {
+      console.error(`[polling-monitor] No updates for ${Math.round(silentMs / 60000)}min — polling may be dead. Restarting...`);
+      try {
+        await bot.telegram.sendMessage(config.ownerUserId,
+          `[POLLING-MONITOR] No Telegram updates received for ${Math.round(silentMs / 60000)}min. Restarting polling...`
+        );
+      } catch {}
+      try {
+        bot.stop('polling_restart');
+        // Small delay to let Telegram release the getUpdates lock
+        await new Promise(r => setTimeout(r, 3000));
+        bot.launch({ dropPendingUpdates: true });
+        lastUpdateReceived = Date.now(); // Reset timer
+        console.log('[polling-monitor] Polling restarted successfully');
+        try {
+          await bot.telegram.sendMessage(config.ownerUserId, '[POLLING-MONITOR] Polling restarted successfully.');
+        } catch {}
+      } catch (restartErr) {
+        console.error('[polling-monitor] Failed to restart polling:', restartErr.message);
+        persistCrashEntry('polling_restart_failed', restartErr);
+      }
+    }
+  }, POLLING_CHECK_INTERVAL);
 
   // ============ Self-Healing Watchdog ============
   // Pings own health endpoint every 60s. If 3 consecutive failures, notifies Will.

@@ -2711,4 +2711,269 @@ mod tests {
         // Phase is cloned from auction_state
         assert_eq!(output_auction.phase, PHASE_COMMIT);
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_mine_difficulty_five_succeeds_h6() {
+        let pair_id = [0xBB; 32];
+        let prev_hash = [0xCC; 32];
+        let proof = mine_for_cell(&pair_id, 7, &prev_hash, 5, 500_000);
+        assert!(proof.is_some());
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 5));
+    }
+
+    #[test]
+    fn test_mine_difficulty_six_succeeds_h6() {
+        let pair_id = [0xDD; 32];
+        let prev_hash = [0xEE; 32];
+        let proof = mine_for_cell(&pair_id, 10, &prev_hash, 6, 1_000_000);
+        assert!(proof.is_some());
+        assert!(vibeswap_pow::verify(&proof.unwrap(), 6));
+    }
+
+    #[test]
+    fn test_mine_same_inputs_deterministic_challenge_h6() {
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+        let c1 = vibeswap_pow::generate_challenge(&pair_id, 5, &prev_hash);
+        let c2 = vibeswap_pow::generate_challenge(&pair_id, 5, &prev_hash);
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn test_mine_adjacent_batch_ids_different_challenges_h6() {
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+        let c1 = vibeswap_pow::generate_challenge(&pair_id, 100, &prev_hash);
+        let c2 = vibeswap_pow::generate_challenge(&pair_id, 101, &prev_hash);
+        assert_ne!(c1, c2);
+    }
+
+    #[test]
+    fn test_estimate_profitability_ten_commits_h6() {
+        let est = estimate_profitability(4, 10, 100, 100_000.0);
+        assert_eq!(est.expected_reward_ckb, 1000);
+        assert!(est.is_profitable);
+    }
+
+    #[test]
+    fn test_estimate_profitability_energy_cost_zero_difficulty_h6() {
+        let est = estimate_profitability(0, 5, 200, 100_000.0);
+        // At difficulty 0, expected_hashes should be very small
+        // energy_cost = expected_hashes / 1_000_000 * 0.1
+        assert!(est.estimated_cost_ckb <= 1);
+    }
+
+    #[test]
+    fn test_estimate_profitability_reward_proportional_to_commits_h6() {
+        let est1 = estimate_profitability(4, 5, 100, 100_000.0);
+        let est2 = estimate_profitability(4, 10, 100, 100_000.0);
+        assert_eq!(est2.expected_reward_ckb, est1.expected_reward_ckb * 2);
+    }
+
+    #[test]
+    fn test_track_difficulty_four_transitions_h6() {
+        // Four transitions, each ~10 blocks apart, target = 10
+        let blocks = vec![100, 110, 120, 130];
+        let d = track_difficulty(8, &blocks, 10);
+        // Actual avg = 10, target = 10, should stay near 8
+        assert!(d >= 7 && d <= 9);
+    }
+
+    #[test]
+    fn test_track_difficulty_slow_transitions_decrease_h6() {
+        // Transitions 100 blocks apart, target = 10
+        let blocks = vec![100, 200, 300, 400, 500];
+        let d = track_difficulty(10, &blocks, 10);
+        assert!(d < 10);
+    }
+
+    #[test]
+    fn test_track_difficulty_fast_transitions_increase_h6() {
+        // Transitions 2 blocks apart, target = 20
+        let blocks = vec![100, 102, 104, 106, 108];
+        let d = track_difficulty(5, &blocks, 20);
+        assert!(d > 5);
+    }
+
+    #[test]
+    fn test_compute_auction_hash_nonzero_batch_id_h6() {
+        let mut auction = test_auction();
+        auction.batch_id = 999;
+        let h1 = compute_auction_hash(&auction);
+        auction.batch_id = 1000;
+        let h2 = compute_auction_hash(&auction);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_compute_auction_hash_all_zero_state_h6() {
+        let auction = AuctionCellData::default();
+        let h = compute_auction_hash(&auction);
+        assert_ne!(h, [0u8; 32]); // SHA-256 of non-empty data should not be all zeros
+    }
+
+    #[test]
+    fn test_aggregation_output_count_always_one_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1), make_commit(2), make_commit(3)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        assert_eq!(tx.outputs.len(), 1);
+    }
+
+    #[test]
+    fn test_aggregation_input_count_equals_commits_plus_one_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1), make_commit(2)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        // 1 auction cell + 2 commit cells = 3 inputs
+        assert_eq!(tx.inputs.len(), 3);
+    }
+
+    #[test]
+    fn test_aggregation_witness_exactly_one_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        assert_eq!(tx.witnesses.len(), 1);
+    }
+
+    #[test]
+    fn test_aggregation_cell_dep_count_always_one_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        assert_eq!(tx.cell_deps.len(), 1);
+    }
+
+    #[test]
+    fn test_aggregation_commit_count_increment_by_n_h6() {
+        let mut auction = test_auction();
+        auction.commit_count = 10;
+        let commits = vec![make_commit(1), make_commit(2), make_commit(3), make_commit(4), make_commit(5)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        let output = AuctionCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(output.commit_count, 15);
+    }
+
+    #[test]
+    fn test_aggregation_mmr_root_single_commit_nonzero_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        let output = AuctionCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_ne!(output.commit_mmr_root, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_aggregation_output_type_script_present_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        assert!(tx.outputs[0].type_script.is_some());
+    }
+
+    #[test]
+    fn test_aggregation_output_type_script_args_match_pair_id_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        let ts = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(ts.args, auction.pair_id.to_vec());
+    }
+
+    #[test]
+    fn test_aggregation_output_lock_args_contain_pair_id_h6() {
+        let auction = test_auction();
+        let commits = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx = build_aggregation_tx(&auction, &commits, None, &proof, &test_deployment(), &test_miner_lock());
+        let lock_args = &tx.outputs[0].lock_script.args;
+        // PoWLockArgs starts with pair_id (32 bytes)
+        assert!(lock_args.len() >= 32);
+        assert_eq!(&lock_args[..32], &auction.pair_id[..]);
+    }
+
+    #[test]
+    fn test_profitability_struct_is_profitable_matches_profit_h6() {
+        let est = estimate_profitability(4, 100, 1, 100_000.0);
+        // With base_reward=1 and 100 commits, reward = 100
+        // If energy_cost > 100, is_profitable should be false
+        if est.estimated_profit_ckb > 0 {
+            assert!(est.is_profitable);
+        }
+    }
+
+    #[test]
+    fn test_mining_stats_default_zero_avg_hash_rate_h6() {
+        let stats = MiningStats::default();
+        assert_eq!(stats.avg_hash_rate, 0.0);
+    }
+
+    #[test]
+    fn test_mining_stats_blocks_mined_field_h6() {
+        let stats = MiningStats {
+            total_hashes: 1000,
+            blocks_mined: 5,
+            total_commits_aggregated: 50,
+            total_reward_ckb: 500,
+            avg_hash_rate: 200.0,
+        };
+        assert_eq!(stats.blocks_mined, 5);
+        assert_eq!(stats.total_commits_aggregated, 50);
+    }
+
+    #[test]
+    fn test_miner_config_min_reward_threshold_h6() {
+        let config = MinerConfig {
+            max_iterations: 1000,
+            ckb_rpc_url: "http://localhost:8114".to_string(),
+            indexer_rpc_url: "http://localhost:8116".to_string(),
+            miner_lock: test_miner_lock(),
+            pair_ids: vec![[0x01; 32]],
+            min_reward_ckb: 50,
+        };
+        assert_eq!(config.min_reward_ckb, 50);
+    }
+
+    #[test]
+    fn test_aggregation_sequential_prev_state_hash_chain_h6() {
+        let auction1 = test_auction();
+        let commits1 = vec![make_commit(1)];
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let tx1 = build_aggregation_tx(&auction1, &commits1, None, &proof, &test_deployment(), &test_miner_lock());
+        let output1 = AuctionCellData::deserialize(&tx1.outputs[0].data).unwrap();
+
+        // Second build using output1 as input
+        let tx2 = build_aggregation_tx(&output1, &vec![make_commit(2)], None, &proof, &test_deployment(), &test_miner_lock());
+        let output2 = AuctionCellData::deserialize(&tx2.outputs[0].data).unwrap();
+
+        // prev_state_hash should differ between outputs
+        assert_ne!(output1.prev_state_hash, output2.prev_state_hash);
+    }
+
+    #[test]
+    fn test_mine_proof_nonce_length_32_h6() {
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000).unwrap();
+        assert_eq!(proof.nonce.len(), 32);
+    }
+
+    #[test]
+    fn test_mine_proof_challenge_length_32_h6() {
+        let pair_id = [0x42; 32];
+        let prev_hash = [0u8; 32];
+        let proof = mine_for_cell(&pair_id, 0, &prev_hash, 4, 100_000).unwrap();
+        assert_eq!(proof.challenge.len(), 32);
+    }
 }

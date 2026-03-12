@@ -2731,4 +2731,293 @@ mod tests {
         assert_eq!(updated.emergency_mode, state.emergency_mode);
         assert_eq!(updated.daily_outflow_limit, state.daily_outflow_limit);
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_create_treasury_available_equals_total_h6() {
+        let state = create_treasury(5_000_000 * PRECISION, 0).unwrap();
+        assert_eq!(state.available_balance, state.total_balance);
+        assert_eq!(state.reserved_balance, 0);
+    }
+
+    #[test]
+    fn test_create_treasury_daily_limit_is_5_percent_h6() {
+        let total = 10_000 * PRECISION;
+        let state = create_treasury(total, 0).unwrap();
+        let expected = mul_div(total, MAX_DAILY_OUTFLOW_BPS as u128, BPS);
+        assert_eq!(state.daily_outflow_limit, expected);
+    }
+
+    #[test]
+    fn test_allocate_funds_valid_development_h6() {
+        let state = default_state();
+        let alloc = allocate_funds(&state, 10_000 * PRECISION, AllocationPurpose::Development, default_recipient(), 1_000_000).unwrap();
+        assert_eq!(alloc.amount, 10_000 * PRECISION);
+        assert_eq!(alloc.purpose, AllocationPurpose::Development);
+        assert_eq!(alloc.amount_claimed, 0);
+    }
+
+    #[test]
+    fn test_allocate_funds_security_bounty_h6() {
+        let state = default_state();
+        let alloc = allocate_funds(&state, 5_000 * PRECISION, AllocationPurpose::SecurityBounty, default_recipient(), 500_000).unwrap();
+        assert_eq!(alloc.purpose, AllocationPurpose::SecurityBounty);
+    }
+
+    #[test]
+    fn test_allocate_funds_exactly_50_percent_h6() {
+        let state = default_state();
+        let max = mul_div(state.total_balance, MAX_ALLOCATION_BPS as u128, BPS);
+        let result = allocate_funds(&state, max, AllocationPurpose::Development, default_recipient(), 1_000_000);
+        // May fail due to daily limit or reserve, but should not fail on allocation size
+        if let Err(e) = &result {
+            assert_ne!(*e, TreasuryError::AllocationTooLarge);
+        }
+    }
+
+    #[test]
+    fn test_allocate_funds_over_50_percent_fails_h6() {
+        let state = default_state();
+        let over_max = mul_div(state.total_balance, MAX_ALLOCATION_BPS as u128 + 1, BPS);
+        let result = allocate_funds(&state, over_max, AllocationPurpose::Development, default_recipient(), 1_000_000);
+        assert_eq!(result, Err(TreasuryError::AllocationTooLarge));
+    }
+
+    #[test]
+    fn test_vesting_linear_halfway_h6() {
+        let alloc = make_allocation(1000 * PRECISION, 0, 200_000);
+        let halfway = VESTING_CLIFF_BLOCKS + 100_000;
+        let vested = compute_vested_amount(&alloc, halfway);
+        assert_eq!(vested, 500 * PRECISION);
+    }
+
+    #[test]
+    fn test_vesting_one_block_after_cliff_h6() {
+        let alloc = make_allocation(1_000_000 * PRECISION, 0, 1_000_000);
+        let one_after = VESTING_CLIFF_BLOCKS + 1;
+        let vested = compute_vested_amount(&alloc, one_after);
+        // 1/1_000_000 of total
+        assert_eq!(vested, mul_div(1_000_000 * PRECISION, 1, 1_000_000));
+    }
+
+    #[test]
+    fn test_claimable_before_cliff_zero_h6() {
+        let alloc = make_allocation(1000 * PRECISION, 0, 200_000);
+        assert_eq!(compute_claimable(&alloc, 0), 0);
+        assert_eq!(compute_claimable(&alloc, VESTING_CLIFF_BLOCKS - 1), 0);
+    }
+
+    #[test]
+    fn test_claim_vested_partial_then_rest_h6() {
+        let alloc = make_allocation(1000 * PRECISION, 0, 200_000);
+        let mid = VESTING_CLIFF_BLOCKS + 100_000;
+        let (claimed1, updated) = claim_vested(&alloc, mid).unwrap();
+        assert_eq!(claimed1, 500 * PRECISION);
+
+        let end = VESTING_CLIFF_BLOCKS + 200_000;
+        let (claimed2, final_alloc) = claim_vested(&updated, end).unwrap();
+        assert_eq!(claimed2, 500 * PRECISION);
+        assert_eq!(final_alloc.amount_claimed, 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_claim_vested_nothing_before_cliff_h6() {
+        let alloc = make_allocation(1000 * PRECISION, 0, 200_000);
+        let result = claim_vested(&alloc, VESTING_CLIFF_BLOCKS - 1);
+        assert_eq!(result, Err(TreasuryError::InsufficientFunds));
+    }
+
+    #[test]
+    fn test_check_daily_limit_exact_remaining_h6() {
+        let state = default_state();
+        let remaining = check_daily_limit(&state, 1).unwrap();
+        assert_eq!(remaining, state.daily_outflow_limit - 1);
+    }
+
+    #[test]
+    fn test_check_daily_limit_zero_proposed_fails_h6() {
+        let state = default_state();
+        let result = check_daily_limit(&state, 0);
+        assert_eq!(result, Err(TreasuryError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_update_daily_outflow_increments_h6() {
+        let state = default_state();
+        let updated = update_daily_outflow(&state, 100).unwrap();
+        assert_eq!(updated.daily_outflow, 100);
+        let updated2 = update_daily_outflow(&updated, 200).unwrap();
+        assert_eq!(updated2.daily_outflow, 300);
+    }
+
+    #[test]
+    fn test_enter_emergency_exactly_20_percent_loss_h6() {
+        let state = default_state();
+        // 20% loss = 200_000 * PRECISION
+        let current = state.total_balance - mul_div(state.total_balance, EMERGENCY_THRESHOLD_BPS as u128, BPS);
+        let result = enter_emergency_mode(&state, current);
+        assert!(result.is_ok());
+        assert!(result.unwrap().emergency_mode);
+    }
+
+    #[test]
+    fn test_enter_emergency_19_percent_loss_fails_h6() {
+        let state = default_state();
+        // 19% loss
+        let current = state.total_balance - mul_div(state.total_balance, 1900, BPS);
+        let result = enter_emergency_mode(&state, current);
+        assert_eq!(result, Err(TreasuryError::EmergencyThresholdNotMet));
+    }
+
+    #[test]
+    fn test_exit_emergency_when_not_in_emergency_fails_h6() {
+        let state = default_state();
+        assert_eq!(exit_emergency_mode(&state), Err(TreasuryError::EmergencyThresholdNotMet));
+    }
+
+    #[test]
+    fn test_exit_emergency_preserves_balances_h6() {
+        let state = default_state();
+        let current = state.total_balance / 2; // 50% loss
+        let emergency = enter_emergency_mode(&state, current).unwrap();
+        let exited = exit_emergency_mode(&emergency).unwrap();
+        assert!(!exited.emergency_mode);
+        assert_eq!(exited.total_balance, emergency.total_balance);
+    }
+
+    #[test]
+    fn test_reserve_ratio_50_percent_h6() {
+        let mut state = default_state();
+        state.reserved_balance = state.total_balance / 2;
+        let ratio = compute_reserve_ratio(&state);
+        assert_eq!(ratio, 5000);
+    }
+
+    #[test]
+    fn test_stabilization_buy_support_h6() {
+        let result = compute_stabilization_action(
+            900 * PRECISION,     // current below target
+            1000 * PRECISION,    // target
+            100_000 * PRECISION, // treasury available
+            1_000_000 * PRECISION, // pool reserve
+        ).unwrap();
+        assert_eq!(result.action_type, StabilizationType::BuySupport);
+    }
+
+    #[test]
+    fn test_stabilization_sell_pressure_h6() {
+        let result = compute_stabilization_action(
+            1100 * PRECISION,    // current above target
+            1000 * PRECISION,    // target
+            100_000 * PRECISION,
+            1_000_000 * PRECISION,
+        ).unwrap();
+        assert_eq!(result.action_type, StabilizationType::SellPressure);
+    }
+
+    #[test]
+    fn test_stabilization_liquidity_add_when_close_h6() {
+        let result = compute_stabilization_action(
+            1010 * PRECISION,    // 1% above target, within 3% threshold
+            1000 * PRECISION,
+            100_000 * PRECISION,
+            1_000_000 * PRECISION,
+        ).unwrap();
+        assert_eq!(result.action_type, StabilizationType::LiquidityAdd);
+    }
+
+    #[test]
+    fn test_price_impact_small_amount_h6() {
+        let action = StabilizationAction {
+            action_type: StabilizationType::BuySupport,
+            amount: 100 * PRECISION,
+            target_price: PRECISION,
+            current_price: PRECISION,
+            impact_estimate: 0,
+        };
+        let impact = estimate_price_impact(&action, 1_000_000 * PRECISION, 1_000_000 * PRECISION).unwrap();
+        assert!(impact > 0);
+        assert!(impact < PRECISION / 100); // Less than 1%
+    }
+
+    #[test]
+    fn test_price_impact_zero_amount_h6() {
+        let action = StabilizationAction {
+            action_type: StabilizationType::BuySupport,
+            amount: 0,
+            target_price: PRECISION,
+            current_price: PRECISION,
+            impact_estimate: 0,
+        };
+        let impact = estimate_price_impact(&action, 1_000_000 * PRECISION, 1_000_000 * PRECISION).unwrap();
+        assert_eq!(impact, 0);
+    }
+
+    #[test]
+    fn test_report_healthy_treasury_high_score_h6() {
+        let state = default_state();
+        let report = generate_report(&state, &[], 100, 0);
+        assert!(report.health_score >= 60);
+        assert_eq!(report.total_liabilities, 0);
+        assert_eq!(report.total_assets, state.total_balance);
+    }
+
+    #[test]
+    fn test_report_with_allocation_liabilities_h6() {
+        let state = default_state();
+        let alloc = make_allocation(100_000 * PRECISION, 0, 500_000);
+        let report = generate_report(&state, &[alloc], VESTING_CLIFF_BLOCKS + 250_000, 0);
+        // 50% vested, so liabilities = 50% of allocation
+        assert!(report.total_liabilities > 0);
+        assert!(report.total_liabilities < 100_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_report_runway_infinite_with_zero_outflow_h6() {
+        let state = default_state();
+        let report = generate_report(&state, &[], 100, 0);
+        assert_eq!(report.runway_blocks, u64::MAX);
+    }
+
+    // removed: test_check_rebalance_large_deviation_h6 — contradictory assertions (from==0 then from==1)
+
+    #[test]
+    fn test_check_rebalance_below_threshold_h6() {
+        let actual = vec![3300u16, 3400, 3300];
+        let target = vec![3333u16, 3334, 3333];
+        let result = check_rebalance_needed(&actual, &target);
+        assert_eq!(result, Err(TreasuryError::RebalanceNotNeeded));
+    }
+
+    #[test]
+    fn test_compute_rebalance_excess_capped_by_deficit_h6() {
+        // from has 6000 with target 3000 (excess=3000), to has 1000 with target 3000 (deficit=2000)
+        let transfer = compute_rebalance(6000, 1000, 3000, 10000).unwrap();
+        assert_eq!(transfer, 2000); // min(excess=3000, deficit=2000)
+    }
+
+    #[test]
+    fn test_compute_rebalance_from_at_target_fails_h6() {
+        let result = compute_rebalance(3000, 1000, 3000, 10000);
+        assert_eq!(result, Err(TreasuryError::RebalanceNotNeeded));
+    }
+
+    #[test]
+    fn test_allocation_purpose_variants_h6() {
+        let purposes = vec![
+            AllocationPurpose::Development,
+            AllocationPurpose::Marketing,
+            AllocationPurpose::LiquidityIncentive,
+            AllocationPurpose::SecurityBounty,
+            AllocationPurpose::CommunityGrant,
+            AllocationPurpose::EmergencyReserve,
+            AllocationPurpose::Stabilization,
+        ];
+        for i in 0..purposes.len() {
+            for j in (i+1)..purposes.len() {
+                assert_ne!(purposes[i], purposes[j]);
+            }
+        }
+    }
 }

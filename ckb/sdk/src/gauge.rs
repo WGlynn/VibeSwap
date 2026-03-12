@@ -2418,4 +2418,236 @@ mod tests {
             }
         }
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_create_gauge_preserves_all_defaults_h6() {
+        let g = create_gauge(pid(99), 500);
+        assert_eq!(g.total_weight, 0);
+        assert_eq!(g.voter_count, 0);
+        assert_eq!(g.cumulative_emissions, 0);
+        assert_eq!(g.last_emission_epoch, 0);
+        assert!(g.is_active);
+    }
+
+    #[test]
+    fn test_cast_vote_five_pool_split_h6() {
+        let allocs: Vec<([u8; 32], u16)> = (1..=5).map(|i| (pid(i), 2000)).collect();
+        let vote = cast_vote(vid(1), ONE_VIBE * 10, &allocs, 1).unwrap();
+        assert_eq!(vote.allocation_count, 5);
+    }
+
+    #[test]
+    fn test_cast_vote_9999_bps_total_h6() {
+        let allocs = vec![(pid(1), 5000), (pid(2), 4999)];
+        let vote = cast_vote(vid(1), ONE_VIBE, &allocs, 0).unwrap();
+        assert_eq!(vote.allocation_count, 2);
+    }
+
+    #[test]
+    fn test_cast_vote_exact_min_power_boundary_h6() {
+        let result = cast_vote(vid(1), MIN_VOTE_WEIGHT - 1, &[(pid(1), 10000)], 0);
+        assert_eq!(result, Err(GaugeError::InsufficientVotingPower));
+        let result = cast_vote(vid(1), MIN_VOTE_WEIGHT, &[(pid(1), 10000)], 0);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_apply_votes_five_voters_accumulates_h6() {
+        let g = create_gauge(pid(1), 0);
+        let votes: Vec<VoteAllocation> = (1..=5)
+            .map(|i| cast_vote(vid(i), ONE_VIBE * 100, &[(pid(1), 10000)], 0).unwrap())
+            .collect();
+        let result = apply_votes(&[g], &votes).unwrap();
+        assert_eq!(result[0].voter_count, 5);
+        assert!(result[0].total_weight > 0);
+    }
+
+    #[test]
+    fn test_apply_votes_ignores_nonexistent_pool_h6() {
+        let g = create_gauge(pid(1), 0);
+        // Vote for pool 99 which has no gauge
+        let vote = cast_vote(vid(1), ONE_VIBE * 10, &[(pid(99), 10000)], 0).unwrap();
+        let result = apply_votes(&[g], &[vote]).unwrap();
+        assert_eq!(result[0].total_weight, 0);
+        assert_eq!(result[0].voter_count, 0);
+    }
+
+    #[test]
+    fn test_finalize_epoch_three_gauges_proportional_h6() {
+        let g1 = Gauge { pool_id: pid(1), total_weight: 500, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let g2 = Gauge { pool_id: pid(2), total_weight: 300, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let g3 = Gauge { pool_id: pid(3), total_weight: 200, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let result = finalize_epoch(&[g1, g2, g3], 10000, 1).unwrap();
+        assert_eq!(result.gauge_count, 3);
+        let total_emitted: u128 = (0..3).map(|i| result.gauge_emissions[i].emission_amount).sum();
+        assert_eq!(total_emitted, 10000);
+    }
+
+    #[test]
+    fn test_finalize_epoch_single_gauge_gets_everything_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 1000, voter_count: 5, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let result = finalize_epoch(&[g], 50000, 10).unwrap();
+        assert_eq!(result.gauge_emissions[0].emission_amount, 50000);
+    }
+
+    #[test]
+    fn test_boost_10_percent_vp_h6() {
+        let info = compute_boost(ONE_VIBE * 10, ONE_VIBE * 100, 5000, 1000);
+        assert!(info.boosted_reward >= info.base_reward);
+        assert!(info.boost_multiplier_bps >= BOOST_BASE_BPS);
+    }
+
+    #[test]
+    fn test_boost_99_percent_vp_h6() {
+        let info = compute_boost(ONE_VIBE * 99, ONE_VIBE * 100, 9900, 10000);
+        // Nearly full voting power, boost should be near max
+        assert!(info.boost_multiplier_bps > 9000);
+    }
+
+    #[test]
+    fn test_boost_base_reward_zero_returns_zero_h6() {
+        let info = compute_boost(ONE_VIBE * 50, ONE_VIBE * 100, 5000, 0);
+        assert_eq!(info.boosted_reward, 0);
+        assert_eq!(info.base_reward, 0);
+    }
+
+    #[test]
+    fn test_decay_five_epochs_monotonic_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 1_000_000, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let d1 = apply_decay(&g, 1);
+        let d3 = apply_decay(&g, 3);
+        let d5 = apply_decay(&g, 5);
+        assert!(d1.total_weight > d3.total_weight);
+        assert!(d3.total_weight > d5.total_weight);
+    }
+
+    #[test]
+    fn test_decay_preserves_is_active_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 1000, voter_count: 3, created_epoch: 5, is_active: true, cumulative_emissions: 100, last_emission_epoch: 4 };
+        let decayed = apply_decay(&g, 10);
+        assert!(decayed.is_active);
+        assert_eq!(decayed.created_epoch, 5);
+        assert_eq!(decayed.cumulative_emissions, 100);
+    }
+
+    #[test]
+    fn test_kill_gauge_resets_voter_count_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 5000, voter_count: 10, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let killed = kill_gauge(&g).unwrap();
+        assert_eq!(killed.voter_count, 0);
+        assert_eq!(killed.total_weight, 0);
+        assert!(!killed.is_active);
+    }
+
+    #[test]
+    fn test_revive_gauge_sets_last_emission_epoch_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 0, voter_count: 0, created_epoch: 0, is_active: false, cumulative_emissions: 500, last_emission_epoch: 0 };
+        let revived = revive_gauge(&g, 42).unwrap();
+        assert_eq!(revived.last_emission_epoch, 42);
+        assert!(revived.is_active);
+    }
+
+    #[test]
+    fn test_estimate_apr_realistic_values_h6() {
+        // 100 tokens per epoch, 365 epochs/year, price = 2 PRECISION, TVL = 1M PRECISION
+        let apr = estimate_apr(100 * PRECISION, 1_000_000 * PRECISION, 2 * PRECISION, 365);
+        assert!(apr > 0);
+    }
+
+    #[test]
+    fn test_estimate_apr_very_high_emission_h6() {
+        let apr = estimate_apr(u128::MAX / 10000, PRECISION, PRECISION, 1);
+        // Should not panic, may saturate
+        assert!(apr > 0 || apr == 0); // Just ensure no panic
+    }
+
+    #[test]
+    fn test_vote_weight_decays_over_100_epochs_h6() {
+        let vote = cast_vote(vid(1), ONE_VIBE * 1000, &[(pid(1), 10000)], 0).unwrap();
+        let w0 = vote_weight_at_epoch(&vote, 0);
+        let w100 = vote_weight_at_epoch(&vote, 100);
+        assert_eq!(w0, ONE_VIBE * 1000);
+        assert!(w100 < w0);
+        assert!(w100 > 0); // 1% decay per epoch, 100 epochs -> ~36% remaining
+    }
+
+    #[test]
+    fn test_vote_weight_before_vote_returns_zero_h6() {
+        let vote = cast_vote(vid(1), ONE_VIBE * 100, &[(pid(1), 10000)], 50).unwrap();
+        assert_eq!(vote_weight_at_epoch(&vote, 49), 0);
+    }
+
+    #[test]
+    fn test_relative_weight_two_equal_gauges_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 500, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let rw = relative_weight(&g, 1000);
+        assert_eq!(rw, 5000); // 50%
+    }
+
+    #[test]
+    fn test_relative_weight_tiny_gauge_large_total_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 1, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let rw = relative_weight(&g, 1_000_000);
+        assert_eq!(rw, 0); // rounds to 0 bps
+    }
+
+    #[test]
+    fn test_top_gauges_three_returns_sorted_h6() {
+        let g1 = Gauge { pool_id: pid(1), total_weight: 100, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let g2 = Gauge { pool_id: pid(2), total_weight: 300, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let g3 = Gauge { pool_id: pid(3), total_weight: 200, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let top = top_gauges(&[g1, g2, g3], 3);
+        assert_eq!(top[0].1, 300);
+        assert_eq!(top[1].1, 200);
+        assert_eq!(top[2].1, 100);
+    }
+
+    #[test]
+    fn test_top_gauges_request_more_than_available_h6() {
+        let g1 = Gauge { pool_id: pid(1), total_weight: 100, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let top = top_gauges(&[g1], 10);
+        assert_eq!(top[0].1, 100);
+        assert_eq!(top[1].1, 0); // rest empty
+    }
+
+    #[test]
+    fn test_finalize_epoch_with_max_gauges_h6() {
+        // Create MAX_GAUGES gauges with different weights
+        let gauges: Vec<Gauge> = (0..MAX_GAUGES).map(|i| {
+            Gauge { pool_id: pid((i + 1) as u8), total_weight: (i as u128 + 1) * 100, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 }
+        }).collect();
+        let result = finalize_epoch(&gauges, 1_000_000, 1).unwrap();
+        assert_eq!(result.gauge_count as usize, MAX_GAUGES);
+    }
+
+    #[test]
+    fn test_apply_votes_killed_gauge_gets_zero_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 0, voter_count: 0, created_epoch: 0, is_active: false, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let vote = cast_vote(vid(1), ONE_VIBE * 100, &[(pid(1), 10000)], 0).unwrap();
+        let result = apply_votes(&[g], &[vote]).unwrap();
+        assert_eq!(result[0].total_weight, 0);
+    }
+
+    #[test]
+    fn test_boost_multiplier_never_exceeds_10000_h6() {
+        // Even with massive voting power
+        let info = compute_boost(ONE_VIBE * 1_000_000, ONE_VIBE * 1, 10000, 10000);
+        assert!(info.boost_multiplier_bps <= 10_000);
+    }
+
+    #[test]
+    fn test_decay_one_epoch_exact_99_percent_h6() {
+        let g = Gauge { pool_id: pid(1), total_weight: 10_000, voter_count: 1, created_epoch: 0, is_active: true, cumulative_emissions: 0, last_emission_epoch: 0 };
+        let decayed = apply_decay(&g, 1);
+        assert_eq!(decayed.total_weight, 9900); // 10000 * 9900 / 10000
+    }
+
+    #[test]
+    fn test_cast_vote_eleven_splits_rejected_h6() {
+        let allocs: Vec<([u8; 32], u16)> = (1..=11).map(|i| (pid(i), 909)).collect();
+        let result = cast_vote(vid(1), ONE_VIBE * 10, &allocs, 0);
+        assert_eq!(result, Err(GaugeError::TooManySplits));
+    }
 }

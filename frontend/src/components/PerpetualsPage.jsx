@@ -117,65 +117,41 @@ function FundingChart({ data, height = 60 }) {
 
 // ============ Mark vs Index SVG Chart ============
 
-function MarkIndexChart({ data, pair }) {
-  const w = 320
-  const h = 100
+function MarkIndexChart({ data }) {
+  const w = 320, h = 100
   const allVals = data.flatMap(d => [d.mark, d.index])
-  const max = Math.max(...allVals)
-  const min = Math.min(...allVals)
-  const range = max - min || 1
-  const pad = 0.1
-
-  const toY = (v) => h - ((v - min) / range) * h * (1 - pad * 2) - h * pad
+  const max = Math.max(...allVals), min = Math.min(...allVals), range = max - min || 1
+  const toY = (v) => h - ((v - min) / range) * h * 0.8 - h * 0.1
   const toX = (i) => (i / (data.length - 1)) * w
-
-  const markPoints = data.map((d, i) => `${toX(i)},${toY(d.mark)}`).join(' ')
-  const indexPoints = data.map((d, i) => `${toX(i)},${toY(d.index)}`).join(' ')
-
-  // Basis spread (mark - index) as filled area
-  const basisPath = data.map((d, i) => {
-    const x = toX(i)
-    const yMark = toY(d.mark)
-    const yIndex = toY(d.index)
-    return { x, yMark, yIndex }
-  })
-  const basisFill = `M${basisPath[0].x},${basisPath[0].yMark} ` +
-    basisPath.slice(1).map(p => `L${p.x},${p.yMark}`).join(' ') +
-    ` L${basisPath[basisPath.length - 1].x},${basisPath[basisPath.length - 1].yIndex} ` +
-    basisPath.slice(0, -1).reverse().map(p => `L${p.x},${p.yIndex}`).join(' ') +
-    ' Z'
-
-  const lastMark = data[data.length - 1].mark
-  const lastIndex = data[data.length - 1].index
-  const basisBps = (((lastMark - lastIndex) / lastIndex) * 10000).toFixed(1)
-
+  const markPts = data.map((d, i) => `${toX(i)},${toY(d.mark)}`).join(' ')
+  const indexPts = data.map((d, i) => `${toX(i)},${toY(d.index)}`).join(' ')
+  const bp = data.map((d, i) => ({ x: toX(i), ym: toY(d.mark), yi: toY(d.index) }))
+  const basisFill = `M${bp[0].x},${bp[0].ym} ${bp.slice(1).map(p => `L${p.x},${p.ym}`).join(' ')} L${bp[bp.length-1].x},${bp[bp.length-1].yi} ${bp.slice(0,-1).reverse().map(p => `L${p.x},${p.yi}`).join(' ')} Z`
+  const last = data[data.length - 1]
+  const basisBps = (((last.mark - last.index) / last.index) * 10000).toFixed(1)
+  const Legend = ({ color, label }) => (
+    <div className="flex items-center gap-1.5">
+      <div className="w-3 h-0.5 rounded-full" style={{ background: color }} />
+      <span className="text-[9px] font-mono text-black-400">{label}</span>
+    </div>
+  )
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded-full" style={{ background: CYAN }} />
-            <span className="text-[9px] font-mono text-black-400">Mark</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded-full" style={{ background: '#a855f7' }} />
-            <span className="text-[9px] font-mono text-black-400">Index</span>
-          </div>
+          <Legend color={CYAN} label="Mark" />
+          <Legend color="#a855f7" label="Index" />
         </div>
         <span className={`text-[10px] font-mono font-bold ${parseFloat(basisBps) >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
           Basis: {basisBps} bps
         </span>
       </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: h }}>
-        {/* Basis spread fill */}
         <path d={basisFill} fill={`${CYAN}10`} />
-        {/* Index line */}
-        <polyline points={indexPoints} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
-        {/* Mark line */}
-        <polyline points={markPoints} fill="none" stroke={CYAN} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {/* End dots */}
-        <circle cx={toX(data.length - 1)} cy={toY(lastMark)} r="3" fill={CYAN} />
-        <circle cx={toX(data.length - 1)} cy={toY(lastIndex)} r="3" fill="#a855f7" opacity="0.7" />
+        <polyline points={indexPts} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+        <polyline points={markPts} fill="none" stroke={CYAN} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={toX(data.length - 1)} cy={toY(last.mark)} r="3" fill={CYAN} />
+        <circle cx={toX(data.length - 1)} cy={toY(last.index)} r="3" fill="#a855f7" opacity="0.7" />
       </svg>
     </div>
   )
@@ -210,40 +186,16 @@ function LeverageSlider({ value, onChange, max = 50 }) {
             transition={{ duration: 0.15 }}
           />
         </div>
-        <input
-          type="range"
-          min={1}
-          max={max}
-          step={1}
-          value={value}
+        <input type="range" min={1} max={max} step={1} value={value}
           onChange={(e) => onChange(parseInt(e.target.value))}
-          className="absolute inset-x-0 w-full h-8 opacity-0 cursor-pointer"
-          style={{ zIndex: 2 }}
-        />
-        <motion.div
-          className="absolute w-4 h-4 rounded-full border-2"
-          style={{
-            left: `calc(${pct}% - 8px)`,
-            background: '#0f0f0f',
-            borderColor: CYAN,
-            boxShadow: `0 0 8px ${CYAN}40`,
-            zIndex: 1,
-          }}
-          animate={{ left: `calc(${pct}% - 8px)` }}
-          transition={{ duration: 0.15 }}
-        />
+          className="absolute inset-x-0 w-full h-8 opacity-0 cursor-pointer" style={{ zIndex: 2 }} />
+        <motion.div className="absolute w-4 h-4 rounded-full border-2"
+          style={{ left: `calc(${pct}% - 8px)`, background: '#0f0f0f', borderColor: CYAN, boxShadow: `0 0 8px ${CYAN}40`, zIndex: 1 }}
+          animate={{ left: `calc(${pct}% - 8px)` }} transition={{ duration: 0.15 }} />
       </div>
       <div className="flex justify-between mt-1">
         {stops.map((s) => (
-          <button
-            key={s}
-            onClick={() => onChange(s)}
-            className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-all ${
-              value === s ? 'text-cyan-400 font-bold' : 'text-black-500 hover:text-black-300'
-            }`}
-          >
-            {s}x
-          </button>
+          <button key={s} onClick={() => onChange(s)} className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-all ${value === s ? 'text-cyan-400 font-bold' : 'text-black-500 hover:text-black-300'}`}>{s}x</button>
         ))}
       </div>
     </div>
@@ -252,10 +204,10 @@ function LeverageSlider({ value, onChange, max = 50 }) {
 
 // ============ Position Manager ============
 
-const DetailCell = ({ label, value, color = 'text-black-300' }) => (
+const DetailCell = ({ label, value, color, style }) => (
   <div>
     <p className="text-[8px] font-mono text-black-500 uppercase">{label}</p>
-    <p className={`text-[10px] font-mono ${color}`}>{value}</p>
+    <p className={`text-[10px] font-mono ${color || 'text-black-300'}`} style={style}>{value}</p>
   </div>
 )
 
@@ -301,7 +253,7 @@ function PositionManager({ positions }) {
               <DetailCell label="Entry" value={pos.entry} />
               <DetailCell label="Mark" value={`$${pos.markRaw.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} color="text-white" />
               <DetailCell label="Liq. Price" value={pos.liqPrice} color="text-red-400" />
-              <DetailCell label="Margin" value={`${pos.marginRatio}%`} color={`text-[${marginColor(pos.marginRatio)}]`} />
+              <DetailCell label="Margin" value={`${pos.marginRatio}%`} style={{ color: marginColor(pos.marginRatio) }} />
             </div>
             <div className="mt-2 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pos.marginRatio, 100)}%`, background: marginColor(pos.marginRatio) }} />
@@ -733,7 +685,7 @@ export default function PerpetualsPage() {
                     <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Mark vs Index Price</h3>
                     <span className="text-[10px] font-mono text-black-400">Last 10 batches</span>
                   </div>
-                  <MarkIndexChart data={MARK_INDEX_DATA[market.pair] || MARK_INDEX_DATA['ETH/USD']} pair={market.pair} />
+                  <MarkIndexChart data={MARK_INDEX_DATA[market.pair] || MARK_INDEX_DATA['ETH/USD']} />
                 </div>
               </GlassCard>
 

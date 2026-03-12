@@ -295,6 +295,8 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
     if (!draftText) return null;
 
     // Phase 2: Haiku quality-gates the draft (Claude reasoning on every response)
+    // Calibration feeds into the editor too — if naturalness is weak, editor pushes for more human tone
+    const reviewCalibration = calibration ? `\n\nSELF-IMPROVEMENT NOTE: ${calibration}` : '';
     const review = await llmChat({
       _background: true,
       model: 'claude-haiku-4-5-20251001',
@@ -309,7 +311,7 @@ What makes a response dead: it could've been written by any chatbot ("That's a g
 What makes it good: it sounds like a specific person with opinions, it moves the conversation forward, it's funny/sharp/insightful.
 
 ECOSYSTEM HALLUCINATION FILTER: If the draft asserts specific facts about VibeSwap's live state — TVL, volume, token supply, stablecoin distribution, user counts, fee revenue, liquidity depth — that were NOT in the conversation context, return SKIP. JARVIS must never fabricate ecosystem metrics. General crypto market commentary is fine. VibeSwap-specific data claims without source data are not.
-
+${reviewCalibration}
 Return ONLY the final text or SKIP. No explanation needed.`,
       messages: [{ role: 'user', content: `Draft: ${draftText}\n\nContext: [${userName}] said "${text}"` }],
     });

@@ -2063,4 +2063,402 @@ mod tests {
         assert!(report.pool_solvent_ok);
         assert!(report.all_ok);
     }
+
+    // ============ Batch 8: Hardening to 185+ Tests ============
+
+    #[test]
+    fn test_emission_rate_era_15_midpoint() {
+        // Verify rate at a mid-range era
+        let rate = emission_rate(15);
+        assert_eq!(rate, BASE_EMISSION_RATE >> 15);
+        assert!(rate > 0);
+    }
+
+    #[test]
+    fn test_emission_rate_era_30_near_zero() {
+        let rate = emission_rate(30);
+        assert_eq!(rate, BASE_EMISSION_RATE >> 30);
+        assert!(rate > 0, "Era 30 rate should still be positive");
+    }
+
+    #[test]
+    fn test_current_era_one_second_into_era_1() {
+        assert_eq!(current_era(GENESIS, GENESIS + ERA_DURATION + 1), 1);
+    }
+
+    #[test]
+    fn test_current_era_last_second_of_era_31() {
+        let t = GENESIS + 32 * ERA_DURATION - 1;
+        assert_eq!(current_era(GENESIS, t), 31);
+    }
+
+    #[test]
+    fn test_current_era_exact_boundary_era_10() {
+        assert_eq!(current_era(GENESIS, GENESIS + 10 * ERA_DURATION), 10);
+    }
+
+    #[test]
+    fn test_validate_split_one_bps_each_sink() {
+        let split = BudgetSplit { shapley_bps: 1, gauge_bps: 1, staking_bps: 9998 };
+        assert!(validate_budget_split(&split).is_ok());
+    }
+
+    #[test]
+    fn test_validate_split_9999_1_0() {
+        let split = BudgetSplit { shapley_bps: 9999, gauge_bps: 1, staking_bps: 0 };
+        assert!(validate_budget_split(&split).is_ok());
+    }
+
+    #[test]
+    fn test_validate_split_sum_9999_fails() {
+        let split = BudgetSplit { shapley_bps: 3333, gauge_bps: 3333, staking_bps: 3333 };
+        assert_eq!(validate_budget_split(&split), Err(EmissionError::InvalidBudgetSplit));
+    }
+
+    #[test]
+    fn test_drip_two_seconds() {
+        let state = default_state();
+        let split = default_split();
+        let drip = calculate_drip(&state, GENESIS + 2, &split).unwrap();
+        assert_eq!(drip.total_minted, BASE_EMISSION_RATE * 2);
+    }
+
+    #[test]
+    fn test_drip_mid_era_to_mid_next_era() {
+        let mut state = default_state();
+        state.last_drip_timestamp = GENESIS + ERA_DURATION / 2;
+        let split = default_split();
+        let now = GENESIS + ERA_DURATION + ERA_DURATION / 2;
+        let drip = calculate_drip(&state, now, &split).unwrap();
+
+        let era0_part = BASE_EMISSION_RATE * (ERA_DURATION / 2) as u128;
+        let era1_part = (BASE_EMISSION_RATE >> 1) * (ERA_DURATION / 2) as u128;
+        assert_eq!(drip.total_minted, era0_part + era1_part);
+        assert_eq!(drip.new_era, 1);
+    }
+
+    #[test]
+    fn test_drip_supply_cap_zero_remaining() {
+        let mut state = default_state();
+        state.total_emitted = MAX_SUPPLY;
+        state.shapley_pool = MAX_SUPPLY;
+        let split = default_split();
+        let drip = calculate_drip(&state, GENESIS + 86400, &split).unwrap();
+        assert_eq!(drip.total_minted, 0);
+        assert_eq!(drip.shapley_share, 0);
+        assert_eq!(drip.gauge_share, 0);
+        assert_eq!(drip.staking_share, 0);
+    }
+
+    #[test]
+    fn test_drip_all_to_gauge_split() {
+        let state = default_state();
+        let split = BudgetSplit { shapley_bps: 0, gauge_bps: 10000, staking_bps: 0 };
+        let drip = calculate_drip(&state, GENESIS + 1000, &split).unwrap();
+        assert_eq!(drip.shapley_share, 0);
+        assert_eq!(drip.gauge_share, drip.total_minted);
+        assert_eq!(drip.staking_share, 0);
+    }
+
+    #[test]
+    fn test_apply_drip_timestamp_advances() {
+        let mut state = default_state();
+        let split = default_split();
+        let now = GENESIS + 5000;
+        let drip = calculate_drip(&state, now, &split).unwrap();
+        apply_drip(&mut state, &drip, now);
+        assert_eq!(state.last_drip_timestamp, now);
+
+        let now2 = now + 5000;
+        let drip2 = calculate_drip(&state, now2, &split).unwrap();
+        apply_drip(&mut state, &drip2, now2);
+        assert_eq!(state.last_drip_timestamp, now2);
+    }
+
+    #[test]
+    fn test_apply_drip_zero_minted_no_change() {
+        let mut state = default_state();
+        state.total_emitted = MAX_SUPPLY;
+        state.shapley_pool = MAX_SUPPLY;
+        let drip = DripResult {
+            total_minted: 0,
+            shapley_share: 0,
+            gauge_share: 0,
+            staking_share: 0,
+            new_era: 32,
+        };
+        let now = GENESIS + 86400;
+        apply_drip(&mut state, &drip, now);
+        assert_eq!(state.total_emitted, MAX_SUPPLY);
+        assert_eq!(state.last_drip_timestamp, now);
+    }
+
+    #[test]
+    fn test_drain_pool_of_two_wei() {
+        // Pool of 2: min_drain = mul_div(2, 100, 10000) = 0
+        // raw_drain at 5000 bps = mul_div(2, 5000, 10000) = 1
+        // Since raw_drain(1) >= min_drain(0) and <= max_drain(1), should work
+        let result = calculate_drain(2, MAX_DRAIN_BPS);
+        match result {
+            Ok(drain) => {
+                assert!(drain.amount_drained <= 2);
+                assert_eq!(drain.amount_drained + drain.pool_remaining, 2);
+            }
+            Err(EmissionError::DrainBelowMinimum) => {
+                // Also acceptable if min computation rounds up
+            }
+            Err(e) => panic!("Unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_drain_preserves_pool_plus_drained_identity() {
+        let pool = 500_000 * PRECISION;
+        let drain = calculate_drain(pool, 2500).unwrap();
+        assert_eq!(drain.amount_drained + drain.pool_remaining, pool);
+    }
+
+    #[test]
+    fn test_drain_max_supply_pool() {
+        let pool = MAX_SUPPLY;
+        let drain = calculate_drain(pool, 1000).unwrap();
+        assert!(drain.amount_drained > 0);
+        assert!(drain.amount_drained <= pool);
+        assert_eq!(drain.amount_drained + drain.pool_remaining, pool);
+    }
+
+    #[test]
+    fn test_apply_drain_then_verify_coherence_after_staking_distribution() {
+        let mut state = default_state();
+        let split = default_split();
+
+        let now = GENESIS + 86400;
+        let drip = calculate_drip(&state, now, &split).unwrap();
+        apply_drip(&mut state, &drip, now);
+
+        // Drain some
+        let drain = calculate_drain(state.shapley_pool, 2000).unwrap();
+        apply_drain(&mut state, &drain);
+
+        // Distribute all staking rewards
+        let pending = state.staking_pending;
+        state.staking_pending = 0;
+        state.total_staking_funded += pending;
+
+        let report = verify_coherence(&state);
+        assert!(report.all_ok, "Coherence should hold after staking distribution");
+    }
+
+    #[test]
+    fn test_coherence_gauge_only_state() {
+        let mut state = default_state();
+        state.total_emitted = 500_000 * PRECISION;
+        state.total_gauge_funded = 500_000 * PRECISION;
+        let report = verify_coherence(&state);
+        assert!(report.all_ok);
+    }
+
+    #[test]
+    fn test_coherence_split_across_all_sinks() {
+        let mut state = default_state();
+        state.total_emitted = 100_000;
+        state.shapley_pool = 20_000;
+        state.total_shapley_drained = 30_000;
+        state.total_gauge_funded = 25_000;
+        state.staking_pending = 10_000;
+        state.total_staking_funded = 15_000;
+        let report = verify_coherence(&state);
+        assert!(report.all_ok);
+    }
+
+    #[test]
+    fn test_cross_era_emission_single_second_era_boundary() {
+        // Single second that straddles an era boundary
+        let from = GENESIS + ERA_DURATION - 1;
+        let to = GENESIS + ERA_DURATION + 1;
+        let emission = cross_era_emission(GENESIS, from, to);
+        let expected = BASE_EMISSION_RATE + (BASE_EMISSION_RATE >> 1);
+        assert_eq!(emission, expected);
+    }
+
+    #[test]
+    fn test_cross_era_emission_exactly_one_era() {
+        // Exactly one full era (era 1)
+        let from = GENESIS + ERA_DURATION;
+        let to = GENESIS + 2 * ERA_DURATION;
+        let emission = cross_era_emission(GENESIS, from, to);
+        let expected = (BASE_EMISSION_RATE >> 1) * ERA_DURATION as u128;
+        assert_eq!(emission, expected);
+    }
+
+    #[test]
+    fn test_cross_era_additivity_three_segments() {
+        let a = GENESIS;
+        let b = GENESIS + ERA_DURATION / 3;
+        let c = GENESIS + ERA_DURATION;
+        let d = GENESIS + ERA_DURATION + ERA_DURATION / 2;
+
+        let total = cross_era_emission(GENESIS, a, d);
+        let seg1 = cross_era_emission(GENESIS, a, b);
+        let seg2 = cross_era_emission(GENESIS, b, c);
+        let seg3 = cross_era_emission(GENESIS, c, d);
+        assert_eq!(total, seg1 + seg2 + seg3);
+    }
+
+    #[test]
+    fn test_emission_schedule_two_points() {
+        let schedule = emission_schedule(GENESIS, 2);
+        assert_eq!(schedule.len(), 2);
+        assert_eq!(schedule[0].era, 0);
+        assert_eq!(schedule[1].era, 1);
+        assert!(schedule[1].cumulative > schedule[0].cumulative);
+    }
+
+    #[test]
+    fn test_emission_schedule_five_points_rates_halve() {
+        let schedule = emission_schedule(GENESIS, 5);
+        for i in 1..5 {
+            assert_eq!(schedule[i].rate, schedule[i - 1].rate >> 1);
+        }
+    }
+
+    #[test]
+    fn test_total_supply_at_era_1_greater_than_era_0() {
+        let s0 = total_supply_at_era(0);
+        let s1 = total_supply_at_era(1);
+        assert!(s1 > s0);
+        // Era 1 adds half of what era 0 added
+        let era1_addition = s1 - s0;
+        assert_eq!(era1_addition, (BASE_EMISSION_RATE >> 1) * ERA_DURATION as u128);
+    }
+
+    #[test]
+    fn test_rate_monotonicity_check_zero_to_one_fails() {
+        assert_eq!(
+            rate_monotonicity_check(0, 1),
+            Err(EmissionError::RateIncreased)
+        );
+    }
+
+    #[test]
+    fn test_rate_monotonicity_check_large_decrease() {
+        assert!(rate_monotonicity_check(u128::MAX, 0).is_ok());
+    }
+
+    #[test]
+    fn test_is_game_type_safe_boundary_values() {
+        assert!(is_game_type_safe(0));
+        assert!(!is_game_type_safe(1));
+        assert!(!is_game_type_safe(128));
+    }
+
+    #[test]
+    fn test_drip_100_hours_coherence() {
+        let mut state = default_state();
+        let split = default_split();
+        for hour in 1..=100u64 {
+            let now = GENESIS + hour * 3600;
+            let drip = calculate_drip(&state, now, &split).unwrap();
+            apply_drip(&mut state, &drip, now);
+        }
+        let report = verify_coherence(&state);
+        assert!(report.all_ok, "Coherence should hold after 100 hourly drips");
+        assert!(state.total_emitted > 0);
+    }
+
+    #[test]
+    fn test_drip_and_drain_interleaved_coherence() {
+        let mut state = default_state();
+        let split = default_split();
+
+        for i in 1..=20u64 {
+            let now = GENESIS + i * 7200;
+            let drip = calculate_drip(&state, now, &split).unwrap();
+            apply_drip(&mut state, &drip, now);
+
+            if state.shapley_pool > 0 {
+                match calculate_drain(state.shapley_pool, 1500) {
+                    Ok(drain) => apply_drain(&mut state, &drain),
+                    Err(_) => {}
+                }
+            }
+
+            let report = verify_coherence(&state);
+            assert!(report.all_ok, "Coherence broken at iteration {}", i);
+        }
+    }
+
+    #[test]
+    fn test_drain_bounds_symmetry() {
+        // min should always be <= max for any positive pool
+        for exp in 0..20u32 {
+            let pool = 1u128 << exp;
+            let (min, max) = drain_bounds(pool);
+            assert!(min <= max, "min {} > max {} for pool {}", min, max, pool);
+        }
+    }
+
+    #[test]
+    fn test_emission_state_clone_eq() {
+        let s1 = default_state();
+        let s2 = s1.clone();
+        assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn test_budget_split_clone_eq() {
+        let s1 = default_split();
+        let s2 = s1.clone();
+        assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn test_drip_result_clone_eq() {
+        let state = default_state();
+        let split = default_split();
+        let drip = calculate_drip(&state, GENESIS + 100, &split).unwrap();
+        let cloned = drip.clone();
+        assert_eq!(drip, cloned);
+    }
+
+    #[test]
+    fn test_drain_result_clone_eq() {
+        let pool = 100_000 * PRECISION;
+        let drain = calculate_drain(pool, 2000).unwrap();
+        let cloned = drain.clone();
+        assert_eq!(drain, cloned);
+    }
+
+    #[test]
+    fn test_coherence_report_clone_eq() {
+        let state = default_state();
+        let report = verify_coherence(&state);
+        let cloned = report.clone();
+        assert_eq!(report, cloned);
+    }
+
+    #[test]
+    fn test_schedule_point_clone_eq() {
+        let schedule = emission_schedule(GENESIS, 2);
+        let cloned = schedule[0].clone();
+        assert_eq!(schedule[0], cloned);
+    }
+
+    #[test]
+    fn test_remaining_mintable_half() {
+        let half = MAX_SUPPLY / 2;
+        assert_eq!(remaining_mintable(half), MAX_SUPPLY - half);
+    }
+
+    #[test]
+    fn test_total_supply_at_era_convergence() {
+        // Total supply should converge: era 31 and era 32 should be very close
+        let s31 = total_supply_at_era(31);
+        let s32 = total_supply_at_era(32);
+        // Era 32 rate is 0, so s32 == s31 + 0
+        // But total_supply_at_era(32) includes era 32 emission which is 0
+        assert!(s32 >= s31);
+        // The difference should be exactly the era 32 emission (which is 0)
+        assert_eq!(s32 - s31, emission_rate(32) * ERA_DURATION as u128);
+    }
 }

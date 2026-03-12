@@ -1,985 +1,685 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { useWallet } from '../hooks/useWallet'
-import { useDeviceWallet } from '../hooks/useDeviceWallet'
-import toast from 'react-hot-toast'
 import GlassCard from './ui/GlassCard'
-import InteractiveButton from './ui/InteractiveButton'
-import AnimatedNumber from './ui/AnimatedNumber'
-import { StaggerContainer, StaggerItem } from './ui/StaggerContainer'
+import PageHero from './ui/PageHero'
+import StatCard from './ui/StatCard'
+import Sparkline, { generateSparklineData } from './ui/Sparkline'
 
-const EPOCH_LENGTH = 100 // proofs per difficulty adjustment (matches server)
+// ============ Constants ============
 
-// ============ JARVIS Mining API ============
+const PHI = 1.618033988749895
+const AMBER = '#f59e0b'
+const EMERALD = '#10b981'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
-
-async function fetchMiningTarget() {
-  const res = await fetch(`${API_URL}/web/mining/target`)
-  if (!res.ok) throw new Error('Failed to fetch mining target')
-  return res.json()
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 1 / (PHI * PHI * 10) } } }
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 1 / (PHI * PHI), ease: 'easeOut' } },
 }
 
-async function submitMiningProof(walletAddress, nonce, hash, challenge) {
-  const res = await fetch(`${API_URL}/web/mining/submit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ walletAddress, nonce, hash, challenge }),
+// ============ Seeded PRNG ============
+
+function seededRandom(seed) {
+  let s = seed
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 }
+}
+
+// ============ Mock Data Generators ============
+
+function generateHashRateHistory(points = 24) {
+  const rng = seededRandom(7919); let rate = 14200
+  return Array.from({ length: points }, () => {
+    rate += (rng() - 0.46) * 2400; rate = Math.max(rate, 6000)
+    return rate
   })
-  return res.json()
 }
 
-async function fetchMiningStats(walletAddress) {
-  const res = await fetch(`${API_URL}/web/mining/stats/wallet:${walletAddress.toLowerCase()}`)
-  if (!res.ok) return null
-  return res.json()
+function generateDifficultyHistory(points = 24) {
+  const rng = seededRandom(3571); let diff = 12.0
+  return Array.from({ length: points }, () => {
+    diff += (rng() - 0.48) * 0.6; diff = Math.max(diff, 8)
+    return diff
+  })
 }
 
-// ============ SHA-256 Mining Worker (inline) ============
-// Worker uses server challenge + leading-zero-bit difficulty (not hex prefix)
+function generateBlockTimeHistory(points = 24) {
+  const rng = seededRandom(2137); let bt = 42
+  return Array.from({ length: points }, () => {
+    bt += (rng() - 0.5) * 8; bt = Math.max(bt, 15); bt = Math.min(bt, 90)
+    return bt
+  })
+}
 
-const WORKER_CODE = `
-  let mining = false
-  let hashCount = 0
-  let startTime = 0
-  let reporterInterval = null
-  let currentGeneration = 0
+function generateMinerCountHistory(points = 24) {
+  const rng = seededRandom(9973); let mc = 24
+  return Array.from({ length: points }, () => {
+    mc += Math.round((rng() - 0.4) * 6); mc = Math.max(mc, 5)
+    return mc
+  })
+}
 
-  // Convert hex string to Uint8Array (matches Node Buffer.from(hex, 'hex'))
-  function hexToBytes(hex) {
-    const bytes = new Uint8Array(hex.length / 2)
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16)
-    }
-    return bytes
+function generateEmissionSchedule() {
+  const total = 21_000_000
+  const halvings = [0, 2.3, 4.6, 6.9, 9.2, 11.5, 13.8, 16.1, 18.4]
+  let remaining = total; const data = []
+  for (let i = 0; i < halvings.length; i++) {
+    const mined = remaining * 0.5
+    remaining -= mined
+    data.push({ year: halvings[i], remaining, mined: total - remaining })
   }
+  return data
+}
 
-  function bytesToHex(bytes) {
-    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-  }
+// ============ Static Seed Data ============
 
-  // SHA-256 of raw bytes — matches server: createHash('sha256').update(Buffer).digest()
-  async function sha256(challengeHex, nonceHex) {
-    const challengeBytes = hexToBytes(challengeHex)
-    const nonceBytes = hexToBytes(nonceHex)
-    const combined = new Uint8Array(challengeBytes.length + nonceBytes.length)
-    combined.set(challengeBytes)
-    combined.set(nonceBytes, challengeBytes.length)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', combined)
-    return new Uint8Array(hashBuffer)
-  }
+const hashRateData = generateHashRateHistory()
+const difficultyData = generateDifficultyHistory()
+const blockTimeData = generateBlockTimeHistory()
+const minerCountData = generateMinerCountHistory()
+const emissionData = generateEmissionSchedule()
 
-  // Count leading zero bits (matches server-side countLeadingZeroBits)
-  function countLeadingZeroBits(hashBytes) {
-    for (let i = 0; i < hashBytes.length; i++) {
-      const byte = hashBytes[i]
-      if (byte === 0) continue
-      return i * 8 + (Math.clz32(byte) - 24)
-    }
-    return 255
-  }
+// ============ Mining Tiers ============
 
-  async function mineBlock(challengeHex, difficulty, batchSize, generation) {
-    for (let i = 0; i < batchSize; i++) {
-      if (!mining || currentGeneration !== generation) return null
+const MINING_TIERS = [
+  {
+    id: 'prospector', label: 'Prospector', icon: '\u26CF',
+    requirement: '0 - 99 blocks', multiplier: '1.0x',
+    color: '#a1a1aa', gradient: 'from-zinc-500/20 to-zinc-600/10',
+    desc: 'Starting tier. Mine your first blocks to climb the ranks.',
+  },
+  {
+    id: 'miner', label: 'Miner', icon: '\u2692',
+    requirement: '100 - 499 blocks', multiplier: '1.25x',
+    color: '#3b82f6', gradient: 'from-blue-500/20 to-blue-600/10',
+    desc: 'Proven hashpower. 25% reward bonus on all mined blocks.',
+  },
+  {
+    id: 'foreman', label: 'Foreman', icon: '\u2655',
+    requirement: '500 - 1,999 blocks', multiplier: '1.618x',
+    color: '#f59e0b', gradient: 'from-amber-500/20 to-amber-600/10',
+    desc: 'PHI multiplier unlocked. Priority in batch settlement.',
+  },
+  {
+    id: 'baron', label: 'Baron', icon: '\u2654',
+    requirement: '2,000+ blocks', multiplier: '2.0x',
+    color: '#a855f7', gradient: 'from-purple-500/20 to-purple-600/10',
+    desc: 'Elite miner. Double rewards, governance weight, streak shield.',
+  },
+]
 
-      const nonce = crypto.getRandomValues(new Uint8Array(32))
-      const nonceHex = bytesToHex(nonce)
+// ============ Mock Leaderboard ============
 
-      // Hash: SHA-256(challenge_bytes || nonce_bytes) — raw byte concat
-      const hashBytes = await sha256(challengeHex, nonceHex)
-      hashCount++
-
-      if (countLeadingZeroBits(hashBytes) >= difficulty) {
-        return { nonce: nonceHex, hash: bytesToHex(hashBytes), challenge: challengeHex }
-      }
-    }
-    return undefined
-  }
-
-  self.onmessage = async (e) => {
-    const { type, challenge, difficulty } = e.data
-
-    if (type === 'start') {
-      // Stop any previous mining loop via generation counter
-      mining = false
-      if (reporterInterval) { clearInterval(reporterInterval); reporterInterval = null }
-      // Small yield to let previous loop exit
-      await new Promise(r => setTimeout(r, 10))
-
-      mining = true
-      hashCount = 0
-      startTime = Date.now()
-      const gen = ++currentGeneration
-
-      reporterInterval = setInterval(() => {
-        if (!mining || currentGeneration !== gen) { clearInterval(reporterInterval); reporterInterval = null; return }
-        const elapsed = (Date.now() - startTime) / 1000
-        const hashrate = elapsed > 0 ? hashCount / elapsed : 0
-        self.postMessage({ type: 'hashrate', hashrate, totalHashes: hashCount })
-      }, 1000)
-
-      while (mining && currentGeneration === gen) {
-        const result = await mineBlock(challenge, difficulty, 100, gen)
-        if (result === null) break
-        if (result) {
-          mining = false
-          if (reporterInterval) { clearInterval(reporterInterval); reporterInterval = null }
-          self.postMessage({ type: 'found', ...result, totalHashes: hashCount })
-          return
-        }
-      }
-
-      if (reporterInterval) { clearInterval(reporterInterval); reporterInterval = null }
-      self.postMessage({ type: 'stopped' })
-    }
-
-    if (type === 'stop') {
-      mining = false
-      currentGeneration++
-    }
-  }
-`
-
-// ============ TIP JAR PANEL ============
-
-function TipJarPanel({ address, serverBalance, onTipSuccess, apiUrl }) {
-  const [tipAmount, setTipAmount] = useState('')
-  const [isTipping, setIsTipping] = useState(false)
-  const [tipStatus, setTipStatus] = useState(null) // { type: 'success'|'error', message }
-
-  const presets = [
-    { label: '1 JUL', value: '1' },
-    { label: '5 JUL', value: '5' },
-    { label: '10 JUL', value: '10' },
-    { label: 'All', value: String(serverBalance || 0) },
+function generateLeaderboard() {
+  const rng = seededRandom(4219)
+  const names = [
+    '0x7a3F...e91C', '0xdB42...0f8A', '0x19cE...a3D7', '0x5f1B...c42E',
+    '0xaC08...7b6F', '0xe3D9...1a2B', '0x82fA...d05C', '0x6b1E...f93A',
+    '0xc47D...2e8B', '0x0fA6...b71D',
   ]
+  return names.map((addr, i) => ({
+    rank: i + 1,
+    address: addr,
+    totalMined: Math.round((10000 - i * 800) * (0.8 + rng() * 0.4) * 100) / 100,
+    streak: Math.round(14 + rng() * 60 - i * 3),
+  }))
+}
 
-  const handleTip = async () => {
-    const amount = parseFloat(tipAmount)
-    if (!amount || amount <= 0) return
-    if (amount > (serverBalance || 0)) {
-      setTipStatus({ type: 'error', message: 'Insufficient JUL balance — mine more first!' })
-      return
-    }
+const leaderboard = generateLeaderboard()
 
-    setIsTipping(true)
-    setTipStatus(null)
+// ============ Mock Active Workers ============
 
-    try {
-      // Step 1: Generate binding proof (commit-reveal)
-      const nonce = crypto.randomUUID()
-      const timestamp = Date.now()
+function generateWorkers() {
+  const rng = seededRandom(1337)
+  return Array.from({ length: 4 }, (_, i) => ({
+    id: `worker-${i + 1}`,
+    name: `Thread ${i + 1}`,
+    status: i < 3 ? 'active' : 'idle',
+    hashRate: i < 3 ? Math.round(1800 + rng() * 3200) : 0,
+    uptime: i < 3 ? `${Math.round(1 + rng() * 6)}h ${Math.round(rng() * 59)}m` : '--',
+    earnings: i < 3 ? Math.round(rng() * 120 * 100) / 100 : 0,
+  }))
+}
 
-      // Step 2: Submit tip to backend with proof binding
-      const res = await fetch(`${apiUrl}/web/mining/tip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: address,
-          amount,
-          nonce,
-          timestamp,
-          // Binding proof: hash(address + amount + nonce + timestamp)
-          bindingProof: await generateBindingProof(address, amount, nonce, timestamp),
-        }),
+const activeWorkers = generateWorkers()
+
+// ============ Helpers ============
+
+function fmt(n) {
+  const a = Math.abs(n)
+  if (a >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
+  if (a >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toLocaleString()
+}
+
+// ============ Mining Visualization (Animated SVG) ============
+
+function MiningVisualization({ isMining, blockCount, difficulty }) {
+  const [particles, setParticles] = useState([])
+  const [pickaxeAngle, setPickaxeAngle] = useState(0)
+
+  useEffect(() => {
+    if (!isMining) { setParticles([]); return }
+    const interval = setInterval(() => {
+      setPickaxeAngle(prev => prev === 0 ? -25 : 0)
+      setParticles(prev => {
+        const rng = seededRandom(Date.now() % 100000)
+        const fresh = Array.from({ length: 3 }, (_, i) => ({
+          id: Date.now() + i,
+          x: 140 + (rng() - 0.5) * 60,
+          y: 100 + (rng() - 0.5) * 30,
+          size: 2 + rng() * 3,
+          vx: (rng() - 0.5) * 4,
+          vy: -1 - rng() * 3,
+          life: 1.0,
+        }))
+        const updated = [...prev, ...fresh]
+          .map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 0.04 }))
+          .filter(p => p.life > 0)
+          .slice(-40)
+        return updated
       })
-
-      const result = await res.json()
-
-      if (result.success) {
-        setTipStatus({
-          type: 'success',
-          message: `${amount.toFixed(2)} JUL sent to Jarvis Compute Vault! +${(amount * 1000).toFixed(0)} compute credits activated.`
-        })
-        setTipAmount('')
-        onTipSuccess(result.newBalance || (serverBalance - amount))
-      } else {
-        setTipStatus({ type: 'error', message: result.error || 'Tip failed — try again' })
-      }
-    } catch (err) {
-      setTipStatus({ type: 'error', message: `Network error: ${err.message}` })
-    } finally {
-      setIsTipping(false)
-    }
-  }
-
-  return (
-    <div>
-      {/* Quick presets */}
-      <div className="flex gap-2 mb-3">
-        {presets.map(p => (
-          <button
-            key={p.label}
-            onClick={() => setTipAmount(p.value)}
-            disabled={isTipping || !(serverBalance > 0)}
-            className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors border ${
-              tipAmount === p.value
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                : 'bg-void-800/50 text-void-400 border-void-700/50 hover:text-void-200 hover:border-void-500/50'
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Custom amount + send button */}
-      <div className="flex gap-2">
-        <input
-          type="number"
-          value={tipAmount}
-          onChange={(e) => setTipAmount(e.target.value)}
-          placeholder="JUL amount..."
-          min="0"
-          step="0.001"
-          disabled={isTipping}
-          className="flex-1 bg-void-900/60 border border-void-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-void-500 focus:border-amber-500/50 focus:outline-none disabled:opacity-40"
-        />
-        <button
-          onClick={handleTip}
-          disabled={isTipping || !tipAmount || parseFloat(tipAmount) <= 0}
-          className="px-4 py-2 bg-amber-500/80 hover:bg-amber-500 disabled:bg-void-700 disabled:text-void-500 text-black font-bold text-sm rounded-lg transition-colors flex items-center gap-2"
-        >
-          {isTipping ? (
-            <span className="animate-pulse">Sending...</span>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Top Off Jarvis
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Status message */}
-      {tipStatus && (
-        <div className={`mt-2 p-2 rounded text-xs font-mono ${
-          tipStatus.type === 'success'
-            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-            : 'bg-red-500/10 text-red-400 border border-red-500/20'
-        }`}>
-          {tipStatus.message}
-        </div>
-      )}
-
-      {/* Rate info */}
-      <div className="mt-2 flex items-center justify-between text-void-500 text-xs">
-        <span>1 JUL = 1,000 compute credits</span>
-        <span>Credits expire in 30 days</span>
-      </div>
-    </div>
-  )
-}
-
-// Generate a binding proof hash (SHA-256)
-async function generateBindingProof(address, amount, nonce, timestamp) {
-  const data = new TextEncoder().encode(`${address}:${amount}:${nonce}:${timestamp}`)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = new Uint8Array(hashBuffer)
-  return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-function LeaderboardCard({ apiUrl }) {
-  const [leaders, setLeaders] = useState([])
-  const [supply, setSupply] = useState(null)
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [lbRes, supRes] = await Promise.allSettled([
-          fetch(`${apiUrl}/web/mining/leaderboard`).then(r => r.json()),
-          fetch(`${apiUrl}/web/mining/supply`).then(r => r.json()),
-        ])
-        if (lbRes.status === 'fulfilled') setLeaders(lbRes.value?.leaderboard || [])
-        if (supRes.status === 'fulfilled') setSupply(supRes.value)
-      } catch {}
-    }
-    fetchData()
-    const interval = setInterval(fetchData, 30_000)
-    return () => clearInterval(interval)
-  }, [apiUrl])
-
-  const formatId = (id) => {
-    if (!id) return '???'
-    if (id.startsWith('wallet:')) return `${id.slice(7, 13)}...${id.slice(-4)}`
-    if (id.length > 12) return `${id.slice(0, 8)}...`
-    return id
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-      <GlassCard className="p-5">
-        <h3 className="text-sm font-semibold text-void-300 mb-3">Top Miners</h3>
-        {leaders.length === 0 ? (
-          <div className="text-void-600 text-sm">No miners yet — be the first!</div>
-        ) : (
-          <div className="space-y-1.5">
-            {leaders.slice(0, 10).map((m, i) => (
-              <div key={m.userId} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2">
-                  <span className={`font-mono w-5 text-right ${i < 3 ? 'text-amber-400' : 'text-void-500'}`}>
-                    {i + 1}.
-                  </span>
-                  <span className="text-void-300 font-mono text-xs">{formatId(m.userId)}</span>
-                </div>
-                <span className="text-amber-400 font-mono text-xs">{m.julBalance?.toFixed(2)} JUL</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </GlassCard>
-
-      <GlassCard className="p-5">
-        <h3 className="text-sm font-semibold text-void-300 mb-3">Supply Economics</h3>
-        {supply ? (
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-void-400 text-sm">Circulating</span>
-              <span className="font-mono text-sm text-amber-400">{supply.supply?.circulating?.toFixed(2) || '0'} JUL</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-void-400 text-sm">Burned (sinks)</span>
-              <span className="font-mono text-sm text-red-400">{supply.supply?.burned?.toFixed(2) || '0'} JUL</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-void-400 text-sm">Escape Velocity</span>
-              <span className="font-mono text-sm text-void-300">{supply.escapeVelocity?.escapeVelocity?.toLocaleString() || '—'} JUL</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-void-400 text-sm">Hash Cost Index</span>
-              <span className={`font-mono text-sm ${
-                supply.hashCostIndex?.trend === 'deflationary' ? 'text-green-400' :
-                supply.hashCostIndex?.trend === 'inflationary' ? 'text-red-400' :
-                'text-void-300'
-              }`}>
-                {supply.hashCostIndex?.index || '1.0'} ({supply.hashCostIndex?.trend || 'equilibrium'})
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-void-400 text-sm">Daily Burns</span>
-              <span className="font-mono text-sm">{supply.treasury?.dailyBurned?.toFixed(2) || '0'} JUL</span>
-            </div>
-          </div>
-        ) : (
-          <div className="text-void-600 text-sm">Loading supply data...</div>
-        )}
-      </GlassCard>
-    </div>
-  )
-}
-
-function MinePage() {
-  const { isConnected: isExternalConnected, connect, address: externalAddress } = useWallet()
-  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
-  const isConnected = isExternalConnected || isDeviceConnected
-  const address = externalAddress || deviceAddress
-
-  // Mining state
-  const [isMining, setIsMining] = useState(false)
-  const [hashrate, setHashrate] = useState(0)
-  const [totalHashes, setTotalHashes] = useState(0)
-  const [blocksFound, setBlocksFound] = useState(0)
-  const [totalReward, setTotalReward] = useState(0)
-  const [miningLog, setMiningLog] = useState([])
-  const [workerCount, setWorkerCount] = useState(
-    Math.max(1, Math.min(navigator.hardwareConcurrency || 4, 8))
-  )
-
-  // Network state (from JARVIS backend)
-  const [difficulty, setDifficulty] = useState(12)
-  const [currentReward, setCurrentReward] = useState(1.0)
-  const [epochNumber, setEpochNumber] = useState(0)
-  const [totalBlocksMined, setTotalBlocksMined] = useState(0)
-  const [challenge, setChallenge] = useState('')
-  const [serverBalance, setServerBalance] = useState(0)
-  const [serverProofs, setServerProofs] = useState(0)
-  const [activeMinerCount, setActiveMinerCount] = useState(0)
-
-  const workersRef = useRef([])
-  const miningStartRef = useRef(null)
-  const challengeRef = useRef('')
-
-  // Fetch mining target from backend on mount + every 60s
-  const refreshTarget = useCallback(async () => {
-    try {
-      const target = await fetchMiningTarget()
-      setChallenge(target.challenge)
-      challengeRef.current = target.challenge
-      setDifficulty(target.difficulty)
-      setCurrentReward(target.reward)
-      setEpochNumber(target.epoch)
-      setTotalBlocksMined(target.totalProofs)
-      setActiveMinerCount(target.activeMinerCount)
-    } catch (err) {
-      console.warn('[mine] Failed to fetch target:', err.message)
-    }
-  }, [])
-
-  // Fetch user's server-side balance
-  const refreshStats = useCallback(async () => {
-    if (!address) return
-    try {
-      const stats = await fetchMiningStats(address)
-      if (stats) {
-        setServerBalance(stats.julBalance)
-        setServerProofs(stats.proofsSubmitted)
-      }
-    } catch {}
-  }, [address])
-
-  // Refresh target on mount + every 4 min (challenge rotates every 5 min on server)
-  // Also restarts active workers with fresh challenge to prevent stale submissions
-  useEffect(() => {
-    refreshTarget()
-    const interval = setInterval(async () => {
-      const oldChallenge = challengeRef.current
-      await refreshTarget()
-      // If challenge changed and we're mining, restart workers with new challenge
-      if (isMining && challengeRef.current && challengeRef.current !== oldChallenge) {
-        workersRef.current.forEach(w => {
-          w.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
-        })
-      }
-    }, 4 * 60_000)
-    return () => clearInterval(interval)
-  }, [refreshTarget, isMining, difficulty])
-
-  useEffect(() => {
-    refreshStats()
-  }, [refreshStats])
-
-  const addLog = useCallback((message, type = 'info') => {
-    const timestamp = new Date().toLocaleTimeString()
-    setMiningLog(prev => [{timestamp, message, type}, ...prev.slice(0, 49)])
-  }, [])
-
-  const startMining = useCallback(async () => {
-    if (!isConnected) {
-      connect()
-      return
-    }
-
-    // Fetch fresh challenge before starting
-    await refreshTarget()
-
-    if (!challengeRef.current) {
-      addLog('Failed to get mining target from network', 'error')
-      return
-    }
-
-    setIsMining(true)
-    setHashrate(0)
-    setTotalHashes(0)
-    miningStartRef.current = Date.now()
-    addLog(`Starting ${workerCount} mining threads...`, 'system')
-    addLog(`Challenge: ${challengeRef.current.slice(0, 18)}...`, 'system')
-    addLog(`Difficulty: ${difficulty} bits`, 'system')
-
-    const blob = new Blob([WORKER_CODE], { type: 'application/javascript' })
-    const workerUrl = URL.createObjectURL(blob)
-    const workers = []
-
-    for (let i = 0; i < workerCount; i++) {
-      const worker = new Worker(workerUrl)
-
-      worker.onmessage = async (e) => {
-        const { type, hashrate: hr, nonce, hash, challenge: proofChallenge } = e.data
-
-        if (type === 'hashrate') {
-          setHashrate(hr * workerCount)
-          setTotalHashes(prev => prev + 100)
-        }
-
-        if (type === 'found') {
-          addLog(`PROOF FOUND! Submitting to network...`, 'success')
-          addLog(`Nonce: ${nonce.slice(0, 18)}...`, 'success')
-          addLog(`Hash: ${hash.slice(0, 18)}...`, 'success')
-
-          // Submit proof to JARVIS backend — use the challenge the proof was mined against
-          try {
-            const submitChallenge = proofChallenge || challengeRef.current
-            if (!submitChallenge) {
-              addLog('No challenge available — refreshing...', 'error')
-              await refreshTarget()
-              worker.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
-              return
-            }
-            const result = await submitMiningProof(address, nonce, hash, submitChallenge)
-            if (result.accepted) {
-              setBlocksFound(prev => prev + 1)
-              setTotalReward(result.julBalance || 0)
-              setServerBalance(result.julBalance || 0)
-              setServerProofs(result.proofsSubmitted || 0)
-              setTotalBlocksMined(prev => prev + 1)
-              addLog(`ACCEPTED! +${result.reward?.toFixed(6) || '?'} JUL (total: ${result.julBalance?.toFixed(4) || '?'})`, 'success')
-              toast.success(`Block accepted! +${result.reward?.toFixed(4) || '?'} JUL`)
-            } else {
-              const reason = result.reason || result.error || 'unknown'
-              addLog(`Rejected: ${reason}`, 'error')
-              if (reason === 'stale_challenge' || reason.includes('challenge')) {
-                addLog('Challenge expired — refreshing and restarting...', 'system')
-                await refreshTarget()
-                // Don't break — the worker restart below will use the fresh challenge
-              } else if (reason === 'rate_limited') {
-                addLog(`Rate limited — waiting ${result.retryAfter || 60}s`, 'warning')
-              }
-            }
-          } catch (err) {
-            addLog(`Submit error: ${err.message}`, 'error')
-          }
-
-          // Refresh challenge and restart worker
-          await refreshTarget()
-          worker.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
-        }
-      }
-
-      worker.postMessage({ type: 'start', challenge: challengeRef.current, difficulty })
-      workers.push(worker)
-    }
-
-    workersRef.current = workers
-    // Don't revoke blob URL until workers are stopped — some mobile browsers
-    // (OnePlus/Android) fail if the source URL is revoked during worker init
-    workersRef.current._blobUrl = workerUrl
-  }, [isConnected, connect, workerCount, difficulty, address, addLog, refreshTarget])
-
-  const stopMining = useCallback(() => {
-    if (workersRef.current._blobUrl) {
-      URL.revokeObjectURL(workersRef.current._blobUrl)
-    }
-    workersRef.current.forEach(w => {
-      w.postMessage({ type: 'stop' })
-      w.terminate()
-    })
-    workersRef.current = []
-    setIsMining(false)
-    setHashrate(0)
-    addLog('Mining stopped', 'system')
-  }, [addLog])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      workersRef.current.forEach(w => {
-        w.postMessage({ type: 'stop' })
-        w.terminate()
-      })
-    }
-  }, [])
-
-  // Format hashrate for display
-  const formatHashrate = (h) => {
-    if (h >= 1e9) return `${(h / 1e9).toFixed(2)} GH/s`
-    if (h >= 1e6) return `${(h / 1e6).toFixed(2)} MH/s`
-    if (h >= 1e3) return `${(h / 1e3).toFixed(2)} KH/s`
-    return `${Math.round(h)} H/s`
-  }
-
-  const uptime = isMining && miningStartRef.current
-    ? Math.floor((Date.now() - miningStartRef.current) / 1000)
-    : 0
-
-  const formatUptime = (s) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    if (h > 0) return `${h}h ${m}m ${sec}s`
-    if (m > 0) return `${m}m ${sec}s`
-    return `${sec}s`
-  }
-
-  // Force re-render every second for uptime counter
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    if (!isMining) return
-    const interval = setInterval(() => setTick(t => t + 1), 1000)
+    }, 120)
     return () => clearInterval(interval)
   }, [isMining])
 
-  if (!isConnected) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-20">
-        <GlassCard className="max-w-md mx-auto p-8 text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <svg className="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-display font-bold mb-3">Mine Joule (JUL)</h2>
-          <p className="text-void-400 mb-6 max-w-md mx-auto">
-            Mine JUL — elastic cyphercash for compute. Reward is proportional to
-            actual work done. No hard cap, no insider advantage. Your hashrate, your credit.
-          </p>
-          <InteractiveButton variant="primary" onClick={connect} className="px-6 py-3">
-            Sign In to Mine
-          </InteractiveButton>
-        </GlassCard>
-      </div>
-    )
+  return (
+    <div className="relative w-full h-48 overflow-hidden rounded-xl bg-void-900/40">
+      <svg viewBox="0 0 320 192" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+        {/* Grid lines */}
+        {Array.from({ length: 8 }, (_, i) => (
+          <line key={`h${i}`} x1="0" y1={i * 24} x2="320" y2={i * 24}
+            stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+        ))}
+        {Array.from({ length: 13 }, (_, i) => (
+          <line key={`v${i}`} x1={i * 26} y1="0" x2={i * 26} y2="192"
+            stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+        ))}
+
+        {/* Block being mined */}
+        <motion.g
+          animate={isMining ? { y: [0, -3, 0] } : { y: 0 }}
+          transition={isMining ? { duration: 1 / PHI, repeat: Infinity, ease: 'easeInOut' } : {}}
+        >
+          <rect x="115" y="75" width="50" height="50" rx="6"
+            fill="url(#blockGrad)" stroke={AMBER} strokeWidth="1.5" opacity={isMining ? 1 : 0.3} />
+          <text x="140" y="105" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold"
+            fontFamily="monospace" opacity={isMining ? 1 : 0.4}>
+            {blockCount}
+          </text>
+        </motion.g>
+
+        {/* Pickaxe */}
+        <motion.g
+          animate={{ rotate: pickaxeAngle }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          style={{ transformOrigin: '200px 110px' }}
+        >
+          <line x1="200" y1="110" x2="230" y2="80" stroke="#a1a1aa" strokeWidth="3" strokeLinecap="round" />
+          <polygon points="228,82 242,72 236,68 226,78" fill={AMBER} opacity={isMining ? 1 : 0.3} />
+        </motion.g>
+
+        {/* Particles */}
+        {particles.map(p => (
+          <circle key={p.id} cx={p.x} cy={p.y} r={p.size}
+            fill={AMBER} opacity={p.life * 0.8} />
+        ))}
+
+        {/* Difficulty indicator */}
+        <text x="16" y="24" fill="rgba(255,255,255,0.5)" fontSize="10" fontFamily="monospace">
+          difficulty: {difficulty} bits
+        </text>
+
+        {/* Status text */}
+        <text x="304" y="24" textAnchor="end" fill={isMining ? EMERALD : 'rgba(255,255,255,0.3)'}
+          fontSize="10" fontFamily="monospace">
+          {isMining ? 'HASHING...' : 'IDLE'}
+        </text>
+
+        {/* Pulse ring when mining */}
+        {isMining && (
+          <motion.circle
+            cx="140" cy="100" r="35"
+            fill="none" stroke={AMBER} strokeWidth="1"
+            initial={{ r: 35, opacity: 0.6 }}
+            animate={{ r: 60, opacity: 0 }}
+            transition={{ duration: 1 / PHI, repeat: Infinity, ease: 'easeOut' }}
+          />
+        )}
+
+        <defs>
+          <linearGradient id="blockGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={AMBER} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={AMBER} stopOpacity="0.08" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  )
+}
+
+// ============ Emission Schedule Chart ============
+
+function EmissionChart({ data }) {
+  const W = 640, H = 200
+  const PAD = { top: 20, right: 20, bottom: 32, left: 64 }
+  const iW = W - PAD.left - PAD.right
+  const iH = H - PAD.top - PAD.bottom
+  const maxY = 21_000_000
+  const maxX = 20
+
+  const pts = data.map(d => ({
+    x: PAD.left + (d.year / maxX) * iW,
+    y: PAD.top + iH - (d.remaining / maxY) * iH,
+  }))
+
+  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+  const areaPath = `${linePath} L${pts[pts.length - 1].x},${PAD.top + iH} L${pts[0].x},${PAD.top + iH} Z`
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+      <defs>
+        <linearGradient id="emissionGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={AMBER} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={AMBER} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      {/* Y-axis labels */}
+      {[0, 5_250_000, 10_500_000, 15_750_000, 21_000_000].map((t, i) => {
+        const y = PAD.top + iH - (t / maxY) * iH
+        return (
+          <g key={i}>
+            <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="rgba(255,255,255,0.06)" />
+            <text x={PAD.left - 8} y={y + 4} textAnchor="end" fill="rgba(255,255,255,0.35)"
+              fontSize="10" fontFamily="monospace">{fmt(t)}</text>
+          </g>
+        )
+      })}
+
+      {/* Halving markers */}
+      {data.map((d, i) => {
+        const x = PAD.left + (d.year / maxX) * iW
+        return (
+          <g key={i}>
+            <line x1={x} y1={PAD.top} x2={x} y2={PAD.top + iH} stroke={AMBER} strokeWidth="0.5"
+              strokeDasharray="3,3" opacity="0.4" />
+            <text x={x} y={H - 8} textAnchor="middle" fill="rgba(255,255,255,0.35)"
+              fontSize="9" fontFamily="monospace">{d.year.toFixed(1)}y</text>
+          </g>
+        )
+      })}
+
+      <path d={areaPath} fill="url(#emissionGrad)" />
+      <path d={linePath} fill="none" stroke={AMBER} strokeWidth="2" strokeLinecap="round" />
+
+      {/* Dots on halvings */}
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3" fill={AMBER} stroke="#111" strokeWidth="1" />
+      ))}
+
+      {/* Label */}
+      <text x={PAD.left + 4} y={PAD.top + 14} fill="rgba(255,255,255,0.5)" fontSize="10" fontFamily="monospace">
+        Remaining JUL Supply
+      </text>
+    </svg>
+  )
+}
+
+// ============ MinePage Component ============
+
+function MinePage() {
+  const [isMining, setIsMining] = useState(false)
+  const [blockCount, setBlockCount] = useState(247)
+  const [minedToday, setMinedToday] = useState(34.82)
+  const [totalMined, setTotalMined] = useState(1_847.56)
+  const [nextReward, setNextReward] = useState(42)
+  const [displayMined, setDisplayMined] = useState(1_847.56)
+
+  // Animated counter for mined tokens
+  useEffect(() => {
+    if (!isMining) return
+    const interval = setInterval(() => {
+      const increment = 0.001 + Math.random() * 0.004
+      setMinedToday(prev => Math.round((prev + increment) * 1000) / 1000)
+      setTotalMined(prev => Math.round((prev + increment) * 1000) / 1000)
+      setDisplayMined(prev => Math.round((prev + increment) * 1000) / 1000)
+      setNextReward(prev => {
+        const n = prev - 1
+        if (n <= 0) {
+          setBlockCount(b => b + 1)
+          return Math.round(30 + Math.random() * 30)
+        }
+        return n
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [isMining])
+
+  const toggleMining = useCallback(() => {
+    setIsMining(prev => !prev)
+  }, [])
+
+  const currentTier = blockCount >= 2000 ? MINING_TIERS[3]
+    : blockCount >= 500 ? MINING_TIERS[2]
+    : blockCount >= 100 ? MINING_TIERS[1]
+    : MINING_TIERS[0]
+
+  const formatTime = (s) => {
+    if (s >= 60) return `${Math.floor(s / 60)}m ${s % 60}s`
+    return `${s}s`
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pb-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold">Mine JUL</h1>
-        <p className="text-void-400 mt-1">SHA-256 proof-of-work mining — earn Joule tokens · <a href="/jul" className="text-matrix-500 hover:underline">Learn about JUL</a></p>
-      </div>
+    <div className="max-w-7xl mx-auto px-4 pb-12">
+      <PageHero
+        category="defi"
+        title="Mine JUL"
+        subtitle="Contribute compute, earn tokens — proof of useful work"
+        badge={isMining ? 'Mining' : 'Idle'}
+        badgeColor={isMining ? '#22c55e' : '#71717a'}
+      />
 
-      <StaggerContainer>
-        {/* Mining Controls */}
-        <StaggerItem>
-          <GlassCard className="p-6 mb-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${isMining ? 'bg-green-400 animate-pulse' : 'bg-void-500'}`} />
-                <span className="text-lg font-semibold">
-                  {isMining ? 'Mining Active' : 'Miner Idle'}
-                </span>
-              </div>
-              <InteractiveButton
-                variant={isMining ? 'danger' : 'primary'}
-                onClick={isMining ? stopMining : startMining}
-                className="px-6 py-2.5"
-              >
-                {isMining ? 'Stop Mining' : 'Start Mining'}
-              </InteractiveButton>
+      <motion.div variants={stagger} initial="hidden" animate="show">
+
+        {/* ============ Mining Dashboard ============ */}
+        <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <GlassCard className="p-4">
+            <div className="text-[10px] text-void-500 font-mono uppercase tracking-wider mb-1">Hash Rate</div>
+            <div className="text-2xl font-bold font-mono text-white">
+              {isMining ? '14.2' : '0'} <span className="text-sm text-void-400">KH/s</span>
             </div>
+            <div className="mt-2">
+              <Sparkline data={hashRateData} width={80} height={20} color={isMining ? EMERALD : '#52525b'} />
+            </div>
+          </GlassCard>
 
-            {/* Thread Count Selector */}
-            <div className="flex items-center gap-4 mb-4">
-              <span className="text-void-400 text-sm">Threads:</span>
-              <div className="flex gap-1">
-                {[1, 2, 4, 6, 8].filter(n => n <= (navigator.hardwareConcurrency || 4) * 2).map(n => (
-                  <button
-                    key={n}
-                    onClick={() => !isMining && setWorkerCount(n)}
-                    disabled={isMining}
-                    className={`px-3 py-1 rounded text-sm font-mono transition-colors ${
-                      workerCount === n
-                        ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
-                        : 'bg-void-800/50 text-void-400 border border-void-700/50 hover:text-void-200'
-                    } ${isMining ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    {n}
-                  </button>
-                ))}
+          <GlassCard className="p-4">
+            <div className="text-[10px] text-void-500 font-mono uppercase tracking-wider mb-1">JUL Mined Today</div>
+            <div className="text-2xl font-bold font-mono text-amber-400">
+              {minedToday.toFixed(2)}
+            </div>
+            <div className="mt-2">
+              <Sparkline data={generateSparklineData(8811)} width={80} height={20} color={AMBER} />
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-4">
+            <div className="text-[10px] text-void-500 font-mono uppercase tracking-wider mb-1">Total Mined</div>
+            <motion.div
+              key={Math.floor(displayMined)}
+              className="text-2xl font-bold font-mono text-white"
+            >
+              {fmt(totalMined)}
+            </motion.div>
+            <div className="mt-2">
+              <Sparkline data={generateSparklineData(4477)} width={80} height={20} color="#22c55e" />
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-4">
+            <div className="text-[10px] text-void-500 font-mono uppercase tracking-wider mb-1">Next Reward</div>
+            <div className="text-2xl font-bold font-mono text-white">
+              {formatTime(nextReward)}
+            </div>
+            <div className="w-full h-1.5 bg-void-800 rounded-full mt-3 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"
+                animate={{ width: `${Math.max(0, 100 - (nextReward / 60) * 100)}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+          </GlassCard>
+        </motion.div>
+
+        {/* ============ Mining Visualization + Start/Stop ============ */}
+        <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div className="lg:col-span-2">
+            <GlassCard className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-void-300">Mining Visualization</h2>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isMining ? 'bg-green-400 animate-pulse' : 'bg-void-600'}`} />
+                  <span className="text-xs font-mono text-void-400">{isMining ? 'ACTIVE' : 'STOPPED'}</span>
+                </div>
               </div>
-              <span className="text-void-500 text-xs">
-                ({navigator.hardwareConcurrency || '?'} CPU cores detected)
+              <MiningVisualization isMining={isMining} blockCount={blockCount} difficulty={12} />
+            </GlassCard>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {/* Start/Stop Button */}
+            <GlassCard className="p-5 flex flex-col items-center justify-center text-center flex-1">
+              <div className="text-xs font-mono text-void-500 uppercase tracking-wider mb-3">Mining Control</div>
+              <motion.button
+                onClick={toggleMining}
+                className={`relative w-28 h-28 rounded-full border-2 flex items-center justify-center transition-colors ${
+                  isMining
+                    ? 'border-red-500/60 bg-red-500/10 hover:bg-red-500/20'
+                    : 'border-green-500/60 bg-green-500/10 hover:bg-green-500/20'
+                }`}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              >
+                {isMining ? (
+                  <svg className="w-10 h-10 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg className="w-10 h-10 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                    <polygon points="8,5 19,12 8,19" />
+                  </svg>
+                )}
+                {isMining && (
+                  <motion.div
+                    className="absolute inset-0 rounded-full border-2 border-red-400/30"
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
+                    transition={{ duration: PHI, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                )}
+              </motion.button>
+              <div className="text-sm font-bold mt-3 text-white">
+                {isMining ? 'Stop Mining' : 'Start Mining'}
+              </div>
+              <div className="text-[10px] text-void-500 mt-1">
+                Tier: <span style={{ color: currentTier.color }}>{currentTier.icon} {currentTier.label}</span>
+              </div>
+            </GlassCard>
+          </div>
+        </motion.div>
+
+        {/* ============ Mining Tiers ============ */}
+        <motion.div variants={fadeUp} className="mb-6">
+          <h2 className="text-sm font-semibold text-void-300 mb-3 px-1">Mining Tiers</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {MINING_TIERS.map((tier) => {
+              const isActive = currentTier.id === tier.id
+              return (
+                <GlassCard
+                  key={tier.id}
+                  className={`p-4 relative overflow-hidden ${isActive ? 'ring-1' : ''}`}
+                  style={isActive ? { '--tw-ring-color': tier.color + '40' } : {}}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${tier.gradient} pointer-events-none`} />
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl" style={{ color: tier.color }}>{tier.icon}</span>
+                        <span className="font-bold text-sm" style={{ color: tier.color }}>{tier.label}</span>
+                      </div>
+                      <span className="font-mono text-xs text-void-400 bg-void-900/50 px-2 py-0.5 rounded">
+                        {tier.multiplier}
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-mono text-void-500 mb-1">{tier.requirement}</div>
+                    <p className="text-xs text-void-400 leading-relaxed">{tier.desc}</p>
+                    {isActive && (
+                      <div className="mt-2 text-[10px] font-mono uppercase tracking-wider"
+                        style={{ color: tier.color }}>
+                        Current Tier
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+              )
+            })}
+          </div>
+        </motion.div>
+
+        {/* ============ Active Workers ============ */}
+        <motion.div variants={fadeUp} className="mb-6">
+          <GlassCard className="p-5">
+            <h2 className="text-sm font-semibold text-void-300 mb-3">Active Workers</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-void-500 text-xs font-mono border-b border-void-800/50">
+                    <th className="text-left pb-2 pr-4">Worker</th>
+                    <th className="text-left pb-2 pr-4">Status</th>
+                    <th className="text-right pb-2 pr-4">Hash Rate</th>
+                    <th className="text-right pb-2 pr-4">Uptime</th>
+                    <th className="text-right pb-2">Earnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeWorkers.map((w) => (
+                    <tr key={w.id} className="border-b border-void-800/30 last:border-0">
+                      <td className="py-2.5 pr-4 font-mono text-void-300">{w.name}</td>
+                      <td className="py-2.5 pr-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            w.status === 'active' ? 'bg-green-400 animate-pulse' : 'bg-void-600'
+                          }`} />
+                          <span className={`text-xs font-mono ${
+                            w.status === 'active' ? 'text-green-400' : 'text-void-500'
+                          }`}>
+                            {w.status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-4 text-right font-mono text-void-300">
+                        {w.hashRate > 0 ? `${(w.hashRate / 1000).toFixed(1)} KH/s` : '--'}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right font-mono text-void-400">{w.uptime}</td>
+                      <td className="py-2.5 text-right font-mono text-amber-400">
+                        {w.earnings > 0 ? `${w.earnings.toFixed(2)} JUL` : '--'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
+        </motion.div>
+
+        {/* ============ Leaderboard ============ */}
+        <motion.div variants={fadeUp} className="mb-6">
+          <GlassCard className="p-5">
+            <h2 className="text-sm font-semibold text-void-300 mb-3">Leaderboard — Top 10 Miners</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-void-500 text-xs font-mono border-b border-void-800/50">
+                    <th className="text-left pb-2 pr-4 w-12">Rank</th>
+                    <th className="text-left pb-2 pr-4">Address</th>
+                    <th className="text-right pb-2 pr-4">Total Mined</th>
+                    <th className="text-right pb-2">Streak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((m) => (
+                    <tr key={m.rank} className="border-b border-void-800/30 last:border-0">
+                      <td className="py-2 pr-4">
+                        <span className={`font-mono font-bold ${
+                          m.rank === 1 ? 'text-amber-400' :
+                          m.rank === 2 ? 'text-gray-300' :
+                          m.rank === 3 ? 'text-orange-400' :
+                          'text-void-500'
+                        }`}>
+                          {m.rank <= 3 ? ['', '\u{1F947}', '\u{1F948}', '\u{1F949}'][m.rank] : `#${m.rank}`}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 font-mono text-xs text-void-300">{m.address}</td>
+                      <td className="py-2 pr-4 text-right font-mono text-amber-400">
+                        {m.totalMined.toLocaleString()} JUL
+                      </td>
+                      <td className="py-2 text-right font-mono text-void-400">
+                        {m.streak > 0 ? `${m.streak}d` : '--'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
+        </motion.div>
+
+        {/* ============ Emission Schedule ============ */}
+        <motion.div variants={fadeUp} className="mb-6">
+          <GlassCard className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-void-300">Emission Schedule</h2>
+              <span className="text-[10px] font-mono text-void-500">
+                Moore's Law decay ~2.3yr halving
               </span>
             </div>
-
-            {/* Hashrate Bar */}
-            {isMining && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="mt-4"
-              >
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-void-400">Hashrate</span>
-                  <span className="text-amber-300 font-mono">{formatHashrate(hashrate)}</span>
-                </div>
-                <div className="w-full h-2 bg-void-800 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"
-                    animate={{ width: `${Math.min((hashrate / 10000) * 100, 100)}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </GlassCard>
-        </StaggerItem>
-
-        {/* Stats Grid */}
-        <StaggerItem>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <GlassCard className="p-4 text-center">
-              <div className="text-void-400 text-xs mb-1">Uptime</div>
-              <div className="text-lg font-mono font-bold">{formatUptime(uptime)}</div>
-            </GlassCard>
-            <GlassCard className="p-4 text-center">
-              <div className="text-void-400 text-xs mb-1">Blocks Found</div>
-              <div className="text-lg font-mono font-bold text-green-400">
-                <AnimatedNumber value={blocksFound} />
+            <EmissionChart data={emissionData} />
+            <div className="flex items-center gap-4 mt-3 text-xs text-void-500 font-mono">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: AMBER }} />
+                <span>Remaining supply</span>
               </div>
-            </GlassCard>
-            <GlassCard className="p-4 text-center">
-              <div className="text-void-400 text-xs mb-1">JUL Balance</div>
-              <div className="text-lg font-mono font-bold text-amber-400">
-                <AnimatedNumber value={serverBalance || totalReward} decimals={4} />
-              </div>
-            </GlassCard>
-            <GlassCard className="p-4 text-center">
-              <div className="text-void-400 text-xs mb-1">Total Hashes</div>
-              <div className="text-lg font-mono font-bold">
-                {totalHashes >= 1e6 ? `${(totalHashes / 1e6).toFixed(1)}M` :
-                 totalHashes >= 1e3 ? `${(totalHashes / 1e3).toFixed(1)}K` :
-                 totalHashes}
-              </div>
-            </GlassCard>
-          </div>
-        </StaggerItem>
-
-        {/* Jarvis Compute Vault — PROMINENT placement right after stats */}
-        <StaggerItem>
-          <GlassCard className="p-6 mb-4 border-2 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-amber-300">Convert JUL to Jarvis Credits</h3>
-                  <p className="text-void-400 text-sm">Spend your mined JUL to talk to Jarvis</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-void-400">Available</div>
-                <div className="font-mono text-xl text-amber-400 font-bold">{(serverBalance || 0).toFixed(2)} JUL</div>
-                <div className="text-xs text-void-500">{((serverBalance || 0) * 1000).toFixed(0)} compute credits</div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-0.5 h-3 rounded-full" style={{ backgroundColor: AMBER, opacity: 0.4 }} />
+                <span>Halving epoch</span>
               </div>
             </div>
+          </GlassCard>
+        </motion.div>
 
-            <TipJarPanel
-              address={address}
-              serverBalance={serverBalance}
-              onTipSuccess={(newBalance) => {
-                setServerBalance(newBalance)
-                refreshStats()
-                addLog(`JUL converted to Jarvis compute credits!`, 'success')
-                toast.success('JUL converted — Jarvis compute credits activated!')
-              }}
-              apiUrl={API_URL}
+        {/* ============ Network Stats (StatCards with Sparklines) ============ */}
+        <motion.div variants={fadeUp}>
+          <h2 className="text-sm font-semibold text-void-300 mb-3 px-1">Network Stats</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              label="Network Hash Rate"
+              value={14.2}
+              suffix=" KH/s"
+              decimals={1}
+              change={8.4}
+              sparkData={hashRateData}
+              size="sm"
             />
-          </GlassCard>
-        </StaggerItem>
-
-        {/* Network Info */}
-        <StaggerItem>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <GlassCard className="p-5">
-              <h3 className="text-sm font-semibold text-void-300 mb-3">Network Stats</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Difficulty</span>
-                  <span className="font-mono text-sm">{difficulty} bits</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Block Reward</span>
-                  <span className="font-mono text-sm text-amber-400">{currentReward.toFixed(6)} JUL</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Epoch</span>
-                  <span className="font-mono text-sm">{epochNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Network Proofs</span>
-                  <span className="font-mono text-sm">{totalBlocksMined.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Active Miners</span>
-                  <span className="font-mono text-sm">{activeMinerCount}</span>
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard className="p-5">
-              <h3 className="text-sm font-semibold text-void-300 mb-3">Ergon Economics</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Algorithm</span>
-                  <span className="font-mono text-sm">SHA-256 (browser PoW)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Reward Formula</span>
-                  <span className="font-mono text-sm">2<sup>{difficulty}</sup> / 256 = <span className="text-amber-400">{currentReward.toFixed(2)}</span></span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Supply Model</span>
-                  <span className="font-mono text-sm text-void-300">Elastic (no hard cap)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Moore's Law Decay</span>
-                  <span className="font-mono text-sm">~2.3yr halving</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-void-400 text-sm">Stability</span>
-                  <span className="font-mono text-sm">TSS: Hash Cost Oracle + PoW + Burns</span>
-                </div>
-              </div>
-              <div className="mt-3 p-2 bg-void-900/40 rounded text-void-500 text-xs">
-                Reward = work done. More difficulty = more JUL. Supply bounded by physics, not arbitrary cap.
-              </div>
-            </GlassCard>
+            <StatCard
+              label="Difficulty"
+              value={12}
+              suffix=" bits"
+              decimals={0}
+              change={0}
+              sparkData={difficultyData}
+              size="sm"
+            />
+            <StatCard
+              label="Avg Block Time"
+              value={42}
+              suffix="s"
+              decimals={0}
+              change={-5.2}
+              sparkData={blockTimeData}
+              size="sm"
+            />
+            <StatCard
+              label="Active Miners"
+              value={24}
+              decimals={0}
+              change={12.5}
+              sparkData={minerCountData}
+              size="sm"
+            />
           </div>
-        </StaggerItem>
+        </motion.div>
 
-        {/* Quantum Resistance */}
-        <StaggerItem>
-          <GlassCard className="p-5 mb-4 border border-emerald-500/10">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <h3 className="text-sm font-semibold text-emerald-400">Quantum Resistance</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-void-400 text-sm">Preimage Security</span>
-                <span className="font-mono text-sm text-emerald-400">256-bit (classical) / 128-bit (quantum)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-void-400 text-sm">Grover's Speedup</span>
-                <span className="font-mono text-sm">2x bit reduction (sqrt of search space)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-void-400 text-sm">Qubits to Break</span>
-                <span className="font-mono text-sm text-amber-400">~{(2593 + difficulty * 20).toLocaleString()} error-corrected</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-void-400 text-sm">Best Quantum Computer (2026)</span>
-                <span className="font-mono text-sm text-red-400">~1,180 noisy qubits (IBM Condor)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-void-400 text-sm">Raspberry Pi Qubits</span>
-                <span className="font-mono text-sm text-red-400">0 (classical silicon, no coherence)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-void-400 text-sm">NIST Status</span>
-                <span className="font-mono text-sm text-emerald-400">SHA-256 approved post-quantum (Category 1)</span>
-              </div>
-            </div>
-            <div className="mt-3 p-3 bg-void-900/60 rounded-lg">
-              <p className="text-void-500 text-xs leading-relaxed">
-                SHA-256 mining is quantum-resistant by design. Grover's algorithm provides only a quadratic speedup
-                (2<sup>128</sup> operations vs 2<sup>256</sup>), requiring millions of error-corrected qubits that
-                don't exist and won't for decades. A Raspberry Pi is classical silicon — it has exactly zero quantum
-                bits, zero superposition, and zero entanglement. Calling it a "quantum computer" is like calling a
-                bicycle a spaceship because both have wheels. Even if quantum mining existed, our difficulty
-                auto-adjusts every {EPOCH_LENGTH} proofs — the network adapts to any computational advantage.
-              </p>
-            </div>
-
-            {/* Alternative Arithmetic Validator */}
-            <div className="mt-3 p-3 bg-void-900/60 rounded-lg border border-red-500/10">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-mono font-bold text-red-400">ALTERNATIVE ARITHMETIC VALIDATOR</span>
-              </div>
-              <div className="space-y-1.5 font-mono text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-void-600">test:</span>
-                  <span className="text-void-400">if 1 x 1 = 2, then SHA-256 search space =</span>
-                  <span className="text-red-400">2<sup>512</sup></span>
-                  <span className="text-void-600">— harder, not easier</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-void-600">test:</span>
-                  <span className="text-void-400">if 1 x 1 = 2, then {difficulty}-bit difficulty =</span>
-                  <span className="text-red-400">{(difficulty * 2).toLocaleString()}-bit equivalent</span>
-                  <span className="text-void-600">— double the work</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-void-600">test:</span>
-                  <span className="text-void-400">if 1 x 1 = 2, then hash output bits =</span>
-                  <span className="text-red-400">512</span>
-                  <span className="text-void-600">— more entropy, more impossible</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-void-600">test:</span>
-                  <span className="text-void-400">if 1 x 1 = 2, then brute force operations =</span>
-                  <span className="text-red-400">2<sup>{difficulty * 2}</sup></span>
-                  <span className="text-void-600">— universe dies first</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-void-600">test:</span>
-                  <span className="text-void-400">if 1 x 1 = 2, then qubits needed =</span>
-                  <span className="text-red-400">{((2593 + difficulty * 20) * 2).toLocaleString()}</span>
-                  <span className="text-void-600">— more than atoms in your brain</span>
-                </div>
-                <div className="mt-2 pt-2 border-t border-void-800">
-                  <span className="text-void-500">result: </span>
-                  <span className="text-emerald-400 font-bold">EVERY alternative arithmetic makes SHA-256 harder, not weaker.</span>
-                </div>
-                <div>
-                  <span className="text-void-500">proof: </span>
-                  <span className="text-void-400">
-                    SHA-256 is a one-way compression function. Inflating the input domain (1x1=2)
-                    expands the search space exponentially. Deflating it (1x1=0) collapses valid nonces
-                    to the empty set. Standard arithmetic (1x1=1) is the <span className="text-amber-400">only</span> system
-                    where mining is even possible. You don't get to rewrite the axioms of
-                    a hash function after it's been deployed to 10,000+ Bitcoin nodes since 2009.
-                    The math was here first. Sit down.
-                  </span>
-                </div>
-              </div>
-            </div>
-          </GlassCard>
-        </StaggerItem>
-
-        {/* Leaderboard */}
-        <StaggerItem>
-          <LeaderboardCard apiUrl={API_URL} />
-        </StaggerItem>
-
-        {/* Old tip jar moved up — see "Convert JUL to Jarvis Credits" above stats */}
-
-        {/* Current Challenge */}
-        <StaggerItem>
-          <GlassCard className="p-5 mb-4">
-            <h3 className="text-sm font-semibold text-void-300 mb-3">Current Challenge</h3>
-            <div className="bg-void-900/60 rounded-lg p-3 font-mono text-xs text-void-400 break-all select-all">
-              {challenge || 'Loading...'}
-            </div>
-            <p className="text-void-500 text-xs mt-2">
-              Find a nonce where SHA-256(challenge + nonce) meets the difficulty target.
-              Compatible with Bitcoin ASICs.
-            </p>
-          </GlassCard>
-        </StaggerItem>
-
-        {/* Mining Log */}
-        <StaggerItem>
-          <GlassCard className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-void-300">Mining Log</h3>
-              {miningLog.length > 0 && (
-                <button
-                  onClick={() => setMiningLog([])}
-                  className="text-void-500 text-xs hover:text-void-300 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <div className="bg-void-900/60 rounded-lg p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1">
-              {miningLog.length === 0 ? (
-                <div className="text-void-600">Waiting for mining activity...</div>
-              ) : (
-                miningLog.map((entry, i) => (
-                  <div key={i} className="flex gap-2">
-                    <span className="text-void-600 shrink-0">[{entry.timestamp}]</span>
-                    <span className={
-                      entry.type === 'success' ? 'text-green-400' :
-                      entry.type === 'error' ? 'text-red-400' :
-                      entry.type === 'system' ? 'text-amber-400/70' :
-                      'text-void-400'
-                    }>
-                      {entry.message}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </GlassCard>
-        </StaggerItem>
-      </StaggerContainer>
+      </motion.div>
     </div>
   )
 }

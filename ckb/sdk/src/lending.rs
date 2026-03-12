@@ -2236,4 +2236,234 @@ mod tests {
         // borrow_apy from base rate: apy = 200 + 200*200/20000 = 200+2 = 202
         assert_eq!(info.borrow_apy_bps, 202);
     }
+
+    // ============ Hardening Round 5 — 25 new tests ============
+
+    #[test]
+    fn test_utilization_rate_75_percent_v5() {
+        let pool = LendingPool {
+            total_deposits: 1_000_000 * PRECISION,
+            total_borrows: 750_000 * PRECISION,
+            ..default_pool()
+        };
+        assert_eq!(utilization_rate(&pool), 7500);
+    }
+
+    #[test]
+    fn test_utilization_rate_1_percent_v5() {
+        let pool = LendingPool {
+            total_deposits: 100_000_000 * PRECISION,
+            total_borrows: 1_000_000 * PRECISION,
+            ..default_pool()
+        };
+        assert_eq!(utilization_rate(&pool), 100);
+    }
+
+    #[test]
+    fn test_borrow_rate_at_50_percent_utilization_v5() {
+        let pool = default_pool(); // 50% utilization, optimal=80%
+        let rate = borrow_rate_bps(&pool);
+        // util=50, optimal=80: variable = 50 * 400 / 80 = 250
+        // rate = 200 + 250 = 450
+        assert_eq!(rate, 450);
+    }
+
+    #[test]
+    fn test_supply_rate_always_lte_borrow_rate_v5() {
+        for util_pct in [10u128, 30, 50, 70, 90, 95, 99] {
+            let pool = LendingPool {
+                total_deposits: 100 * PRECISION,
+                total_borrows: util_pct * PRECISION,
+                ..default_pool()
+            };
+            assert!(supply_rate_bps(&pool) <= borrow_rate_bps(&pool));
+        }
+    }
+
+    #[test]
+    fn test_health_factor_no_debt_returns_max_v5() {
+        let pos = UserPosition {
+            debt_shares: 0,
+            ..default_position()
+        };
+        assert_eq!(health_factor(&pos, PRECISION), u128::MAX);
+    }
+
+    #[test]
+    fn test_health_factor_decreases_with_more_debt_v5() {
+        let pos1 = UserPosition {
+            debt_shares: 5 * PRECISION,
+            ..default_position()
+        };
+        let pos2 = UserPosition {
+            debt_shares: 10 * PRECISION,
+            ..default_position()
+        };
+        let hf1 = health_factor(&pos1, PRECISION);
+        let hf2 = health_factor(&pos2, PRECISION);
+        assert!(hf1 > hf2);
+    }
+
+    #[test]
+    fn test_health_factor_increases_with_collateral_price_v5() {
+        let pos1 = UserPosition {
+            collateral_price: 1000 * PRECISION,
+            ..default_position()
+        };
+        let pos2 = UserPosition {
+            collateral_price: 3000 * PRECISION,
+            ..default_position()
+        };
+        let hf1 = health_factor(&pos1, PRECISION);
+        let hf2 = health_factor(&pos2, PRECISION);
+        assert!(hf2 > hf1);
+    }
+
+    #[test]
+    fn test_borrow_capacity_zero_when_fully_utilized_v5() {
+        let pos = UserPosition {
+            collateral_amount: 10 * PRECISION,
+            collateral_price: 1000 * PRECISION,
+            debt_shares: 10_000 * PRECISION, // debt > max borrow value
+            debt_price: PRECISION,
+            collateral_factor_bps: 7500,
+            ..default_position()
+        };
+        let cap = borrow_capacity(&pos, PRECISION);
+        assert_eq!(cap.remaining_capacity, 0);
+    }
+
+    #[test]
+    fn test_borrow_capacity_full_when_no_debt_v5() {
+        let pos = UserPosition {
+            debt_shares: 0,
+            ..default_position()
+        };
+        let cap = borrow_capacity(&pos, PRECISION);
+        assert_eq!(cap.current_debt_value, 0);
+        assert!(cap.remaining_capacity > 0);
+        assert_eq!(cap.utilization_bps, 0);
+    }
+
+    #[test]
+    fn test_liquidation_check_safe_position_returns_err_v5() {
+        let pos = default_position(); // Should be safe
+        let result = liquidation_check(&pos, PRECISION, 5000, 500);
+        assert_eq!(result, Err(LendingError::HealthFactorSafe));
+    }
+
+    #[test]
+    fn test_liquidation_check_underwater_returns_ok_v5() {
+        let pos = UserPosition {
+            collateral_amount: 1 * PRECISION,
+            collateral_price: 100 * PRECISION,
+            debt_shares: 200 * PRECISION, // debt > collateral
+            debt_price: PRECISION,
+            liquidation_threshold_bps: 8000,
+            ..default_position()
+        };
+        let result = liquidation_check(&pos, PRECISION, 5000, 500);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_accrue_interest_updates_last_accrual_block_v5() {
+        let pool = default_pool();
+        let updated = accrue_interest(&pool, 200);
+        assert_eq!(updated.last_accrual_block, 200);
+    }
+
+    #[test]
+    fn test_accrue_interest_increases_total_borrows_v5() {
+        let pool = default_pool();
+        let updated = accrue_interest(&pool, 10_000); // Many blocks elapsed
+        assert!(updated.total_borrows > pool.total_borrows);
+    }
+
+    #[test]
+    fn test_accrue_interest_increases_borrow_index_v5() {
+        let pool = default_pool();
+        let updated = accrue_interest(&pool, 10_000);
+        assert!(updated.borrow_index > pool.borrow_index);
+    }
+
+    #[test]
+    fn test_deposit_to_shares_first_deposit_one_to_one_v5() {
+        let shares = deposit_to_shares(1000, 0, 0);
+        assert_eq!(shares, 1000);
+    }
+
+    #[test]
+    fn test_deposit_to_shares_proportional_v5() {
+        // Pool: 2000 shares, 4000 underlying -> 1:2 ratio
+        let shares = deposit_to_shares(2000, 2000, 4000);
+        assert_eq!(shares, 1000); // 2000 * 2000 / 4000 = 1000
+    }
+
+    #[test]
+    fn test_shares_to_underlying_proportional_v5() {
+        let underlying = shares_to_underlying(1000, 2000, 4000);
+        assert_eq!(underlying, 2000); // 1000 * 4000 / 2000 = 2000
+    }
+
+    #[test]
+    fn test_shares_to_underlying_zero_shares_v5() {
+        let underlying = shares_to_underlying(0, 2000, 4000);
+        assert_eq!(underlying, 0);
+    }
+
+    #[test]
+    fn test_repayment_schedule_zero_blocks_no_interest_v5() {
+        let schedule = repayment_schedule(1000, PRECISION, PRECISION, 0, 0);
+        assert_eq!(schedule.blocks_elapsed, 0);
+        assert_eq!(schedule.interest_accrued, 0);
+        assert_eq!(schedule.total_owed, schedule.principal);
+    }
+
+    #[test]
+    fn test_repayment_schedule_interest_grows_with_index_v5() {
+        let s1 = repayment_schedule(1000 * PRECISION, PRECISION * 11 / 10, PRECISION, 100, 1000);
+        let s2 = repayment_schedule(1000 * PRECISION, PRECISION * 12 / 10, PRECISION, 100, 1000);
+        assert!(s2.interest_accrued > s1.interest_accrued);
+    }
+
+    #[test]
+    fn test_pool_summary_available_liquidity_v5() {
+        let pool = default_pool(); // 1M deposits, 500K borrows
+        let summary = pool_summary(&pool, 10, 5);
+        assert_eq!(summary.available_liquidity, 500_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_pool_summary_utilization_50_percent_v5() {
+        let pool = default_pool();
+        let summary = pool_summary(&pool, 10, 5);
+        assert_eq!(summary.utilization_bps, 5000);
+    }
+
+    #[test]
+    fn test_max_safe_borrow_no_debt_v5() {
+        let max = max_safe_borrow(10_000 * PRECISION, 7500, 0);
+        assert_eq!(max, 7_500 * PRECISION);
+    }
+
+    #[test]
+    fn test_max_safe_borrow_at_limit_v5() {
+        let max = max_safe_borrow(10_000 * PRECISION, 7500, 7_500 * PRECISION);
+        assert_eq!(max, 0);
+    }
+
+    #[test]
+    fn test_debt_value_scales_with_price_v5() {
+        let dv1 = debt_value(1000 * PRECISION, PRECISION, 100 * PRECISION);
+        let dv2 = debt_value(1000 * PRECISION, PRECISION, 200 * PRECISION);
+        assert_eq!(dv2, dv1 * 2);
+    }
+
+    #[test]
+    fn test_debt_value_scales_with_index_v5() {
+        let dv1 = debt_value(1000 * PRECISION, PRECISION, PRECISION);
+        let dv2 = debt_value(1000 * PRECISION, 2 * PRECISION, PRECISION);
+        assert_eq!(dv2, dv1 * 2);
+    }
 }

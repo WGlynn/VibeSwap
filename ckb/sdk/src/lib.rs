@@ -36,6 +36,7 @@ pub mod multisig;
 pub mod notify;
 pub mod orderbook;
 pub mod oracle;
+pub mod permission;
 pub mod pool;
 pub mod portfolio;
 pub mod prediction;

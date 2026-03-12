@@ -3170,4 +3170,304 @@ mod tests {
         ).unwrap();
         assert_eq!(tx.outputs[0].lock_script.args, recipient.args);
     }
+
+    // ============ Hardening Round 5 — 25 new tests ============
+
+    #[test]
+    fn test_mint_token_type_args_length_is_36_v5() {
+        let config = test_xudt_config();
+        let (tx, _) = mint_token(&config, test_lock(0x01), test_lock(0x02), 100, test_input(0x10));
+        let type_script = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(type_script.args.len(), 36);
+    }
+
+    #[test]
+    fn test_mint_token_type_args_ends_with_plain_flags_v5() {
+        let config = test_xudt_config();
+        let (tx, _) = mint_token(&config, test_lock(0x01), test_lock(0x02), 100, test_input(0x10));
+        let args = &tx.outputs[0].type_script.as_ref().unwrap().args;
+        assert_eq!(&args[32..], &XUDT_FLAGS_PLAIN);
+    }
+
+    #[test]
+    fn test_mint_batch_two_recipients_distinct_locks_v5() {
+        let config = test_xudt_config();
+        let r1 = test_lock(0x01);
+        let r2 = test_lock(0x02);
+        let (tx, _) = mint_batch(&config, test_lock(0x10), &[(r1.clone(), 100), (r2.clone(), 200)], test_input(0x20));
+        assert_eq!(tx.outputs[0].lock_script.args, r1.args);
+        assert_eq!(tx.outputs[1].lock_script.args, r2.args);
+    }
+
+    #[test]
+    fn test_transfer_change_amount_correct_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let tx = transfer_token(&config, type_script, test_lock(0x01), test_lock(0x02), 300, vec![(test_input(0x10), 1000)]).unwrap();
+        let change_data = &tx.outputs[1].data;
+        let change_amount = u128::from_le_bytes(change_data[0..16].try_into().unwrap());
+        assert_eq!(change_amount, 700);
+    }
+
+    #[test]
+    fn test_transfer_recipient_amount_in_data_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let tx = transfer_token(&config, type_script, test_lock(0x01), test_lock(0x02), 250, vec![(test_input(0x10), 1000)]).unwrap();
+        let recipient_amount = u128::from_le_bytes(tx.outputs[0].data[0..16].try_into().unwrap());
+        assert_eq!(recipient_amount, 250);
+    }
+
+    #[test]
+    fn test_burn_remaining_amount_in_data_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let tx = burn_token(&config, type_script, 600, test_lock(0x01), vec![(test_input(0x10), 1000)]).unwrap();
+        let remaining = u128::from_le_bytes(tx.outputs[0].data[0..16].try_into().unwrap());
+        assert_eq!(remaining, 400);
+    }
+
+    #[test]
+    fn test_burn_all_produces_no_outputs_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let tx = burn_token(&config, type_script, 1000, test_lock(0x01), vec![(test_input(0x10), 1000)]).unwrap();
+        assert!(tx.outputs.is_empty());
+    }
+
+    #[test]
+    fn test_token_info_max_supply_zero_means_unlimited_v5() {
+        let info = TokenInfo {
+            name: "Test".to_string(),
+            symbol: "TST".to_string(),
+            decimals: 8,
+            description: "desc".to_string(),
+            max_supply: 0,
+        };
+        let data = info.serialize();
+        let parsed = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(parsed.max_supply, 0);
+    }
+
+    #[test]
+    fn test_token_info_max_supply_u128_max_v5() {
+        let info = TokenInfo {
+            name: "A".to_string(),
+            symbol: "B".to_string(),
+            decimals: 18,
+            description: "".to_string(),
+            max_supply: u128::MAX,
+        };
+        let data = info.serialize();
+        let parsed = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(parsed.max_supply, u128::MAX);
+    }
+
+    #[test]
+    fn test_parse_token_amount_boundary_exactly_15_bytes_v5() {
+        let data = vec![0u8; 15];
+        assert!(parse_token_amount(&data).is_none());
+    }
+
+    #[test]
+    fn test_hash_script_consistency_across_calls_v5() {
+        let script = super::super::Script {
+            code_hash: [0x42; 32],
+            hash_type: super::super::HashType::Data,
+            args: vec![1, 2, 3],
+        };
+        let h1 = hash_script(&script);
+        let h2 = hash_script(&script);
+        let h3 = hash_script(&script);
+        assert_eq!(h1, h2);
+        assert_eq!(h2, h3);
+    }
+
+    #[test]
+    fn test_mint_batch_three_recipients_output_count_v5() {
+        let config = test_xudt_config();
+        let recipients = vec![
+            (test_lock(0x01), 100),
+            (test_lock(0x02), 200),
+            (test_lock(0x03), 300),
+        ];
+        let (tx, _) = mint_batch(&config, test_lock(0x10), &recipients, test_input(0x20));
+        assert_eq!(tx.outputs.len(), 3);
+    }
+
+    #[test]
+    fn test_mint_batch_data_amounts_match_recipients_v5() {
+        let config = test_xudt_config();
+        let amounts = [100u128, 200, 300, 400];
+        let recipients: Vec<_> = amounts.iter().enumerate().map(|(i, &a)| (test_lock(i as u8), a)).collect();
+        let (tx, _) = mint_batch(&config, test_lock(0xF0), &recipients, test_input(0x20));
+        for (i, &expected_amount) in amounts.iter().enumerate() {
+            let parsed = u128::from_le_bytes(tx.outputs[i].data[0..16].try_into().unwrap());
+            assert_eq!(parsed, expected_amount);
+        }
+    }
+
+    #[test]
+    fn test_transfer_two_inputs_combined_sufficient_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let result = transfer_token(
+            &config, type_script, test_lock(0x01), test_lock(0x02), 150,
+            vec![(test_input(0x10), 80), (test_input(0x11), 80)],
+        );
+        assert!(result.is_ok());
+        let tx = result.unwrap();
+        let recipient_amount = u128::from_le_bytes(tx.outputs[0].data[0..16].try_into().unwrap());
+        assert_eq!(recipient_amount, 150);
+        let change_amount = u128::from_le_bytes(tx.outputs[1].data[0..16].try_into().unwrap());
+        assert_eq!(change_amount, 10);
+    }
+
+    #[test]
+    fn test_transfer_two_inputs_combined_insufficient_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let result = transfer_token(
+            &config, type_script, test_lock(0x01), test_lock(0x02), 200,
+            vec![(test_input(0x10), 80), (test_input(0x11), 80)],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_burn_from_two_inputs_combined_v5() {
+        let config = test_xudt_config();
+        let type_script = super::super::Script {
+            code_hash: config.xudt_code_hash,
+            hash_type: config.xudt_hash_type.clone(),
+            args: build_xudt_args(&[0x01; 32]),
+        };
+        let tx = burn_token(
+            &config, type_script, 120, test_lock(0x01),
+            vec![(test_input(0x10), 80), (test_input(0x11), 80)],
+        ).unwrap();
+        assert_eq!(tx.outputs.len(), 1);
+        let remaining = u128::from_le_bytes(tx.outputs[0].data[0..16].try_into().unwrap());
+        assert_eq!(remaining, 40);
+    }
+
+    #[test]
+    fn test_compute_token_type_hash_consistency_v5() {
+        let code_hash = [0xAA; 32];
+        let lock_hash = [0xBB; 32];
+        let h1 = compute_token_type_hash(&code_hash, &super::super::HashType::Data1, &lock_hash);
+        let h2 = compute_token_type_hash(&code_hash, &super::super::HashType::Data1, &lock_hash);
+        assert_eq!(h1, h2);
+        // Different lock hash should differ
+        let h3 = compute_token_type_hash(&code_hash, &super::super::HashType::Data1, &[0xCC; 32]);
+        assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn test_token_info_decimals_zero_v5() {
+        let info = TokenInfo {
+            name: "Nodec".to_string(),
+            symbol: "ND".to_string(),
+            decimals: 0,
+            description: "Zero decimals".to_string(),
+            max_supply: 1_000_000,
+        };
+        let data = info.serialize();
+        let parsed = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(parsed.decimals, 0);
+    }
+
+    #[test]
+    fn test_token_info_decimals_255_v5() {
+        let info = TokenInfo {
+            name: "Max".to_string(),
+            symbol: "MX".to_string(),
+            decimals: 255,
+            description: "".to_string(),
+            max_supply: 0,
+        };
+        let data = info.serialize();
+        let parsed = TokenInfo::deserialize(&data).unwrap();
+        assert_eq!(parsed.decimals, 255);
+    }
+
+    #[test]
+    fn test_create_token_info_type_script_args_is_token_type_hash_v5() {
+        let config = test_xudt_config();
+        let token_type_hash = [0x42; 32];
+        let info = TokenInfo {
+            name: "T".to_string(),
+            symbol: "T".to_string(),
+            decimals: 8,
+            description: "".to_string(),
+            max_supply: 0,
+        };
+        let tx = create_token_info(&config, token_type_hash, &info, test_lock(0x01), test_input(0x10));
+        let output_type = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(output_type.args, token_type_hash.to_vec());
+    }
+
+    #[test]
+    fn test_xudt_flags_plain_is_all_zeros_v5() {
+        assert_eq!(XUDT_FLAGS_PLAIN, [0x00, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn test_token_cell_capacity_reasonable_v5() {
+        // Token cell capacity should be at least 100 CKB (10 billion shannons)
+        assert!(TOKEN_CELL_CAPACITY >= 10_000_000_000);
+        // But not more than 1000 CKB
+        assert!(TOKEN_CELL_CAPACITY <= 100_000_000_000);
+    }
+
+    #[test]
+    fn test_token_info_cell_capacity_larger_than_token_cell_v5() {
+        assert!(TOKEN_INFO_CELL_CAPACITY > TOKEN_CELL_CAPACITY);
+    }
+
+    #[test]
+    fn test_mint_token_input_count_is_one_v5() {
+        let config = test_xudt_config();
+        let (tx, _) = mint_token(&config, test_lock(0x01), test_lock(0x02), 100, test_input(0x10));
+        assert_eq!(tx.inputs.len(), 1);
+    }
+
+    #[test]
+    fn test_mint_token_output_count_is_one_v5() {
+        let config = test_xudt_config();
+        let (tx, _) = mint_token(&config, test_lock(0x01), test_lock(0x02), 100, test_input(0x10));
+        assert_eq!(tx.outputs.len(), 1);
+    }
+
+    #[test]
+    fn test_mint_batch_input_count_is_one_v5() {
+        let config = test_xudt_config();
+        let recipients = vec![(test_lock(0x01), 100), (test_lock(0x02), 200)];
+        let (tx, _) = mint_batch(&config, test_lock(0x10), &recipients, test_input(0x20));
+        assert_eq!(tx.inputs.len(), 1);
+    }
 }

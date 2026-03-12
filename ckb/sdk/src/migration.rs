@@ -1487,4 +1487,240 @@ mod tests {
         };
         assert!(can_rollback(&status));
     }
+
+    // ============ Hardening Batch 7: Deep Edge Cases & Coverage Expansion ============
+
+    #[test]
+    fn test_version_compare_max_major_vs_zero() {
+        assert_eq!(version_compare(&v(u16::MAX, 0, 0), &v(0, u16::MAX, u16::MAX)), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn test_version_compare_zero_minor_greater_patch() {
+        assert_eq!(version_compare(&v(1, 0, 5), &v(1, 0, 3)), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn test_is_compatible_zero_major_both() {
+        assert!(is_compatible(&v(0, 1, 0), &v(0, 99, 99)));
+    }
+
+    #[test]
+    fn test_is_compatible_high_major_both() {
+        assert!(is_compatible(&v(100, 0, 0), &v(100, 50, 25)));
+    }
+
+    #[test]
+    fn test_compatibility_report_incompatible_zero_changes() {
+        let report = compatibility_report(&v(1, 0, 0), &v(2, 0, 0), 0, 0, 0);
+        assert!(!report.compatible);
+        assert!(report.migration_required);
+    }
+
+    #[test]
+    fn test_create_migration_plan_version_too_old_boundary() {
+        // Version 0.8.9 is below MIN_SUPPORTED (0.9.0)
+        let steps = vec![make_step(1, TransformType::SchemaChange, 10, false)];
+        let err = create_migration_plan(&v(0, 8, 9), &v(1, 0, 0), steps).unwrap_err();
+        assert_eq!(err, MigrationError::VersionTooOld);
+    }
+
+    #[test]
+    fn test_create_migration_plan_min_supported_boundary_ok() {
+        // Exactly at MIN_SUPPORTED version should be accepted
+        let steps = vec![make_step(1, TransformType::SchemaChange, 10, false)];
+        let result = create_migration_plan(&v(0, 9, 0), &v(0, 9, 1), steps);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_migration_plan_target_equals_current_ok() {
+        // Target at exactly CURRENT_PROTOCOL_VERSION should be accepted
+        let steps = vec![make_step(1, TransformType::SchemaChange, 10, false)];
+        let result = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_migration_plan_target_just_above_current() {
+        // Target version 1.0.1 > CURRENT (1.0.0) → VersionTooNew
+        let steps = vec![make_step(1, TransformType::SchemaChange, 10, false)];
+        let err = create_migration_plan(&v(0, 9, 0), &v(1, 0, 1), steps).unwrap_err();
+        assert_eq!(err, MigrationError::VersionTooNew);
+    }
+
+    #[test]
+    fn test_create_migration_plan_zero_cells_steps() {
+        // Steps with 0 affected cells each — valid but estimated_cells = 0
+        let steps = vec![
+            make_step(1, TransformType::ParameterUpdate, 0, false),
+            make_step(2, TransformType::DataReformat, 0, false),
+        ];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(plan.estimated_cells, 0);
+        assert_eq!(plan.estimated_blocks, 0);
+    }
+
+    #[test]
+    fn test_estimate_migration_time_one_cell() {
+        let steps = vec![make_step(1, TransformType::SchemaChange, 1, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(estimate_migration_time(&plan, 100), 1); // ceil(1/100) = 1
+    }
+
+    #[test]
+    fn test_estimate_migration_time_cells_equal_rate() {
+        let steps = vec![make_step(1, TransformType::SchemaChange, 50, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(estimate_migration_time(&plan, 50), 1); // exact
+    }
+
+    #[test]
+    fn test_migration_progress_three_quarters() {
+        let status = MigrationStatus::InProgress {
+            completed_steps: 3,
+            total_steps: 4,
+        };
+        assert_eq!(migration_progress_bps(&status), 7_500);
+    }
+
+    #[test]
+    fn test_migration_progress_nine_of_ten() {
+        let status = MigrationStatus::InProgress {
+            completed_steps: 9,
+            total_steps: 10,
+        };
+        assert_eq!(migration_progress_bps(&status), 9_000);
+    }
+
+    #[test]
+    fn test_needs_migration_cross_major() {
+        assert!(needs_migration(&v(1, 99, 99), &v(2, 0, 0)));
+    }
+
+    #[test]
+    fn test_needs_migration_same_major_higher_minor() {
+        assert!(needs_migration(&v(1, 0, 0), &v(1, 5, 0)));
+    }
+
+    #[test]
+    fn test_needs_migration_same_major_lower_minor() {
+        assert!(!needs_migration(&v(1, 5, 0), &v(1, 0, 0)));
+    }
+
+    #[test]
+    fn test_cell_transform_summary_large_values_saturating() {
+        // Large old/new sizes near u32::MAX — should saturate in summary
+        let transforms = vec![
+            make_transform(u32::MAX, u32::MAX, 0, 0, 0),
+            make_transform(u32::MAX, u32::MAX, 0, 0, 0),
+        ];
+        let (old, new, count) = cell_transform_summary(&transforms);
+        // u32::MAX + u32::MAX should saturate at u64 level (no overflow)
+        assert_eq!(old, u32::MAX as u64 * 2);
+        assert_eq!(new, u32::MAX as u64 * 2);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_data_size_delta_max_growth() {
+        let transforms = vec![make_transform(0, u32::MAX, 10, 0, 0)];
+        assert_eq!(data_size_delta(&transforms), u32::MAX as i64);
+    }
+
+    #[test]
+    fn test_data_size_delta_max_shrink() {
+        let transforms = vec![make_transform(u32::MAX, 0, 0, 10, 0)];
+        assert_eq!(data_size_delta(&transforms), -(u32::MAX as i64));
+    }
+
+    #[test]
+    fn test_parse_version_whitespace_tolerance() {
+        // parse_version trims whitespace
+        let ver = parse_version(b" 1.2.3 ").unwrap();
+        assert_eq!(ver, v(1, 2, 3));
+    }
+
+    #[test]
+    fn test_version_string_large_values_truncation() {
+        // Version with 5-digit components: "65535.65535.65535" = 17 chars, but buffer is 16
+        let buf = version_string(&v(u16::MAX, u16::MAX, u16::MAX));
+        // Should truncate to 16 bytes
+        assert_eq!(buf.len(), 16);
+        // First 16 bytes of "65535.65535.6553" + truncation
+        let s = std::str::from_utf8(&buf).unwrap().trim_end_matches('\0');
+        assert!(s.starts_with("65535.65535.6553"));
+    }
+
+    #[test]
+    fn test_checksum_single_byte() {
+        let cs = checksum(&[0x42]);
+        assert_eq!(cs.len(), 32);
+        assert_ne!(cs, checksum(&[0x43]));
+    }
+
+    #[test]
+    fn test_checksum_all_zero_vs_all_ff() {
+        let zero_cs = checksum(&[0u8; 32]);
+        let ff_cs = checksum(&[0xFFu8; 32]);
+        assert_ne!(zero_cs, ff_cs);
+    }
+
+    #[test]
+    fn test_step_completion_rate_single_step_done() {
+        let steps = vec![make_step(1, TransformType::SchemaChange, 10, true)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(step_completion_rate(&plan), 10_000);
+    }
+
+    #[test]
+    fn test_step_completion_rate_single_step_not_done() {
+        let steps = vec![make_step(1, TransformType::SchemaChange, 10, false)];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(step_completion_rate(&plan), 0);
+    }
+
+    #[test]
+    fn test_migration_status_failed_preserves_step() {
+        let status = MigrationStatus::Failed {
+            step: 42,
+            reason: [0xAB; 64],
+        };
+        assert_eq!(migration_progress_bps(&status), 0);
+        assert!(!can_rollback(&status));
+    }
+
+    #[test]
+    fn test_create_migration_plan_all_transform_types() {
+        let steps = vec![
+            make_step(1, TransformType::SchemaChange, 10, false),
+            make_step(2, TransformType::DataReformat, 20, false),
+            make_step(3, TransformType::IndexRebuild, 30, false),
+            make_step(4, TransformType::ScriptUpgrade, 40, false),
+            make_step(5, TransformType::ParameterUpdate, 50, false),
+        ];
+        let plan = create_migration_plan(&v(0, 9, 0), &v(1, 0, 0), steps).unwrap();
+        assert_eq!(plan.steps.len(), 5);
+        assert_eq!(plan.estimated_cells, 150);
+    }
+
+    #[test]
+    fn test_validate_checkpoint_one_bit_difference() {
+        let cs = checksum(b"test_data");
+        let mut bad = cs;
+        bad[31] ^= 0x01; // flip one bit
+        let cp = make_checkpoint(v(1, 0, 0), cs);
+        assert_eq!(
+            validate_checkpoint(&cp, &bad).unwrap_err(),
+            MigrationError::ChecksumMismatch
+        );
+    }
+
+    #[test]
+    fn test_cell_transform_same_fields_counts() {
+        let t = make_transform(100, 100, 0, 0, 0);
+        assert_eq!(t.fields_added, 0);
+        assert_eq!(t.fields_removed, 0);
+        assert_eq!(t.fields_modified, 0);
+    }
 }

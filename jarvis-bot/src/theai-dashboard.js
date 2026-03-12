@@ -9,6 +9,7 @@
 //   POST /theai/api/chat     — Chat with any agent
 //   POST /theai/api/fork     — Fork new agent from archetype
 //   POST /theai/api/prune    — Trigger prune cycle
+//   GET  /theai/api/health   — Full pipeline health check
 //
 // Auth: x-api-secret header or ?t= token (same as Nyx)
 // ============
@@ -17,7 +18,8 @@ import { nyxAuth } from './nyx.js'
 import {
   listAgents, getArchetypes, getAllCosts, getInfraCosts,
   pantheonChat, forkAgent, pruneAll, clearConversation,
-  getAgentCosts, consultAgent,
+  getAgentCosts, consultAgent, getTheAIStatus,
+  PANTHEON_TOOL_NAMES,
 } from './pantheon.js'
 
 // ============ Route Handler ============
@@ -94,6 +96,23 @@ export async function handleTheAIRequest(req, res, url) {
     const results = await pruneAll()
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(results))
+    return
+  }
+
+  // API: Health — full pipeline check
+  if (path === '/theai/api/health') {
+    const status = await getTheAIStatus()
+    const health = {
+      status: 'ok',
+      agents: status.activeAgents,
+      jarvisBridge: { wired: true, tools: PANTHEON_TOOL_NAMES },
+      ollamaConfigured: !!process.env.OLLAMA_URL,
+      model: process.env.PANTHEON_MODEL || (process.env.OLLAMA_URL ? 'qwen2.5:7b' : 'claude-sonnet-4-5-20250929'),
+      nextPrune: status.nextPrune,
+      totalCost: status.totalCost,
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(health))
     return
   }
 
@@ -212,6 +231,12 @@ body{font-family:'SF Mono',Monaco,Consolas,monospace;background:#050508;color:#e
 <div class="fork-grid" id="fork-grid"></div>
 </div>
 
+<!-- System Status -->
+<div class="section">
+<div class="section-title">System Status</div>
+<div class="costs-bar" id="status-bar"><div class="loading">Loading...</div></div>
+</div>
+
 <!-- Costs -->
 <div class="section">
 <div class="section-title">Cost Tracking</div>
@@ -227,12 +252,17 @@ const H={'Content-Type':'application/json','x-api-secret':SECRET};
 let currentAgent=null;
 
 async function load(){
-  const r=await fetch('/theai/api/status',{headers:H});
+  const [r,hr]=await Promise.all([
+    fetch('/theai/api/status',{headers:H}),
+    fetch('/theai/api/health',{headers:H}),
+  ]);
   const d=await r.json();
+  const health=await hr.json();
   renderTree(d);
   renderAgents(d);
   renderFork(d);
   renderCosts(d);
+  renderStatus(health);
   document.getElementById('header-stats').innerHTML=
     d.agents.length+' agents | '+d.costs.totalUsd+' total LLM cost';
 }
@@ -321,6 +351,22 @@ async function forkAgent(name){
   const d=await r.json();
   if(d.error)alert('Fork failed: '+d.error);
   else{alert(name+' forked successfully!');load()}
+}
+
+function renderStatus(h){
+  let html='';
+  html+='<div class="cost-item"><div class="label">Jarvis Bridge</div><div class="value" style="color:'+(h.jarvisBridge.wired?'#00ff88':'#ff4444')+'">'+(h.jarvisBridge.wired?'WIRED':'OFFLINE')+'</div><div class="detail">'+h.jarvisBridge.tools.join(', ')+'</div></div>';
+  html+='<div class="cost-item"><div class="label">LLM Model</div><div class="value" style="font-size:0.9em">'+h.model+'</div><div class="detail">Ollama: '+(h.ollamaConfigured?'YES':'NO')+'</div></div>';
+  html+='<div class="cost-item"><div class="label">Next Prune</div><div class="value" style="font-size:0.9em">'+h.nextPrune+'</div><div class="detail"><button class="fork-btn" onclick="triggerPrune()" style="margin-top:4px">Prune Now</button></div></div>';
+  document.getElementById('status-bar').innerHTML=html;
+}
+
+async function triggerPrune(){
+  if(!confirm('Run prune cycle for all agents?'))return;
+  const r=await fetch('/theai/api/prune',{method:'POST',headers:H});
+  const d=await r.json();
+  alert('Prune complete: '+d.length+' agents processed');
+  load();
 }
 
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}

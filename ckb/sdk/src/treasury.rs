@@ -2413,4 +2413,322 @@ mod tests {
         let cloned = alloc.clone();
         assert_eq!(alloc, cloned);
     }
+
+    // ============ Hardening Batch v4 ============
+
+    #[test]
+    fn test_create_treasury_max_u128_v4() {
+        // u128::MAX treasury — daily limit should not overflow via mul_div
+        let state = create_treasury(u128::MAX, 0).unwrap();
+        assert_eq!(state.total_balance, u128::MAX);
+        // daily limit = MAX * 500 / 10000 via mul_div (256-bit safe)
+        assert!(state.daily_outflow_limit > 0);
+    }
+
+    #[test]
+    fn test_allocate_funds_exactly_daily_remaining_v4() {
+        // Spend some daily, then allocate exactly the remaining
+        let mut state = default_state();
+        state.daily_outflow = 40_000 * PRECISION;
+        // Remaining daily = 50K - 40K = 10K
+        let alloc = allocate_funds(
+            &state, 10_000 * PRECISION,
+            AllocationPurpose::LiquidityIncentive,
+            default_recipient(),
+            1_000_000,
+        ).unwrap();
+        assert_eq!(alloc.amount, 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_allocate_funds_one_over_daily_remaining_v4() {
+        let mut state = default_state();
+        state.daily_outflow = 40_000 * PRECISION;
+        // Remaining = 10K, try 10K + 1 wei
+        let result = allocate_funds(
+            &state, 10_000 * PRECISION + 1,
+            AllocationPurpose::Development,
+            default_recipient(),
+            1_000_000,
+        );
+        assert_eq!(result, Err(TreasuryError::ExceedsDailyLimit));
+    }
+
+    #[test]
+    fn test_vesting_one_block_before_full_v4() {
+        let alloc = make_allocation(1_000_000 * PRECISION, 0, 1_000_000);
+        let one_before = VESTING_CLIFF_BLOCKS + 999_999;
+        let vested = compute_vested_amount(&alloc, one_before);
+        let expected = mul_div(1_000_000 * PRECISION, 999_999, 1_000_000);
+        assert_eq!(vested, expected);
+        assert!(vested < 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_vesting_exactly_at_full_v4() {
+        let alloc = make_allocation(1_000_000 * PRECISION, 0, 1_000_000);
+        let vesting_end = VESTING_CLIFF_BLOCKS + 1_000_000;
+        let vested = compute_vested_amount(&alloc, vesting_end);
+        assert_eq!(vested, 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_vesting_u64_max_block_v4() {
+        // Current block = u64::MAX, well after full vesting
+        let alloc = make_allocation(1_000_000 * PRECISION, 0, 1_000_000);
+        let vested = compute_vested_amount(&alloc, u64::MAX);
+        assert_eq!(vested, 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_claim_vested_incremental_three_claims_v4() {
+        let alloc = make_allocation(1_000_000 * PRECISION, 0, 1_000_000);
+        // Claim at 25%, 50%, 100%
+        let (c1, u1) = claim_vested(&alloc, VESTING_CLIFF_BLOCKS + 250_000).unwrap();
+        assert_eq!(c1, 250_000 * PRECISION);
+
+        let (c2, u2) = claim_vested(&u1, VESTING_CLIFF_BLOCKS + 500_000).unwrap();
+        assert_eq!(c2, 250_000 * PRECISION);
+
+        let (c3, u3) = claim_vested(&u2, VESTING_CLIFF_BLOCKS + 1_000_000).unwrap();
+        assert_eq!(c3, 500_000 * PRECISION);
+        assert_eq!(u3.amount_claimed, 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_update_daily_outflow_overflow_v4() {
+        // Overflow in checked_add
+        let mut state = default_state();
+        state.daily_outflow = u128::MAX;
+        state.daily_outflow_limit = u128::MAX;
+        let result = update_daily_outflow(&state, 1);
+        assert_eq!(result, Err(TreasuryError::Overflow));
+    }
+
+    #[test]
+    fn test_check_daily_limit_one_remaining_v4() {
+        let mut state = default_state();
+        state.daily_outflow = state.daily_outflow_limit - 1;
+        let remaining = check_daily_limit(&state, 1).unwrap();
+        assert_eq!(remaining, 0);
+    }
+
+    #[test]
+    fn test_enter_emergency_total_loss_v4() {
+        // Current balance = 0 → 100% drawdown
+        let state = default_state();
+        let updated = enter_emergency_mode(&state, 0).unwrap();
+        assert!(updated.emergency_mode);
+        assert_eq!(updated.total_balance, 0);
+        assert_eq!(updated.available_balance, 0);
+        assert_eq!(updated.daily_outflow_limit, 0);
+    }
+
+    #[test]
+    fn test_enter_emergency_just_barely_meets_threshold_v4() {
+        // Exactly 20% drawdown → threshold = 200_000, drawdown = 200_000 → meets
+        let state = default_state();
+        let threshold = mul_div(state.total_balance, EMERGENCY_THRESHOLD_BPS as u128, BPS);
+        let current = state.total_balance - threshold;
+        let updated = enter_emergency_mode(&state, current).unwrap();
+        assert!(updated.emergency_mode);
+    }
+
+    #[test]
+    fn test_enter_emergency_one_below_threshold_v4() {
+        // 19.99...% drawdown → just below threshold
+        let state = default_state();
+        let threshold = mul_div(state.total_balance, EMERGENCY_THRESHOLD_BPS as u128, BPS);
+        let current = state.total_balance - threshold + 1; // one unit less drawdown
+        let result = enter_emergency_mode(&state, current);
+        assert_eq!(result, Err(TreasuryError::EmergencyThresholdNotMet));
+    }
+
+    #[test]
+    fn test_compute_reserve_ratio_over_100_percent_capped_v4() {
+        // reserved > total (shouldn't happen but test the cap)
+        let mut state = default_state();
+        state.reserved_balance = state.total_balance + 1;
+        let ratio = compute_reserve_ratio(&state);
+        assert_eq!(ratio, 10_000); // Capped at 100%
+    }
+
+    #[test]
+    fn test_stabilization_price_50_percent_above_v4() {
+        // Price is 50% above target → SellPressure
+        let current = 1500 * PRECISION;
+        let target = 1000 * PRECISION;
+        let available = 100_000 * PRECISION;
+        let pool = 1_000_000 * PRECISION;
+
+        let action = compute_stabilization_action(current, target, available, pool).unwrap();
+        assert_eq!(action.action_type, StabilizationType::SellPressure);
+        assert!(action.amount <= available / 2);
+    }
+
+    #[test]
+    fn test_stabilization_extreme_deviation_cap_v4() {
+        // 200% above target → capped amount at max_action
+        let current = 3000 * PRECISION;
+        let target = 1000 * PRECISION;
+        let available = 100_000 * PRECISION;
+        let pool = 1_000_000 * PRECISION;
+
+        let action = compute_stabilization_action(current, target, available, pool).unwrap();
+        assert_eq!(action.action_type, StabilizationType::SellPressure);
+        // raw_amount = max_action * deviation_bps / BPS
+        // deviation = 200% = 20000 bps → raw = 50K * 20000 / 10000 = 100K > 50K cap
+        assert_eq!(action.amount, available / 2); // Capped
+    }
+
+    #[test]
+    fn test_stabilization_1_wei_available_v4() {
+        // Very small treasury
+        let current = 900 * PRECISION;
+        let target = 1000 * PRECISION;
+        let available = 1;
+        let pool = 1_000_000 * PRECISION;
+
+        let action = compute_stabilization_action(current, target, available, pool).unwrap();
+        // max_action = 1/2 = 0, raw_amount = 0, but minimum is 1
+        assert_eq!(action.amount, 1);
+    }
+
+    #[test]
+    fn test_price_impact_equal_pools_v4() {
+        // Symmetric pool, trade = 10% of pool
+        let action = StabilizationAction {
+            action_type: StabilizationType::BuySupport,
+            amount: 100_000 * PRECISION,
+            target_price: PRECISION,
+            current_price: PRECISION,
+            impact_estimate: 0,
+        };
+        let impact = estimate_price_impact(&action, 1_000_000 * PRECISION, 1_000_000 * PRECISION).unwrap();
+        // 100K / 1.1M ≈ 9.09%
+        assert!(impact > PRECISION / 20); // > 5%
+        assert!(impact < PRECISION / 5);  // < 20%
+    }
+
+    #[test]
+    fn test_report_zero_outflow_infinite_runway_v4() {
+        let state = default_state();
+        let report = generate_report(&state, &[], 1000, 0);
+        assert_eq!(report.runway_blocks, u64::MAX);
+    }
+
+    #[test]
+    fn test_report_high_utilization_low_health_v4() {
+        let mut state = default_state();
+        state.reserved_balance = 900_000 * PRECISION; // 90% utilization
+        state.available_balance = 100_000 * PRECISION;
+        let report = generate_report(&state, &[], 1000, 100 * PRECISION);
+        // 90% utilization > 70% → utilization_score = 0
+        assert!(report.utilization_bps >= 9000);
+    }
+
+    #[test]
+    fn test_report_no_allocations_zero_liabilities_v4() {
+        let state = default_state();
+        let report = generate_report(&state, &[], 1000, 100 * PRECISION);
+        assert_eq!(report.total_liabilities, 0);
+        assert_eq!(report.net_position, state.total_balance);
+    }
+
+    #[test]
+    fn test_check_rebalance_single_category_v4() {
+        let actual = vec![10_000];
+        let target = vec![10_000];
+        let result = check_rebalance_needed(&actual, &target);
+        assert_eq!(result, Err(TreasuryError::RebalanceNotNeeded));
+    }
+
+    #[test]
+    fn test_check_rebalance_two_categories_exactly_at_v4() {
+        // One category 300 bps over, other 300 bps under → exactly at threshold
+        let actual = vec![5300, 4700];
+        let target = vec![5000, 5000];
+        let (from, to, dev) = check_rebalance_needed(&actual, &target).unwrap();
+        assert_eq!(from, 0);
+        assert_eq!(to, 1);
+        assert_eq!(dev, 300);
+    }
+
+    #[test]
+    fn test_compute_rebalance_zero_bps_target_v4() {
+        // target_ratio = 0 bps → target_balance = 0
+        // from_balance must be > 0 → excess = from_balance
+        // to_target = 0 → deficit = 0 if to_balance >= 0 → transfer 0 → RebalanceNotNeeded
+        let result = compute_rebalance(1000, 0, 0, 10_000);
+        assert_eq!(result, Err(TreasuryError::RebalanceNotNeeded));
+    }
+
+    #[test]
+    fn test_compute_rebalance_100_percent_target_v4() {
+        // target_ratio = 10000 bps (100%) → target = total
+        // from_balance = 6000, total = 10000, target = 10000 → from < target → NotNeeded
+        let result = compute_rebalance(
+            6000 * PRECISION, 2000 * PRECISION,
+            10_000, 10_000 * PRECISION,
+        );
+        assert_eq!(result, Err(TreasuryError::RebalanceNotNeeded));
+    }
+
+    #[test]
+    fn test_allocate_then_report_liabilities_v4() {
+        // Allocate, then verify report shows correct liabilities
+        let state = default_state();
+        let alloc = allocate_funds(
+            &state, 20_000 * PRECISION,
+            AllocationPurpose::SecurityBounty,
+            default_recipient(),
+            2_000_000,
+        ).unwrap();
+        let mut alloc = alloc;
+        alloc.vesting_start = 0;
+
+        // At cliff end: 0 vested, all 20K is liability
+        let report = generate_report(&state, &[alloc.clone()], VESTING_CLIFF_BLOCKS, 100 * PRECISION);
+        assert_eq!(report.total_liabilities, 20_000 * PRECISION);
+
+        // After half vesting: 10K vested, 10K liability
+        let report = generate_report(&state, &[alloc], VESTING_CLIFF_BLOCKS + 1_000_000, 100 * PRECISION);
+        assert_eq!(report.total_liabilities, 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_exit_emergency_preserves_other_fields_v4() {
+        let mut state = default_state();
+        state.emergency_mode = true;
+        state.reserved_balance = 500_000 * PRECISION;
+        state.daily_outflow = 10_000 * PRECISION;
+        let updated = exit_emergency_mode(&state).unwrap();
+        assert!(!updated.emergency_mode);
+        // Other fields preserved
+        assert_eq!(updated.reserved_balance, 500_000 * PRECISION);
+        assert_eq!(updated.daily_outflow, 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_stabilization_action_impact_with_zero_amount_v4() {
+        // LiquidityAdd with deviation=0 gives amount=1
+        let action = compute_stabilization_action(
+            1000 * PRECISION, 1000 * PRECISION,
+            100_000 * PRECISION, 1_000_000 * PRECISION,
+        ).unwrap();
+        assert_eq!(action.amount, 1);
+        assert_eq!(action.action_type, StabilizationType::LiquidityAdd);
+    }
+
+    #[test]
+    fn test_update_daily_outflow_preserves_state_v4() {
+        let state = default_state();
+        let updated = update_daily_outflow(&state, 10_000 * PRECISION).unwrap();
+        // Everything except daily_outflow should be the same
+        assert_eq!(updated.total_balance, state.total_balance);
+        assert_eq!(updated.reserved_balance, state.reserved_balance);
+        assert_eq!(updated.available_balance, state.available_balance);
+        assert_eq!(updated.emergency_mode, state.emergency_mode);
+        assert_eq!(updated.daily_outflow_limit, state.daily_outflow_limit);
+    }
 }

@@ -26,10 +26,11 @@ const EXEC_TIMEOUT = 15000; // 15s command timeout
 
 // ============ Auth ============
 
-export function nyxAuth(req) {
+export function nyxAuth(req, url) {
   const secret = process.env.CLAUDE_CODE_API_SECRET;
   if (!secret) return false; // No secret configured = Nyx disabled
-  return req.headers['x-api-secret'] === secret;
+  // Check header first, then URL token (for browser navigation)
+  return req.headers['x-api-secret'] === secret || url?.searchParams?.get('t') === secret;
 }
 
 // ============ Path Safety ============
@@ -146,7 +147,7 @@ export async function handleNyxRequest(req, res, url) {
   const path = url.pathname;
 
   // Auth check — everything behind the gate
-  if (!nyxAuth(req)) {
+  if (!nyxAuth(req, url)) {
     if (path === '/nyx' || path === '/nyx/') {
       // Show login page instead of 401
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -293,17 +294,12 @@ document.getElementById('secret').addEventListener('keydown',e=>{if(e.key==='Ent
 async function login(){
 const secret=document.getElementById('secret').value;
 const r=await fetch('/nyx/api/files',{headers:{'x-api-secret':secret}});
-if(r.ok){localStorage.setItem('nyx-secret',secret);await loadNyx(secret)}
+if(r.ok){localStorage.setItem('nyx-secret',secret);window.location.href='/nyx?t='+encodeURIComponent(secret)}
 else{document.getElementById('err').style.display='block'}
-}
-async function loadNyx(secret){
-const r=await fetch('/nyx',{headers:{'x-api-secret':secret}});
-const html=await r.text();
-document.open();document.write(html);document.close();
 }
 // Auto-login if secret stored
 const s=localStorage.getItem('nyx-secret');
-if(s){fetch('/nyx/api/files',{headers:{'x-api-secret':s}}).then(r=>{if(r.ok)loadNyx(s)})}
+if(s){fetch('/nyx/api/files',{headers:{'x-api-secret':s}}).then(r=>{if(r.ok)window.location.href='/nyx?t='+encodeURIComponent(s)})}
 </script>
 </body></html>`;
 }
@@ -440,6 +436,9 @@ body{font-family:'SF Mono',Monaco,Consolas,monospace;background:#0a0a0a;color:#e
 </div>
 
 <script>
+// Store token from URL, then clean it
+const urlToken=new URLSearchParams(window.location.search).get('t');
+if(urlToken){localStorage.setItem('nyx-secret',urlToken);history.replaceState(null,'','/nyx')}
 const SECRET=localStorage.getItem('nyx-secret')||'';
 const H={'Content-Type':'application/json','x-api-secret':SECRET};
 let currentPath='';

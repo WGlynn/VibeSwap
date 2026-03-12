@@ -94,24 +94,44 @@ export async function pantheonChat(agentId, message, chatId = 'default') {
   // Trim (keep last 50 messages)
   while (history.length > 50) history.shift()
 
-  // Call LLM
-  const model = process.env.PANTHEON_MODEL || 'claude-sonnet-4-5-20250929'
-  const { default: Anthropic } = await import('@anthropic-ai/sdk')
-  const client = new Anthropic({ timeout: 120_000 })
+  // Call LLM — Ollama (free, local) or Claude API
+  const ollamaUrl = process.env.OLLAMA_URL
+  const model = process.env.PANTHEON_MODEL || (ollamaUrl ? 'qwen2.5:7b' : 'claude-sonnet-4-5-20250929')
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 2048,
-    system: agent.identity,
-    messages: history,
-  })
+  let text, usage
+  if (ollamaUrl || model.includes('qwen') || model.includes('llama') || model.includes('mistral')) {
+    // ============ Ollama (zero cost) ============
+    const url = ollamaUrl || 'http://localhost:11434'
+    const ollamaMessages = [
+      { role: 'system', content: agent.identity },
+      ...history,
+    ]
+    const res = await fetch(`${url}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages: ollamaMessages, stream: false }),
+    })
+    const data = await res.json()
+    text = data.message?.content || ''
+    usage = { input_tokens: data.prompt_eval_count || 0, output_tokens: data.eval_count || 0 }
+  } else {
+    // ============ Claude API ============
+    const { default: Anthropic } = await import('@anthropic-ai/sdk')
+    const client = new Anthropic({ timeout: 120_000 })
+    const response = await client.messages.create({
+      model,
+      max_tokens: 2048,
+      system: agent.identity,
+      messages: history,
+    })
+    text = response.content.map(b => b.text || '').join('')
+    usage = response.usage || {}
+  }
 
-  const text = response.content.map(b => b.text || '').join('')
   history.push({ role: 'assistant', content: text })
 
-  // Track costs
-  const usage = response.usage || {}
-  const pricing = PRICING[model] || { input: 3, output: 15 }
+  // Track costs (Ollama = $0, Claude = per-token)
+  const pricing = PRICING[model] || { input: 0, output: 0 }
   const cost = ((usage.input_tokens || 0) * pricing.input + (usage.output_tokens || 0) * pricing.output) / 1_000_000
 
   agent.costs.inputTokens += usage.input_tokens || 0

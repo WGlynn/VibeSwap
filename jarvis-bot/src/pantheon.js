@@ -84,9 +84,10 @@ export async function pantheonChat(agentId, message, chatId = 'default') {
     }
   }
 
-  // Get or create conversation
+  // Get or create conversation (load persisted if available)
   if (!agent.conversations.has(chatId)) {
-    agent.conversations.set(chatId, [])
+    const persisted = await loadConversation(agentId, chatId)
+    agent.conversations.set(chatId, persisted)
   }
   const history = agent.conversations.get(chatId)
   history.push({ role: 'user', content: message })
@@ -129,6 +130,9 @@ export async function pantheonChat(agentId, message, chatId = 'default') {
   }
 
   history.push({ role: 'assistant', content: text })
+
+  // Persist conversation to disk
+  await persistConversation(agentId, chatId, history)
 
   // Track costs (Ollama = $0, Claude = per-token)
   const pricing = PRICING[model] || { input: 0, output: 0 }
@@ -407,6 +411,84 @@ export async function pruneAll() {
     }
   }
   return results
+}
+
+// ============ Conversation Persistence ============
+
+const CONV_DIR = join(DATA_DIR, 'pantheon-conversations')
+
+async function persistConversation(agentId, chatId, history) {
+  try {
+    if (!existsSync(CONV_DIR)) mkdirSync(CONV_DIR, { recursive: true })
+    const file = join(CONV_DIR, `${agentId}-${chatId.replace(/[^a-z0-9-]/gi, '_')}.json`)
+    await writeFile(file, JSON.stringify(history.slice(-50)))
+  } catch {}
+}
+
+async function loadConversation(agentId, chatId) {
+  try {
+    const file = join(CONV_DIR, `${agentId}-${chatId.replace(/[^a-z0-9-]/gi, '_')}.json`)
+    const data = await readFile(file, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return []
+  }
+}
+
+// ============ System Status (for Jarvis awareness) ============
+
+export async function getTheAIStatus() {
+  const agentList = await listAgents()
+  const costs = await getAllCosts()
+  const archetypes = getArchetypes()
+
+  const agentSummaries = agentList.map(name => {
+    const arch = archetypes[name]
+    const agent = agents.get(name)
+    const convCount = agent ? agent.conversations.size : 0
+    return `${name} (T${arch?.tier ?? '?'}, ${arch?.domain?.split(',')[0] || 'custom'}, ${convCount} convos)`
+  })
+
+  return {
+    activeAgents: agentList.length,
+    agents: agentSummaries,
+    totalCost: costs.totalUsd,
+    totalCalls: costs.totalCalls,
+    nextPrune: 'midnight UTC',
+  }
+}
+
+// Format for injection into Jarvis system prompt
+export async function getTheAIContext() {
+  const status = await getTheAIStatus()
+  if (status.activeAgents === 0) return ''
+  return `\n[TheAI Pantheon: ${status.activeAgents} agents active (${status.agents.join(', ')}). LLM cost: ${status.totalCost}. Use consult_pantheon tool to ask any agent.]`
+}
+
+// ============ Jarvis Bridge — LLM Tool ============
+
+export const PANTHEON_TOOLS = [
+  {
+    name: 'consult_pantheon',
+    description: 'Consult a TheAI Pantheon agent. Nyx (coordinator), Poseidon (finance), Athena (strategy), Hephaestus (building), Hermes (comms), Apollo (analytics). Ask them questions in their domain.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agent: { type: 'string', description: 'Agent name (nyx, poseidon, athena, etc.)' },
+        question: { type: 'string', description: 'Your question for this agent' },
+      },
+      required: ['agent', 'question'],
+    },
+  },
+]
+export const PANTHEON_TOOL_NAMES = PANTHEON_TOOLS.map(t => t.name)
+
+export async function handlePantheonTool(name, input) {
+  if (name === 'consult_pantheon') {
+    const response = await pantheonChat(input.agent, `[Jarvis consulting you]: ${input.question}`, 'jarvis-bridge')
+    return JSON.stringify({ agent: input.agent, response: response.text, cost: response.usage.cost })
+  }
+  return JSON.stringify({ error: `Unknown tool: ${name}` })
 }
 
 // ============ Init ============

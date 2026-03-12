@@ -21,6 +21,7 @@ import { WALLET_TOOLS, WALLET_TOOL_NAMES, handleWalletTool } from './wallet.js';
 import { TRADING_TOOLS, handleTradingTool } from './trading.js';
 const TRADING_TOOL_NAMES = TRADING_TOOLS.map(t => t.name);
 import { SOCIAL_TOOLS, SOCIAL_TOOL_NAMES, handleSocialTool } from './social.js';
+import { PANTHEON_TOOLS, PANTHEON_TOOL_NAMES, handlePantheonTool } from './pantheon.js';
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 import { runLocalCRPC } from './crpc.js';
 
@@ -1598,6 +1599,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     ...SOCIAL_TOOLS,
     // ============ Proactive Engine — Autonomous Actions ============
     ...PROACTIVE_TOOLS,
+    // ============ TheAI Pantheon — Agent Consultation ============
+    ...PANTHEON_TOOLS,
   ];
 
   // Select only relevant tools based on message content
@@ -2144,6 +2147,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (PROACTIVE_TOOL_NAMES.includes(tb.name)) {
           result = await handleProactiveTool(tb.name, tb.input);
+          console.log(`[claude] Tool: ${tb.name}`);
+        } else if (PANTHEON_TOOL_NAMES.includes(tb.name)) {
+          result = await handlePantheonTool(tb.name, tb.input);
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (tb.name === 'defer_task') {
           const taskResult = createTask({

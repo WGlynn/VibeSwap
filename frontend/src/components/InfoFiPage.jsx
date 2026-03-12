@@ -53,7 +53,6 @@ const MOCK_LEADERBOARD = [
 const FEED_CATEGORIES = ['All', 'Price', 'Sentiment', 'On-Chain', 'Analytics']
 
 // ============ API Helpers ============
-
 async function api(path, opts = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts,
@@ -69,7 +68,6 @@ function useDebounce(val, ms) {
 }
 
 // ============ Shared Modal Wrapper ============
-
 function Modal({ onClose, children, maxW = 'max-w-lg' }) {
   return (
     <motion.div
@@ -99,7 +97,6 @@ function ModalHeader({ title, onClose }) {
 }
 
 // ============ Small Components ============
-
 function TypeBadge({ type }) {
   const c = {
     Insight: 'text-cyan-400 bg-cyan-900/30 border-cyan-800/40',
@@ -152,13 +149,9 @@ function AccuracyBar({ value }) {
 const inputCls = 'w-full bg-black-800 border border-black-700 rounded-lg px-3 py-2 text-sm text-white placeholder-black-600 focus:border-matrix-600 focus:outline-none transition-colors'
 
 // ============ InfoFi Score Card ============
-
 function InfoFiScoreCard({ connected }) {
-  const score = 73.4
-  const tier = 'Silver'
-  const circumference = 2 * Math.PI * 36
-  const filled = circumference * (score / 100)
-
+  const score = 73.4, tier = 'Silver'
+  const circumference = 2 * Math.PI * 36, filled = circumference * (score / 100)
   return (
     <GlassCard glowColor="terminal" className="p-4 mb-6">
       <div className="flex items-center gap-4">
@@ -199,15 +192,11 @@ function InfoFiScoreCard({ connected }) {
 }
 
 // ============ Revenue Stream Card ============
-
 function RevenueStreamCard({ connected }) {
   const streams = [
-    { label: 'Citation Royalties', amount: '142.8 JUL', pct: 45 },
-    { label: 'Signal Subscriptions', amount: '89.2 JUL', pct: 28 },
-    { label: 'Data Feed Sales', amount: '54.6 JUL', pct: 17 },
-    { label: 'Shapley Rewards', amount: '31.4 JUL', pct: 10 },
+    { label: 'Citation Royalties', amount: '142.8 JUL', pct: 45 }, { label: 'Signal Subscriptions', amount: '89.2 JUL', pct: 28 },
+    { label: 'Data Feed Sales', amount: '54.6 JUL', pct: 17 }, { label: 'Shapley Rewards', amount: '31.4 JUL', pct: 10 },
   ]
-
   return (
     <GlassCard glowColor="matrix" className="p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
@@ -240,11 +229,9 @@ function RevenueStreamCard({ connected }) {
 }
 
 // ============ Data Marketplace Tab ============
-
 function DataMarketplace({ connected }) {
   const [feedFilter, setFeedFilter] = useState('All')
   const filtered = feedFilter === 'All' ? MOCK_DATA_FEEDS : MOCK_DATA_FEEDS.filter((f) => f.category === feedFilter)
-
   return (
     <div>
       <div className="flex flex-wrap gap-1 mb-4">
@@ -303,7 +290,6 @@ function DataMarketplace({ connected }) {
 }
 
 // ============ Signal Dashboard Tab ============
-
 function SignalDashboard({ connected }) {
   return (
     <div className="space-y-3">
@@ -358,7 +344,6 @@ function SignalDashboard({ connected }) {
 }
 
 // ============ Leaderboard Tab ============
-
 function LeaderboardTab() {
   return (
     <div>
@@ -368,37 +353,27 @@ function LeaderboardTab() {
         <StatBox label="Rewards Pool" value="50K JUL" />
       </div>
       <div className="overflow-hidden rounded-xl border border-black-700/50">
-        {/* Header row */}
         <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-black-800/60 border-b border-black-700/50">
-          <span className="col-span-1 text-[9px] font-mono text-black-500">#</span>
-          <span className="col-span-3 text-[9px] font-mono text-black-500">Provider</span>
-          <span className="col-span-2 text-[9px] font-mono text-black-500 text-right">Score</span>
-          <span className="col-span-2 text-[9px] font-mono text-black-500 text-right">Signals</span>
-          <span className="col-span-2 text-[9px] font-mono text-black-500 text-right">Earnings</span>
-          <span className="col-span-2 text-[9px] font-mono text-black-500 text-right">Streak</span>
-        </div>
-        {/* Rows */}
-        <AnimatePresence>
-          {MOCK_LEADERBOARD.map((entry, i) => (
-            <motion.div key={entry.author}
-              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: PHI * 0.25, delay: i * 0.04 }}
-              className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors hover:bg-black-800/40 ${
-                i < MOCK_LEADERBOARD.length - 1 ? 'border-b border-black-800/50' : ''
-              }`}>
-              <span className={`col-span-1 font-mono font-bold text-xs ${
-                entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-black-300' : entry.rank === 3 ? 'text-orange-400' : 'text-black-500'
-              }`}>{entry.rank}</span>
-              <span className="col-span-3 text-[11px] font-mono text-white truncate">{entry.author}</span>
-              <span className="col-span-2 text-[11px] font-mono font-bold text-right" style={{ color: CYAN }}>{entry.score}%</span>
-              <span className="col-span-2 text-[11px] font-mono text-black-400 text-right">{entry.signals}</span>
-              <span className="col-span-2 text-[11px] font-mono text-matrix-400 text-right">{entry.earnings}</span>
-              <div className="col-span-2 flex items-center justify-end gap-1">
-                <span className="text-[11px] font-mono text-black-400">{entry.streak}d</span>
-                <span className="text-[9px] text-amber-500">&#9650;</span>
-              </div>
-            </motion.div>
+          {[['#',1,'text-left'],['Provider',3,'text-left'],['Score',2,'text-right'],['Signals',2,'text-right'],['Earnings',2,'text-right'],['Streak',2,'text-right']].map(([l,s,a]) => (
+            <span key={l} className={`col-span-${s} text-[9px] font-mono text-black-500 ${a}`}>{l}</span>
           ))}
+        </div>
+        <AnimatePresence>
+          {MOCK_LEADERBOARD.map((e, i) => {
+            const rankColor = e.rank === 1 ? 'text-amber-400' : e.rank === 2 ? 'text-black-300' : e.rank === 3 ? 'text-orange-400' : 'text-black-500'
+            return (
+              <motion.div key={e.author} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: PHI * 0.25, delay: i * 0.04 }}
+                className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center hover:bg-black-800/40 transition-colors ${i < MOCK_LEADERBOARD.length - 1 ? 'border-b border-black-800/50' : ''}`}>
+                <span className={`col-span-1 font-mono font-bold text-xs ${rankColor}`}>{e.rank}</span>
+                <span className="col-span-3 text-[11px] font-mono text-white truncate">{e.author}</span>
+                <span className="col-span-2 text-[11px] font-mono font-bold text-right" style={{ color: CYAN }}>{e.score}%</span>
+                <span className="col-span-2 text-[11px] font-mono text-black-400 text-right">{e.signals}</span>
+                <span className="col-span-2 text-[11px] font-mono text-matrix-400 text-right">{e.earnings}</span>
+                <span className="col-span-2 text-[11px] font-mono text-black-400 text-right">{e.streak}d &#9650;</span>
+              </motion.div>
+            )
+          })}
         </AnimatePresence>
       </div>
     </div>
@@ -406,7 +381,6 @@ function LeaderboardTab() {
 }
 
 // ============ Primitive Card ============
-
 function PrimitiveCard({ p, onSelect, onCite, onAuthor, max, connected }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -448,7 +422,6 @@ function PrimitiveCard({ p, onSelect, onCite, onAuthor, max, connected }) {
 }
 
 // ============ Detail Modal ============
-
 function DetailModal({ p, onClose, onCite, onAuthor, max, connected }) {
   if (!p) return null
   return (
@@ -490,7 +463,6 @@ function DetailModal({ p, onClose, onCite, onAuthor, max, connected }) {
 }
 
 // ============ Create Modal ============
-
 function CreateModal({ onClose, onCreated, existing }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
@@ -561,7 +533,6 @@ function CreateModal({ onClose, onCreated, existing }) {
 }
 
 // ============ Author Profile Modal ============
-
 function AuthorModal({ author, onClose }) {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)

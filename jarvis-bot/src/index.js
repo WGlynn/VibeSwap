@@ -150,6 +150,7 @@ import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio,
 import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedule, listSchedules, getSchedulerStats } from './tools-scheduler.js';
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
+import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -1162,6 +1163,14 @@ SOVEREIGN WALLET (owner-only)
   /wallet balance — All chain balances
   /wallet whitelist add <addr> — Add address
   /wallet pause / unpause — Emergency stop
+
+TRADING (owner-only)
+  /trade — Portfolio + P&L
+  /trade setup — Whitelist Uniswap router
+  /trade buy <usdc> — Buy ETH with USDC
+  /trade sell <eth> — Sell ETH for USDC
+  /trade history — Recent trades
+  /trade pnl — P&L breakdown
 
 SOCIAL PRESENCE (owner-only)
   /social status — Platform status
@@ -2441,6 +2450,48 @@ bot.command('wallet', async (ctx) => {
     } else {
       ctx.reply(`Address: ${info.address}\nUnlocked: ${info.unlocked}\nPaused: ${info.paused}\nDaily: ${info.today?.spent} / ${info.limits?.dailyCap}\nTx today: ${info.today?.txCount} / ${info.limits?.dailyTxLimit}\nTotal tx: ${info.totalTx}\nChains: ${info.chains?.join(', ')}`);
     }
+  }
+});
+
+// ============ Trading — Autonomous DEX ============
+
+bot.command('trade', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Trading commands are owner-only.');
+  }
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'setup') {
+    const result = setupTrading();
+    ctx.reply(`Trading setup complete.\nUniswap Router whitelisted: ${result.router}`);
+  } else if (sub === 'buy' || sub === 'sell') {
+    const amount = args[1];
+    if (!amount || isNaN(parseFloat(amount))) {
+      return ctx.reply(`Usage: /trade ${sub} <amount>\n\n${sub === 'buy' ? 'Amount in USDC' : 'Amount in ETH'}`);
+    }
+    const reasoning = args.slice(2).join(' ') || 'Manual trade via Telegram';
+    ctx.reply(`Executing ${sub} ${amount} ${sub === 'buy' ? 'USDC → ETH' : 'ETH → USDC'}...`);
+    const result = await swap(sub, amount, reasoning);
+    if (result.error) {
+      ctx.reply(`Trade failed: ${result.error}`);
+    } else {
+      ctx.reply(`Trade executed!\nTx: ${result.explorer}\nExpected: ${result.trade.amountOutExpected} ${result.trade.tokenOut}`);
+    }
+  } else if (sub === 'history') {
+    const trades = await getTradeHistory(10);
+    if (trades.length === 0) return ctx.reply('No trades yet.');
+    const lines = trades.map(t =>
+      `${t.direction.toUpperCase()} ${t.amountIn} ${t.tokenIn} → ${t.amountOutExpected} ${t.tokenOut} (${new Date(t.timestamp).toLocaleDateString()})`
+    );
+    ctx.reply(`Recent Trades:\n${lines.join('\n')}`);
+  } else if (sub === 'pnl') {
+    const pnl = await getPnL();
+    ctx.reply(`P&L Report:\nTrades: ${pnl.trades}\nRealized: $${pnl.realizedPnl}\nUnrealized: $${pnl.unrealizedPnl}\nTotal: $${pnl.totalPnl}\nAvg Buy: $${pnl.avgBuyPrice}\nAvg Sell: $${pnl.avgSellPrice}\nETH Price: $${pnl.currentPrice}`);
+  } else {
+    // Default: show portfolio
+    const status = await formatTradeStatus();
+    ctx.reply(status);
   }
 });
 
@@ -6344,6 +6395,8 @@ async function main() {
   );
   // Sovereign wallet — on-chain agency
   initWallet();
+  // Trading — autonomous DEX trading on Base
+  initTrading();
   // Social outbound presence — X, Discord, GitHub
   initSocialOutbound();
   // Proactive engine — autonomous scheduled actions

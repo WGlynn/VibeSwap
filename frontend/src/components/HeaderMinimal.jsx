@@ -191,6 +191,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/philosophy', label: 'Philosophy', icon: '∞' },
     { path: '/covenants', label: 'Ten Covenants', icon: 'X' },
     { path: '/rosetta', label: 'Rosetta Protocol', icon: '⟷' },
+    { path: '/trust', label: 'Trust Network', icon: '⊗' },
+    { path: '/gametheory', label: 'Game Theory', icon: '∑' },
     { path: '/research', label: 'Research', icon: '~' },
     { path: '/status', label: 'System Status', icon: '|' },
     { path: '/about', label: 'About', icon: 'i' },

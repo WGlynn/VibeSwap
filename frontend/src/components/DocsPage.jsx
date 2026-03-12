@@ -1353,6 +1353,33 @@ function PapersSection() {
           </span>
         </div>
       </div>
+
+      {/* Interactive Knowledge Pages */}
+      <div className="mt-8 pt-6 border-t border-void-700/50">
+        <h3 className="text-lg font-semibold text-white mb-4">Interactive Deep Dives</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link to="/philosophy" className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl hover:bg-purple-500/10 transition-colors">
+            <span className="text-purple-400 font-semibold text-sm">The Intellectual DNA</span>
+            <p className="text-void-400 text-xs mt-1">Six pillars of knowledge behind every line of code</p>
+          </Link>
+          <Link to="/jul" className="p-4 bg-matrix-600/5 border border-matrix-600/20 rounded-xl hover:bg-matrix-600/10 transition-colors">
+            <span className="text-matrix-400 font-semibold text-sm">JUL Token</span>
+            <p className="text-void-400 text-xs mt-1">The elastic currency — monetary biology meets DeFi</p>
+          </Link>
+          <Link to="/covenants" className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition-colors">
+            <span className="text-red-400 font-semibold text-sm">Ten Covenants</span>
+            <p className="text-void-400 text-xs mt-1">Immutable laws governing the Pantheon agent network</p>
+          </Link>
+          <Link to="/rosetta" className="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl hover:bg-cyan-500/10 transition-colors">
+            <span className="text-cyan-400 font-semibold text-sm">Rosetta Protocol</span>
+            <p className="text-void-400 text-xs mt-1">Universal translation between AI agents</p>
+          </Link>
+          <Link to="/economics" className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-colors">
+            <span className="text-amber-400 font-semibold text-sm">Economics</span>
+            <p className="text-void-400 text-xs mt-1">Cost equivalence, commit-reveal, MEV prevention</p>
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }

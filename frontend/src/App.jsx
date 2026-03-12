@@ -93,6 +93,8 @@ const CovenantPage = lazy(() => import('./components/CovenantPage'))
 const RosettaPage = lazy(() => import('./components/RosettaPage'))
 const JulPage = lazy(() => import('./components/JulPage'))
 const PhilosophyPage = lazy(() => import('./components/PhilosophyPage'))
+const TrustTimelinePage = lazy(() => import('./components/TrustTimelinePage'))
+const GameTheoryPage = lazy(() => import('./components/GameTheoryPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -174,6 +176,8 @@ function AnimatedRoutes() {
             <Route path="/rosetta" element={<RosettaPage />} />
             <Route path="/jul" element={<JulPage />} />
             <Route path="/philosophy" element={<PhilosophyPage />} />
+            <Route path="/trust" element={<TrustTimelinePage />} />
+            <Route path="/gametheory" element={<GameTheoryPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             </Routes>

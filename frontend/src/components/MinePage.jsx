@@ -627,7 +627,7 @@ function MinePage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-display font-bold">Mine JUL</h1>
-        <p className="text-void-400 mt-1">SHA-256 proof-of-work mining — earn Joule tokens</p>
+        <p className="text-void-400 mt-1">SHA-256 proof-of-work mining — earn Joule tokens · <a href="/jul" className="text-matrix-500 hover:underline">Learn about JUL</a></p>
       </div>
 
       <StaggerContainer>

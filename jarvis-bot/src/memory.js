@@ -14,6 +14,7 @@ const MEMORY_FILES = [
   'psinet-protocol.md',
   'nervos-intel.md',
   'limni-systems.md',
+  'tim-cotten-avb.md',
 ];
 
 // Path resolution uses config (supports both local and Docker/cloud)

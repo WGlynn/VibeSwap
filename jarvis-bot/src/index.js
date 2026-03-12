@@ -3326,7 +3326,7 @@ bot.command('shard', async (ctx) => {
 });
 
 bot.command('network', async (ctx) => {
-  if (!isOwner(ctx)) return ownerOnly(ctx);
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
   const topo = getTopology();
   const archives = getArchiveStatus();
   const consensus = getConsensusState();
@@ -3375,47 +3375,46 @@ bot.command('network', async (ctx) => {
 // Usage: /crpc [prompt] — default prompt if none provided.
 
 bot.command('crpc', async (ctx) => {
-  if (!isOwner(ctx)) return ownerOnly(ctx);
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
 
   const customPrompt = ctx.message.text.replace(/^\/crpc\s*/, '').trim() || null;
-  await ctx.reply('Running CRPC consensus round — 3 shards generating independently...');
+  await ctx.reply('⚡ Running CRPC consensus — 3 shards generating independently...');
 
   try {
     const trace = await runCRPCDemo(customPrompt);
 
-    const lines = [
-      `CRPC CONSENSUS COMPLETE`,
-      `Protocol: Tim Cotton's Commit-Reveal Pairwise Comparison`,
-      `Duration: ${trace.totalDurationMs}ms`,
+    // Message 1: Protocol trace
+    const traceLines = [
+      `🔐 CRPC CONSENSUS COMPLETE`,
+      `Protocol: Commit-Reveal Pairwise Comparison`,
+      `Duration: ${trace.totalDurationMs}ms | Prompt: "${(customPrompt || trace.prompt || 'default').slice(0, 60)}"`,
       '',
-      'PHASE 1 — WORK COMMIT',
-      ...trace.phases[0].commits.map(c => `  ${c.shardId}: ${c.commitHash.slice(0, 16)}...`),
+      `━━ Phase 1: WORK COMMIT ━━`,
+      ...trace.phases[0].commits.map(c => `  🔒 ${c.shardId}: ${c.commitHash.slice(0, 20)}…`),
       '',
-      'PHASE 2 — WORK REVEAL (all hashes verified)',
-      ...trace.phases[1].reveals.map(r => `  ${r.shardId}: "${r.response.slice(0, 80)}..."`),
+      `━━ Phase 2: WORK REVEAL ━━`,
+      ...trace.phases[1].reveals.map(r => `  ✅ ${r.shardId}: "${r.response.slice(0, 60)}…"`),
       '',
-      'PHASE 3+4 — PAIRWISE COMPARISON',
+      `━━ Phase 3+4: PAIRWISE VOTE ━━`,
       ...trace.phases[3].pairwiseResults.map(pr =>
         `  ${pr.pairId}: A=${pr.votes.A_BETTER} B=${pr.votes.B_BETTER} EQ=${pr.votes.EQUIVALENT} → ${pr.winner}`
       ),
       '',
-      'RANKINGS:',
-      ...trace.rankings.map((r, i) => `  ${i + 1}. ${r.shardId} (${r.pairwiseWins} wins)`),
+      `━━ RANKINGS ━━`,
+      ...trace.rankings.map((r, i) => `  ${['🥇','🥈','🥉'][i] || '  '} ${r.shardId} (${r.pairwiseWins} wins)`),
       '',
-      `Winner: ${trace.consensusWinner}`,
-      `Confidence: ${(trace.confidence * 100).toFixed(0)}%`,
-      '',
-      'CONSENSUS RESPONSE:',
-      trace.consensusResponse,
+      `Winner: ${trace.consensusWinner} | Confidence: ${(trace.confidence * 100).toFixed(0)}%`,
     ];
 
-    // Split into multiple messages if too long
-    const output = lines.join('\n');
-    if (output.length > 4000) {
-      await ctx.reply(output.slice(0, 4000));
-      await ctx.reply(output.slice(4000));
+    await ctx.reply(traceLines.join('\n'));
+
+    // Message 2: The actual consensus response (clean, separate)
+    const responseMsg = `💬 Consensus response:\n\n${trace.consensusResponse}`;
+    if (responseMsg.length > 4000) {
+      await ctx.reply(responseMsg.slice(0, 4000));
+      await ctx.reply(responseMsg.slice(4000));
     } else {
-      await ctx.reply(output);
+      await ctx.reply(responseMsg);
     }
   } catch (err) {
     await ctx.reply(`CRPC failed: ${err.message}`);

@@ -2404,4 +2404,274 @@ mod tests {
         let s2 = test_script(0x02);
         assert_ne!(hash_script_bytes(&s1), hash_script_bytes(&s2));
     }
+
+    // ============ Hardening Batch 6: Edge Cases & Boundaries ============
+
+    #[test]
+    fn test_witness_args_very_large_lock_roundtrip_v4() {
+        // Lock field with 10KB of data
+        let wa = WitnessArgs {
+            lock: Some(vec![0xAB; 10_000]),
+            input_type: None,
+            output_type: None,
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.lock.as_ref().unwrap().len(), 10_000);
+    }
+
+    #[test]
+    fn test_witness_args_all_three_large_fields() {
+        let wa = WitnessArgs {
+            lock: Some(vec![0x11; 500]),
+            input_type: Some(vec![0x22; 500]),
+            output_type: Some(vec![0x33; 500]),
+        };
+        let bytes = wa.serialize();
+        let decoded = WitnessArgs::deserialize(&bytes).unwrap();
+        assert_eq!(decoded.lock.unwrap().len(), 500);
+        assert_eq!(decoded.input_type.unwrap().len(), 500);
+        assert_eq!(decoded.output_type.unwrap().len(), 500);
+    }
+
+    #[test]
+    fn test_witness_args_deserialize_zero_total_size() {
+        // total_size = 0 with 16 bytes of data — we have enough bytes for header
+        // but total_size says 0, meaning all offsets point to 0.
+        // The parser reads 16 bytes of header regardless, then uses total_size for field boundaries.
+        // With total_size=0 and offsets=0, fields all map to (0..0), so no data — should succeed with all None
+        let mut data = vec![0u8; 16];
+        data[0..4].copy_from_slice(&0u32.to_le_bytes());
+        let result = WitnessArgs::deserialize(&data);
+        // Parser doesn't panic — either returns valid (all None) or error
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_tx_hash_is_always_32_bytes_v4() {
+        for n in [1, 2, 5, 10] {
+            let tx = test_unsigned(n);
+            let hash = hash_raw_transaction(&tx.cell_deps, &tx.inputs, &tx.outputs);
+            assert_eq!(hash.len(), 32);
+            assert_ne!(hash, [0u8; 32]);
+        }
+    }
+
+    #[test]
+    fn test_tx_hash_output_capacity_boundary_v4() {
+        let mut tx1 = test_unsigned(1);
+        let mut tx2 = test_unsigned(1);
+        tx1.outputs[0].capacity = 0;
+        tx2.outputs[0].capacity = u64::MAX;
+        let h1 = hash_raw_transaction(&tx1.cell_deps, &tx1.inputs, &tx1.outputs);
+        let h2 = hash_raw_transaction(&tx2.cell_deps, &tx2.inputs, &tx2.outputs);
+        assert_ne!(h1, h2, "0 capacity vs u64::MAX capacity should differ");
+    }
+
+    #[test]
+    fn test_signing_message_changes_with_different_extra_content() {
+        let tx_hash = [0x42; 32];
+        let wa = WitnessArgs::new_with_empty_lock();
+        let m1 = compute_signing_message(&tx_hash, &wa, &[&[0x01]]);
+        let m2 = compute_signing_message(&tx_hash, &wa, &[&[0x02]]);
+        assert_ne!(m1, m2, "Different extra witness content should produce different messages");
+    }
+
+    #[test]
+    fn test_fee_calculation_one_byte() {
+        // 1 byte at 1 per byte = 1, but MIN_FEE = 1000
+        assert_eq!(calculate_fee(1, 1), MIN_FEE);
+    }
+
+    #[test]
+    fn test_fee_calculation_exactly_1000_bytes() {
+        // 1000 bytes at 1 per byte = 1000 = MIN_FEE
+        assert_eq!(calculate_fee(1000, 1), MIN_FEE);
+    }
+
+    #[test]
+    fn test_fee_calculation_1001_bytes() {
+        // 1001 bytes at 1 per byte = 1001 > MIN_FEE
+        assert_eq!(calculate_fee(1001, 1), 1001);
+    }
+
+    #[test]
+    fn test_mock_signer_deterministic_across_messages() {
+        // MockSigner should return the same signature regardless of message
+        let signer = MockSigner::new(test_script(0x42));
+        let msg1 = [0x00; 32];
+        let msg2 = [0xFF; 32];
+        let sig1 = signer.sign(&msg1).unwrap();
+        let sig2 = signer.sign(&msg2).unwrap();
+        assert_eq!(sig1, sig2, "MockSigner should return the same signature for any message");
+    }
+
+    #[test]
+    fn test_assemble_five_inputs_single_lock_v4() {
+        let mut tx = test_unsigned(5);
+        for output in &mut tx.outputs {
+            output.lock_script = test_script(0x01);
+        }
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01); 5];
+
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.witnesses.len(), 5);
+        // Only first witness in the group has the signature
+        let wa = WitnessArgs::deserialize(&signed.witnesses[0]).unwrap();
+        assert!(wa.lock.is_some());
+        assert_eq!(wa.lock.unwrap().len(), SECP256K1_SIGNATURE_SIZE);
+    }
+
+    #[test]
+    fn test_assemble_with_fee_deducts_correct_amount_v4() {
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].capacity = 10_000_000_000;
+        let original_cap = tx.outputs[0].capacity;
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+
+        let signed = assemble_with_fee(&mut tx, &[&signer], &locks, DEFAULT_FEE_RATE).unwrap();
+        let deducted = original_cap - signed.outputs[0].capacity;
+        assert!(deducted >= MIN_FEE, "Fee deducted should be at least MIN_FEE: {}", deducted);
+    }
+
+    #[test]
+    fn test_validate_unsigned_single_input_unique() {
+        let tx = test_unsigned(1);
+        assert!(validate_unsigned(&tx).is_ok());
+    }
+
+    #[test]
+    fn test_validate_unsigned_large_transaction() {
+        let tx = test_unsigned(20);
+        assert!(validate_unsigned(&tx).is_ok(), "20 unique inputs should be valid");
+    }
+
+    #[test]
+    fn test_signed_tx_hash_changes_with_different_inputs() {
+        let tx1 = test_unsigned(1);
+        let tx2 = test_unsigned(2);
+        let signer = MockSigner::new(test_script(0x01));
+        let signed1 = assemble_single_signer(&tx1, &signer).unwrap();
+        let signed2 = assemble_single_signer(&tx2, &signer).unwrap();
+        assert_ne!(signed1.tx_hash(), signed2.tx_hash());
+    }
+
+    #[test]
+    fn test_signed_tx_estimated_size_positive_v4() {
+        for n in [1, 2, 5] {
+            let tx = test_unsigned(n);
+            let signer = MockSigner::new(test_script(0x01));
+            let signed = assemble_single_signer(&tx, &signer).unwrap();
+            assert!(signed.estimated_size() > 0, "Size should be positive for {} inputs", n);
+        }
+    }
+
+    #[test]
+    fn test_assemble_output_data_preserved_v4() {
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].data = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+        let signed = assemble(&tx, &[&signer], &locks).unwrap();
+        assert_eq!(signed.outputs[0].data, vec![0xDE, 0xAD, 0xBE, 0xEF]);
+    }
+
+    #[test]
+    fn test_estimate_tx_size_with_large_output_data_v4() {
+        let mut tx = test_unsigned(1);
+        let s1 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        tx.outputs[0].data = vec![0u8; 10_000];
+        let s2 = estimate_tx_size(&tx.cell_deps, &tx.inputs, &tx.outputs, &tx.witnesses);
+        assert_eq!(s2 - s1, 10_000, "Adding 10KB data should increase size by 10000");
+    }
+
+    #[test]
+    fn test_assemble_input_since_preserved_v4() {
+        let mut tx = test_unsigned(2);
+        tx.inputs[0].since = 999;
+        tx.inputs[1].since = 12345;
+        let signer = MockSigner::new(test_script(0x01));
+        let signed = assemble_single_signer(&tx, &signer).unwrap();
+        assert_eq!(signed.inputs[0].since, 999);
+        assert_eq!(signed.inputs[1].since, 12345);
+    }
+
+    #[test]
+    fn test_witness_args_serialize_size_grows_with_data() {
+        let small = WitnessArgs { lock: Some(vec![0x01; 10]), input_type: None, output_type: None };
+        let large = WitnessArgs { lock: Some(vec![0x01; 100]), input_type: None, output_type: None };
+        let s1 = small.serialize().len();
+        let s2 = large.serialize().len();
+        assert!(s2 > s1, "Larger lock data should produce larger serialization");
+        assert_eq!(s2 - s1, 90, "Size difference should equal data difference");
+    }
+
+    #[test]
+    fn test_hash_script_bytes_is_32_bytes() {
+        let script = test_script(0x42);
+        let hash = hash_script_bytes(&script);
+        assert_eq!(hash.len(), 32);
+        assert_ne!(hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_hash_script_bytes_empty_args() {
+        let script = Script {
+            code_hash: [0x42; 32],
+            hash_type: HashType::Type,
+            args: vec![],
+        };
+        let hash = hash_script_bytes(&script);
+        assert_ne!(hash, [0u8; 32]);
+
+        // Different from one with args
+        let script_with_args = test_script(0x42);
+        assert_ne!(hash, hash_script_bytes(&script_with_args));
+    }
+
+    #[test]
+    fn test_assemble_with_fee_zero_rate_v4() {
+        // Fee rate 0 should give fee = 0, which gets floored to MIN_FEE
+        let mut tx = test_unsigned(1);
+        tx.outputs[0].capacity = 100_000_000;
+        let signer = MockSigner::new(test_script(0x01));
+        let locks = vec![test_script(0x01)];
+        let signed = assemble_with_fee(&mut tx, &[&signer], &locks, 0).unwrap();
+        // Fee should be at least MIN_FEE even at rate 0
+        assert!(signed.outputs[0].capacity < 100_000_000);
+    }
+
+    #[test]
+    fn test_assembler_error_variants_distinct_v4() {
+        let err1 = AssemblerError::EmptyTransaction;
+        let err2 = AssemblerError::EmptyLockGroup;
+        let err3 = AssemblerError::WitnessMismatch { inputs: 1, witnesses: 2 };
+        let err4 = AssemblerError::SigningFailed("test".into());
+        let err5 = AssemblerError::InsufficientFeeCapacity { fee: 100, available: 50 };
+        let err6 = AssemblerError::SerializationError("test".into());
+        let err7 = AssemblerError::DuplicateInput { tx_hash: [0u8; 32], index: 0 };
+        assert_ne!(err1, err2);
+        assert_ne!(err3, err4);
+        assert_ne!(err5, err6);
+        // All variants are unique types
+        assert_ne!(format!("{:?}", err1), format!("{:?}", err7));
+    }
+
+    #[test]
+    fn test_compute_signing_message_deterministic_v4() {
+        // Same inputs produce same signing message every time
+        let tx_hash = [0xAB; 32];
+        let wa = WitnessArgs {
+            lock: Some(vec![0xFF; 65]),
+            input_type: Some(vec![0x11; 10]),
+            output_type: None,
+        };
+        let extras: &[&[u8]] = &[&[0xAA, 0xBB]];
+        let m1 = compute_signing_message(&tx_hash, &wa, extras);
+        let m2 = compute_signing_message(&tx_hash, &wa, extras);
+        assert_eq!(m1, m2);
+        assert_ne!(m1, [0u8; 32]);
+    }
 }

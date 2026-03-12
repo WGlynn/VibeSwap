@@ -30,6 +30,7 @@ pub mod liquidity;
 pub mod metrics;
 pub mod migration;
 pub mod miner;
+pub mod multisig;
 pub mod orderbook;
 pub mod oracle;
 pub mod pool;

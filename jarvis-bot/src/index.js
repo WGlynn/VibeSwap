@@ -689,6 +689,9 @@ function isRateLimited(userId) {
     timestamps.shift();
   }
 
+  // Hard cap — prevent unbounded growth from clock skew or rapid bursts
+  if (timestamps.length > 120) timestamps.splice(0, timestamps.length - 60);
+
   if (timestamps.length >= config.rateLimitPerMinute) {
     return true;
   }
@@ -740,6 +743,12 @@ setInterval(() => {
   const now = Date.now();
   for (const [key, ts] of commandRateLimits) {
     if (now - ts > 300000) commandRateLimits.delete(key); // 5min stale
+  }
+  // Prune stale bot-to-bot exchange entries (>1hr old)
+  if (global._botExchanges) {
+    for (const [key, val] of global._botExchanges) {
+      if (now - val.lastTime > 3600000) global._botExchanges.delete(key);
+    }
   }
 }, 10 * 60 * 1000);
 

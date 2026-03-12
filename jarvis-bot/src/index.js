@@ -6276,6 +6276,13 @@ async function main() {
     console.error(`[telegraf] Error in chat ${chatInfo}:`, err.message);
     // Log but don't crash — Telegraf will continue polling
     persistCrashEntry('telegraf_error', err);
+    // Best-effort user feedback — prevents silent command failures
+    try {
+      const isGroup = ctx?.chat?.type === 'group' || ctx?.chat?.type === 'supergroup';
+      if (!isGroup && ctx?.reply) {
+        ctx.reply('Something went wrong. Try again in a moment.').catch(() => {});
+      }
+    } catch {}
   });
 
   // ============ Polling Liveness Monitor ============

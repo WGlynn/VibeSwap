@@ -4,6 +4,7 @@ import { join } from 'path';
 import { config } from './config.js';
 import { getPersonaOverlay, getActivePersonaId } from './persona.js';
 import { syncFileChange } from './knowledge-chain.js';
+import { getTheAIContext } from './pantheon.js';
 
 const MEMORY_FILES = [
   'MEMORY.md',
@@ -726,6 +727,12 @@ export async function loadSystemPrompt() {
       }
     }
   }
+
+  // Inject TheAI Pantheon awareness (active agents, cost, consult tool hint)
+  try {
+    const theaiContext = await getTheAIContext();
+    if (theaiContext) dynamicParts.push(theaiContext);
+  } catch {}
 
   const dynamicPrompt = dynamicParts.join('\n');
   const fullPrompt = staticPrompt + '\n' + dynamicPrompt + '\n' + RECENCY_RULES;

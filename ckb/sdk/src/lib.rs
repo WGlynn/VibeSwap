@@ -41,6 +41,7 @@ pub mod miner;
 pub mod monitoring;
 pub mod multisig;
 pub mod notify;
+pub mod order_router;
 pub mod orderbook;
 pub mod oracle;
 pub mod permission;

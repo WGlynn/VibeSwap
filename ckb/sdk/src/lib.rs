@@ -17,6 +17,7 @@ pub mod circuit_breaker;
 pub mod config;
 pub mod collector;
 pub mod compliance;
+pub mod cross_chain;
 pub mod delegate;
 pub mod consensus;
 pub mod emission;

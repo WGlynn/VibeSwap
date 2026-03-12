@@ -33,6 +33,40 @@ const PRICING = {
   'claude-opus-4-20250514': { input: 15, output: 75 },
 }
 
+// ============ Event Bus — TheAI Nervous System ============
+// Every agent interaction becomes an event. Events flow through the system.
+// Nyx sees all events. Managers see events from their subordinates.
+
+const eventLog = []
+const MAX_EVENTS = 200
+const eventListeners = new Map() // agentId -> callback[]
+
+function emitEvent(type, data) {
+  const event = { type, ...data, timestamp: new Date().toISOString() }
+  eventLog.push(event)
+  while (eventLog.length > MAX_EVENTS) eventLog.shift()
+
+  // Notify listeners
+  for (const [agentId, callbacks] of eventListeners) {
+    for (const cb of callbacks) {
+      try { cb(event) } catch {}
+    }
+  }
+  return event
+}
+
+export function getEvents(filter = {}, limit = 50) {
+  let events = eventLog
+  if (filter.type) events = events.filter(e => e.type === filter.type)
+  if (filter.agent) events = events.filter(e => e.agent === filter.agent || e.from === filter.agent || e.to === filter.agent)
+  return events.slice(-limit)
+}
+
+export function onEvent(agentId, callback) {
+  if (!eventListeners.has(agentId)) eventListeners.set(agentId, [])
+  eventListeners.get(agentId).push(callback)
+}
+
 // ============ State ============
 
 const agents = new Map()
@@ -136,6 +170,9 @@ export async function pantheonChat(agentId, message, chatId = 'default') {
   }
 
   history.push({ role: 'assistant', content: text })
+
+  // Emit chat event
+  emitEvent('chat', { agent: agentId, chatId, messageLength: message.length, responseLength: text.length })
 
   // Persist conversation to disk
   await persistConversation(agentId, chatId, history)
@@ -327,6 +364,7 @@ ${customizations.additionalContext || ''}
 `
 
   await updateIdentity(name, identity)
+  emitEvent('fork', { agent: name, archetype: archetypeName, tier: archetype.tier, manager: archetype.manager })
   return {
     success: true,
     agent: name,

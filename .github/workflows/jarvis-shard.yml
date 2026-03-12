@@ -1,17 +1,18 @@
 name: Publish JARVIS Shard Image
 
+# Disabled — deploying via SSH to VPS directly. Re-enable when GHCR is configured.
 on:
-  workflow_dispatch:  # Manual trigger
-  push:
-    branches: [master]
-    paths:
-      - 'jarvis-bot/src/**'
-      - 'jarvis-bot/Dockerfile'
-      - 'jarvis-bot/Dockerfile.*'
-      - 'jarvis-bot/entrypoint*.sh'
-      - 'jarvis-bot/package.json'
-      - 'jarvis-bot/package-lock.json'
-      - 'jarvis-bot/memory/**'
+  workflow_dispatch:  # Manual trigger only
+  # push:
+  #   branches: [master]
+  #   paths:
+  #     - 'jarvis-bot/src/**'
+  #     - 'jarvis-bot/Dockerfile'
+  #     - 'jarvis-bot/Dockerfile.*'
+  #     - 'jarvis-bot/entrypoint*.sh'
+  #     - 'jarvis-bot/package.json'
+  #     - 'jarvis-bot/package-lock.json'
+  #     - 'jarvis-bot/memory/**'
 
 env:
   REGISTRY: ghcr.io

@@ -1,11 +1,12 @@
 name: Deploy Jarvis
 
+# Disabled — deploying via SSH to Hetzner VPS. Re-enable for Fly.io deployments.
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'jarvis-bot/**'
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only
+  # push:
+  #   branches: [master]
+  #   paths:
+  #     - 'jarvis-bot/**'
 
 jobs:
   deploy:

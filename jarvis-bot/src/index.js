@@ -6317,7 +6317,21 @@ async function main() {
     return next();
   });
 
-  bot.launch({ dropPendingUpdates: true });
+  // Launch with retry — if Telegram is unreachable at boot, retry up to 3 times
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await bot.launch({ dropPendingUpdates: true });
+      break;
+    } catch (launchErr) {
+      console.error(`[jarvis] bot.launch() attempt ${attempt}/3 failed: ${launchErr.message}`);
+      if (attempt === 3) {
+        console.error('[jarvis] All launch attempts failed — polling monitor will handle recovery');
+        persistCrashEntry('launch_failed', launchErr);
+      } else {
+        await new Promise(r => setTimeout(r, 5000 * attempt)); // 5s, 10s backoff
+      }
+    }
+  }
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
 
   // Polling liveness checker — restarts polling if no updates for 5 min

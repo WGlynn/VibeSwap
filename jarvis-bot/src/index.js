@@ -6424,7 +6424,7 @@ async function main() {
   // HTTP health endpoint for cloud platforms (Fly.io, Railway, etc.)
   if (config.isDocker || process.env.HEALTH_PORT) {
     const healthPort = parseInt(process.env.HEALTH_PORT, 10) || 8080;
-    createServer(async (req, res) => {
+    const httpServer = createServer(async (req, res) => {
       if (req.url === '/health') {
         const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
         const isAuthenticated = apiSecret && req.headers['x-api-secret'] === apiSecret;
@@ -6475,11 +6475,9 @@ async function main() {
         // ============ Meeting Transcript Webhook ============
         // Receives live transcript chunks from Fireflies.ai (or any transcription service)
         // and forwards Jarvis's response to the Telegram group/DM
-        let body = '';
-        req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-        req.on('end', async () => {
-          try {
-            const payload = JSON.parse(body);
+        try {
+          const body = await readBody(req);
+          const payload = JSON.parse(body);
 
             // Verify webhook secret
             if (config.transcriptWebhookSecret && payload.secret !== config.transcriptWebhookSecret) {
@@ -6547,12 +6545,11 @@ async function main() {
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', responded: response.text?.trim() !== '—' }));
-          } catch (err) {
+        } catch (err) {
             console.error('[transcript] Webhook error:', err.message);
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
-          }
-        });
+        }
       // ============ Fireflies.ai Webhook ============
       // GET = verification ping (Fireflies checks URL is live before activating)
       // POST = transcription event
@@ -6561,10 +6558,8 @@ async function main() {
         res.end(JSON.stringify({ status: 'ok', service: 'jarvis-fireflies-webhook' }));
 
       } else if (req.url === '/fireflies' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-        req.on('end', async () => {
-          try {
+        try {
+          const body = await readBody(req);
             // Verify HMAC signature if secret is configured
             if (config.fireflies?.webhookSecret) {
               const signature = req.headers['x-hub-signature'];
@@ -6760,21 +6755,18 @@ async function main() {
             console.log(`[fireflies] Meeting "${title}" processed — ${sentences?.length || 0} sentences, notes saved`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', title, sentences: sentences?.length || 0 }));
-          } catch (err) {
+        } catch (err) {
             console.error('[fireflies] Webhook error:', err.message);
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
-          }
-        });
+        }
 
       // ============ GitHub Webhook — Live Push Feed to Telegram ============
       // Receives push events from GitHub and posts to the Telegram group.
       // Set up: GitHub repo → Settings → Webhooks → https://jarvis-vibeswap.fly.dev/github
       } else if (req.url === '/github' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; if (body.length > 64 * 1024) req.destroy(); });
-        req.on('end', async () => {
-          try {
+        try {
+            const body = await readBody(req);
             const event = req.headers['x-github-event'];
             const payload = JSON.parse(body);
 
@@ -6804,12 +6796,11 @@ async function main() {
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', event }));
-          } catch (err) {
+        } catch (err) {
             console.error('[github] Webhook error:', err.message);
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
-          }
-        });
+        }
 
       // ============ Mini App Static Files ============
       // Serves the built Jarvis Shard Miner webapp at /app/*
@@ -6940,10 +6931,8 @@ async function main() {
 
         // POST /api/message — Claude Code sends message/task to JARVIS
         } else if (path === '/api/message' && req.method === 'POST') {
-          let body = '';
-          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-          req.on('end', async () => {
-            try {
+          try {
+              const body = await readBody(req);
               const payload = JSON.parse(body);
               const entry = receiveFromClaudeCode(payload);
               await saveComms();
@@ -6978,11 +6967,10 @@ async function main() {
 
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ ok: true, id: entry.id }));
-            } catch (err) {
+          } catch (err) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          }
 
         // GET /api/outbox — Messages JARVIS has queued for Claude Code
         } else if (path === '/api/outbox' && req.method === 'GET') {
@@ -6992,20 +6980,17 @@ async function main() {
 
         // POST /api/outbox/ack — Claude Code acknowledges receipt
         } else if (path === '/api/outbox/ack' && req.method === 'POST') {
-          let body = '';
-          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-          req.on('end', async () => {
-            try {
+          try {
+              const body = await readBody(req);
               const payload = JSON.parse(body);
               acknowledgeOutbox(payload.ids || 'all');
               await saveComms();
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ ok: true }));
-            } catch (err) {
+          } catch (err) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          }
 
         // GET /api/comms/log — Audit trail
         } else if (path === '/api/comms/log' && req.method === 'GET') {
@@ -7016,10 +7001,8 @@ async function main() {
 
         // POST /api/tg/send — Send a message to Telegram via JARVIS
         } else if (path === '/api/tg/send' && req.method === 'POST') {
-          let body = '';
-          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-          req.on('end', async () => {
-            try {
+          try {
+              const body = await readBody(req);
               const payload = JSON.parse(body);
               const chatId = payload.chatId || config.ownerUserId;
               const text = payload.text || payload.message || '';
@@ -7031,11 +7014,10 @@ async function main() {
               await bot.telegram.sendMessage(chatId, text, { parse_mode: undefined });
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ ok: true, chatId }));
-            } catch (err) {
+          } catch (err) {
               res.writeHead(500, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          }
 
         } else {
           res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -7057,10 +7039,8 @@ async function main() {
       // ============ Shard Proxy Processing ============
       // Allows any shard (including primary) to process messages forwarded from peers
       } else if (req.url === '/shard/process' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-        req.on('end', async () => {
-          try {
+        try {
+            const body = await readBody(req);
             const payload = JSON.parse(body);
             const response = await chat(
               payload.chatId || 'proxy',
@@ -7070,11 +7050,10 @@ async function main() {
             );
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, text: response.text, shardId: getShardInfo().id }));
-          } catch (err) {
+        } catch (err) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: err.message }));
-          }
-        });
+        }
 
       // ============ Router API (Shard Network) ============
       } else if (req.url?.startsWith('/router/')) {
@@ -7085,19 +7064,16 @@ async function main() {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unknown router route' }));
         } else if (routerResult.parse) {
-          let body = '';
-          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-          req.on('end', () => {
-            try {
+          try {
+              const body = await readBody(req);
               const payload = JSON.parse(body);
               const data = processRouterBody(routerResult.handler, payload, routerResult.userId);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(data));
-            } catch (err) {
+          } catch (err) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          }
         } else {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(routerResult.data));
@@ -7137,19 +7113,16 @@ async function main() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(getCRPCStats()));
           } else {
-            let body = '';
-            req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-            req.on('end', () => {
-              try {
-                const payload = JSON.parse(body);
-                const data = processCRPCBody(crpcHandler, payload);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data));
-              } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-              }
-            });
+            try {
+              const body = await readBody(req);
+              const payload = JSON.parse(body);
+              const data = processCRPCBody(crpcHandler, payload);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(data));
+            } catch (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
           }
           return;
         }
@@ -7167,19 +7140,16 @@ async function main() {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unknown knowledge-chain route' }));
         } else if (kcHandler === 'epoch') {
-          let body = '';
-          req.on('data', chunk => { body += chunk; if (body.length > MAX_BODY_SIZE) req.destroy(); });
-          req.on('end', async () => {
-            try {
+          try {
+              const body = await readBody(req);
               const payload = JSON.parse(body);
               const data = await processKnowledgeChainBody(kcHandler, payload);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(data));
-            } catch (err) {
+          } catch (err) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: err.message }));
-            }
-          });
+          }
         } else {
           const query = Object.fromEntries(kcUrl.searchParams);
           const data = await processKnowledgeChainBody(kcHandler, null, query);
@@ -7190,7 +7160,9 @@ async function main() {
         res.writeHead(404);
         res.end('Not found');
       }
-    }).listen(healthPort, () => {
+    });
+    global._httpServer = httpServer;
+    httpServer.listen(healthPort, () => {
       console.log(`[jarvis] Health endpoint: http://0.0.0.0:${healthPort}/health`);
       console.log(`[jarvis] Transcript webhook: http://0.0.0.0:${healthPort}/transcript`);
       console.log(`[jarvis] Fireflies webhook: http://0.0.0.0:${healthPort}/fireflies ${config.fireflies?.apiKey ? '(API key set)' : '(no API key)'}`);
@@ -7526,6 +7498,10 @@ async function main() {
     stopAutonomous();
     stopGroupContext();
     stopCRPC();
+    // Close HTTP server — stop accepting new connections during shutdown
+    if (global._httpServer) {
+      global._httpServer.close();
+    }
     await writeHeartbeat('stopped');
     await releaseInstanceLock();
     clearTimeout(shutdownTimer);

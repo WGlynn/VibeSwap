@@ -2253,4 +2253,312 @@ mod tests {
         assert!(total_bps >= 9_998 && total_bps <= 10_000,
             "Share bps sum should be ~10000, got {}", total_bps);
     }
+
+    // ============ Hardening Round 5 Tests ============
+
+    #[test]
+    fn test_shapley_two_contributors_90_10_split_h5() {
+        let contributors = vec![
+            make_contributor(1, 90, ContributionType::LiquidityProvider),
+            make_contributor(2, 10, ContributionType::Trader),
+        ];
+        let allocs = shapley_distribute(10_000, &contributors).unwrap();
+        assert_eq!(allocs[0].amount + allocs[1].amount, 10_000);
+        assert!(allocs[0].amount > allocs[1].amount);
+    }
+
+    #[test]
+    fn test_shapley_single_contributor_gets_all_h5() {
+        let contributors = vec![
+            make_contributor(1, 100, ContributionType::Governance),
+        ];
+        let allocs = shapley_distribute(5000, &contributors).unwrap();
+        assert_eq!(allocs[0].amount, 5000);
+        assert_eq!(allocs[0].share_bps, 10_000);
+    }
+
+    #[test]
+    fn test_shapley_reward_of_1_three_contributors_h5() {
+        let contributors = vec![
+            make_contributor(1, 10, ContributionType::Trader),
+            make_contributor(2, 10, ContributionType::Relayer),
+            make_contributor(3, 10, ContributionType::Validator),
+        ];
+        let allocs = shapley_distribute(1, &contributors).unwrap();
+        let total: u128 = allocs.iter().map(|a| a.amount).sum();
+        assert_eq!(total, 1); // Dust assignment ensures conservation
+    }
+
+    #[test]
+    fn test_shapley_contribution_type_preserved_h5() {
+        let contributors = vec![
+            make_contributor(1, 50, ContributionType::KeeperBot),
+            make_contributor(2, 50, ContributionType::OracleOperator),
+        ];
+        let allocs = shapley_distribute(1000, &contributors).unwrap();
+        assert_eq!(allocs[0].contribution_type, ContributionType::KeeperBot);
+        assert_eq!(allocs[1].contribution_type, ContributionType::OracleOperator);
+    }
+
+    #[test]
+    fn test_shapley_address_preserved_h5() {
+        let contributors = vec![
+            make_contributor(42, 100, ContributionType::Trader),
+        ];
+        let allocs = shapley_distribute(1000, &contributors).unwrap();
+        assert_eq!(allocs[0].address, addr(42));
+    }
+
+    #[test]
+    fn test_vesting_zero_cliff_at_start_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        // At start block with zero cliff → should be claimable (but 0 elapsed → 0 vested)
+        let result = vesting_claimable(&schedule, 100);
+        // elapsed=0, cliff=0, so cliff passed; elapsed=0 so vested = 0
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_vesting_one_block_after_start_zero_cliff_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        let claimable = vesting_claimable(&schedule, 101).unwrap();
+        // 1/1000 of 10000 = 10
+        assert_eq!(claimable, 10);
+    }
+
+    #[test]
+    fn test_vesting_half_duration_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        let claimable = vesting_claimable(&schedule, 600).unwrap();
+        // 500/1000 = half vested = 5000
+        assert_eq!(claimable, 5000);
+    }
+
+    #[test]
+    fn test_vesting_released_equals_total_h5() {
+        let schedule = make_schedule(10_000, 10_000, 100, 0, 1000);
+        let result = vesting_claimable(&schedule, 1200);
+        assert_eq!(result, Err(RewardsError::VestingComplete));
+    }
+
+    #[test]
+    fn test_vesting_progress_before_start_is_0_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 50, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 50), 0);
+    }
+
+    #[test]
+    fn test_vesting_progress_at_start_is_0_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 50, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 100), 0);
+    }
+
+    #[test]
+    fn test_vesting_progress_at_end_is_10000_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 1100), 10_000);
+    }
+
+    #[test]
+    fn test_vesting_progress_beyond_end_is_10000_h5() {
+        let schedule = make_schedule(10_000, 0, 100, 0, 1000);
+        assert_eq!(vesting_progress_bps(&schedule, 5000), 10_000);
+    }
+
+    #[test]
+    fn test_stake_reward_exact_start_returns_base_h5() {
+        let stake = make_stake(100 * PRECISION, 100, 10_000);
+        let reward = stake_reward(&stake, 500, 100);
+        // elapsed=0 → multiplier=10000 (1x) → reward = 500 * 10000 / 10000 = 500
+        assert_eq!(reward, 500);
+    }
+
+    #[test]
+    fn test_stake_reward_zero_amount_returns_0_h5() {
+        let stake = make_stake(0, 100, 10_000);
+        let reward = stake_reward(&stake, 500, 200);
+        assert_eq!(reward, 0);
+    }
+
+    #[test]
+    fn test_time_multiplier_zero_max_duration_returns_base_h5() {
+        let mult = time_weighted_multiplier(1000, 0, 30_000);
+        assert_eq!(mult, 10_000);
+    }
+
+    #[test]
+    fn test_time_multiplier_max_below_base_returns_base_h5() {
+        // max_multiplier_bps <= 10000 → returns 10000
+        let mult = time_weighted_multiplier(1000, 5000, 9_999);
+        assert_eq!(mult, 10_000);
+    }
+
+    #[test]
+    fn test_time_multiplier_half_duration_h5() {
+        // half of max_duration → half of bonus range
+        let mult = time_weighted_multiplier(5000, 10_000, 30_000);
+        // bonus_range = 30000 - 10000 = 20000
+        // bonus = 20000 * 5000 / 10000 = 10000
+        // result = 10000 + 10000 = 20000
+        assert_eq!(mult, 20_000);
+    }
+
+    #[test]
+    fn test_time_multiplier_full_duration_h5() {
+        let mult = time_weighted_multiplier(10_000, 10_000, 30_000);
+        assert_eq!(mult, 30_000);
+    }
+
+    #[test]
+    fn test_time_multiplier_over_max_duration_capped_h5() {
+        let mult = time_weighted_multiplier(99_999, 10_000, 30_000);
+        assert_eq!(mult, 30_000); // Capped at max
+    }
+
+    #[test]
+    fn test_loyalty_tier_zero_points_h5() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(0, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 0);
+    }
+
+    #[test]
+    fn test_loyalty_tier_exact_threshold_500_h5() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(500, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 2); // 500 >= 500 (tier 2)
+    }
+
+    #[test]
+    fn test_loyalty_tier_between_thresholds_h5() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(1000, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 2); // 1000 >= 500 but < 2000
+    }
+
+    #[test]
+    fn test_loyalty_tier_max_points_h5() {
+        let tiers = default_tiers();
+        let tier = loyalty_tier(u64::MAX, &tiers).unwrap();
+        assert_eq!(tier.tier_id, 4); // Highest tier
+    }
+
+    #[test]
+    fn test_loyalty_points_zero_volume_zero_consecutive_h5() {
+        let points = loyalty_points_earned(0, 0);
+        assert_eq!(points, BASE_LOYALTY_POINTS_PER_EPOCH);
+    }
+
+    #[test]
+    fn test_loyalty_points_max_volume_h5() {
+        let points = loyalty_points_earned(1000 * PRECISION, 0);
+        // Volume bonus capped at 500
+        assert_eq!(points, BASE_LOYALTY_POINTS_PER_EPOCH + 500);
+    }
+
+    #[test]
+    fn test_loyalty_points_10_consecutive_epochs_h5() {
+        let points = loyalty_points_earned(0, 10);
+        // consecutive bonus = 100 * 10 * 500 / 10000 = 50
+        assert_eq!(points, BASE_LOYALTY_POINTS_PER_EPOCH + 50);
+    }
+
+    #[test]
+    fn test_fee_discount_zero_discount_h5() {
+        let tier = LoyaltyTier {
+            tier_id: 0,
+            min_points: 0,
+            fee_discount_bps: 0,
+            boost_multiplier_bps: 10_000,
+        };
+        assert_eq!(fee_discount(&tier, 1000), 1000);
+    }
+
+    #[test]
+    fn test_fee_discount_full_discount_h5() {
+        let tier = LoyaltyTier {
+            tier_id: 4,
+            min_points: 0,
+            fee_discount_bps: 10_000, // 100% discount
+            boost_multiplier_bps: 10_000,
+        };
+        assert_eq!(fee_discount(&tier, 1000), 0);
+    }
+
+    #[test]
+    fn test_fee_discount_half_h5() {
+        let tier = LoyaltyTier {
+            tier_id: 2,
+            min_points: 0,
+            fee_discount_bps: 5000, // 50% discount
+            boost_multiplier_bps: 10_000,
+        };
+        assert_eq!(fee_discount(&tier, 1000), 500);
+    }
+
+    #[test]
+    fn test_epoch_rewards_breakdown_sum_h5() {
+        let rewards = epoch_rewards_breakdown(100, 200, 1, 50);
+        assert_eq!(rewards.total_rewards, 350);
+        assert_eq!(rewards.fee_rewards, 100);
+        assert_eq!(rewards.emission_rewards, 200);
+        assert_eq!(rewards.bonus_rewards, 50);
+    }
+
+    #[test]
+    fn test_reward_summary_empty_h5() {
+        let summary = reward_summary(&[]);
+        assert_eq!(summary.total_distributed, 0);
+        assert_eq!(summary.unique_recipients, 0);
+        assert_eq!(summary.avg_reward, 0);
+    }
+
+    #[test]
+    fn test_merge_contributions_three_unique_h5() {
+        let a = vec![
+            make_contributor(1, 100, ContributionType::Trader),
+        ];
+        let b = vec![
+            make_contributor(2, 200, ContributionType::Relayer),
+            make_contributor(3, 300, ContributionType::Validator),
+        ];
+        let merged = merge_contributions(&a, &b);
+        assert_eq!(merged.len(), 3);
+    }
+
+    #[test]
+    fn test_merge_contributions_duplicate_sums_weight_h5() {
+        let a = vec![
+            make_contributor(1, 100, ContributionType::Trader),
+        ];
+        let b = vec![
+            make_contributor(1, 200, ContributionType::Relayer),
+        ];
+        let merged = merge_contributions(&a, &b);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].weight, 300);
+        // Keeps first occurrence's type
+        assert_eq!(merged[0].contribution_type, ContributionType::Trader);
+    }
+
+    #[test]
+    fn test_validate_weights_single_valid_h5() {
+        let contributors = vec![
+            make_contributor(1, 100, ContributionType::Governance),
+        ];
+        assert!(validate_weights(&contributors).is_ok());
+    }
+
+    #[test]
+    fn test_validate_weights_zero_weight_fails_h5() {
+        let contributors = vec![
+            make_contributor(1, 0, ContributionType::Governance),
+        ];
+        assert_eq!(validate_weights(&contributors), Err(RewardsError::InvalidWeight));
+    }
+
+    #[test]
+    fn test_validate_weights_empty_fails_h5() {
+        assert_eq!(validate_weights(&[]), Err(RewardsError::NoContributions));
+    }
 }

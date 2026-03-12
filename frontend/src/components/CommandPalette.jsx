@@ -1,0 +1,307 @@
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+
+// ============================================================
+// Command Palette — Global search & navigation overlay
+// Opens with Ctrl+Shift+K or "/" when not typing
+// Searchable list of every page, action, and shortcut
+// ============================================================
+
+const PHI = 1.618033988749895
+
+const COMMANDS = [
+  // DeFi
+  { id: 'swap', label: 'Swap', description: 'Trade tokens with zero MEV', path: '/', category: 'DeFi', shortcut: 'Ctrl+K' },
+  { id: 'buy', label: 'Buy / Sell', description: 'Fiat onramp & order book', path: '/buy', category: 'DeFi', shortcut: 'Ctrl+B' },
+  { id: 'earn', label: 'Earn (Pools)', description: 'Provide liquidity, earn fees', path: '/earn', category: 'DeFi', shortcut: 'Ctrl+N' },
+  { id: 'trade', label: 'Trading', description: 'Advanced trading interface', path: '/trade', category: 'DeFi' },
+  { id: 'perps', label: 'Perpetuals', description: 'Leveraged perpetual futures', path: '/perps', category: 'DeFi' },
+  { id: 'options', label: 'Options', description: 'On-chain options trading', path: '/options', category: 'DeFi' },
+  { id: 'lend', label: 'Lending', description: 'Supply & borrow assets', path: '/lend', category: 'DeFi' },
+  { id: 'stake', label: 'Staking', description: 'Stake JUL, earn rewards', path: '/stake', category: 'DeFi' },
+  { id: 'vault', label: 'Vaults', description: 'Automated yield strategies', path: '/vault', category: 'DeFi' },
+  { id: 'yield', label: 'Yield', description: 'Yield farming opportunities', path: '/yield', category: 'DeFi' },
+  { id: 'dca', label: 'DCA', description: 'Dollar cost averaging', path: '/dca', category: 'DeFi' },
+  { id: 'insurance', label: 'Insurance', description: 'Protocol insurance pools', path: '/insurance', category: 'DeFi' },
+  { id: 'bonds', label: 'Bonds', description: 'Protocol-owned liquidity bonds', path: '/bonds', category: 'DeFi' },
+  { id: 'launchpad', label: 'Launchpad', description: 'Fair token launches', path: '/launchpad', category: 'DeFi' },
+  { id: 'aggregator', label: 'Aggregator', description: 'Best price routing', path: '/aggregator', category: 'DeFi' },
+  { id: 'nft', label: 'NFT Market', description: 'Soulbound badges & auctions', path: '/nft', category: 'DeFi' },
+
+  // Protocol
+  { id: 'commit-reveal', label: 'Commit-Reveal', description: 'Batch auction mechanism', path: '/commit-reveal', category: 'Protocol' },
+  { id: 'fairness', label: 'Fairness Race', description: 'Fisher-Yates shuffle demo', path: '/fairness', category: 'Protocol' },
+  { id: 'gametheory', label: 'Game Theory', description: 'Nash, Shapley, Prisoner\'s Dilemma', path: '/gametheory', category: 'Protocol' },
+  { id: 'gameswap', label: 'GameSwap', description: 'Gamified trading experience', path: '/gameswap', category: 'Protocol' },
+  { id: 'oracle', label: 'Oracle', description: 'Kalman filter price feeds', path: '/oracle', category: 'Protocol' },
+  { id: 'circuit-breaker', label: 'Circuit Breaker', description: 'Emergency safety systems', path: '/circuit-breaker', category: 'Protocol' },
+  { id: 'crosschain', label: 'Cross-Chain', description: 'LayerZero omnichain bridge', path: '/crosschain', category: 'Protocol' },
+  { id: 'send', label: 'Send / Bridge', description: 'Transfer across chains', path: '/send', category: 'Protocol' },
+
+  // Intelligence
+  { id: 'jarvis', label: 'JARVIS', description: 'AI assistant & protocol brain', path: '/jarvis', category: 'Intelligence', shortcut: 'Ctrl+J' },
+  { id: 'voice', label: 'Voice Chat', description: 'Talk to JARVIS', path: '/voice', category: 'Intelligence' },
+  { id: 'mesh', label: 'Mind Mesh', description: 'Neural network visualization', path: '/mesh', category: 'Intelligence', shortcut: 'Ctrl+M' },
+  { id: 'agents', label: 'Agent Hub', description: 'AI agent marketplace', path: '/agents', category: 'Intelligence' },
+  { id: 'predict', label: 'Prediction Market', description: 'Bet on outcomes', path: '/predict', category: 'Intelligence' },
+  { id: 'memehunter', label: 'Memehunter', description: 'AI-powered meme token scanner', path: '/memehunter', category: 'Intelligence' },
+
+  // Community
+  { id: 'feed', label: 'Vibe Feed', description: 'Social trading feed', path: '/feed', category: 'Community' },
+  { id: 'forum', label: 'Forum', description: 'Community discussions', path: '/forum', category: 'Community' },
+  { id: 'board', label: 'Message Board', description: 'Bulletin board', path: '/board', category: 'Community' },
+  { id: 'bounties', label: 'Bounties', description: 'Job market & bounties', path: '/bounties', category: 'Community' },
+  { id: 'live', label: 'Live Stream', description: 'Live protocol activity', path: '/live', category: 'Community' },
+  { id: 'govern', label: 'Governance', description: 'Vote on proposals', path: '/govern', category: 'Community' },
+
+  // Ecosystem
+  { id: 'apps', label: 'App Store', description: 'VSOS applications', path: '/apps', category: 'Ecosystem' },
+  { id: 'depin', label: 'DePIN Hub', description: 'Physical infrastructure networks', path: '/depin', category: 'Ecosystem' },
+  { id: 'rwa', label: 'RWA Hub', description: 'Real world assets', path: '/rwa', category: 'Ecosystem' },
+  { id: 'infofi', label: 'InfoFi', description: 'Information finance', path: '/infofi', category: 'Ecosystem' },
+
+  // Knowledge
+  { id: 'wiki', label: 'Wiki', description: 'Knowledge base & docs', path: '/wiki', category: 'Knowledge' },
+  { id: 'docs', label: 'Docs', description: 'Developer documentation', path: '/docs', category: 'Knowledge' },
+  { id: 'research', label: 'Research', description: 'Academic foundations', path: '/research', category: 'Knowledge', shortcut: 'Ctrl+R' },
+  { id: 'whitepaper', label: 'Whitepaper', description: 'Technical whitepaper', path: '/whitepaper', category: 'Knowledge' },
+  { id: 'philosophy', label: 'Philosophy', description: 'Protocol philosophy', path: '/philosophy', category: 'Knowledge' },
+  { id: 'economics', label: 'Economics', description: 'Cooperative capitalism model', path: '/economics', category: 'Knowledge', shortcut: 'Ctrl+E' },
+  { id: 'tokenomics', label: 'Tokenomics', description: 'JUL token economics', path: '/tokenomics', category: 'Knowledge' },
+
+  // Account
+  { id: 'portfolio', label: 'Portfolio', description: 'Your holdings & PnL', path: '/portfolio', category: 'Account', shortcut: 'Ctrl+P' },
+  { id: 'history', label: 'History', description: 'Transaction history', path: '/history', category: 'Account', shortcut: 'Ctrl+H' },
+  { id: 'rewards', label: 'Rewards', description: 'Shapley rewards & claims', path: '/rewards', category: 'Account' },
+  { id: 'mine', label: 'Mine', description: 'Proof-of-participation mining', path: '/mine', category: 'Account' },
+  { id: 'personality', label: 'Personality', description: 'Your trading personality', path: '/personality', category: 'Account' },
+
+  // System
+  { id: 'analytics', label: 'Analytics', description: 'Protocol dashboard', path: '/analytics', category: 'System' },
+  { id: 'status', label: 'Status', description: 'System health', path: '/status', category: 'System' },
+  { id: 'security', label: 'Security', description: 'Security overview', path: '/security', category: 'System' },
+  { id: 'roadmap', label: 'Roadmap', description: 'Development roadmap', path: '/roadmap', category: 'System' },
+  { id: 'team', label: 'Team', description: 'Core builders', path: '/team', category: 'System' },
+  { id: 'faq', label: 'FAQ', description: 'Frequently asked questions', path: '/faq', category: 'System' },
+  { id: 'changelog', label: 'Changelog', description: 'Release notes', path: '/changelog', category: 'System' },
+  { id: 'about', label: 'About', description: 'About VibeSwap', path: '/about', category: 'System' },
+  { id: 'covenants', label: 'Covenants', description: 'The Ten Covenants', path: '/covenants', category: 'System' },
+]
+
+const CATEGORY_COLORS = {
+  DeFi: 'text-emerald-400',
+  Protocol: 'text-cyan-400',
+  Intelligence: 'text-blue-400',
+  Community: 'text-purple-400',
+  Ecosystem: 'text-amber-400',
+  Knowledge: 'text-yellow-400',
+  Account: 'text-orange-400',
+  System: 'text-black-400',
+}
+
+export default function CommandPalette() {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const inputRef = useRef(null)
+  const listRef = useRef(null)
+  const navigate = useNavigate()
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return COMMANDS
+    const q = query.toLowerCase()
+    return COMMANDS.filter(
+      (cmd) =>
+        cmd.label.toLowerCase().includes(q) ||
+        cmd.description.toLowerCase().includes(q) ||
+        cmd.category.toLowerCase().includes(q) ||
+        cmd.path.toLowerCase().includes(q)
+    )
+  }, [query])
+
+  const grouped = useMemo(() => {
+    const groups = {}
+    filtered.forEach((cmd) => {
+      if (!groups[cmd.category]) groups[cmd.category] = []
+      groups[cmd.category].push(cmd)
+    })
+    return groups
+  }, [filtered])
+
+  // Flatten for keyboard navigation
+  const flatList = useMemo(() => {
+    const result = []
+    Object.values(grouped).forEach((cmds) => result.push(...cmds))
+    return result
+  }, [grouped])
+
+  const execute = useCallback((cmd) => {
+    setOpen(false)
+    setQuery('')
+    navigate(cmd.path)
+  }, [navigate])
+
+  // Keyboard handler
+  useEffect(() => {
+    function handleKeyDown(e) {
+      // Open: Ctrl+Shift+K or "/" when not in input
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setOpen((prev) => !prev)
+        return
+      }
+
+      if (!open) return
+
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+        setQuery('')
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedIndex((prev) => Math.min(prev + 1, flatList.length - 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedIndex((prev) => Math.max(prev - 1, 0))
+      } else if (e.key === 'Enter' && flatList[selectedIndex]) {
+        e.preventDefault()
+        execute(flatList[selectedIndex])
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, flatList, selectedIndex, execute])
+
+  // Reset selection on query change
+  useEffect(() => {
+    setSelectedIndex(0)
+  }, [query])
+
+  // Focus input on open
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [open])
+
+  // Scroll selected into view
+  useEffect(() => {
+    if (!listRef.current) return
+    const selected = listRef.current.querySelector('[data-selected="true"]')
+    if (selected) selected.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex])
+
+  let flatIndex = -1
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
+            onClick={() => { setOpen(false); setQuery('') }}
+          />
+
+          {/* Palette */}
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 1 / (PHI * PHI * PHI), ease: [0.25, 0.1, 1 / PHI, 1] }}
+            className="fixed top-[15vh] left-1/2 -translate-x-1/2 z-[201] w-full max-w-lg"
+          >
+            <div
+              className="rounded-2xl border border-black-600 overflow-hidden"
+              style={{
+                background: 'rgba(8,8,12,0.95)',
+                boxShadow: '0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(6,182,212,0.08)',
+              }}
+            >
+              {/* Search input */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-black-700">
+                <svg className="w-4 h-4 text-black-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search pages, actions, shortcuts..."
+                  className="flex-1 bg-transparent text-sm text-white placeholder:text-black-500 focus:outline-none font-mono"
+                />
+                <kbd className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono text-black-500 bg-black-800 border border-black-600">
+                  ESC
+                </kbd>
+              </div>
+
+              {/* Results */}
+              <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
+                {flatList.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <p className="text-sm text-black-500 font-mono">No results for "{query}"</p>
+                  </div>
+                ) : (
+                  Object.entries(grouped).map(([category, cmds]) => (
+                    <div key={category}>
+                      <div className="px-4 py-1.5">
+                        <span className={`text-[10px] font-mono font-bold uppercase tracking-widest ${CATEGORY_COLORS[category] || 'text-black-400'}`}>
+                          {category}
+                        </span>
+                      </div>
+                      {cmds.map((cmd) => {
+                        flatIndex++
+                        const idx = flatIndex
+                        const isSelected = idx === selectedIndex
+                        return (
+                          <button
+                            key={cmd.id}
+                            data-selected={isSelected}
+                            onClick={() => execute(cmd)}
+                            onMouseEnter={() => setSelectedIndex(idx)}
+                            className={`w-full flex items-center justify-between px-4 py-2 text-left transition-colors ${
+                              isSelected
+                                ? 'bg-black-700/60 text-white'
+                                : 'text-black-300 hover:bg-black-800/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="text-sm font-medium truncate">{cmd.label}</span>
+                              <span className="text-xs text-black-500 truncate hidden sm:inline">{cmd.description}</span>
+                            </div>
+                            {cmd.shortcut && (
+                              <kbd className="shrink-0 ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono text-black-500 bg-black-800 border border-black-700">
+                                {cmd.shortcut}
+                              </kbd>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between px-4 py-2 border-t border-black-700 text-[10px] font-mono text-black-500">
+                <div className="flex items-center gap-3">
+                  <span><kbd className="px-1 py-0.5 rounded bg-black-800 border border-black-700">↑↓</kbd> navigate</span>
+                  <span><kbd className="px-1 py-0.5 rounded bg-black-800 border border-black-700">↵</kbd> open</span>
+                  <span><kbd className="px-1 py-0.5 rounded bg-black-800 border border-black-700">esc</kbd> close</span>
+                </div>
+                <span>{flatList.length} results</span>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}

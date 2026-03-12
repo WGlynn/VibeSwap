@@ -2649,4 +2649,285 @@ mod tests {
         // 1 * (10000-30)/10000 = 0 due to integer math
         assert!(out <= 1);
     }
+
+    // ============ Hardening Round 10 ============
+
+    #[test]
+    fn test_find_best_route_zero_amount_h10() {
+        let v = sample_venues();
+        let p = sample_pools();
+        let req = make_request(100, 200, 0, 2, 500, 1);
+        let result = find_best_route(&req, &v, &p);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_best_route_no_venues_h10() {
+        let req = make_request(100, 200, 10_000, 2, 500, 1);
+        let result = find_best_route(&req, &[], &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_all_routes_empty_venues_h10() {
+        let req = make_request(100, 200, 10_000, 2, 500, 1);
+        let routes = find_all_routes(&req, &[], &[], 50);
+        assert!(routes.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_route_output_zero_amount_h10() {
+        let h = make_hop(1, 100, 200, 1, PRICE_PRECISION as u64, 30);
+        let route = make_route(vec![h], 30, 100_000, 50_000);
+        let result = calculate_route_output(&route, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_calculate_route_output_empty_route_h10() {
+        let route = make_route(vec![], 0, 0, 0);
+        let result = calculate_route_output(&route, 1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_calculate_route_output_zero_price_h10() {
+        let h = make_hop(1, 100, 200, 1, 0, 30); // zero price
+        let route = make_route(vec![h], 30, 0, 0);
+        let result = calculate_route_output(&route, 1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_split_order_zero_amount_h10() {
+        let v = sample_venues();
+        let p = sample_pools();
+        let req = make_request(100, 200, 0, 2, 500, 1);
+        let result = split_order(&req, &v, &p);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_split_order_no_venues_h10() {
+        let req = make_request(100, 200, 10_000, 2, 500, 1);
+        let result = split_order(&req, &[], &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_optimal_split_ratio_empty_h10() {
+        let result = optimal_split_ratio(&[], &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_optimal_split_ratio_single_h10() {
+        let result = optimal_split_ratio(&[1000], &[50]);
+        assert_eq!(result, vec![1000]);
+    }
+
+    #[test]
+    fn test_optimal_split_ratio_zero_impacts_h10() {
+        let result = optimal_split_ratio(&[500, 500], &[0, 0]);
+        let total: u64 = result.iter().sum();
+        assert_eq!(total, 1000);
+    }
+
+    #[test]
+    fn test_rebalance_split_empty_h10() {
+        let so = SplitOrder { splits: vec![], total_input: 0, total_expected_output: 0 };
+        let result = rebalance_split(&so, &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rebalance_split_mismatched_prices_h10() {
+        let so = SplitOrder {
+            splits: vec![
+                Split { venue_id: 1, amount: 1000, expected_output: 990, cost_bps: 30 },
+            ],
+            total_input: 1000,
+            total_expected_output: 990,
+        };
+        let result = rebalance_split(&so, &[100, 200]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_estimate_slippage_zero_liquidity_h10() {
+        let slip = estimate_slippage(1000, 0, 30);
+        assert_eq!(slip, BPS);
+    }
+
+    #[test]
+    fn test_estimate_slippage_capped_h10() {
+        let slip = estimate_slippage(u64::MAX, 1, 30);
+        assert_eq!(slip, BPS); // capped at BPS
+    }
+
+    #[test]
+    fn test_estimate_gas_cost_empty_h10() {
+        assert_eq!(estimate_gas_cost(&[]), 0);
+    }
+
+    #[test]
+    fn test_estimate_gas_cost_multiple_hops_h10() {
+        let h = make_hop(1, 100, 200, 1, 500, 30);
+        let gas = estimate_gas_cost(&[h.clone(), h.clone(), h]);
+        assert_eq!(gas, GAS_PER_HOP * 3);
+    }
+
+    #[test]
+    fn test_calculate_price_impact_zero_liquidity_h10() {
+        assert_eq!(calculate_price_impact(1000, 0), BPS);
+    }
+
+    #[test]
+    fn test_calculate_price_impact_small_amount_h10() {
+        let impact = calculate_price_impact(100, 1_000_000);
+        assert_eq!(impact, 1); // 100/1M * 10000 = 1 bps
+    }
+
+    #[test]
+    fn test_multi_hop_output_empty_h10() {
+        let result = multi_hop_output(1000, &[], &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multi_hop_output_mismatched_lengths_h10() {
+        let result = multi_hop_output(1000, &[30], &[100, 200]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multi_hop_output_zero_price_h10() {
+        let result = multi_hop_output(1000, &[30], &[0]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_calculate_effective_price_zero_input_h10() {
+        assert_eq!(calculate_effective_price(0, 1000), 0);
+    }
+
+    #[test]
+    fn test_calculate_effective_price_normal_h10() {
+        let price = calculate_effective_price(1000, 2000);
+        assert_eq!(price, (2000u128 * PRICE_PRECISION / 1000) as u64);
+    }
+
+    #[test]
+    fn test_estimate_bridge_time_same_chain_h10() {
+        assert_eq!(estimate_bridge_time(1, 1), 0);
+    }
+
+    #[test]
+    fn test_estimate_bridge_time_different_chains_h10() {
+        let time = estimate_bridge_time(1, 2);
+        assert!(time > 0);
+        assert!(time >= BRIDGE_TIME_BASE_MS);
+    }
+
+    #[test]
+    fn test_score_route_zero_output_h10() {
+        let route = make_route(vec![], 0, 0, 0);
+        let score = score_route(&route);
+        assert_eq!(score.price_score, 0);
+    }
+
+    #[test]
+    fn test_compare_routes_empty_h10() {
+        let scored = compare_routes(&[]);
+        assert!(scored.is_empty());
+    }
+
+    #[test]
+    fn test_select_venues_no_match_h10() {
+        let v = vec![make_venue(1, 0, 1, 1_000_000, 30, 100, 200)];
+        let selected = select_venues(999, 888, &v);
+        assert!(selected.is_empty());
+    }
+
+    #[test]
+    fn test_filter_venues_by_liquidity_none_pass_h10() {
+        let v = vec![make_venue(1, 0, 1, 500, 30, 100, 200)];
+        let filtered = filter_venues_by_liquidity(&v, 1_000);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_build_execution_plan_single_hop_h10() {
+        let h = make_hop(1, 100, 200, 1, PRICE_PRECISION as u64, 30);
+        let route = make_route(vec![h], 30, 100_000, 50_000);
+        let plan = build_execution_plan(&route);
+        assert_eq!(plan.steps.len(), 1);
+        assert!(plan.steps[0].depends_on.is_empty());
+        assert_eq!(plan.total_timeout_ms, DEFAULT_STEP_TIMEOUT_MS);
+    }
+
+    #[test]
+    fn test_validate_execution_plan_empty_h10() {
+        let plan = ExecutionPlan { steps: vec![], total_timeout_ms: 0, estimated_gas: 0 };
+        assert!(validate_execution_plan(&plan).is_err());
+    }
+
+    #[test]
+    fn test_cache_route_initial_hit_count_h10() {
+        let route = make_route(vec![], 0, 0, 0);
+        let cached = cache_route(&route, 30_000, 1000);
+        assert_eq!(cached.hit_count, 0);
+        assert_eq!(cached.cached_at, 1000);
+        assert_eq!(cached.ttl_ms, 30_000);
+    }
+
+    #[test]
+    fn test_lookup_cached_route_expired_h10() {
+        let h = make_hop(1, 100, 200, 1, 500, 30);
+        let route = make_route(vec![h], 30, 100_000, 50_000);
+        let mut cache = vec![cache_route(&route, 1000, 0)]; // TTL = 1000, cached at 0
+        let result = lookup_cached_route(&mut cache, 100, 200, 2000); // current_time = 2000, expired
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_venue_stats_empty_h10() {
+        let stats = aggregate_venue_stats(&[]);
+        assert_eq!(stats.trade_count, 0);
+        assert_eq!(stats.avg_slippage_bps, 0);
+    }
+
+    #[test]
+    fn test_aggregate_venue_stats_single_fill_h10() {
+        let fills = vec![Fill { venue_id: 1, slippage_bps: 50, filled: true, gas_used: 60_000 }];
+        let stats = aggregate_venue_stats(&fills);
+        assert_eq!(stats.venue_id, 1);
+        assert_eq!(stats.trade_count, 1);
+        assert_eq!(stats.avg_slippage_bps, 50);
+        assert_eq!(stats.fill_rate_bps, BPS);
+    }
+
+    #[test]
+    fn test_compare_execution_positive_deviation_h10() {
+        let cmp = compare_execution(1000, 900, 50_000);
+        assert_eq!(cmp.deviation_bps, 1000); // 10%
+    }
+
+    #[test]
+    fn test_compare_execution_negative_deviation_h10() {
+        let cmp = compare_execution(1000, 1100, 50_000);
+        assert_eq!(cmp.deviation_bps, 1000); // 10% absolute
+    }
+
+    #[test]
+    fn test_invalidate_stale_routes_h10() {
+        let h = make_hop(1, 100, 200, 1, 500, 30);
+        let route = make_route(vec![h], 30, 100_000, 50_000);
+        let cache = vec![
+            cache_route(&route, 1000, 0),  // expires at 1000
+            cache_route(&route, 5000, 0),  // expires at 5000
+        ];
+        let stale = invalidate_stale_routes(&cache, 2000);
+        assert_eq!(stale.len(), 1); // only first is stale
+    }
 }

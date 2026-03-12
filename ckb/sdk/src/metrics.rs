@@ -2630,4 +2630,240 @@ mod tests {
             }
         }
     }
+
+    // ============ Hardening Round 10 ============
+
+    #[test]
+    fn test_compute_growth_rate_both_zero_h10() {
+        assert_eq!(compute_growth_rate(0, 0), 0);
+    }
+
+    #[test]
+    fn test_compute_growth_rate_from_zero_h10() {
+        assert_eq!(compute_growth_rate(0, 100), GROWTH_RATE_CAP_BPS);
+    }
+
+    #[test]
+    fn test_compute_growth_rate_no_change_h10() {
+        assert_eq!(compute_growth_rate(1000, 1000), 0);
+    }
+
+    #[test]
+    fn test_compute_growth_rate_positive_h10() {
+        let rate = compute_growth_rate(100, 110);
+        assert_eq!(rate, 1000); // 10% = 1000 bps
+    }
+
+    #[test]
+    fn test_compute_growth_rate_negative_h10() {
+        let rate = compute_growth_rate(100, 90);
+        assert_eq!(rate, -1000); // -10%
+    }
+
+    #[test]
+    fn test_compute_growth_rate_capped_h10() {
+        let rate = compute_growth_rate(1, 1_000_000);
+        assert_eq!(rate, GROWTH_RATE_CAP_BPS);
+    }
+
+    #[test]
+    fn test_moving_average_empty_h10() {
+        let result = moving_average(&[], 5);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_moving_average_zero_window_h10() {
+        let result = moving_average(&[100, 200], 0);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_moving_average_window_larger_than_data_h10() {
+        let result = moving_average(&[100, 200, 300], 10).unwrap();
+        assert_eq!(result, 200); // average of all 3
+    }
+
+    #[test]
+    fn test_moving_average_exact_window_h10() {
+        let result = moving_average(&[100, 200, 300, 400, 500], 3).unwrap();
+        // Last 3: 300, 400, 500 => avg = 400
+        assert_eq!(result, 400);
+    }
+
+    #[test]
+    fn test_weighted_moving_average_empty_h10() {
+        let result = weighted_moving_average(&[], 5);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_weighted_moving_average_zero_window_h10() {
+        let result = weighted_moving_average(&[100, 200], 0);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_weighted_moving_average_single_h10() {
+        let result = weighted_moving_average(&[100], 1).unwrap();
+        assert_eq!(result, 100);
+    }
+
+    #[test]
+    fn test_compute_volatility_insufficient_h10() {
+        let result = compute_volatility(&[100]);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_compute_volatility_zero_vol_h10() {
+        let result = compute_volatility(&[100, 100, 100]).unwrap();
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_compute_volatility_nonzero_h10() {
+        let result = compute_volatility(&[100, 200, 300]).unwrap();
+        // Mean = 200, deviations: 100, 0, 100, avg = 66
+        assert!(result > 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_zero_period_h10() {
+        assert_eq!(annualize_revenue(1000, 0), 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_zero_fees_h10() {
+        assert_eq!(annualize_revenue(0, 1000), 0);
+    }
+
+    #[test]
+    fn test_annualize_revenue_one_day_h10() {
+        let annual = annualize_revenue(1000, BLOCKS_PER_DAY);
+        // Should be approximately 1000 * 365.25
+        let expected = 1000u128 * BLOCKS_PER_YEAR as u128 / BLOCKS_PER_DAY as u128;
+        assert_eq!(annual, expected);
+    }
+
+    #[test]
+    fn test_capital_efficiency_zero_tvl_h10() {
+        assert_eq!(capital_efficiency(1000, 0), 0);
+    }
+
+    #[test]
+    fn test_capital_efficiency_normal_h10() {
+        let ratio = capital_efficiency(1000, 10_000);
+        assert_eq!(ratio, 1000); // 10% in bps
+    }
+
+    #[test]
+    fn test_protocol_health_score_zero_inputs_h10() {
+        let score = protocol_health_score(0, 0, 0, 0, 0);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_protocol_health_score_max_h10() {
+        let tvl = 10_000_001u128 * PRECISION;
+        let volume = tvl / 5; // 20% turnover > 10% threshold
+        let score = protocol_health_score(tvl, volume, 1000, 20, tvl / 2);
+        assert_eq!(score, 100);
+    }
+
+    #[test]
+    fn test_detect_trend_insufficient_h10() {
+        let result = detect_trend(&[100]);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_detect_trend_flat_h10() {
+        let result = detect_trend(&[100, 100, 100]).unwrap();
+        assert_eq!(result.direction, Trend::Flat);
+    }
+
+    #[test]
+    fn test_detect_trend_strong_up_h10() {
+        let result = detect_trend(&[100, 200]).unwrap();
+        assert_eq!(result.direction, Trend::StrongUp);
+    }
+
+    #[test]
+    fn test_detect_trend_strong_down_h10() {
+        let result = detect_trend(&[200, 50]).unwrap();
+        assert_eq!(result.direction, Trend::StrongDown);
+    }
+
+    #[test]
+    fn test_compare_periods_empty_h10() {
+        let result = compare_periods(&[], 0, 0, 0, 0);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_compare_periods_invalid_range_h10() {
+        let snaps = vec![
+            create_snapshot(100, 1000, 500, 10, 5, 20, 2, 1, 100, 5),
+        ];
+        let result = compare_periods(&snaps, 1, 0, 0, 0); // end < start
+        assert_eq!(result, Err(MetricsError::InvalidTimeRange));
+    }
+
+    #[test]
+    fn test_compare_periods_out_of_bounds_h10() {
+        let snaps = vec![
+            create_snapshot(100, 1000, 500, 10, 5, 20, 2, 1, 100, 5),
+        ];
+        let result = compare_periods(&snaps, 0, 5, 0, 0);
+        assert_eq!(result, Err(MetricsError::InvalidTimeRange));
+    }
+
+    #[test]
+    fn test_rank_pools_empty_h10() {
+        let ranked = rank_pools(&[], PoolSortKey::Tvl);
+        assert!(ranked.is_empty());
+    }
+
+    #[test]
+    fn test_estimate_time_to_target_zero_growth_h10() {
+        assert_eq!(estimate_time_to_target(100, 200, 0), u64::MAX);
+    }
+
+    #[test]
+    fn test_create_snapshot_fields_h10() {
+        let s = create_snapshot(100, 1000, 500, 10, 5, 20, 2, 1, 100, 5);
+        assert_eq!(s.block_number, 100);
+        assert_eq!(s.tvl, 1000);
+        assert_eq!(s.volume_24h, 500);
+        assert_eq!(s.fees_24h, 10);
+        assert_eq!(s.unique_users, 5);
+        assert_eq!(s.total_txs, 20);
+        assert_eq!(s.active_pools, 2);
+        assert_eq!(s.active_gauges, 1);
+        assert_eq!(s.total_staked, 100);
+        assert_eq!(s.avg_batch_size, 5);
+    }
+
+    #[test]
+    fn test_compute_kpis_empty_snapshots_h10() {
+        let current = create_snapshot(200, 2000, 1000, 50, 10, 40, 3, 2, 200, 8);
+        let result = compute_kpis(&[], &current);
+        assert_eq!(result, Err(MetricsError::InsufficientData));
+    }
+
+    #[test]
+    fn test_compute_pool_metrics_zero_tvl_h10() {
+        let pm = compute_pool_metrics([0; 32], 0, 1000, 50, 100, PRECISION, 200, 10);
+        assert_eq!(pm.fee_apr_bps, 0);
+        assert_eq!(pm.emission_apr_bps, 0);
+        assert_eq!(pm.utilization_bps, 0);
+    }
+
+    #[test]
+    fn test_compute_pool_metrics_net_apr_negative_h10() {
+        let pm = compute_pool_metrics([0; 32], PRECISION * 1_000_000, 100, 1, 0, 0, 5000, 10);
+        // Very low fees, high IL => negative net APR
+        assert!(pm.net_apr_bps < 0);
+    }
 }

@@ -2367,4 +2367,283 @@ mod tests {
         let h2 = simple_hash_u64(1);
         assert_ne!(h1, h2);
     }
+
+    // ============ Hardening Round 10 ============
+
+    #[test]
+    fn test_mock_pool_k_value_h10() {
+        let pool = mock_pool(1, 1000, 2000);
+        let k = compute_mock_k(&pool);
+        assert_eq!(k, 1000u128 * 2000u128);
+    }
+
+    #[test]
+    fn test_mock_pool_zero_reserves_h10() {
+        let pool = mock_pool(1, 0, 0);
+        assert_eq!(pool.reserve_a, 0);
+        assert_eq!(pool.reserve_b, 0);
+        assert_eq!(pool.total_lp, 0);
+    }
+
+    #[test]
+    fn test_balanced_pool_equal_reserves_h10() {
+        let pool = balanced_pool(5, 999_999);
+        assert_eq!(pool.reserve_a, pool.reserve_b);
+        assert_eq!(pool.reserve_a, 999_999);
+    }
+
+    #[test]
+    fn test_imbalanced_pool_ratio_h10() {
+        let pool = imbalanced_pool(1, 8000, 10_000);
+        assert_eq!(pool.reserve_a, 8000);
+        assert_eq!(pool.reserve_b, 2000);
+    }
+
+    #[test]
+    fn test_imbalanced_pool_capped_ratio_h10() {
+        // Ratio > BPS should be capped
+        let pool = imbalanced_pool(1, 15_000, 10_000);
+        // Capped to BPS=10000, so reserve_a = total, reserve_b = 0
+        assert_eq!(pool.reserve_a, 10_000);
+        assert_eq!(pool.reserve_b, 0);
+    }
+
+    #[test]
+    fn test_high_fee_pool_fee_h10() {
+        let pool = high_fee_pool(1, 1_000_000);
+        assert_eq!(pool.fee_bps, HIGH_FEE_BPS);
+        assert_eq!(pool.reserve_a, pool.reserve_b);
+    }
+
+    #[test]
+    fn test_low_fee_pool_fee_h10() {
+        let pool = low_fee_pool(1, 1_000_000);
+        assert_eq!(pool.fee_bps, LOW_FEE_BPS);
+    }
+
+    #[test]
+    fn test_pool_with_k_balanced_h10() {
+        let pool = pool_with_k(1_000_000, 5000);
+        let actual_k = pool.reserve_a as u128 * pool.reserve_b as u128;
+        // Should be approximately k (integer rounding may cause small diff)
+        let diff = if actual_k > 1_000_000 { actual_k - 1_000_000 } else { 1_000_000 - actual_k };
+        assert!(diff < 100, "k deviated by {}", diff);
+    }
+
+    #[test]
+    fn test_pool_with_k_zero_ratio_h10() {
+        let pool = pool_with_k(1_000_000, 0);
+        // Should default to 5000 (balanced)
+        assert!(pool.reserve_a > 0);
+        assert!(pool.reserve_b > 0);
+    }
+
+    #[test]
+    fn test_whale_user_balance_h10() {
+        let user = whale_user(1);
+        assert_eq!(user.balance, WHALE_BALANCE);
+        assert_eq!(user.voting_power, WHALE_BALANCE / 10);
+    }
+
+    #[test]
+    fn test_dust_user_balance_h10() {
+        let user = dust_user(1);
+        assert_eq!(user.balance, DUST_BALANCE);
+        assert_eq!(user.voting_power, 0);
+    }
+
+    #[test]
+    fn test_staker_user_fields_h10() {
+        let user = staker_user(1, 5000, 2500);
+        assert_eq!(user.staked, 5000);
+        assert_eq!(user.voting_power, 2500);
+        assert_eq!(user.balance, 5000);
+    }
+
+    #[test]
+    fn test_mock_users_scaling_h10() {
+        let users = mock_users(5, 100);
+        assert_eq!(users.len(), 5);
+        assert_eq!(users[0].balance, 100);
+        assert_eq!(users[4].balance, 500);
+    }
+
+    #[test]
+    fn test_mock_users_zero_count_h10() {
+        let users = mock_users(0, 100);
+        assert!(users.is_empty());
+    }
+
+    #[test]
+    fn test_mock_buy_order_fields_h10() {
+        let order = mock_buy_order(5000, 200);
+        assert!(order.is_buy);
+        assert_eq!(order.amount, 5000);
+        assert_eq!(order.price_limit, 200);
+    }
+
+    #[test]
+    fn test_mock_sell_order_fields_h10() {
+        let order = mock_sell_order(3000, 150);
+        assert!(!order.is_buy);
+        assert_eq!(order.amount, 3000);
+        assert_eq!(order.price_limit, 150);
+    }
+
+    #[test]
+    fn test_mock_market_order_buy_h10() {
+        let order = mock_market_order(1000, true);
+        assert!(order.is_buy);
+        assert_eq!(order.price_limit, u64::MAX);
+    }
+
+    #[test]
+    fn test_mock_market_order_sell_h10() {
+        let order = mock_market_order(1000, false);
+        assert!(!order.is_buy);
+        assert_eq!(order.price_limit, 0);
+    }
+
+    #[test]
+    fn test_random_orders_count_h10() {
+        let orders = random_orders(50, 10_000, 5000);
+        assert_eq!(orders.len(), 50);
+    }
+
+    #[test]
+    fn test_random_orders_zero_max_amount_h10() {
+        let orders = random_orders(5, 0, 5000);
+        // Should still produce orders with amount = 1
+        for order in &orders {
+            assert!(order.amount >= 1);
+        }
+    }
+
+    #[test]
+    fn test_balanced_orderbook_equal_sides_h10() {
+        let orders = balanced_orderbook(10, 1000, 100);
+        let buys = orders.iter().filter(|o| o.is_buy).count();
+        let sells = orders.iter().filter(|o| !o.is_buy).count();
+        assert_eq!(buys, sells);
+    }
+
+    #[test]
+    fn test_balanced_orderbook_zero_count_h10() {
+        let orders = balanced_orderbook(0, 1000, 100);
+        assert!(orders.is_empty());
+    }
+
+    #[test]
+    fn test_simulate_swap_zero_amount_h10() {
+        let mut pool = balanced_pool(1, 1_000_000);
+        let result = simulate_swap(&mut pool, 0, true);
+        assert!(result.k_preserved);
+        assert_eq!(result.total_fees, 0);
+        assert_eq!(result.trades_executed, 0);
+    }
+
+    #[test]
+    fn test_simulate_swap_preserves_k_h10() {
+        let mut pool = balanced_pool(1, 1_000_000);
+        let result = simulate_swap(&mut pool, 10_000, true);
+        assert!(result.k_preserved, "k should not decrease after swap with fees");
+        assert!(result.total_fees > 0);
+    }
+
+    #[test]
+    fn test_simulate_multi_swap_roundtrip_h10() {
+        let mut pool = balanced_pool(1, 1_000_000);
+        let swaps = vec![(10_000, true), (10_000, false)];
+        let result = simulate_multi_swap(&mut pool, &swaps);
+        assert_eq!(result.trades_executed, 2);
+        assert!(result.k_preserved);
+    }
+
+    #[test]
+    fn test_assert_approximately_equal_exact_h10() {
+        assert!(assert_approximately_equal(100, 100, 0));
+    }
+
+    #[test]
+    fn test_assert_approximately_equal_within_tolerance_h10() {
+        assert!(assert_approximately_equal(101, 100, 200)); // 1% diff, 2% tolerance
+    }
+
+    #[test]
+    fn test_assert_approximately_equal_zero_expected_h10() {
+        assert!(!assert_approximately_equal(1, 0, 100));
+        assert!(assert_approximately_equal(0, 0, 100));
+    }
+
+    #[test]
+    fn test_assert_within_range_boundary_h10() {
+        assert!(assert_within_range(5, 5, 10));
+        assert!(assert_within_range(10, 5, 10));
+        assert!(!assert_within_range(4, 5, 10));
+        assert!(!assert_within_range(11, 5, 10));
+    }
+
+    #[test]
+    fn test_assert_monotonic_empty_and_single_h10() {
+        assert!(assert_monotonic_increasing(&[]));
+        assert!(assert_monotonic_increasing(&[42]));
+        assert!(assert_monotonic_decreasing(&[]));
+        assert!(assert_monotonic_decreasing(&[42]));
+    }
+
+    #[test]
+    fn test_assert_sum_equals_h10() {
+        assert!(assert_sum_equals(&[1, 2, 3], 6));
+        assert!(!assert_sum_equals(&[1, 2, 3], 7));
+    }
+
+    #[test]
+    fn test_ckb_cell_conversion_h10() {
+        let cell = ckb_cell(100);
+        assert_eq!(cell.capacity, 100 * CKB_SHANNON);
+    }
+
+    #[test]
+    fn test_mock_typed_cell_hashes_h10() {
+        let cell = mock_typed_cell(500, 1, 2);
+        assert!(cell.type_hash.is_some());
+        assert_eq!(cell.type_hash.unwrap(), mock_hash(1));
+        assert_eq!(cell.lock_hash, mock_hash(2));
+    }
+
+    #[test]
+    fn test_transfer_transaction_structure_h10() {
+        let tx = transfer_transaction(1, 2, 5000);
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.inputs[0].capacity, 5000);
+        assert_eq!(tx.outputs[0].capacity, 5000);
+    }
+
+    #[test]
+    fn test_empty_scenario_fields_h10() {
+        let s = empty_scenario("test");
+        assert_eq!(s.name, "test");
+        assert!(s.pools.is_empty());
+        assert!(s.users.is_empty());
+        assert!(s.orders.is_empty());
+    }
+
+    #[test]
+    fn test_basic_swap_scenario_contents_h10() {
+        let s = basic_swap_scenario();
+        assert_eq!(s.pools.len(), 1);
+        assert_eq!(s.users.len(), 2);
+        assert_eq!(s.orders.len(), 2);
+    }
+
+    #[test]
+    fn test_known_sqrt_vectors_valid_h10() {
+        let vectors = known_sqrt_vectors();
+        for v in &vectors {
+            let input = v.input[0];
+            let expected = v.expected_output[0];
+            assert_eq!(isqrt_u128(input as u128), expected, "Failed for {}", v.description);
+        }
+    }
 }

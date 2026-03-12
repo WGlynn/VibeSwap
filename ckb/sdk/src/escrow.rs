@@ -2516,4 +2516,296 @@ mod tests {
         force_release(&mut reg, id, &arbiter_key(), false, now() + 20).unwrap();
         assert_eq!(reg.total_refunded, 1000);
     }
+
+    // ============ Hardening Round 10 ============
+
+    #[test]
+    fn test_create_escrow_zero_amount_h10() {
+        let mut reg = default_registry();
+        let result = create_escrow(&mut reg, alice(), bob(), token_a(), 0,
+            EscrowCondition::Hashlock { hash: secret_hash() }, deadline(), now());
+        assert_eq!(result, Err(EscrowError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_create_escrow_self_escrow_h10() {
+        let mut reg = default_registry();
+        let result = create_escrow(&mut reg, alice(), alice(), token_a(), 1000,
+            EscrowCondition::Hashlock { hash: secret_hash() }, deadline(), now());
+        assert_eq!(result, Err(EscrowError::SelfEscrow));
+    }
+
+    #[test]
+    fn test_create_escrow_deadline_in_past_h10() {
+        let mut reg = default_registry();
+        let result = create_escrow(&mut reg, alice(), bob(), token_a(), 1000,
+            EscrowCondition::Hashlock { hash: secret_hash() }, now(), now());
+        assert_eq!(result, Err(EscrowError::InvalidDeadline));
+    }
+
+    #[test]
+    fn test_compute_fee_zero_amount_h10() {
+        assert_eq!(compute_fee(0, 100), 0);
+    }
+
+    #[test]
+    fn test_compute_fee_zero_rate_h10() {
+        assert_eq!(compute_fee(10_000, 0), 0);
+    }
+
+    #[test]
+    fn test_compute_fee_normal_h10() {
+        // 10000 * 10 / 10000 = 10
+        assert_eq!(compute_fee(10_000, 10), 10);
+    }
+
+    #[test]
+    fn test_compute_hash_deterministic_h10() {
+        let preimage = [42u8; 32];
+        let h1 = compute_hash(&preimage);
+        let h2 = compute_hash(&preimage);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_check_hashlock_correct_preimage_h10() {
+        let preimage = [1u8; 32];
+        let hash = compute_hash(&preimage);
+        assert!(check_hashlock(&hash, &preimage));
+    }
+
+    #[test]
+    fn test_check_hashlock_wrong_preimage_h10() {
+        let preimage = [1u8; 32];
+        let hash = compute_hash(&preimage);
+        let wrong = [2u8; 32];
+        assert!(!check_hashlock(&hash, &wrong));
+    }
+
+    #[test]
+    fn test_check_timelock_before_h10() {
+        assert!(!check_timelock(1000, 999));
+    }
+
+    #[test]
+    fn test_check_timelock_exact_h10() {
+        assert!(check_timelock(1000, 1000));
+    }
+
+    #[test]
+    fn test_check_timelock_after_h10() {
+        assert!(check_timelock(1000, 1001));
+    }
+
+    #[test]
+    fn test_check_multisig_insufficient_h10() {
+        let signers = vec![[1u8; 32], [2u8; 32], [3u8; 32]];
+        let provided = vec![[1u8; 32]]; // only 1, need 2
+        assert!(!check_multisig(2, &signers, &provided));
+    }
+
+    #[test]
+    fn test_check_multisig_sufficient_h10() {
+        let signers = vec![[1u8; 32], [2u8; 32], [3u8; 32]];
+        let provided = vec![[1u8; 32], [3u8; 32]]; // 2 of 3
+        assert!(check_multisig(2, &signers, &provided));
+    }
+
+    #[test]
+    fn test_check_multisig_required_exceeds_signers_h10() {
+        let signers = vec![[1u8; 32]];
+        let provided = vec![[1u8; 32]];
+        assert!(!check_multisig(2, &signers, &provided));
+    }
+
+    #[test]
+    fn test_validate_condition_empty_composite_h10() {
+        let cond = EscrowCondition::Composite { conditions: vec![], require_all: true };
+        assert_eq!(validate_condition(&cond), Err(EscrowError::InvalidCondition));
+    }
+
+    #[test]
+    fn test_validate_condition_timelock_zero_h10() {
+        let cond = EscrowCondition::Timelock { unlock_at: 0 };
+        assert_eq!(validate_condition(&cond), Err(EscrowError::InvalidCondition));
+    }
+
+    #[test]
+    fn test_validate_condition_multisig_zero_required_h10() {
+        let cond = EscrowCondition::MultiSig { required: 0, signers: vec![[1u8; 32]] };
+        assert_eq!(validate_condition(&cond), Err(EscrowError::InvalidCondition));
+    }
+
+    #[test]
+    fn test_validate_escrow_full_h10() {
+        let escrow = Escrow {
+            escrow_id: 1, depositor: alice(), recipient: bob(), token: token_a(),
+            amount: 1000, fee: 1, condition: EscrowCondition::Hashlock { hash: secret_hash() },
+            status: EscrowStatus::Active, created_at: now(), deadline: deadline(),
+            released_at: None, dispute_deadline: deadline() + 86_400_000,
+            arbiter: None,
+        };
+        assert!(validate_escrow(&escrow).is_ok());
+    }
+
+    #[test]
+    fn test_release_after_deadline_h10() {
+        let mut reg = default_registry();
+        let id = create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        let result = release_escrow(&mut reg, id, Some(secret()), deadline() + 1, &[], None);
+        assert_eq!(result, Err(EscrowError::DeadlinePassed));
+    }
+
+    #[test]
+    fn test_refund_before_deadline_h10() {
+        let mut reg = default_registry();
+        let id = create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        let result = refund_escrow(&mut reg, id, now() + 10);
+        assert_eq!(result, Err(EscrowError::DeadlineNotPassed));
+    }
+
+    #[test]
+    fn test_release_not_found_h10() {
+        let mut reg = default_registry();
+        let result = release_escrow(&mut reg, 999, None, now(), &[], None);
+        assert_eq!(result, Err(EscrowError::NotFound));
+    }
+
+    #[test]
+    fn test_refund_not_found_h10() {
+        let mut reg = default_registry();
+        let result = refund_escrow(&mut reg, 999, now());
+        assert_eq!(result, Err(EscrowError::NotFound));
+    }
+
+    #[test]
+    fn test_escrows_by_depositor_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 2000, secret_hash(), deadline(), now()).unwrap();
+        let found = escrows_by_depositor(&reg, &alice());
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn test_escrows_by_recipient_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        let found = escrows_by_recipient(&reg, &bob());
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn test_active_escrows_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        assert_eq!(active_escrows(&reg).len(), 1);
+    }
+
+    #[test]
+    fn test_expire_escrows_count_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), now() + 100, now()).unwrap();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 2000, secret_hash(), now() + 200, now()).unwrap();
+        let expired = expire_escrows(&mut reg, now() + 150);
+        assert_eq!(expired, 1);
+    }
+
+    #[test]
+    fn test_time_remaining_before_deadline_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), now() + 500, now()).unwrap();
+        let escrow = &reg.escrows[0];
+        assert_eq!(time_remaining(escrow, now() + 100), 400);
+    }
+
+    #[test]
+    fn test_time_remaining_past_deadline_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), now() + 100, now()).unwrap();
+        let escrow = &reg.escrows[0];
+        assert_eq!(time_remaining(escrow, now() + 200), 0);
+    }
+
+    #[test]
+    fn test_is_expired_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), now() + 100, now()).unwrap();
+        let escrow = &reg.escrows[0];
+        assert!(!is_expired(escrow, now()));
+        assert!(is_expired(escrow, now() + 101));
+    }
+
+    #[test]
+    fn test_is_releasable_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), now() + 100, now()).unwrap();
+        let escrow = &reg.escrows[0];
+        assert!(is_releasable(escrow, now()));
+        assert!(!is_releasable(escrow, now() + 101));
+    }
+
+    #[test]
+    fn test_cleanup_completed_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        release_escrow(&mut reg, 1, Some(secret()), now() + 10, &[], None).unwrap();
+        let removed = cleanup_completed(&mut reg);
+        assert_eq!(removed, 1);
+        assert!(reg.escrows.is_empty());
+    }
+
+    #[test]
+    fn test_compute_stats_empty_h10() {
+        let reg = default_registry();
+        let stats = compute_stats(&reg);
+        assert_eq!(stats.active_count, 0);
+        assert_eq!(stats.total_volume, 0);
+    }
+
+    #[test]
+    fn test_validate_registry_consistent_h10() {
+        let mut reg = default_registry();
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        assert!(validate_registry(&reg));
+    }
+
+    #[test]
+    fn test_next_escrow_id_increments_h10() {
+        let mut reg = default_registry();
+        assert_eq!(next_escrow_id(&reg), 1);
+        create_htlc(&mut reg, alice(), bob(), token_a(), 1000, secret_hash(), deadline(), now()).unwrap();
+        assert_eq!(next_escrow_id(&reg), 2);
+    }
+
+    #[test]
+    fn test_create_timelock_zero_unlock_h10() {
+        let mut reg = default_registry();
+        let result = create_timelock(&mut reg, alice(), bob(), token_a(), 1000, 0, now());
+        assert_eq!(result, Err(EscrowError::InvalidCondition));
+    }
+
+    #[test]
+    fn test_evaluate_composite_empty_conditions_h10() {
+        let result = evaluate_composite(&[], true, None, now(), &[], None);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_evaluate_composite_any_mode_h10() {
+        let conditions = vec![
+            EscrowCondition::Timelock { unlock_at: now() + 1000 }, // not met
+            EscrowCondition::Timelock { unlock_at: now() },        // met
+        ];
+        assert!(evaluate_composite(&conditions, false, None, now(), &[], None));
+    }
+
+    #[test]
+    fn test_evaluate_composite_all_mode_h10() {
+        let conditions = vec![
+            EscrowCondition::Timelock { unlock_at: now() + 1000 }, // not met
+            EscrowCondition::Timelock { unlock_at: now() },        // met
+        ];
+        assert!(!evaluate_composite(&conditions, true, None, now(), &[], None));
+    }
 }

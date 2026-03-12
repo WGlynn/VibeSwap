@@ -158,6 +158,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
 
   const navItems = [
     { path: '/', label: 'Exchange', icon: '⚡', description: 'Trade one currency for another' },
+    { path: '/trade', label: 'Pro Trading', icon: '📈', description: 'Charts, order book & positions' },
     { path: '/buy', label: 'Add Money', icon: '💳', description: 'Use Venmo, PayPal, or bank' },
     { path: '/lend', label: 'Lend & Borrow', icon: '🏦', description: 'Supply or borrow assets' },
     { path: '/stake', label: 'Stake & Earn', icon: '🔒', description: 'Lock tokens for rewards' },

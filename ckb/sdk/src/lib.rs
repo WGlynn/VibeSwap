@@ -31,6 +31,7 @@ pub mod migration;
 pub mod miner;
 pub mod orderbook;
 pub mod oracle;
+pub mod pool;
 pub mod portfolio;
 pub mod prediction;
 pub mod pricing;

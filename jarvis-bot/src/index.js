@@ -152,7 +152,7 @@ import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedu
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
-import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation } from './pantheon.js';
+import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus } from './pantheon.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -1176,8 +1176,9 @@ TRADING (owner-only)
 
 THEAI PANTHEON (owner-only)
   /pantheon — Dashboard
+  /pantheon status — System health + bridge status
   /pantheon archetypes — Available god-agents
-  /pantheon fork <name> — Create agent from archetype
+  /pantheon fork <name|all> — Create agent(s) from archetype
   /pantheon chat <agent> <msg> — Talk to any agent
   /pantheon consult <from> <to> <q> — Agent-to-agent messaging
   /pantheon costs — LLM + infra cost breakdown
@@ -2492,7 +2493,17 @@ bot.command('pantheon', async (ctx) => {
     if (!archetype) {
       const archetypes = getArchetypes();
       const lines = Object.entries(archetypes).map(([name, a]) => `  ${name} (T${a.tier}) — ${a.domain}`);
-      return ctx.reply(`Usage: /pantheon fork <archetype>\n\nAvailable:\n${lines.join('\n')}`);
+      return ctx.reply(`Usage: /pantheon fork <archetype|all>\n\nAvailable:\n${lines.join('\n')}`);
+    }
+    if (archetype === 'all') {
+      // Batch fork all archetypes
+      const archetypes = getArchetypes();
+      const results = [];
+      for (const name of Object.keys(archetypes)) {
+        const r = await forkAgent(name);
+        results.push(r.error ? `${name}: ${r.error}` : `${name}: OK (T${r.tier})`);
+      }
+      return ctx.reply(`Batch Fork Results:\n${results.join('\n')}`);
     }
     const result = await forkAgent(archetype, { additionalContext: args.slice(2).join(' ') });
     if (result.error) return ctx.reply(`Fork failed: ${result.error}`);
@@ -2535,6 +2546,21 @@ bot.command('pantheon', async (ctx) => {
     clearConversation(agentName, `tg-${ctx.from.id}`);
     ctx.reply(`Conversation with ${agentName} cleared.`);
 
+  } else if (sub === 'status') {
+    const status = await getTheAIStatus();
+    const ollamaConfigured = !!process.env.OLLAMA_URL;
+    const model = process.env.PANTHEON_MODEL || (ollamaConfigured ? 'qwen2.5:7b' : 'claude-sonnet-4-5-20250929');
+    let msg = `TheAI — System Status\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Agents: ${status.activeAgents} active\n`;
+    msg += `Model: ${model}\n`;
+    msg += `Ollama: ${ollamaConfigured ? 'YES' : 'NO'}\n`;
+    msg += `Jarvis Bridge: WIRED (consult_pantheon)\n`;
+    msg += `LLM Cost: ${status.totalCost}\n`;
+    msg += `Total Calls: ${status.totalCalls}\n`;
+    msg += `Next Prune: ${status.nextPrune}\n`;
+    msg += `\nAgents:\n${status.agents.join('\n')}`;
+    ctx.reply(msg);
+
   } else if (sub === 'archetypes') {
     const archetypes = getArchetypes();
     let msg = `TheAI — Archetypes\n━━━━━━━━━━━━━━━━\n`;
@@ -2552,8 +2578,9 @@ bot.command('pantheon', async (ctx) => {
     msg += `Active Agents: ${agentList.length ? agentList.join(', ') : 'none'}\n`;
     msg += `Total LLM cost: ${costs.totalUsd}\n\n`;
     msg += `Commands:\n`;
+    msg += `  /pantheon status — System health\n`;
     msg += `  /pantheon archetypes — Available god-agents\n`;
-    msg += `  /pantheon fork <name> — Create agent from archetype\n`;
+    msg += `  /pantheon fork <name|all> — Create agent(s)\n`;
     msg += `  /pantheon chat <agent> <msg> — Talk to an agent\n`;
     msg += `  /pantheon consult <from> <to> <q> — Agent-to-agent\n`;
     msg += `  /pantheon costs — Cost breakdown\n`;
@@ -6526,6 +6553,10 @@ async function main() {
       console.log('[theai] Running scheduled 24h prune...');
       try {
         const results = await pruneAll();
+        for (const r of results) {
+          if (r.error) console.warn(`[theai] Prune ${r.agent}: ERROR ${r.error}`);
+          else console.log(`[theai] Prune ${r.agent} → ${r.manager}: OK (${r.cost})`);
+        }
         console.log(`[theai] Prune complete: ${results.length} agents processed`);
       } catch (err) { console.warn(`[theai] Prune failed: ${err.message}`); }
       // Schedule next prune in 24h

@@ -3142,4 +3142,227 @@ mod tests {
             data: 0,
         }
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_schedule_task_invalid_recurrence_zero_blocks_h7() {
+        let mut s = default_scheduler();
+        let res = schedule_task(&mut s, 1, TaskPriority::Normal, RecurrenceType::EveryNBlocks(0), 1000, 30000, 0);
+        assert_eq!(res, Err(SchedulerError::InvalidRecurrence));
+    }
+
+    #[test]
+    fn test_schedule_task_invalid_recurrence_zero_seconds_h7() {
+        let mut s = default_scheduler();
+        let res = schedule_task(&mut s, 1, TaskPriority::Normal, RecurrenceType::EveryNSeconds(0), 1000, 30000, 0);
+        assert_eq!(res, Err(SchedulerError::InvalidRecurrence));
+    }
+
+    #[test]
+    fn test_schedule_recurring_once_rejected_h7() {
+        let mut s = default_scheduler();
+        let res = schedule_recurring(&mut s, 1, RecurrenceType::Once, 1000, None, 0);
+        assert_eq!(res, Err(SchedulerError::InvalidRecurrence));
+    }
+
+    #[test]
+    fn test_cancel_completed_task_fails_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        s.tasks[0].status = TaskStatus::Completed;
+        let res = cancel_task(&mut s, id);
+        assert_eq!(res, Err(SchedulerError::TaskExpired));
+    }
+
+    #[test]
+    fn test_cancel_running_task_fails_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        s.tasks[0].status = TaskStatus::Running;
+        let res = cancel_task(&mut s, id);
+        assert_eq!(res, Err(SchedulerError::AlreadyRunning));
+    }
+
+    #[test]
+    fn test_cancel_already_cancelled_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        cancel_task(&mut s, id).unwrap();
+        let res = cancel_task(&mut s, id);
+        assert_eq!(res, Err(SchedulerError::CancelledTask));
+    }
+
+    #[test]
+    fn test_cancel_nonexistent_task_h7() {
+        let mut s = default_scheduler();
+        let res = cancel_task(&mut s, 999);
+        assert_eq!(res, Err(SchedulerError::TaskNotFound));
+    }
+
+    #[test]
+    fn test_reschedule_cancelled_task_fails_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        cancel_task(&mut s, id).unwrap();
+        let res = reschedule(&mut s, id, 5000);
+        assert_eq!(res, Err(SchedulerError::CancelledTask));
+    }
+
+    #[test]
+    fn test_reschedule_running_task_fails_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        start_task(&mut s, id, 1000).unwrap();
+        let res = reschedule(&mut s, id, 5000);
+        assert_eq!(res, Err(SchedulerError::AlreadyRunning));
+    }
+
+    #[test]
+    fn test_start_task_paused_scheduler_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        pause_scheduler(&mut s);
+        let res = start_task(&mut s, id, 1000);
+        assert_eq!(res, Err(SchedulerError::SchedulerPaused));
+    }
+
+    #[test]
+    fn test_start_task_max_concurrent_h7() {
+        let mut s = create_scheduler(10_000, 1);
+        let id1 = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        let id2 = schedule_once(&mut s, 2, 1000, TaskPriority::Normal, 0).unwrap();
+        start_task(&mut s, id1, 1000).unwrap();
+        let res = start_task(&mut s, id2, 1000);
+        assert_eq!(res, Err(SchedulerError::MaxConcurrentReached));
+    }
+
+    #[test]
+    fn test_start_already_running_task_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        start_task(&mut s, id, 1000).unwrap();
+        let res = start_task(&mut s, id, 2000);
+        assert_eq!(res, Err(SchedulerError::AlreadyRunning));
+    }
+
+    #[test]
+    fn test_fail_task_records_error_h7() {
+        let mut s = default_scheduler();
+        let id = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        start_task(&mut s, id, 1000).unwrap();
+        fail_task(&mut s, id, 42, 2000).unwrap();
+        assert_eq!(s.tasks[0].status, TaskStatus::Failed);
+        assert_eq!(s.results.last().unwrap().error_code, Some(42));
+    }
+
+    #[test]
+    fn test_due_tasks_sorted_by_priority_h7() {
+        let mut s = default_scheduler();
+        schedule_task(&mut s, 1, TaskPriority::Low, RecurrenceType::Once, 500, 30000, 0).unwrap();
+        schedule_task(&mut s, 2, TaskPriority::Critical, RecurrenceType::Once, 500, 30000, 0).unwrap();
+        schedule_task(&mut s, 3, TaskPriority::Normal, RecurrenceType::Once, 500, 30000, 0).unwrap();
+        let due = due_tasks(&s, 1000);
+        assert_eq!(due[0].priority, TaskPriority::Critical);
+        assert_eq!(due[1].priority, TaskPriority::Normal);
+        assert_eq!(due[2].priority, TaskPriority::Low);
+    }
+
+    #[test]
+    fn test_due_tasks_ignores_future_h7() {
+        let mut s = default_scheduler();
+        schedule_once(&mut s, 1, 5000, TaskPriority::Normal, 0).unwrap();
+        let due = due_tasks(&s, 1000);
+        assert!(due.is_empty());
+    }
+
+    #[test]
+    fn test_running_count_h7() {
+        let mut s = default_scheduler();
+        let id1 = schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        let id2 = schedule_once(&mut s, 2, 1000, TaskPriority::Normal, 0).unwrap();
+        assert_eq!(running_count(&s), 0);
+        start_task(&mut s, id1, 1000).unwrap();
+        assert_eq!(running_count(&s), 1);
+        start_task(&mut s, id2, 1000).unwrap();
+        assert_eq!(running_count(&s), 2);
+    }
+
+    #[test]
+    fn test_next_run_time_daily_h7() {
+        let next = next_run_time(&RecurrenceType::Daily, 1000, 10_000);
+        assert_eq!(next, 1000 + DAY_MS);
+    }
+
+    #[test]
+    fn test_next_run_time_weekly_h7() {
+        let next = next_run_time(&RecurrenceType::Weekly, 1000, 10_000);
+        assert_eq!(next, 1000 + WEEK_MS);
+    }
+
+    #[test]
+    fn test_next_run_time_batch_cycle_h7() {
+        let next = next_run_time(&RecurrenceType::BatchCycle, 1000, 10_000);
+        assert_eq!(next, 11_000);
+    }
+
+    #[test]
+    fn test_remaining_runs_unlimited_h7() {
+        let task = make_task(1, TaskPriority::Normal, RecurrenceType::Once, None, 0);
+        assert_eq!(remaining_runs(&task), None);
+    }
+
+    #[test]
+    fn test_remaining_runs_some_h7() {
+        let task = make_task(1, TaskPriority::Normal, RecurrenceType::Once, Some(5), 2);
+        assert_eq!(remaining_runs(&task), Some(3));
+    }
+
+    #[test]
+    fn test_is_expired_task_h7() {
+        let task = make_task(1, TaskPriority::Normal, RecurrenceType::Once, Some(1), 1);
+        assert!(is_expired(&task));
+    }
+
+    #[test]
+    fn test_is_not_expired_task_h7() {
+        let task = make_task(1, TaskPriority::Normal, RecurrenceType::Once, Some(5), 2);
+        assert!(!is_expired(&task));
+    }
+
+    #[test]
+    fn test_batches_per_epoch_h7() {
+        assert_eq!(batches_per_epoch(EPOCH_MS, DEFAULT_BATCH_CYCLE_MS), EPOCH_MS / DEFAULT_BATCH_CYCLE_MS);
+    }
+
+    #[test]
+    fn test_batches_per_epoch_zero_cycle_h7() {
+        assert_eq!(batches_per_epoch(EPOCH_MS, 0), 0);
+    }
+
+    #[test]
+    fn test_epoch_progress_bps_at_start_h7() {
+        let epoch = create_epoch(0, 0, 0, 10_000, 10_000);
+        let progress = epoch_progress_bps(&epoch, 0);
+        assert_eq!(progress, 0);
+    }
+
+    #[test]
+    fn test_task_count_h7() {
+        let mut s = default_scheduler();
+        assert_eq!(task_count(&s), 0);
+        schedule_once(&mut s, 1, 1000, TaskPriority::Normal, 0).unwrap();
+        assert_eq!(task_count(&s), 1);
+    }
+
+    #[test]
+    fn test_success_rate_no_results_h7() {
+        let s = default_scheduler();
+        assert_eq!(success_rate(&s), 0);
+    }
+
+    #[test]
+    fn test_recurrence_interval_once_h7() {
+        assert_eq!(recurrence_interval_ms(&RecurrenceType::Once, 10_000), 0);
+    }
 }

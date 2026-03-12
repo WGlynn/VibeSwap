@@ -2669,4 +2669,258 @@ mod tests {
         let pct = balance_percentile(&snap, &addr(3)).unwrap();
         assert_eq!(pct, 4000);
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_create_snapshot_empty_state_h7() {
+        let snap = create_snapshot(0, SnapshotType::Governance, 100, 1000);
+        assert_eq!(snap.snapshot_id, 0);
+        assert!(snap.balances.is_empty());
+        assert!(snap.pools.is_empty());
+        assert_eq!(snap.merkle_root, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_finalize_empty_snapshot_fails_h7() {
+        let mut snap = create_snapshot(1, SnapshotType::Rewards, 100, 1000);
+        assert_eq!(finalize_snapshot(&mut snap), Err(SnapshotError::EmptySnapshot));
+    }
+
+    #[test]
+    fn test_add_duplicate_balance_rejected_h7() {
+        let mut snap = create_snapshot(1, SnapshotType::Governance, 100, 1000);
+        add_balance(&mut snap, make_record(1, 100, 10)).unwrap();
+        let res = add_balance(&mut snap, make_record(1, 200, 20));
+        assert_eq!(res, Err(SnapshotError::AlreadyExists));
+    }
+
+    #[test]
+    fn test_add_duplicate_pool_rejected_h7() {
+        let mut snap = create_snapshot(1, SnapshotType::Governance, 100, 1000);
+        add_pool(&mut snap, make_pool(1, 1000, 2000)).unwrap();
+        let res = add_pool(&mut snap, make_pool(1, 500, 600));
+        assert_eq!(res, Err(SnapshotError::AlreadyExists));
+    }
+
+    #[test]
+    fn test_from_balances_empty_fails_h7() {
+        let res = from_balances(1, SnapshotType::Governance, 100, 1000, Vec::new(), Vec::new());
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_from_balances_duplicate_addresses_h7() {
+        let records = vec![make_record(1, 100, 10), make_record(1, 200, 20)];
+        let res = from_balances(1, SnapshotType::Governance, 100, 1000, records, Vec::new());
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_get_balance_missing_address_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        assert!(get_balance(&snap, &addr(99)).is_none());
+    }
+
+    #[test]
+    fn test_voting_power_at_missing_returns_zero_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        assert_eq!(voting_power_at(&snap, &addr(99)), 0);
+    }
+
+    #[test]
+    fn test_total_voting_power_single_holder_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 42)]);
+        assert_eq!(total_voting_power(&snap), 42);
+    }
+
+    #[test]
+    fn test_top_holders_limited_h7() {
+        let snap = make_finalized_snapshot(vec![
+            make_record(1, 100, 10),
+            make_record(2, 300, 30),
+            make_record(3, 200, 20),
+        ]);
+        let top = top_holders(&snap, 2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].token_balance, 300);
+        assert_eq!(top[1].token_balance, 200);
+    }
+
+    #[test]
+    fn test_holder_count_h7() {
+        let snap = make_finalized_snapshot(vec![
+            make_record(1, 100, 10),
+            make_record(2, 200, 20),
+        ]);
+        assert_eq!(holder_count(&snap), 2);
+    }
+
+    #[test]
+    fn test_pool_count_h7() {
+        let mut snap = create_snapshot(1, SnapshotType::Governance, 100, 1000);
+        add_balance(&mut snap, make_record(1, 100, 10)).unwrap();
+        add_pool(&mut snap, make_pool(1, 1000, 2000)).unwrap();
+        add_pool(&mut snap, make_pool(2, 500, 600)).unwrap();
+        finalize_snapshot(&mut snap).unwrap();
+        assert_eq!(pool_count(&snap), 2);
+    }
+
+    #[test]
+    fn test_total_tvl_h7() {
+        let mut snap = create_snapshot(1, SnapshotType::Analytics, 100, 1000);
+        add_balance(&mut snap, make_record(1, 100, 10)).unwrap();
+        add_pool(&mut snap, make_pool(1, 1000, 2000)).unwrap();
+        finalize_snapshot(&mut snap).unwrap();
+        // TVL = reserve_a * 2 = 1000 * 2 = 2000
+        assert_eq!(total_tvl(&snap), 2000);
+    }
+
+    #[test]
+    fn test_get_pool_missing_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        assert!(get_pool(&snap, &pool_id(99)).is_none());
+    }
+
+    #[test]
+    fn test_compute_merkle_root_empty_h7() {
+        let root = compute_merkle_root(&[]);
+        assert_eq!(root, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_compute_merkle_root_single_leaf_h7() {
+        let leaf = [0x42u8; 32];
+        let root = compute_merkle_root(&[leaf]);
+        assert_eq!(root, leaf);
+    }
+
+    #[test]
+    fn test_proof_depth_boundary_values_h7() {
+        assert_eq!(proof_depth(0), 0);
+        assert_eq!(proof_depth(1), 0);
+        assert_eq!(proof_depth(2), 1);
+        assert_eq!(proof_depth(3), 2);
+        assert_eq!(proof_depth(4), 2);
+        assert_eq!(proof_depth(5), 3);
+    }
+
+    #[test]
+    fn test_generate_and_verify_proof_h7() {
+        let snap = make_finalized_snapshot(vec![
+            make_record(1, 100, 10),
+            make_record(2, 200, 20),
+            make_record(3, 300, 30),
+        ]);
+        let proof = generate_proof(&snap, &addr(2)).unwrap();
+        assert!(verify_proof(&snap.merkle_root, &proof));
+    }
+
+    #[test]
+    fn test_generate_proof_missing_address_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        let res = generate_proof(&snap, &addr(99));
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_diff_snapshots_new_holder_h7() {
+        let old = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        let new_snap = make_finalized_snapshot(vec![
+            make_record(1, 100, 10),
+            make_record(2, 200, 20),
+        ]);
+        let diff = diff_snapshots(&old, &new_snap);
+        assert_eq!(diff.new_addresses.len(), 1);
+        assert_eq!(diff.removed_addresses.len(), 0);
+    }
+
+    #[test]
+    fn test_diff_snapshots_removed_holder_h7() {
+        let old = make_finalized_snapshot(vec![
+            make_record(1, 100, 10),
+            make_record(2, 200, 20),
+        ]);
+        let new_snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        let diff = diff_snapshots(&old, &new_snap);
+        assert_eq!(diff.removed_addresses.len(), 1);
+    }
+
+    #[test]
+    fn test_net_balance_change_increased_h7() {
+        let old = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        let new_snap = make_finalized_snapshot(vec![make_record(1, 300, 30)]);
+        assert_eq!(net_balance_change(&old, &new_snap, &addr(1)), 200);
+    }
+
+    #[test]
+    fn test_supply_growth_bps_h7() {
+        let old = make_finalized_snapshot(vec![make_record(1, 1000, 100)]);
+        let new_snap = make_finalized_snapshot(vec![make_record(1, 1100, 110)]);
+        let growth = supply_growth_bps(&old, &new_snap);
+        assert_eq!(growth, 1000); // 10% = 1000 bps
+    }
+
+    #[test]
+    fn test_should_snapshot_disabled_h7() {
+        let mut sched = create_schedule(100, 0, vec![SnapshotType::Governance], 10);
+        sched.enabled = false;
+        assert!(!should_snapshot(&sched, 200));
+    }
+
+    #[test]
+    fn test_advance_schedule_h7() {
+        let mut sched = create_schedule(100, 0, vec![SnapshotType::Governance], 10);
+        let next = advance_schedule(&mut sched);
+        assert_eq!(next, 200);
+        assert_eq!(sched.last_snapshot_height, 100);
+    }
+
+    #[test]
+    fn test_prune_old_snapshots_h7() {
+        let mut snaps = vec![
+            make_finalized_snapshot(vec![make_record(1, 100, 10)]),
+            make_finalized_snapshot(vec![make_record(2, 200, 20)]),
+            make_finalized_snapshot(vec![make_record(3, 300, 30)]),
+        ];
+        let removed = prune_old_snapshots(&mut snaps, 2);
+        assert_eq!(removed, 1);
+        assert_eq!(snaps.len(), 2);
+    }
+
+    #[test]
+    fn test_snapshot_size_estimate_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        let size = snapshot_size_estimate(&snap);
+        assert_eq!(size, SNAPSHOT_BASE_BYTES + BYTES_PER_RECORD);
+    }
+
+    #[test]
+    fn test_compute_shares_proportional_h7() {
+        let snap = make_finalized_snapshot(vec![
+            make_record(1, 100, 100),
+            make_record(2, 200, 300),
+        ]);
+        let shares = compute_shares(&snap, 400);
+        // total_vp=400, addr(1) gets 100/400*400=100, addr(2) gets 300/400*400=300
+        assert_eq!(shares.len(), 2);
+        assert_eq!(shares[0].1, 100);
+        assert_eq!(shares[1].1, 300);
+    }
+
+    #[test]
+    fn test_gini_all_equal_h7() {
+        let snap = make_finalized_snapshot(vec![
+            make_record(1, 100, 10),
+            make_record(2, 100, 10),
+            make_record(3, 100, 10),
+        ]);
+        assert_eq!(gini_coefficient(&snap), 0);
+    }
+
+    #[test]
+    fn test_balance_percentile_not_found_h7() {
+        let snap = make_finalized_snapshot(vec![make_record(1, 100, 10)]);
+        assert!(balance_percentile(&snap, &addr(99)).is_none());
+    }
 }

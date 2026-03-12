@@ -2817,4 +2817,231 @@ mod tests {
         let result = verify_checkpoint(&chain.checkpoints[0]);
         assert_eq!(result.checkpoint_id, 0);
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_create_chain_custom_params_h7() {
+        let chain = create_chain(500, 5, 50, 8000);
+        assert_eq!(chain.interval_blocks, 500);
+        assert_eq!(chain.min_verifiers, 5);
+        assert_eq!(chain.retention_count, 50);
+        assert_eq!(chain.auto_archive_after, 8000);
+        assert!(chain.checkpoints.is_empty());
+    }
+
+    #[test]
+    fn test_create_checkpoint_first_has_no_prev_h7() {
+        let mut chain = default_chain();
+        let id = create_checkpoint(&mut chain, 1000, 10000, creator(1)).unwrap();
+        assert_eq!(id, 0);
+        assert_eq!(chain.checkpoints[0].prev_checkpoint_id, None);
+    }
+
+    #[test]
+    fn test_create_checkpoint_second_links_to_first_h7() {
+        let mut chain = default_chain();
+        create_checkpoint(&mut chain, 1000, 10000, creator(1)).unwrap();
+        let id2 = create_checkpoint(&mut chain, 2000, 20000, creator(1)).unwrap();
+        assert_eq!(id2, 1);
+        assert_eq!(chain.checkpoints[1].prev_checkpoint_id, Some(0));
+    }
+
+    #[test]
+    fn test_add_entry_to_finalized_fails_h7() {
+        let mut chain = default_chain();
+        let id = from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        let res = add_entry(&mut chain, id, make_entry(2, 200));
+        assert_eq!(res, Err(CheckpointError::AlreadyFinalized));
+    }
+
+    #[test]
+    fn test_add_duplicate_entry_fails_h7() {
+        let mut chain = default_chain();
+        let id = create_checkpoint(&mut chain, 1000, 10000, creator(1)).unwrap();
+        add_entry(&mut chain, id, make_entry(1, 100)).unwrap();
+        let res = add_entry(&mut chain, id, make_entry(1, 200));
+        assert_eq!(res, Err(CheckpointError::DuplicateEntry));
+    }
+
+    #[test]
+    fn test_finalize_empty_checkpoint_fails_h7() {
+        let mut chain = default_chain();
+        let id = create_checkpoint(&mut chain, 1000, 10000, creator(1)).unwrap();
+        let res = finalize_checkpoint(&mut chain, id);
+        assert_eq!(res, Err(CheckpointError::EmptyCheckpoint));
+    }
+
+    #[test]
+    fn test_from_entries_empty_fails_h7() {
+        let mut chain = default_chain();
+        let res = from_entries(&mut chain, 1000, 10000, creator(1), Vec::new());
+        assert_eq!(res, Err(CheckpointError::EmptyCheckpoint));
+    }
+
+    #[test]
+    fn test_from_entries_duplicate_cell_ids_fails_h7() {
+        let mut chain = default_chain();
+        let res = from_entries(&mut chain, 1000, 10000, creator(1), vec![
+            make_entry(1, 100),
+            make_entry(1, 200),
+        ]);
+        assert_eq!(res, Err(CheckpointError::DuplicateEntry));
+    }
+
+    #[test]
+    fn test_verify_state_root_valid_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        assert!(verify_state_root(&chain.checkpoints[0]));
+    }
+
+    #[test]
+    fn test_verify_state_root_invalid_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        chain.checkpoints[0].state_root = [0xFF; 32];
+        assert!(!verify_state_root(&chain.checkpoints[0]));
+    }
+
+    #[test]
+    fn test_compute_state_root_empty_h7() {
+        let root = compute_state_root(&[]);
+        assert_eq!(root, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_compute_state_root_deterministic_h7() {
+        let entries = vec![make_entry(1, 100), make_entry(2, 200)];
+        let root1 = compute_state_root(&entries);
+        let root2 = compute_state_root(&entries);
+        assert_eq!(root1, root2);
+        assert_ne!(root1, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_add_verification_pending_fails_h7() {
+        let mut chain = default_chain();
+        create_checkpoint(&mut chain, 1000, 10000, creator(1)).unwrap();
+        let res = add_verification(&mut chain, 0);
+        assert_eq!(res, Err(CheckpointError::NotFinalized));
+    }
+
+    #[test]
+    fn test_add_verification_finalized_ok_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        let count = add_verification(&mut chain, 0).unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_is_fully_verified_false_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        assert!(!is_fully_verified(&chain, 0)); // needs 3, has 0
+    }
+
+    #[test]
+    fn test_is_fully_verified_true_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        for _ in 0..3 {
+            add_verification(&mut chain, 0).unwrap();
+        }
+        assert!(is_fully_verified(&chain, 0));
+    }
+
+    #[test]
+    fn test_mark_verified_insufficient_verifiers_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        let res = mark_verified(&mut chain, 0);
+        assert_eq!(res, Err(CheckpointError::InsufficientVerifiers));
+    }
+
+    #[test]
+    fn test_get_checkpoint_nonexistent_h7() {
+        let chain = default_chain();
+        assert!(get_checkpoint(&chain, 999).is_none());
+    }
+
+    #[test]
+    fn test_latest_checkpoint_empty_chain_h7() {
+        let chain = default_chain();
+        assert!(latest_checkpoint(&chain).is_none());
+    }
+
+    #[test]
+    fn test_latest_finalized_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        let lf = latest_finalized(&chain);
+        assert!(lf.is_some());
+        assert_eq!(lf.unwrap().checkpoint_id, 0);
+    }
+
+    #[test]
+    fn test_checkpoint_at_height_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        assert!(checkpoint_at_height(&chain, 1000).is_some());
+        assert!(checkpoint_at_height(&chain, 999).is_none());
+    }
+
+    #[test]
+    fn test_nearest_checkpoint_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        from_entries(&mut chain, 3000, 30000, creator(1), vec![make_entry(2, 200)]).unwrap();
+        let nearest = nearest_checkpoint(&chain, 2500);
+        assert!(nearest.is_some());
+        assert_eq!(nearest.unwrap().block_height, 1000);
+    }
+
+    #[test]
+    fn test_diff_checkpoints_added_cells_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        from_entries(&mut chain, 2000, 20000, creator(1), vec![make_entry(1, 100), make_entry(2, 200)]).unwrap();
+        let diff = diff_checkpoints(&chain.checkpoints[0], &chain.checkpoints[1]);
+        assert_eq!(diff.added_cells.len(), 1);
+        assert_eq!(diff.removed_cells.len(), 0);
+    }
+
+    #[test]
+    fn test_can_rollback_to_finalized_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        assert!(can_rollback_to(&chain, 0));
+    }
+
+    #[test]
+    fn test_can_rollback_to_pending_false_h7() {
+        let mut chain = default_chain();
+        create_checkpoint(&mut chain, 1000, 10000, creator(1)).unwrap();
+        assert!(!can_rollback_to(&chain, 0));
+    }
+
+    #[test]
+    fn test_validate_entry_zero_capacity_h7() {
+        let entry = make_entry(1, 0);
+        assert!(!validate_entry(&entry));
+    }
+
+    #[test]
+    fn test_checkpoint_count_h7() {
+        let mut chain = default_chain();
+        assert_eq!(checkpoint_count(&chain), 0);
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        assert_eq!(checkpoint_count(&chain), 1);
+    }
+
+    #[test]
+    fn test_should_checkpoint_h7() {
+        let mut chain = default_chain();
+        from_entries(&mut chain, 1000, 10000, creator(1), vec![make_entry(1, 100)]).unwrap();
+        assert!(should_checkpoint(&chain, 2000));
+        assert!(!should_checkpoint(&chain, 1500));
+    }
 }

@@ -2632,4 +2632,232 @@ mod tests {
         let chain = delegation_chain(&r, &addr(1), 100);
         assert!(chain.depth <= 4); // bounded by max_iter
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_self_delegation_full_rejected_h7() {
+        let mut r = reg();
+        let res = delegate_full(&mut r, addr(1), addr(1), 5000, 100, None, true);
+        assert_eq!(res, Err(DelegateError::SelfDelegation));
+    }
+
+    #[test]
+    fn test_self_delegation_partial_rejected_h7() {
+        let mut r = reg();
+        let res = delegate_partial(&mut r, addr(1), addr(1), 2000, 100, None, true);
+        assert_eq!(res, Err(DelegateError::SelfDelegation));
+    }
+
+    #[test]
+    fn test_self_delegation_proportional_rejected_h7() {
+        let mut r = reg();
+        let res = delegate_proportional(&mut r, addr(1), addr(1), 5000, 100, None, true);
+        assert_eq!(res, Err(DelegateError::SelfDelegation));
+    }
+
+    #[test]
+    fn test_partial_zero_amount_rejected_h7() {
+        let mut r = reg();
+        let res = delegate_partial(&mut r, addr(1), addr(2), 0, 100, None, true);
+        assert_eq!(res, Err(DelegateError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_partial_below_min_amount_h7() {
+        let mut r = reg();
+        let res = delegate_partial(&mut r, addr(1), addr(2), 500, 100, None, true);
+        assert_eq!(res, Err(DelegateError::AmountTooSmall));
+    }
+
+    #[test]
+    fn test_proportional_zero_bps_rejected_h7() {
+        let mut r = reg();
+        let res = delegate_proportional(&mut r, addr(1), addr(2), 0, 100, None, true);
+        assert_eq!(res, Err(DelegateError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_proportional_over_10000_bps_rejected_h7() {
+        let mut r = reg();
+        let res = delegate_proportional(&mut r, addr(1), addr(2), 10001, 100, None, true);
+        assert_eq!(res, Err(DelegateError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_proportional_boundary_10000_bps_ok_h7() {
+        let mut r = reg();
+        let res = delegate_proportional(&mut r, addr(1), addr(2), 10000, 100, None, true);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_full_insufficient_power_h7() {
+        let mut r = reg();
+        let res = delegate_full(&mut r, addr(1), addr(2), 500, 100, None, true);
+        assert_eq!(res, Err(DelegateError::InsufficientPower));
+    }
+
+    #[test]
+    fn test_duplicate_active_delegation_rejected_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        let res = delegate_partial(&mut r, addr(1), addr(2), 3000, 100, None, true);
+        assert_eq!(res, Err(DelegateError::AlreadyDelegated));
+    }
+
+    #[test]
+    fn test_revoke_nonexistent_delegation_h7() {
+        let mut r = reg();
+        let res = revoke_delegation(&mut r, &addr(1), &addr(2));
+        assert_eq!(res, Err(DelegateError::DelegationNotFound));
+    }
+
+    #[test]
+    fn test_revoke_non_revocable_delegation_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, false).unwrap();
+        let res = revoke_delegation(&mut r, &addr(1), &addr(2));
+        assert_eq!(res, Err(DelegateError::NotRevocable));
+    }
+
+    #[test]
+    fn test_modify_full_delegation_rejected_h7() {
+        let mut r = reg();
+        delegate_full(&mut r, addr(1), addr(2), 5000, 100, None, true).unwrap();
+        let res = modify_delegation(&mut r, &addr(1), &addr(2), 3000);
+        assert_eq!(res, Err(DelegateError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_modify_zero_amount_rejected_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        let res = modify_delegation(&mut r, &addr(1), &addr(2), 0);
+        assert_eq!(res, Err(DelegateError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_modify_proportional_over_10000_rejected_h7() {
+        let mut r = reg();
+        delegate_proportional(&mut r, addr(1), addr(2), 5000, 100, None, true).unwrap();
+        let res = modify_delegation(&mut r, &addr(1), &addr(2), 10001);
+        assert_eq!(res, Err(DelegateError::InvalidAmount));
+    }
+
+    #[test]
+    fn test_effective_power_with_partial_delegation_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 3000, 100, None, true).unwrap();
+        // addr(2) receives 3000 partial
+        let eff = effective_power(&r, &addr(2), 1000, 100);
+        assert_eq!(eff, 1000 + 3000); // own_power + received partial
+    }
+
+    #[test]
+    fn test_available_power_after_full_delegation_h7() {
+        let mut r = reg();
+        delegate_full(&mut r, addr(1), addr(2), 5000, 100, None, true).unwrap();
+        let avail = available_power(&r, &addr(1), 5000, 100);
+        assert_eq!(avail, 0); // All power delegated out
+    }
+
+    #[test]
+    fn test_delegation_chain_single_node_h7() {
+        let r = reg();
+        let chain = delegation_chain(&r, &addr(1), 100);
+        assert_eq!(chain.depth, 0);
+        assert_eq!(chain.addresses.len(), 1);
+    }
+
+    #[test]
+    fn test_reverse_chain_empty_h7() {
+        let r = reg();
+        let rev = reverse_chain(&r, &addr(1), 100);
+        assert!(rev.is_empty());
+    }
+
+    #[test]
+    fn test_expire_delegations_none_expired_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        let count = expire_delegations(&mut r, 200);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_expire_delegations_one_expired_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, Some(150), true).unwrap();
+        delegate_partial(&mut r, addr(3), addr(4), 3000, 100, None, true).unwrap();
+        let count = expire_delegations(&mut r, 200);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_cleanup_inactive_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        revoke_delegation(&mut r, &addr(1), &addr(2)).unwrap();
+        let removed = cleanup_inactive(&mut r);
+        assert_eq!(removed, 1);
+        assert!(r.delegations.is_empty());
+    }
+
+    #[test]
+    fn test_is_delegating_active_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        assert!(is_delegating(&r, &addr(1), 100));
+        assert!(!is_delegating(&r, &addr(2), 100));
+    }
+
+    #[test]
+    fn test_is_delegate_active_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        assert!(is_delegate(&r, &addr(2), 100));
+        assert!(!is_delegate(&r, &addr(1), 100));
+    }
+
+    #[test]
+    fn test_would_create_cycle_true_h7() {
+        let mut r = reg();
+        delegate_full(&mut r, addr(1), addr(2), 5000, 100, None, true).unwrap();
+        assert!(would_create_cycle(&r, &addr(2), &addr(1), 100));
+    }
+
+    #[test]
+    fn test_would_create_cycle_false_h7() {
+        let mut r = reg();
+        delegate_full(&mut r, addr(1), addr(2), 5000, 100, None, true).unwrap();
+        assert!(!would_create_cycle(&r, &addr(3), &addr(2), 100));
+    }
+
+    #[test]
+    fn test_circular_delegation_prevented_h7() {
+        let mut r = reg();
+        delegate_full(&mut r, addr(1), addr(2), 5000, 100, None, true).unwrap();
+        let res = delegate_full(&mut r, addr(2), addr(1), 5000, 100, None, true);
+        assert_eq!(res, Err(DelegateError::CircularDelegation));
+    }
+
+    #[test]
+    fn test_delegation_count_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, true).unwrap();
+        delegate_partial(&mut r, addr(1), addr(3), 3000, 100, None, true).unwrap();
+        delegate_partial(&mut r, addr(4), addr(1), 4000, 100, None, true).unwrap();
+        let (out, in_) = delegation_count(&r, &addr(1), 100);
+        assert_eq!(out, 2);
+        assert_eq!(in_, 1);
+    }
+
+    #[test]
+    fn test_revoke_all_no_revocable_h7() {
+        let mut r = reg();
+        delegate_partial(&mut r, addr(1), addr(2), 2000, 100, None, false).unwrap();
+        let count = revoke_all(&mut r, &addr(1));
+        assert_eq!(count, 0);
+    }
 }

@@ -2497,4 +2497,266 @@ mod tests {
         remove(&mut c, &key(1));
         assert!(!is_full(&c));
     }
+
+    // ============ Hardening Round 7 ============
+
+    #[test]
+    fn test_create_cache_zero_capacity_h7() {
+        let c = create_cache(0, EvictionPolicy::Lru, 10_000);
+        assert_eq!(c.max_entries, 0);
+        assert!(is_full(&c));
+    }
+
+    #[test]
+    fn test_put_zero_capacity_cache_returns_full_h7() {
+        let mut c = create_cache(0, EvictionPolicy::Lru, 10_000);
+        let res = put(&mut c, key(1), 100, 200, 1000);
+        assert_eq!(res, Err(CacheError::CacheFull));
+    }
+
+    #[test]
+    fn test_get_nonexistent_key_increments_miss_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert!(get(&mut c, &key(99), 1000).is_none());
+        assert_eq!(c.misses, 1);
+        assert_eq!(c.hits, 0);
+    }
+
+    #[test]
+    fn test_put_then_get_returns_both_values_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 42, 84, 1000).unwrap();
+        let val = get(&mut c, &key(1), 1500);
+        assert_eq!(val, Some((42, 84)));
+    }
+
+    #[test]
+    fn test_get_expired_entry_returns_none_and_removes_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 5000);
+        put(&mut c, key(1), 10, 20, 1000).unwrap();
+        // Entry created at 1000 with ttl 5000, expires at > 6000
+        assert!(get(&mut c, &key(1), 7000).is_none());
+        assert_eq!(entry_count(&c), 0);
+    }
+
+    #[test]
+    fn test_get_if_fresh_does_not_update_stats_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 10, 20, 1000).unwrap();
+        let val = get_if_fresh(&c, &key(1), 1500);
+        assert_eq!(val, Some((10, 20)));
+        assert_eq!(c.hits, 0);
+        assert_eq!(c.misses, 0);
+    }
+
+    #[test]
+    fn test_get_if_fresh_expired_returns_none_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 100);
+        put(&mut c, key(1), 10, 20, 1000).unwrap();
+        assert!(get_if_fresh(&c, &key(1), 2000).is_none());
+    }
+
+    #[test]
+    fn test_update_value_on_expired_entry_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 100);
+        put(&mut c, key(1), 10, 20, 1000).unwrap();
+        let res = update_value(&mut c, &key(1), 99, 88, 5000);
+        assert_eq!(res, Err(CacheError::Expired));
+        assert_eq!(entry_count(&c), 0);
+    }
+
+    #[test]
+    fn test_update_value_on_missing_key_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        let res = update_value(&mut c, &key(99), 10, 20, 1000);
+        assert_eq!(res, Err(CacheError::KeyNotFound));
+    }
+
+    #[test]
+    fn test_put_with_ttl_zero_never_expires_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put_with_ttl(&mut c, key(1), 10, 20, 0, 1000).unwrap();
+        assert!(get(&mut c, &key(1), u64::MAX - 1).is_some());
+    }
+
+    #[test]
+    fn test_evict_lru_from_empty_cache_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert!(evict_lru(&mut c).is_none());
+    }
+
+    #[test]
+    fn test_evict_lfu_removes_least_accessed_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lfu, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        put(&mut c, key(2), 20, 0, 1000).unwrap();
+        // Access key(2) many times
+        for _ in 0..5 {
+            get(&mut c, &key(2), 2000);
+        }
+        let evicted = evict_lfu(&mut c).unwrap();
+        assert_eq!(evicted.key, key(1)); // key(1) has 0 accesses
+    }
+
+    #[test]
+    fn test_evict_fifo_removes_oldest_created_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Fifo, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        put(&mut c, key(2), 20, 0, 2000).unwrap();
+        let evicted = evict_fifo(&mut c).unwrap();
+        assert_eq!(evicted.key, key(1));
+    }
+
+    #[test]
+    fn test_evict_expired_none_expired_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        put(&mut c, key(2), 20, 0, 1000).unwrap();
+        assert_eq!(evict_expired(&mut c, 2000), 0);
+    }
+
+    #[test]
+    fn test_contains_expired_entry_returns_false_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 100);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        assert!(!contains(&c, &key(1), 5000));
+    }
+
+    #[test]
+    fn test_contains_missing_key_returns_false_h7() {
+        let c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert!(!contains(&c, &key(1), 1000));
+    }
+
+    #[test]
+    fn test_refresh_ttl_resets_created_at_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 5000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        refresh_ttl(&mut c, &key(1), 4000).unwrap();
+        // Now created_at=4000, ttl=5000, expires at >9000
+        assert!(contains(&c, &key(1), 8000));
+    }
+
+    #[test]
+    fn test_refresh_ttl_missing_key_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert_eq!(refresh_ttl(&mut c, &key(99), 1000), Err(CacheError::KeyNotFound));
+    }
+
+    #[test]
+    fn test_extend_ttl_adds_time_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 5000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        extend_ttl(&mut c, &key(1), 10_000).unwrap();
+        // ttl is now 15000, created_at=1000, expires at >16000
+        assert!(contains(&c, &key(1), 15000));
+    }
+
+    #[test]
+    fn test_set_ttl_to_zero_makes_immortal_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 5000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        set_ttl(&mut c, &key(1), 0).unwrap();
+        assert!(contains(&c, &key(1), u64::MAX - 1));
+    }
+
+    #[test]
+    fn test_invalidate_nonexistent_returns_false_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert!(!invalidate(&mut c, &key(99)));
+    }
+
+    #[test]
+    fn test_invalidate_all_empty_cache_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert_eq!(invalidate_all(&mut c), 0);
+    }
+
+    #[test]
+    fn test_invalidate_by_prefix_no_match_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        assert_eq!(invalidate_by_prefix(&mut c, &[0xFF]), 0);
+        assert_eq!(entry_count(&c), 1);
+    }
+
+    #[test]
+    fn test_invalidate_older_than_boundary_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 100_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap(); // age=4000 at now=5000
+        put(&mut c, key(2), 20, 0, 3000).unwrap(); // age=2000 at now=5000
+        let removed = invalidate_older_than(&mut c, 3000, 5000);
+        assert_eq!(removed, 1); // key(1) age=4000 > 3000
+    }
+
+    #[test]
+    fn test_mark_dirty_and_flush_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        put(&mut c, key(2), 20, 0, 1000).unwrap();
+        mark_dirty(&mut c, &key(1)).unwrap();
+        assert_eq!(dirty_count(&c), 1);
+        let flushed = flush_dirty(&mut c);
+        assert_eq!(flushed.len(), 1);
+        assert_eq!(dirty_count(&c), 0);
+    }
+
+    #[test]
+    fn test_compare_and_swap_version_mismatch_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        let res = compare_and_swap(&mut c, &key(1), 999, 50, 60, 2000);
+        assert_eq!(res, Err(CacheError::VersionMismatch));
+    }
+
+    #[test]
+    fn test_compare_and_swap_success_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        let new_ver = compare_and_swap(&mut c, &key(1), 1, 50, 60, 2000).unwrap();
+        assert_eq!(new_ver, 2);
+        assert_eq!(get(&mut c, &key(1), 2000), Some((50, 60)));
+    }
+
+    #[test]
+    fn test_compare_and_swap_expired_h7() {
+        let mut c = create_cache(10, EvictionPolicy::Lru, 100);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        let res = compare_and_swap(&mut c, &key(1), 1, 50, 60, 5000);
+        assert_eq!(res, Err(CacheError::Expired));
+    }
+
+    #[test]
+    fn test_hit_rate_no_lookups_h7() {
+        let c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert_eq!(hit_rate_bps(&c), 0);
+    }
+
+    #[test]
+    fn test_utilization_bps_zero_capacity_h7() {
+        let c = create_cache(0, EvictionPolicy::Lru, 10_000);
+        assert_eq!(utilization_bps(&c), 0);
+    }
+
+    #[test]
+    fn test_memory_estimate_scales_with_entries_h7() {
+        let mut c = create_cache(100, EvictionPolicy::Lru, 10_000);
+        assert_eq!(memory_estimate(&c), 0);
+        put(&mut c, key(1), 10, 0, 1000).unwrap();
+        assert_eq!(memory_estimate(&c), BYTES_PER_ENTRY);
+        put(&mut c, key(2), 20, 0, 1000).unwrap();
+        assert_eq!(memory_estimate(&c), 2 * BYTES_PER_ENTRY);
+    }
+
+    #[test]
+    fn test_most_accessed_empty_cache_h7() {
+        let c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert!(most_accessed(&c, 5).is_empty());
+    }
+
+    #[test]
+    fn test_least_accessed_empty_cache_h7() {
+        let c = create_cache(10, EvictionPolicy::Lru, 10_000);
+        assert!(least_accessed(&c, 5).is_empty());
+    }
 }

@@ -1,883 +1,729 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useWallet } from '../hooks/useWallet'
-import { useDeviceWallet } from '../hooks/useDeviceWallet'
-import toast from 'react-hot-toast'
+import GlassCard from './ui/GlassCard'
+import PageHero from './ui/PageHero'
+import StatCard from './ui/StatCard'
 
 /**
- * Buy/Sell Page - Fiat On/Off Ramps
- * Supports Venmo, PayPal, Cash App, Zelle, Apple Pay, Google Pay, Bank Transfer, Cards
- * @version 1.0.0
+ * BuySellPage — Polished fiat on/off-ramp.
+ * Buy crypto with Venmo, PayPal, Apple Pay, Credit Card, or Bank Transfer.
+ * Sell crypto back to fiat via the same methods.
+ * 0% protocol fees — VibeSwap never takes a cut.
+ * @version 2.0.0
  */
 
-// Payment methods with their details and support routing
+const PHI = 1.618033988749895
+
+// ============ Payment Methods ============
+
 const PAYMENT_METHODS = [
   {
     id: 'venmo',
     name: 'Venmo',
-    icon: '💜',
-    color: 'bg-[#008CFF]',
-    fee: '1.5%',
-    speed: 'Instant',
-    limit: '$5,000/week',
-    popular: true,
-    support: {
-      url: 'https://help.venmo.com',
-      phone: '1-855-812-4430',
-      hours: '24/7',
-      provider: 'Venmo Support',
-    },
+    icon: '\uD83D\uDC9C',
+    color: '#008CFF',
+    processingTime: 'Instant',
+    dailyLimit: '$5,000',
+    monthlyLimit: '$25,000',
+    fee: '0%',
   },
   {
     id: 'paypal',
     name: 'PayPal',
-    icon: '🅿️',
-    color: 'bg-[#003087]',
-    fee: '2.0%',
-    speed: 'Instant',
-    limit: '$10,000/week',
-    popular: true,
-    support: {
-      url: 'https://www.paypal.com/us/smarthelp/contact-us',
-      phone: '1-888-221-1161',
-      hours: '24/7',
-      provider: 'PayPal Support',
-    },
-  },
-  {
-    id: 'cashapp',
-    name: 'Cash App',
-    icon: '💚',
-    color: 'bg-[#00D632]',
-    fee: '1.5%',
-    speed: 'Instant',
-    limit: '$7,500/week',
-    popular: true,
-    support: {
-      url: 'https://cash.app/help',
-      phone: '1-800-969-1940',
-      hours: '24/7',
-      provider: 'Cash App Support',
-    },
-  },
-  {
-    id: 'zelle',
-    name: 'Zelle',
-    icon: '🟣',
-    color: 'bg-[#6D1ED4]',
-    fee: '0.5%',
-    speed: '1-3 min',
-    limit: '$2,000/day',
-    popular: false,
-    support: {
-      url: 'https://www.zellepay.com/support',
-      phone: 'Contact your bank',
-      hours: '24/7 via bank',
-      provider: 'Your Bank + Zelle',
-    },
+    icon: '\uD83C\uDD7F\uFE0F',
+    color: '#003087',
+    processingTime: 'Instant',
+    dailyLimit: '$10,000',
+    monthlyLimit: '$50,000',
+    fee: '0%',
   },
   {
     id: 'applepay',
     name: 'Apple Pay',
-    icon: '🍎',
-    color: 'bg-black',
-    fee: '2.5%',
-    speed: 'Instant',
-    limit: '$10,000/tx',
-    popular: true,
-    support: {
-      url: 'https://support.apple.com/apple-pay',
-      phone: '1-800-275-2273',
-      hours: '24/7',
-      provider: 'Apple Support',
-    },
+    icon: '\uD83C\uDF4E',
+    color: '#000000',
+    processingTime: 'Instant',
+    dailyLimit: '$10,000',
+    monthlyLimit: '$50,000',
+    fee: '0%',
   },
   {
-    id: 'googlepay',
-    name: 'Google Pay',
-    icon: '🔵',
-    color: 'bg-[#4285F4]',
-    fee: '2.5%',
-    speed: 'Instant',
-    limit: '$10,000/tx',
-    popular: false,
-    support: {
-      url: 'https://support.google.com/googlepay',
-      phone: '1-888-986-7944',
-      hours: '24/7',
-      provider: 'Google Pay Support',
-    },
+    id: 'card',
+    name: 'Credit Card',
+    icon: '\uD83D\uDCB3',
+    color: '#6D1ED4',
+    processingTime: 'Instant',
+    dailyLimit: '$20,000',
+    monthlyLimit: '$100,000',
+    fee: '0%',
   },
   {
     id: 'bank',
     name: 'Bank Transfer',
-    icon: '🏦',
-    color: 'bg-[#1a1a2e]',
-    fee: '0.1%',
-    speed: '1-3 days',
-    limit: '$100,000/tx',
-    popular: false,
-    support: {
-      url: null,
-      phone: 'Contact your bank directly',
-      hours: 'Bank hours',
-      provider: 'Your Bank',
-    },
-  },
-  {
-    id: 'card',
-    name: 'Debit/Credit',
-    icon: '💳',
-    color: 'bg-gradient-to-r from-[#1a1a2e] to-[#2d2d44]',
-    fee: '3.0%',
-    speed: 'Instant',
-    limit: '$20,000/day',
-    popular: false,
-    support: {
-      url: null,
-      phone: 'Contact your card issuer',
-      hours: '24/7 via card issuer',
-      provider: 'Your Card Issuer (Visa/Mastercard/Amex)',
-    },
+    icon: '\uD83C\uDFE6',
+    color: '#1a6b3c',
+    processingTime: '1-3 business days',
+    dailyLimit: '$100,000',
+    monthlyLimit: '$500,000',
+    fee: '0%',
   },
 ]
 
-// Supported cryptocurrencies — prices from CoinGecko global cache
-const CRYPTO_OPTIONS = [
-  { symbol: 'ETH', name: 'Ethereum', icon: '\u27E0' },
-  { symbol: 'BTC', name: 'Bitcoin', icon: '\u20BF' },
-  { symbol: 'USDC', name: 'USD Coin', icon: '$' },
-  { symbol: 'USDT', name: 'Tether', icon: '$' },
-  { symbol: 'SOL', name: 'Solana', icon: '\u25CE' },
-  { symbol: 'MATIC', name: 'Polygon', icon: 'M' },
+// ============ Supported Tokens ============
+
+const TOKENS = [
+  { symbol: 'ETH', name: 'Ethereum', icon: '\u27E0', price: 2800 },
+  { symbol: 'USDC', name: 'USD Coin', icon: '\uD83D\uDFE2', price: 1 },
+  { symbol: 'JUL', name: 'Julius', icon: '\u2726', price: 0.42 },
 ]
 
-function getCryptoPrice(symbol) {
-  const live = window.__vibePriceCache?.[symbol]
-  if (live && live > 0) return live
-  const fb = { ETH: 2800, BTC: 96000, USDC: 1, USDT: 1, SOL: 145, MATIC: 0.35 }
-  return fb[symbol] || 0
+// ============ Mock Recent Purchases ============
+
+const RECENT_PURCHASES = [
+  { id: 1, type: 'buy', token: 'ETH', amount: 0.25, fiat: 700.0, method: 'Venmo', time: '2 min ago', status: 'completed' },
+  { id: 2, type: 'buy', token: 'USDC', amount: 500.0, fiat: 500.0, method: 'Apple Pay', time: '18 min ago', status: 'completed' },
+  { id: 3, type: 'sell', token: 'ETH', amount: 0.1, fiat: 280.0, method: 'PayPal', time: '1 hr ago', status: 'completed' },
+  { id: 4, type: 'buy', token: 'JUL', amount: 1200, fiat: 504.0, method: 'Bank Transfer', time: '3 hr ago', status: 'pending' },
+  { id: 5, type: 'buy', token: 'ETH', amount: 1.0, fiat: 2800.0, method: 'Credit Card', time: '5 hr ago', status: 'completed' },
+]
+
+// ============ Helpers ============
+
+function formatUSD(n) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
 
+function getTokenPrice(symbol) {
+  const live = window.__vibePriceCache?.[symbol]
+  if (live && live > 0) return live
+  return TOKENS.find((t) => t.symbol === symbol)?.price || 0
+}
+
+// ============ Component ============
+
 function BuySellPage() {
-  const { isConnected: isExternalConnected, connect, account: externalAccount } = useWallet()
-  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
-
-  // Combined wallet state - connected if EITHER wallet type is connected
-  const isConnected = isExternalConnected || isDeviceConnected
-  const account = externalAccount || deviceAddress
-
-  const [mode, setMode] = useState('buy') // 'buy' or 'sell'
+  // ---- State ----
+  const [activeTab, setActiveTab] = useState('buy')
   const [amount, setAmount] = useState('')
-  const [selectedCrypto, setSelectedCrypto] = useState(CRYPTO_OPTIONS[0])
-  const [selectedPayment, setSelectedPayment] = useState(null)
-  const [showCryptoSelect, setShowCryptoSelect] = useState(false)
-  const [showPaymentSelect, setShowPaymentSelect] = useState(false)
-  const [paymentHandle, setPaymentHandle] = useState('')
+  const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0])
+  const [selectedToken, setSelectedToken] = useState(TOKENS[0])
+  const [showTokenDropdown, setShowTokenDropdown] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [step, setStep] = useState('amount') // 'amount', 'payment', 'confirm', 'processing', 'complete'
-  const [showSupport, setShowSupport] = useState(false)
+  const [kycStatus] = useState('verified') // mock: 'verified' | 'pending' | 'not_started'
 
-  // Calculate crypto amount from fiat
-  const cryptoAmount = amount && selectedCrypto
-    ? (parseFloat(amount) / getCryptoPrice(selectedCrypto.symbol)).toFixed(6)
-    : '0'
+  // ---- Limits (mock) ----
+  const dailyLimit = 10000
+  const monthlyLimit = 50000
+  const dailyUsed = 1784
+  const monthlyUsed = 12450
 
-  // Calculate fiat from crypto amount (for sell mode)
-  const fiatAmount = amount && selectedCrypto
-    ? (parseFloat(amount) * getCryptoPrice(selectedCrypto.symbol)).toFixed(2)
-    : '0'
+  // ---- Derived values ----
+  const numericAmount = parseFloat(amount) || 0
+  const tokenPrice = getTokenPrice(selectedToken.symbol)
 
-  // Calculate fee
-  const getFee = () => {
-    if (!selectedPayment || !amount) return '0'
-    const feePercent = parseFloat(selectedPayment.fee) / 100
-    return (parseFloat(amount) * feePercent).toFixed(2)
-  }
+  const estimatedTokens = activeTab === 'buy'
+    ? (tokenPrice > 0 ? numericAmount / tokenPrice : 0)
+    : numericAmount
 
-  // Calculate total
-  const getTotal = () => {
-    if (!amount) return '0'
-    const fee = parseFloat(getFee())
-    const base = parseFloat(amount)
-    return mode === 'buy' ? (base + fee).toFixed(2) : (base - fee).toFixed(2)
-  }
+  const estimatedFiat = activeTab === 'sell'
+    ? numericAmount * tokenPrice
+    : numericAmount
 
-  // Handle transaction
-  const handleTransaction = async () => {
-    if (!isConnected) {
-      connect()
-      return
-    }
-
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Enter an amount')
-      return
-    }
-
-    if (!selectedPayment) {
-      toast.error('Select a payment method')
-      return
-    }
-
+  // ---- Handlers ----
+  const handleSubmit = async () => {
+    if (numericAmount <= 0) return
     setIsProcessing(true)
-    setStep('processing')
-
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    if (mode === 'buy') {
-      toast.success(`Done! Added $${amount} to your account`)
-    } else {
-      toast.success(`Done! Sent $${fiatAmount} to your ${selectedPayment?.name}`)
-    }
-
-    setStep('complete')
+    await new Promise((r) => setTimeout(r, 1800))
     setIsProcessing(false)
+    setAmount('')
   }
 
-  // Reset flow
-  const resetFlow = () => {
-    setAmount('')
-    setSelectedPayment(null)
-    setPaymentHandle('')
-    setStep('amount')
+  const handleQuickAmount = (val) => setAmount(String(val))
+
+  // ---- KYC badge ----
+  const kycConfig = {
+    verified: { label: 'Verified', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', dot: 'bg-green-400' },
+    pending: { label: 'Pending', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', dot: 'bg-amber-400' },
+    not_started: { label: 'Not Started', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', dot: 'bg-red-400' },
   }
+  const kyc = kycConfig[kycStatus]
+
+  // ---- Animation presets ----
+  const fadeUp = {
+    initial: { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 1 / (PHI * PHI), ease: [0.25, 0.1, 1 / PHI, 1] },
+  }
+
+  const stagger = (i) => ({
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { delay: i * (1 / (PHI * PHI * PHI * 4)), duration: 1 / (PHI * PHI), ease: [0.25, 0.1, 1 / PHI, 1] },
+  })
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Add & Withdraw Money</h1>
-        <p className="text-black-400 mt-1">
-          Use Venmo, PayPal, Cash App, or your bank
-        </p>
-      </div>
-
-      {/* Mode Toggle */}
-      <div className="flex p-1 rounded-xl bg-black-800 mb-6">
-        <button
-          onClick={() => setMode('buy')}
-          className={`flex-1 py-2.5 rounded-lg font-medium transition-all ${
-            mode === 'buy'
-              ? 'bg-matrix-500 text-black-900'
-              : 'text-black-400 hover:text-white'
-          }`}
-        >
-          Add Money
-        </button>
-        <button
-          onClick={() => setMode('sell')}
-          className={`flex-1 py-2.5 rounded-lg font-medium transition-all ${
-            mode === 'sell'
-              ? 'bg-terminal-500 text-black-900'
-              : 'text-black-400 hover:text-white'
-          }`}
-        >
-          Cash Out
-        </button>
-      </div>
-
-      {/* Main Card */}
-      <div className="bg-black-800 rounded-2xl border border-black-700 p-4">
-        <AnimatePresence mode="wait">
-          {/* Step 1: Amount Entry */}
-          {step === 'amount' && (
-            <motion.div
-              key="amount"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              {/* Amount Input */}
-              <div>
-                <label className="text-sm text-black-400 mb-2 block">
-                  {mode === 'buy' ? 'You pay' : 'You sell'}
-                </label>
-                <div className="flex items-center space-x-3 p-4 rounded-xl bg-black-700 border border-black-600">
-                  {mode === 'buy' ? (
-                    <>
-                      <span className="text-2xl">$</span>
-                      <input
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="flex-1 bg-transparent text-2xl font-medium outline-none placeholder-black-500"
-                      />
-                      <span className="text-black-400">USD</span>
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="flex-1 bg-transparent text-2xl font-medium outline-none placeholder-black-500"
-                      />
-                      <button
-                        onClick={() => setShowCryptoSelect(true)}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-black-600 hover:bg-black-500 transition-colors"
-                      >
-                        <span className="text-xl">{selectedCrypto.icon}</span>
-                        <span className="font-medium">{selectedCrypto.symbol}</span>
-                        <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Swap Arrow */}
-              <div className="flex justify-center">
-                <div className="p-2 rounded-full bg-black-700">
-                  <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Receive Amount */}
-              <div>
-                <label className="text-sm text-black-400 mb-2 block">
-                  {mode === 'buy' ? 'You receive' : 'You get'}
-                </label>
-                <div className="flex items-center space-x-3 p-4 rounded-xl bg-black-700/50 border border-black-600">
-                  {mode === 'buy' ? (
-                    <>
-                      <span className="text-2xl text-black-300">{cryptoAmount}</span>
-                      <div className="flex-1" />
-                      <button
-                        onClick={() => setShowCryptoSelect(true)}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-black-600 hover:bg-black-500 transition-colors"
-                      >
-                        <span className="text-xl">{selectedCrypto.icon}</span>
-                        <span className="font-medium">{selectedCrypto.symbol}</span>
-                        <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-2xl">$</span>
-                      <span className="text-2xl text-black-300">{fiatAmount}</span>
-                      <div className="flex-1" />
-                      <span className="text-black-400">USD</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Amounts */}
-              {mode === 'buy' && (
-                <div className="grid grid-cols-4 gap-2">
-                  {['50', '100', '250', '500'].map((preset) => (
-                    <button
-                      key={preset}
-                      onClick={() => setAmount(preset)}
-                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                        amount === preset
-                          ? 'bg-matrix-500/20 text-matrix-400 border border-matrix-500/30'
-                          : 'bg-black-700 text-black-300 hover:bg-black-600'
-                      }`}
-                    >
-                      ${preset}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Price Info */}
-              <div className="p-3 rounded-lg bg-black-700/50 text-sm">
-                <div className="flex justify-between text-black-400">
-                  <span>1 {selectedCrypto.symbol}</span>
-                  <span>${getCryptoPrice(selectedCrypto.symbol).toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Continue Button */}
-              <button
-                onClick={() => setStep('payment')}
-                disabled={!amount || parseFloat(amount) <= 0}
-                className={`w-full py-3.5 rounded-xl font-semibold transition-colors ${
-                  mode === 'buy'
-                    ? 'bg-matrix-500 hover:bg-matrix-400 disabled:bg-black-600 text-black-900 disabled:text-black-500'
-                    : 'bg-terminal-500 hover:bg-terminal-400 disabled:bg-black-600 text-black-900 disabled:text-black-500'
-                }`}
-              >
-                {!amount ? 'Enter Amount' : 'Choose Payment Method'}
-              </button>
-            </motion.div>
-          )}
-
-          {/* Step 2: Payment Method Selection */}
-          {step === 'payment' && (
-            <motion.div
-              key="payment"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <button
-                  onClick={() => setStep('amount')}
-                  className="flex items-center space-x-1 text-black-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Back</span>
-                </button>
-                <span className="text-sm text-black-400">Step 2 of 3</span>
-              </div>
-
-              <h3 className="text-lg font-semibold">
-                {mode === 'buy' ? 'Pay with' : 'Receive funds via'}
-              </h3>
-
-              {/* Popular Methods */}
-              <div className="space-y-2">
-                <span className="text-xs text-black-500 uppercase">Popular</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {PAYMENT_METHODS.filter(p => p.popular).map((method) => (
-                    <button
-                      key={method.id}
-                      onClick={() => setSelectedPayment(method)}
-                      className={`p-4 rounded-xl border transition-all text-left ${
-                        selectedPayment?.id === method.id
-                          ? 'border-matrix-500 bg-matrix-500/10'
-                          : 'border-black-600 bg-black-700/50 hover:border-black-500'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{method.icon}</span>
-                        <div>
-                          <div className="font-medium">{method.name}</div>
-                          <div className="text-xs text-black-500">{method.fee} fee</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Other Methods */}
-              <div className="space-y-2">
-                <span className="text-xs text-black-500 uppercase">More Options</span>
-                <div className="space-y-2">
-                  {PAYMENT_METHODS.filter(p => !p.popular).map((method) => (
-                    <button
-                      key={method.id}
-                      onClick={() => setSelectedPayment(method)}
-                      className={`w-full p-3 sm:p-4 rounded-xl border transition-all text-left flex items-center justify-between gap-2 ${
-                        selectedPayment?.id === method.id
-                          ? 'border-matrix-500 bg-matrix-500/10'
-                          : 'border-black-600 bg-black-700/50 hover:border-black-500'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <span className="text-2xl flex-shrink-0">{method.icon}</span>
-                        <div className="min-w-0">
-                          <div className="font-medium">{method.name}</div>
-                          <div className="text-xs text-black-500">{method.speed} · {method.fee} fee</div>
-                        </div>
-                      </div>
-                      <span className="text-xs text-black-500 flex-shrink-0 hidden sm:block">{method.limit}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Continue Button */}
-              <button
-                onClick={() => setStep('confirm')}
-                disabled={!selectedPayment}
-                className={`w-full py-3.5 rounded-xl font-semibold transition-colors ${
-                  mode === 'buy'
-                    ? 'bg-matrix-500 hover:bg-matrix-400 disabled:bg-black-600 text-black-900 disabled:text-black-500'
-                    : 'bg-terminal-500 hover:bg-terminal-400 disabled:bg-black-600 text-black-900 disabled:text-black-500'
-                }`}
-              >
-                {selectedPayment ? `Continue with ${selectedPayment.name}` : 'Select Payment Method'}
-              </button>
-            </motion.div>
-          )}
-
-          {/* Step 3: Confirmation */}
-          {step === 'confirm' && (
-            <motion.div
-              key="confirm"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <button
-                  onClick={() => setStep('payment')}
-                  className="flex items-center space-x-1 text-black-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Back</span>
-                </button>
-                <span className="text-sm text-black-400">Step 3 of 3</span>
-              </div>
-
-              <h3 className="text-lg font-semibold">Confirm Order</h3>
-
-              {/* Order Summary */}
-              <div className="p-4 rounded-xl bg-black-700/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-black-400">{mode === 'buy' ? 'You pay' : 'You sell'}</span>
-                  <span className="font-medium">
-                    {mode === 'buy' ? `$${amount}` : `${amount} ${selectedCrypto.symbol}`}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-black-400">Payment method</span>
-                  <div className="flex items-center space-x-2">
-                    <span>{selectedPayment?.icon}</span>
-                    <span className="font-medium">{selectedPayment?.name}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-black-400">Fee ({selectedPayment?.fee})</span>
-                  <span className="text-black-300">${getFee()}</span>
-                </div>
-                <div className="border-t border-black-600 my-2" />
-                <div className="flex items-center justify-between">
-                  <span className="text-black-400">{mode === 'buy' ? 'You receive' : 'You get'}</span>
-                  <span className="font-bold text-lg">
-                    {mode === 'buy'
-                      ? `${cryptoAmount} ${selectedCrypto.symbol}`
-                      : `$${getTotal()}`
-                    }
-                  </span>
-                </div>
-              </div>
-
-              {/* Payment Handle Input (for P2P methods) */}
-              {['venmo', 'paypal', 'cashapp', 'zelle'].includes(selectedPayment?.id) && (
-                <div>
-                  <label className="text-sm text-black-400 mb-2 block">
-                    {mode === 'buy' ? `Your ${selectedPayment.name} username` : `Recipient's ${selectedPayment.name}`}
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentHandle}
-                    onChange={(e) => setPaymentHandle(e.target.value)}
-                    placeholder={
-                      selectedPayment.id === 'venmo' ? '@username' :
-                      selectedPayment.id === 'cashapp' ? '$cashtag' :
-                      selectedPayment.id === 'zelle' ? 'email or phone' :
-                      'email'
-                    }
-                    className="w-full p-3 rounded-xl bg-black-700 border border-black-600 outline-none focus:border-matrix-500 transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* Wallet Address (for buy mode) */}
-              {mode === 'buy' && (
-                <div className="p-3 rounded-xl bg-matrix-500/10 border border-matrix-500/20">
-                  <div className="flex items-center space-x-2 text-sm">
-                    <span className="text-matrix-400">Receiving wallet:</span>
-                    <span className="font-mono text-black-300">
-                      {isConnected ? `${account?.slice(0, 8)}...${account?.slice(-6)}` : 'Connect wallet'}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Terms */}
-              <p className="text-xs text-black-500 text-center">
-                By continuing, you agree to our terms and acknowledge the {selectedPayment?.fee} processing fee.
-              </p>
-
-              {/* Confirm Button */}
-              <button
-                onClick={handleTransaction}
-                disabled={isProcessing || (['venmo', 'paypal', 'cashapp', 'zelle'].includes(selectedPayment?.id) && !paymentHandle)}
-                className={`w-full py-3.5 rounded-xl font-semibold transition-colors ${
-                  mode === 'buy'
-                    ? 'bg-matrix-500 hover:bg-matrix-400 disabled:bg-black-600 text-black-900 disabled:text-black-500'
-                    : 'bg-terminal-500 hover:bg-terminal-400 disabled:bg-black-600 text-black-900 disabled:text-black-500'
-                }`}
-              >
-                {!isConnected
-                  ? 'Get Started'
-                  : mode === 'buy'
-                    ? `Add $${amount}`
-                    : `Cash Out $${getTotal()}`
-                }
-              </button>
-
-              {/* Contextual Support Link */}
-              {selectedPayment && (
-                <div className="text-center mt-3">
-                  <p className="text-xs text-black-500 mb-1">Having issues with {selectedPayment.name}?</p>
-                  {selectedPayment.support.url ? (
-                    <a
-                      href={selectedPayment.support.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-terminal-500 hover:text-terminal-400 transition-colors"
-                    >
-                      Contact {selectedPayment.support.provider} →
-                    </a>
-                  ) : (
-                    <span className="text-xs text-black-400">{selectedPayment.support.phone}</span>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Processing State */}
-          {step === 'processing' && (
-            <motion.div
-              key="processing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="py-12 text-center"
-            >
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black-700 flex items-center justify-center">
-                <svg className="w-8 h-8 text-matrix-500 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Processing</h3>
-              <p className="text-black-400 text-sm">
-                {mode === 'buy'
-                  ? `Adding $${amount} to your account...`
-                  : `Sending $${fiatAmount} to your ${selectedPayment?.name}...`
-                }
-              </p>
-            </motion.div>
-          )}
-
-          {/* Complete State */}
-          {step === 'complete' && (
-            <motion.div
-              key="complete"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="py-8 text-center"
-            >
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-matrix-500/20 border border-matrix-500/30 flex items-center justify-center">
-                <svg className="w-10 h-10 text-matrix-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">
-                {mode === 'buy' ? 'Money Added!' : 'Cash Out Complete!'}
-              </h3>
-              <p className="text-black-400 mb-6">
-                {mode === 'buy'
-                  ? `$${amount} has been added to your account`
-                  : `$${getTotal()} is on its way to your ${selectedPayment?.name}`
-                }
-              </p>
-
-              {/* Transaction Details */}
-              <div className="p-4 rounded-xl bg-black-700/50 text-left mb-6 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-black-400">Amount</span>
-                  <span>{mode === 'buy' ? `${cryptoAmount} ${selectedCrypto.symbol}` : `$${getTotal()}`}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-black-400">Via</span>
-                  <span>{selectedPayment?.name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-black-400">Fee</span>
-                  <span>${getFee()}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={resetFlow}
-                className="w-full py-3 rounded-xl bg-black-700 hover:bg-black-600 font-medium transition-colors"
-              >
-                Done
-              </button>
-
-              {/* Support Link for completed transaction */}
-              {selectedPayment && (
-                <div className="text-center mt-4 p-3 rounded-xl bg-black-700/30">
-                  <p className="text-xs text-black-500 mb-1">Questions about your transaction?</p>
-                  {selectedPayment.support.url ? (
-                    <a
-                      href={selectedPayment.support.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-terminal-500 hover:text-terminal-400 transition-colors"
-                    >
-                      {selectedPayment.support.provider} ({selectedPayment.support.hours}) →
-                    </a>
-                  ) : (
-                    <span className="text-xs text-black-400">{selectedPayment.support.phone}</span>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Trust Badges */}
-      <div className="mt-6 flex items-center justify-center flex-wrap gap-2 sm:gap-4">
-        <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black-800 border border-black-700">
-          <svg className="w-4 h-4 text-matrix-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          <span className="text-xs text-black-300">Bank-level encryption</span>
+    <div className="min-h-screen">
+      {/* ============ Hero ============ */}
+      <PageHero
+        category="defi"
+        title="Buy & Sell Crypto"
+        subtitle="Use Venmo, PayPal, Apple Pay, or bank transfer"
+        badge="Live"
+        badgeColor="#22c55e"
+      >
+        {/* KYC Badge */}
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono ${kyc.bg} border ${kyc.border}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${kyc.dot} ${kycStatus === 'pending' ? 'animate-pulse' : ''}`} />
+          <span className={kyc.color}>KYC: {kyc.label}</span>
         </div>
-        <button
-          onClick={() => setShowSupport(true)}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black-800 border border-black-700 hover:border-terminal-500/50 transition-colors"
-        >
-          <svg className="w-4 h-4 text-terminal-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-          <span className="text-xs text-black-300">Need help?</span>
-        </button>
-      </div>
+      </PageHero>
 
-      {/* Crypto Select Modal */}
-      {showCryptoSelect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowCryptoSelect(false)} />
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="relative w-full max-w-sm bg-black-800 rounded-2xl border border-black-600 shadow-xl max-h-[80vh] overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-4 border-b border-black-700">
-              <h3 className="font-semibold">Select Crypto</h3>
-              <button
-                onClick={() => setShowCryptoSelect(false)}
-                className="p-2 rounded-lg hover:bg-black-700 transition-colors"
-              >
-                <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="overflow-y-auto allow-scroll">
-              {CRYPTO_OPTIONS.map((crypto) => (
-                <button
-                  key={crypto.symbol}
-                  onClick={() => {
-                    setSelectedCrypto(crypto)
-                    setShowCryptoSelect(false)
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-3 hover:bg-black-700 transition-colors ${
-                    selectedCrypto.symbol === crypto.symbol ? 'bg-matrix-500/10' : ''
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{crypto.icon}</span>
-                    <div className="text-left">
-                      <div className="font-medium">{crypto.symbol}</div>
-                      <div className="text-sm text-black-400">{crypto.name}</div>
-                    </div>
-                  </div>
-                  <span className="text-black-300">${getCryptoPrice(crypto.symbol).toLocaleString()}</span>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <div className="max-w-7xl mx-auto px-4 pb-12">
+        {/* ============ Stats Row ============ */}
+        <motion.div {...fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          <StatCard label="Daily Limit" value={dailyLimit} prefix="$" decimals={0} size="sm" />
+          <StatCard label="Daily Used" value={dailyUsed} prefix="$" decimals={0} size="sm" />
+          <StatCard label="Monthly Limit" value={monthlyLimit} prefix="$" decimals={0} size="sm" />
+          <StatCard label="Monthly Used" value={monthlyUsed} prefix="$" decimals={0} size="sm" />
+        </motion.div>
 
-      {/* Support Modal - Routes to payment provider support */}
-      {showSupport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSupport(false)} />
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="relative w-full max-w-md bg-black-800 rounded-2xl border border-black-600 shadow-xl max-h-[90vh] overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-4 border-b border-black-700">
-              <h3 className="font-semibold">Get Help</h3>
-              <button
-                onClick={() => setShowSupport(false)}
-                className="p-2 rounded-lg hover:bg-black-700 transition-colors"
-              >
-                <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-4 overflow-y-auto allow-scroll">
-              {/* Explainer */}
-              <div className="p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/20 mb-4">
-                <p className="text-sm text-black-300">
-                  Payment support is handled directly by each provider's dedicated team. Select your payment method below for 24/7 assistance.
-                </p>
-              </div>
-
-              {/* Payment Provider Support Links */}
-              <div className="space-y-3">
-                {PAYMENT_METHODS.map((method) => (
-                  <div
-                    key={method.id}
-                    className="p-4 rounded-xl bg-black-700/50 border border-black-600"
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ============ Main Buy/Sell Card ============ */}
+          <div className="lg:col-span-2 space-y-6">
+            <GlassCard glowColor="matrix" spotlight className="p-6">
+              {/* Tab Toggle */}
+              <div className="flex p-1 rounded-xl bg-black-900/60 mb-6">
+                {['buy', 'sell'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => { setActiveTab(tab); setAmount('') }}
+                    className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 ${
+                      activeTab === tab
+                        ? tab === 'buy'
+                          ? 'bg-green-500 text-black-900 shadow-lg shadow-green-500/20'
+                          : 'bg-cyan-500 text-black-900 shadow-lg shadow-cyan-500/20'
+                        : 'text-black-400 hover:text-white'
+                    }`}
                   >
-                    <div className="flex items-center space-x-3 mb-3">
-                      <span className="text-2xl">{method.icon}</span>
-                      <div>
-                        <div className="font-medium">{method.name}</div>
-                        <div className="text-xs text-black-500">{method.support.provider}</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {method.support.url && (
-                        <a
-                          href={method.support.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 hover:bg-black-500 transition-colors text-sm"
-                        >
-                          <span className="text-black-300">Help Center</span>
-                          <svg className="w-4 h-4 text-terminal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                      )}
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm gap-2">
-                        <span className="text-black-300 flex-shrink-0">Phone</span>
-                        <span className="text-black-200 font-mono text-xs text-right truncate">{method.support.phone}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-black-600 text-sm">
-                        <span className="text-black-300">Hours</span>
-                        <span className="text-terminal-400">{method.support.hours}</span>
-                      </div>
-                    </div>
-                  </div>
+                    {tab === 'buy' ? 'Buy' : 'Sell'}
+                  </button>
                 ))}
               </div>
 
-              {/* Disclaimer */}
-              <p className="text-xs text-black-500 text-center mt-4">
-                VibeSwap facilitates transactions but does not handle payment processing. All payment-related support is provided by the respective payment provider.
-              </p>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, x: activeTab === 'buy' ? -16 : 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: activeTab === 'buy' ? 16 : -16 }}
+                  transition={{ duration: 1 / (PHI * PHI * PHI), ease: [0.25, 0.1, 1 / PHI, 1] }}
+                >
+                  {activeTab === 'buy' ? (
+                    /* ======== BUY FLOW ======== */
+                    <div className="space-y-5">
+                      {/* Amount Input (USD) */}
+                      <div>
+                        <label className="text-xs font-mono text-black-500 uppercase tracking-wider mb-2 block">You Pay</label>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-black-800/80 border border-black-700 focus-within:border-green-500/40 transition-colors">
+                          <span className="text-2xl font-bold text-black-300">$</span>
+                          <input
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="0.00"
+                            className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder-black-600 min-w-0"
+                          />
+                          <span className="text-sm font-mono text-black-500">USD</span>
+                        </div>
+                        {/* Quick amounts */}
+                        <div className="flex gap-2 mt-3">
+                          {[50, 100, 250, 500, 1000].map((val) => (
+                            <button
+                              key={val}
+                              onClick={() => handleQuickAmount(val)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                                amount === String(val)
+                                  ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                                  : 'bg-black-800 text-black-400 border border-black-700 hover:border-black-600'
+                              }`}
+                            >
+                              ${val}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Payment Method Selector */}
+                      <div>
+                        <label className="text-xs font-mono text-black-500 uppercase tracking-wider mb-2 block">Pay With</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {PAYMENT_METHODS.map((method) => (
+                            <button
+                              key={method.id}
+                              onClick={() => setSelectedPayment(method)}
+                              className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${
+                                selectedPayment.id === method.id
+                                  ? 'border-green-500/40 bg-green-500/8 shadow-sm shadow-green-500/10'
+                                  : 'border-black-700 bg-black-800/50 hover:border-black-600'
+                              }`}
+                            >
+                              <span className="text-xl flex-shrink-0">{method.icon}</span>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium truncate">{method.name}</div>
+                                <div className="text-[10px] text-black-500">{method.processingTime}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Token Selector */}
+                      <div>
+                        <label className="text-xs font-mono text-black-500 uppercase tracking-wider mb-2 block">You Receive</label>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-black-800/80 border border-black-700">
+                          <span className="text-2xl font-bold text-green-400">
+                            {estimatedTokens > 0 ? estimatedTokens.toFixed(6) : '0.00'}
+                          </span>
+                          <div className="flex-1" />
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowTokenDropdown(!showTokenDropdown)}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black-700 hover:bg-black-600 transition-colors border border-black-600"
+                            >
+                              <span className="text-lg">{selectedToken.icon}</span>
+                              <span className="font-semibold text-sm">{selectedToken.symbol}</span>
+                              <svg className="w-3.5 h-3.5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {showTokenDropdown && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="absolute right-0 top-full mt-1 w-48 bg-black-800 border border-black-600 rounded-xl shadow-xl z-30 overflow-hidden"
+                              >
+                                {TOKENS.map((token) => (
+                                  <button
+                                    key={token.symbol}
+                                    onClick={() => { setSelectedToken(token); setShowTokenDropdown(false) }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-black-700 transition-colors ${
+                                      selectedToken.symbol === token.symbol ? 'bg-green-500/10' : ''
+                                    }`}
+                                  >
+                                    <span className="text-lg">{token.icon}</span>
+                                    <div>
+                                      <div className="text-sm font-medium">{token.symbol}</div>
+                                      <div className="text-[10px] text-black-500">{token.name}</div>
+                                    </div>
+                                    <span className="ml-auto text-xs text-black-400">{formatUSD(getTokenPrice(token.symbol))}</span>
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Rate + Fees */}
+                      <div className="p-3 rounded-xl bg-black-800/40 border border-black-700/50 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-black-500">Rate</span>
+                          <span className="text-black-300 font-mono">1 {selectedToken.symbol} = {formatUSD(tokenPrice)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-black-500">Protocol Fee</span>
+                          <span className="text-green-400 font-mono">0% (free)</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-black-500">Estimated Total</span>
+                          <span className="text-white font-bold font-mono">{formatUSD(numericAmount)}</span>
+                        </div>
+                      </div>
+
+                      {/* Buy Button */}
+                      <motion.button
+                        onClick={handleSubmit}
+                        disabled={numericAmount <= 0 || isProcessing}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full py-4 rounded-xl font-bold text-base transition-all bg-green-500 hover:bg-green-400 disabled:bg-black-700 text-black-900 disabled:text-black-500 shadow-lg shadow-green-500/20 disabled:shadow-none"
+                      >
+                        {isProcessing ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Processing...
+                          </span>
+                        ) : numericAmount > 0 ? (
+                          `Buy ${estimatedTokens.toFixed(4)} ${selectedToken.symbol}`
+                        ) : (
+                          'Enter Amount'
+                        )}
+                      </motion.button>
+                    </div>
+                  ) : (
+                    /* ======== SELL FLOW ======== */
+                    <div className="space-y-5">
+                      {/* Token + Amount Input */}
+                      <div>
+                        <label className="text-xs font-mono text-black-500 uppercase tracking-wider mb-2 block">You Sell</label>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-black-800/80 border border-black-700 focus-within:border-cyan-500/40 transition-colors">
+                          <input
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="0.00"
+                            className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder-black-600 min-w-0"
+                          />
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowTokenDropdown(!showTokenDropdown)}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black-700 hover:bg-black-600 transition-colors border border-black-600"
+                            >
+                              <span className="text-lg">{selectedToken.icon}</span>
+                              <span className="font-semibold text-sm">{selectedToken.symbol}</span>
+                              <svg className="w-3.5 h-3.5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {showTokenDropdown && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="absolute right-0 top-full mt-1 w-48 bg-black-800 border border-black-600 rounded-xl shadow-xl z-30 overflow-hidden"
+                              >
+                                {TOKENS.map((token) => (
+                                  <button
+                                    key={token.symbol}
+                                    onClick={() => { setSelectedToken(token); setShowTokenDropdown(false) }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-black-700 transition-colors ${
+                                      selectedToken.symbol === token.symbol ? 'bg-cyan-500/10' : ''
+                                    }`}
+                                  >
+                                    <span className="text-lg">{token.icon}</span>
+                                    <div>
+                                      <div className="text-sm font-medium">{token.symbol}</div>
+                                      <div className="text-[10px] text-black-500">{token.name}</div>
+                                    </div>
+                                    <span className="ml-auto text-xs text-black-400">{formatUSD(getTokenPrice(token.symbol))}</span>
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Receive Method Selector */}
+                      <div>
+                        <label className="text-xs font-mono text-black-500 uppercase tracking-wider mb-2 block">Receive To</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {PAYMENT_METHODS.map((method) => (
+                            <button
+                              key={method.id}
+                              onClick={() => setSelectedPayment(method)}
+                              className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${
+                                selectedPayment.id === method.id
+                                  ? 'border-cyan-500/40 bg-cyan-500/8 shadow-sm shadow-cyan-500/10'
+                                  : 'border-black-700 bg-black-800/50 hover:border-black-600'
+                              }`}
+                            >
+                              <span className="text-xl flex-shrink-0">{method.icon}</span>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium truncate">{method.name}</div>
+                                <div className="text-[10px] text-black-500">{method.processingTime}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Estimated Payout */}
+                      <div>
+                        <label className="text-xs font-mono text-black-500 uppercase tracking-wider mb-2 block">Estimated Payout</label>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-black-800/80 border border-black-700">
+                          <span className="text-2xl font-bold text-cyan-400">
+                            {estimatedFiat > 0 ? formatUSD(estimatedFiat) : '$0.00'}
+                          </span>
+                          <div className="flex-1" />
+                          <span className="text-sm font-mono text-black-500">USD</span>
+                        </div>
+                      </div>
+
+                      {/* Rate + Fees */}
+                      <div className="p-3 rounded-xl bg-black-800/40 border border-black-700/50 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-black-500">Rate</span>
+                          <span className="text-black-300 font-mono">1 {selectedToken.symbol} = {formatUSD(tokenPrice)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-black-500">Protocol Fee</span>
+                          <span className="text-green-400 font-mono">0% (free)</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-black-500">You Receive</span>
+                          <span className="text-white font-bold font-mono">{estimatedFiat > 0 ? formatUSD(estimatedFiat) : '$0.00'}</span>
+                        </div>
+                      </div>
+
+                      {/* Sell Button */}
+                      <motion.button
+                        onClick={handleSubmit}
+                        disabled={numericAmount <= 0 || isProcessing}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full py-4 rounded-xl font-bold text-base transition-all bg-cyan-500 hover:bg-cyan-400 disabled:bg-black-700 text-black-900 disabled:text-black-500 shadow-lg shadow-cyan-500/20 disabled:shadow-none"
+                      >
+                        {isProcessing ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Processing...
+                          </span>
+                        ) : numericAmount > 0 ? (
+                          `Sell ${numericAmount} ${selectedToken.symbol} for ${formatUSD(estimatedFiat)}`
+                        ) : (
+                          'Enter Amount'
+                        )}
+                      </motion.button>
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </GlassCard>
+
+            {/* ============ Payment Method Cards ============ */}
+            <div>
+              <h2 className="text-lg font-bold mb-4">Payment Methods</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {PAYMENT_METHODS.map((method, i) => (
+                  <motion.div key={method.id} {...stagger(i)}>
+                    <GlassCard hover className="p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                          style={{ backgroundColor: method.color + '22' }}
+                        >
+                          {method.icon}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-sm">{method.name}</div>
+                          <div className="text-[10px] text-green-400 font-mono">0% fee</div>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-black-500">Processing</span>
+                          <span className="text-black-300">{method.processingTime}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-black-500">Daily Limit</span>
+                          <span className="text-black-300">{method.dailyLimit}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-black-500">Monthly Limit</span>
+                          <span className="text-black-300">{method.monthlyLimit}</span>
+                        </div>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
+                ))}
+              </div>
             </div>
-          </motion.div>
+
+            {/* ============ Recent Purchases Table ============ */}
+            <div>
+              <h2 className="text-lg font-bold mb-4">Recent Transactions</h2>
+              <GlassCard className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-black-700/50">
+                        <th className="text-left px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">Type</th>
+                        <th className="text-left px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">Token</th>
+                        <th className="text-right px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">Amount</th>
+                        <th className="text-right px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">USD</th>
+                        <th className="text-left px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">Method</th>
+                        <th className="text-left px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">Time</th>
+                        <th className="text-right px-4 py-3 text-xs font-mono text-black-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {RECENT_PURCHASES.map((tx, i) => (
+                        <motion.tr
+                          key={tx.id}
+                          {...stagger(i)}
+                          className="border-b border-black-800/50 last:border-0 hover:bg-black-800/30 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono ${
+                              tx.type === 'buy'
+                                ? 'bg-green-500/10 text-green-400'
+                                : 'bg-cyan-500/10 text-cyan-400'
+                            }`}>
+                              {tx.type === 'buy' ? '\u2191' : '\u2193'} {tx.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-medium">{tx.token}</td>
+                          <td className="px-4 py-3 text-right font-mono text-black-300">{tx.amount}</td>
+                          <td className="px-4 py-3 text-right font-mono text-black-300">{formatUSD(tx.fiat)}</td>
+                          <td className="px-4 py-3 text-black-400">{tx.method}</td>
+                          <td className="px-4 py-3 text-black-500 text-xs">{tx.time}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                              tx.status === 'completed' ? 'bg-green-400' : 'bg-amber-400 animate-pulse'
+                            }`} />
+                            <span className={`text-xs font-mono ${
+                              tx.status === 'completed' ? 'text-green-400' : 'text-amber-400'
+                            }`}>
+                              {tx.status}
+                            </span>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+
+          {/* ============ Sidebar ============ */}
+          <div className="space-y-6">
+            {/* KYC Status Card */}
+            <motion.div {...fadeUp}>
+              <GlassCard glowColor={kycStatus === 'verified' ? 'matrix' : 'warning'} className="p-5">
+                <h3 className="text-sm font-bold mb-3">Identity Verification</h3>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${kyc.bg} border ${kyc.border}`}>
+                    {kycStatus === 'verified' ? (
+                      <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    ) : kycStatus === 'pending' ? (
+                      <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <div className={`font-bold ${kyc.color}`}>{kyc.label}</div>
+                    <div className="text-[10px] text-black-500">
+                      {kycStatus === 'verified'
+                        ? 'Full access to all features'
+                        : kycStatus === 'pending'
+                        ? 'Review in progress (1-2 days)'
+                        : 'Complete KYC to unlock higher limits'}
+                    </div>
+                  </div>
+                </div>
+                {kycStatus !== 'verified' && (
+                  <button className="w-full py-2 rounded-lg bg-black-700 hover:bg-black-600 text-sm font-medium transition-colors border border-black-600">
+                    {kycStatus === 'pending' ? 'Check Status' : 'Start Verification'}
+                  </button>
+                )}
+              </GlassCard>
+            </motion.div>
+
+            {/* Limits Display */}
+            <motion.div {...fadeUp}>
+              <GlassCard className="p-5">
+                <h3 className="text-sm font-bold mb-4">Your Limits</h3>
+                {/* Daily */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-black-500">Daily</span>
+                    <span className="text-black-300 font-mono">{formatUSD(dailyUsed)} / {formatUSD(dailyLimit)}</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-black-800 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(dailyUsed / dailyLimit) * 100}%` }}
+                      transition={{ duration: 1 / PHI, ease: [0.25, 0.1, 1 / PHI, 1] }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-black-500 mt-1">
+                    {formatUSD(dailyLimit - dailyUsed)} remaining today
+                  </div>
+                </div>
+                {/* Monthly */}
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-black-500">Monthly</span>
+                    <span className="text-black-300 font-mono">{formatUSD(monthlyUsed)} / {formatUSD(monthlyLimit)}</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-black-800 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-400"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(monthlyUsed / monthlyLimit) * 100}%` }}
+                      transition={{ duration: 1 / PHI, ease: [0.25, 0.1, 1 / PHI, 1], delay: 0.1 }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-black-500 mt-1">
+                    {formatUSD(monthlyLimit - monthlyUsed)} remaining this month
+                  </div>
+                </div>
+              </GlassCard>
+            </motion.div>
+
+            {/* Trust Indicators */}
+            <motion.div {...fadeUp}>
+              <GlassCard glowColor="matrix" className="p-5">
+                <h3 className="text-sm font-bold mb-3">Why VibeSwap</h3>
+                <div className="space-y-3">
+                  {[
+                    { icon: (
+                        <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      ), label: '0% protocol fees', desc: 'We never take a cut' },
+                    { icon: (
+                        <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      ), label: 'Bank-grade encryption', desc: 'End-to-end secured' },
+                    { icon: (
+                        <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      ), label: 'Instant settlement', desc: 'No waiting for confirmations' },
+                    { icon: (
+                        <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      ), label: 'Non-custodial', desc: 'Your keys, your crypto' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex-shrink-0">{item.icon}</div>
+                      <div>
+                        <div className="text-sm font-medium">{item.label}</div>
+                        <div className="text-[10px] text-black-500">{item.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-3 border-t border-black-700/50">
+                  <p className="text-[10px] text-black-500 text-center leading-relaxed">
+                    Powered by VibeSwap -- 0% protocol fees, bank-grade encryption
+                  </p>
+                </div>
+              </GlassCard>
+            </motion.div>
+          </div>
         </div>
+      </div>
+
+      {/* Click-away overlay for token dropdown */}
+      {showTokenDropdown && (
+        <div className="fixed inset-0 z-20" onClick={() => setShowTokenDropdown(false)} />
       )}
     </div>
   )

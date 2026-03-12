@@ -55,8 +55,10 @@ export const config = {
   maxTokens: 4096,
   // Rate limit: max Claude API calls per user per minute
   rateLimitPerMinute: parseInt(process.env.RATE_LIMIT_PER_MINUTE, 10) || 5,
-  // Auto-sync: pull from git + reload context (ms, default 10s)
-  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL, 10) || 10000,
+  // Auto-sync: pull from git + reload context (ms, default 60s)
+  // Was 10s but that's aggressive — git pull every 10s creates unnecessary network load
+  // and can cause file contention. 60s is responsive enough for context updates.
+  autoSyncInterval: parseInt(process.env.AUTO_SYNC_INTERVAL, 10) || 60000,
   // Auto-backup: commit data/ to git (ms, default 30 min)
   autoBackupInterval: parseInt(process.env.AUTO_BACKUP_INTERVAL, 10) || 1800000,
   // Daily digest: UTC hour to send (default 18 = 6pm UTC)

@@ -111,39 +111,25 @@ function TypeBadge({ type }) {
 }
 
 function StatBox({ label, value, loading, accent = false }) {
-  return (
-    <div className="text-center p-2 bg-black-800/40 border border-black-700/50 rounded-lg">
-      <div className={`font-mono font-bold text-sm ${accent ? 'text-cyan-400' : 'text-white'}`}>
-        {loading ? <span className="animate-pulse text-black-500">--</span> : value}
-      </div>
-      <div className="text-black-500 text-[10px] font-mono">{label}</div>
-    </div>
-  )
+  return (<div className="text-center p-2 bg-black-800/40 border border-black-700/50 rounded-lg">
+    <div className={`font-mono font-bold text-sm ${accent ? 'text-cyan-400' : 'text-white'}`}>
+      {loading ? <span className="animate-pulse text-black-500">--</span> : value}</div>
+    <div className="text-black-500 text-[10px] font-mono">{label}</div></div>)
 }
 
 function CurveBar({ citations, max }) {
   const pct = max > 0 ? Math.min((citations / max) * 100, 100) : 0
-  return (
-    <div className="w-full h-1.5 bg-black-800 rounded-full overflow-hidden">
-      <motion.div className="h-full bg-gradient-to-r from-matrix-700 to-matrix-400 rounded-full"
-        initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-        transition={{ duration: PHI * 0.6, ease: 'easeOut' }} />
-    </div>
-  )
+  return (<div className="w-full h-1.5 bg-black-800 rounded-full overflow-hidden">
+    <motion.div className="h-full bg-gradient-to-r from-matrix-700 to-matrix-400 rounded-full"
+      initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: PHI * 0.6, ease: 'easeOut' }} /></div>)
 }
 
 function AccuracyBar({ value }) {
-  const color = value >= 90 ? 'from-emerald-600 to-emerald-400'
-    : value >= 80 ? 'from-cyan-600 to-cyan-400'
-    : value >= 70 ? 'from-amber-600 to-amber-400'
-    : 'from-red-600 to-red-400'
-  return (
-    <div className="w-full h-1 bg-black-800 rounded-full overflow-hidden">
-      <motion.div className={`h-full bg-gradient-to-r ${color} rounded-full`}
-        initial={{ width: 0 }} animate={{ width: `${value}%` }}
-        transition={{ duration: PHI * 0.6, ease: 'easeOut' }} />
-    </div>
-  )
+  const color = value >= 90 ? 'from-emerald-600 to-emerald-400' : value >= 80 ? 'from-cyan-600 to-cyan-400'
+    : value >= 70 ? 'from-amber-600 to-amber-400' : 'from-red-600 to-red-400'
+  return (<div className="w-full h-1 bg-black-800 rounded-full overflow-hidden">
+    <motion.div className={`h-full bg-gradient-to-r ${color} rounded-full`}
+      initial={{ width: 0 }} animate={{ width: `${value}%` }} transition={{ duration: PHI * 0.6, ease: 'easeOut' }} /></div>)
 }
 
 const inputCls = 'w-full bg-black-800 border border-black-700 rounded-lg px-3 py-2 text-sm text-white placeholder-black-600 focus:border-matrix-600 focus:outline-none transition-colors'
@@ -432,48 +418,31 @@ function DetailModal({ p, onClose, onCite, onAuthor, max, connected }) {
         onClick={() => { onClose(); onAuthor(p.author) }}>by {p.author}</button>
       <p className="text-black-400 text-sm mb-4 leading-relaxed">{p.description || 'No description available.'}</p>
       <div className="mb-4 p-3 bg-black-800/40 rounded-lg border border-black-700/50">
-        <div className="flex justify-between text-[10px] font-mono text-black-500 mb-1.5">
-          <span>Bonding Curve</span><span>{p.price || '--'}</span>
-        </div>
+        <div className="flex justify-between text-[10px] font-mono text-black-500 mb-1.5"><span>Bonding Curve</span><span>{p.price || '--'}</span></div>
         <CurveBar citations={p.citations ?? 0} max={max} />
         <div className="flex justify-between mt-2 text-[10px] font-mono">
           <span className="text-black-500">{p.citations ?? 0} citations</span>
-          <span className="text-matrix-500">Shapley: {p.shapleyEarnings || p.shapley || '--'}</span>
-        </div>
+          <span className="text-matrix-500">Shapley: {p.shapleyEarnings || p.shapley || '--'}</span></div>
       </div>
-      {p.citedPrimitives?.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-xs font-mono text-black-400 mb-2">Cites</h4>
-          <div className="space-y-1">
-            {p.citedPrimitives.map((cp, i) => (
-              <div key={i} className="text-[11px] font-mono text-black-500 bg-black-800/30 rounded px-2 py-1 border border-black-800">
-                {typeof cp === 'string' ? cp : cp.title || `Primitive #${cp.id || i}`}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {connected && (
-        <button onClick={() => onCite(p.id)}
-          className="w-full mt-2 py-2 rounded-lg bg-matrix-600 text-black-900 font-mono font-bold text-sm hover:bg-matrix-500 transition-colors">
-          Cite This Primitive</button>
-      )}
+      {p.citedPrimitives?.length > 0 && (<div className="mb-4">
+        <h4 className="text-xs font-mono text-black-400 mb-2">Cites</h4>
+        <div className="space-y-1">{p.citedPrimitives.map((cp, i) => (
+          <div key={i} className="text-[11px] font-mono text-black-500 bg-black-800/30 rounded px-2 py-1 border border-black-800">
+            {typeof cp === 'string' ? cp : cp.title || `Primitive #${cp.id || i}`}</div>
+        ))}</div></div>)}
+      {connected && <button onClick={() => onCite(p.id)}
+        className="w-full mt-2 py-2 rounded-lg bg-matrix-600 text-black-900 font-mono font-bold text-sm hover:bg-matrix-500 transition-colors">
+        Cite This Primitive</button>}
     </Modal>
   )
 }
 
 // ============ Create Modal ============
 function CreateModal({ onClose, onCreated, existing }) {
-  const [title, setTitle] = useState('')
-  const [desc, setDesc] = useState('')
-  const [type, setType] = useState('Insight')
-  const [author, setAuthor] = useState('')
-  const [cited, setCited] = useState([])
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState(null)
-
+  const [title, setTitle] = useState(''), [desc, setDesc] = useState(''), [type, setType] = useState('Insight')
+  const [author, setAuthor] = useState(''), [cited, setCited] = useState([])
+  const [busy, setBusy] = useState(false), [err, setErr] = useState(null)
   const toggle = (id) => setCited((p) => p.includes(id) ? p.filter((c) => c !== id) : [...p, id])
-
   const submit = async () => {
     if (!title.trim() || !author.trim()) { setErr('Title and author are required'); return }
     setBusy(true); setErr(null)
@@ -491,40 +460,25 @@ function CreateModal({ onClose, onCreated, existing }) {
     <Modal onClose={onClose}>
       <ModalHeader title="Register Primitive" onClose={onClose} />
       {err && <div className="mb-3 p-2 rounded bg-red-900/30 border border-red-800/40 text-red-400 text-xs font-mono">{err}</div>}
-      <label className="block mb-3">
-        <span className="text-black-400 text-xs font-mono block mb-1">Title *</span>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What did you discover?" className={inputCls} />
-      </label>
-      <label className="block mb-3">
-        <span className="text-black-400 text-xs font-mono block mb-1">Description</span>
+      <label className="block mb-3"><span className="text-black-400 text-xs font-mono block mb-1">Title *</span>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What did you discover?" className={inputCls} /></label>
+      <label className="block mb-3"><span className="text-black-400 text-xs font-mono block mb-1">Description</span>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Explain the knowledge primitive..."
-          rows={3} className={`${inputCls} resize-none`} />
-      </label>
+          rows={3} className={`${inputCls} resize-none`} /></label>
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <label className="block">
-          <span className="text-black-400 text-xs font-mono block mb-1">Type</span>
+        <label className="block"><span className="text-black-400 text-xs font-mono block mb-1">Type</span>
           <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
-            {TYPES.filter((t) => t !== 'All').map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-black-400 text-xs font-mono block mb-1">Author *</span>
-          <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="your.name" className={inputCls} />
-        </label>
+            {TYPES.filter((t) => t !== 'All').map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
+        <label className="block"><span className="text-black-400 text-xs font-mono block mb-1">Author *</span>
+          <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="your.name" className={inputCls} /></label>
       </div>
-      {existing.length > 0 && (
-        <div className="mb-4">
-          <span className="text-black-400 text-xs font-mono block mb-1">Cite Existing Primitives</span>
-          <div className="max-h-32 overflow-y-auto space-y-1 border border-black-700 rounded-lg p-2 bg-black-800/40">
-            {existing.map((p) => (
-              <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-black-800 rounded px-1 py-0.5 transition-colors">
-                <input type="checkbox" checked={cited.includes(p.id)} onChange={() => toggle(p.id)} className="accent-matrix-500" />
-                <span className="text-[11px] font-mono text-black-400 truncate">{p.title}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+      {existing.length > 0 && (<div className="mb-4">
+        <span className="text-black-400 text-xs font-mono block mb-1">Cite Existing Primitives</span>
+        <div className="max-h-32 overflow-y-auto space-y-1 border border-black-700 rounded-lg p-2 bg-black-800/40">
+          {existing.map((p) => (<label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-black-800 rounded px-1 py-0.5 transition-colors">
+            <input type="checkbox" checked={cited.includes(p.id)} onChange={() => toggle(p.id)} className="accent-matrix-500" />
+            <span className="text-[11px] font-mono text-black-400 truncate">{p.title}</span></label>))}
+        </div></div>)}
       <button onClick={submit} disabled={busy || !title.trim() || !author.trim()}
         className="w-full py-2.5 rounded-lg bg-matrix-600 text-black-900 font-mono font-bold text-sm hover:bg-matrix-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
         {busy ? 'Registering...' : 'Register Primitive'}</button>
@@ -534,10 +488,7 @@ function CreateModal({ onClose, onCreated, existing }) {
 
 // ============ Author Profile Modal ============
 function AuthorModal({ author, onClose }) {
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState(null)
-
+  const [stats, setStats] = useState(null), [loading, setLoading] = useState(true), [err, setErr] = useState(null)
   useEffect(() => {
     let dead = false
     setLoading(true); setErr(null)
@@ -547,7 +498,6 @@ function AuthorModal({ author, onClose }) {
       .finally(() => { if (!dead) setLoading(false) })
     return () => { dead = true }
   }, [author])
-
   const s = (k1, k2) => stats?.[k1] ?? stats?.[k2] ?? '--'
   return (
     <Modal onClose={onClose} maxW="max-w-sm">
@@ -596,17 +546,12 @@ export default function InfoFiPage() {
   const [selected, setSelected] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
   const [authorView, setAuthorView] = useState(null)
-
   const query = useDebounce(searchInput, 300)
   const sentinelRef = useRef(null)
   const maxCit = useMemo(() => Math.max(1, ...primitives.map((p) => p.citations ?? 0)), [primitives])
 
-  // ============ Fetch Stats ============
-  useEffect(() => {
-    api('/web/infofi/stats').then(setStats).catch(() => setOffline(true))
-  }, [])
+  useEffect(() => { api('/web/infofi/stats').then(setStats).catch(() => setOffline(true)) }, [])
 
-  // ============ Fetch Primitives ============
   const fetchPrimitives = useCallback(async (reset = false) => {
     const off = reset ? 0 : offset
     reset ? setLoading(true) : setLoadingMore(true)
@@ -627,8 +572,6 @@ export default function InfoFiPage() {
   }, [offset, query, filter, sort])
 
   useEffect(() => { setOffset(0); fetchPrimitives(true) }, [filter, sort, query]) // eslint-disable-line
-
-  // ============ Infinite Scroll ============
   useEffect(() => {
     if (!sentinelRef.current || !hasMore || loadingMore) return
     const obs = new IntersectionObserver(
@@ -638,8 +581,6 @@ export default function InfoFiPage() {
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
   }, [hasMore, loadingMore, fetchPrimitives])
-
-  // ============ Actions ============
   const handleCite = useCallback(async (id) => {
     try {
       await api('/web/infofi/cite', { method: 'POST', body: JSON.stringify({ primitiveId: id, citingAuthor: 'anonymous' }) })
@@ -647,61 +588,34 @@ export default function InfoFiPage() {
       if (selected?.id === id) setSelected((prev) => ({ ...prev, citations: (prev.citations ?? 0) + 1 }))
     } catch { /* optimistic update skipped */ }
   }, [selected])
-
   const handleCreated = useCallback((np) => {
     if (np && typeof np === 'object') setPrimitives((prev) => [np, ...prev])
   }, [])
 
-  // ============ Render ============
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-white font-display text-5d">
-            Info<span style={{ color: CYAN }}>Fi</span>
-          </h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white font-display text-5d">Info<span style={{ color: CYAN }}>Fi</span></h1>
           <p className="text-black-400 text-sm mt-1 max-w-md">Knowledge primitives as economic assets</p>
         </div>
-        {isConnected && (
-          <button onClick={() => setShowCreate(true)}
-            className="flex-shrink-0 px-4 py-2 rounded-lg bg-matrix-600 text-black-900 font-mono font-bold text-xs hover:bg-matrix-500 transition-colors">
-            + Create</button>
-        )}
+        {isConnected && <button onClick={() => setShowCreate(true)}
+          className="flex-shrink-0 px-4 py-2 rounded-lg bg-matrix-600 text-black-900 font-mono font-bold text-xs hover:bg-matrix-500 transition-colors">+ Create</button>}
       </div>
-
-      {/* InfoFi Score + Revenue */}
       <InfoFiScoreCard connected={isConnected} />
       <RevenueStreamCard connected={isConnected} />
-
-      {/* Offline banner */}
-      {offline && (
-        <div className="mb-4 p-2.5 rounded-lg bg-black-800/60 border border-black-700/50 text-center">
-          <span className="text-black-400 text-xs font-mono">Backend offline — connect to see live data</span>
-        </div>
-      )}
-
-      {/* Tab Navigation */}
+      {offline && <div className="mb-4 p-2.5 rounded-lg bg-black-800/60 border border-black-700/50 text-center">
+        <span className="text-black-400 text-xs font-mono">Backend offline — connect to see live data</span></div>}
       <div className="flex items-center gap-1 mb-5 border-b border-black-800 pb-px">
         {TABS.map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`text-xs font-mono px-4 py-2 rounded-t-lg transition-colors relative ${
-              activeTab === tab
-                ? 'text-white font-bold'
-                : 'text-black-500 hover:text-black-300'
-            }`}>
+            className={`text-xs font-mono px-4 py-2 rounded-t-lg transition-colors relative ${activeTab === tab ? 'text-white font-bold' : 'text-black-500 hover:text-black-300'}`}>
             {tab}
-            {activeTab === tab && (
-              <motion.div layoutId="infofi-tab-indicator"
-                className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
-                style={{ backgroundColor: CYAN }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-            )}
+            {activeTab === tab && <motion.div layoutId="infofi-tab-indicator" className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
+              style={{ backgroundColor: CYAN }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />}
           </button>
         ))}
       </div>
-
-      {/* Stats bar — always visible */}
       <div className="grid grid-cols-4 gap-3 mb-5">
         <StatBox label="Primitives" value={stats?.totalPrimitives ?? stats?.primitives ?? '--'} loading={!stats && !offline} />
         <StatBox label="Citations" value={stats?.totalCitations ?? stats?.citations ?? '--'} loading={!stats && !offline} />
@@ -757,51 +671,26 @@ export default function InfoFiPage() {
                       onAuthor={setAuthorView} max={maxCit} connected={isConnected} />
                   ))}
                 </AnimatePresence>
-                {primitives.length === 0 && !offline && (
+                {primitives.length === 0 && (
                   <div className="text-center py-12 text-black-500 text-xs font-mono">
-                    No primitives found. {isConnected ? 'Create the first one.' : 'Connect wallet to contribute.'}
-                  </div>
-                )}
-                {primitives.length === 0 && offline && (
-                  <div className="text-center py-12">
-                    <p className="text-black-500 text-xs font-mono mb-1">No data available</p>
-                    <p className="text-black-600 text-[10px] font-mono">Start the backend to load primitives</p>
+                    {offline ? 'No data available — start backend' : isConnected ? 'No primitives found. Create the first one.' : 'Connect wallet to contribute.'}
                   </div>
                 )}
                 {hasMore && <div ref={sentinelRef} className="h-4" />}
-                {loadingMore && (
-                  <div className="text-center py-4">
-                    <span className="text-black-500 text-xs font-mono animate-pulse">Loading more...</span>
-                  </div>
-                )}
+                {loadingMore && <div className="text-center py-4"><span className="text-black-500 text-xs font-mono animate-pulse">Loading more...</span></div>}
               </div>
             )}
           </motion.div>
         )}
 
-        {activeTab === 'Marketplace' && (
-          <motion.div key="marketplace"
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: PHI * 0.2 }}>
-            <DataMarketplace connected={isConnected} />
+        {['Marketplace', 'Signals', 'Leaderboard'].map((t) => activeTab === t && (
+          <motion.div key={t.toLowerCase()} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }} transition={{ duration: PHI * 0.2 }}>
+            {t === 'Marketplace' && <DataMarketplace connected={isConnected} />}
+            {t === 'Signals' && <SignalDashboard connected={isConnected} />}
+            {t === 'Leaderboard' && <LeaderboardTab />}
           </motion.div>
-        )}
-
-        {activeTab === 'Signals' && (
-          <motion.div key="signals"
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: PHI * 0.2 }}>
-            <SignalDashboard connected={isConnected} />
-          </motion.div>
-        )}
-
-        {activeTab === 'Leaderboard' && (
-          <motion.div key="leaderboard"
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: PHI * 0.2 }}>
-            <LeaderboardTab />
-          </motion.div>
-        )}
+        ))}
       </AnimatePresence>
 
       {!isConnected && (

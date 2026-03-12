@@ -2524,4 +2524,301 @@ mod tests {
         // rebalanced_value = position_value + accrued_fees
         assert_eq!(signal.rebalanced_value, signal.position_value + 5_000 * PRECISION);
     }
+
+    // ============ Hardening Tests v3 ============
+
+    #[test]
+    fn test_arb_spread_proportional_to_price_diff_v3() {
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 10);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_100_000 * PRECISION, 10);
+        let opps = find_arbitrage(&[(id(1), &pool_a), (id(2), &pool_b)], 0);
+        assert!(!opps.is_empty());
+        let opp = &opps[0];
+        assert!(opp.spread_bps > 0);
+        assert!(opp.buy_price < opp.sell_price);
+    }
+
+    #[test]
+    fn test_arb_empty_input_v3() {
+        let opps = find_arbitrage(&[], 0);
+        assert!(opps.is_empty());
+    }
+
+    #[test]
+    fn test_arb_single_pool_no_arb_v3() {
+        let pool = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 30);
+        let opps = find_arbitrage(&[(id(1), &pool)], 0);
+        assert!(opps.is_empty());
+    }
+
+    #[test]
+    fn test_rebalance_zero_il_suggests_add_liquidity_v3() {
+        let signal = check_rebalance(
+            PRECISION,
+            PRECISION, // Same price
+            100_000 * PRECISION,
+            1_000 * PRECISION, // Has accrued fees
+            500,
+            2000,
+        ).unwrap();
+        assert_eq!(signal.action, RebalanceAction::AddLiquidity);
+        assert!(!signal.should_rebalance);
+    }
+
+    #[test]
+    fn test_rebalance_extreme_il_suggests_exit_v3() {
+        let signal = check_rebalance(
+            PRECISION,
+            20 * PRECISION, // 20x price change
+            100_000 * PRECISION,
+            0, // No fees to compensate
+            500,
+            2000, // Exit threshold
+        ).unwrap();
+        assert_eq!(signal.action, RebalanceAction::ExitPosition);
+        assert!(signal.should_rebalance);
+    }
+
+    #[test]
+    fn test_yield_single_source_returns_it_v3() {
+        let sources = vec![YieldSource {
+            source_id: id(1),
+            source_type: YieldType::LPFees,
+            apy_bps: 500,
+            tvl: PRECISION,
+            risk_score: 10,
+        }];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(1));
+        assert_eq!(rec.best_apy_bps, 500);
+    }
+
+    #[test]
+    fn test_yield_risk_adjusted_score_monotonic_v3() {
+        // Same APY, increasing risk → decreasing adjusted score
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 1000, tvl: PRECISION, risk_score: 10 },
+            YieldSource { source_id: id(2), source_type: YieldType::LPFees, apy_bps: 1000, tvl: PRECISION, risk_score: 50 },
+            YieldSource { source_id: id(3), source_type: YieldType::LPFees, apy_bps: 1000, tvl: PRECISION, risk_score: 90 },
+        ];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        for i in 0..rec.ranked_sources.len() - 1 {
+            assert!(rec.ranked_sources[i].2 >= rec.ranked_sources[i + 1].2);
+        }
+    }
+
+    #[test]
+    fn test_yield_zero_risk_gets_max_adjustment_v3() {
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 1000, tvl: PRECISION, risk_score: 0 },
+            YieldSource { source_id: id(2), source_type: YieldType::LPFees, apy_bps: 1000, tvl: PRECISION, risk_score: 50 },
+        ];
+        let rec = optimize_yield(&sources, 100).unwrap();
+        assert_eq!(rec.best_source, id(1)); // Zero risk wins
+    }
+
+    #[test]
+    fn test_liquidation_urgency_boundary_values_v3() {
+        // HF = 0 → urgency = 100
+        let opps = find_liquidations(
+            &[(0, 100, 15000)], // 0 collateral, 100 debt, high threshold → HF=0
+            500,
+            0, // zero gas
+        );
+        // With 0 collateral, skipped by the zero check
+        assert!(opps.is_empty());
+    }
+
+    #[test]
+    fn test_liquidation_gas_cost_eliminates_profit_v3() {
+        let opps = find_liquidations(
+            &[(1000, 900, 10_000)], // barely underwater
+            500,  // 5% incentive
+            1000, // gas cost equals entire position
+        );
+        // Gas too high, no profitable liquidation
+        assert!(opps.is_empty());
+    }
+
+    #[test]
+    fn test_liquidation_sorted_by_profit_v3() {
+        let opps = find_liquidations(
+            &[
+                (100_000, 90_000, 10_000), // HF < 1
+                (200_000, 190_000, 10_000), // HF < 1, more profit
+                (50_000, 45_000, 10_000),  // HF < 1, less profit
+            ],
+            500,
+            0,
+        );
+        for i in 0..opps.len().saturating_sub(1) {
+            assert!(opps[i].estimated_profit >= opps[i + 1].estimated_profit);
+        }
+    }
+
+    #[test]
+    fn test_alerts_below_watch_threshold_no_alert_v3() {
+        let positions = vec![(id(1), 99u64, AlertReason::LowHealthFactor)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_alerts_at_watch_threshold_v3() {
+        let positions = vec![(id(1), 100u64, AlertReason::LowHealthFactor)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].level, AlertLevel::Watch);
+    }
+
+    #[test]
+    fn test_alerts_at_warning_threshold_v3() {
+        let positions = vec![(id(1), 500u64, AlertReason::HighImpermanentLoss)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].level, AlertLevel::Warning);
+    }
+
+    #[test]
+    fn test_alerts_at_critical_threshold_v3() {
+        let positions = vec![(id(1), 1000u64, AlertReason::HighConcentration)];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].level, AlertLevel::Critical);
+    }
+
+    #[test]
+    fn test_alerts_sorted_critical_first_v3() {
+        let positions = vec![
+            (id(1), 150u64, AlertReason::LowHealthFactor),    // Watch
+            (id(2), 1500u64, AlertReason::HighImpermanentLoss), // Critical
+            (id(3), 600u64, AlertReason::HighUtilization),      // Warning
+        ];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 3);
+        assert_eq!(alerts[0].level, AlertLevel::Critical);
+        assert_eq!(alerts[1].level, AlertLevel::Warning);
+        assert_eq!(alerts[2].level, AlertLevel::Watch);
+    }
+
+    #[test]
+    fn test_rebalance_fees_cover_il_hold_v3() {
+        let signal = check_rebalance(
+            PRECISION,
+            2 * PRECISION, // 2x price change
+            100_000 * PRECISION,
+            50_000 * PRECISION, // Large fee accrual covers IL
+            500,
+            2000,
+        ).unwrap();
+        // IL exceeds threshold but fees cover it → Hold
+        assert_eq!(signal.action, RebalanceAction::Hold);
+    }
+
+    #[test]
+    fn test_arb_opportunity_fields_correct_v3() {
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 800_000 * PRECISION, 10);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_200_000 * PRECISION, 10);
+        let opps = find_arbitrage(&[(id(1), &pool_a), (id(2), &pool_b)], 0);
+        assert!(!opps.is_empty());
+        let opp = &opps[0];
+        assert_eq!(opp.buy_pool_id, id(1)); // Lower price
+        assert_eq!(opp.sell_pool_id, id(2)); // Higher price
+        assert!(opp.estimated_profit > 0);
+        assert!(opp.optimal_size > 0);
+    }
+
+    #[test]
+    fn test_yield_all_above_risk_cap_returns_error_v3() {
+        let sources = vec![
+            YieldSource { source_id: id(1), source_type: YieldType::LPFees, apy_bps: 1000, tvl: PRECISION, risk_score: 80 },
+            YieldSource { source_id: id(2), source_type: YieldType::StakingRewards, apy_bps: 500, tvl: PRECISION, risk_score: 90 },
+        ];
+        let result = optimize_yield(&sources, 50); // Max risk = 50
+        assert_eq!(result, Err(StrategyError::NoPositions));
+    }
+
+    #[test]
+    fn test_rebalance_rebalanced_value_includes_fees_v3() {
+        let signal = check_rebalance(
+            PRECISION,
+            PRECISION * 3 / 2, // 1.5x price change
+            100_000 * PRECISION,
+            10_000 * PRECISION,
+            500,
+            2000,
+        ).unwrap();
+        // rebalanced_value = lp_value + accrued_fees
+        assert_eq!(signal.rebalanced_value, signal.position_value + 10_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_arb_min_spread_filter_exact_v3() {
+        let pool_a = make_pool_data(1_000_000 * PRECISION, 1_000_000 * PRECISION, 10);
+        let pool_b = make_pool_data(1_000_000 * PRECISION, 1_050_000 * PRECISION, 10);
+        // Spread is about 500 bps (5%)
+        let opps_low = find_arbitrage(&[(id(1), &pool_a), (id(2), &pool_b)], 100);
+        let opps_high = find_arbitrage(&[(id(1), &pool_a), (id(2), &pool_b)], 1000);
+        // Low min spread finds it, high min spread may not
+        assert!(opps_low.len() >= opps_high.len());
+    }
+
+    #[test]
+    fn test_liquidation_seizable_capped_at_collateral_v3() {
+        let opps = find_liquidations(
+            &[(100, 200, 10_000)], // debt > collateral (deeply underwater)
+            5000, // 50% incentive
+            0,
+        );
+        if !opps.is_empty() {
+            assert!(opps[0].seizable_collateral <= 100);
+        }
+    }
+
+    #[test]
+    fn test_alert_reason_propagated_v3() {
+        let positions = vec![
+            (id(1), 600u64, AlertReason::LowHealthFactor),
+            (id(2), 600u64, AlertReason::HighImpermanentLoss),
+            (id(3), 600u64, AlertReason::HighConcentration),
+            (id(4), 600u64, AlertReason::HighUtilization),
+        ];
+        let alerts = check_risk_alerts(&positions, 100, 500, 1000);
+        assert_eq!(alerts.len(), 4);
+        // Verify all are Warning level (600 >= 500, < 1000)
+        for alert in &alerts {
+            assert_eq!(alert.level, AlertLevel::Warning);
+        }
+    }
+
+    #[test]
+    fn test_strategy_error_variants_cover_all_v3() {
+        let e1 = StrategyError::NoArbOpportunity;
+        let e2 = StrategyError::InsufficientData;
+        let e3 = StrategyError::EmptyPool;
+        let e4 = StrategyError::NoPositions;
+        assert_ne!(e1, e2);
+        assert_ne!(e2, e3);
+        assert_ne!(e3, e4);
+    }
+
+    #[test]
+    fn test_alert_level_ordering_complete_v3() {
+        assert!(AlertLevel::Safe < AlertLevel::Watch);
+        assert!(AlertLevel::Watch < AlertLevel::Warning);
+        assert!(AlertLevel::Warning < AlertLevel::Critical);
+    }
+
+    #[test]
+    fn test_rebalance_entry_price_zero_returns_error_v3() {
+        let result = check_rebalance(0, PRECISION, 100_000, 0, 500, 2000);
+        assert_eq!(result, Err(StrategyError::InsufficientData));
+    }
+
+    #[test]
+    fn test_rebalance_current_price_zero_returns_error_v3() {
+        let result = check_rebalance(PRECISION, 0, 100_000, 0, 500, 2000);
+        // Zero current price → error from IL calculation
+        assert!(result.is_err());
+    }
 }

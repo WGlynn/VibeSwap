@@ -2034,4 +2034,223 @@ mod tests {
         assert_eq!(il, cloned);
         let _debug = format!("{:?}", il);
     }
+
+    // ============ Hardening Tests v3 ============
+
+    #[test]
+    fn test_position_value_proportional_to_lp_v3() {
+        let pool = balanced_pool();
+        let val_half = position_value(500_000 * PRECISION, &pool, PRECISION, PRECISION).unwrap();
+        let val_full = position_value(1_000_000 * PRECISION, &pool, PRECISION, PRECISION).unwrap();
+        assert_eq!(val_full.amount0, 2 * val_half.amount0);
+        assert_eq!(val_full.amount1, 2 * val_half.amount1);
+    }
+
+    #[test]
+    fn test_position_value_pool_share_full_pool_v3() {
+        let pool = balanced_pool();
+        let val = position_value(pool.total_lp_supply, &pool, PRECISION, PRECISION).unwrap();
+        assert_eq!(val.pool_share_bps, 10_000); // 100%
+    }
+
+    #[test]
+    fn test_position_value_pool_share_half_v3() {
+        let pool = balanced_pool();
+        let val = position_value(pool.total_lp_supply / 2, &pool, PRECISION, PRECISION).unwrap();
+        assert_eq!(val.pool_share_bps, 5000); // 50%
+    }
+
+    #[test]
+    fn test_il_increases_with_price_ratio_v3() {
+        let il_2x = impermanent_loss(PRECISION, 2 * PRECISION, 100_000 * PRECISION).unwrap();
+        let il_4x = impermanent_loss(PRECISION, 4 * PRECISION, 100_000 * PRECISION).unwrap();
+        let il_10x = impermanent_loss(PRECISION, 10 * PRECISION, 100_000 * PRECISION).unwrap();
+        assert!(il_2x.il_bps < il_4x.il_bps);
+        assert!(il_4x.il_bps < il_10x.il_bps);
+    }
+
+    #[test]
+    fn test_il_symmetric_for_inverse_prices_v3() {
+        let il_2x = impermanent_loss(PRECISION, 2 * PRECISION, 100_000 * PRECISION).unwrap();
+        let il_half = impermanent_loss(PRECISION, PRECISION / 2, 100_000 * PRECISION).unwrap();
+        // IL should be similar for 2x and 0.5x (symmetric about 1.0)
+        let diff = if il_2x.il_bps > il_half.il_bps { il_2x.il_bps - il_half.il_bps } else { il_half.il_bps - il_2x.il_bps };
+        assert!(diff < 100); // Within 1% difference
+    }
+
+    #[test]
+    fn test_withdrawal_proportional_amounts_v3() {
+        let pool = balanced_pool();
+        let est_half = estimate_withdrawal(pool.total_lp_supply / 2, &pool).unwrap();
+        let est_quarter = estimate_withdrawal(pool.total_lp_supply / 4, &pool).unwrap();
+        assert_eq!(est_half.amount0, 2 * est_quarter.amount0);
+        assert_eq!(est_half.amount1, 2 * est_quarter.amount1);
+    }
+
+    #[test]
+    fn test_withdrawal_full_supply_gets_all_reserves_v3() {
+        let pool = balanced_pool();
+        let est = estimate_withdrawal(pool.total_lp_supply, &pool).unwrap();
+        assert_eq!(est.amount0, pool.reserve0);
+        assert_eq!(est.amount1, pool.reserve1);
+    }
+
+    #[test]
+    fn test_withdrawal_below_minimum_flag_v3() {
+        let pool = make_pool(1_000_000 * PRECISION, 1_000_000 * PRECISION, 1_000_000 * PRECISION, 30);
+        // Burn almost all LP → remaining below minimum
+        let almost_all = pool.total_lp_supply - 1;
+        let est = estimate_withdrawal(almost_all, &pool).unwrap();
+        assert!(est.below_minimum);
+    }
+
+    #[test]
+    fn test_optimal_deposit_exact_ratio_no_leftover_v3() {
+        let pool = balanced_pool();
+        // Deposit in exact pool ratio (1:1 for balanced)
+        let result = optimal_deposit(1000 * PRECISION, 1000 * PRECISION, &pool).unwrap();
+        assert_eq!(result.leftover0, 0);
+        assert_eq!(result.leftover1, 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_excess_token0_v3() {
+        let pool = balanced_pool();
+        let result = optimal_deposit(2000 * PRECISION, 1000 * PRECISION, &pool).unwrap();
+        // Token1 is limiting → leftover0 should be non-zero
+        assert!(result.leftover0 > 0);
+        assert_eq!(result.leftover1, 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_excess_token1_v3() {
+        let pool = balanced_pool();
+        let result = optimal_deposit(1000 * PRECISION, 2000 * PRECISION, &pool).unwrap();
+        assert_eq!(result.leftover0, 0);
+        assert!(result.leftover1 > 0);
+    }
+
+    #[test]
+    fn test_zap_in_token0_splits_roughly_half_v3() {
+        let pool = balanced_pool();
+        let est = zap_in_estimate(10_000 * PRECISION, true, &pool).unwrap();
+        assert_eq!(est.swap_amount, 5_000 * PRECISION);
+        assert_eq!(est.deposit_amount_in, 5_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_zap_in_token1_splits_roughly_half_v3() {
+        let pool = balanced_pool();
+        let est = zap_in_estimate(10_000 * PRECISION, false, &pool).unwrap();
+        assert_eq!(est.swap_amount, 5_000 * PRECISION);
+        assert_eq!(est.deposit_amount_in, 5_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_zap_in_impact_increases_with_amount_v3() {
+        let pool = balanced_pool();
+        let est_small = zap_in_estimate(1_000 * PRECISION, true, &pool).unwrap();
+        let est_large = zap_in_estimate(100_000 * PRECISION, true, &pool).unwrap();
+        assert!(est_large.swap_impact_bps >= est_small.swap_impact_bps);
+    }
+
+    #[test]
+    fn test_pool_analytics_tvl_sum_of_values_v3() {
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap();
+        let expected_tvl = vibeswap_math::mul_div(pool.reserve0, PRECISION, PRECISION)
+            + vibeswap_math::mul_div(pool.reserve1, PRECISION, PRECISION);
+        assert_eq!(analytics.tvl, expected_tvl);
+    }
+
+    #[test]
+    fn test_pool_analytics_spot_price_balanced_v3() {
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap();
+        assert_eq!(analytics.spot_price, PRECISION); // 1:1 ratio
+    }
+
+    #[test]
+    fn test_pool_analytics_depth_geometric_mean_v3() {
+        let pool = make_pool(4 * PRECISION, 9 * PRECISION, PRECISION, 30);
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 0, 1000).unwrap();
+        // sqrt(4 * 9) = 6
+        assert_eq!(analytics.depth, 6 * PRECISION);
+    }
+
+    #[test]
+    fn test_pool_analytics_fee_apr_with_volume_v3() {
+        let pool = balanced_pool();
+        let analytics = pool_analytics(&pool, PRECISION, PRECISION, 100_000 * PRECISION, 1000).unwrap();
+        assert!(analytics.fee_apr_bps > 0);
+    }
+
+    #[test]
+    fn test_available_lp_to_burn_exact_minimum_v3() {
+        let pool = make_pool(PRECISION, PRECISION, MINIMUM_LIQUIDITY, 30);
+        assert_eq!(available_lp_to_burn(&pool), 0);
+    }
+
+    #[test]
+    fn test_spot_price_2_to_1_ratio_v3() {
+        let pool = make_pool(PRECISION, 2 * PRECISION, PRECISION, 30);
+        let price = spot_price(&pool).unwrap();
+        assert_eq!(price, 2 * PRECISION);
+    }
+
+    #[test]
+    fn test_k_invariant_product_v3() {
+        let pool = make_pool(100 * PRECISION, 200 * PRECISION, PRECISION, 30);
+        let (hi, lo) = k_invariant(&pool);
+        // k = 100 * 200 * PRECISION^2 = 20000 * PRECISION^2
+        // Verify via wide_mul
+        let (expected_hi, expected_lo) = vibeswap_math::wide_mul(100 * PRECISION, 200 * PRECISION);
+        assert_eq!(hi, expected_hi);
+        assert_eq!(lo, expected_lo);
+    }
+
+    #[test]
+    fn test_il_hodl_always_gte_lp_when_price_changes_v3() {
+        // For any price change != 1.0, hodl >= lp
+        for multiplier in [2u128, 3, 4, 5, 10, 50, 100] {
+            let il = impermanent_loss(PRECISION, multiplier * PRECISION, 100_000 * PRECISION).unwrap();
+            assert!(il.hodl_value >= il.lp_value, "Failed for {}x", multiplier);
+        }
+    }
+
+    #[test]
+    fn test_position_value_zero_reserve_pool_v3() {
+        let pool = make_pool(0, 0, PRECISION, 30);
+        // Zero LP supply but try to value
+        let result = position_value(100, &pool, PRECISION, PRECISION);
+        // total_lp_supply is PRECISION which is non-zero, so values will be zero from reserves
+        // Actually let's check with zero lp supply
+        let pool2 = make_pool(1000, 1000, 0, 30);
+        assert!(position_value(100, &pool2, PRECISION, PRECISION).is_err());
+    }
+
+    #[test]
+    fn test_zap_in_odd_amount_v3() {
+        let pool = balanced_pool();
+        let est = zap_in_estimate(999 * PRECISION, true, &pool).unwrap();
+        // swap_amount = 999/2 = 499, remaining = 500
+        assert_eq!(est.swap_amount, 499 * PRECISION + PRECISION / 2);
+        // deposit_amount_in = 999 - 499 = 500
+    }
+
+    #[test]
+    fn test_estimate_withdrawal_zero_reserve_pool_v3() {
+        let pool = make_pool(0, 0, PRECISION, 30);
+        let est = estimate_withdrawal(100, &pool).unwrap();
+        assert_eq!(est.amount0, 0);
+        assert_eq!(est.amount1, 0);
+    }
+
+    #[test]
+    fn test_optimal_deposit_imbalanced_pool_v3() {
+        let pool = imbalanced_pool(); // 500K : 2M
+        let result = optimal_deposit(1000 * PRECISION, 1000 * PRECISION, &pool).unwrap();
+        // Pool ratio is 1:4, so with equal deposits, token0 is limiting
+        assert!(result.leftover1 > 0 || result.leftover0 > 0);
+    }
 }

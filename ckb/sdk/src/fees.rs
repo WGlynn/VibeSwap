@@ -2445,4 +2445,315 @@ mod tests {
             + dist.lp_distributions.values().sum::<u128>();
         assert_eq!(dist.total_distributed, manual_total);
     }
+
+    // ============ Hardening Tests v3 ============
+
+    #[test]
+    fn test_shapley_weights_high_utilization_bonus_v3() {
+        // Volume = 2x depth → utilization capped at PRECISION (100%)
+        let pools = vec![
+            PoolDepthInfo {
+                pair_id: pair(1),
+                depth: 1_000_000 * PRECISION,
+                epoch_volume: 3_000_000 * PRECISION, // 3x depth
+                route_count: 1,
+            },
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        let w = weights[&pair(1)];
+        // With capped util bonus = PRECISION, conn bonus = PRECISION (only pool)
+        // weight = depth * (P + P) / P * (P + P) / P = depth * 2 * 2 = 4 * depth
+        assert_eq!(w, 4 * 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_shapley_weights_zero_volume_zero_routes_v3() {
+        let pools = vec![
+            PoolDepthInfo {
+                pair_id: pair(1),
+                depth: 1_000_000 * PRECISION,
+                epoch_volume: 0,
+                route_count: 0,
+            },
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        let w = weights[&pair(1)];
+        // util_bonus = 0, conn_bonus = 0 (routes/max_routes = 0/1 = 0)
+        // But wait: max(1, max_routes) = 1, and route_count=0 → conn_bonus = 0
+        // weight = depth * (P + 0) / P * (P + 0) / P = depth
+        assert_eq!(w, 1_000_000 * PRECISION);
+    }
+
+    #[test]
+    fn test_distribution_amm_protocol_split_exact_v3() {
+        let config = FeeConfig::default();
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000);
+        let dist = calculate_distribution(&epoch, &config);
+        // Protocol gets 1667/10000 of 10000 = 1667
+        let protocol_share = vibeswap_math::mul_div(10_000, config.protocol_fee_bps as u128, 10_000);
+        let lp_share = 10_000 - protocol_share;
+        assert_eq!(*dist.lp_distributions.get(&pair(1)).unwrap(), lp_share);
+    }
+
+    #[test]
+    fn test_distribution_multiple_amm_pools_independent_v3() {
+        let config = FeeConfig::default();
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 5_000);
+        epoch.record_amm_fee(pair(2), 15_000);
+        let dist = calculate_distribution(&epoch, &config);
+        // Each pool retains its own LP share in simple distribution
+        let lp1 = *dist.lp_distributions.get(&pair(1)).unwrap();
+        let lp2 = *dist.lp_distributions.get(&pair(2)).unwrap();
+        assert!(lp2 > lp1); // Pool 2 earned more
+    }
+
+    #[test]
+    fn test_shapley_distribution_deeper_pool_gets_more_lp_v3() {
+        let config = FeeConfig::default();
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000);
+        epoch.record_amm_fee(pair(2), 10_000);
+        let pools = vec![
+            PoolDepthInfo { pair_id: pair(1), depth: 1_000_000 * PRECISION, epoch_volume: 500_000 * PRECISION, route_count: 1 },
+            PoolDepthInfo { pair_id: pair(2), depth: 100_000 * PRECISION, epoch_volume: 500_000 * PRECISION, route_count: 1 },
+        ];
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        let lp1 = *dist.lp_distributions.get(&pair(1)).unwrap_or(&0);
+        let lp2 = *dist.lp_distributions.get(&pair(2)).unwrap_or(&0);
+        assert!(lp1 > lp2, "Deeper pool should get more LP fees");
+    }
+
+    #[test]
+    fn test_swap_fee_fee_never_exceeds_input_v3() {
+        let (fee, output) = calculate_swap_fee(100, 1_000_000, 1_000_000, 9999);
+        assert!(fee < 100);
+        assert!(output > 0 || fee > 0);
+    }
+
+    #[test]
+    fn test_swap_fee_30bps_standard_v3() {
+        let (fee, output) = calculate_swap_fee(10_000, 1_000_000, 1_000_000, 30);
+        // Fee = 10000 * 30 / 10000 = 30
+        assert_eq!(fee, 30);
+        assert!(output > 0);
+        assert!(output < 10_000); // Can't get more out than in
+    }
+
+    #[test]
+    fn test_lending_reserve_income_proportional_v3() {
+        let income1 = calculate_lending_reserve_income(1_000_000, 500, 2000, 1000);
+        let income2 = calculate_lending_reserve_income(2_000_000, 500, 2000, 1000);
+        // Double borrows → double income
+        assert!(income2 > income1);
+        // Approximately 2x (within rounding)
+        let ratio = income2 * 100 / income1;
+        assert!(ratio >= 199 && ratio <= 201);
+    }
+
+    #[test]
+    fn test_prediction_fee_proportional_to_pool_v3() {
+        let fee1 = calculate_prediction_fee(5_000, 10_000, 100);
+        let fee2 = calculate_prediction_fee(5_000, 20_000, 100);
+        assert_eq!(fee2, fee1 * 2);
+    }
+
+    #[test]
+    fn test_annualize_revenue_proportional_to_epoch_length_v3() {
+        let mut epoch_short = FeeEpoch::new(1, 0, 1000);
+        epoch_short.record_amm_fee(pair(1), 100_000);
+        let mut epoch_long = FeeEpoch::new(2, 0, 10_000);
+        epoch_long.record_amm_fee(pair(1), 100_000);
+        let ann_short = annualize_revenue(&epoch_short);
+        let ann_long = annualize_revenue(&epoch_long);
+        // Shorter epoch → higher annualized (extrapolating from shorter period)
+        assert!(ann_short > ann_long);
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_proportional_v3() {
+        let yield1 = revenue_yield_bps(10_000, 100_000);
+        let yield2 = revenue_yield_bps(10_000, 200_000);
+        // Double TVL → half yield
+        assert_eq!(yield2, yield1 / 2);
+    }
+
+    #[test]
+    fn test_fee_config_shares_must_sum_to_10000_v3() {
+        let valid_config = FeeConfig {
+            protocol_fee_bps: 1667,
+            treasury_share_bps: 4000,
+            staker_share_bps: 3000,
+            insurance_share_bps: 3000,
+        };
+        assert!(valid_config.is_valid());
+        let invalid_config = FeeConfig {
+            protocol_fee_bps: 1667,
+            treasury_share_bps: 4000,
+            staker_share_bps: 3000,
+            insurance_share_bps: 2999, // off by 1
+        };
+        assert!(!invalid_config.is_valid());
+    }
+
+    #[test]
+    fn test_fee_epoch_accumulates_fees_correctly_v3() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100);
+        epoch.record_amm_fee(pair(1), 200);
+        epoch.record_lending_fee(pair(2), 50);
+        epoch.record_insurance_fee(pair(3), 30);
+        epoch.record_prediction_fee(pair(4), 20);
+        epoch.record_priority_fee(10);
+        assert_eq!(epoch.total_fees(), 410);
+    }
+
+    #[test]
+    fn test_shapley_distribution_conserves_total_lp_fees_v3() {
+        let config = FeeConfig::default();
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100_000);
+        epoch.record_amm_fee(pair(2), 200_000);
+        epoch.record_amm_fee(pair(3), 50_000);
+        let pools = vec![
+            PoolDepthInfo { pair_id: pair(1), depth: 500_000 * PRECISION, epoch_volume: 100_000 * PRECISION, route_count: 3 },
+            PoolDepthInfo { pair_id: pair(2), depth: 1_000_000 * PRECISION, epoch_volume: 500_000 * PRECISION, route_count: 5 },
+            PoolDepthInfo { pair_id: pair(3), depth: 200_000 * PRECISION, epoch_volume: 50_000 * PRECISION, route_count: 1 },
+        ];
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        let total_lp: u128 = dist.lp_distributions.values().sum();
+        // Total AMM fees minus protocol share should equal LP total
+        let total_amm = 350_000u128;
+        let protocol_from_amm = vibeswap_math::mul_div(total_amm, config.protocol_fee_bps as u128, 10_000);
+        let expected_lp = total_amm - protocol_from_amm;
+        assert_eq!(total_lp, expected_lp);
+    }
+
+    #[test]
+    fn test_swap_fee_large_reserves_small_trade_v3() {
+        let (fee, output) = calculate_swap_fee(100, u128::MAX / 4, u128::MAX / 4, 30);
+        assert_eq!(fee, 0); // 100 * 30 / 10000 = 0 (rounds down)
+        assert!(output > 0);
+    }
+
+    #[test]
+    fn test_fee_breakdown_consistency_with_epoch_v3() {
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 1000);
+        epoch.record_lending_fee(pair(2), 500);
+        epoch.record_insurance_fee(pair(3), 300);
+        epoch.record_prediction_fee(pair(4), 200);
+        epoch.record_priority_fee(100);
+        let breakdown = epoch.fees_by_source();
+        assert_eq!(breakdown.total(), epoch.total_fees());
+        assert_eq!(breakdown.amm, 1000);
+        assert_eq!(breakdown.lending, 500);
+        assert_eq!(breakdown.insurance, 300);
+        assert_eq!(breakdown.prediction, 200);
+        assert_eq!(breakdown.priority, 100);
+    }
+
+    #[test]
+    fn test_distribution_zero_protocol_fee_all_to_lps_v3() {
+        let config = FeeConfig {
+            protocol_fee_bps: 0,
+            treasury_share_bps: 5000,
+            staker_share_bps: 3000,
+            insurance_share_bps: 2000,
+        };
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 10_000);
+        let dist = calculate_distribution(&epoch, &config);
+        assert_eq!(*dist.lp_distributions.get(&pair(1)).unwrap(), 10_000);
+    }
+
+    #[test]
+    fn test_shapley_weights_route_count_affects_weight_v3() {
+        let pools = vec![
+            PoolDepthInfo { pair_id: pair(1), depth: PRECISION, epoch_volume: 0, route_count: 10 },
+            PoolDepthInfo { pair_id: pair(2), depth: PRECISION, epoch_volume: 0, route_count: 1 },
+        ];
+        let weights = calculate_shapley_weights(&pools);
+        assert!(weights[&pair(1)] > weights[&pair(2)]);
+    }
+
+    #[test]
+    fn test_lending_reserve_income_large_borrows_v3() {
+        let income = calculate_lending_reserve_income(
+            1_000_000_000 * PRECISION, // 1B tokens borrowed
+            1000,  // 10% APR
+            5000,  // 50% reserve factor
+            7_884_000, // 1 year
+        );
+        assert!(income > 0);
+        // Should be roughly: 1B * 10% * 50% = 50M
+        // income = borrows * rate * blocks / (10000 * blocks_per_year) * factor / 10000
+        // = 1B * 1000 * 7884000 / (10000 * 7884000) * 5000 / 10000
+        // = 1B * 0.1 * 0.5 = 50M
+    }
+
+    #[test]
+    fn test_annualize_revenue_very_long_epoch_v3() {
+        let mut epoch = FeeEpoch::new(1, 0, 100_000_000);
+        epoch.record_amm_fee(pair(1), 1_000_000);
+        let ann = annualize_revenue(&epoch);
+        // 100M blocks >> 7.8M blocks/year, so annualized < actual
+        assert!(ann < 1_000_000);
+    }
+
+    #[test]
+    fn test_prediction_fee_max_fee_rate_boundary_v3() {
+        let fee = calculate_prediction_fee(5_000, 10_000, 10_000);
+        // 100% fee rate → fee equals total pool
+        assert_eq!(fee, 10_000);
+    }
+
+    #[test]
+    fn test_fee_epoch_empty_sources_total_zero_v3() {
+        let epoch = default_epoch();
+        assert_eq!(epoch.total_fees(), 0);
+        let breakdown = epoch.fees_by_source();
+        assert_eq!(breakdown.total(), 0);
+    }
+
+    #[test]
+    fn test_shapley_distribution_single_pool_gets_everything_v3() {
+        let config = FeeConfig::default();
+        let mut epoch = default_epoch();
+        epoch.record_amm_fee(pair(1), 100_000);
+        let pools = vec![
+            PoolDepthInfo { pair_id: pair(1), depth: PRECISION, epoch_volume: PRECISION, route_count: 1 },
+        ];
+        let dist = calculate_distribution_shapley(&epoch, &config, &pools);
+        let total_amm = 100_000u128;
+        let protocol_from_amm = vibeswap_math::mul_div(total_amm, config.protocol_fee_bps as u128, 10_000);
+        let expected_lp = total_amm - protocol_from_amm;
+        assert_eq!(*dist.lp_distributions.get(&pair(1)).unwrap(), expected_lp);
+    }
+
+    #[test]
+    fn test_swap_fee_exact_10000_bps_v3() {
+        let (fee, _output) = calculate_swap_fee(10_000, 1_000_000, 1_000_000, 10_000);
+        // 100% fee means fee = input, after_fee = 0
+        assert_eq!(fee, 10_000);
+    }
+
+    #[test]
+    fn test_revenue_yield_bps_large_revenue_small_tvl_v3() {
+        let yield_bps = revenue_yield_bps(1_000_000, 100);
+        // revenue >> tvl → very high yield
+        assert!(yield_bps > 10_000);
+    }
+
+    #[test]
+    fn test_fee_config_equal_shares_v3() {
+        let config = FeeConfig {
+            protocol_fee_bps: 1667,
+            treasury_share_bps: 3334,
+            staker_share_bps: 3333,
+            insurance_share_bps: 3333,
+        };
+        assert!(config.is_valid());
+    }
 }

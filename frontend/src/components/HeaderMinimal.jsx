@@ -193,6 +193,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { path: '/rosetta', label: 'Rosetta Protocol', icon: '⟷' },
     { path: '/trust', label: 'Trust Network', icon: '⊗' },
     { path: '/gametheory', label: 'Game Theory', icon: '∑' },
+    { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
     { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
     { path: '/inversion', label: 'Graceful Inversion', icon: '∿' },
     { path: '/research', label: 'Research', icon: '~' },

@@ -1947,4 +1947,387 @@ mod tests {
         };
         assert_eq!(cell.token_amount(), None);
     }
+
+    // ============ Hardening Tests (Batch harden3) ============
+
+    #[test]
+    fn test_select_capacity_exact_match_harden3() {
+        let cells = vec![plain_cell(500), plain_cell(500)];
+        let sel = select_capacity_cells(&cells, 1000, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(sel.total_capacity, 1000);
+        assert_eq!(sel.capacity_change, 0);
+        assert_eq!(sel.selected.len(), 2);
+    }
+
+    #[test]
+    fn test_select_capacity_single_cell_sufficient_harden3() {
+        let cells = vec![plain_cell(5000)];
+        let sel = select_capacity_cells(&cells, 3000, &SelectionStrategy::LargestFirst).unwrap();
+        assert_eq!(sel.selected.len(), 1);
+        assert_eq!(sel.total_capacity, 5000);
+        assert_eq!(sel.capacity_change, 2000);
+    }
+
+    #[test]
+    fn test_select_capacity_skips_typed_cells_harden3() {
+        let cells = vec![
+            token_cell(1000, 500, 0x01),  // has type script, should be skipped
+            plain_cell(800),               // plain, should be selected
+        ];
+        let sel = select_capacity_cells(&cells, 500, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(sel.selected.len(), 1);
+        assert_eq!(sel.total_capacity, 800);
+    }
+
+    #[test]
+    fn test_select_capacity_insufficient_harden3() {
+        let cells = vec![plain_cell(100), plain_cell(200)];
+        let result = select_capacity_cells(&cells, 500, &SelectionStrategy::SmallestFirst);
+        assert!(matches!(result, Err(CollectorError::InsufficientCapacity { .. })));
+    }
+
+    #[test]
+    fn test_select_capacity_empty_cells_harden3() {
+        let result = select_capacity_cells(&[], 100, &SelectionStrategy::SmallestFirst);
+        assert!(matches!(result, Err(CollectorError::InsufficientCapacity { .. })));
+    }
+
+    #[test]
+    fn test_select_capacity_zero_target_harden3() {
+        let cells = vec![plain_cell(1000)];
+        let sel = select_capacity_cells(&cells, 0, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(sel.selected.len(), 0);
+        assert_eq!(sel.capacity_change, 0);
+    }
+
+    #[test]
+    fn test_select_token_cells_exact_amount_harden3() {
+        let cells = vec![
+            token_cell(1000, 500, 0x01),
+            token_cell(1000, 300, 0x01),
+        ];
+        let sel = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 800, &SelectionStrategy::SmallestFirst
+        ).unwrap();
+        assert_eq!(sel.total_token_amount, 800);
+        assert_eq!(sel.token_change, 0);
+    }
+
+    #[test]
+    fn test_select_token_cells_with_change_harden3() {
+        let cells = vec![token_cell(1000, 1000, 0x01)];
+        let sel = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 600, &SelectionStrategy::LargestFirst
+        ).unwrap();
+        assert_eq!(sel.total_token_amount, 1000);
+        assert_eq!(sel.token_change, 400);
+    }
+
+    #[test]
+    fn test_select_token_cells_insufficient_harden3() {
+        let cells = vec![token_cell(1000, 100, 0x01)];
+        let result = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 500, &SelectionStrategy::SmallestFirst
+        );
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { .. })));
+    }
+
+    #[test]
+    fn test_select_token_cells_wrong_code_hash_harden3() {
+        let cells = vec![token_cell(1000, 500, 0x01)];
+        let result = select_token_cells(
+            &cells, &[0xBB; 32], &vec![0x01; 36], 100, &SelectionStrategy::SmallestFirst
+        );
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { .. })));
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_plain_harden3() {
+        // Plain cell: 8 + 32+1+4+20 = 65 bytes → 65 * 1e8 = 6_500_000_000
+        let cap = calculate_cell_capacity(0, 20, None);
+        assert_eq!(cap, 65 * 100_000_000);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_with_type_harden3() {
+        // With type: 8 + (32+1+4+20) + (32+1+4+36) + 16 data = 154 bytes
+        let cap = calculate_cell_capacity(16, 20, Some(36));
+        assert_eq!(cap, 154 * 100_000_000);
+    }
+
+    #[test]
+    fn test_min_plain_cell_capacity_standard_harden3() {
+        let cap = min_plain_cell_capacity(20);
+        assert!(cap > 0);
+        assert_eq!(cap, calculate_cell_capacity(0, 20, None));
+    }
+
+    #[test]
+    fn test_min_token_cell_capacity_standard_harden3() {
+        let cap = min_token_cell_capacity(20);
+        assert!(cap > min_plain_cell_capacity(20));
+    }
+
+    #[test]
+    fn test_merge_cells_plain_harden3() {
+        let cells = vec![plain_cell(1000), plain_cell(2000), plain_cell(3000)];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        assert_eq!(tx.inputs.len(), 3);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].capacity, 6000);
+        assert!(tx.outputs[0].data.is_empty());
+    }
+
+    #[test]
+    fn test_merge_cells_empty_harden3() {
+        let result = merge_cells(&[], test_lock(0x01));
+        assert_eq!(result.unwrap_err(), CollectorError::NoCells);
+    }
+
+    #[test]
+    fn test_merge_cells_mixed_types_fails_harden3() {
+        let cells = vec![plain_cell(1000), token_cell(1000, 500, 0x01)];
+        let result = merge_cells(&cells, test_lock(0x01));
+        assert_eq!(result.unwrap_err(), CollectorError::MixedCellTypes);
+    }
+
+    #[test]
+    fn test_merge_cells_token_sums_amounts_harden3() {
+        let cells = vec![
+            token_cell(10_000_000_000, 100, 0x01),
+            token_cell(10_000_000_000, 200, 0x01),
+            token_cell(10_000_000_000, 300, 0x01),
+        ];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        let merged_amount = super::super::token::parse_token_amount(&tx.outputs[0].data).unwrap();
+        assert_eq!(merged_amount, 600);
+    }
+
+    #[test]
+    fn test_merge_cells_single_cell_harden3() {
+        let cells = vec![plain_cell(5000)];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].capacity, 5000);
+    }
+
+    #[test]
+    fn test_split_cell_equal_parts_harden3() {
+        let cell = token_cell(100_000_000_000, 1000, 0x01);
+        let splits = vec![250_u128, 250, 250, 250];
+        let tx = split_cell(&cell, &splits, test_lock(0x01)).unwrap();
+        assert_eq!(tx.outputs.len(), 4); // No change (exact split)
+        for out in &tx.outputs {
+            let amount = super::super::token::parse_token_amount(&out.data).unwrap();
+            assert_eq!(amount, 250);
+        }
+    }
+
+    #[test]
+    fn test_split_cell_with_change_harden3() {
+        let cell = token_cell(100_000_000_000, 1000, 0x01);
+        let splits = vec![300_u128, 200];
+        let tx = split_cell(&cell, &splits, test_lock(0x01)).unwrap();
+        // 3 outputs: 300, 200, 500 (change)
+        assert_eq!(tx.outputs.len(), 3);
+        let amounts: Vec<u128> = tx.outputs.iter()
+            .map(|o| super::super::token::parse_token_amount(&o.data).unwrap())
+            .collect();
+        assert_eq!(amounts[0], 300);
+        assert_eq!(amounts[1], 200);
+        assert_eq!(amounts[2], 500);
+    }
+
+    #[test]
+    fn test_split_cell_empty_splits_harden3() {
+        let cell = token_cell(100_000_000_000, 1000, 0x01);
+        let result = split_cell(&cell, &[], test_lock(0x01));
+        assert_eq!(result.unwrap_err(), CollectorError::NoCells);
+    }
+
+    #[test]
+    fn test_split_cell_exceeds_amount_harden3() {
+        let cell = token_cell(100_000_000_000, 100, 0x01);
+        let splits = vec![60_u128, 50]; // Total 110 > 100
+        let result = split_cell(&cell, &splits, test_lock(0x01));
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { .. })));
+    }
+
+    #[test]
+    fn test_live_cell_as_input_preserves_fields_harden3() {
+        let cell = LiveCell {
+            tx_hash: [0xAB; 32],
+            index: 42,
+            capacity: 1000,
+            data: vec![],
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        let input = cell.as_input();
+        assert_eq!(input.tx_hash, [0xAB; 32]);
+        assert_eq!(input.index, 42);
+        assert_eq!(input.since, 0);
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_true_harden3() {
+        let cell = token_cell(1000, 100, 0x01);
+        assert!(cell.has_type_code_hash(&[0xDD; 32]));
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_false_harden3() {
+        let cell = token_cell(1000, 100, 0x01);
+        assert!(!cell.has_type_code_hash(&[0xBB; 32]));
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_no_type_harden3() {
+        let cell = plain_cell(1000);
+        assert!(!cell.has_type_code_hash(&[0xDD; 32]));
+    }
+
+    #[test]
+    fn test_select_capacity_largest_first_strategy_harden3() {
+        let cells = vec![plain_cell(100), plain_cell(500), plain_cell(300)];
+        let sel = select_capacity_cells(&cells, 500, &SelectionStrategy::LargestFirst).unwrap();
+        assert_eq!(sel.selected.len(), 1);
+        assert_eq!(sel.total_capacity, 500);
+    }
+
+    #[test]
+    fn test_merge_cells_witnesses_match_inputs_harden3() {
+        let cells = vec![plain_cell(1000), plain_cell(2000)];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        assert_eq!(tx.witnesses.len(), tx.inputs.len());
+    }
+
+    #[test]
+    fn test_merge_cells_different_token_types_fails_harden3() {
+        let cell1 = token_cell(5_000_000_000, 100, 0x01);
+        let cell2 = token_cell(5_000_000_000, 200, 0x02); // Different token_id = different type args
+        let result = merge_cells(&[cell1, cell2], test_lock(0x01));
+        assert_eq!(result.unwrap_err(), CollectorError::MixedCellTypes);
+    }
+
+    #[test]
+    fn test_split_cell_single_output_no_change_harden3() {
+        let cell = token_cell(100_000_000_000, 500, 0x01);
+        let splits = vec![500_u128]; // Exact amount
+        let tx = split_cell(&cell, &splits, test_lock(0x01)).unwrap();
+        assert_eq!(tx.outputs.len(), 1); // No change cell needed
+        assert_eq!(super::super::token::parse_token_amount(&tx.outputs[0].data).unwrap(), 500);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_zero_everything_harden3() {
+        let cap = calculate_cell_capacity(0, 0, None);
+        // 8 (capacity) + 32+1+4+0 (lock) = 45
+        assert_eq!(cap, 45 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_large_data_harden3() {
+        let cap = calculate_cell_capacity(10000, 20, None);
+        // 8 + 32+1+4+20 + 10000 = 10065
+        assert_eq!(cap, 10065 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_select_capacity_many_small_cells_harden3() {
+        let cells: Vec<LiveCell> = (0..20).map(|_| plain_cell(100)).collect();
+        let sel = select_capacity_cells(&cells, 1500, &SelectionStrategy::SmallestFirst).unwrap();
+        assert!(sel.total_capacity >= 1500);
+        assert_eq!(sel.selected.len(), 15); // Need 15 cells of 100 each
+    }
+
+    #[test]
+    fn test_select_token_cells_empty_harden3() {
+        let result = select_token_cells(
+            &[], &[0xDD; 32], &vec![0x01; 36], 100, &SelectionStrategy::SmallestFirst
+        );
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { .. })));
+    }
+
+    #[test]
+    fn test_select_token_cells_zero_target_harden3() {
+        let cells = vec![token_cell(1000, 500, 0x01)];
+        let sel = select_token_cells(
+            &cells, &[0xDD; 32], &vec![0x01; 36], 0, &SelectionStrategy::SmallestFirst
+        ).unwrap();
+        assert_eq!(sel.selected.len(), 0);
+        assert_eq!(sel.token_change, 0);
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_exactly_16_bytes_harden3() {
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: 42u128.to_le_bytes().to_vec(),
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), Some(42));
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_zero_harden3() {
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: 0u128.to_le_bytes().to_vec(),
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), Some(0));
+    }
+
+    #[test]
+    fn test_merge_cells_output_lock_is_recipient_harden3() {
+        let cells = vec![plain_cell(1000), plain_cell(2000)];
+        let recipient = test_lock(0x99);
+        let tx = merge_cells(&cells, recipient.clone()).unwrap();
+        assert_eq!(tx.outputs[0].lock_script.args, recipient.args);
+    }
+
+    #[test]
+    fn test_split_cell_insufficient_capacity_harden3() {
+        // Cell with very little capacity but lots of tokens
+        let cell = token_cell(100, 1000, 0x01); // Only 100 shannons capacity
+        let splits = vec![500_u128, 500];
+        let result = split_cell(&cell, &splits, test_lock(0x01));
+        assert!(matches!(result, Err(CollectorError::InsufficientCapacity { .. })));
+    }
+
+    #[test]
+    fn test_cell_selection_token_amount_zero_harden3() {
+        let sel = CellSelection {
+            selected: vec![],
+            total_capacity: 0,
+            total_token_amount: 0,
+            capacity_change: 0,
+            token_change: 0,
+        };
+        assert_eq!(sel.total_token_amount, 0);
+        assert_eq!(sel.capacity_change, 0);
+    }
+
+    #[test]
+    fn test_selection_strategy_eq_harden3() {
+        assert_eq!(SelectionStrategy::SmallestFirst, SelectionStrategy::SmallestFirst);
+        assert_eq!(SelectionStrategy::LargestFirst, SelectionStrategy::LargestFirst);
+        assert_eq!(SelectionStrategy::BestFit, SelectionStrategy::BestFit);
+        assert_ne!(SelectionStrategy::SmallestFirst, SelectionStrategy::LargestFirst);
+    }
+
+    #[test]
+    fn test_collector_error_eq_harden3() {
+        assert_eq!(CollectorError::NoCells, CollectorError::NoCells);
+        assert_eq!(CollectorError::MixedCellTypes, CollectorError::MixedCellTypes);
+        assert_ne!(CollectorError::NoCells, CollectorError::MixedCellTypes);
+    }
 }

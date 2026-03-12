@@ -2369,4 +2369,318 @@ mod tests {
         // Check not available after deadline
         assert!(!is_rollback_available(&rb, MIN_TIMELOCK_BLOCKS + 100_001));
     }
+
+    // ============ Hardening Tests (Round 6) ============
+
+    #[test]
+    fn test_create_proposal_exactly_at_min_timelock() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MIN_TIMELOCK_BLOCKS, false, 10, desc_hash(), 0,
+        );
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().timelock_blocks, MIN_TIMELOCK_BLOCKS);
+    }
+
+    #[test]
+    fn test_create_proposal_exactly_at_max_timelock() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MAX_TIMELOCK_BLOCKS, false, 10, desc_hash(), 0,
+        );
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().timelock_blocks, MAX_TIMELOCK_BLOCKS);
+    }
+
+    #[test]
+    fn test_create_proposal_one_below_min_timelock() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MIN_TIMELOCK_BLOCKS - 1, false, 10, desc_hash(), 0,
+        );
+        assert_eq!(result, Err(UpgradeError::InvalidTimelock));
+    }
+
+    #[test]
+    fn test_create_proposal_one_above_max_timelock() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MAX_TIMELOCK_BLOCKS + 1, false, 10, desc_hash(), 0,
+        );
+        assert_eq!(result, Err(UpgradeError::InvalidTimelock));
+    }
+
+    #[test]
+    fn test_create_proposal_emergency_with_normal_timelock_rejected() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MIN_TIMELOCK_BLOCKS, true, 10, desc_hash(), 0,
+        );
+        assert_eq!(result, Err(UpgradeError::InvalidTimelock));
+    }
+
+    #[test]
+    fn test_approve_proposal_single_bps_increments() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        for _ in 0..100 {
+            approve_proposal(&mut p, 1, false).unwrap();
+        }
+        assert_eq!(p.approval_bps, 100);
+        assert_eq!(p.status, UpgradeStatus::Pending);
+    }
+
+    #[test]
+    fn test_approve_proposal_exact_quorum_boundary() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        approve_proposal(&mut p, QUORUM_BPS - 1, false).unwrap();
+        assert_eq!(p.status, UpgradeStatus::Pending);
+        approve_proposal(&mut p, 1, false).unwrap();
+        assert_eq!(p.status, UpgradeStatus::Approved);
+        assert_eq!(p.approval_bps, QUORUM_BPS);
+    }
+
+    #[test]
+    fn test_approve_proposal_exact_super_majority_boundary() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        approve_proposal(&mut p, SUPER_MAJORITY_BPS - 1, true).unwrap();
+        assert_eq!(p.status, UpgradeStatus::Pending);
+        approve_proposal(&mut p, 1, true).unwrap();
+        assert_eq!(p.status, UpgradeStatus::Approved);
+        assert_eq!(p.approval_bps, SUPER_MAJORITY_BPS);
+    }
+
+    #[test]
+    fn test_can_execute_one_block_before_timelock_end() {
+        let p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, 100);
+        let timelock_end = 100 + MIN_TIMELOCK_BLOCKS;
+        let result = can_execute(&p, timelock_end - 1, false).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_can_execute_at_exact_timelock_end() {
+        let p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, 100);
+        let timelock_end = 100 + MIN_TIMELOCK_BLOCKS;
+        let result = can_execute(&p, timelock_end, false).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_can_execute_one_block_before_window_end() {
+        let p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, 100);
+        let window_end = 100 + MIN_TIMELOCK_BLOCKS + UPGRADE_WINDOW_BLOCKS;
+        let result = can_execute(&p, window_end - 1, false).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_can_execute_at_exact_window_end() {
+        let p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, 100);
+        let window_end = 100 + MIN_TIMELOCK_BLOCKS + UPGRADE_WINDOW_BLOCKS;
+        let result = can_execute(&p, window_end, false).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_upgrade_sets_executed_status() {
+        let mut p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        let exec_block = MIN_TIMELOCK_BLOCKS;
+        let result = execute_upgrade(&mut p, exec_block, false).unwrap();
+        assert_eq!(p.status, UpgradeStatus::Executed);
+        assert_eq!(result.executed_block, exec_block);
+        assert!(result.rollback_available);
+    }
+
+    #[test]
+    fn test_execute_upgrade_cells_upgraded_matches_proposal() {
+        let mut p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        p.affected_cells = 42;
+        let result = execute_upgrade(&mut p, MIN_TIMELOCK_BLOCKS, false).unwrap();
+        assert_eq!(result.cells_upgraded, 42);
+    }
+
+    #[test]
+    fn test_cancel_by_guardian_when_no_guardian_provided() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        let result = cancel_proposal(&mut p, guardian(), None);
+        assert_eq!(result, Err(UpgradeError::NotAuthorized));
+    }
+
+    #[test]
+    fn test_cancel_sets_cancelled_status() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        cancel_proposal(&mut p, proposer_a(), None).unwrap();
+        assert_eq!(p.status, UpgradeStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_check_expiry_sets_expired_status() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        let far_future = MIN_TIMELOCK_BLOCKS + UPGRADE_WINDOW_BLOCKS + 1;
+        let expired = check_expiry(&mut p, far_future).unwrap();
+        assert!(expired);
+        assert_eq!(p.status, UpgradeStatus::Expired);
+    }
+
+    #[test]
+    fn test_check_expiry_returns_false_for_non_expired() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        let expired = check_expiry(&mut p, 100).unwrap();
+        assert!(!expired);
+        assert_eq!(p.status, UpgradeStatus::Pending);
+    }
+
+    #[test]
+    fn test_prepare_rollback_deadline_calculation() {
+        let rb = prepare_rollback(hash_a(), 1000, 5000, 50).unwrap();
+        assert_eq!(rb.rollback_deadline, 6000);
+        assert_eq!(rb.cells_to_revert, 50);
+        assert_eq!(rb.original_code_hash, hash_a());
+    }
+
+    #[test]
+    fn test_prepare_rollback_max_u64_overflow() {
+        let result = prepare_rollback(hash_a(), u64::MAX, 1, 10);
+        assert_eq!(result, Err(UpgradeError::Overflow));
+    }
+
+    #[test]
+    fn test_execute_rollback_at_exact_deadline() {
+        let rb = prepare_rollback(hash_a(), 1000, 5000, 50).unwrap();
+        let result = execute_rollback(&rb, 6000);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 50);
+    }
+
+    #[test]
+    fn test_execute_rollback_one_block_past_deadline() {
+        let rb = prepare_rollback(hash_a(), 1000, 5000, 50).unwrap();
+        let result = execute_rollback(&rb, 6001);
+        assert_eq!(result, Err(UpgradeError::RollbackNotAvailable));
+    }
+
+    #[test]
+    fn test_pending_count_with_mixed_terminal_and_active() {
+        let proposals = vec![
+            { let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Pending; p },
+            { let mut p = make_proposal(2, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Approved; p },
+            { let mut p = make_proposal(3, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Executed; p },
+            { let mut p = make_proposal(4, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Cancelled; p },
+            { let mut p = make_proposal(5, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Expired; p },
+        ];
+        assert_eq!(pending_upgrades_count(&proposals), 2);
+    }
+
+    #[test]
+    fn test_history_summary_cells_from_executed_only() {
+        let proposals = vec![
+            { let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Executed; p.affected_cells = 100; p },
+            { let mut p = make_proposal(2, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Cancelled; p.affected_cells = 200; p },
+            { let mut p = make_proposal(3, MIN_TIMELOCK_BLOCKS, 0); p.status = UpgradeStatus::Executed; p.affected_cells = 50; p },
+        ];
+        let (total, exec, canc, exp, cells) = upgrade_history_summary(&proposals);
+        assert_eq!(total, 3);
+        assert_eq!(exec, 2);
+        assert_eq!(canc, 1);
+        assert_eq!(exp, 0);
+        assert_eq!(cells, 150);
+    }
+
+    #[test]
+    fn test_assess_impact_gas_calculation_no_migration_no_breaking() {
+        let impact = assess_impact(10, false, false).unwrap();
+        // 10 * 100_000 * 1 * 10000 / 10000 = 1_000_000
+        assert_eq!(impact.estimated_gas, 1_000_000);
+        assert!(!impact.requires_migration);
+        assert!(!impact.breaking_change);
+    }
+
+    #[test]
+    fn test_assess_impact_gas_calculation_with_migration() {
+        let impact = assess_impact(10, true, false).unwrap();
+        // 10 * 100_000 * 3 * 10000 / 10000 = 3_000_000
+        assert_eq!(impact.estimated_gas, 3_000_000);
+    }
+
+    #[test]
+    fn test_assess_impact_gas_calculation_with_breaking() {
+        let impact = assess_impact(10, false, true).unwrap();
+        // 10 * 100_000 * 1 * 15000 / 10000 = 1_500_000
+        assert_eq!(impact.estimated_gas, 1_500_000);
+    }
+
+    #[test]
+    fn test_assess_impact_gas_calculation_migration_and_breaking() {
+        let impact = assess_impact(10, true, true).unwrap();
+        // 10 * 100_000 * 3 * 15000 / 10000 = 4_500_000
+        assert_eq!(impact.estimated_gas, 4_500_000);
+    }
+
+    #[test]
+    fn test_validate_compatibility_returns_true_when_compatible() {
+        let result = validate_compatibility(hash_a(), hash_b(), true).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_validate_compatibility_returns_error_when_not_compatible() {
+        let result = validate_compatibility(hash_a(), hash_b(), false);
+        assert_eq!(result, Err(UpgradeError::IncompatibleVersion));
+    }
+
+    #[test]
+    fn test_emergency_proposal_has_correct_fields() {
+        let p = create_emergency_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 100, 50, desc_hash(), 0,
+        ).unwrap();
+        assert!(p.is_emergency);
+        assert_eq!(p.timelock_blocks, EMERGENCY_TIMELOCK_BLOCKS);
+        assert_eq!(p.proposed_block, 100);
+        assert_eq!(p.affected_cells, 50);
+    }
+
+    #[test]
+    fn test_create_proposal_pending_count_at_max_minus_one() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MIN_TIMELOCK_BLOCKS, false, 10, desc_hash(),
+            MAX_PENDING_UPGRADES - 1,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_proposal_pending_count_at_max() {
+        let result = create_proposal(
+            1, hash_a(), hash_b(), proposer_a(), 0,
+            MIN_TIMELOCK_BLOCKS, false, 10, desc_hash(),
+            MAX_PENDING_UPGRADES,
+        );
+        assert_eq!(result, Err(UpgradeError::MaxPendingReached));
+    }
+
+    #[test]
+    fn test_approve_proposal_overflow_u16_max_plus_one() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, 0);
+        p.approval_bps = u16::MAX;
+        let result = approve_proposal(&mut p, 1, false).unwrap();
+        // Should cap at BPS (10000), not overflow
+        assert_eq!(result, BPS as u16);
+    }
+
+    #[test]
+    fn test_can_execute_overflow_block_near_u64_max() {
+        let mut p = make_approved_proposal(1, MIN_TIMELOCK_BLOCKS, u64::MAX - 100);
+        p.timelock_blocks = MIN_TIMELOCK_BLOCKS;
+        // proposed_block + timelock_blocks would overflow
+        let result = can_execute(&p, u64::MAX, false);
+        assert_eq!(result, Err(UpgradeError::Overflow));
+    }
+
+    #[test]
+    fn test_check_expiry_overflow_block_near_u64_max() {
+        let mut p = make_proposal(1, MIN_TIMELOCK_BLOCKS, u64::MAX - 100);
+        let result = check_expiry(&mut p, u64::MAX);
+        assert_eq!(result, Err(UpgradeError::Overflow));
+    }
 }

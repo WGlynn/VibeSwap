@@ -3332,4 +3332,255 @@ mod tests {
         // Zero collateral with debt = HF should be 0
         assert_eq!(assessment.health_factor, 0);
     }
+
+    // ============ Hardening Tests (Round 6) ============
+
+    #[test]
+    fn test_assess_vault_no_debt_always_max_hf() {
+        let vault = test_vault(0, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        assert_eq!(result.health_factor, u128::MAX);
+        assert_eq!(result.risk_tier, RiskTier::Safe);
+        assert_eq!(result.current_debt, 0);
+    }
+
+    #[test]
+    fn test_assess_vault_no_debt_collateral_value_still_computed() {
+        let vault = test_vault(0, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        assert!(result.collateral_value > 0);
+        assert_eq!(result.debt_value, 0);
+    }
+
+    #[test]
+    fn test_assess_vault_safe_action_contains_hf_harden6() {
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        if let KeeperAction::Safe { health_factor } = result.action {
+            assert_eq!(health_factor, result.health_factor);
+        } else {
+            panic!("Expected Safe action");
+        }
+    }
+
+    #[test]
+    fn test_assess_vault_warn_action_contains_owner_harden6() {
+        let vault = test_vault(7_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let result = assess_vault(&vault, &pool, None, 1200 * PRECISION, PRECISION);
+        if let KeeperAction::Warn { vault_owner, .. } = result.action {
+            assert_eq!(vault_owner, vault.owner_lock_hash);
+        } else {
+            panic!("Expected Warn action");
+        }
+    }
+
+    #[test]
+    fn test_batch_assess_empty_returns_empty() {
+        let pool = test_lending_pool();
+        let result = assess_vaults(&[], &pool, None, PRECISION, PRECISION);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_batch_assess_single_vault_returns_one() {
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let vaults = vec![(vault, test_cell_input(1))];
+        let result = assess_vaults(&vaults, &pool, None, 2000 * PRECISION, PRECISION);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_batch_assess_sorted_by_hf_ascending() {
+        let vault_safe = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let vault_risky = test_vault(7_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (vault_safe, test_cell_input(1)),
+            (vault_risky, test_cell_input(2)),
+        ];
+        let result = assess_vaults(&vaults, &pool, None, 1200 * PRECISION, PRECISION);
+        assert!(result[0].0.health_factor <= result[1].0.health_factor);
+    }
+
+    #[test]
+    fn test_batch_assess_preserves_original_index() {
+        let vault_safe = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let vault_risky = test_vault(7_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (vault_safe, test_cell_input(1)),
+            (vault_risky, test_cell_input(2)),
+        ];
+        let result = assess_vaults(&vaults, &pool, None, 1200 * PRECISION, PRECISION);
+        // Indices should be either 0 or 1
+        let indices: Vec<usize> = result.iter().map(|(_, i)| *i).collect();
+        assert!(indices.contains(&0));
+        assert!(indices.contains(&1));
+    }
+
+    #[test]
+    fn test_premium_accrual_zero_when_block_too_early() {
+        let ins = test_insurance_pool();
+        let pool = test_lending_pool();
+        // Current block is same as last premium block
+        let premium = check_premium_accrual(&ins, &pool, 100, 100);
+        assert_eq!(premium, 0);
+    }
+
+    #[test]
+    fn test_premium_accrual_nonzero_when_blocks_elapsed() {
+        let ins = test_insurance_pool();
+        let pool = test_lending_pool();
+        let premium = check_premium_accrual(&ins, &pool, 300, 100);
+        assert!(premium > 0);
+    }
+
+    #[test]
+    fn test_premium_accrual_larger_gap_more_premium() {
+        let ins = test_insurance_pool();
+        let pool = test_lending_pool();
+        let p1 = check_premium_accrual(&ins, &pool, 300, 100);
+        let p2 = check_premium_accrual(&ins, &pool, 500, 100);
+        assert!(p2 > p1);
+    }
+
+    #[test]
+    fn test_stress_test_empty_vaults_empty_result() {
+        let pool = test_lending_pool();
+        let result = stress_test_vaults(&[], &pool, 2000 * PRECISION, PRECISION, 3000);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_stress_test_no_debt_vault_not_at_risk_harden6() {
+        let vault = test_vault(0, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let vaults = vec![(vault, test_cell_input(1))];
+        let result = stress_test_vaults(&vaults, &pool, 2000 * PRECISION, PRECISION, 5000);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_stress_test_zero_drop_no_risk_harden6() {
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let vaults = vec![(vault, test_cell_input(1))];
+        let result = stress_test_vaults(&vaults, &pool, 2000 * PRECISION, PRECISION, 0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_stress_test_sorted_ascending_by_stressed_hf() {
+        let vault1 = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let vault2 = test_vault(6_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let vaults = vec![
+            (vault1, test_cell_input(1)),
+            (vault2, test_cell_input(2)),
+        ];
+        let result = stress_test_vaults(&vaults, &pool, 2000 * PRECISION, PRECISION, 5000);
+        if result.len() >= 2 {
+            assert!(result[0].1 <= result[1].1);
+        }
+    }
+
+    #[test]
+    fn test_assess_vault_current_debt_equals_shares_when_index_1() {
+        // When borrow_index == borrow_index_snapshot == PRECISION, current_debt == debt_shares
+        let vault = test_vault(1000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        assert_eq!(result.current_debt, 1000 * PRECISION);
+    }
+
+    #[test]
+    fn test_assess_vault_debt_increases_with_borrow_index() {
+        let vault = test_vault(1000 * PRECISION, 10 * PRECISION);
+        let mut pool = test_lending_pool();
+        pool.borrow_index = 2 * PRECISION; // index doubled = debt doubled
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        assert_eq!(result.current_debt, 2000 * PRECISION);
+    }
+
+    #[test]
+    fn test_assess_vault_hf_decreases_when_collateral_price_drops() {
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let r1 = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let r2 = assess_vault(&vault, &pool, None, 1000 * PRECISION, PRECISION);
+        assert!(r2.health_factor < r1.health_factor);
+    }
+
+    #[test]
+    fn test_assess_vault_hf_decreases_when_debt_price_increases() {
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let r1 = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let r2 = assess_vault(&vault, &pool, None, 2000 * PRECISION, 2 * PRECISION);
+        assert!(r2.health_factor < r1.health_factor);
+    }
+
+    #[test]
+    fn test_keeper_action_safe_eq_harden6() {
+        let a = KeeperAction::Safe { health_factor: 100 };
+        let b = KeeperAction::Safe { health_factor: 100 };
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_keeper_action_safe_ne_different_hf_harden6() {
+        let a = KeeperAction::Safe { health_factor: 100 };
+        let b = KeeperAction::Safe { health_factor: 200 };
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_keeper_action_warn_ne_safe() {
+        let a = KeeperAction::Safe { health_factor: 100 };
+        let b = KeeperAction::Warn { health_factor: 100, vault_owner: [0; 32] };
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_vault_assessment_debug_does_not_panic() {
+        let vault = test_vault(5_000 * PRECISION, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let result = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        let debug = format!("{:?}", result);
+        assert!(!debug.is_empty());
+    }
+
+    #[test]
+    fn test_assess_vault_collateral_value_scales_linearly() {
+        let vault = test_vault(0, 10 * PRECISION);
+        let pool = test_lending_pool();
+        let r1 = assess_vault(&vault, &pool, None, 1000 * PRECISION, PRECISION);
+        let r2 = assess_vault(&vault, &pool, None, 2000 * PRECISION, PRECISION);
+        // Collateral value at 2x price should be 2x
+        assert_eq!(r2.collateral_value, r1.collateral_value * 2);
+    }
+
+    #[test]
+    fn test_premium_accrual_at_minimum_boundary() {
+        let ins = test_insurance_pool();
+        let pool = test_lending_pool();
+        let min_blocks = 100u64;
+        // current_block = last_premium_block + min_blocks → should be zero (not enough elapsed)
+        let premium = check_premium_accrual(&ins, &pool, 100 + min_blocks, min_blocks);
+        assert_eq!(premium, 0);
+    }
+
+    #[test]
+    fn test_premium_accrual_one_block_past_minimum() {
+        let ins = test_insurance_pool();
+        let pool = test_lending_pool();
+        let min_blocks = 100u64;
+        let premium = check_premium_accrual(&ins, &pool, 100 + min_blocks + 1, min_blocks);
+        assert!(premium > 0);
+    }
 }

@@ -2512,4 +2512,312 @@ mod tests {
         // Slash = 50% of 100 = 50
         assert_eq!(result.total_slashed, 50);
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_create_batch_preserves_config_h6() {
+        let cfg = test_config();
+        let b = create_batch(42, test_pool_id(), 5000, cfg.clone());
+        assert_eq!(b.batch_id, 42);
+        assert_eq!(b.pool_id, test_pool_id());
+        assert_eq!(b.start_time_ms, 5000);
+        assert_eq!(b.config.commit_duration_ms, cfg.commit_duration_ms);
+    }
+
+    #[test]
+    fn test_validate_config_all_valid_h6() {
+        let cfg = BatchConfig {
+            commit_duration_ms: 1,
+            reveal_duration_ms: 1,
+            min_orders: 1,
+            max_orders: 1,
+            min_deposit_bps: 0,
+            slash_rate_bps: 0,
+            fee_rate_bps: 0,
+            priority_fee_enabled: false,
+        };
+        assert!(validate_config(&cfg).is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_boundary_max_slash_h6() {
+        let mut cfg = test_config();
+        cfg.slash_rate_bps = MAX_SLASH_BPS;
+        assert!(validate_config(&cfg).is_ok());
+        cfg.slash_rate_bps = MAX_SLASH_BPS + 1;
+        assert!(validate_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn test_validate_config_boundary_max_fee_h6() {
+        let mut cfg = test_config();
+        cfg.fee_rate_bps = MAX_FEE_BPS;
+        assert!(validate_config(&cfg).is_ok());
+        cfg.fee_rate_bps = MAX_FEE_BPS + 1;
+        assert!(validate_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn test_current_phase_exactly_at_commit_end_h6() {
+        let b = create_batch(1, test_pool_id(), 1000, test_config());
+        // commit_end = 1000 + 8000 = 9000
+        let phase = current_phase(&b, 9000);
+        assert_eq!(phase, BatchPhase::Revealing);
+    }
+
+    #[test]
+    fn test_current_phase_one_ms_before_commit_end_h6() {
+        let b = create_batch(1, test_pool_id(), 1000, test_config());
+        let phase = current_phase(&b, 8999);
+        assert_eq!(phase, BatchPhase::Accepting);
+    }
+
+    #[test]
+    fn test_time_remaining_mid_accepting_h6() {
+        let b = create_batch(1, test_pool_id(), 1000, test_config());
+        // commit_end = 9000, now = 5000
+        let rem = time_remaining_ms(&b, 5000);
+        assert_eq!(rem, 4000);
+    }
+
+    #[test]
+    fn test_time_remaining_mid_revealing_h6() {
+        let b = create_batch(1, test_pool_id(), 1000, test_config());
+        // reveal_end = 9000 + 2000 = 11000, now = 10000
+        let rem = time_remaining_ms(&b, 10000);
+        assert_eq!(rem, 1000);
+    }
+
+    #[test]
+    fn test_add_commit_deposits_accumulate_h6() {
+        let mut b = create_batch(1, test_pool_id(), 1000, test_config());
+        let s1 = test_secret(1);
+        let s2 = test_secret(2);
+        let c1 = make_commit(100, true, &s1, test_depositor(1), 50, 1500);
+        let c2 = make_commit(200, false, &s2, test_depositor(2), 75, 1600);
+        add_commit(&mut b, c1, 1500).unwrap();
+        add_commit(&mut b, c2, 1600).unwrap();
+        assert_eq!(b.total_deposits, 125);
+    }
+
+    #[test]
+    fn test_compute_commit_hash_buy_vs_sell_differ_h6() {
+        let secret = test_secret(1);
+        let h_buy = compute_commit_hash(100, true, &secret);
+        let h_sell = compute_commit_hash(100, false, &secret);
+        assert_ne!(h_buy, h_sell);
+    }
+
+    #[test]
+    fn test_minimum_deposit_100_bps_h6() {
+        let cfg = test_config(); // min_deposit_bps = 100
+        let deposit = minimum_deposit(10000, &cfg);
+        assert_eq!(deposit, 100); // 10000 * 100 / 10000 = 100
+    }
+
+    #[test]
+    fn test_minimum_deposit_small_amount_floor_h6() {
+        let cfg = test_config();
+        let deposit = minimum_deposit(1, &cfg);
+        assert_eq!(deposit, 1); // minimum 1 if amount > 0
+    }
+
+    #[test]
+    fn test_verify_reveal_correct_h6() {
+        let secret = test_secret(1);
+        let hash = compute_commit_hash(500, true, &secret);
+        let commit = Commit { commit_hash: hash, depositor: test_depositor(1), deposit_amount: 50, timestamp_ms: 1000, is_eoa: true };
+        let reveal = Reveal { commit_index: 0, amount: 500, is_buy: true, secret, priority_fee: 0 };
+        assert!(verify_reveal(&commit, &reveal));
+    }
+
+    #[test]
+    fn test_verify_reveal_wrong_amount_h6() {
+        let secret = test_secret(1);
+        let hash = compute_commit_hash(500, true, &secret);
+        let commit = Commit { commit_hash: hash, depositor: test_depositor(1), deposit_amount: 50, timestamp_ms: 1000, is_eoa: true };
+        let reveal = Reveal { commit_index: 0, amount: 501, is_buy: true, secret, priority_fee: 0 };
+        assert!(!verify_reveal(&commit, &reveal));
+    }
+
+    #[test]
+    fn test_reveal_rate_bps_all_revealed_h6() {
+        let b = make_batch_with_commits_and_reveals(3, 1000, 2, 1000);
+        assert_eq!(reveal_rate_bps(&b), 10000); // 5/5 = 100%
+    }
+
+    #[test]
+    fn test_unrevealed_commits_all_revealed_empty_h6() {
+        let b = make_batch_with_commits_and_reveals(2, 1000, 2, 1000);
+        let unrevealed = unrevealed_commits(&b);
+        assert!(unrevealed.is_empty());
+    }
+
+    #[test]
+    fn test_slash_unrevealed_no_unrevealed_h6() {
+        let mut b = make_batch_with_commits_and_reveals(2, 1000, 0, 0);
+        let slashed = slash_unrevealed(&mut b);
+        assert_eq!(slashed, 0);
+    }
+
+    #[test]
+    fn test_compute_clearing_price_equal_reserves_h6() {
+        let reveals = vec![
+            Reveal { commit_index: 0, amount: 1000, is_buy: true, secret: test_secret(1), priority_fee: 0 },
+            Reveal { commit_index: 1, amount: 1000, is_buy: false, secret: test_secret(2), priority_fee: 0 },
+        ];
+        let price = compute_clearing_price(&reveals, 10000, 10000);
+        // Base price = 10000 * 10000 / 10000 = 10000, balanced so no shift
+        assert_eq!(price, 10000);
+    }
+
+    #[test]
+    fn test_compute_clearing_price_zero_reserve_a_h6() {
+        let reveals = vec![];
+        let price = compute_clearing_price(&reveals, 0, 10000);
+        assert_eq!(price, 0);
+    }
+
+    #[test]
+    fn test_buy_sell_ratio_only_buys_h6() {
+        let b = make_batch_with_commits_and_reveals(3, 1000, 0, 0);
+        let (buys, sells) = buy_sell_ratio(&b);
+        assert_eq!(buys, 3000);
+        assert_eq!(sells, 0);
+    }
+
+    #[test]
+    fn test_order_imbalance_full_buy_h6() {
+        let b = make_batch_with_commits_and_reveals(3, 1000, 0, 0);
+        let imb = order_imbalance_bps(&b);
+        assert_eq!(imb, 10000); // 100% imbalance
+    }
+
+    #[test]
+    fn test_avg_order_size_h6() {
+        let b = make_batch_with_commits_and_reveals(2, 1000, 2, 3000);
+        let avg = avg_order_size(&b);
+        // Total = 2*1000 + 2*3000 = 8000, count = 4, avg = 2000
+        assert_eq!(avg, 2000);
+    }
+
+    #[test]
+    fn test_priority_fee_total_nonzero_h6() {
+        let mut b = create_batch(1, test_pool_id(), 1000, test_config());
+        b.reveals.push(Reveal { commit_index: 0, amount: 100, is_buy: true, secret: test_secret(1), priority_fee: 10 });
+        b.reveals.push(Reveal { commit_index: 1, amount: 200, is_buy: false, secret: test_secret(2), priority_fee: 20 });
+        assert_eq!(priority_fee_total(&b), 30);
+    }
+
+    #[test]
+    fn test_settlement_quality_balanced_high_count_h6() {
+        let result = BatchResult {
+            batch_id: 1,
+            clearing_price: 10000,
+            total_buy_volume: 5000,
+            total_sell_volume: 5000,
+            matched_volume: 10000,
+            total_fees: 30,
+            total_slashed: 0,
+            fill_count: 20,
+            average_fill_rate_bps: 10000,
+            quality_score: 0,
+        };
+        let q = settlement_quality(&result);
+        assert_eq!(q, 10000); // Perfect balance, perfect fill, 20+ orders
+    }
+
+    #[test]
+    fn test_compute_batch_stats_two_results_h6() {
+        let r1 = BatchResult { batch_id: 1, clearing_price: 10000, total_buy_volume: 500, total_sell_volume: 500, matched_volume: 1000, total_fees: 3, total_slashed: 0, fill_count: 4, average_fill_rate_bps: 10000, quality_score: 9000 };
+        let r2 = BatchResult { batch_id: 2, clearing_price: 12000, total_buy_volume: 800, total_sell_volume: 200, matched_volume: 500, total_fees: 2, total_slashed: 10, fill_count: 3, average_fill_rate_bps: 5000, quality_score: 6000 };
+        let stats = compute_batch_stats(&[r1, r2], 1);
+        assert_eq!(stats.total_batches, 3);
+        assert_eq!(stats.settled_batches, 2);
+        assert_eq!(stats.expired_batches, 1);
+        assert_eq!(stats.total_volume, 1500);
+    }
+
+    #[test]
+    fn test_batch_throughput_10_batches_1_second_h6() {
+        let stats = BatchStats { total_batches: 10, settled_batches: 10, expired_batches: 0, total_volume: 0, total_fees_collected: 0, total_slashed: 0, avg_orders_per_batch: 0, avg_reveal_rate_bps: 0, avg_settlement_quality: 0 };
+        let tput = batch_throughput(&stats, 1000);
+        assert_eq!(tput, 10_000); // 10 batches per 1000ms = 10_000 per million ms
+    }
+
+    #[test]
+    fn test_expire_batch_returns_total_refund_h6() {
+        let mut b = create_batch(1, test_pool_id(), 1000, test_config());
+        let s = test_secret(1);
+        let commit = make_commit(1000, true, &s, test_depositor(1), 100, 1500);
+        b.commits.push(commit);
+        b.total_deposits += 100;
+        // All unrevealed, slash 50%
+        let refund = expire_batch(&mut b, 12000).unwrap();
+        // Refund = 100 - slash(50%) = 50
+        assert_eq!(refund, 50);
+    }
+
+    #[test]
+    fn test_refund_amounts_revealed_get_full_back_h6() {
+        let mut b = create_batch(1, test_pool_id(), 1000, test_config());
+        let s = test_secret(1);
+        let commit = make_commit(1000, true, &s, test_depositor(1), 100, 1500);
+        b.commits.push(commit);
+        b.reveals.push(make_reveal(0, 1000, true, s, 0));
+        let refunds = refund_amounts(&b);
+        assert_eq!(refunds[0].1, 100); // Full deposit back
+    }
+
+    #[test]
+    fn test_next_batch_id_increment_h6() {
+        assert_eq!(next_batch_id(0), 1);
+        assert_eq!(next_batch_id(100), 101);
+    }
+
+    #[test]
+    fn test_next_batch_id_saturates_h6() {
+        assert_eq!(next_batch_id(u64::MAX), u64::MAX);
+    }
+
+    #[test]
+    fn test_batch_duration_default_h6() {
+        let cfg = test_config();
+        assert_eq!(batch_duration_ms(&cfg), 10000); // 8000 + 2000
+    }
+
+    #[test]
+    fn test_validate_batch_sequence_gap_in_ids_h6() {
+        let b1 = create_batch(1, test_pool_id(), 1000, test_config());
+        let b2 = create_batch(3, test_pool_id(), 20000, test_config()); // id gap
+        assert!(!validate_batch_sequence(&[b1, b2]));
+    }
+
+    #[test]
+    fn test_is_valid_batch_fresh_batch_h6() {
+        let b = create_batch(1, test_pool_id(), 1000, test_config());
+        assert!(is_valid_batch(&b));
+    }
+
+    #[test]
+    fn test_effective_fee_rate_30_bps_h6() {
+        let result = BatchResult { batch_id: 1, clearing_price: 10000, total_buy_volume: 500, total_sell_volume: 500, matched_volume: 10000, total_fees: 30, total_slashed: 0, fill_count: 2, average_fill_rate_bps: 10000, quality_score: 0 };
+        let rate = effective_fee_rate_bps(&result);
+        assert_eq!(rate, 30); // 30 fees / 10000 volume * 10000 = 30
+    }
+
+    #[test]
+    fn test_fee_efficiency_h6() {
+        let stats = BatchStats { total_batches: 1, settled_batches: 1, expired_batches: 0, total_volume: 10000, total_fees_collected: 30, total_slashed: 0, avg_orders_per_batch: 5, avg_reveal_rate_bps: 10000, avg_settlement_quality: 9000 };
+        let eff = fee_efficiency(&stats);
+        assert_eq!(eff, 30); // 30 * 10000 / 10000
+    }
+
+    #[test]
+    fn test_volume_weighted_quality_single_h6() {
+        let r = BatchResult { batch_id: 1, clearing_price: 10000, total_buy_volume: 500, total_sell_volume: 500, matched_volume: 1000, total_fees: 3, total_slashed: 0, fill_count: 4, average_fill_rate_bps: 10000, quality_score: 8000 };
+        let q = volume_weighted_quality(&[r]);
+        assert_eq!(q, 8000);
+    }
 }

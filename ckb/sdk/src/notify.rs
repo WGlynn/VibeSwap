@@ -2267,4 +2267,287 @@ mod tests {
         assert_eq!(event_frequency(&log, &EventType::Swap, 500, 500), 2);
         assert_eq!(event_frequency(&log, &EventType::Stake, 500, 500), 1);
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_emit_event_data_hash_encodes_values_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 42, 99);
+        let e = get_event(&log, 1).unwrap();
+        // First 8 bytes = value LE, next 8 = secondary LE
+        assert_eq!(u64::from_le_bytes(e.data_hash[0..8].try_into().unwrap()), 42);
+        assert_eq!(u64::from_le_bytes(e.data_hash[8..16].try_into().unwrap()), 99);
+    }
+
+    #[test]
+    fn test_emit_event_preserves_all_fields_h6() {
+        let mut log = create_event_log(100);
+        let src = make_source(5);
+        let act = make_actor(7);
+        emit_event(&mut log, EventType::GovernanceProposal, Severity::Critical, 5000, 99, src, act, 123, 456);
+        let e = get_event(&log, 1).unwrap();
+        assert_eq!(e.event_type, EventType::GovernanceProposal);
+        assert_eq!(e.severity, Severity::Critical);
+        assert_eq!(e.timestamp, 5000);
+        assert_eq!(e.block_height, 99);
+        assert_eq!(e.source, src);
+        assert_eq!(e.actor, act);
+        assert_eq!(e.value, 123);
+        assert_eq!(e.secondary_value, 456);
+    }
+
+    #[test]
+    fn test_subscribe_inactive_not_duplicate_h6() {
+        let mut log = create_event_log(100);
+        let sub_id = subscribe(&mut log, make_source(1), vec![EventType::Swap], Severity::Info, None, FilterOp::Any, 0).unwrap();
+        pause_subscription(&mut log, sub_id).unwrap();
+        // Same params but original is paused — should NOT be duplicate since it checks active flag
+        let sub_id2 = subscribe(&mut log, make_source(1), vec![EventType::Swap], Severity::Info, None, FilterOp::Any, 0);
+        assert!(sub_id2.is_ok());
+    }
+
+    #[test]
+    fn test_clear_old_events_boundary_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 200, 2, make_source(1), make_actor(1), 20, 0);
+        // Clear events before timestamp 200 — should remove ts=100 but keep ts=200
+        let removed = clear_old_events(&mut log, 200);
+        assert_eq!(removed, 1);
+        assert_eq!(log.events.len(), 1);
+        assert_eq!(log.events[0].timestamp, 200);
+    }
+
+    #[test]
+    fn test_events_in_range_boundary_inclusive_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 200, 2, make_source(1), make_actor(1), 20, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 300, 3, make_source(1), make_actor(1), 30, 0);
+        let in_range = events_in_range(&log, 100, 300);
+        assert_eq!(in_range.len(), 3);
+    }
+
+    #[test]
+    fn test_filter_events_equals_exact_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 42, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 200, 2, make_source(1), make_actor(1), 43, 0);
+        let filtered = filter_events(&log, None, None, &FilterOp::Equals(42));
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].value, 42);
+    }
+
+    #[test]
+    fn test_classify_severity_boundary_150_h6() {
+        // ratio=150 for general events should be Warning
+        let s = classify_severity(&EventType::Swap, 150, 100);
+        assert_eq!(s, Severity::Warning);
+    }
+
+    #[test]
+    fn test_classify_severity_boundary_300_h6() {
+        // ratio=300 for general events should be Critical
+        let s = classify_severity(&EventType::Swap, 300, 100);
+        assert_eq!(s, Severity::Critical);
+    }
+
+    #[test]
+    fn test_classify_severity_boundary_500_h6() {
+        // ratio=500 for general events should be Emergency
+        let s = classify_severity(&EventType::Swap, 500, 100);
+        assert_eq!(s, Severity::Emergency);
+    }
+
+    #[test]
+    fn test_classify_severity_circuit_breaker_150_h6() {
+        // ratio=150 for circuit breaker should be Critical
+        let s = classify_severity(&EventType::CircuitBreakerTrip, 150, 100);
+        assert_eq!(s, Severity::Critical);
+    }
+
+    #[test]
+    fn test_classify_severity_circuit_breaker_200_h6() {
+        // ratio=200 for circuit breaker should be Emergency
+        let s = classify_severity(&EventType::CircuitBreakerTrip, 200, 100);
+        assert_eq!(s, Severity::Emergency);
+    }
+
+    #[test]
+    fn test_process_event_updates_notification_count_h6() {
+        let mut log = create_event_log(100);
+        subscribe(&mut log, make_source(1), vec![EventType::Swap], Severity::Info, None, FilterOp::Any, 0).unwrap();
+        let eid = emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        process_event(&mut log, eid);
+        assert_eq!(log.subscriptions[0].notification_count, 1);
+    }
+
+    #[test]
+    fn test_pending_notifications_after_delivery_h6() {
+        let mut log = create_event_log(100);
+        subscribe(&mut log, make_source(1), vec![EventType::Swap], Severity::Info, None, FilterOp::Any, 0).unwrap();
+        let eid = emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        let nids = process_event(&mut log, eid);
+        assert_eq!(pending_notifications(&log).len(), 1);
+        mark_delivered(&mut log, nids[0], 200).unwrap();
+        assert_eq!(pending_notifications(&log).len(), 0);
+    }
+
+    #[test]
+    fn test_price_alert_below_threshold_returns_none_h6() {
+        let mut log = create_event_log(100);
+        let result = price_alert(&mut log, make_source(1), 99, 100, 1000, 10);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_volume_alert_exactly_at_threshold_h6() {
+        let mut log = create_event_log(100);
+        let result = volume_alert(&mut log, make_source(1), 100, 100, 1000, 10);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_large_tx_alert_below_threshold_h6() {
+        let mut log = create_event_log(100);
+        let result = large_tx_alert(&mut log, make_actor(1), 50, 100, 1000, 10);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_compute_stats_delivery_rate_100_percent_h6() {
+        let mut log = create_event_log(100);
+        subscribe(&mut log, make_source(1), vec![EventType::Swap], Severity::Info, None, FilterOp::Any, 0).unwrap();
+        let eid = emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        let nids = process_event(&mut log, eid);
+        mark_delivered(&mut log, nids[0], 200).unwrap();
+        let stats = compute_stats(&log);
+        assert_eq!(stats.delivery_rate_bps, 10000);
+    }
+
+    #[test]
+    fn test_most_common_event_with_ties_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Stake, Severity::Info, 200, 2, make_source(1), make_actor(1), 20, 0);
+        // Both have count=1, function returns first found
+        let common = most_common_event(&log);
+        assert!(common.is_some());
+    }
+
+    #[test]
+    fn test_busiest_block_single_block_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 5, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Stake, Severity::Info, 200, 5, make_source(1), make_actor(1), 20, 0);
+        let (block, count) = busiest_block(&log).unwrap();
+        assert_eq!(block, 5);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_severity_distribution_all_levels_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Warning, 200, 2, make_source(1), make_actor(1), 20, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Critical, 300, 3, make_source(1), make_actor(1), 30, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Emergency, 400, 4, make_source(1), make_actor(1), 40, 0);
+        let dist = severity_distribution(&log);
+        assert_eq!(dist.len(), 4);
+        for (_, c) in &dist {
+            assert_eq!(*c, 1);
+        }
+    }
+
+    #[test]
+    fn test_trim_to_capacity_overflow_h6() {
+        let mut log = create_event_log(2);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 200, 2, make_source(1), make_actor(1), 20, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 300, 3, make_source(1), make_actor(1), 30, 0);
+        // Should have auto-trimmed to 2
+        assert_eq!(log.events.len(), 2);
+        assert_eq!(log.events[0].timestamp, 200);
+    }
+
+    #[test]
+    fn test_capacity_remaining_at_capacity_h6() {
+        let mut log = create_event_log(2);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 200, 2, make_source(1), make_actor(1), 20, 0);
+        assert_eq!(capacity_remaining(&log), 0);
+    }
+
+    #[test]
+    fn test_oldest_newest_ordering_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 500, 5, make_source(1), make_actor(1), 50, 0);
+        assert_eq!(oldest_event(&log).unwrap().timestamp, 100);
+        assert_eq!(newest_event(&log).unwrap().timestamp, 500);
+    }
+
+    #[test]
+    fn test_cleanup_delivered_respects_time_boundary_h6() {
+        let mut log = create_event_log(100);
+        subscribe(&mut log, make_source(1), vec![EventType::Swap], Severity::Info, None, FilterOp::Any, 0).unwrap();
+        let eid = emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        let nids = process_event(&mut log, eid);
+        mark_delivered(&mut log, nids[0], 150).unwrap();
+        // Cleanup before 200 should remove the notification (delivered_at=150 < 200)
+        let removed = cleanup_delivered(&mut log, 200);
+        assert_eq!(removed, 1);
+    }
+
+    #[test]
+    fn test_matches_filter_between_boundary_h6() {
+        assert!(matches_filter(10, &FilterOp::Between(10, 20)));
+        assert!(matches_filter(20, &FilterOp::Between(10, 20)));
+        assert!(!matches_filter(9, &FilterOp::Between(10, 20)));
+        assert!(!matches_filter(21, &FilterOp::Between(10, 20)));
+    }
+
+    #[test]
+    fn test_matches_filter_greater_than_boundary_h6() {
+        assert!(!matches_filter(10, &FilterOp::GreaterThan(10)));
+        assert!(matches_filter(11, &FilterOp::GreaterThan(10)));
+    }
+
+    #[test]
+    fn test_matches_filter_less_than_boundary_h6() {
+        assert!(!matches_filter(10, &FilterOp::LessThan(10)));
+        assert!(matches_filter(9, &FilterOp::LessThan(10)));
+    }
+
+    #[test]
+    fn test_event_frequency_outside_window_h6() {
+        let mut log = create_event_log(100);
+        emit_event(&mut log, EventType::Swap, Severity::Info, 100, 1, make_source(1), make_actor(1), 10, 0);
+        // Window starts at now - window_ms = 500 - 100 = 400, event at 100 is before
+        assert_eq!(event_frequency(&log, &EventType::Swap, 100, 500), 0);
+    }
+
+    #[test]
+    fn test_emit_batch_multiple_types_h6() {
+        let mut log = create_event_log(100);
+        let events = vec![
+            (EventType::Swap, Severity::Info, 100u64, 1u64, make_source(1), make_actor(1), 10u64, 0u64),
+            (EventType::Stake, Severity::Warning, 200, 2, make_source(2), make_actor(2), 20, 0),
+            (EventType::GovernanceVote, Severity::Critical, 300, 3, make_source(3), make_actor(3), 30, 0),
+        ];
+        let ids = emit_batch(&mut log, events);
+        assert_eq!(ids.len(), 3);
+        assert_eq!(log.events.len(), 3);
+    }
+
+    #[test]
+    fn test_total_events_processed_saturating_h6() {
+        let mut log = create_event_log(10);
+        for i in 0..20u64 {
+            emit_event(&mut log, EventType::Swap, Severity::Info, i * 10, i, make_source(1), make_actor(1), 10, 0);
+        }
+        // Even though ring buffer trims, total_events_processed should be 20
+        assert_eq!(log.total_events_processed, 20);
+    }
 }

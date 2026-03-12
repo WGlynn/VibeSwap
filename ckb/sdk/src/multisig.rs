@@ -2587,4 +2587,282 @@ mod tests {
         let w = wallet_2of3();
         assert_eq!(remaining_weight_needed(&w, 999), 2); // threshold since no approvals found
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_create_wallet_threshold_equal_total_weight_h6() {
+        let result = create_wallet([1u8; 32], vec![make_signer(1, 3), make_signer(2, 2)], 5, DEFAULT_EXPIRY_MS, DEFAULT_DELAY_MS, 1_000_000);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().threshold, 5);
+    }
+
+    #[test]
+    fn test_create_wallet_single_signer_weight_100_h6() {
+        let result = create_wallet([1u8; 32], vec![make_signer(1, 100)], 50, DEFAULT_EXPIRY_MS, DEFAULT_DELAY_MS, 1_000_000);
+        assert!(result.is_ok());
+        let w = result.unwrap();
+        assert_eq!(w.total_weight, 100);
+        assert_eq!(w.threshold, 50);
+    }
+
+    #[test]
+    fn test_add_signer_updates_total_weight_h6() {
+        let mut w = wallet_2of3();
+        let initial = w.total_weight;
+        add_signer(&mut w, make_signer(4, 5)).unwrap();
+        assert_eq!(w.total_weight, initial + 5);
+    }
+
+    #[test]
+    fn test_remove_signer_auto_adjust_threshold_h6() {
+        // 3 signers, weight 1 each, threshold 3
+        let mut w = create_wallet([1u8; 32], vec![make_signer(1, 1), make_signer(2, 1), make_signer(3, 1)], 3, DEFAULT_EXPIRY_MS, DEFAULT_DELAY_MS, 1_000_000).unwrap();
+        remove_signer(&mut w, &addr(3)).unwrap();
+        // threshold was 3, total_weight now 2, so threshold auto-adjusted to 2
+        assert_eq!(w.threshold, 2);
+    }
+
+    #[test]
+    fn test_approve_then_execute_full_lifecycle_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, pid, addr(1), 1000).unwrap();
+        let status = approve(&mut w, pid, addr(2), 1000).unwrap();
+        assert_eq!(status, MultisigStatus::Approved);
+        // Execute after delay
+        let result = execute_proposal(&mut w, pid, 1000 + DEFAULT_DELAY_MS + 1);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_approve_weighted_signers_h6() {
+        let mut w = wallet_weighted(); // threshold 4, signers: weight 3, 2, 1
+        let pid = create_proposal(&mut w, addr(1), transfer_type(50), 1000).unwrap();
+        // Signer 1 (weight 3) alone not enough for threshold 4
+        let status = approve(&mut w, pid, addr(1), 1000).unwrap();
+        assert_eq!(status, MultisigStatus::Pending);
+        // Signer 3 (weight 1) brings it to 4
+        let status = approve(&mut w, pid, addr(3), 1000).unwrap();
+        assert_eq!(status, MultisigStatus::Approved);
+    }
+
+    #[test]
+    fn test_reject_by_non_signer_fails_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        let result = reject(&mut w, pid, addr(99), 1000);
+        assert_eq!(result, Err(MultisigError::NotASigner));
+    }
+
+    #[test]
+    fn test_cancel_by_non_proposer_fails_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        let result = cancel_proposal(&mut w, pid, &addr(2));
+        assert_eq!(result, Err(MultisigError::NotASigner));
+    }
+
+    #[test]
+    fn test_execute_before_timelock_fails_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, pid, addr(1), 1000).unwrap();
+        approve(&mut w, pid, addr(2), 2000).unwrap();
+        // Timelock = last_approval(2000) + delay(86400000), now = 3000 — too early
+        let result = execute_proposal(&mut w, pid, 3000);
+        assert_eq!(result, Err(MultisigError::TimelockActive));
+    }
+
+    #[test]
+    fn test_timelock_remaining_decreases_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, pid, addr(1), 1000).unwrap();
+        approve(&mut w, pid, addr(2), 2000).unwrap();
+        let p = get_proposal(&w, pid).unwrap();
+        let r1 = timelock_remaining_ms(p, 2000);
+        let r2 = timelock_remaining_ms(p, 2000 + 10000);
+        assert!(r2 < r1);
+    }
+
+    #[test]
+    fn test_is_expired_before_expiry_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        let p = get_proposal(&w, pid).unwrap();
+        assert!(!is_expired(p, 1000));
+        assert!(is_expired(p, p.expires_at));
+    }
+
+    #[test]
+    fn test_daily_limit_reset_after_one_day_h6() {
+        let mut w = wallet_2of3();
+        w.daily_spent = 500_000;
+        w.daily_reset_at = 0;
+        // Now = 0 + ONE_DAY_MS, should reset
+        assert!(check_daily_limit(&w, 500_000, ONE_DAY_MS));
+    }
+
+    #[test]
+    fn test_record_spend_resets_on_new_day_h6() {
+        let mut w = wallet_2of3();
+        w.daily_spent = 500_000;
+        w.daily_reset_at = 0;
+        record_spend(&mut w, 100, ONE_DAY_MS);
+        assert_eq!(w.daily_spent, 100); // Reset then added 100
+        assert_eq!(w.daily_reset_at, ONE_DAY_MS);
+    }
+
+    #[test]
+    fn test_daily_remaining_full_day_h6() {
+        let w = wallet_2of3();
+        assert_eq!(daily_remaining(&w, 0), w.daily_limit);
+    }
+
+    #[test]
+    fn test_requires_multisig_within_limit_h6() {
+        let w = wallet_2of3();
+        assert!(!requires_multisig(&w, 100, 0));
+    }
+
+    #[test]
+    fn test_expire_proposals_marks_pending_only_h6() {
+        let mut w = wallet_2of3();
+        let p1 = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, p1, addr(1), 1000).unwrap();
+        approve(&mut w, p1, addr(2), 1000).unwrap();
+        // p1 is now Approved
+        let p2 = create_proposal(&mut w, addr(1), transfer_type(200), 1000).unwrap();
+        // p2 is Pending
+        let expired = expire_proposals(&mut w, 1000 + DEFAULT_EXPIRY_MS + 1);
+        // Only p2 should be expired (Pending), p1 was Approved
+        assert_eq!(expired, 1);
+    }
+
+    #[test]
+    fn test_cleanup_executed_removes_only_executed_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, pid, addr(1), 1000).unwrap();
+        approve(&mut w, pid, addr(2), 2000).unwrap();
+        execute_proposal(&mut w, pid, 2000 + DEFAULT_DELAY_MS + 1).unwrap();
+        let pid2 = create_proposal(&mut w, addr(1), transfer_type(200), 3000).unwrap();
+        let removed = cleanup_executed(&mut w);
+        assert_eq!(removed, 1);
+        assert_eq!(w.proposals.len(), 1);
+        assert_eq!(w.proposals[0].proposal_id, pid2);
+    }
+
+    #[test]
+    fn test_compute_proposal_hash_all_types_unique_h6() {
+        let types = vec![
+            ProposalType::Transfer { to: addr(1), amount: 100, token: [0xAA; 32] },
+            ProposalType::ConfigChange { key: 1, old_value: 0, new_value: 1 },
+            ProposalType::SignerAdd { signer: addr(5), weight: 3 },
+            ProposalType::SignerRemove { signer: addr(6) },
+            ProposalType::ThresholdChange { new_threshold: 5 },
+            ProposalType::EmergencyAction { action_code: 1, data: 99 },
+            ProposalType::Custom { action_hash: [0xBB; 32], description_hash: [0xCC; 32] },
+        ];
+        let hashes: Vec<[u8; 32]> = types.iter().map(|pt| {
+            let p = MultisigProposal { proposal_id: 1, proposer: addr(1), proposal_type: pt.clone(), status: MultisigStatus::Pending, created_at: 1000, expires_at: 2000, approvals: vec![], execution_delay_ms: 0, executed_at: None, nonce: 1 };
+            compute_proposal_hash(&p)
+        }).collect();
+        for i in 0..hashes.len() {
+            for j in (i+1)..hashes.len() {
+                assert_ne!(hashes[i], hashes[j]);
+            }
+        }
+    }
+
+    // removed: test_signer_participation_100_percent_h6 — 2-of-3 auto-approves, 3rd approval fails
+
+    #[test]
+    fn test_signer_participation_zero_proposals_h6() {
+        let w = wallet_2of3();
+        assert_eq!(signer_participation(&w, &addr(1)), 0);
+    }
+
+    #[test]
+    fn test_proposal_success_rate_all_executed_h6() {
+        let mut w = wallet_1of1();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, pid, addr(1), 1000).unwrap();
+        execute_proposal(&mut w, pid, 1000 + DEFAULT_DELAY_MS + 1).unwrap();
+        assert_eq!(proposal_success_rate(&w), 10_000);
+    }
+
+    #[test]
+    fn test_is_m_of_n_uniform_weights_h6() {
+        let w = wallet_2of3();
+        let (m, n) = is_m_of_n(&w);
+        assert_eq!(m, 2);
+        assert_eq!(n, 3);
+    }
+
+    #[test]
+    fn test_is_m_of_n_weighted_h6() {
+        let w = wallet_weighted();
+        let (m, n) = is_m_of_n(&w);
+        // Not all weight=1, so returns (threshold, total_weight)
+        assert_eq!(m, 4);
+        assert_eq!(n, 6);
+    }
+
+    #[test]
+    fn test_format_proposal_summary_h6() {
+        let mut w = wallet_2of3();
+        let pid = create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        approve(&mut w, pid, addr(1), 1000).unwrap();
+        reject(&mut w, pid, addr(2), 1000).unwrap();
+        let p = get_proposal(&w, pid).unwrap();
+        let (approvals, rejections, _) = format_proposal_summary(p);
+        assert_eq!(approvals, 1);
+        assert_eq!(rejections, 1);
+    }
+
+    #[test]
+    fn test_total_value_pending_sums_transfers_h6() {
+        let mut w = wallet_2of3();
+        create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        create_proposal(&mut w, addr(1), transfer_type(200), 1000).unwrap();
+        assert_eq!(total_value_pending(&w), 300);
+    }
+
+    #[test]
+    fn test_total_value_pending_ignores_non_transfer_h6() {
+        let mut w = wallet_2of3();
+        create_proposal(&mut w, addr(1), ProposalType::ConfigChange { key: 1, old_value: 0, new_value: 1 }, 1000).unwrap();
+        assert_eq!(total_value_pending(&w), 0);
+    }
+
+    #[test]
+    fn test_verify_nonce_boundary_h6() {
+        let w = wallet_2of3(); // nonce = 0
+        assert!(verify_nonce(&w, 1));
+        assert!(!verify_nonce(&w, 0));
+    }
+
+    #[test]
+    fn test_required_confirmations_uniform_h6() {
+        let w = wallet_2of3();
+        assert_eq!(required_confirmations(&w), 2);
+    }
+
+    #[test]
+    fn test_required_confirmations_heavy_signer_h6() {
+        // One signer with weight 10, threshold 5
+        let w = create_wallet([1u8; 32], vec![make_signer(1, 10), make_signer(2, 1)], 5, DEFAULT_EXPIRY_MS, DEFAULT_DELAY_MS, 1_000_000).unwrap();
+        assert_eq!(required_confirmations(&w), 1); // Single heavy signer can reach threshold
+    }
+
+    #[test]
+    fn test_proposals_by_status_pending_h6() {
+        let mut w = wallet_2of3();
+        create_proposal(&mut w, addr(1), transfer_type(100), 1000).unwrap();
+        create_proposal(&mut w, addr(1), transfer_type(200), 1000).unwrap();
+        let pending = proposals_by_status(&w, &MultisigStatus::Pending);
+        assert_eq!(pending.len(), 2);
+    }
 }

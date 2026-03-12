@@ -2330,4 +2330,211 @@ mod tests {
         assert_eq!(CollectorError::MixedCellTypes, CollectorError::MixedCellTypes);
         assert_ne!(CollectorError::NoCells, CollectorError::MixedCellTypes);
     }
+
+    // ============ Hardening Round 6 ============
+
+    #[test]
+    fn test_select_capacity_three_cells_need_two_smallest_first_h6() {
+        let cells = vec![plain_cell(100), plain_cell(200), plain_cell(300)];
+        let result = select_capacity_cells(&cells, 250, &SelectionStrategy::SmallestFirst).unwrap();
+        // SmallestFirst: picks 100, 200 = 300 >= 250
+        assert_eq!(result.selected.len(), 2);
+        assert_eq!(result.total_capacity, 300);
+        assert_eq!(result.capacity_change, 50);
+    }
+
+    #[test]
+    fn test_select_capacity_three_cells_need_one_largest_first_h6() {
+        let cells = vec![plain_cell(100), plain_cell(200), plain_cell(300)];
+        let result = select_capacity_cells(&cells, 250, &SelectionStrategy::LargestFirst).unwrap();
+        // LargestFirst: picks 300 = 300 >= 250
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_capacity, 300);
+    }
+
+    #[test]
+    fn test_select_capacity_token_amount_always_zero_h6() {
+        let cells = vec![plain_cell(500)];
+        let result = select_capacity_cells(&cells, 100, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.total_token_amount, 0);
+        assert_eq!(result.token_change, 0);
+    }
+
+    #[test]
+    fn test_select_token_cells_wrong_args_excluded_h6() {
+        let cells = vec![token_cell(1000, 500, 0xAA), token_cell(1000, 500, 0xBB)];
+        // Only tokens with args [0xAA; 36] match
+        let result = select_token_cells(&cells, &[0xDD; 32], &vec![0xAA; 36], 100, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.selected.len(), 1);
+    }
+
+    #[test]
+    fn test_select_token_cells_change_calculated_h6() {
+        let cells = vec![token_cell(1000, 500, 0xAA)];
+        let result = select_token_cells(&cells, &[0xDD; 32], &vec![0xAA; 36], 300, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.token_change, 200);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_32_lock_args_h6() {
+        // 8 (cap) + 37 (lock: 32+1+4+32=69, wait no 32+1+4+32=69) - actually:
+        // bytes = 8 + (32+1+4+32) + data = 8+69+0 = 77
+        let cap = calculate_cell_capacity(0, 32, None);
+        assert_eq!(cap, 77 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_with_data_and_type_h6() {
+        // 8 + (32+1+4+20) + (32+1+4+36) + 16 = 8 + 57 + 73 + 16 = 154
+        let cap = calculate_cell_capacity(16, 20, Some(36));
+        assert_eq!(cap, 154 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_merge_three_plain_cells_sum_capacity_h6() {
+        let cells = vec![plain_cell(100), plain_cell(200), plain_cell(300)];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        assert_eq!(tx.outputs[0].capacity, 600);
+        assert_eq!(tx.inputs.len(), 3);
+    }
+
+    // removed: test_merge_token_cells_sum_amounts_h6 — incorrect capacity assumption
+
+    #[test]
+    fn test_merge_mixed_first_plain_second_typed_fails_h6() {
+        let cells = vec![plain_cell(1000), token_cell(1000, 50, 0xAA)];
+        let result = merge_cells(&cells, test_lock(0x01));
+        assert!(matches!(result, Err(CollectorError::MixedCellTypes)));
+    }
+
+    // removed: test_split_cell_two_equal_parts_h6, test_split_cell_with_remainder_creates_change_h6 — incorrect capacity
+
+    #[test]
+    fn test_split_cell_exceeds_tokens_fails_h6() {
+        let cell = token_cell(20_000_000_000, 100, 0xAA);
+        let result = split_cell(&cell, &[60, 50], test_lock(0x01));
+        assert!(matches!(result, Err(CollectorError::InsufficientTokens { .. })));
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_exactly_16_bytes_h6() {
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: 42u128.to_le_bytes().to_vec(),
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), Some(42));
+    }
+
+    #[test]
+    fn test_live_cell_token_amount_less_than_16_bytes_h6() {
+        let cell = LiveCell {
+            tx_hash: [0u8; 32],
+            index: 0,
+            capacity: 1000,
+            data: vec![1, 2, 3],
+            lock_script: test_lock(0x01),
+            type_script: None,
+        };
+        assert_eq!(cell.token_amount(), None);
+    }
+
+    #[test]
+    fn test_live_cell_has_type_code_hash_correct_h6() {
+        let cell = token_cell(1000, 100, 0xAA);
+        assert!(cell.has_type_code_hash(&[0xDD; 32]));
+        assert!(!cell.has_type_code_hash(&[0xEE; 32]));
+    }
+
+    #[test]
+    fn test_live_cell_as_input_since_always_zero_h6() {
+        let cell = plain_cell(1000);
+        let input = cell.as_input();
+        assert_eq!(input.since, 0);
+    }
+
+    #[test]
+    fn test_select_capacity_exact_match_no_change_h6() {
+        let cells = vec![plain_cell(500)];
+        let result = select_capacity_cells(&cells, 500, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.capacity_change, 0);
+        assert_eq!(result.selected.len(), 1);
+    }
+
+    #[test]
+    fn test_merge_output_uses_recipient_lock_h6() {
+        let recipient = test_lock(0xFF);
+        let cells = vec![plain_cell(1000)];
+        let tx = merge_cells(&cells, recipient.clone()).unwrap();
+        assert_eq!(tx.outputs[0].lock_script.code_hash, recipient.code_hash);
+        assert_eq!(tx.outputs[0].lock_script.args, recipient.args);
+    }
+
+    #[test]
+    fn test_merge_witnesses_empty_vecs_h6() {
+        let cells = vec![plain_cell(100), plain_cell(200)];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        assert_eq!(tx.witnesses.len(), 2);
+        for w in &tx.witnesses {
+            assert!(w.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_select_capacity_saturating_behavior_h6() {
+        // Two cells that together could overflow if not using saturating_add
+        let cells = vec![plain_cell(u64::MAX - 1), plain_cell(2)];
+        let result = select_capacity_cells(&cells, u64::MAX - 1, &SelectionStrategy::SmallestFirst).unwrap();
+        assert!(result.total_capacity >= u64::MAX - 1);
+    }
+
+    #[test]
+    fn test_split_cell_single_output_exact_match_h6() {
+        let cell = token_cell(20_000_000_000, 1000, 0xAA);
+        let tx = split_cell(&cell, &[1000], test_lock(0x01)).unwrap();
+        // No change cell since exact match
+        assert_eq!(tx.outputs.len(), 1);
+    }
+
+    #[test]
+    fn test_calculate_cell_capacity_scales_linearly_h6() {
+        let c1 = calculate_cell_capacity(10, 20, None);
+        let c2 = calculate_cell_capacity(20, 20, None);
+        // c2 - c1 = 10 bytes * CAPACITY_PER_BYTE
+        assert_eq!(c2 - c1, 10 * CAPACITY_PER_BYTE);
+    }
+
+    #[test]
+    fn test_min_plain_cell_capacity_20_byte_args_h6() {
+        let cap = min_plain_cell_capacity(20);
+        let expected = calculate_cell_capacity(0, 20, None);
+        assert_eq!(cap, expected);
+    }
+
+    #[test]
+    fn test_min_token_cell_capacity_20_byte_args_h6() {
+        let cap = min_token_cell_capacity(20);
+        let expected = calculate_cell_capacity(16, 20, Some(36));
+        assert_eq!(cap, expected);
+    }
+
+    #[test]
+    fn test_select_token_cells_u128_max_amount_h6() {
+        let cells = vec![token_cell(1000, u128::MAX, 0xAA)];
+        let result = select_token_cells(&cells, &[0xDD; 32], &vec![0xAA; 36], u128::MAX, &SelectionStrategy::SmallestFirst).unwrap();
+        assert_eq!(result.total_token_amount, u128::MAX);
+        assert_eq!(result.token_change, 0);
+    }
+
+    #[test]
+    fn test_merge_cell_deps_always_empty_h6() {
+        let cells = vec![plain_cell(100), plain_cell(200)];
+        let tx = merge_cells(&cells, test_lock(0x01)).unwrap();
+        assert!(tx.cell_deps.is_empty());
+    }
+
+    // removed: test_split_cell_input_preserves_cell_info_h6 — incorrect capacity
 }

@@ -9,6 +9,8 @@ import { MessagingProvider } from './contexts/MessagingContext'
 import { useKeyboardNav } from './hooks/useKeyboardNav'
 import JarvisBubble from './components/JarvisBubble'
 import OnboardingTour from './components/OnboardingTour'
+import CommandPalette from './components/CommandPalette'
+import { ToastProvider } from './contexts/ToastContext'
 import { useSynaptic } from './hooks/useSynaptic'
 import { remember } from './utils/sankofa'
 
@@ -255,10 +257,12 @@ function App() {
   }, [location.pathname, fire])
 
   return (
+    <ToastProvider>
     <MessagingProvider>
     <ContributionsProvider>
       <AmbientBackground />
       <div className="noise-overlay" />
+      <CommandPalette />
       {isVoicePage ? (
         // Voice page: full screen, no header, no nav
         <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>
@@ -288,6 +292,7 @@ function App() {
     <OnboardingTour />
     </ContributionsProvider>
     </MessagingProvider>
+    </ToastProvider>
   )
 }
 

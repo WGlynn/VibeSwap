@@ -19,8 +19,9 @@ import {
   listAgents, getArchetypes, getAllCosts, getInfraCosts,
   pantheonChat, forkAgent, pruneAll, clearConversation,
   getAgentCosts, consultAgent, getTheAIStatus,
-  PANTHEON_TOOL_NAMES,
+  PANTHEON_TOOL_NAMES, routeQuestion,
 } from './pantheon.js'
+import { getPrimitiveManifest } from './primitive-gate.js'
 
 // ============ Route Handler ============
 
@@ -96,6 +97,29 @@ export async function handleTheAIRequest(req, res, url) {
     const results = await pruneAll()
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(results))
+    return
+  }
+
+  // API: Route — test intelligent routing
+  if (path === '/theai/api/route' && req.method === 'POST') {
+    const chunks = []; for await (const c of req) chunks.push(c)
+    const body = JSON.parse(Buffer.concat(chunks).toString())
+    if (!body.question) {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'question required' }))
+      return
+    }
+    const route = routeQuestion(body.question)
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(route))
+    return
+  }
+
+  // API: Primitives — value manifest
+  if (path === '/theai/api/primitives') {
+    const manifest = getPrimitiveManifest()
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(manifest))
     return
   }
 
@@ -237,6 +261,22 @@ body{font-family:'SF Mono',Monaco,Consolas,monospace;background:#050508;color:#e
 <div class="costs-bar" id="status-bar"><div class="loading">Loading...</div></div>
 </div>
 
+<!-- Router Tester -->
+<div class="section">
+<div class="section-title">Intelligent Router</div>
+<div class="chat-input-row" style="max-width:600px">
+<input id="route-input" placeholder="Test a question... (e.g. 'what's the ETH price trend?')" onkeydown="if(event.key==='Enter')testRoute()" style="flex:1;background:#050508;border:1px solid #333;color:#e0e0e0;padding:8px 12px;border-radius:4px;font-family:inherit;font-size:0.85em">
+<button onclick="testRoute()" style="background:#1a1a2e;border:1px solid #333;color:#a855f7;padding:8px 16px;border-radius:4px;cursor:pointer;font-family:inherit">Route</button>
+</div>
+<div id="route-result" style="margin-top:8px;font-size:0.85em;color:#888"></div>
+</div>
+
+<!-- Primitive Manifest -->
+<div class="section">
+<div class="section-title">Primitive Gate — Values Manifest</div>
+<div id="primitives-bar" class="costs-bar"><div class="loading">Loading...</div></div>
+</div>
+
 <!-- Costs -->
 <div class="section">
 <div class="section-title">Cost Tracking</div>
@@ -252,20 +292,25 @@ const H={'Content-Type':'application/json','x-api-secret':SECRET};
 let currentAgent=null;
 
 async function load(){
-  const [r,hr]=await Promise.all([
+  const [r,hr,pr]=await Promise.all([
     fetch('/theai/api/status',{headers:H}),
     fetch('/theai/api/health',{headers:H}),
+    fetch('/theai/api/primitives',{headers:H}),
   ]);
   const d=await r.json();
   const health=await hr.json();
+  const primitives=await pr.json();
   renderTree(d);
   renderAgents(d);
   renderFork(d);
   renderCosts(d);
   renderStatus(health);
+  renderPrimitives(primitives);
   document.getElementById('header-stats').innerHTML=
     d.agents.length+' agents | '+d.costs.totalUsd+' total LLM cost';
 }
+// Auto-refresh every 30s
+setInterval(load,30000);
 
 function renderTree(d){
   const active=d.agents.map(a=>a.name);
@@ -367,6 +412,23 @@ async function triggerPrune(){
   const d=await r.json();
   alert('Prune complete: '+d.length+' agents processed');
   load();
+}
+
+function renderPrimitives(p){
+  let html='<div class="cost-item"><div class="label">Manifest Hash</div><div class="value" style="font-size:0.7em;word-break:break-all">'+p.hash.slice(0,24)+'...</div><div class="detail">'+p.count+' primitives, weight: '+p.totalWeight+'</div></div>';
+  for(const pr of p.primitives){
+    html+='<div class="cost-item"><div class="label">'+pr.id+'</div><div class="value" style="font-size:0.85em">'+pr.name+'</div><div class="detail">weight: '+pr.weight+(pr.hash?' | '+pr.hash.slice(0,20):'')+'</div></div>';
+  }
+  document.getElementById('primitives-bar').innerHTML=html;
+}
+
+async function testRoute(){
+  const input=document.getElementById('route-input');
+  const q=input.value.trim();if(!q)return;
+  const r=await fetch('/theai/api/route',{method:'POST',headers:H,body:JSON.stringify({question:q})});
+  const d=await r.json();
+  const color=d.confidence==='high'?'#00ff88':d.confidence==='medium'?'#a855f7':'#888';
+  document.getElementById('route-result').innerHTML='<span style="color:'+color+'">→ '+d.agent.toUpperCase()+'</span> ('+d.confidence+') — '+d.reason;
 }
 
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}

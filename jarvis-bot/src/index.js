@@ -152,7 +152,7 @@ import { initScheduler, flushScheduler, stopScheduler, addSchedule, removeSchedu
 import { initTaskQueue, flushTaskQueue, stopTaskQueue, listTasks, cancelTask, getTaskStats } from './task-queue.js';
 import { initWallet, flushWallet, getWalletInfo, generateWallet, unlockWallet, lockWallet, pauseWallet, unpauseWallet, addToWhitelist, removeFromWhitelist, getAllBalances, revealMnemonic } from './wallet.js';
 import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, getPnL, getTradeHistory, formatTradeStatus, getEthPrice } from './trading.js';
-import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus } from './pantheon.js';
+import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus, routeQuestion } from './pantheon.js';
 import { runPrimitiveGate, formatGateResult, getPrimitives, getPrimitiveManifest, getGateHistory } from './primitive-gate.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
@@ -2552,6 +2552,12 @@ bot.command('pantheon', async (ctx) => {
     if (!agentName) return ctx.reply('Usage: /pantheon clear <agent>');
     clearConversation(agentName, `tg-${ctx.from.id}`);
     ctx.reply(`Conversation with ${agentName} cleared.`);
+
+  } else if (sub === 'route') {
+    const question = args.slice(1).join(' ');
+    if (!question) return ctx.reply('Usage: /pantheon route <question>\nRoutes to the best agent without sending.');
+    const route = routeQuestion(question);
+    ctx.reply(`Route: ${route.agent.toUpperCase()}\nConfidence: ${route.confidence}\nReason: ${route.reason}`);
 
   } else if (sub === 'status') {
     const status = await getTheAIStatus();

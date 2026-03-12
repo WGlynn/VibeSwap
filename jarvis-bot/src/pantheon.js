@@ -465,16 +465,47 @@ export async function getTheAIContext() {
   return `\n[TheAI Pantheon: ${status.activeAgents} agents active (${status.agents.join(', ')}). LLM cost: ${status.totalCost}. Use consult_pantheon tool to ask any agent.]`
 }
 
+// ============ Intelligent Routing — Who Handles This? ============
+
+const DOMAIN_KEYWORDS = {
+  poseidon: ['trade', 'trading', 'price', 'market', 'defi', 'swap', 'liquidity', 'amm', 'yield', 'apy', 'tvl', 'portfolio', 'pnl', 'slippage', 'mev', 'arbitrage', 'whale', 'volume', 'dex', 'cex', 'funding', 'leverage', 'long', 'short', 'bull', 'bear'],
+  athena: ['architect', 'design', 'plan', 'strategy', 'review', 'refactor', 'pattern', 'structure', 'roadmap', 'technical debt', 'scalab', 'tradeoff', 'decision', 'approach', 'system design'],
+  hephaestus: ['build', 'deploy', 'docker', 'ci', 'cd', 'pipeline', 'infra', 'server', 'devops', 'container', 'kubernetes', 'nginx', 'ssl', 'compile', 'test', 'debug', 'fix', 'implement', 'code', 'ship'],
+  hermes: ['api', 'webhook', 'telegram', 'discord', 'twitter', 'social', 'message', 'notification', 'integration', 'oauth', 'endpoint', 'cors', 'websocket'],
+  apollo: ['data', 'analytic', 'metric', 'dashboard', 'monitor', 'alert', 'trend', 'pattern', 'predict', 'forecast', 'chart', 'graph', 'statistic', 'anomal'],
+  proteus: ['adapt', 'regime', 'strategy rotation', 'condition', 'shift', 'dynamic', 'multi-strategy'],
+  artemis: ['security', 'audit', 'vulnerab', 'attack', 'exploit', 'hack', 'phish', 'scam', 'rug', 'malicious', 'permission', 'access control', 'encryption', 'key management'],
+  anansi: ['community', 'content', 'meme', 'engagement', 'narrative', 'story', 'brand', 'marketing', 'growth'],
+  nyx: ['coordinate', 'overview', 'status', 'all agents', 'freedom', 'cks', 'schedule', 'organization'],
+}
+
+export function routeQuestion(question) {
+  const q = question.toLowerCase()
+  const scores = {}
+
+  for (const [agent, keywords] of Object.entries(DOMAIN_KEYWORDS)) {
+    scores[agent] = 0
+    for (const kw of keywords) {
+      if (q.includes(kw)) scores[agent]++
+    }
+  }
+
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1])
+  if (sorted[0][1] === 0) return { agent: 'nyx', confidence: 'low', reason: 'No domain keywords matched — routing to Nyx as coordinator' }
+  if (sorted[0][1] === sorted[1]?.[1]) return { agent: 'nyx', confidence: 'medium', reason: `Tie between ${sorted[0][0]} and ${sorted[1][0]} — routing to Nyx to decide` }
+  return { agent: sorted[0][0], confidence: sorted[0][1] >= 3 ? 'high' : 'medium', reason: `Matched ${sorted[0][1]} keywords for ${sorted[0][0]} domain` }
+}
+
 // ============ Jarvis Bridge — LLM Tool ============
 
 export const PANTHEON_TOOLS = [
   {
     name: 'consult_pantheon',
-    description: 'Consult a TheAI Pantheon agent. Nyx (coordinator), Poseidon (finance), Athena (strategy), Hephaestus (building), Hermes (comms), Apollo (analytics). Ask them questions in their domain.',
+    description: 'Consult a TheAI Pantheon agent. Nyx (coordinator), Poseidon (finance), Athena (strategy), Hephaestus (building), Hermes (comms), Apollo (analytics), Proteus (adaptive strategy), Artemis (security), Anansi (social). Ask them questions in their domain. If unsure which agent, set agent to "auto" and the router will pick.',
     input_schema: {
       type: 'object',
       properties: {
-        agent: { type: 'string', description: 'Agent name (nyx, poseidon, athena, etc.)' },
+        agent: { type: 'string', description: 'Agent name (nyx, poseidon, athena, etc.) or "auto" for smart routing' },
         question: { type: 'string', description: 'Your question for this agent' },
       },
       required: ['agent', 'question'],
@@ -485,8 +516,17 @@ export const PANTHEON_TOOL_NAMES = PANTHEON_TOOLS.map(t => t.name)
 
 export async function handlePantheonTool(name, input) {
   if (name === 'consult_pantheon') {
-    const response = await pantheonChat(input.agent, `[Jarvis consulting you]: ${input.question}`, 'jarvis-bridge')
-    return JSON.stringify({ agent: input.agent, response: response.text, cost: response.usage.cost })
+    let targetAgent = input.agent?.toLowerCase()
+
+    // Auto-routing: analyze question and pick the best agent
+    if (targetAgent === 'auto' || !targetAgent) {
+      const route = routeQuestion(input.question)
+      targetAgent = route.agent
+      console.log(`[pantheon] Auto-routed to ${targetAgent} (${route.confidence}: ${route.reason})`)
+    }
+
+    const response = await pantheonChat(targetAgent, `[Jarvis consulting you]: ${input.question}`, 'jarvis-bridge')
+    return JSON.stringify({ agent: targetAgent, response: response.text, cost: response.usage.cost })
   }
   return JSON.stringify({ error: `Unknown tool: ${name}` })
 }

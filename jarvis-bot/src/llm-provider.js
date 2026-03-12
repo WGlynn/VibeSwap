@@ -455,6 +455,7 @@ function createClaudeProvider(providerConfig) {
         system: request.system,
         messages: request.messages,
         ...(request.tools?.length ? { tools: request.tools } : {}),
+        ...(request.temperature != null ? { temperature: request.temperature } : {}),
       });
       // Already in Anthropic format — pass through
       return {

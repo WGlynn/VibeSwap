@@ -18,7 +18,7 @@ import { initProvider, getProviderName, getModelName, getFallbackChain, getIntel
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
-import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody } from './crpc.js';
+import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody, runCRPCDemo } from './crpc.js';
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
@@ -5952,11 +5952,25 @@ async function main() {
           if (crpcHandler === 'stats') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(getCRPCStats()));
+          } else if (crpcHandler === 'demo') {
+            try {
+              let prompt = null;
+              if (req.method === 'POST') {
+                const body = await readBody(req);
+                if (body) prompt = JSON.parse(body).prompt;
+              }
+              const trace = await runCRPCDemo(prompt);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(trace, null, 2));
+            } catch (err) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
           } else {
             try {
               const body = await readBody(req);
               const payload = JSON.parse(body);
-              const data = processCRPCBody(crpcHandler, payload);
+              const data = await processCRPCBody(crpcHandler, payload);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(data));
             } catch (err) {
@@ -7134,11 +7148,27 @@ async function main() {
           if (crpcHandler === 'stats') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(getCRPCStats()));
+          } else if (crpcHandler === 'demo') {
+            // Demo endpoint — runs full 4-phase CRPC with real LLM calls
+            // Supports GET (default prompt) and POST { prompt: "..." }
+            try {
+              let prompt = null;
+              if (req.method === 'POST') {
+                const body = await readBody(req);
+                if (body) prompt = JSON.parse(body).prompt;
+              }
+              const trace = await runCRPCDemo(prompt);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(trace, null, 2));
+            } catch (err) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message, stack: err.stack?.split('\n').slice(0, 3) }));
+            }
           } else {
             try {
               const body = await readBody(req);
               const payload = JSON.parse(body);
-              const data = processCRPCBody(crpcHandler, payload);
+              const data = await processCRPCBody(crpcHandler, payload);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(data));
             } catch (err) {

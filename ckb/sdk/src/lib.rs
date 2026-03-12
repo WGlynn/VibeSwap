@@ -48,6 +48,7 @@ pub mod rewards;
 pub mod risk;
 pub mod rollup;
 pub mod scheduler;
+pub mod serde_cell;
 pub mod router;
 pub mod settlement;
 pub mod simulator;
@@ -84,7 +85,7 @@ pub struct CellDep {
     pub dep_type: DepType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DepType {
     Code,
     DepGroup,

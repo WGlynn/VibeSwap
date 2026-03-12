@@ -2590,4 +2590,345 @@ mod tests {
         assert_eq!(q1.premium_amount, q2.premium_amount, "Same inputs must produce same premium");
         assert_eq!(q1.effective_rate_bps, q2.effective_rate_bps);
     }
+
+    // ============ Hardening Round 5 Tests ============
+
+    #[test]
+    fn test_premium_small_pool_deposits_h5() {
+        // Very small deposits pool — premium may round to 0 → InvalidPremium
+        let pool = make_pool(100, 10);
+        let tier = make_tier(0, 2000, 10_000);
+        let result = calculate_premium(&pool, 50, 1000, &tier);
+        // With coverage=50, rate~100bps, duration=1000, reference=1000
+        // premium = 50 * 100 * 1000 / (10000 * 1000) = 0 (rounds down)
+        // So it returns InvalidPremium — expected for tiny amounts
+        assert_eq!(result, Err(InsuranceError::InvalidPremium));
+    }
+
+    #[test]
+    fn test_premium_max_u128_coverage_amount_h5() {
+        // Attempting to cover a huge amount that exceeds pool capacity
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(0, 2000, 10_000);
+        let result = calculate_premium(&pool, u128::MAX, 1000, &tier);
+        assert_eq!(result, Err(InsuranceError::PoolFull));
+    }
+
+    #[test]
+    fn test_premium_tier_0_to_4_all_valid_h5() {
+        let pool = make_pool(10_000_000 * PRECISION, 0);
+        for tier_id in 0..MAX_TIERS {
+            let tier = make_tier(tier_id as u8, 2000, 10_000);
+            let result = calculate_premium(&pool, 1000 * PRECISION, 1000, &tier);
+            assert!(result.is_ok(), "Tier {} should be valid", tier_id);
+        }
+    }
+
+    #[test]
+    fn test_premium_extremely_long_duration_h5() {
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(0, 2000, 10_000);
+        let result = calculate_premium(&pool, 1000 * PRECISION, u64::MAX, &tier);
+        // Should succeed (premium could be very large but mul_div handles it)
+        assert!(result.is_ok());
+        assert!(result.unwrap().premium_amount > 0);
+    }
+
+    #[test]
+    fn test_premium_multiplier_zero_h5() {
+        // Tier multiplier of 0 — effective rate gets clamped to MIN
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(0, 2000, 0); // 0 multiplier
+        let result = calculate_premium(&pool, 1000 * PRECISION, 1000, &tier);
+        // Effective rate = base * 0 / 10000 = 0, clamped to MIN_PREMIUM_RATE_BPS
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().effective_rate_bps, MIN_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_premium_multiplier_very_high_h5() {
+        // Tier multiplier much higher than base — clamped to MAX
+        let pool = make_pool(1_000_000 * PRECISION, 0);
+        let tier = make_tier(0, 2000, 50_000); // 5x multiplier
+        let result = calculate_premium(&pool, 1000 * PRECISION, 1000, &tier);
+        assert!(result.is_ok());
+        assert!(result.unwrap().effective_rate_bps <= MAX_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_il_claim_price_drops_50_percent_h5() {
+        let position = make_position(1_000_000 * PRECISION, 1000, 50_000, 0);
+        let tier = make_tier(0, 5000, 10_000);
+        let entry = 2000 * PRECISION;
+        let current = 1000 * PRECISION; // 50% drop
+        let claim = calculate_il_claim(&position, entry, current, &tier).unwrap();
+        // IL for 50% drop is about 5.72%
+        assert!(claim.actual_il_bps > 0);
+        assert!(claim.claimable_amount > 0);
+    }
+
+    #[test]
+    fn test_il_claim_price_increases_50_percent_h5() {
+        let position = make_position(1_000_000 * PRECISION, 1000, 50_000, 0);
+        let tier = make_tier(0, 5000, 10_000);
+        let entry = 2000 * PRECISION;
+        let current = 3000 * PRECISION; // 50% increase
+        let claim = calculate_il_claim(&position, entry, current, &tier).unwrap();
+        // IL exists for any price deviation
+        assert!(claim.actual_il_bps > 0);
+    }
+
+    #[test]
+    fn test_il_claim_price_very_close_to_entry_h5() {
+        let position = make_position(1_000_000 * PRECISION, 1000, 50_000, 0);
+        let tier = make_tier(0, 5000, 10_000);
+        // Price deviates by just 1 wei
+        let entry = 2000 * PRECISION;
+        let current = 2000 * PRECISION + 1;
+        let claim = calculate_il_claim(&position, entry, current, &tier).unwrap();
+        // Such a tiny deviation should produce negligible IL
+        assert!(claim.actual_il_bps <= 1);
+    }
+
+    #[test]
+    fn test_validate_claim_exactly_at_cooldown_end_h5() {
+        let position = make_position(1000, 100, 50_000, 0);
+        // current_block = start + cooldown = 100 + 1000 = 1100
+        let result = validate_claim(&position, 1100, DEFAULT_COOLDOWN_BLOCKS);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_claim_exactly_at_expiry_h5() {
+        let position = make_position(1000, 100, 50_000, 0);
+        // current_block = expiry_block = 50_000, which is valid (not > expiry)
+        let result = validate_claim(&position, 50_000, DEFAULT_COOLDOWN_BLOCKS);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_pool_health_very_small_deposits_h5() {
+        let pool = make_pool(1, 0);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 0);
+        assert!(health.sustainable);
+        assert_eq!(health.risk_score, 0);
+    }
+
+    #[test]
+    fn test_pool_health_exactly_90_percent_h5() {
+        let pool = make_pool(1_000_000, 900_000);
+        let health = pool_health(&pool);
+        // 90% utilization is in the 80-100% tier (critical)
+        assert!(health.risk_score >= 8500);
+        assert!(!health.sustainable); // 90% > 80% max coverage
+    }
+
+    #[test]
+    fn test_pool_health_exactly_1_percent_h5() {
+        let pool = make_pool(10_000, 100);
+        let health = pool_health(&pool);
+        assert_eq!(health.utilization_bps, 100);
+        assert_eq!(health.reserve_ratio_bps, 9900);
+        assert!(health.sustainable);
+    }
+
+    #[test]
+    fn test_available_coverage_deposits_equals_coverage_h5() {
+        let mut pool = make_pool(1_000_000, 1_000_000);
+        pool.max_coverage_ratio_bps = 10_000; // 100% coverage allowed
+        let available = available_coverage(&pool);
+        assert_eq!(available, 0); // fully utilized
+    }
+
+    #[test]
+    fn test_dynamic_premium_rate_at_50_percent_h5() {
+        let rate = dynamic_premium_rate(100, 5000);
+        // rate = 100 + 100 * 2 * 5000 / 10000 = 100 + 100 = 200
+        assert_eq!(rate, 200);
+    }
+
+    #[test]
+    fn test_dynamic_premium_rate_at_25_percent_h5() {
+        let rate = dynamic_premium_rate(100, 2500);
+        // rate = 100 + 100 * 2 * 2500 / 10000 = 100 + 50 = 150
+        assert_eq!(rate, 150);
+    }
+
+    #[test]
+    fn test_dynamic_premium_rate_at_75_percent_h5() {
+        let rate = dynamic_premium_rate(100, 7500);
+        // rate = 100 + 100 * 2 * 7500 / 10000 = 100 + 150 = 250
+        assert_eq!(rate, 250);
+    }
+
+    #[test]
+    fn test_estimate_payout_large_il_small_coverage_h5() {
+        let tier = make_tier(0, 5000, 10_000);
+        let payout = estimate_payout(100, 10_000, &tier); // 100% IL
+        // max_payout = 100 * 5000 / 10000 = 50
+        assert_eq!(payout, 50);
+    }
+
+    #[test]
+    fn test_coverage_status_far_from_expiry_h5() {
+        let position = make_position(1000, 100, 1_000_000, 0);
+        let status = coverage_expiry_status(&position, 200);
+        assert_eq!(status, CoverageStatus::Active);
+    }
+
+    #[test]
+    fn test_coverage_status_within_warning_window_h5() {
+        let position = make_position(1000, 100, 10_000, 0);
+        // EXPIRY_WARNING_BLOCKS = 5000, expiry = 10000
+        // current = 5001 → 10000 - 5001 = 4999 blocks left < 5000
+        let status = coverage_expiry_status(&position, 5001);
+        assert_eq!(status, CoverageStatus::Expiring);
+    }
+
+    #[test]
+    fn test_sustainability_income_exactly_covers_claims_h5() {
+        let pool = make_pool(1_000_000, 200_000);
+        let claims = vec![(50_000, 100), (50_000, 200)];
+        let result = pool_sustainability_check(&pool, &claims, 100_000);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_sustainability_income_just_under_claims_h5() {
+        let pool = make_pool(1_000_000, 200_000);
+        let claims = vec![(50_000, 100), (50_001, 200)];
+        let result = pool_sustainability_check(&pool, &claims, 100_000);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_optimal_coverage_mid_range_tolerance_h5() {
+        let tier = make_tier(0, 3000, 10_000); // max payout 30%
+        let optimal = optimal_coverage_amount(100_000, 1500, &tier); // 15% tolerance
+        // protection_range = 3000 - 1500 = 1500
+        // optimal = 100000 * 1500 / 3000 = 50000
+        assert_eq!(optimal, 50_000);
+    }
+
+    #[test]
+    fn test_aggregate_pool_stats_single_pool_full_utilization_h5() {
+        let pool = InsurancePool {
+            pool_id: [0x01; 32],
+            total_deposits: 1_000_000,
+            total_coverage: 1_000_000,
+            utilization_bps: 10_000,
+            premium_rate_bps: 100,
+            max_coverage_ratio_bps: MAX_COVERAGE_RATIO_BPS,
+            cooldown_blocks: DEFAULT_COOLDOWN_BLOCKS,
+        };
+        let (deposits, coverage, util) = aggregate_pool_stats(&[pool]);
+        assert_eq!(deposits, 1_000_000);
+        assert_eq!(coverage, 1_000_000);
+        assert_eq!(util, 10_000);
+    }
+
+    #[test]
+    fn test_claim_priority_zero_deposits_with_claim_h5() {
+        let claim = ILClaim {
+            position: make_position(1000, 100, 50_000, 0),
+            actual_il_bps: 500,
+            claimable_amount: 50,
+            payout_ratio_bps: 500,
+        };
+        let health = PoolHealth {
+            total_deposits: 0,
+            total_coverage: 0,
+            utilization_bps: 0,
+            reserve_ratio_bps: 10_000,
+            risk_score: 0,
+            sustainable: true,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // il_severity = 500 * 4000 / 10000 = 200
+        // efficiency = 1500 (edge case)
+        // urgency = 1000 (healthy)
+        assert_eq!(score, 200 + 1500 + 1000);
+    }
+
+    #[test]
+    fn test_claim_priority_max_il_h5() {
+        let claim = ILClaim {
+            position: make_position(1000 * PRECISION, 100, 50_000, 0),
+            actual_il_bps: 10_000, // 100% IL
+            claimable_amount: 500 * PRECISION,
+            payout_ratio_bps: 5000,
+        };
+        let health = PoolHealth {
+            total_deposits: 1_000_000 * PRECISION,
+            total_coverage: 100_000 * PRECISION,
+            utilization_bps: 1000,
+            reserve_ratio_bps: 9000,
+            risk_score: 1000,
+            sustainable: true,
+        };
+        let score = claim_priority_score(&claim, &health);
+        // il_severity = 10000 * 4000 / 10000 = 4000
+        assert!(score >= 4000);
+    }
+
+    #[test]
+    fn test_pool_health_risk_score_boundary_6001_bps_h5() {
+        let pool = make_pool(10_000, 6001);
+        let health = pool_health(&pool);
+        // 60.01% utilization enters accelerated zone
+        assert!(health.risk_score > 6000);
+    }
+
+    #[test]
+    fn test_pool_health_risk_score_boundary_7999_bps_h5() {
+        let pool = make_pool(10_000, 7999);
+        let health = pool_health(&pool);
+        // 79.99% utilization — still in accelerated zone, not critical
+        assert!(health.risk_score >= 6000);
+        assert!(health.risk_score < 8500);
+    }
+
+    #[test]
+    fn test_coverage_position_clone_preserves_fields_h5() {
+        let position = make_position(12345, 100, 50_000, 3);
+        let clone = position.clone();
+        assert_eq!(position, clone);
+    }
+
+    #[test]
+    fn test_pool_health_fields_consistency_h5() {
+        let pool = make_pool(1_000_000, 500_000);
+        let health = pool_health(&pool);
+        assert_eq!(health.total_deposits, 1_000_000);
+        assert_eq!(health.total_coverage, 500_000);
+        assert_eq!(health.utilization_bps + health.reserve_ratio_bps, 10_000);
+    }
+
+    #[test]
+    fn test_premium_quote_effective_rate_within_bounds_h5() {
+        let pool = make_pool(1_000_000 * PRECISION, 100_000 * PRECISION);
+        let tier = make_tier(0, 3000, 15_000);
+        let quote = calculate_premium(&pool, 10_000 * PRECISION, 5000, &tier).unwrap();
+        assert!(quote.effective_rate_bps >= MIN_PREMIUM_RATE_BPS);
+        assert!(quote.effective_rate_bps <= MAX_PREMIUM_RATE_BPS);
+    }
+
+    #[test]
+    fn test_estimate_payout_symmetry_h5() {
+        let tier = make_tier(0, 5000, 10_000);
+        // Same IL, different coverage amounts — payout scales linearly
+        let p1 = estimate_payout(1000, 500, &tier);
+        let p2 = estimate_payout(2000, 500, &tier);
+        assert_eq!(p2, p1 * 2);
+    }
+
+    #[test]
+    fn test_sustainability_large_number_of_small_claims_h5() {
+        let pool = make_pool(1_000_000, 200_000);
+        let claims: Vec<(u128, u64)> = (0..100).map(|i| (1_000, i as u64)).collect();
+        // Total claims = 100_000, income = 200_000 → sustainable
+        let result = pool_sustainability_check(&pool, &claims, 200_000);
+        assert!(result);
+    }
 }

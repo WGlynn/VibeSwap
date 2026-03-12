@@ -5499,6 +5499,20 @@ bot.on('text', async (ctx) => {
         }
 
         if (analysis.action === 'engage' && analysis.response_hint) {
+          // ============ Group Reply Cooldown ============
+          // Prevent back-to-back responses in the same group. A mind that responds to
+          // every message in rapid succession feels like a bot flooding, not a teammate.
+          // 15s minimum gap between proactive replies. Direct mentions/replies bypass this.
+          if (!global._lastGroupReply) global._lastGroupReply = new Map();
+          const lastReplyTime = global._lastGroupReply.get(ctx.chat.id) || 0;
+          const replyGap = Date.now() - lastReplyTime;
+          const isMentioned = msgText.includes('@JarvisMind') || msgText.includes('@diablojarvis');
+          const isReplyToBot = ctx.message?.reply_to_message?.from?.is_bot;
+          if (replyGap < 15000 && !isMentioned && !isReplyToBot) {
+            // Too soon — let the conversation breathe
+            return;
+          }
+
           const proactiveReply = await generateProactiveResponse(
             msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx
           );
@@ -5511,6 +5525,7 @@ bot.on('text', async (ctx) => {
             const typeDelay = Math.min(1000 + cleanReply.length * 10, 3000) + Math.random() * 1000;
             await new Promise(r => setTimeout(r, typeDelay));
             await ctx.reply(cleanReply, { parse_mode: undefined });
+            global._lastGroupReply.set(ctx.chat.id, Date.now());
             const myDisplayName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
             pushGroupMessage(ctx.chat.id, myDisplayName, proactiveReply, null, true);
             bufferAssistantMessage(ctx.chat.id, proactiveReply);

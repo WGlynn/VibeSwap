@@ -2309,4 +2309,414 @@ mod tests {
         assert_eq!(cell.timestamp_block, block);
         assert_eq!(cell.difficulty, KNOWLEDGE_MIN_DIFFICULTY);
     }
+
+    // ============ Hardening Tests — Edge Cases, Boundaries, Error Paths ============
+
+    #[test]
+    fn test_key_hash_long_namespace() {
+        let long_ns = "a".repeat(10_000);
+        let h = compute_key_hash(&long_ns, "key");
+        assert_ne!(h, [0u8; 32]);
+        assert_eq!(h, compute_key_hash(&long_ns, "key")); // Deterministic
+    }
+
+    #[test]
+    fn test_key_hash_long_key() {
+        let long_key = "k".repeat(10_000);
+        let h = compute_key_hash("ns", &long_key);
+        assert_ne!(h, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_key_hash_whitespace_sensitivity_2() {
+        let h1 = compute_key_hash("ns", "key");
+        let h2 = compute_key_hash("ns", "key ");
+        let h3 = compute_key_hash("ns", " key");
+        assert_ne!(h1, h2);
+        assert_ne!(h1, h3);
+        assert_ne!(h2, h3);
+    }
+
+    #[test]
+    fn test_key_hash_null_bytes() {
+        let h1 = compute_key_hash("ns\0", "key");
+        let h2 = compute_key_hash("ns", "\0key");
+        let h3 = compute_key_hash("ns", "key");
+        assert_ne!(h1, h3);
+        assert_ne!(h2, h3);
+    }
+
+    #[test]
+    fn test_value_hash_single_byte_2() {
+        let h = compute_value_hash(&[0x42]);
+        assert_ne!(h, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_value_hash_all_zeros() {
+        let h1 = compute_value_hash(&[0u8; 32]);
+        let h2 = compute_value_hash(&[0u8; 33]);
+        assert_ne!(h1, h2); // Different lengths → different hashes
+    }
+
+    #[test]
+    fn test_value_hash_all_ones_vs_zeros() {
+        let h1 = compute_value_hash(&[0x00; 64]);
+        let h2 = compute_value_hash(&[0xFF; 64]);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_sha256_data_empty() {
+        let h = sha256_data(b"");
+        assert_ne!(h, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_sha256_data_deterministic_2() {
+        let h1 = sha256_data(b"test data");
+        let h2 = sha256_data(b"test data");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_sha256_data_different_inputs() {
+        let h1 = sha256_data(b"abc");
+        let h2 = sha256_data(b"abd");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_create_knowledge_cell_empty_value() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell("ns", "key", b"", [0xFF; 32], 100, &deployment, input);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.value_size, 0);
+        assert_eq!(cell.value_hash, compute_value_hash(b""));
+    }
+
+    #[test]
+    fn test_create_knowledge_cell_large_value() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+        let large_value = vec![0xAB; 100_000];
+
+        let tx = create_knowledge_cell("ns", "key", &large_value, [0xFF; 32], 100, &deployment, input);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.value_size, 100_000);
+    }
+
+    #[test]
+    fn test_create_knowledge_cell_capacity_is_300_ckb() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell("ns", "key", b"val", [0xFF; 32], 100, &deployment, input);
+        assert_eq!(tx.outputs[0].capacity, 30_000_000_000u64);
+    }
+
+    #[test]
+    fn test_create_knowledge_cell_witness_is_empty_vec() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell("ns", "key", b"val", [0xFF; 32], 100, &deployment, input);
+        assert_eq!(tx.witnesses.len(), 1);
+        assert_eq!(tx.witnesses[0].len(), 0);
+    }
+
+    #[test]
+    fn test_update_knowledge_cell_witness_is_64_bytes() {
+        let deployment = test_deployment();
+        let old = KnowledgeCellData { ..Default::default() };
+        let proof = PoWProof { challenge: [0xAA; 32], nonce: [0xBB; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let tx = update_knowledge_cell(&old, input, b"new", [0; 32], [0; 32], 200, &proof, &deployment);
+        assert_eq!(tx.witnesses[0].len(), 64);
+        assert_eq!(&tx.witnesses[0][..32], &[0xAA; 32]);
+        assert_eq!(&tx.witnesses[0][32..], &[0xBB; 32]);
+    }
+
+    #[test]
+    fn test_update_preserves_key_hash_across_many_updates() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0x42; 32], index: 0, since: 0 };
+        let original_key_hash = compute_key_hash("ns", "persistent_key");
+
+        let mut current = KnowledgeCellData {
+            key_hash: original_key_hash,
+            ..Default::default()
+        };
+
+        for i in 1..=10u64 {
+            let val = format!("value_{}", i);
+            let tx = update_knowledge_cell(
+                &current, input.clone(), val.as_bytes(),
+                [i as u8; 32], [0xEE; 32], 100 + i * 10, &proof, &deployment,
+            );
+            current = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+            assert_eq!(current.key_hash, original_key_hash,
+                "Key hash must never change on update {}", i);
+        }
+    }
+
+    #[test]
+    fn test_compute_new_difficulty_at_min_with_slow_update() {
+        let cell = KnowledgeCellData {
+            difficulty: KNOWLEDGE_MIN_DIFFICULTY,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+        // Very slow update — difficulty should stay at min
+        let new_diff = compute_new_difficulty(&cell, 100 + 1_000_000);
+        assert_eq!(new_diff, KNOWLEDGE_MIN_DIFFICULTY);
+    }
+
+    #[test]
+    fn test_compute_new_difficulty_max_block_number() {
+        let cell = KnowledgeCellData {
+            difficulty: 20,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+        let new_diff = compute_new_difficulty(&cell, u64::MAX);
+        assert!(new_diff >= KNOWLEDGE_MIN_DIFFICULTY);
+        // Should be clamped: at most -1 from current
+        assert!(new_diff >= 19);
+    }
+
+    #[test]
+    fn test_compute_new_difficulty_same_block() {
+        let cell = KnowledgeCellData {
+            difficulty: 16,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+        // blocks_elapsed = 0 via saturating_sub
+        let new_diff = compute_new_difficulty(&cell, 100);
+        // Very fast (0 blocks elapsed) → wants to increase
+        assert!(new_diff <= 17); // clamped to +1
+        assert!(new_diff >= KNOWLEDGE_MIN_DIFFICULTY);
+    }
+
+    #[test]
+    fn test_compute_new_difficulty_current_block_before_timestamp() {
+        let cell = KnowledgeCellData {
+            difficulty: 16,
+            timestamp_block: 200,
+            ..Default::default()
+        };
+        // current_block < timestamp_block → saturating_sub = 0
+        let new_diff = compute_new_difficulty(&cell, 100);
+        assert!(new_diff >= KNOWLEDGE_MIN_DIFFICULTY);
+        assert!(new_diff <= 17);
+    }
+
+    #[test]
+    fn test_create_knowledge_cell_author_lock_hash_stored() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+        let author = [0x42; 32];
+
+        let tx = create_knowledge_cell("ns", "key", b"val", author, 100, &deployment, input);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.author_lock_hash, author);
+    }
+
+    #[test]
+    fn test_update_author_lock_hash_changes() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            author_lock_hash: [0xAA; 32],
+            ..Default::default()
+        };
+        let new_author = [0xBB; 32];
+
+        let tx = update_knowledge_cell(&old, input, b"val", [0; 32], new_author, 200, &proof, &deployment);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.author_lock_hash, new_author);
+    }
+
+    #[test]
+    fn test_update_mmr_root_stored() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData::default();
+        let new_mmr = [0xCC; 32];
+
+        let tx = update_knowledge_cell(&old, input, b"val", new_mmr, [0; 32], 200, &proof, &deployment);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.mmr_root, new_mmr);
+    }
+
+    #[test]
+    fn test_create_cell_dep_count() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell("ns", "key", b"val", [0; 32], 100, &deployment, input);
+        assert_eq!(tx.cell_deps.len(), 1);
+    }
+
+    #[test]
+    fn test_update_cell_dep_count() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+        let old = KnowledgeCellData::default();
+
+        let tx = update_knowledge_cell(&old, input, b"val", [0; 32], [0; 32], 200, &proof, &deployment);
+        assert_eq!(tx.cell_deps.len(), 1);
+    }
+
+    #[test]
+    fn test_key_hash_separator_in_inputs() {
+        // Ensure the ":" separator in the hash input doesn't cause collisions
+        // "ns:key" with namespace="ns" key="key" vs namespace="ns:" key="key"
+        let h1 = compute_key_hash("ns", "key");
+        let h2 = compute_key_hash("ns:", "key");
+        let h3 = compute_key_hash("n", "s:key");
+        assert_ne!(h1, h2);
+        assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn test_value_hash_two_byte_difference() {
+        // Changing a single byte should change the hash
+        let mut data = [0u8; 256];
+        let h1 = compute_value_hash(&data);
+        data[127] = 1;
+        let h2 = compute_value_hash(&data);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_update_value_size_matches_new_value() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+        let old = KnowledgeCellData::default();
+
+        let values: &[&[u8]] = &[b"", b"a", b"hello world", &[0xFFu8; 1000]];
+        for val in values {
+            let tx = update_knowledge_cell(&old, input.clone(), val, [0; 32], [0; 32], 200, &proof, &deployment);
+            let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+            assert_eq!(cell.value_size, val.len() as u32,
+                "value_size mismatch for value of length {}", val.len());
+        }
+    }
+
+    #[test]
+    fn test_update_value_hash_matches_new_value() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+        let old = KnowledgeCellData::default();
+
+        let tx = update_knowledge_cell(&old, input, b"specific_value", [0; 32], [0; 32], 200, &proof, &deployment);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.value_hash, compute_value_hash(b"specific_value"));
+    }
+
+    #[test]
+    fn test_difficulty_clamp_prevents_large_jump() {
+        // With a high starting difficulty, fast update should only increase by 1
+        let cell = KnowledgeCellData {
+            difficulty: 30,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+        let new_diff = compute_new_difficulty(&cell, 101); // Very fast
+        assert!(new_diff <= 31, "Max increase should be KNOWLEDGE_MAX_DIFFICULTY_DELTA");
+    }
+
+    #[test]
+    fn test_difficulty_clamp_prevents_large_decrease() {
+        let cell = KnowledgeCellData {
+            difficulty: 30,
+            timestamp_block: 100,
+            ..Default::default()
+        };
+        // Very slow update
+        let new_diff = compute_new_difficulty(&cell, 100 + 10_000_000);
+        assert!(new_diff >= 29, "Max decrease should be KNOWLEDGE_MAX_DIFFICULTY_DELTA");
+    }
+
+    #[test]
+    fn test_create_lock_script_uses_pow_lock() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell("ns", "key", b"val", [0; 32], 100, &deployment, input);
+        assert_eq!(tx.outputs[0].lock_script.code_hash, deployment.pow_lock_code_hash);
+    }
+
+    #[test]
+    fn test_create_type_script_uses_knowledge_type() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let tx = create_knowledge_cell("ns", "key", b"val", [0; 32], 100, &deployment, input);
+        let type_script = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(type_script.code_hash, deployment.knowledge_type_code_hash);
+    }
+
+    #[test]
+    fn test_create_type_script_args_is_key_hash() {
+        let deployment = test_deployment();
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+        let expected_key_hash = compute_key_hash("myns", "mykey");
+
+        let tx = create_knowledge_cell("myns", "mykey", b"val", [0; 32], 100, &deployment, input);
+        let type_script = tx.outputs[0].type_script.as_ref().unwrap();
+        assert_eq!(type_script.args, expected_key_hash.to_vec());
+    }
+
+    #[test]
+    fn test_update_count_overflow_at_u64_max() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let old = KnowledgeCellData {
+            update_count: u64::MAX - 1,
+            ..Default::default()
+        };
+
+        let tx = update_knowledge_cell(&old, input, b"val", [0; 32], [0; 32], 200, &proof, &deployment);
+        let cell = KnowledgeCellData::deserialize(&tx.outputs[0].data).unwrap();
+        assert_eq!(cell.update_count, u64::MAX);
+    }
+
+    #[test]
+    fn test_prev_state_hash_changes_with_different_old_cells() {
+        let deployment = test_deployment();
+        let proof = PoWProof { challenge: [0x11; 32], nonce: [0x22; 32] };
+        let input = super::super::CellInput { tx_hash: [0; 32], index: 0, since: 0 };
+
+        let old1 = KnowledgeCellData {
+            value_size: 10,
+            ..Default::default()
+        };
+        let old2 = KnowledgeCellData {
+            value_size: 20,
+            ..Default::default()
+        };
+
+        let tx1 = update_knowledge_cell(&old1, input.clone(), b"val", [0; 32], [0; 32], 200, &proof, &deployment);
+        let tx2 = update_knowledge_cell(&old2, input, b"val", [0; 32], [0; 32], 200, &proof, &deployment);
+
+        let cell1 = KnowledgeCellData::deserialize(&tx1.outputs[0].data).unwrap();
+        let cell2 = KnowledgeCellData::deserialize(&tx2.outputs[0].data).unwrap();
+        assert_ne!(cell1.prev_state_hash, cell2.prev_state_hash);
+    }
 }

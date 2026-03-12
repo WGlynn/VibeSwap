@@ -84,40 +84,21 @@ function AgentAvatar({ agent, size = 48 }) {
   const rng = useMemo(() => seededRandom(agent.name.charCodeAt(0) * 137 + agent.name.length * 31), [agent.name])
   const angle1 = useMemo(() => Math.floor(rng() * 360), [rng])
   const angle2 = useMemo(() => angle1 + 90 + Math.floor(rng() * 90), [rng, angle1])
+  const statusColor = agent.status === 'active' ? '#22c55e' : '#f59e0b'
 
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      <div
-        className="w-full h-full rounded-full"
-        style={{
-          background: `linear-gradient(${angle1}deg, ${agent.color}, ${agent.color}66)`,
-          boxShadow: `0 0 20px ${agent.color}30`,
-        }}
-      />
-      <div
-        className="absolute inset-1 rounded-full"
-        style={{
-          background: `linear-gradient(${angle2}deg, rgba(0,0,0,0.6), rgba(0,0,0,0.2))`,
-        }}
-      />
+      <div className="w-full h-full rounded-full" style={{ background: `linear-gradient(${angle1}deg, ${agent.color}, ${agent.color}66)`, boxShadow: `0 0 20px ${agent.color}30` }} />
+      <div className="absolute inset-1 rounded-full" style={{ background: `linear-gradient(${angle2}deg, rgba(0,0,0,0.6), rgba(0,0,0,0.2))` }} />
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-white font-mono font-bold" style={{ fontSize: size * 0.3 }}>
-          {agent.name.slice(0, 2).toUpperCase()}
-        </span>
+        <span className="text-white font-mono font-bold" style={{ fontSize: size * 0.3 }}>{agent.name.slice(0, 2).toUpperCase()}</span>
       </div>
-      {agent.status === 'active' && (
-        <motion.div
-          className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black"
-          style={{ background: '#22c55e' }}
+      {agent.status === 'active' ? (
+        <motion.div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black" style={{ background: statusColor }}
           animate={{ boxShadow: ['0 0 0px #22c55e', '0 0 8px #22c55e', '0 0 0px #22c55e'] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      )}
-      {agent.status === 'standby' && (
-        <div
-          className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black"
-          style={{ background: '#f59e0b' }}
-        />
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} />
+      ) : (
+        <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black" style={{ background: statusColor }} />
       )}
     </div>
   )
@@ -147,39 +128,17 @@ function AgentCard({ agent, index }) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-mono font-bold text-white">{agent.name}</h3>
-                  <span
-                    className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-                    style={{
-                      background: agent.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
-                      color: agent.status === 'active' ? '#22c55e' : '#f59e0b',
-                      border: `1px solid ${agent.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                    }}
-                  >
+                  <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                    style={{ background: agent.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: agent.status === 'active' ? '#22c55e' : '#f59e0b', border: `1px solid ${agent.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
                     {agent.status}
                   </span>
                 </div>
-                <motion.span
-                  animate={{ rotate: isExpanded ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="text-gray-500 text-xs flex-shrink-0 ml-2"
-                >
-                  &#9662;
-                </motion.span>
+                <motion.span animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-gray-500 text-xs flex-shrink-0 ml-2">&#9662;</motion.span>
               </div>
-              <p className="text-[11px] font-mono mt-0.5" style={{ color: agent.color }}>
-                {agent.role}
-              </p>
-
-              {/* Stats Row */}
+              <p className="text-[11px] font-mono mt-0.5" style={{ color: agent.color }}>{agent.role}</p>
               <div className="flex items-center gap-4 mt-2">
-                <span className="text-[10px] font-mono">
-                  <span className="text-white font-bold">{agent.tasks.toLocaleString()}</span>
-                  <span className="text-gray-500 ml-1">tasks</span>
-                </span>
-                <span className="text-[10px] font-mono">
-                  <span className="text-white font-bold">{agent.uptime}%</span>
-                  <span className="text-gray-500 ml-1">uptime</span>
-                </span>
+                <span className="text-[10px] font-mono"><span className="text-white font-bold">{agent.tasks.toLocaleString()}</span><span className="text-gray-500 ml-1">tasks</span></span>
+                <span className="text-[10px] font-mono"><span className="text-white font-bold">{agent.uptime}%</span><span className="text-gray-500 ml-1">uptime</span></span>
               </div>
             </div>
           </div>
@@ -371,32 +330,17 @@ function AgentFeed() {
         {/* Terminal Header */}
         <div className="flex items-center gap-2 pb-2 mb-2" style={{ borderBottom: `1px solid ${CYAN}08` }}>
           <div className="flex gap-1">
-            <div className="w-2 h-2 rounded-full bg-red-500/60" />
-            <div className="w-2 h-2 rounded-full bg-yellow-500/60" />
-            <div className="w-2 h-2 rounded-full bg-green-500/60" />
+            <div className="w-2 h-2 rounded-full bg-red-500/60" /><div className="w-2 h-2 rounded-full bg-yellow-500/60" /><div className="w-2 h-2 rounded-full bg-green-500/60" />
           </div>
           <span className="text-gray-600 text-[9px] tracking-wider uppercase">pantheon://agent-mesh/live</span>
-          <motion.div
-            className="w-1.5 h-1.5 rounded-full ml-auto"
-            style={{ background: '#22c55e' }}
-            animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          />
+          <motion.div className="w-1.5 h-1.5 rounded-full ml-auto" style={{ background: '#22c55e' }} animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
         </div>
 
         {/* Messages */}
         {AGENT_MESSAGES.slice(0, visibleCount).map((m, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{
-              opacity: highlightIdx === i ? 1 : 0.6,
-              x: 0,
-              background: highlightIdx === i ? `${m.color}08` : 'transparent',
-            }}
-            transition={{ duration: 0.3, delay: i * (0.04 * PHI) }}
-            className="flex gap-2 px-2 py-1 rounded"
-          >
+          <motion.div key={i} initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: highlightIdx === i ? 1 : 0.6, x: 0, background: highlightIdx === i ? `${m.color}08` : 'transparent' }}
+            transition={{ duration: 0.3, delay: i * (0.04 * PHI) }} className="flex gap-2 px-2 py-1 rounded">
             <span className="text-gray-600 flex-shrink-0">{m.ts}</span>
             <span className="flex-shrink-0" style={{ color: m.color }}>{m.from}</span>
             <span className="text-gray-600 flex-shrink-0">&rarr;</span>
@@ -407,13 +351,11 @@ function AgentFeed() {
       </div>
 
       {visibleCount < AGENT_MESSAGES.length && (
-        <button
-          onClick={() => setVisibleCount(AGENT_MESSAGES.length)}
+        <button onClick={() => setVisibleCount(AGENT_MESSAGES.length)}
           className="mt-2 text-[10px] font-mono px-3 py-1 rounded-full transition-colors"
           style={{ color: `${CYAN}80`, background: `${CYAN}06`, border: `1px solid ${CYAN}15` }}
           onMouseOver={(e) => { e.currentTarget.style.background = `${CYAN}12` }}
-          onMouseOut={(e) => { e.currentTarget.style.background = `${CYAN}06` }}
-        >
+          onMouseOut={(e) => { e.currentTarget.style.background = `${CYAN}06` }}>
           Show all messages
         </button>
       )}
@@ -427,56 +369,31 @@ function DeployCTA() {
   return (
     <div
       className="rounded-2xl p-6 text-center"
-      style={{
-        background: `linear-gradient(135deg, ${CYAN}06, rgba(168,85,247,0.04))`,
-        border: `1px solid ${CYAN}15`,
-        boxShadow: `0 0 60px -20px ${CYAN}10`,
-      }}
+      style={{ background: `linear-gradient(135deg, ${CYAN}06, rgba(168,85,247,0.04))`, border: `1px solid ${CYAN}15`, boxShadow: `0 0 60px -20px ${CYAN}10` }}
     >
-      <div className="mb-4">
-        <div
-          className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3"
-          style={{ background: `${CYAN}10`, border: `1px solid ${CYAN}25` }}
-        >
-          <span className="text-2xl" style={{ color: CYAN }}>+</span>
-        </div>
-        <h3 className="text-sm font-mono font-bold text-white mb-1">Deploy Your Agent</h3>
-        <p className="text-[11px] font-mono text-gray-400 max-w-md mx-auto leading-relaxed">
-          Build custom autonomous agents on the Pantheon framework. Register skills, join the mesh, earn revenue through Shapley-attributed task completion.
-        </p>
+      <div className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3" style={{ background: `${CYAN}10`, border: `1px solid ${CYAN}25` }}>
+        <span className="text-2xl" style={{ color: CYAN }}>+</span>
       </div>
-
+      <h3 className="text-sm font-mono font-bold text-white mb-1">Deploy Your Agent</h3>
+      <p className="text-[11px] font-mono text-gray-400 max-w-md mx-auto leading-relaxed mb-4">
+        Build custom autonomous agents on the Pantheon framework. Register skills, join the mesh, earn revenue through Shapley-attributed task completion.
+      </p>
       <div className="flex flex-wrap justify-center gap-2 mb-4">
-        {['Skill Registry', 'Proof of Mind', 'Task Escrow', 'Shapley Rewards'].map((feature) => (
-          <span
-            key={feature}
-            className="text-[9px] font-mono px-2.5 py-1 rounded-full"
-            style={{ background: `${CYAN}08`, color: `${CYAN}90`, border: `1px solid ${CYAN}15` }}
-          >
-            {feature}
-          </span>
+        {['Skill Registry', 'Proof of Mind', 'Task Escrow', 'Shapley Rewards'].map((f) => (
+          <span key={f} className="text-[9px] font-mono px-2.5 py-1 rounded-full" style={{ background: `${CYAN}08`, color: `${CYAN}90`, border: `1px solid ${CYAN}15` }}>{f}</span>
         ))}
       </div>
-
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <motion.a
-          href="https://github.com/wglynn/vibeswap"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="https://github.com/wglynn/vibeswap" target="_blank" rel="noopener noreferrer"
           className="px-5 py-2 rounded-full text-xs font-mono font-bold transition-all"
-          style={{
-            background: `linear-gradient(135deg, ${CYAN}, #0891b2)`,
-            color: '#000',
-            boxShadow: `0 0 20px ${CYAN}30`,
-          }}
+          style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)`, color: '#000', boxShadow: `0 0 20px ${CYAN}30` }}
           whileHover={{ scale: 1.03, boxShadow: `0 0 30px ${CYAN}50` }}
           whileTap={{ scale: 0.97 }}
         >
           View Docs &rarr;
         </motion.a>
-        <span className="text-[10px] font-mono text-gray-500">
-          Supports: Claude, GPT, Gemini, Open Source
-        </span>
+        <span className="text-[10px] font-mono text-gray-500">Supports: Claude, GPT, Gemini, Open Source</span>
       </div>
     </div>
   )
@@ -505,25 +422,10 @@ function BackgroundParticles() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {Array.from({ length: 16 }).map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute w-px h-px rounded-full"
-          style={{
-            background: CYAN,
-            left: `${(i * PHI * 17) % 100}%`,
-            top: `${(i * PHI * 23) % 100}%`,
-          }}
-          animate={{
-            opacity: [0, 0.3, 0],
-            scale: [0, 1.5, 0],
-            y: [0, -60 - (i % 4) * 25],
-          }}
-          transition={{
-            duration: 3 + (i % 4) * 1.2,
-            repeat: Infinity,
-            delay: (i * 0.7) % 4,
-            ease: 'easeOut',
-          }}
+        <motion.div key={i} className="absolute w-px h-px rounded-full"
+          style={{ background: CYAN, left: `${(i * PHI * 17) % 100}%`, top: `${(i * PHI * 23) % 100}%` }}
+          animate={{ opacity: [0, 0.3, 0], scale: [0, 1.5, 0], y: [0, -60 - (i % 4) * 25] }}
+          transition={{ duration: 3 + (i % 4) * 1.2, repeat: Infinity, delay: (i * 0.7) % 4, ease: 'easeOut' }}
         />
       ))}
     </div>

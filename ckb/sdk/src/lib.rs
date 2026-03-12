@@ -8,6 +8,7 @@ pub mod antibot;
 pub mod arbitrage;
 pub mod assembler;
 pub mod auction;
+pub mod batch;
 pub mod bridge;
 pub mod circuit_breaker;
 pub mod collector;

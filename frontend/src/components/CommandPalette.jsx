@@ -158,6 +158,9 @@ const COMMANDS = [
   { id: 'rebalance', label: 'Rebalancer', description: 'Auto-rebalance portfolio allocations', path: '/rebalance', category: 'DeFi' },
   { id: 'lp-optimizer', label: 'LP Optimizer', description: 'Maximize liquidity provision returns', path: '/lp-optimizer', category: 'DeFi' },
   { id: 'claims', label: 'Airdrop Claims', description: 'Claim all pending airdrop rewards', path: '/claims', category: 'Account' },
+  { id: 'sentiment', label: 'Market Sentiment', description: 'Fear & greed index, social signals', path: '/sentiment', category: 'Intelligence' },
+  { id: 'priority', label: 'Priority Auction', description: 'Bid for batch execution priority', path: '/priority', category: 'Protocol' },
+  { id: 'compare', label: 'Protocol Comparison', description: 'Compare VibeSwap vs other DEXs', path: '/compare', category: 'Knowledge' },
 ]
 
 const CATEGORY_COLORS = {

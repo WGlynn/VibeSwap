@@ -121,6 +121,9 @@ const COMMANDS = [
   { id: 'treasury', label: 'Treasury', description: 'DAO treasury dashboard & assets', path: '/treasury', category: 'Community' },
   { id: 'otc', label: 'OTC Desk', description: 'Large block trades & RFQs', path: '/otc', category: 'DeFi' },
   { id: 'fees', label: 'Fee Structure', description: 'Fee tiers, volume discounts', path: '/fees', category: 'Protocol' },
+  { id: 'social', label: 'Social Trading', description: 'Copy trade top traders', path: '/social', category: 'Community' },
+  { id: 'achievements', label: 'Achievements', description: 'Quests, XP, daily challenges', path: '/achievements', category: 'Account' },
+  { id: 'swap-history', label: 'Swap History', description: 'Detailed swap transaction log', path: '/swap-history', category: 'Account' },
 ]
 
 const CATEGORY_COLORS = {

@@ -110,6 +110,9 @@ const ROUTE_LABELS = {
   treasury: 'Treasury',
   otc: 'OTC Desk',
   fees: 'Fee Structure',
+  social: 'Social Trading',
+  achievements: 'Achievements',
+  'swap-history': 'Swap History',
 }
 
 export default function Breadcrumb({ className = '' }) {

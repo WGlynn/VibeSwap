@@ -116,6 +116,7 @@ const ROUTE_LABELS = {
   grants: 'Grants',
   'lp-positions': 'LP Positions',
   networks: 'Networks',
+  approvals: 'Approvals',
 }
 
 export default function Breadcrumb({ className = '' }) {

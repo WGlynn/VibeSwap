@@ -8,6 +8,8 @@
     "build": "cp -r src dist",
     "start": "node --expose-gc --max-old-space-size=450 dist/index.js",
     "dev": "node --expose-gc --watch src/index.js",
+    "chatterbox": "node src/chatterbox/index.js",
+    "chatterbox:dev": "node --watch src/chatterbox/index.js",
     "test": "node --test test/mi-bandit.test.js test/shard-learnings.test.js test/mi-manifest.test.js test/mi-host.test.js test/mi-lifecycle.test.js"
   },
   "dependencies": {

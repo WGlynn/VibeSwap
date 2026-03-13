@@ -107,6 +107,7 @@ const ROUTE_LABELS = {
   'bridge-history': 'Bridge History',
   token: 'Token',
   pool: 'Pool',
+  treasury: 'Treasury',
 }
 
 export default function Breadcrumb({ className = '' }) {

@@ -161,6 +161,7 @@ const PortfolioAnalyticsPage = lazy(() => import('./components/PortfolioAnalytic
 const BridgeHistoryPage = lazy(() => import('./components/BridgeHistoryPage'))
 const TokenDetailsPage = lazy(() => import('./components/TokenDetailsPage'))
 const PoolDetailsPage = lazy(() => import('./components/PoolDetailsPage'))
+const TreasuryPage = lazy(() => import('./components/TreasuryPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -304,6 +305,7 @@ function AnimatedRoutes() {
             <Route path="/bridge-history" element={<BridgeHistoryPage />} />
             <Route path="/token/:symbol" element={<TokenDetailsPage />} />
             <Route path="/pool/:id" element={<PoolDetailsPage />} />
+            <Route path="/treasury" element={<TreasuryPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

@@ -76,8 +76,16 @@ const COMMANDS = [
   { id: 'rewards', label: 'Rewards', description: 'Shapley rewards & claims', path: '/rewards', category: 'Account' },
   { id: 'mine', label: 'Mine', description: 'Proof-of-participation mining', path: '/mine', category: 'Account' },
   { id: 'personality', label: 'Personality', description: 'Your trading personality', path: '/personality', category: 'Account' },
+  { id: 'wallet', label: 'Wallet', description: 'Token balances & approvals', path: '/wallet', category: 'Account' },
+  { id: 'notifications', label: 'Notifications', description: 'Activity feed & alerts', path: '/notifications', category: 'Account' },
+  { id: 'settings', label: 'Settings', description: 'Preferences & config', path: '/settings', category: 'Account' },
+  { id: 'profile', label: 'Profile', description: 'Your account & achievements', path: '/profile', category: 'Account' },
+  { id: 'leaderboard', label: 'Leaderboard', description: 'Top traders & LPs', path: '/leaderboard', category: 'Account' },
+  { id: 'referral', label: 'Referrals', description: 'Invite friends, earn rewards', path: '/referral', category: 'Account' },
+  { id: 'tutorial', label: 'Getting Started', description: 'Step-by-step tutorial', path: '/tutorial', category: 'Account' },
 
   // System
+  { id: 'gas', label: 'Gas Tracker', description: 'Live gas prices & estimator', path: '/gas', category: 'System' },
   { id: 'analytics', label: 'Analytics', description: 'Protocol dashboard', path: '/analytics', category: 'System' },
   { id: 'status', label: 'Status', description: 'System health', path: '/status', category: 'System' },
   { id: 'security', label: 'Security', description: 'Security overview', path: '/security', category: 'System' },

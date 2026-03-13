@@ -27,6 +27,7 @@ import { handleTheAIRequest } from './theai-dashboard.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
 import { loadWorkflowStats, handleWillIntercept, getWorkflowStats } from './workflow-router.js';
 import { submitIdea, getIdeas, approveIdea, getIdeaStats, formatSubmitterResponse, buildOwnerNotification } from './idea-pipeline.js';
+import { detectSuggestion, reportSuggestion, acceptVIP, rejectVIP, getVIPStats, flushVIPs } from './vip-detector.js';
 // ============ Module Health Registry ============
 // Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
 // MUST be before all dynamic imports so registerModule() is available in catch blocks
@@ -4680,6 +4681,46 @@ bot.command('mesh', async (ctx) => {
   }
 });
 
+// ============ VIP — VibeSwap Improvement Proposals ============
+
+bot.command('vip_accept', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const vipNumber = ctx.message.text.replace(/^\/vip_accept(@\S+)?/, '').trim();
+  if (!vipNumber) return ctx.reply('Usage: /vip_accept <VIP number>');
+  const result = await acceptVIP(vipNumber);
+  if (result.error) return ctx.reply(result.error);
+  ctx.reply(`VIP-${vipNumber} accepted. Queued for GitHub issue creation.`);
+});
+
+bot.command('vip_reject', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const parts = ctx.message.text.replace(/^\/vip_reject(@\S+)?/, '').trim().split(/\s+/);
+  const vipNumber = parts[0];
+  const reason = parts.slice(1).join(' ') || null;
+  if (!vipNumber) return ctx.reply('Usage: /vip_reject <VIP number> [reason]');
+  const result = await rejectVIP(vipNumber, reason);
+  if (result.error) return ctx.reply(result.error);
+  ctx.reply(`VIP-${vipNumber} rejected.${reason ? ` Reason: ${reason}` : ''}`);
+});
+
+bot.command('vips', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const stats = await getVIPStats();
+  const lines = [
+    'VIP Pipeline Stats',
+    '',
+    `Total: ${stats.total}`,
+    `Pending: ${stats.pending}`,
+    `Accepted: ${stats.accepted}`,
+    `Rejected: ${stats.rejected}`,
+    `Implemented: ${stats.implemented}`,
+    '',
+    'Recent:',
+    ...stats.recent.map(s => `  VIP-${s.vip.slice(-6)} @${s.from} [${s.status}]`),
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
 // ============ /idea + /suggest — Community Idea Pipeline ============
 // People submit ideas, Jarvis evaluates against primitives, credits the contributor.
 // Every voice evaluated by the same standard. Contributor gets Shapley credit.
@@ -6393,6 +6434,14 @@ bot.on('text', async (ctx) => {
           for (const norm of normResult.norms) {
             addGroupNorm(ctx.chat.id, norm).catch(() => {});
           }
+        }
+
+        // ============ VIP Detection — Shard reports suggestions to Will's DM ============
+        // Connects: community users → Jarvis shards → Will's DM → GitHub → mainnet
+        if (detectSuggestion(msgText)) {
+          reportSuggestion(bot, ctx).catch(err => {
+            console.warn(`[vip] Detection error: ${err.message}`);
+          });
         }
 
         if (analysis.action === 'engage' && analysis.response_hint) {

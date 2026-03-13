@@ -92,6 +92,12 @@ const ROUTE_LABELS = {
   proposal: 'Proposal',
   legal: 'Legal',
   careers: 'Careers',
+  badges: 'Badges',
+  alerts: 'Price Alerts',
+  export: 'Export',
+  multisend: 'Multi-Send',
+  limit: 'Limit Orders',
+  airdrop: 'Airdrop',
 }
 
 export default function Breadcrumb({ className = '' }) {

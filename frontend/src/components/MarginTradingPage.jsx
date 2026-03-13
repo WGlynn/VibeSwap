@@ -14,10 +14,7 @@ const ease = [0.25, 0.1, 0.25, 1]
 
 function seededRandom(seed) {
   let s = seed
-  return () => {
-    s = (s * 16807 + 0) % 2147483647
-    return s / 2147483647
-  }
+  return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647 }
 }
 
 // ============ Animation Variants ============
@@ -41,44 +38,12 @@ const TOKEN_PAIRS = [
 
 // ============ Mock Open Positions ============
 
-const rng = seededRandom(42)
-
 const MOCK_POSITIONS = [
-  {
-    id: 1, pair: 'ETH/USDC', side: 'long', size: '$17,426', sizeRaw: 17426,
-    entryPrice: '$3,412.50', markPrice: '$3,485.20', markRaw: 3485.20, entryRaw: 3412.50,
-    leverage: '5x', leverageRaw: 5, collateral: 3485.20,
-    pnl: '+$363.88', pnlRaw: 363.88, pnlPct: '+2.13%',
-    liqPrice: '$2,798.40', positive: true,
-  },
-  {
-    id: 2, pair: 'BTC/USDC', side: 'short', size: '$34,371', sizeRaw: 34371,
-    entryPrice: '$69,120.00', markPrice: '$68,742.50', markRaw: 68742.50, entryRaw: 69120.00,
-    leverage: '3x', leverageRaw: 3, collateral: 11457.00,
-    pnl: '+$187.95', pnlRaw: 187.95, pnlPct: '+0.55%',
-    liqPrice: '$92,160.00', positive: true,
-  },
-  {
-    id: 3, pair: 'SOL/USDC', side: 'long', size: '$7,142', sizeRaw: 7142,
-    entryPrice: '$148.60', markPrice: '$142.85', markRaw: 142.85, entryRaw: 148.60,
-    leverage: '10x', leverageRaw: 10, collateral: 714.25,
-    pnl: '-$276.22', pnlRaw: -276.22, pnlPct: '-3.87%',
-    liqPrice: '$134.21', positive: false,
-  },
-  {
-    id: 4, pair: 'ETH/USDC', side: 'short', size: '$10,455', sizeRaw: 10455,
-    entryPrice: '$3,502.80', markPrice: '$3,485.20', markRaw: 3485.20, entryRaw: 3502.80,
-    leverage: '7x', leverageRaw: 7, collateral: 1493.57,
-    pnl: '+$52.73', pnlRaw: 52.73, pnlPct: '+0.50%',
-    liqPrice: '$4,003.20', positive: true,
-  },
-  {
-    id: 5, pair: 'JUL/USDC', side: 'long', size: '$2,060', sizeRaw: 2060,
-    entryPrice: '$0.0798', markPrice: '$0.0824', markRaw: 0.0824, entryRaw: 0.0798,
-    leverage: '4x', leverageRaw: 4, collateral: 515.00,
-    pnl: '+$67.14', pnlRaw: 67.14, pnlPct: '+3.26%',
-    liqPrice: '$0.0599', positive: true,
-  },
+  { id: 1, pair: 'ETH/USDC', side: 'long', size: '$17,426', entryPrice: '$3,412.50', markPrice: '$3,485.20', leverage: '5x', collateral: 3485.20, pnl: '+$363.88', pnlRaw: 363.88, pnlPct: '+2.13%', liqPrice: '$2,798.40', positive: true },
+  { id: 2, pair: 'BTC/USDC', side: 'short', size: '$34,371', entryPrice: '$69,120.00', markPrice: '$68,742.50', leverage: '3x', collateral: 11457.00, pnl: '+$187.95', pnlRaw: 187.95, pnlPct: '+0.55%', liqPrice: '$92,160.00', positive: true },
+  { id: 3, pair: 'SOL/USDC', side: 'long', size: '$7,142', entryPrice: '$148.60', markPrice: '$142.85', leverage: '10x', collateral: 714.25, pnl: '-$276.22', pnlRaw: -276.22, pnlPct: '-3.87%', liqPrice: '$134.21', positive: false },
+  { id: 4, pair: 'ETH/USDC', side: 'short', size: '$10,455', entryPrice: '$3,502.80', markPrice: '$3,485.20', leverage: '7x', collateral: 1493.57, pnl: '+$52.73', pnlRaw: 52.73, pnlPct: '+0.50%', liqPrice: '$4,003.20', positive: true },
+  { id: 5, pair: 'JUL/USDC', side: 'long', size: '$2,060', entryPrice: '$0.0798', markPrice: '$0.0824', leverage: '4x', collateral: 515.00, pnl: '+$67.14', pnlRaw: 67.14, pnlPct: '+3.26%', liqPrice: '$0.0599', positive: true },
 ]
 
 // ============ Funding Rate Data ============
@@ -95,7 +60,6 @@ const FUNDING_RATES = [
 function LeverageSlider({ value, onChange }) {
   const stops = [1, 2, 3, 5, 7, 10]
   const pct = ((value - 1) / 9) * 100
-
   const riskColor = value <= 3 ? '#22c55e' : value <= 7 ? '#f59e0b' : '#ef4444'
   const riskLabel = value <= 3 ? 'Low' : value <= 7 ? 'Medium' : 'High'
 
@@ -104,10 +68,8 @@ function LeverageSlider({ value, onChange }) {
       <div className="flex items-center justify-between mb-2">
         <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Leverage</p>
         <div className="flex items-center gap-2">
-          <span
-            className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-            style={{ background: `${riskColor}15`, color: riskColor, border: `1px solid ${riskColor}30` }}
-          >
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+            style={{ background: `${riskColor}15`, color: riskColor, border: `1px solid ${riskColor}30` }}>
             {riskLabel} Risk
           </span>
           <span className="text-sm font-mono font-bold" style={{ color: CYAN }}>{value}x</span>
@@ -115,38 +77,21 @@ function LeverageSlider({ value, onChange }) {
       </div>
       <div className="relative h-8 flex items-center">
         <div className="absolute inset-x-0 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-          <motion.div
-            className="h-full rounded-full"
+          <motion.div className="h-full rounded-full"
             style={{ width: `${pct}%`, background: `linear-gradient(90deg, #22c55e, ${CYAN}, #f59e0b, #ef4444)` }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.15 }}
-          />
+            animate={{ width: `${pct}%` }} transition={{ duration: 0.15 }} />
         </div>
-        <input
-          type="range" min={1} max={10} step={1} value={value}
+        <input type="range" min={1} max={10} step={1} value={value}
           onChange={(e) => onChange(parseInt(e.target.value))}
-          className="absolute inset-x-0 w-full h-8 opacity-0 cursor-pointer"
-          style={{ zIndex: 2 }}
-        />
-        <motion.div
-          className="absolute w-4 h-4 rounded-full border-2"
-          style={{
-            left: `calc(${pct}% - 8px)`, background: '#0f0f0f',
-            borderColor: CYAN, boxShadow: `0 0 8px ${CYAN}40`, zIndex: 1,
-          }}
-          animate={{ left: `calc(${pct}% - 8px)` }}
-          transition={{ duration: 0.15 }}
-        />
+          className="absolute inset-x-0 w-full h-8 opacity-0 cursor-pointer" style={{ zIndex: 2 }} />
+        <motion.div className="absolute w-4 h-4 rounded-full border-2"
+          style={{ left: `calc(${pct}% - 8px)`, background: '#0f0f0f', borderColor: CYAN, boxShadow: `0 0 8px ${CYAN}40`, zIndex: 1 }}
+          animate={{ left: `calc(${pct}% - 8px)` }} transition={{ duration: 0.15 }} />
       </div>
       <div className="flex justify-between mt-1">
         {stops.map((s) => (
-          <button
-            key={s}
-            onClick={() => onChange(s)}
-            className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-all ${
-              value === s ? 'text-cyan-400 font-bold' : 'text-black-500 hover:text-black-300'
-            }`}
-          >
+          <button key={s} onClick={() => onChange(s)}
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-all ${value === s ? 'text-cyan-400 font-bold' : 'text-black-500 hover:text-black-300'}`}>
             {s}x
           </button>
         ))}
@@ -166,22 +111,17 @@ function HealthBar({ ratio }) {
       <div className="flex items-center justify-between mb-1.5">
         <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Account Health</p>
         <div className="flex items-center gap-2">
-          <span
-            className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-            style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
-          >
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+            style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>
             {label}
           </span>
           <span className="text-xs font-mono font-bold" style={{ color }}>{ratio.toFixed(1)}%</span>
         </div>
       </div>
       <div className="h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-        <motion.div
-          className="h-full rounded-full"
+        <motion.div className="h-full rounded-full"
           style={{ background: `linear-gradient(90deg, #ef4444, #f59e0b, #22c55e)` }}
-          animate={{ width: `${Math.min(ratio, 100)}%` }}
-          transition={{ duration: 0.4, ease }}
-        />
+          animate={{ width: `${Math.min(ratio, 100)}%` }} transition={{ duration: 0.4, ease }} />
       </div>
       <div className="flex justify-between mt-1">
         <span className="text-[8px] font-mono text-red-400/60">Liquidation</span>
@@ -194,11 +134,9 @@ function HealthBar({ ratio }) {
 // ============ Mini Funding Sparkline ============
 
 function FundingSparkline({ rates, height = 32 }) {
-  const w = 120
-  const h = height
+  const w = 120, h = height
   const max = Math.max(...rates.map(Math.abs))
   const range = max || 0.001
-
   const points = rates.map((r, i) => {
     const x = (i / (rates.length - 1)) * w
     const y = h / 2 - (r / range) * (h * 0.4)
@@ -210,13 +148,21 @@ function FundingSparkline({ rates, height = 32 }) {
       <line x1="0" y1={h / 2} x2={w} y2={h / 2} stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" strokeDasharray="3,2" />
       <polyline points={points} fill="none" stroke={CYAN} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       {rates.map((r, i) => {
-        const x = (i / (rates.length - 1)) * w
-        const y = h / 2 - (r / range) * (h * 0.4)
+        const x = (i / (rates.length - 1)) * w, y = h / 2 - (r / range) * (h * 0.4)
         return <circle key={i} cx={x} cy={y} r="2" fill={r >= 0 ? '#22c55e' : '#ef4444'} opacity="0.7" />
       })}
     </svg>
   )
 }
+
+// ============ Detail Cell ============
+
+const DetailCell = ({ label, value, color }) => (
+  <div>
+    <p className="text-[8px] font-mono text-black-500 uppercase">{label}</p>
+    <p className={`text-[10px] font-mono ${color || 'text-black-300'}`}>{value}</p>
+  </div>
+)
 
 // ============ Main Component ============
 
@@ -225,42 +171,25 @@ export default function MarginTradingPage() {
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
 
-  // ---- Form State ----
   const [side, setSide] = useState('long')
   const [selectedPairIdx, setSelectedPairIdx] = useState(0)
   const [collateral, setCollateral] = useState('')
   const [leverage, setLeverage] = useState(3)
 
   const pair = TOKEN_PAIRS[selectedPairIdx]
+  const fmtPrice = (p) => p >= 1 ? `$${p.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : `$${p.toFixed(4)}`
 
-  // ---- Derived Values ----
-  const notionalValue = useMemo(() => {
-    const amt = parseFloat(collateral) || 0
-    return amt * leverage
-  }, [collateral, leverage])
-
-  const positionSizeInBase = useMemo(() => {
-    if (!notionalValue || !pair.price) return 0
-    return notionalValue / pair.price
-  }, [notionalValue, pair.price])
+  const notionalValue = useMemo(() => (parseFloat(collateral) || 0) * leverage, [collateral, leverage])
+  const positionSizeInBase = useMemo(() => notionalValue && pair.price ? notionalValue / pair.price : 0, [notionalValue, pair.price])
 
   const liquidationPrice = useMemo(() => {
     if (!collateral || parseFloat(collateral) <= 0) return null
     const p = pair.price
-    const maintenanceMargin = 0.05
-    if (side === 'long') {
-      return p * (1 - (1 - maintenanceMargin) / leverage)
-    }
-    return p * (1 + (1 - maintenanceMargin) / leverage)
+    return side === 'long' ? p * (1 - 0.95 / leverage) : p * (1 + 0.95 / leverage)
   }, [pair.price, collateral, leverage, side])
 
-  const estimatedFee = useMemo(() => {
-    return notionalValue * 0.0005
-  }, [notionalValue])
-
-  const currentFunding = FUNDING_RATES.find(
-    f => f.pair === `${pair.base}/${pair.quote}`
-  ) || FUNDING_RATES[0]
+  const estimatedFee = useMemo(() => notionalValue * 0.0005, [notionalValue])
+  const currentFunding = FUNDING_RATES.find(f => f.pair === `${pair.base}/${pair.quote}`) || FUNDING_RATES[0]
 
   // ---- Risk Metrics ----
   const totalMarginUsed = MOCK_POSITIONS.reduce((sum, p) => sum + p.collateral, 0)
@@ -270,26 +199,15 @@ export default function MarginTradingPage() {
   const maintenanceMargin = totalMarginUsed * 0.05
   const healthRatio = ((totalAccountValue - maintenanceMargin) / totalAccountValue) * 100
 
-  // ---- Stats ----
-  const stats = [
-    { label: 'Total Open Interest', value: '$48.2M' },
-    { label: '24h Volume', value: '$127.5M' },
-    { label: 'Total Traders', value: '3,842' },
-    { label: 'Avg Leverage', value: '4.7x' },
-  ]
-
   return (
     <div className="min-h-screen pb-20">
       {/* ============ Background Particles ============ */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {Array.from({ length: 10 }).map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-px h-px rounded-full"
+          <motion.div key={i} className="absolute w-px h-px rounded-full"
             style={{ background: CYAN, left: `${(i * PHI * 17) % 100}%`, top: `${(i * PHI * 23) % 100}%` }}
             animate={{ opacity: [0, 0.25, 0], scale: [0, 1.5, 0], y: [0, -40 - (i % 4) * 15] }}
-            transition={{ duration: 3 + (i % 3) * 1.5, repeat: Infinity, delay: (i * 0.8) % 4, ease: 'easeOut' }}
-          />
+            transition={{ duration: 3 + (i % 3) * 1.5, repeat: Infinity, delay: (i * 0.8) % 4, ease: 'easeOut' }} />
         ))}
       </div>
 
@@ -306,13 +224,14 @@ export default function MarginTradingPage() {
         {/* ============ Stats Bar ============ */}
         <motion.div custom={0} variants={sectionV} initial="hidden" animate="visible" className="mb-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {stats.map((s, i) => (
-              <motion.div
-                key={s.label}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + i * 0.08, duration: 0.3 }}
-              >
+            {[
+              { label: 'Total Open Interest', value: '$48.2M' },
+              { label: '24h Volume', value: '$127.5M' },
+              { label: 'Total Traders', value: '3,842' },
+              { label: 'Avg Leverage', value: '4.7x' },
+            ].map((s, i) => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.08, duration: 0.3 }}>
                 <GlassCard hover glowColor="terminal">
                   <div className="p-3 text-center">
                     <p className="text-lg font-mono font-bold text-white">{s.value}</p>
@@ -337,26 +256,16 @@ export default function MarginTradingPage() {
 
                 {/* Long / Short Toggle */}
                 <div className="flex gap-1 p-1 rounded-lg mb-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
-                  <button
-                    onClick={() => setSide('long')}
-                    className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${
-                      side === 'long'
-                        ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
-                        : 'text-black-400 hover:text-white'
-                    }`}
-                  >
-                    LONG
-                  </button>
-                  <button
-                    onClick={() => setSide('short')}
-                    className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${
-                      side === 'short'
-                        ? 'bg-red-500 text-white shadow-lg shadow-red-500/20'
-                        : 'text-black-400 hover:text-white'
-                    }`}
-                  >
-                    SHORT
-                  </button>
+                  {['long', 'short'].map((s) => (
+                    <button key={s} onClick={() => setSide(s)}
+                      className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${
+                        side === s
+                          ? (s === 'long' ? 'bg-green-500 text-black shadow-lg shadow-green-500/20' : 'bg-red-500 text-white shadow-lg shadow-red-500/20')
+                          : 'text-black-400 hover:text-white'
+                      }`}>
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Token Pair Selector */}
@@ -364,19 +273,14 @@ export default function MarginTradingPage() {
                   <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider mb-2">Trading Pair</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {TOKEN_PAIRS.map((tp, i) => (
-                      <button
-                        key={tp.id}
-                        onClick={() => setSelectedPairIdx(i)}
+                      <button key={tp.id} onClick={() => setSelectedPairIdx(i)}
                         className={`py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all ${
-                          selectedPairIdx === i
-                            ? 'text-cyan-400 ring-1 ring-cyan-500/40'
-                            : 'text-black-400 hover:text-white'
+                          selectedPairIdx === i ? 'text-cyan-400 ring-1 ring-cyan-500/40' : 'text-black-400 hover:text-white'
                         }`}
                         style={{
                           background: selectedPairIdx === i ? `${CYAN}10` : 'rgba(0,0,0,0.3)',
                           border: `1px solid ${selectedPairIdx === i ? `${CYAN}25` : 'rgba(255,255,255,0.05)'}`,
-                        }}
-                      >
+                        }}>
                         <span>{tp.base}/{tp.quote}</span>
                         <span className={`block text-[9px] mt-0.5 ${tp.change >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
                           {tp.change >= 0 ? '+' : ''}{tp.change}%
@@ -395,32 +299,15 @@ export default function MarginTradingPage() {
                     </p>
                   </div>
                   <div className="relative">
-                    <input
-                      type="number"
-                      value={collateral}
-                      onChange={(e) => setCollateral(e.target.value)}
+                    <input type="number" value={collateral} onChange={(e) => setCollateral(e.target.value)}
                       placeholder="0.00"
                       className="w-full rounded-lg px-4 py-3 text-white font-mono placeholder-black-600 focus:outline-none"
-                      style={{
-                        background: 'rgba(0,0,0,0.4)',
-                        border: `1px solid ${collateral ? `${CYAN}40` : 'rgba(255,255,255,0.08)'}`,
-                      }}
-                    />
+                      style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${collateral ? `${CYAN}40` : 'rgba(255,255,255,0.08)'}` }} />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                      <button
-                        onClick={() => setCollateral('6225')}
-                        className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-                        style={{ background: `${CYAN}10`, color: `${CYAN}90` }}
-                      >
-                        HALF
-                      </button>
-                      <button
-                        onClick={() => setCollateral('12450')}
-                        className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-                        style={{ background: `${CYAN}15`, color: CYAN }}
-                      >
-                        MAX
-                      </button>
+                      <button onClick={() => setCollateral('6225')} className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+                        style={{ background: `${CYAN}10`, color: `${CYAN}90` }}>HALF</button>
+                      <button onClick={() => setCollateral('12450')} className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+                        style={{ background: `${CYAN}15`, color: CYAN }}>MAX</button>
                     </div>
                   </div>
                 </div>
@@ -433,39 +320,21 @@ export default function MarginTradingPage() {
                 {/* Position Details */}
                 <AnimatePresence>
                   {collateral && parseFloat(collateral) > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mb-4 rounded-lg p-3 space-y-2.5"
-                      style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}15` }}
-                    >
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-black-400">Notional Value</span>
-                        <span className="text-white font-bold">${notionalValue.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-black-400">Position Size</span>
-                        <span className="text-white">{positionSizeInBase.toFixed(6)} {pair.base}</span>
-                      </div>
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-black-400">Entry Price</span>
-                        <span className="text-white">
-                          ${pair.price.toLocaleString('en-US', { maximumFractionDigits: pair.price < 1 ? 4 : 2 })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-black-400">Liquidation Price</span>
-                        <span className="text-red-400">
-                          {liquidationPrice
-                            ? `$${liquidationPrice.toLocaleString('en-US', { maximumFractionDigits: pair.price < 1 ? 4 : 2 })}`
-                            : '--'
-                          }
-                        </span>
-                      </div>
-
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }} className="mb-4 rounded-lg p-3 space-y-2.5"
+                      style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}15` }}>
+                      {[
+                        { l: 'Notional Value', v: `$${notionalValue.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, c: 'text-white font-bold' },
+                        { l: 'Position Size', v: `${positionSizeInBase.toFixed(6)} ${pair.base}`, c: 'text-white' },
+                        { l: 'Entry Price', v: fmtPrice(pair.price), c: 'text-white' },
+                        { l: 'Liquidation Price', v: liquidationPrice ? fmtPrice(liquidationPrice) : '--', c: 'text-red-400' },
+                      ].map((row) => (
+                        <div key={row.l} className="flex justify-between text-xs font-mono">
+                          <span className="text-black-400">{row.l}</span>
+                          <span className={row.c}>{row.v}</span>
+                        </div>
+                      ))}
                       <div className="h-px" style={{ background: `${CYAN}10` }} />
-
                       <div className="flex justify-between text-xs font-mono">
                         <span className="text-black-400">Est. Fee (0.05%)</span>
                         <span className="text-black-300">${estimatedFee.toFixed(2)}</span>
@@ -476,18 +345,12 @@ export default function MarginTradingPage() {
                           {currentFunding.current >= 0 ? '+' : ''}{(currentFunding.current * 100).toFixed(4)}% / 8h
                         </span>
                       </div>
-
-                      {/* High leverage warning */}
                       {leverage >= 8 && (
                         <div className="mt-1 rounded-md p-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
                           <p className="text-[9px] font-mono text-red-400 text-center">
-                            High leverage — liquidation at {liquidationPrice
-                              ? `$${liquidationPrice.toLocaleString('en-US', { maximumFractionDigits: pair.price < 1 ? 4 : 2 })}`
-                              : '--'
-                            } ({liquidationPrice
+                            High leverage — liquidation {liquidationPrice
                               ? `${Math.abs(((liquidationPrice - pair.price) / pair.price) * 100).toFixed(1)}% from entry`
-                              : '--'
-                            })
+                              : '--'}
                           </p>
                         </div>
                       )}
@@ -496,21 +359,15 @@ export default function MarginTradingPage() {
                 </AnimatePresence>
 
                 {/* Open Position Button */}
-                <button
-                  disabled={!isConnected || !collateral || parseFloat(collateral) <= 0}
+                <button disabled={!isConnected || !collateral || parseFloat(collateral) <= 0}
                   className={`w-full py-3.5 rounded-lg font-bold text-sm transition-all ${
                     side === 'long'
                       ? 'bg-green-500 hover:bg-green-400 text-black shadow-lg shadow-green-500/10'
                       : 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/10'
-                  } disabled:bg-black-700 disabled:text-black-500 disabled:shadow-none`}
-                >
-                  {!isConnected
-                    ? 'Connect Wallet'
-                    : `Open ${side === 'long' ? 'Long' : 'Short'} ${leverage}x`
-                  }
+                  } disabled:bg-black-700 disabled:text-black-500 disabled:shadow-none`}>
+                  {!isConnected ? 'Connect Wallet' : `Open ${side === 'long' ? 'Long' : 'Short'} ${leverage}x`}
                 </button>
 
-                {/* Margin type indicator */}
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider">
@@ -523,228 +380,165 @@ export default function MarginTradingPage() {
             {/* ---- Right Side ---- */}
             <div className="space-y-4">
 
-              {/* ---- Risk Metrics Panel ---- */}
-              <motion.div custom={2} variants={sectionV} initial="hidden" animate="visible">
-                <GlassCard glowColor="terminal">
-                  <div className="p-4">
-                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider mb-4" style={{ color: CYAN }}>
-                      Risk Overview
-                    </h3>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                      {[
-                        { label: 'Total Margin Used', value: `$${totalMarginUsed.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, color: 'text-white' },
-                        { label: 'Available Margin', value: `$${availableMargin.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, color: 'text-cyan-400' },
-                        { label: 'Margin Ratio', value: `${marginRatio.toFixed(1)}%`, color: marginRatio > 50 ? 'text-green-400' : marginRatio > 25 ? 'text-amber-400' : 'text-red-400' },
-                        { label: 'Maintenance Margin', value: `$${maintenanceMargin.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, color: 'text-black-300' },
-                      ].map((m) => (
-                        <div key={m.label} className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}08` }}>
-                          <p className={`text-sm font-mono font-bold ${m.color}`}>{m.value}</p>
-                          <p className="text-[8px] font-mono text-black-500 uppercase tracking-wider mt-1">{m.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <HealthBar ratio={healthRatio} />
+              {/* Risk Metrics Panel */}
+              <GlassCard glowColor="terminal">
+                <div className="p-4">
+                  <h3 className="text-xs font-mono font-bold uppercase tracking-wider mb-4" style={{ color: CYAN }}>
+                    Risk Overview
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    {[
+                      { label: 'Total Margin Used', value: `$${totalMarginUsed.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, color: 'text-white' },
+                      { label: 'Available Margin', value: `$${availableMargin.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, color: 'text-cyan-400' },
+                      { label: 'Margin Ratio', value: `${marginRatio.toFixed(1)}%`, color: marginRatio > 50 ? 'text-green-400' : marginRatio > 25 ? 'text-amber-400' : 'text-red-400' },
+                      { label: 'Maintenance Margin', value: `$${maintenanceMargin.toLocaleString('en-US', { maximumFractionDigits: 2 })}`, color: 'text-black-300' },
+                    ].map((m) => (
+                      <div key={m.label} className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}08` }}>
+                        <p className={`text-sm font-mono font-bold ${m.color}`}>{m.value}</p>
+                        <p className="text-[8px] font-mono text-black-500 uppercase tracking-wider mt-1">{m.label}</p>
+                      </div>
+                    ))}
                   </div>
-                </GlassCard>
-              </motion.div>
+                  <HealthBar ratio={healthRatio} />
+                </div>
+              </GlassCard>
 
-              {/* ---- Open Positions Table ---- */}
-              <motion.div custom={3} variants={sectionV} initial="hidden" animate="visible">
-                <GlassCard glowColor="terminal">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>
-                        Open Positions
-                      </h3>
-                      <span className="text-[9px] font-mono text-black-500">
-                        {MOCK_POSITIONS.length} active
-                      </span>
-                    </div>
+              {/* Open Positions Table */}
+              <GlassCard glowColor="terminal">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Open Positions</h3>
+                    <span className="text-[9px] font-mono text-black-500">{MOCK_POSITIONS.length} active</span>
+                  </div>
 
-                    {/* Table Header */}
-                    <div className="hidden sm:grid grid-cols-[1fr_0.6fr_0.8fr_0.9fr_0.9fr_0.8fr_0.9fr_0.6fr] gap-2 pb-2 mb-2"
-                      style={{ borderBottom: `1px solid ${CYAN}10` }}
-                    >
-                      {['Pair', 'Side', 'Size', 'Entry', 'Mark', 'PnL', 'Liq. Price', 'Actions'].map((h) => (
-                        <p key={h} className="text-[8px] font-mono text-black-500 uppercase tracking-wider">{h}</p>
-                      ))}
-                    </div>
+                  {/* Table Header — desktop only */}
+                  <div className="hidden sm:grid grid-cols-[1fr_0.6fr_0.8fr_0.9fr_0.9fr_0.8fr_0.9fr_0.6fr] gap-2 pb-2 mb-2"
+                    style={{ borderBottom: `1px solid ${CYAN}10` }}>
+                    {['Pair', 'Side', 'Size', 'Entry', 'Mark', 'PnL', 'Liq. Price', 'Actions'].map((h) => (
+                      <p key={h} className="text-[8px] font-mono text-black-500 uppercase tracking-wider">{h}</p>
+                    ))}
+                  </div>
 
-                    {/* Position Rows */}
-                    <div className="space-y-1.5">
-                      {MOCK_POSITIONS.map((pos, i) => (
-                        <motion.div
-                          key={pos.id}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.1 + i * 0.06 }}
-                          className="rounded-lg p-2.5 sm:p-2 transition-all hover:bg-white/[0.02]"
-                          style={{
-                            background: 'rgba(0,0,0,0.25)',
-                            border: `1px solid ${pos.positive ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}`,
-                          }}
-                        >
-                          {/* Desktop row */}
-                          <div className="hidden sm:grid grid-cols-[1fr_0.6fr_0.8fr_0.9fr_0.9fr_0.8fr_0.9fr_0.6fr] gap-2 items-center">
-                            <span className="text-xs font-mono font-bold text-white">{pos.pair}</span>
-                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded w-fit ${
-                              pos.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
-                            }`}>
-                              {pos.side.toUpperCase()} {pos.leverage}
-                            </span>
-                            <span className="text-[11px] font-mono text-black-300">{pos.size}</span>
-                            <span className="text-[11px] font-mono text-black-300">{pos.entryPrice}</span>
-                            <span className="text-[11px] font-mono text-white">{pos.markPrice}</span>
-                            <div>
-                              <span className={`text-[11px] font-mono font-bold ${pos.positive ? 'text-green-400' : 'text-red-400'}`}>
-                                {pos.pnl}
-                              </span>
-                              <span className={`block text-[9px] font-mono ${pos.positive ? 'text-green-400/60' : 'text-red-400/60'}`}>
-                                {pos.pnlPct}
-                              </span>
-                            </div>
-                            <span className="text-[11px] font-mono text-red-400/80">{pos.liqPrice}</span>
-                            <button
-                              className="text-[9px] font-mono px-2 py-1 rounded transition-all hover:bg-red-500/20 hover:text-red-400"
-                              style={{ background: 'rgba(239,68,68,0.08)', color: '#ef444480', border: '1px solid rgba(239,68,68,0.1)' }}
-                            >
-                              Close
-                            </button>
+                  {/* Position Rows */}
+                  <div className="space-y-1.5">
+                    {MOCK_POSITIONS.map((pos, i) => (
+                      <motion.div key={pos.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 + i * 0.06 }}
+                        className="rounded-lg p-2.5 transition-all hover:bg-white/[0.02]"
+                        style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid ${pos.positive ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}` }}>
+
+                        {/* Desktop row */}
+                        <div className="hidden sm:grid grid-cols-[1fr_0.6fr_0.8fr_0.9fr_0.9fr_0.8fr_0.9fr_0.6fr] gap-2 items-center">
+                          <span className="text-xs font-mono font-bold text-white">{pos.pair}</span>
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded w-fit ${
+                            pos.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                            {pos.side.toUpperCase()} {pos.leverage}
+                          </span>
+                          <span className="text-[11px] font-mono text-black-300">{pos.size}</span>
+                          <span className="text-[11px] font-mono text-black-300">{pos.entryPrice}</span>
+                          <span className="text-[11px] font-mono text-white">{pos.markPrice}</span>
+                          <div>
+                            <span className={`text-[11px] font-mono font-bold ${pos.positive ? 'text-green-400' : 'text-red-400'}`}>{pos.pnl}</span>
+                            <span className={`block text-[9px] font-mono ${pos.positive ? 'text-green-400/60' : 'text-red-400/60'}`}>{pos.pnlPct}</span>
                           </div>
+                          <span className="text-[11px] font-mono text-red-400/80">{pos.liqPrice}</span>
+                          <button className="text-[9px] font-mono px-2 py-1 rounded transition-all hover:bg-red-500/20 hover:text-red-400"
+                            style={{ background: 'rgba(239,68,68,0.08)', color: '#ef444480', border: '1px solid rgba(239,68,68,0.1)' }}>
+                            Close
+                          </button>
+                        </div>
 
-                          {/* Mobile layout */}
-                          <div className="sm:hidden space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold text-white">{pos.pair}</span>
-                                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
-                                  pos.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
-                                }`}>
-                                  {pos.side.toUpperCase()} {pos.leverage}
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <span className={`text-xs font-mono font-bold ${pos.positive ? 'text-green-400' : 'text-red-400'}`}>
-                                  {pos.pnl}
-                                </span>
-                                <span className={`block text-[9px] font-mono ${pos.positive ? 'text-green-400/60' : 'text-red-400/60'}`}>
-                                  {pos.pnlPct}
-                                </span>
-                              </div>
+                        {/* Mobile row */}
+                        <div className="sm:hidden space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-white">{pos.pair}</span>
+                              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                                pos.side === 'long' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                                {pos.side.toUpperCase()} {pos.leverage}
+                              </span>
                             </div>
-                            <div className="grid grid-cols-4 gap-2">
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Size</p>
-                                <p className="text-[10px] font-mono text-black-300">{pos.size}</p>
-                              </div>
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Entry</p>
-                                <p className="text-[10px] font-mono text-black-300">{pos.entryPrice}</p>
-                              </div>
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Mark</p>
-                                <p className="text-[10px] font-mono text-white">{pos.markPrice}</p>
-                              </div>
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Liq.</p>
-                                <p className="text-[10px] font-mono text-red-400">{pos.liqPrice}</p>
-                              </div>
+                            <span className={`text-xs font-mono font-bold ${pos.positive ? 'text-green-400' : 'text-red-400'}`}>{pos.pnl}</span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2">
+                            <DetailCell label="Size" value={pos.size} />
+                            <DetailCell label="Entry" value={pos.entryPrice} />
+                            <DetailCell label="Mark" value={pos.markPrice} color="text-white" />
+                            <DetailCell label="Liq." value={pos.liqPrice} color="text-red-400" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Total PnL */}
+                  <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: `1px solid ${CYAN}10` }}>
+                    <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Total Unrealized PnL</span>
+                    {(() => {
+                      const total = MOCK_POSITIONS.reduce((s, p) => s + p.pnlRaw, 0)
+                      return (
+                        <span className={`text-sm font-mono font-bold ${total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {total >= 0 ? '+' : ''}${total.toFixed(2)}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Funding Rate Display */}
+              <GlassCard glowColor="terminal">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Funding Rates</h3>
+                    <span className="text-[9px] font-mono text-black-500">8h cycle — Next in {FUNDING_RATES[0].cycle}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {FUNDING_RATES.map((fr, i) => {
+                      const rng2 = seededRandom(i * 7 + 13)
+                      const sparkRates = [...Array.from({ length: 8 }, () => fr.current + (rng2() - 0.5) * 0.004), fr.current]
+                      return (
+                        <motion.div key={fr.pair} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 + i * 0.06 }}
+                          className="flex items-center gap-3 rounded-lg p-3"
+                          style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid ${CYAN}08` }}>
+                          <span className="text-xs font-mono font-bold text-white w-24 shrink-0">{fr.pair}</span>
+                          <div className="flex-1 grid grid-cols-3 gap-2">
+                            <div>
+                              <p className="text-[8px] font-mono text-black-500 uppercase">Current</p>
+                              <p className={`text-[11px] font-mono font-bold ${fr.current >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {fr.current >= 0 ? '+' : ''}{(fr.current * 100).toFixed(4)}%
+                              </p>
                             </div>
-                            <button
-                              className="w-full text-[9px] font-mono px-2 py-1.5 rounded transition-all hover:bg-red-500/20 hover:text-red-400"
-                              style={{ background: 'rgba(239,68,68,0.08)', color: '#ef444480', border: '1px solid rgba(239,68,68,0.1)' }}
-                            >
-                              Close Position
-                            </button>
+                            <div>
+                              <p className="text-[8px] font-mono text-black-500 uppercase">Predicted</p>
+                              <p className={`text-[11px] font-mono ${fr.predicted >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
+                                {fr.predicted >= 0 ? '+' : ''}{(fr.predicted * 100).toFixed(4)}%
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-mono text-black-500 uppercase">Annualized</p>
+                              <p className={`text-[11px] font-mono ${parseFloat(fr.annualized) >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
+                                {fr.annualized}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="w-24 shrink-0 hidden sm:block">
+                            <FundingSparkline rates={sparkRates} height={28} />
                           </div>
                         </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Total PnL */}
-                    <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: `1px solid ${CYAN}10` }}>
-                      <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Total Unrealized PnL</span>
-                      {(() => {
-                        const total = MOCK_POSITIONS.reduce((s, p) => s + p.pnlRaw, 0)
-                        const positive = total >= 0
-                        return (
-                          <span className={`text-sm font-mono font-bold ${positive ? 'text-green-400' : 'text-red-400'}`}>
-                            {positive ? '+' : ''}${total.toFixed(2)}
-                          </span>
-                        )
-                      })()}
-                    </div>
+                      )
+                    })}
                   </div>
-                </GlassCard>
-              </motion.div>
 
-              {/* ---- Funding Rate Display ---- */}
-              <motion.div custom={4} variants={sectionV} initial="hidden" animate="visible">
-                <GlassCard glowColor="terminal">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>
-                        Funding Rates
-                      </h3>
-                      <span className="text-[9px] font-mono text-black-500">8h cycle — Next in {FUNDING_RATES[0].cycle}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {FUNDING_RATES.map((fr, i) => {
-                        const rng2 = seededRandom(i * 7 + 13)
-                        const sparkRates = Array.from({ length: 8 }, () => fr.current + (rng2() - 0.5) * 0.004)
-                        sparkRates.push(fr.current)
-
-                        return (
-                          <motion.div
-                            key={fr.pair}
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 + i * 0.06 }}
-                            className="flex items-center gap-3 rounded-lg p-3"
-                            style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid ${CYAN}08` }}
-                          >
-                            <span className="text-xs font-mono font-bold text-white w-24 shrink-0">{fr.pair}</span>
-
-                            <div className="flex-1 grid grid-cols-3 gap-2">
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Current</p>
-                                <p className={`text-[11px] font-mono font-bold ${fr.current >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {fr.current >= 0 ? '+' : ''}{(fr.current * 100).toFixed(4)}%
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Predicted</p>
-                                <p className={`text-[11px] font-mono ${fr.predicted >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
-                                  {fr.predicted >= 0 ? '+' : ''}{(fr.predicted * 100).toFixed(4)}%
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[8px] font-mono text-black-500 uppercase">Annualized</p>
-                                <p className={`text-[11px] font-mono ${parseFloat(fr.annualized) >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
-                                  {fr.annualized}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="w-24 shrink-0 hidden sm:block">
-                              <FundingSparkline rates={sparkRates} height={28} />
-                            </div>
-                          </motion.div>
-                        )
-                      })}
-                    </div>
-
-                    <div className="mt-3 rounded-lg p-2.5" style={{ background: `${CYAN}06`, border: `1px solid ${CYAN}12` }}>
-                      <p className="text-[10px] font-mono text-cyan-400/80 text-center">
-                        Longs pay shorts when funding is positive. Shorts pay longs when negative.
-                      </p>
-                    </div>
+                  <div className="mt-3 rounded-lg p-2.5" style={{ background: `${CYAN}06`, border: `1px solid ${CYAN}12` }}>
+                    <p className="text-[10px] font-mono text-cyan-400/80 text-center">
+                      Longs pay shorts when funding is positive. Shorts pay longs when negative.
+                    </p>
                   </div>
-                </GlassCard>
-              </motion.div>
+                </div>
+              </GlassCard>
             </div>
           </div>
         </motion.div>
@@ -766,21 +560,12 @@ export default function MarginTradingPage() {
                   { step: '2', title: 'Batch Settlement', desc: 'All orders in the 10-second batch receive the same uniform clearing price' },
                   { step: '3', title: 'Isolated Execution', desc: 'Each position is independently margined — one liquidation never cascades to another' },
                 ].map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                  <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 + i * (0.1 * PHI), duration: 0.35, ease }}
-                    className="rounded-lg p-3"
-                    style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}12` }}
-                  >
+                    className="rounded-lg p-3" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${CYAN}12` }}>
                     <div className="flex items-center gap-2.5 mb-2">
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold"
-                        style={{ background: `${CYAN}15`, color: CYAN }}
-                      >
-                        {item.step}
-                      </div>
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold"
+                        style={{ background: `${CYAN}15`, color: CYAN }}>{item.step}</div>
                       <p className="text-xs font-mono font-bold text-white">{item.title}</p>
                     </div>
                     <p className="text-[10px] font-mono text-black-400 leading-relaxed">{item.desc}</p>
@@ -801,12 +586,9 @@ export default function MarginTradingPage() {
               { path: '/lending', label: 'Lending' },
               { path: '/insurance', label: 'Insurance' },
             ].map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
+              <Link key={link.path} to={link.path}
                 className="text-[10px] font-mono px-3 py-1.5 rounded-full transition-all hover:text-cyan-400"
-                style={{ background: `${CYAN}08`, border: `1px solid ${CYAN}15`, color: `${CYAN}99` }}
-              >
+                style={{ background: `${CYAN}08`, border: `1px solid ${CYAN}15`, color: `${CYAN}99` }}>
                 {link.label}
               </Link>
             ))}
@@ -814,12 +596,8 @@ export default function MarginTradingPage() {
         </motion.div>
 
         {/* ============ Footer ============ */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 0.8 }}
-          className="mt-12 mb-8 text-center"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5, duration: 0.8 }}
+          className="mt-12 mb-8 text-center">
           <div className="w-16 h-px mx-auto mb-4" style={{ background: `linear-gradient(90deg, transparent, ${CYAN}40, transparent)` }} />
           <p className="text-[10px] font-mono text-black-500 tracking-widest uppercase">
             VibeSwap Margin — Isolated Risk, Fair Execution

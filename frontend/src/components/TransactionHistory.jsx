@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useTransactions, TX_TYPE, TX_STATUS } from '../hooks/useTransactions'
 import { TransactionRowSkeleton } from './ui/Skeleton'
 
 function TransactionHistory({ isOpen, onClose }) {
-  const { isConnected } = useWallet()
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const { transactions, clearAllTransactions, pendingCount } = useTransactions()
   const [filter, setFilter] = useState('all')
   const [isClearing, setIsClearing] = useState(false)

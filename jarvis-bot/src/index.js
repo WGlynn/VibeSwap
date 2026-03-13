@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { config } from './config.js';
 import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats, trimConversationCache } from './claude.js';
-import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster } from './git.js';
+import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster, gitPush, gitStatusShort, gitLogOneline } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
@@ -1318,6 +1318,12 @@ MIND NETWORK
   /crpc [prompt] — Run live CRPC consensus round
   /brain — Intelligence loop: scores, calibration, engagement
   /network — Shard topology, CRPC stats, knowledge chain
+
+GIT (Owner Only)
+  /gitstatus — Working tree status (short)
+  /gitlog — Last 10 commits (oneline)
+  /gitcommit <msg> — Stage all + commit + push both remotes
+  /gitpush — Stage all + push both remotes (no commit)
 
 SYSTEM
   /mi_status — MI cell status & telemetry
@@ -3267,6 +3273,39 @@ bot.command('commit', async (ctx) => {
   }
   const result = await gitCommitAndPush(message);
   ctx.reply(result);
+});
+
+// ============ Git Management Commands (TG Remote) ============
+
+bot.command('gitpush', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  ctx.reply('Pushing to both remotes...');
+  const result = await gitPush();
+  ctx.reply(`\`\`\`\n${result}\n\`\`\``, { parse_mode: 'Markdown' });
+});
+
+bot.command('gitcommit', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  let message = ctx.message.text.replace('/gitcommit', '').trim();
+  if (!message) {
+    const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    message = `TG commit — ${ts}`;
+  }
+  ctx.reply(`Committing: ${message}`);
+  const result = await gitCommitAndPush(message);
+  ctx.reply(`\`\`\`\n${result}\n\`\`\``, { parse_mode: 'Markdown' });
+});
+
+bot.command('gitstatus', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const result = await gitStatusShort();
+  ctx.reply(`\`\`\`\n${result}\n\`\`\``, { parse_mode: 'Markdown' });
+});
+
+bot.command('gitlog', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const result = await gitLogOneline(10);
+  ctx.reply(`\`\`\`\n${result}\n\`\`\``, { parse_mode: 'Markdown' });
 });
 
 bot.command('refresh', async (ctx) => {

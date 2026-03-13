@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import { useQuantumVault } from '../hooks/useQuantumVault'
 import SoulboundAvatar from './SoulboundAvatar'
@@ -15,7 +16,9 @@ import toast from 'react-hot-toast'
  * 4. Identity creation
  */
 function OnboardingModal({ isOpen, onClose, onComplete }) {
-  const { address, isConnected } = useWallet()
+  const { address, isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const { mintIdentity, mintIdentityQuantum, checkUsername, isLoading: identityLoading } = useIdentity()
   const { generateKeys, isGenerating, merkleRoot } = useQuantumVault()
 

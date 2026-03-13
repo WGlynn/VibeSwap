@@ -268,6 +268,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/treasury', label: 'Treasury', icon: '🏛' },
       { path: '/grants', label: 'Grants', icon: '💰' },
       { path: '/dao-tools', label: 'DAO Tools', icon: '🛠' },
+      { path: '/delegate', label: 'Delegate', icon: '🗳' },
+      { path: '/competitions', label: 'Competitions', icon: '🏆' },
     ]},
     { label: 'Intelligence', items: [
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
@@ -306,6 +308,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/team', label: 'Team', icon: '👥' },
       { path: '/faq', label: 'FAQ', icon: '?' },
       { path: '/changelog', label: 'Changelog', icon: '📝' },
+      { path: '/migrate', label: 'Migration', icon: '🔄' },
       { path: '/about', label: 'About', icon: 'i' },
       { path: '/partners', label: 'Partners', icon: '🤝' },
       { path: '/brand', label: 'Brand', icon: '🎨' },

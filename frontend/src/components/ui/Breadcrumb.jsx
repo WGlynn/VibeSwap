@@ -98,6 +98,9 @@ const ROUTE_LABELS = {
   multisend: 'Multi-Send',
   limit: 'Limit Orders',
   airdrop: 'Airdrop',
+  'staking-rewards': 'Staking Rewards',
+  watchlist: 'Watchlist',
+  onramp: 'On-Ramp',
 }
 
 export default function Breadcrumb({ className = '' }) {

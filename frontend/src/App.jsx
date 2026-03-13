@@ -152,6 +152,9 @@ const ExportPage = lazy(() => import('./components/ExportPage'))
 const MultiSendPage = lazy(() => import('./components/MultiSendPage'))
 const LimitOrderPage = lazy(() => import('./components/LimitOrderPage'))
 const AirdropPage = lazy(() => import('./components/AirdropPage'))
+const StakingRewardsPage = lazy(() => import('./components/StakingRewardsPage'))
+const WatchlistPage = lazy(() => import('./components/WatchlistPage'))
+const TransakPage = lazy(() => import('./components/TransakPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -286,6 +289,9 @@ function AnimatedRoutes() {
             <Route path="/multisend" element={<MultiSendPage />} />
             <Route path="/limit" element={<LimitOrderPage />} />
             <Route path="/airdrop" element={<AirdropPage />} />
+            <Route path="/staking-rewards" element={<StakingRewardsPage />} />
+            <Route path="/watchlist" element={<WatchlistPage />} />
+            <Route path="/onramp" element={<TransakPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

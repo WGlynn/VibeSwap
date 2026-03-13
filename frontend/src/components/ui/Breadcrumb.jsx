@@ -124,6 +124,9 @@ const ROUTE_LABELS = {
   margin: 'Margin Trading',
   user: 'Profile',
   automation: 'Automation',
+  revenue: 'Revenue Share',
+  vesting: 'Vesting',
+  liquidations: 'Liquidations',
 }
 
 export default function Breadcrumb({ className = '' }) {

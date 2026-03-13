@@ -99,6 +99,17 @@ const COMMANDS = [
   { id: 'contact', label: 'Contact', description: 'Support & feedback', path: '/contact', category: 'System' },
   { id: 'ecosystem', label: 'Ecosystem', description: 'Protocol overview & partners', path: '/ecosystem', category: 'Ecosystem' },
   { id: 'brand', label: 'Brand Assets', description: 'Logo, colors, guidelines', path: '/brand', category: 'System' },
+  { id: 'partners', label: 'Partners', description: 'Integration partners', path: '/partners', category: 'System' },
+  { id: 'legal', label: 'Legal', description: 'Terms, privacy, disclosures', path: '/legal', category: 'System' },
+  { id: 'careers', label: 'Careers', description: 'Join the team', path: '/careers', category: 'System' },
+
+  // Tools
+  { id: 'multisend', label: 'Multi-Send', description: 'Batch transfers to multiple recipients', path: '/multisend', category: 'DeFi' },
+  { id: 'limit', label: 'Limit Orders', description: 'Price-triggered orders', path: '/limit', category: 'DeFi' },
+  { id: 'airdrop', label: 'Airdrop', description: 'Check VIBE allocation & eligibility', path: '/airdrop', category: 'Account' },
+  { id: 'badges', label: 'Badges', description: 'Soulbound achievement badges', path: '/badges', category: 'Account' },
+  { id: 'alerts', label: 'Price Alerts', description: 'Set price & volume alerts', path: '/alerts', category: 'Account' },
+  { id: 'export', label: 'Export Data', description: 'CSV, JSON, PDF exports & tax', path: '/export', category: 'Account' },
 ]
 
 const CATEGORY_COLORS = {

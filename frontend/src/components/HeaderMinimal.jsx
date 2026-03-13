@@ -234,6 +234,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/mine', label: 'Mine JUL', icon: '⛏' },
       { path: '/multisend', label: 'Multi-Send', icon: '📨' },
       { path: '/limit', label: 'Limit Orders', icon: '📋' },
+      { path: '/staking-rewards', label: 'Staking Rewards', icon: '💎' },
+      { path: '/onramp', label: 'Buy with Fiat', icon: '💵' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },
@@ -433,6 +435,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             { path: '/alerts', label: 'Price Alerts', icon: '🔔' },
             { path: '/export', label: 'Export Data', icon: '📤' },
             { path: '/airdrop', label: 'Airdrop', icon: '🪂' },
+            { path: '/watchlist', label: 'Watchlist', icon: '👁' },
           ].map((item) => (
             <Link
               key={item.path}

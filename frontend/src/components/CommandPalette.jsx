@@ -110,6 +110,9 @@ const COMMANDS = [
   { id: 'badges', label: 'Badges', description: 'Soulbound achievement badges', path: '/badges', category: 'Account' },
   { id: 'alerts', label: 'Price Alerts', description: 'Set price & volume alerts', path: '/alerts', category: 'Account' },
   { id: 'export', label: 'Export Data', description: 'CSV, JSON, PDF exports & tax', path: '/export', category: 'Account' },
+  { id: 'watchlist', label: 'Watchlist', description: 'Track favorite tokens & prices', path: '/watchlist', category: 'Account' },
+  { id: 'staking-rewards', label: 'Staking Rewards', description: 'Calculator & reward dashboard', path: '/staking-rewards', category: 'DeFi' },
+  { id: 'onramp', label: 'On-Ramp', description: 'Buy crypto with fiat currency', path: '/onramp', category: 'DeFi' },
 ]
 
 const CATEGORY_COLORS = {

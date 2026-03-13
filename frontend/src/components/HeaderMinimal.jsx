@@ -243,6 +243,9 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/derivatives', label: 'Derivatives', icon: '📉' },
       { path: '/create-token', label: 'Token Creator', icon: '🪄' },
       { path: '/margin', label: 'Margin Trading', icon: '📊' },
+      { path: '/revenue', label: 'Revenue Share', icon: '💸' },
+      { path: '/vesting', label: 'Vesting', icon: '🔐' },
+      { path: '/liquidations', label: 'Liquidations', icon: '⚠' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },

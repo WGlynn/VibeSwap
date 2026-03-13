@@ -18,6 +18,8 @@ const COLUMNS = [
       { to: '/options', label: 'Options' },
       { to: '/dca', label: 'DCA' },
       { to: '/aggregator', label: 'Aggregator' },
+      { to: '/limit', label: 'Limit Orders' },
+      { to: '/multisend', label: 'Multi-Send' },
     ],
   },
   {
@@ -66,6 +68,8 @@ const COLUMNS = [
       { to: '/leaderboard', label: 'Leaderboard' },
       { to: '/referral', label: 'Referrals' },
       { to: '/bounties', label: 'Bounties' },
+      { to: '/badges', label: 'Badges' },
+      { to: '/airdrop', label: 'Airdrop' },
       { to: '/team', label: 'Team' },
     ],
   },

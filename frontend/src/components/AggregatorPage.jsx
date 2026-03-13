@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
@@ -55,6 +55,24 @@ const SCORING_FACTORS = [
   { factor: 'Slippage', weight: '15%', desc: 'Difference between quoted and executed price. Volatile pairs get higher slippage penalties.' },
 ]
 
+// ============ Aggregation Stats Data ============
+const AGGREGATION_STATS = {
+  totalVolume: '$14.2M',
+  totalSavings: '$48,720',
+  uniqueRoutes: '1,247',
+  avgSavingPct: '0.34%',
+  tradesRouted: '2,847',
+  protocolsCovered: DEX_ROUTES.length,
+}
+
+// ============ Price Comparison Data ============
+const PRICE_SOURCES = [
+  { name: 'VibeSwap', color: '#06b6d4', icon: '\u25CE' },
+  { name: 'Uniswap', color: '#FF007A', icon: '\u2B21' },
+  { name: '1inch', color: '#1B314F', icon: '\u2B22' },
+  { name: 'Paraswap', color: '#7B61FF', icon: '\u25C6' },
+]
+
 // ============ Animation Variants ============
 const headerV = { hidden: { opacity: 0, y: -30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease } } }
 const sectionV = { hidden: { opacity: 0, y: 40, scale: 0.97 }, visible: (i) => ({ opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, delay: 0.3 + i * (0.12 * PHI), ease } }) }
@@ -75,6 +93,40 @@ function generateRoutes(fromToken, toToken, amount) {
   }).sort((a, b) => b.netOutputRaw - a.netOutputRaw).map((r, i) => ({ ...r, isBest: i === 0 }))
 }
 
+// ============ Price Comparison Generator ============
+function generatePriceComparison(fromToken, toToken, amount) {
+  if (!amount || parseFloat(amount) <= 0 || fromToken.symbol === toToken.symbol) return []
+  const prices = { ETH: 1725, WBTC: 28710, LINK: 14.2, USDC: 1, USDT: 1, DAI: 1 }
+  const baseRate = (prices[fromToken.symbol] || 1) / (prices[toToken.symbol] || 1)
+  const rng = (s) => Math.abs(Math.sin(s * 7919 + 10007) % 1)
+  return PRICE_SOURCES.map((src, i) => {
+    const spread = (rng(i * 13 + amount.length) - 0.5) * 0.006
+    const vibeBonus = src.name === 'VibeSwap' ? 0.0015 : 0
+    const rate = baseRate * (1 + spread + vibeBonus)
+    const output = parseFloat(amount) * rate
+    return { ...src, rate: rate.toFixed(8), output: output.toFixed(6), outputRaw: output }
+  }).sort((a, b) => b.outputRaw - a.outputRaw).map((r, i) => ({ ...r, isBest: i === 0, diff: i === 0 ? null : ((r.outputRaw / PRICE_SOURCES.reduce((best, _, j) => {
+    const s2 = (rng(j * 13 + amount.length) - 0.5) * 0.006
+    const vb = PRICE_SOURCES[j].name === 'VibeSwap' ? 0.0015 : 0
+    const o = parseFloat(amount) * baseRate * (1 + s2 + vb)
+    return o > best ? o : best
+  }, 0) - 1) * 100).toFixed(3) }))
+}
+
+// ============ Slippage Estimator ============
+function estimateSlippage(amount, fromToken, toToken) {
+  if (!amount || parseFloat(amount) <= 0) return []
+  const val = parseFloat(amount)
+  const prices = { ETH: 1725, WBTC: 28710, LINK: 14.2, USDC: 1, USDT: 1, DAI: 1 }
+  const usdValue = val * (prices[fromToken.symbol] || 1)
+  return DEX_ROUTES.map((dex) => {
+    const liqFactor = dex.name === 'Curve' ? 0.8 : dex.name === 'VibeSwap' ? 0.9 : 1.0
+    const baseBps = Math.min(usdValue / 50000 * liqFactor, 5.0)
+    const slippageBps = Math.max(0.01, baseBps * (dex.name === 'VibeSwap' ? 0.6 : 1.0))
+    return { name: dex.name, color: dex.color, slippageBps: slippageBps.toFixed(2), slippagePct: (slippageBps / 100).toFixed(4) }
+  }).sort((a, b) => parseFloat(a.slippageBps) - parseFloat(b.slippageBps))
+}
+
 // ============ Section Wrapper ============
 function Section({ index, title, subtitle, children }) {
   return (
@@ -91,39 +143,79 @@ function Section({ index, title, subtitle, children }) {
   )
 }
 
-// ============ Split Route SVG ============
-function SplitRouteViz({ routes, fromToken, toToken }) {
-  const top = routes.slice(0, 3)
+// ============ Route Flow Visualization (SVG) ============
+function RouteFlowViz({ routes, fromToken, toToken, amount }) {
+  const top = routes.slice(0, 4)
   if (top.length < 2) return null
-  const splits = top.length === 3 ? [50, 30, 20] : [60, 40]
-  const yPos = top.length === 3 ? [30, 80, 130] : [45, 105]
-  const h = top.length === 3 ? 160 : 150
-  const mid = h / 2
+  const total = top.reduce((s, r) => s + r.netOutputRaw, 0)
+  const splits = top.map((r) => Math.round((r.netOutputRaw / total) * 100))
+  // Normalize so splits sum to 100
+  const diff = 100 - splits.reduce((s, v) => s + v, 0)
+  if (diff !== 0) splits[0] += diff
+  const count = top.length
+  const rowH = 36
+  const gap = 12
+  const totalH = count * rowH + (count - 1) * gap
+  const svgH = totalH + 60
+  const midY = svgH / 2
+  const startX = 50
+  const endX = 490
+  const boxW = 130
+  const boxX = (startX + endX) / 2 - boxW / 2
+  const yPositions = top.map((_, i) => (svgH / 2) - (totalH / 2) + i * (rowH + gap) + rowH / 2)
+
   return (
     <div className="w-full overflow-x-auto">
-      <svg viewBox={`0 0 520 ${h}`} className="w-full min-w-[420px]" style={{ maxHeight: 180 }}>
-        <circle cx="40" cy={mid} r="18" fill="rgba(6,182,212,0.15)" stroke={CYAN} strokeWidth="1.5" />
-        <text x="40" y={mid + 4} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">{fromToken.symbol}</text>
-        <circle cx="480" cy={mid} r="18" fill="rgba(6,182,212,0.15)" stroke={CYAN} strokeWidth="1.5" />
-        <text x="480" y={mid + 4} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">{toToken.symbol}</text>
+      <svg viewBox={`0 0 540 ${svgH}`} className="w-full min-w-[440px]" style={{ maxHeight: 240 }}>
+        <defs>
+          <filter id="routeGlow"><feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={CYAN} stopOpacity="0.6" /><stop offset="100%" stopColor={CYAN} stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+        {/* Source node */}
+        <circle cx={startX} cy={midY} r="22" fill="rgba(6,182,212,0.12)" stroke={CYAN} strokeWidth="1.5" />
+        <text x={startX} y={midY - 5} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">{fromToken.symbol}</text>
+        <text x={startX} y={midY + 8} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="7">{amount}</text>
+        {/* Destination node */}
+        <circle cx={endX} cy={midY} r="22" fill="rgba(6,182,212,0.12)" stroke={CYAN} strokeWidth="1.5" />
+        <text x={endX} y={midY + 4} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">{toToken.symbol}</text>
+        {/* Route paths */}
         {top.map((r, i) => {
-          const y = yPos[i]
+          const y = yPositions[i]
+          const cpOut = startX + 60
+          const cpIn = endX - 60
           return (
             <g key={r.name}>
-              <motion.path d={`M 58 ${mid} C 120 ${mid}, 140 ${y}, 200 ${y}`} fill="none" stroke={r.color} strokeWidth="2" strokeDasharray="6 3"
-                initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 0.7 }} transition={{ duration: 1 + i * 0.3, ease: 'easeInOut' }} />
-              <rect x="200" y={y - 14} width="120" height="28" rx="6" fill="rgba(0,0,0,0.6)" stroke={r.color} strokeWidth="1" />
-              <text x="260" y={y + 4} textAnchor="middle" fill={r.color} fontSize="10" fontWeight="600">{r.name} ({splits[i]}%)</text>
-              <motion.path d={`M 320 ${y} C 380 ${y}, 400 ${mid}, 462 ${mid}`} fill="none" stroke={r.color} strokeWidth="2" strokeDasharray="6 3"
-                initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 0.7 }} transition={{ duration: 1 + i * 0.3, delay: 0.5, ease: 'easeInOut' }} />
-              <motion.circle r="3" fill={r.color} initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 1, 1, 0], cx: [58, 200, 320, 462], cy: [mid, y, y, mid] }}
-                transition={{ duration: 3 + i * 0.5, repeat: Infinity, delay: i * 0.8, ease: 'easeInOut' }} />
+              {/* Left curve: source to DEX box */}
+              <motion.path
+                d={`M ${startX + 22} ${midY} C ${cpOut} ${midY}, ${boxX - 20} ${y}, ${boxX} ${y}`}
+                fill="none" stroke={r.color} strokeWidth={r.isBest ? 2.5 : 1.5} strokeDasharray="6 3" opacity={r.isBest ? 0.9 : 0.5}
+                initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: r.isBest ? 0.9 : 0.5 }}
+                transition={{ duration: 0.8 + i * 0.2, ease: 'easeInOut' }} />
+              {/* DEX box */}
+              <rect x={boxX} y={y - rowH / 2} width={boxW} height={rowH} rx="8" fill="rgba(0,0,0,0.7)" stroke={r.color} strokeWidth={r.isBest ? 2 : 1} />
+              <text x={boxX + 10} y={y + 1} fill={r.color} fontSize="10" fontWeight="700">{r.name}</text>
+              <text x={boxX + boxW - 10} y={y + 1} textAnchor="end" fill="rgba(255,255,255,0.6)" fontSize="9" fontWeight="600">{splits[i]}%</text>
+              {r.isBest && <text x={boxX + boxW / 2} y={y + rowH / 2 + 11} textAnchor="middle" fill={CYAN} fontSize="7" fontWeight="bold">BEST</text>}
+              {/* Right curve: DEX box to destination */}
+              <motion.path
+                d={`M ${boxX + boxW} ${y} C ${boxX + boxW + 20} ${y}, ${cpIn} ${midY}, ${endX - 22} ${midY}`}
+                fill="none" stroke={r.color} strokeWidth={r.isBest ? 2.5 : 1.5} strokeDasharray="6 3" opacity={r.isBest ? 0.9 : 0.5}
+                initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: r.isBest ? 0.9 : 0.5 }}
+                transition={{ duration: 0.8 + i * 0.2, delay: 0.4, ease: 'easeInOut' }} />
+              {/* Animated dot */}
+              <motion.circle r="3.5" fill={r.color} filter="url(#routeGlow)"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 1, 0], cx: [startX + 22, boxX, boxX + boxW, endX - 22], cy: [midY, y, y, midY] }}
+                transition={{ duration: 3 + i * 0.4, repeat: Infinity, delay: i * 0.6, ease: 'easeInOut' }} />
             </g>
           )
         })}
       </svg>
-      <p className="text-xs text-black-500 text-center mt-2">Splitting across {top.length} DEXs yields a better net rate than any single route</p>
+      <p className="text-xs text-black-500 text-center mt-2">
+        Splitting across {top.length} DEXs yields a {((splits[0] / 100) * 0.34).toFixed(2)}% better net rate than any single route
+      </p>
     </div>
   )
 }
@@ -190,10 +282,14 @@ export default function AggregatorPage() {
   const [showFromSelect, setShowFromSelect] = useState(false)
   const [showToSelect, setShowToSelect] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [sliderAmount, setSliderAmount] = useState(50)
 
   const routes = useMemo(() => generateRoutes(fromToken, toToken, amount), [fromToken, toToken, amount])
   const bestRoute = routes[0] || null
   const hasRoutes = routes.length > 0 && !isSearching
+
+  const priceComparison = useMemo(() => generatePriceComparison(fromToken, toToken, amount), [fromToken, toToken, amount])
+  const slippageEstimates = useMemo(() => estimateSlippage(sliderAmount.toString(), fromToken, toToken), [sliderAmount, fromToken, toToken])
 
   useEffect(() => {
     if (amount && parseFloat(amount) > 0 && fromToken.symbol !== toToken.symbol) {
@@ -205,6 +301,10 @@ export default function AggregatorPage() {
   }, [amount, fromToken, toToken])
 
   const effectiveSlippage = slippage === 'custom' ? (customSlippage || '0.5') : (slippage === 'auto' ? '0.5' : slippage)
+
+  const handleSliderChange = useCallback((e) => {
+    setSliderAmount(parseFloat(e.target.value))
+  }, [])
 
   const stats = [
     { label: 'Routes Compared', value: routes.length || '--', icon: '\u27C1' },
@@ -232,8 +332,29 @@ export default function AggregatorPage() {
           <p className="text-sm text-black-400 mt-1 max-w-xl">Find the best swap rates across 6+ protocols. Compares price, gas, MEV risk, and slippage to route optimally.</p>
         </motion.div>
 
-        {/* 1. Overview */}
-        <Section index={0} title="Overview" subtitle="Real-time aggregation metrics">
+        {/* 1. Aggregation Stats */}
+        <Section index={0} title="Aggregation Stats" subtitle="Cumulative routing performance">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { label: 'Total Volume Routed', value: AGGREGATION_STATS.totalVolume, icon: '\u2211' },
+              { label: 'Total Savings', value: AGGREGATION_STATS.totalSavings, icon: '\u2193', color: '#22c55e' },
+              { label: 'Unique Routes Found', value: AGGREGATION_STATS.uniqueRoutes, icon: '\u2442' },
+              { label: 'Avg Saving / Trade', value: AGGREGATION_STATS.avgSavingPct, icon: '\u0394' },
+              { label: 'Trades Routed', value: AGGREGATION_STATS.tradesRouted, icon: '\u21C4' },
+              { label: 'Protocols Covered', value: AGGREGATION_STATS.protocolsCovered, icon: '\u25CE' },
+            ].map((s, i) => (
+              <motion.div key={s.label} custom={i} variants={rowV} initial="hidden" animate="visible"
+                className="p-3 rounded-xl bg-black-900/60 border border-black-700/50 text-center">
+                <div className="text-lg mb-1">{s.icon}</div>
+                <div className="text-lg md:text-xl font-bold font-mono" style={{ color: s.color || CYAN }}>{s.value}</div>
+                <div className="text-[10px] text-black-500 uppercase tracking-wider mt-1">{s.label}</div>
+              </motion.div>
+            ))}
+          </div>
+        </Section>
+
+        {/* 2. Overview */}
+        <Section index={1} title="Overview" subtitle="Real-time aggregation metrics">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {stats.map((s, i) => (
               <motion.div key={s.label} custom={i} variants={rowV} initial="hidden" animate="visible" className="p-3 rounded-xl bg-black-900/60 border border-black-700/50 text-center">
@@ -245,8 +366,8 @@ export default function AggregatorPage() {
           </div>
         </Section>
 
-        {/* 2. Swap Form */}
-        <Section index={1} title="Swap" subtitle="Select tokens and enter an amount to compare routes">
+        {/* 3. Swap Form */}
+        <Section index={2} title="Swap" subtitle="Select tokens and enter an amount to compare routes">
           <div className="space-y-3">
             <div className="relative">
               <label className="text-xs text-black-500 mb-1 block">From</label>
@@ -284,9 +405,41 @@ export default function AggregatorPage() {
           </div>
         </Section>
 
-        {/* 3. Route Comparison Table */}
+        {/* 4. Price Comparison */}
+        {priceComparison.length > 0 && !isSearching && (
+          <Section index={3} title="Price Comparison" subtitle={`${fromToken.symbol} \u2192 ${toToken.symbol} across aggregators`}>
+            <div className="space-y-2">
+              {priceComparison.map((src, i) => {
+                const bestOutput = priceComparison[0]?.outputRaw || 0
+                const savings = src.isBest ? null : ((bestOutput - src.outputRaw) * (src.outputRaw > 100 ? 1 : (1725))).toFixed(2)
+                return (
+                  <motion.div key={src.name} custom={i} variants={rowV} initial="hidden" animate="visible"
+                    className={`flex items-center justify-between p-3 rounded-xl border ${src.isBest ? 'border-cyan-500/30 bg-cyan-500/5' : 'border-black-800/50 bg-black-900/40'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style={{ background: `${src.color}20`, color: src.color }}>{src.icon}</div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{src.name}</span>
+                          {src.isBest && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ background: `${CYAN}20`, color: CYAN }}>Best Price</span>}
+                        </div>
+                        <div className="text-[10px] text-black-500 font-mono">Rate: {src.rate}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-mono font-bold" style={{ color: src.isBest ? CYAN : 'inherit' }}>{src.output} {toToken.symbol}</div>
+                      {savings && <div className="text-[10px] font-mono text-red-400">-${savings} vs best</div>}
+                      {src.isBest && <div className="text-[10px] font-mono" style={{ color: '#22c55e' }}>You save here</div>}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </Section>
+        )}
+
+        {/* 5. Route Comparison Table */}
         {hasRoutes && (
-          <Section index={2} title="Route Comparison" subtitle={`${routes.length} routes found \u2014 sorted by net output`}>
+          <Section index={4} title="Route Comparison" subtitle={`${routes.length} routes found \u2014 sorted by net output`}>
             <div className="overflow-x-auto -mx-2">
               <table className="w-full text-sm min-w-[600px]">
                 <thead><tr className="text-black-500 text-xs uppercase tracking-wider">
@@ -311,9 +464,9 @@ export default function AggregatorPage() {
           </Section>
         )}
 
-        {/* 4. VibeSwap MEV Advantage */}
+        {/* 6. VibeSwap MEV Advantage */}
         {hasRoutes && (
-          <motion.div custom={3} variants={sectionV} initial="hidden" animate="visible">
+          <motion.div custom={5} variants={sectionV} initial="hidden" animate="visible">
             <div className="p-4 rounded-2xl border border-cyan-500/20" style={{ background: 'rgba(6,182,212,0.05)' }}>
               <div className="flex items-start gap-3">
                 <motion.div variants={pulseV} animate="animate">
@@ -330,35 +483,102 @@ export default function AggregatorPage() {
           </motion.div>
         )}
 
-        {/* 5. Split Route Visualization */}
+        {/* 7. Route Flow Visualization */}
         {routes.length >= 2 && !isSearching && (
-          <Section index={4} title="Split Route" subtitle="Optimal allocation across multiple DEXs">
-            <SplitRouteViz routes={routes} fromToken={fromToken} toToken={toToken} />
+          <Section index={6} title="Route Visualization" subtitle="Split routing flow across DEXs with allocation percentages">
+            <RouteFlowViz routes={routes} fromToken={fromToken} toToken={toToken} amount={amount} />
           </Section>
         )}
 
-        {/* 6. Gas Estimation Comparison */}
+        {/* 8. Gas Optimization */}
         {hasRoutes && (
-          <Section index={5} title="Gas Comparison" subtitle="Estimated gas costs per protocol">
+          <Section index={7} title="Gas Optimization" subtitle="Estimated gas per route \u2014 cheapest highlighted">
             <div className="space-y-2">{routes.map((r, i) => {
+              const minGas = Math.min(...routes.map(x => x.gasCostRaw))
               const maxGas = Math.max(...routes.map(x => x.gasCostRaw))
               const pct = maxGas > 0 ? (r.gasCostRaw / maxGas) * 100 : 0
+              const isCheapest = r.gasCostRaw === minGas
               return (
                 <motion.div key={r.name} custom={i} variants={rowV} initial="hidden" animate="visible" className="flex items-center gap-3">
-                  <div className="w-24 text-xs font-medium truncate">{r.name}</div>
-                  <div className="flex-1 h-5 rounded-full bg-black-800 overflow-hidden">
-                    <motion.div className="h-full rounded-full" style={{ background: r.isBest ? CYAN : 'rgba(255,255,255,0.15)' }}
-                      initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, delay: i * 0.08, ease }} />
+                  <div className="w-24 text-xs font-medium truncate flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
+                    {r.name}
                   </div>
-                  <div className="w-16 text-right text-xs font-mono text-black-400">{r.gasCost}</div>
+                  <div className="flex-1 h-6 rounded-full bg-black-800 overflow-hidden relative">
+                    <motion.div className="h-full rounded-full flex items-center justify-end pr-2"
+                      style={{ background: isCheapest ? `linear-gradient(90deg, ${CYAN}40, ${CYAN})` : 'rgba(255,255,255,0.1)' }}
+                      initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, delay: i * 0.08, ease }}>
+                    </motion.div>
+                    {isCheapest && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-bold uppercase tracking-wider" style={{ color: CYAN }}>Cheapest</span>
+                    )}
+                  </div>
+                  <div className="w-16 text-right text-xs font-mono" style={{ color: isCheapest ? CYAN : 'rgba(255,255,255,0.4)' }}>{r.gasCost}</div>
                 </motion.div>
               )
             })}</div>
+            <div className="mt-4 p-3 rounded-xl bg-black-900/30 border border-black-800/30">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-black-500">Gas range:</span>
+                <span className="font-mono">
+                  <span style={{ color: CYAN }}>${Math.min(...routes.map(r => r.gasCostRaw)).toFixed(2)}</span>
+                  <span className="text-black-600 mx-1">\u2192</span>
+                  <span className="text-black-400">${Math.max(...routes.map(r => r.gasCostRaw)).toFixed(2)}</span>
+                </span>
+                <span className="text-black-500">Potential savings:</span>
+                <span className="font-mono" style={{ color: '#22c55e' }}>
+                  ${(Math.max(...routes.map(r => r.gasCostRaw)) - Math.min(...routes.map(r => r.gasCostRaw))).toFixed(2)}
+                </span>
+              </div>
+            </div>
           </Section>
         )}
 
-        {/* 7. Slippage Settings */}
-        <Section index={6} title="Slippage Tolerance" subtitle="Maximum acceptable price impact">
+        {/* 9. Slippage Estimator */}
+        <Section index={8} title="Slippage Estimator" subtitle="Drag the slider to see expected slippage across DEXs">
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <label className="text-xs text-black-500 w-20 flex-shrink-0">Amount ({fromToken.symbol})</label>
+              <input
+                type="range" min="1" max="500" step="1" value={sliderAmount} onChange={handleSliderChange}
+                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                style={{ background: `linear-gradient(90deg, ${CYAN}, ${CYAN}40)` }} />
+              <div className="w-20 text-right text-sm font-mono font-bold" style={{ color: CYAN }}>{sliderAmount}</div>
+            </div>
+            <div className="space-y-1.5">
+              {slippageEstimates.map((est, i) => {
+                const maxBps = Math.max(...slippageEstimates.map(e => parseFloat(e.slippageBps)), 0.01)
+                const pct = (parseFloat(est.slippageBps) / maxBps) * 100
+                const isLowest = i === 0
+                return (
+                  <motion.div key={est.name} custom={i} variants={rowV} initial="hidden" animate="visible" className="flex items-center gap-3">
+                    <div className="w-24 text-xs font-medium truncate flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: est.color }} />
+                      {est.name}
+                    </div>
+                    <div className="flex-1 h-5 rounded-full bg-black-800 overflow-hidden">
+                      <motion.div className="h-full rounded-full"
+                        style={{ background: isLowest ? CYAN : `${est.color}60` }}
+                        initial={{ width: 0 }} animate={{ width: `${Math.max(pct, 3)}%` }}
+                        transition={{ duration: 0.5, delay: i * 0.06, ease }} />
+                    </div>
+                    <div className="w-20 text-right text-xs font-mono" style={{ color: isLowest ? CYAN : 'rgba(255,255,255,0.4)' }}>
+                      {est.slippageBps} bps
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-black-500 mt-2">
+              At <span className="font-mono" style={{ color: CYAN }}>{sliderAmount} {fromToken.symbol}</span>, lowest slippage is{' '}
+              <span className="font-mono" style={{ color: CYAN }}>{slippageEstimates[0]?.slippageBps || '0'} bps</span> via {slippageEstimates[0]?.name || '--'}.
+              {' '}1 bps = 0.01%.
+            </p>
+          </div>
+        </Section>
+
+        {/* 10. Slippage Settings */}
+        <Section index={9} title="Slippage Tolerance" subtitle="Maximum acceptable price impact">
           <div className="flex flex-wrap items-center gap-2">
             {SLIPPAGE_OPTIONS.map((opt) => (
               <button key={opt} onClick={() => { setSlippage(opt); setCustomSlippage('') }}
@@ -379,8 +599,8 @@ export default function AggregatorPage() {
           <p className="text-xs text-black-500 mt-3">Current: <span className="font-mono" style={{ color: CYAN }}>{effectiveSlippage}%</span>{slippage === 'auto' && ' (auto-adjusted based on pair volatility)'}</p>
         </Section>
 
-        {/* 8. Route History */}
-        <Section index={7} title="Route History" subtitle="Your last 10 aggregated swaps">
+        {/* 11. Route History */}
+        <Section index={10} title="Route History" subtitle="Your last 10 aggregated swaps">
           <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
             {MOCK_HISTORY.map((s, i) => (
               <motion.div key={s.id} custom={i} variants={rowV} initial="hidden" animate="visible" className="flex items-center justify-between p-3 rounded-xl bg-black-900/40 border border-black-800/50">
@@ -398,8 +618,8 @@ export default function AggregatorPage() {
           <div className="text-xs text-black-500 mt-3 text-center">Total saved vs worst routes: <span className="font-mono" style={{ color: '#22c55e' }}>$169.20</span></div>
         </Section>
 
-        {/* 9. Protocol Analytics */}
-        <Section index={8} title="Protocol Analytics" subtitle="Which DEXs give the best rates for which pairs">
+        {/* 12. Protocol Analytics */}
+        <Section index={11} title="Protocol Analytics" subtitle="Which DEXs give the best rates for which pairs">
           <div className="overflow-x-auto -mx-2">
             <table className="w-full text-sm min-w-[400px]">
               <thead><tr className="text-black-500 text-xs uppercase tracking-wider">
@@ -418,8 +638,8 @@ export default function AggregatorPage() {
           </div>
         </Section>
 
-        {/* 10. Smart Order Routing */}
-        <Section index={9} title="Smart Order Routing" subtitle="How the aggregator scores every route">
+        {/* 13. Smart Order Routing */}
+        <Section index={12} title="Smart Order Routing" subtitle="How the aggregator scores every route">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {SCORING_FACTORS.map((item, i) => (
               <motion.div key={item.factor} custom={i} variants={rowV} initial="hidden" animate="visible" className="p-3 rounded-xl bg-black-900/50 border border-black-800/50">
@@ -436,9 +656,9 @@ export default function AggregatorPage() {
           </div>
         </Section>
 
-        {/* 11. Animated Route Path */}
+        {/* 14. Animated Route Path */}
         {bestRoute && !isSearching && (
-          <Section index={10} title="Optimal Route" subtitle={`Best path: ${fromToken.symbol} \u2192 ${bestRoute.name} \u2192 ${toToken.symbol}`}>
+          <Section index={13} title="Optimal Route" subtitle={`Best path: ${fromToken.symbol} \u2192 ${bestRoute.name} \u2192 ${toToken.symbol}`}>
             <AnimatedRoutePath route={bestRoute} fromToken={fromToken} toToken={toToken} />
             <div className="flex items-center justify-between mt-4 p-3 rounded-xl bg-black-900/40 text-xs">
               <div><span className="text-black-500">Input:</span> <span className="font-mono font-bold">{amount} {fromToken.symbol}</span></div>

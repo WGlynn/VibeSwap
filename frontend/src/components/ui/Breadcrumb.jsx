@@ -80,6 +80,10 @@ const ROUTE_LABELS = {
   settings: 'Settings',
   notifications: 'Notifications',
   gas: 'Gas Tracker',
+  leaderboard: 'Leaderboard',
+  referral: 'Referrals',
+  profile: 'Profile',
+  tutorial: 'Getting Started',
 }
 
 export default function Breadcrumb({ className = '' }) {

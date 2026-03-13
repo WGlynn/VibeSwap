@@ -145,6 +145,9 @@ const ROUTE_LABELS = {
   screener: 'DEX Screener',
   offramp: 'Off-Ramp',
   whales: 'Whale Watcher',
+  rebalance: 'Rebalancer',
+  'lp-optimizer': 'LP Optimizer',
+  claims: 'Airdrop Claims',
 }
 
 export default function Breadcrumb({ className = '' }) {

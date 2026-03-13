@@ -33,6 +33,7 @@ const COLUMNS = [
       { to: '/bonds', label: 'Bonds' },
       { to: '/rewards', label: 'Rewards' },
       { to: '/farming', label: 'Farming' },
+      { to: '/lp-optimizer', label: 'LP Optimizer' },
       { to: '/revenue', label: 'Revenue Share' },
       { to: '/vesting', label: 'Vesting' },
     ],

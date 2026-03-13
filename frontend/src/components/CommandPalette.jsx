@@ -116,6 +116,8 @@ const COMMANDS = [
   { id: 'proposals', label: 'Proposals', description: 'Governance proposals & voting', path: '/proposals', category: 'Community' },
   { id: 'farming', label: 'Liquidity Mining', description: 'Farm rewards in liquidity pools', path: '/farming', category: 'DeFi' },
   { id: 'portfolio-analytics', label: 'Portfolio Analytics', description: 'Advanced portfolio metrics & PnL', path: '/portfolio-analytics', category: 'Account' },
+  { id: 'bridge-history', label: 'Bridge History', description: 'Cross-chain transfer history', path: '/bridge-history', category: 'Protocol' },
+  { id: 'token-vibe', label: 'VIBE Token', description: 'Token details & analytics', path: '/token/VIBE', category: 'DeFi' },
 ]
 
 const CATEGORY_COLORS = {

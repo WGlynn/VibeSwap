@@ -164,6 +164,7 @@ const COMMANDS = [
   { id: 'arbitrage', label: 'Arbitrage Scanner', description: 'Cross-chain arbitrage opportunities', path: '/arbitrage', category: 'Intelligence' },
   { id: 'contracts', label: 'Smart Contracts', description: 'Contract explorer & interaction', path: '/contracts', category: 'Protocol' },
   { id: 'unlocks', label: 'Token Unlocks', description: 'Vesting schedules & unlock calendar', path: '/unlocks', category: 'DeFi' },
+  { id: 'names', label: '.vibe Names', description: 'Harberger tax naming system — own your identity', path: '/names', category: 'DeFi' },
   { id: 'jul', label: 'JUL Token', description: 'JUL token info, staking & utility', path: '/jul', category: 'DeFi' },
   { id: 'trust', label: 'Trust Timeline', description: 'Protocol trust history', path: '/trust', category: 'Knowledge' },
   { id: 'agentic', label: 'Agentic Economy', description: 'AI-native economic systems', path: '/agentic', category: 'Intelligence' },

@@ -151,6 +151,7 @@ const TITLES = {
   '/arbitrage': 'Arbitrage — VibeSwap',
   '/contracts': 'Smart Contracts — VibeSwap',
   '/unlocks': 'Token Unlocks — VibeSwap',
+  '/names': '.vibe Names — VibeSwap',
 }
 
 export function usePageTitle(customTitle) {

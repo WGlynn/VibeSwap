@@ -118,6 +118,7 @@ const COMMANDS = [
   { id: 'portfolio-analytics', label: 'Portfolio Analytics', description: 'Advanced portfolio metrics & PnL', path: '/portfolio-analytics', category: 'Account' },
   { id: 'bridge-history', label: 'Bridge History', description: 'Cross-chain transfer history', path: '/bridge-history', category: 'Protocol' },
   { id: 'token-vibe', label: 'VIBE Token', description: 'Token details & analytics', path: '/token/VIBE', category: 'DeFi' },
+  { id: 'treasury', label: 'Treasury', description: 'DAO treasury dashboard & assets', path: '/treasury', category: 'Community' },
 ]
 
 const CATEGORY_COLORS = {

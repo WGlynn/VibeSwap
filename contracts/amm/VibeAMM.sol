@@ -690,6 +690,12 @@ contract VibeAMM is
             pool.reserve1
         );
 
+        // ============ Oracle Update (Pre-Validation) ============
+        // Write current spot price to TWAP oracle BEFORE validation so consult()
+        // always has an observation at or near block.timestamp. Without this,
+        // stale oracle data causes zero-time-delta panics in getSurroundingObservations.
+        _updateOracle(poolId);
+
         // ============ True Price Validation + Damping ============
         // Validate clearing price against True Price Oracle (if enabled and available)
         // Applies golden ratio damping when deviation exceeds soft threshold
@@ -732,7 +738,9 @@ contract VibeAMM is
         // Update circuit breaker with total volume
         _updateBreaker(VOLUME_BREAKER, result.totalTokenInSwapped);
 
-        // Update TWAP oracle after batch
+        // Update TWAP oracle after batch execution (captures post-swap reserves).
+        // If oracle was already written this block (pre-validation above), write()
+        // is a no-op due to its same-timestamp guard — no double-write risk.
         _updateOracle(poolId);
 
         // Check price breaker after batch

@@ -158,6 +158,31 @@ import { initConstellation, handleConstellationRequest } from './constellation.j
 import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, getLexicon, getCovenant, TEN_COVENANTS, COVENANT_HASH, issueChallenge, getChallenges, persistRosetta } from './rosetta.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
+// Nervos Talks — autonomous forum presence (silent guardian)
+let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
+try {
+  const nt = await import('./nervos-talks.js');
+  initNervosTalks = true;
+  nervosStatus = nt.getStatus;
+  nervosPostNext = nt.postNext;
+  nervosPostSpecific = nt.postSpecific;
+  nervosCheckReplies = nt.checkReplies;
+  nervosStartSchedule = nt.startSchedule;
+  nervosStopSchedule = nt.stopSchedule;
+  nervosScanPipeline = nt.scanPipeline;
+  registerModule('nervos-talks', true);
+} catch (err) {
+  console.warn(`[jarvis] Nervos Talks unavailable: ${err.message}`);
+  registerModule('nervos-talks', false, err.message);
+  initNervosTalks = false;
+  nervosStatus = () => ({ configured: false, error: 'Module not loaded' });
+  nervosPostNext = async () => ({ error: 'Module not loaded' });
+  nervosPostSpecific = async () => ({ error: 'Module not loaded' });
+  nervosCheckReplies = async () => [];
+  nervosStartSchedule = () => {};
+  nervosStopSchedule = () => {};
+  nervosScanPipeline = () => ({ total: 0, posted: 0, queued: 0 });
+}
 // ============ Tool Module Imports — Graceful Fallback ============
 // These modules were written by background agents and have crashed the bot on import.
 // Wrap in try/catch so a single broken module doesn't take down the entire bot.
@@ -2873,6 +2898,48 @@ bot.command('proactive', async (ctx) => {
     const status = getProactiveStatus();
     const lines = status.activeActions.map(a => `  ${a.name}: last ${a.lastRun}, next ${a.nextRun}`);
     ctx.reply(`Proactive: ${status.enabled ? 'ON' : 'OFF'}\nActions:\n${lines.join('\n') || '  none'}\nTotal actions: ${status.totalActions}`);
+  }
+});
+
+// ============ Nervos Talks (Silent Guardian) ============
+
+bot.command('nervos', async (ctx) => {
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
+    return ctx.reply('Nervos Talks commands are owner-only.');
+  }
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0]?.toLowerCase();
+
+  if (sub === 'post') {
+    const filename = args[1];
+    const result = filename
+      ? await nervosPostSpecific(config.repo.path, filename)
+      : await nervosPostNext(config.repo.path);
+    ctx.reply(result.success
+      ? `Posted: "${result.title}"\n${result.url}${result.remaining !== undefined ? `\n${result.remaining} remaining` : ''}`
+      : `Error: ${result.error}`);
+  } else if (sub === 'replies') {
+    const replies = await nervosCheckReplies();
+    if (replies.length === 0) {
+      ctx.reply('No new replies since last check.');
+    } else {
+      const lines = replies.slice(0, 5).map(r =>
+        `@${r.username} on "${r.topicTitle}":\n  "${r.content.slice(0, 120)}..."`
+      );
+      ctx.reply(`${replies.length} new replies:\n\n${lines.join('\n\n')}`);
+    }
+  } else if (sub === 'scan') {
+    const result = nervosScanPipeline(config.repo.path);
+    ctx.reply(`Pipeline: ${result.total} total, ${result.posted} posted, ${result.queued} queued\n\nQueued:\n${result.queue?.map(f => `  ${f}`).join('\n') || '  (empty)'}`);
+  } else {
+    const status = nervosStatus();
+    ctx.reply(`Nervos Talks: ${status.configured ? 'CONFIGURED' : 'NOT CONFIGURED'}
+Username: ${status.username}
+Posted: ${status.posted} | Queued: ${status.queued}
+Pending replies: ${status.pendingReplies}
+Last reply check: ${status.lastReplyCheck}
+Post interval: ${status.postInterval}
+Reply check: ${status.replyCheckInterval}${status.recentPosts?.length ? '\n\nRecent:\n' + status.recentPosts.map(p => `  ${p.title}`).join('\n') : ''}`);
   }
 });
 
@@ -6742,6 +6809,16 @@ async function main() {
   initConstellation();
   // Rosetta Stone Protocol — universal translation between agents
   initRosetta();
+  // Nervos Talks — silent guardian of the forum
+  if (initNervosTalks && process.env.NERVOS_TALKS_API_KEY) {
+    nervosStartSchedule(config.repo.path, {
+      chat: (chatId, text) => bot.telegram.sendMessage(chatId, text),
+      llm: async (prompt) => {
+        try { return await chat(-1, prompt, { role: 'system', skipTracking: true }); } catch { return null; }
+      },
+    });
+    console.log('[jarvis] Nervos Talks guardian active');
+  }
   // TheAI — scheduled 24h prune cycle (midnight UTC)
   const schedulePrune = () => {
     const now = new Date();
@@ -8125,6 +8202,7 @@ async function main() {
     stopScheduler();
     stopTaskQueue();
     stopProactive();
+    nervosStopSchedule();
     stopAutonomous();
     stopGroupContext();
     stopCRPC();

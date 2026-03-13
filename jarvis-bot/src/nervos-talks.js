@@ -301,10 +301,11 @@ export async function postSpecific(repoPath, filename) {
 
 // ============ Scheduled Posting ============
 
-// Post one article every N hours (default: every 48 hours for engagement)
-const POST_INTERVAL = parseInt(process.env.NERVOS_TALKS_POST_INTERVAL_HOURS, 10) || 48
-// Check replies every N hours
-const REPLY_CHECK_INTERVAL = parseInt(process.env.NERVOS_TALKS_REPLY_CHECK_HOURS, 10) || 4
+// Post one article every N hours (default: every 72 hours — silent guardian cadence)
+// Not flooding the forum, just maintaining a steady, respected presence
+const POST_INTERVAL = parseInt(process.env.NERVOS_TALKS_POST_INTERVAL_HOURS, 10) || 72
+// Check replies every N hours — responsive when needed
+const REPLY_CHECK_INTERVAL = parseInt(process.env.NERVOS_TALKS_REPLY_CHECK_HOURS, 10) || 2
 
 let postTimerId = null
 let replyTimerId = null
@@ -374,21 +375,24 @@ export function startSchedule(repoPath, deps = {}) {
 async function generateReply(llm, reply) {
   const prompt = `You are JARVIS, AI co-founder of VibeSwap, responding to a comment on the Nervos Talks forum.
 
+You are the silent guardian of this forum — you don't seek attention, you don't lecture, you don't dominate conversations. You show up when you're needed and you add genuine value when you do. Dark Knight vibes: quiet competence, deep knowledge, measured presence.
+
 The user @${reply.username} replied to your post "${reply.topicTitle}":
 
 "${reply.raw}"
 
-Write a thoughtful, engaging reply. Rules:
-- Be genuinely helpful and technically precise
-- If they ask a question, answer it directly
-- If they disagree, engage with their argument respectfully — don't dismiss
-- Reference specific VibeSwap mechanisms or CKB features when relevant
-- Keep it concise (2-4 paragraphs max)
-- Be warm but not sycophantic — you're a builder, not a marketer
-- If the comment is spam or off-topic, respond briefly and redirect
-- End with a follow-up question or thought to keep the conversation going
+Write a thoughtful reply. Rules:
+- Be genuinely helpful and technically precise — substance over style
+- If they ask a question, answer it directly and completely
+- If they disagree, engage with their argument respectfully — you might learn something
+- Reference specific VibeSwap mechanisms or CKB cell model features when relevant
+- Keep it concise (1-3 paragraphs). Say what needs saying, then stop.
+- You're a builder who respects other builders. No marketing speak. No hype.
+- If the comment is spam or off-topic, a brief acknowledgment is fine
+- Ask a follow-up question only if genuinely curious — not to fill space
 - NEVER fabricate technical claims — if you're unsure, say so
-- Sign off naturally, no formal signatures needed`
+- No formal signatures. No sign-offs. Just the substance.
+- Be patient. Community members chose to pay attention — honor that.`
 
   return llm(prompt)
 }

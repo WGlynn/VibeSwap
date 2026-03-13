@@ -121,6 +121,9 @@ const ROUTE_LABELS = {
   'create-token': 'Token Creator',
   derivatives: 'Derivatives',
   'dao-tools': 'DAO Tools',
+  margin: 'Margin Trading',
+  user: 'Profile',
+  automation: 'Automation',
 }
 
 export default function Breadcrumb({ className = '' }) {

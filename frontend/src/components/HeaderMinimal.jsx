@@ -242,6 +242,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/markets', label: 'Markets', icon: '📊' },
       { path: '/derivatives', label: 'Derivatives', icon: '📉' },
       { path: '/create-token', label: 'Token Creator', icon: '🪄' },
+      { path: '/margin', label: 'Margin Trading', icon: '📊' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },
@@ -269,6 +270,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
       { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
       { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
+      { path: '/automation', label: 'Automation', icon: '🤖' },
     ]},
     { label: 'Knowledge', items: [
       { path: '/docs', label: 'Learn', icon: '📖' },

@@ -84,6 +84,10 @@ const ROUTE_LABELS = {
   referral: 'Referrals',
   profile: 'Profile',
   tutorial: 'Getting Started',
+  api: 'API Docs',
+  contact: 'Contact',
+  ecosystem: 'Ecosystem',
+  brand: 'Brand Assets',
 }
 
 export default function Breadcrumb({ className = '' }) {

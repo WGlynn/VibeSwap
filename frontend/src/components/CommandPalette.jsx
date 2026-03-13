@@ -95,6 +95,10 @@ const COMMANDS = [
   { id: 'changelog', label: 'Changelog', description: 'Release notes', path: '/changelog', category: 'System' },
   { id: 'about', label: 'About', description: 'About VibeSwap', path: '/about', category: 'System' },
   { id: 'covenants', label: 'Covenants', description: 'The Ten Covenants', path: '/covenants', category: 'System' },
+  { id: 'api', label: 'API Docs', description: 'REST, WebSocket, SDK docs', path: '/api', category: 'System' },
+  { id: 'contact', label: 'Contact', description: 'Support & feedback', path: '/contact', category: 'System' },
+  { id: 'ecosystem', label: 'Ecosystem', description: 'Protocol overview & partners', path: '/ecosystem', category: 'Ecosystem' },
+  { id: 'brand', label: 'Brand Assets', description: 'Logo, colors, guidelines', path: '/brand', category: 'System' },
 ]
 
 const CATEGORY_COLORS = {

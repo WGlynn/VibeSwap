@@ -118,6 +118,9 @@ const ROUTE_LABELS = {
   networks: 'Networks',
   approvals: 'Approvals',
   markets: 'Markets',
+  'create-token': 'Token Creator',
+  derivatives: 'Derivatives',
+  'dao-tools': 'DAO Tools',
 }
 
 export default function Breadcrumb({ className = '' }) {

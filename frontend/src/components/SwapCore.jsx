@@ -820,9 +820,10 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
 }
 
 function SwapCore() {
-  const { isConnected, connect, shortAddress, account } = useWallet()
+  const { isConnected: isExternalConnected, connect, shortAddress, account } = useWallet()
   const { identity, hasIdentity, mintIdentity } = useIdentity()
   const deviceWallet = useDeviceWallet()
+  const { isConnected: isDeviceConnected } = deviceWallet
   const {
     isLive,
     swapState,
@@ -893,7 +894,7 @@ function SwapCore() {
   const [isSigningIn, setIsSigningIn] = useState(false)
 
   // Combined connection state
-  const isAnyWalletConnected = isConnected || deviceWallet.isConnected
+  const isAnyWalletConnected = isExternalConnected || isDeviceConnected
   const activeAddress = account || deviceWallet.address
   const activeShortAddress = shortAddress || deviceWallet.shortAddress
 
@@ -1368,7 +1369,7 @@ function SwapCore() {
         onSetupRecovery={handleSetupRecovery}
         onSetupICloudBackup={handleSetupICloudBackup}
         walletAddress={activeAddress || ''}
-        isDeviceWallet={deviceWallet.isConnected && !isConnected}
+        isDeviceWallet={isDeviceConnected && !isExternalConnected}
       />
 
       {/* iCloud Backup Modal */}

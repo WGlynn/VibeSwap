@@ -2,7 +2,7 @@ import { Telegraf } from 'telegraf';
 import { config } from './config.js';
 import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats, trimConversationCache } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster, gitPush, gitStatusShort, gitLogOneline } from './git.js';
-import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, flushTracker } from './tracker.js';
+import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, getUserWallet, flushTracker } from './tracker.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
@@ -151,7 +151,8 @@ try {
   alertHuman_mh = async () => null;
 }
 import { getLiquidations, getFundingRates, getOpenInterest, getLongShortRatio, getETFFlows } from './tools-derivatives.js';
-import { initXP, flushXP, awardXP, getXPStatus, getAchievements, getXPLeaderboard } from './tools-xp.js';
+import { initXP, flushXP, awardXP, getXPStatus, getAchievements, getXPLeaderboard, getFactualScore } from './tools-xp.js';
+import { initEmissions, flushEmissions, calculateDailyEmission, processEmissionTick, getVibeBalance, getEmissionStats, getLeaderboard } from './vibe-emissions.js';
 import { getCatchup, getCryptoEvents, getTokenUnlocks, recordActivity } from './tools-catchup.js';
 import { initPredictions, flushPredictions, createPrediction, placeBet, resolveMarket, listMarkets, getMyBets, getPredictorLeaderboard } from './tools-predictions.js';
 import { initPreferences, flushPreferences, addToPortfolio, removeFromPortfolio, getPortfolio, setPreference, getPreferences, setWallet, getUserPreferenceContext, getPreferenceStats } from './tools-preferences.js';
@@ -1277,9 +1278,15 @@ DERIVATIVES
   /etf — BTC ETF flows
 
 XP & GAMIFICATION
-  /xp — Your XP and level
+  /xp — Your XP, level, and VibeScore
   /achievements — View achievements
   /top — XP leaderboard
+
+VIBE TOKEN
+  /vibe — Your VIBE balance + daily rate
+  /vibelb — VIBE leaderboard (top earners)
+  /connect <0x...> — Link wallet for rewards
+  /walletstatus — Wallet status + VIBE balance
 
 CATCHUP
   /catchup [hours] — What you missed
@@ -3171,7 +3178,10 @@ bot.command('etf', async (ctx) => {
 // ============ XP / Gamification ============
 
 bot.command('xp', (ctx) => {
-  ctx.reply(getXPStatus(ctx.from.id, ctx.from.username || ctx.from.first_name));
+  const status = getXPStatus(ctx.from.id, ctx.from.username || ctx.from.first_name);
+  const bal = getVibeBalance(ctx.from.id);
+  const vibeLine = `VIBE earned: ${bal.balance}`;
+  ctx.reply(`${status}\n${vibeLine}`);
 });
 
 bot.command('level', (ctx) => {
@@ -3383,6 +3393,145 @@ bot.command('linkwallet', async (ctx) => {
   } else {
     ctx.reply('Send a message first so I can track you, then link your wallet.');
   }
+});
+
+// ============ /connect — Wallet connect via TG ============
+
+bot.command('connect', async (ctx) => {
+  const input = ctx.message.text.replace(/^\/connect(@\w+)?/i, '').trim();
+
+  if (!input) {
+    // No argument — show current wallet or instructions
+    const wallet = getUserWallet(ctx.from.id);
+    if (wallet) {
+      return ctx.reply(`Connected wallet: ${wallet.slice(0, 6)}...${wallet.slice(-4)}\n\nTo change: /connect 0xNewAddress`);
+    }
+    return ctx.reply(
+      'Link your wallet to earn VIBE rewards.\n\n' +
+      'Usage:\n' +
+      '  /connect 0x1234...abcd\n' +
+      '  /connect myname.eth\n\n' +
+      'Your wallet address will be associated with your Telegram account for on-chain rewards when the VIBE token launches.'
+    );
+  }
+
+  // Accept ENS-style names (store as-is)
+  if (input.endsWith('.eth') || input.endsWith('.ens')) {
+    const success = await linkWallet(ctx.from.id, input);
+    if (success) {
+      ctx.reply(`ENS name linked: ${input}\n\nWe'll resolve this to an address when rewards go on-chain.`);
+    } else {
+      ctx.reply('Send a message first so I can track you, then link your wallet.');
+    }
+    return;
+  }
+
+  // Validate Ethereum address: 0x + 40 hex chars
+  const isValidEth = /^0x[0-9a-fA-F]{40}$/.test(input);
+  if (!isValidEth) {
+    return ctx.reply('Invalid address. Must be:\n  - Ethereum: 0x + 40 hex characters\n  - ENS: name.eth\n\nExample: /connect 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD28');
+  }
+
+  const success = await linkWallet(ctx.from.id, input);
+  if (success) {
+    const bal = getVibeBalance(ctx.from.id);
+    ctx.reply(
+      `Wallet connected: ${input.slice(0, 6)}...${input.slice(-4)} ✓\n` +
+      (bal.balance > 0 ? `\nPending VIBE: ${bal.balance}` : '\nStart contributing to earn VIBE!')
+    );
+  } else {
+    ctx.reply('Send a message first so I can track you, then connect your wallet.');
+  }
+});
+
+// /wallet alias — show wallet status + VIBE balance (does NOT conflict with sovereign /wallet because
+// sovereign wallet requires subcommands like create/unlock/lock; bare /wallet with no args from non-owner
+// falls through to here via the address check in the existing handler)
+bot.command('walletstatus', (ctx) => {
+  const wallet = getUserWallet(ctx.from.id);
+  const bal = getVibeBalance(ctx.from.id);
+  const emission = calculateDailyEmission(ctx.from.id);
+
+  const lines = ['Wallet Status'];
+  if (wallet) {
+    if (wallet.endsWith('.eth') || wallet.endsWith('.ens')) {
+      lines.push(`  Address: ${wallet}`);
+    } else {
+      lines.push(`  Address: ${wallet.slice(0, 6)}...${wallet.slice(-4)}`);
+    }
+    lines.push(`  VIBE Balance: ${bal.balance}`);
+    lines.push(`  Daily Rate: ~${emission.daily} VIBE/day`);
+    if (bal.lastEmission) {
+      lines.push(`  Last Emission: ${bal.lastEmission}`);
+    }
+  } else {
+    lines.push('  No wallet linked.');
+    lines.push('  Use /connect 0x... to link your wallet.');
+  }
+
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ /vibe — VIBE balance + daily rate ============
+
+bot.command('vibe', (ctx) => {
+  const bal = getVibeBalance(ctx.from.id);
+  const emission = calculateDailyEmission(ctx.from.id);
+  const factual = getFactualScore(ctx.from.id);
+
+  const lines = ['VIBE Token Balance'];
+  lines.push(`  Balance: ${bal.balance} VIBE`);
+  lines.push(`  Daily Rate: ~${emission.daily} VIBE/day`);
+
+  if (emission.breakdown && emission.breakdown.share_pct) {
+    lines.push(`  Pool Share: ${emission.breakdown.share_pct}% of ${emission.breakdown.base_rate}/day`);
+    lines.push(`  Active Users: ${emission.breakdown.active_users}`);
+    lines.push(`  Streak Multiplier: ${emission.breakdown.streak_multiplier}x`);
+  }
+
+  if (factual) {
+    const wallet = getUserWallet(ctx.from.id);
+    lines.push('');
+    lines.push(`Contributions: ${factual.total_contributions} tracked`);
+    lines.push(`Quality: ${factual.quality_avg} avg`);
+    if (wallet) {
+      if (wallet.endsWith('.eth') || wallet.endsWith('.ens')) {
+        lines.push(`Wallet: ${wallet} ✓`);
+      } else {
+        lines.push(`Wallet: ${wallet.slice(0, 6)}...${wallet.slice(-4)} ✓`);
+      }
+    } else {
+      lines.push(`Wallet: not linked (/connect 0x...)`);
+    }
+  }
+
+  lines.push('');
+  lines.push('VIBE is not on-chain yet — balances are tracked for future airdrop.');
+
+  ctx.reply(lines.join('\n'));
+});
+
+// ============ /vibelb — VIBE Leaderboard ============
+
+bot.command(['vibeleaderboard', 'vibelb'], (ctx) => {
+  const lb = getLeaderboard(10);
+
+  if (lb.length === 0) {
+    return ctx.reply('No VIBE earned yet. Keep contributing to start earning!');
+  }
+
+  const stats = getEmissionStats();
+  const lines = [`VIBE Leaderboard (${stats.total_emitted} total emitted)\n`];
+
+  for (let i = 0; i < lb.length; i++) {
+    const entry = lb[i];
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    lines.push(`  ${medal} ${entry.username} — ${entry.balance} VIBE`);
+  }
+
+  lines.push(`\nDaily pool: ${stats.daily_rate} VIBE | ${stats.active_earners} earners`);
+
+  ctx.reply(lines.join('\n'));
 });
 
 // ============ Link Miner — Bind mobile mining identity to Telegram account ============
@@ -6876,6 +7025,7 @@ async function main() {
     initPredictions(),
     initSocial(),
     initCKB(),
+    initEmissions(),
   ]);
 
   // Group C: MI Host (depends on nothing but may fail — keep isolated)
@@ -8051,6 +8201,10 @@ async function main() {
       { command: 'mystats', description: 'Your contribution profile' },
       { command: 'groupstats', description: 'Group contribution stats' },
       { command: 'linkwallet', description: 'Link your wallet address' },
+      { command: 'connect', description: 'Connect wallet for VIBE rewards' },
+      { command: 'vibe', description: 'Your VIBE balance + daily rate' },
+      { command: 'vibelb', description: 'VIBE leaderboard — top earners' },
+      { command: 'walletstatus', description: 'Wallet status + VIBE balance' },
       { command: 'linkminer', description: 'Link mobile miner to Telegram' },
       { command: 'digest', description: 'Daily community digest' },
       { command: 'weeklydigest', description: 'Weekly community digest' },
@@ -8130,6 +8284,7 @@ async function main() {
     flushProactive();
     await flushGroupContext();
     await flushXP();
+    await flushEmissions();
     await flushPredictions();
     await flushSocial();
     await flushAutonomous();
@@ -8170,6 +8325,13 @@ async function main() {
       }
     }
   }, 60 * 1000); // Check every minute
+
+  // VIBE emission tick — distribute VIBE to active users every hour
+  setInterval(async () => {
+    try {
+      await processEmissionTick();
+    } catch (err) { console.warn(`[vibe-emissions] Tick failed: ${err.message}`); }
+  }, 60 * 60 * 1000); // Every hour
 
   // Auto-sync: pull from git + reload context periodically
   if (config.autoSyncInterval > 0) {
@@ -8343,6 +8505,7 @@ async function main() {
       ['proactive', flushProactive],
       ['group-context', flushGroupContext],
       ['xp', flushXP],
+      ['emissions', flushEmissions],
       ['predictions', flushPredictions],
       ['social', flushSocial],
       ['autonomous', flushAutonomous],

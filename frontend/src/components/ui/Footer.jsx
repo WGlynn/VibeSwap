@@ -56,6 +56,9 @@ const COLUMNS = [
       { to: '/automation', label: 'Automation' },
       { to: '/price-impact', label: 'Price Impact' },
       { to: '/backtest', label: 'Backtester' },
+      { to: '/screener', label: 'DEX Screener' },
+      { to: '/offramp', label: 'Off-Ramp' },
+      { to: '/whales', label: 'Whale Watcher' },
     ],
   },
   {

@@ -142,6 +142,9 @@ const ROUTE_LABELS = {
   snapshot: 'Snapshots',
   tax: 'Tax Reports',
   'referral-dashboard': 'Referral Dashboard',
+  screener: 'DEX Screener',
+  offramp: 'Off-Ramp',
+  whales: 'Whale Watcher',
 }
 
 export default function Breadcrumb({ className = '' }) {

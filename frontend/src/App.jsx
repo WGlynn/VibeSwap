@@ -197,6 +197,9 @@ const BacktestPage = lazy(() => import('./components/BacktestPage'))
 const SnapshotPage = lazy(() => import('./components/SnapshotPage'))
 const TaxReportPage = lazy(() => import('./components/TaxReportPage'))
 const ReferralDashboardPage = lazy(() => import('./components/ReferralDashboardPage'))
+const DEXScreenerPage = lazy(() => import('./components/DEXScreenerPage'))
+const FiatOffRampPage = lazy(() => import('./components/FiatOffRampPage'))
+const WhaleWatcherPage = lazy(() => import('./components/WhaleWatcherPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -375,6 +378,9 @@ function AnimatedRoutes() {
             <Route path="/snapshot" element={<SnapshotPage />} />
             <Route path="/tax" element={<TaxReportPage />} />
             <Route path="/referral-dashboard" element={<ReferralDashboardPage />} />
+            <Route path="/screener" element={<DEXScreenerPage />} />
+            <Route path="/offramp" element={<FiatOffRampPage />} />
+            <Route path="/whales" element={<WhaleWatcherPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

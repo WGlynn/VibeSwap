@@ -110,9 +110,19 @@ function fmt(n) { const a = Math.abs(n); if (a >= 1e6) return `$${(n/1e6).toFixe
 
 function SectionHeader({ tag, title, delay = 0 }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-40px' }} transition={{ delay, duration: 1 / PHI, ease: 'easeOut' }} className="mb-4">
-      <span className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider">{tag}</span>
-      <h2 className="text-lg font-bold font-mono text-white tracking-wide">{title}</h2>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ delay, duration: 1 / PHI, ease: 'easeOut' }}
+      className="mb-4"
+    >
+      <span className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider">
+        {tag}
+      </span>
+      <h2 className="text-lg font-bold font-mono text-white tracking-wide">
+        {title}
+      </h2>
     </motion.div>
   )
 }
@@ -120,15 +130,40 @@ function SectionHeader({ tag, title, delay = 0 }) {
 function Bar({ pct, color = CYAN, h = 6, delay = 0.3 }) {
   return (
     <div className="bg-black/30 rounded-full overflow-hidden" style={{ height: h }}>
-      <motion.div initial={{ width: 0 }} whileInView={{ width: `${pct}%` }} viewport={{ once: true }} transition={{ delay, duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full" style={{ backgroundColor: color }} />
+      <motion.div
+        initial={{ width: 0 }}
+        whileInView={{ width: `${pct}%` }}
+        viewport={{ once: true }}
+        transition={{ delay, duration: 0.8, ease: 'easeOut' }}
+        className="h-full rounded-full"
+        style={{ backgroundColor: color }}
+      />
     </div>
   )
 }
 
 function RankBadge({ rank }) {
-  const m = { 1: { bg: 'rgba(234,179,8,0.12)', bd: 'rgba(234,179,8,0.25)', c: '#eab308' }, 2: { bg: 'rgba(156,163,175,0.12)', bd: 'rgba(156,163,175,0.25)', c: '#9ca3af' }, 3: { bg: 'rgba(180,83,9,0.12)', bd: 'rgba(180,83,9,0.25)', c: '#b45309' } }[rank]
+  const medals = {
+    1: { bg: 'rgba(234,179,8,0.12)', bd: 'rgba(234,179,8,0.25)', c: '#eab308' },
+    2: { bg: 'rgba(156,163,175,0.12)', bd: 'rgba(156,163,175,0.25)', c: '#9ca3af' },
+    3: { bg: 'rgba(180,83,9,0.12)', bd: 'rgba(180,83,9,0.25)', c: '#b45309' },
+  }
+  const m = medals[rank]
+  if (m) {
+    return (
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold"
+        style={{ background: m.bg, border: `1px solid ${m.bd}`, color: m.c }}
+      >
+        {rank}
+      </div>
+    )
+  }
   return (
-    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold" style={m ? { background: m.bg, border: `1px solid ${m.bd}`, color: m.c } : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
+    <div
+      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono text-black-500"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
       {rank}
     </div>
   )
@@ -172,25 +207,57 @@ export default function StreakTrackerPage() {
         {/* ============ Current Streak Banner ============ */}
         <section>
           <SectionHeader tag="Current" title="Your Streak" delay={0.1} />
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15, ease }}>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15, ease }}
+          >
             <GlassCard glowColor="warning" spotlight className="p-6">
               <div className="flex flex-col sm:flex-row items-center gap-5">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: `rgba(249,115,22,${0.08 + flame * 0.14})`, border: `2px solid rgba(249,115,22,${0.2 + flame * 0.35})`, boxShadow: `0 0 ${Math.round(flame * 30)}px rgba(249,115,22,${flame * 0.35})` }}>
+                {/* Flame icon — intensity scales with streak length */}
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center shrink-0"
+                  style={{
+                    backgroundColor: `rgba(249,115,22,${0.08 + flame * 0.14})`,
+                    border: `2px solid rgba(249,115,22,${0.2 + flame * 0.35})`,
+                    boxShadow: `0 0 ${Math.round(flame * 30)}px rgba(249,115,22,${flame * 0.35})`,
+                  }}
+                >
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z" fill={`rgba(249,115,22,${0.4 + flame * 0.4})`} stroke="rgba(249,115,22,0.8)" strokeWidth="1.5" />
                     <path d="M12 8c0 2-2 3-2 5a2 2 0 0 0 4 0c0-2-2-3-2-5z" fill={`rgba(251,191,36,${0.5 + flame * 0.3})`} />
                   </svg>
                 </div>
+
+                {/* Streak count */}
                 <div className="text-center sm:text-left flex-1">
                   <div className="flex items-baseline gap-2 justify-center sm:justify-start">
-                    <span className="text-5xl font-bold font-mono text-orange-400">{CURRENT_STREAK}</span>
+                    <span className="text-5xl font-bold font-mono text-orange-400">
+                      {CURRENT_STREAK}
+                    </span>
                     <span className="text-lg font-mono text-orange-400/60">Day Streak</span>
                   </div>
-                  <p className="text-[11px] font-mono text-white/40 mt-1">Started {STREAK_START} &middot; Longest: <span className="text-white/60">{LONGEST_STREAK} days</span></p>
+                  <p className="text-[11px] font-mono text-white/40 mt-1">
+                    Started {STREAK_START} &middot; Longest: <span className="text-white/60">{LONGEST_STREAK} days</span>
+                  </p>
                 </div>
+
+                {/* Current multiplier badge */}
                 <div className="shrink-0 text-center">
-                  <div className="px-4 py-2 rounded-xl font-mono font-bold text-lg" style={{ color: curMult.color, backgroundColor: `${curMult.color}15`, border: `1px solid ${curMult.color}33`, boxShadow: `0 0 16px ${curMult.color}20` }}>{curMult.mult}x</div>
-                  <p className="text-[9px] font-mono text-white/30 uppercase mt-1">{curMult.label} Multiplier</p>
+                  <div
+                    className="px-4 py-2 rounded-xl font-mono font-bold text-lg"
+                    style={{
+                      color: curMult.color,
+                      backgroundColor: `${curMult.color}15`,
+                      border: `1px solid ${curMult.color}33`,
+                      boxShadow: `0 0 16px ${curMult.color}20`,
+                    }}
+                  >
+                    {curMult.mult}x
+                  </div>
+                  <p className="text-[9px] font-mono text-white/30 uppercase mt-1">
+                    {curMult.label} Multiplier
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-5 pt-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -212,11 +279,27 @@ export default function StreakTrackerPage() {
         {/* ============ Activity Calendar ============ */}
         <section>
           <SectionHeader tag="Activity" title="Activity Calendar" delay={0.1 / PHI} />
-          <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-40px' }} transition={{ duration: 0.5, delay: 0.2, ease }}>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.5, delay: 0.2, ease }}
+          >
             <GlassCard glowColor="terminal" className="p-5">
+              {/* Month labels above the grid */}
               <div className="flex mb-2 pl-8">
                 {monthLabels.map((ml, i) => (
-                  <div key={i} className="text-[9px] font-mono text-white/30" style={{ position: 'relative', left: `${ml.col * (100 / weeks.length)}%`, marginRight: 'auto' }}>{ml.label}</div>
+                  <div
+                    key={i}
+                    className="text-[9px] font-mono text-white/30"
+                    style={{
+                      position: 'relative',
+                      left: `${ml.col * (100 / weeks.length)}%`,
+                      marginRight: 'auto',
+                    }}
+                  >
+                    {ml.label}
+                  </div>
                 ))}
               </div>
               <div className="flex gap-1">

@@ -72,8 +72,13 @@ library TWAPOracle {
 
         uint32 delta = uint32(block.timestamp) - last.timestamp;
 
-        // Calculate cumulative price (overflow is intentional for TWAP math)
-        uint224 newCumulative = last.priceCumulative + uint224(price * delta);
+        // Calculate cumulative price — use unchecked because TWAP math (like Uniswap V2)
+        // intentionally allows wrapping overflow on cumulative values. The corresponding
+        // subtraction in consult() also uses unchecked, so deltas remain correct.
+        uint224 newCumulative;
+        unchecked {
+            newCumulative = last.priceCumulative + uint224(price * delta);
+        }
 
         // Advance index
         uint16 indexNext = (state.index + 1) % state.cardinalityNext;
@@ -119,6 +124,10 @@ library TWAPOracle {
         require(period <= MAX_TWAP_PERIOD, "Period too long");
 
         uint32 currentTime = uint32(block.timestamp);
+
+        // Guard against underflow when block.timestamp < period
+        require(currentTime >= period, "TWAP: insufficient history");
+
         uint32 targetTime = currentTime - period;
 
         // Get current observation
@@ -134,20 +143,32 @@ library TWAPOracle {
         uint224 targetCumulative;
         if (before.timestamp == targetTime) {
             targetCumulative = before.priceCumulative;
+        } else if (before.timestamp == after_.timestamp) {
+            // Degenerate case: getSurroundingObservations returned the same observation
+            // for both before and after_ (target is at or after newest). Use the
+            // cumulative directly — this is the best approximation available.
+            targetCumulative = before.priceCumulative;
         } else {
             // Linear interpolation
             uint32 timeDelta = after_.timestamp - before.timestamp;
-            uint224 priceDelta = after_.priceCumulative - before.priceCumulative;
+
+            // Use unchecked for cumulative price delta — TWAP math (like Uniswap V2)
+            // relies on wrapping arithmetic for cumulative values.
+            uint224 priceDelta;
+            unchecked {
+                priceDelta = after_.priceCumulative - before.priceCumulative;
+            }
             uint32 targetDelta = targetTime - before.timestamp;
 
-            // Guard against div-by-zero when two observations share a timestamp
-            require(timeDelta > 0, "TWAP: zero time delta");
             targetCumulative = before.priceCumulative +
                 uint224((uint256(priceDelta) * targetDelta) / timeDelta);
         }
 
-        // Calculate TWAP
-        uint224 cumulativeDelta = current.priceCumulative - targetCumulative;
+        // Calculate TWAP — use unchecked for cumulative subtraction (wrapping math)
+        uint224 cumulativeDelta;
+        unchecked {
+            cumulativeDelta = current.priceCumulative - targetCumulative;
+        }
         uint32 twapTimeDelta = current.timestamp - targetTime;
 
         // Guard against div-by-zero when current timestamp equals target
@@ -224,9 +245,25 @@ library TWAPOracle {
     ) internal view returns (bool) {
         if (state.cardinality < 2) return false;
 
-        uint32 oldestTimestamp = getOldestObservationTimestamp(state);
-        uint32 targetTime = uint32(block.timestamp) - period;
+        uint32 currentTime = uint32(block.timestamp);
 
-        return oldestTimestamp <= targetTime;
+        // Guard: if current time is less than period, TWAP window extends before
+        // genesis — not enough history by definition.
+        if (currentTime < period) return false;
+
+        uint32 oldestTimestamp = getOldestObservationTimestamp(state);
+        uint32 targetTime = currentTime - period;
+
+        // Oldest observation must be at or before the target time
+        if (oldestTimestamp > targetTime) return false;
+
+        // Newest observation must be at or after the target time to avoid
+        // degenerate interpolation (both surrounding observations identical).
+        // Without this, consult() may encounter a zero time delta when the
+        // oracle hasn't been updated recently enough to cover the TWAP window.
+        uint32 newestTimestamp = state.observations[state.index].timestamp;
+        if (newestTimestamp < targetTime) return false;
+
+        return true;
     }
 }

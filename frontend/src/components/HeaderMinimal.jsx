@@ -9,6 +9,7 @@ import SoulboundAvatar from './SoulboundAvatar'
 import RecoverySetup from './RecoverySetup'
 import PulseIndicator from './ui/PulseIndicator'
 import InteractiveButton from './ui/InteractiveButton'
+import CountdownTimer from './ui/CountdownTimer'
 import { useTheme } from '../hooks/useTheme'
 import { useUbuntu } from '../hooks/useUbuntu'
 
@@ -77,6 +78,11 @@ function HeaderMinimal() {
 
             {/* Right side */}
             <div className="flex items-center space-x-3">
+              {/* Batch auction countdown — the heartbeat */}
+              <div className="hidden sm:block">
+                <CountdownTimer size={36} showBatch={false} />
+              </div>
+
               {/* Gas indicator */}
               <Link
                 to="/gas"

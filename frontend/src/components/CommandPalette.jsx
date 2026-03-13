@@ -127,6 +127,7 @@ const COMMANDS = [
   { id: 'grants', label: 'Grants', description: 'Ecosystem grants program', path: '/grants', category: 'Community' },
   { id: 'lp-positions', label: 'LP Positions', description: 'Manage liquidity positions', path: '/lp-positions', category: 'DeFi' },
   { id: 'networks', label: 'Networks', description: 'Chain status & switching', path: '/networks', category: 'Protocol' },
+  { id: 'approvals', label: 'Approvals', description: 'Manage token approvals & revoke', path: '/approvals', category: 'System' },
 ]
 
 const CATEGORY_COLORS = {

@@ -88,6 +88,10 @@ const ROUTE_LABELS = {
   contact: 'Contact',
   ecosystem: 'Ecosystem',
   brand: 'Brand Assets',
+  partners: 'Partners',
+  proposal: 'Proposal',
+  legal: 'Legal',
+  careers: 'Careers',
 }
 
 export default function Breadcrumb({ className = '' }) {

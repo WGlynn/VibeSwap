@@ -45,6 +45,7 @@ const COLUMNS = [
       { to: '/launchpad', label: 'Launchpad' },
       { to: '/rwa', label: 'RWA Hub' },
       { to: '/depin', label: 'DePIN' },
+      { to: '/otc', label: 'OTC Desk' },
     ],
   },
   {
@@ -71,6 +72,7 @@ const COLUMNS = [
       { to: '/bounties', label: 'Bounties' },
       { to: '/badges', label: 'Badges' },
       { to: '/airdrop', label: 'Airdrop' },
+      { to: '/social', label: 'Social Trading' },
       { to: '/team', label: 'Team' },
     ],
   },

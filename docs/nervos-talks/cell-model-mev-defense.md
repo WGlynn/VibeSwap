@@ -187,4 +187,23 @@ The five layers are independent -- each addresses a distinct attack surface. The
 
 ---
 
+## Discussion
+
+Some questions for the community:
+
+1. **Are there MEV attack vectors we have not considered?** Our threat model covers five adversary categories. What other actors or strategies might exist in the CKB ecosystem that could challenge these structural defenses?
+
+2. **How does PoW-gated write access interact with CKB's fee market at scale?** As trading volume grows and mining difficulty increases, what are the second-order effects on CKB's base layer congestion and fee dynamics?
+
+3. **Can the forced inclusion protocol be extended to other CKB applications?** Censorship resistance via type script enforcement is general-purpose. What other use cases (governance, identity, prediction markets) would benefit from protocol-enforced inclusion guarantees?
+
+4. **What is the optimal defense-in-depth composition for CKB-native applications?** We propose five layers. Are there additional layers that CKB's architecture uniquely enables, or can some layers be simplified given CKB's structural properties?
+
+5. **How should the community evaluate "structural impossibility" claims versus "economic deterrence"?** We distinguish between the two throughout this paper. Is this distinction meaningful in practice, or does sufficiently strong economic deterrence converge to structural impossibility?
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*
+
 *VibeSwap is open source. We welcome adversarial analysis and responsible disclosure.*

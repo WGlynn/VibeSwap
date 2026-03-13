@@ -236,4 +236,23 @@ A registry of known-good model hashes would allow verifiers to check not just th
 
 ---
 
+## Discussion
+
+Some questions for the community:
+
+1. **What other off-chain computations need on-chain attestation?** We have demonstrated price oracles, but the knowledge cell pattern generalizes to risk models, sentiment analysis, anomaly detection, and governance recommendations. What use cases are most urgent for the CKB ecosystem?
+
+2. **Should knowledge cells support multiple authors with weighted trust?** Currently, any PoW solver can update a knowledge cell. Would a reputation or stake-weighted model for author trust improve the utility of knowledge cells, or does PoW-based permissionless access better align with CKB's philosophy?
+
+3. **How practical is ZK proof verification for computation attestation on CKB-VM?** We propose ZK proofs as future work for on-chain verification of off-chain inference. Has anyone benchmarked Halo2 or Plonky2 verifiers on RISC-V within CKB's cycle limits?
+
+4. **Can knowledge cells serve as a coordination layer for multi-agent AI systems on CKB?** We describe shard coordination as one use case. Is there broader interest in CKB as an AI agent coordination substrate, and what primitives would that require beyond knowledge cells?
+
+5. **What is the right economic model for knowledge cell state rent?** At 181 CKB per cell, the cost is modest but non-trivial for high-frequency updates. Should there be a mechanism for community-funded knowledge cells that serve as public goods?
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*
+
 *This proposal is implemented in VibeSwap's open-source CKB codebase. We invite the Nervos community to review the knowledge-type script, propose extensions, and collaborate on testnet deployment.*

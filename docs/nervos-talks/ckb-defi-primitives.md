@@ -230,4 +230,23 @@ We thank Jan Xie for identifying the missing beneficiary binding in the PoW-gate
 
 ---
 
+## Discussion
+
+Some questions for the community:
+
+1. **What other DeFi primitives does the Cell model make native?** We have cataloged seven. Are there patterns that CKB developers have discovered that do not map to any of these categories?
+
+2. **How can multi-asset cells be standardized?** VibeSwap's LP position cells bundle balance, entry price, pool ID, and deposit block into a single cell. Should there be a community standard for multi-asset cell data layouts to improve interoperability between CKB DeFi protocols?
+
+3. **What is the real-world cost comparison for state-heavy DeFi on CKB versus EVM?** We argue that CKB's per-byte state cost is more predictable than gas-per-operation. Has anyone benchmarked this for production workloads with high transaction frequency?
+
+4. **Can self-custodial LP positions eliminate the need for approval flows entirely?** The approval pattern has caused significant losses on EVM chains. Are there edge cases where CKB's lock-script-based authorization introduces different risks?
+
+5. **How should the CKB ecosystem prioritize DeFi primitive development?** Of these seven primitives, which ones would create the most value if adopted by multiple protocols?
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*
+
 *VibeSwap welcomes collaboration on new CKB DeFi primitives. Our SDK and type scripts are open source.*

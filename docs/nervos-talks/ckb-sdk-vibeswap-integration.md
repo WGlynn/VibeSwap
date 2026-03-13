@@ -352,4 +352,23 @@ All 190 tests pass on both x86 (development) and riscv64 (deployment target).
 
 ---
 
+## Discussion
+
+Some questions for the community:
+
+1. **What SDK ergonomics matter most for CKB developers?** The SDK produces `UnsignedTransaction` structs for maximum wallet compatibility. Are there common CKB development patterns or wallet integrations we should support natively?
+
+2. **How should mining profitability estimation account for CKB's block time variance?** Our `estimate_profitability` function uses measured hash rate and current difficulty, but NC-Max's uncle rate and block time distribution add complexity. What models do CKB miners currently use?
+
+3. **Is Molecule serialization the right choice for cell data, or should we support alternative formats?** We use fixed-size binary serialization with manual serialize/deserialize. Would the community benefit from Molecule table definitions in `cells.mol` for broader tooling compatibility?
+
+4. **What additional transaction builder operations would developers need?** We support 9 operation types. Are there common patterns (batch operations, multi-pair transactions, governance interactions) that would make the SDK more useful for builders integrating with VibeSwap?
+
+5. **How can we make the math parity tests useful for other cross-platform CKB projects?** Our test suite verifies bit-for-bit parity between Rust and Solidity implementations. Is there demand for a shared testing framework for cross-platform arithmetic verification on CKB?
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*
+
 *The VibeSwap CKB SDK is open source. Developer questions, integration requests, and contributions are welcome.*

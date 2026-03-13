@@ -128,6 +128,7 @@ const COMMANDS = [
   { id: 'lp-positions', label: 'LP Positions', description: 'Manage liquidity positions', path: '/lp-positions', category: 'DeFi' },
   { id: 'networks', label: 'Networks', description: 'Chain status & switching', path: '/networks', category: 'Protocol' },
   { id: 'approvals', label: 'Approvals', description: 'Manage token approvals & revoke', path: '/approvals', category: 'System' },
+  { id: 'markets', label: 'Markets', description: 'Market overview, heatmap, trending', path: '/markets', category: 'DeFi' },
 ]
 
 const CATEGORY_COLORS = {

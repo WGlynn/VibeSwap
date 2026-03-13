@@ -18,6 +18,7 @@ import Footer from './components/ui/Footer'
 import { useSynaptic } from './hooks/useSynaptic'
 import { usePageTitle } from './hooks/usePageTitle'
 import { FavoritesProvider } from './contexts/FavoritesContext'
+import { InfinityStonesProvider } from './hooks/useInfinityStones'
 import { GasProvider } from './contexts/GasContext'
 import MobileNav from './components/ui/MobileNav'
 import { remember } from './utils/sankofa'
@@ -213,6 +214,7 @@ const TokenUnlockPage = lazy(() => import('./components/TokenUnlockPage'))
 const VibeNamesPage = lazy(() => import('./components/VibeNamesPage'))
 const PsiNetPage = lazy(() => import('./components/PsiNetPage'))
 const VisionPage = lazy(() => import('./components/VisionPage'))
+const GauntletPage = lazy(() => import('./components/GauntletPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -407,6 +409,7 @@ function AnimatedRoutes() {
             <Route path="/names" element={<VibeNamesPage />} />
             <Route path="/psinet" element={<PsiNetPage />} />
             <Route path="/vision" element={<VisionPage />} />
+            <Route path="/gauntlet" element={<GauntletPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}
@@ -437,6 +440,7 @@ function App() {
     <ToastProvider>
     <GasProvider>
     <FavoritesProvider>
+    <InfinityStonesProvider>
     <MessagingProvider>
     <ContributionsProvider>
       <AmbientBackground />
@@ -475,6 +479,7 @@ function App() {
     <MobileNav onOpenMenu={() => window.dispatchEvent(new CustomEvent('vibeswap:open-drawer'))} />
     </ContributionsProvider>
     </MessagingProvider>
+    </InfinityStonesProvider>
     </FavoritesProvider>
     </GasProvider>
     </ToastProvider>

@@ -8,6 +8,12 @@ import { useDeviceWallet } from '../hooks/useDeviceWallet'
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
 
+// ============ Seeded PRNG ============
+function seededRandom(seed) {
+  let s = seed
+  return () => { s = (s * 16807 + 0) % 2147483647; return (s - 1) / 2147483646 }
+}
+
 // ============ Data ============
 const BONDS = [
   { id: 'eth-jul-lp', label: 'ETH-JUL LP Bond', icon: '\u25C8', discount: 8.2, roi: 12.4, vestDays: 5, capacity: 82, price: 0.87, marketPrice: 0.948, color: '#a78bfa' },
@@ -21,8 +27,10 @@ const USER_BONDS = [
   { id: 3, type: 'ETH Bond', payout: 6100, remaining: 6100, purchased: new Date(Date.now() - 0.5 * 86400000), vested: new Date(Date.now() + 4.5 * 86400000), progress: 0.1 },
 ]
 const TREASURY = [
-  { label: 'ETH', value: 42, color: '#627eea' }, { label: 'USDC', value: 28, color: '#2775ca' },
-  { label: 'LP Tokens', value: 18, color: '#a78bfa' }, { label: 'JUL Backing', value: 12, color: '#fbbf24' },
+  { label: 'ETH', value: 42, amount: '$5.96M', color: '#627eea' },
+  { label: 'USDC', value: 28, amount: '$3.98M', color: '#2775ca' },
+  { label: 'LP Tokens', value: 18, amount: '$2.56M', color: '#a78bfa' },
+  { label: 'JUL Backing', value: 12, amount: '$1.70M', color: '#fbbf24' },
 ]
 const DISCOUNT_HISTORY = [
   { day: 'Mon', eth: 5.2, usdc: 3.8, lp: 7.1 }, { day: 'Tue', eth: 6.1, usdc: 4.2, lp: 8.4 },
@@ -30,6 +38,29 @@ const DISCOUNT_HISTORY = [
   { day: 'Fri', eth: 6.7, usdc: 5.1, lp: 8.2 }, { day: 'Sat', eth: 5.9, usdc: 4.4, lp: 7.5 },
   { day: 'Sun', eth: 6.4, usdc: 4.9, lp: 8.0 },
 ]
+const BOND_HISTORY = (() => {
+  const rng = seededRandom(271828)
+  const types = ['ETH-JUL LP Bond', 'USDC Bond', 'ETH Bond', 'JUL Staking Bond']
+  return Array.from({ length: 6 }, (_, i) => ({
+    id: 100 + i, type: types[Math.floor(rng() * types.length)],
+    faceValue: Math.floor(1000 + rng() * 9000), discount: +(3 + rng() * 10).toFixed(1),
+    roiAchieved: +(5 + rng() * 14).toFixed(1),
+    maturedAt: new Date(Date.now() - (7 + i * 5) * 86400000), status: 'Claimed',
+  }))
+})()
+
+// ============ Maturity Curve Data (discount vs days-to-maturity) ============
+const MATURITY_CURVE = (() => {
+  const rng = seededRandom(161803)
+  return Array.from({ length: 6 }, (_, i) => {
+    const day = i + 0.5
+    return {
+      day, lp: +(2.5 + (5 - day) * 1.4 + rng() * 0.8).toFixed(1),
+      eth: +(1.8 + (5 - day) * 1.1 + rng() * 0.6).toFixed(1),
+      usdc: +(1.2 + (5 - day) * 0.9 + rng() * 0.5).toFixed(1),
+    }
+  })
+})()
 
 // ============ Utilities ============
 function fmt(n) {
@@ -39,6 +70,7 @@ function fmt(n) {
 }
 function fmtDate(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
 function daysUntil(d) { return Math.max(0, Math.ceil((d - Date.now()) / 86400000)) }
+function hoursUntil(d) { return Math.max(0, Math.ceil((d - Date.now()) / 3600000)) }
 
 // ============ Section Wrapper ============
 function Section({ num, title, delay = 0, children }) {
@@ -60,6 +92,8 @@ export default function BondsPage() {
   const [selectedBond, setSelectedBond] = useState(0)
   const [bondAmount, setBondAmount] = useState('')
   const [showInverse, setShowInverse] = useState(false)
+  const [calcFace, setCalcFace] = useState('5000')
+  const [calcDiscount, setCalcDiscount] = useState('8')
   const activeBond = BONDS[selectedBond]
 
   const projections = useMemo(() => {
@@ -67,6 +101,16 @@ export default function BondsPage() {
     const julReceived = amount * (1 + activeBond.discount / 100)
     return { julReceived, dailyVest: julReceived / activeBond.vestDays, saved: julReceived - amount }
   }, [bondAmount, activeBond])
+
+  const calcResult = useMemo(() => {
+    const face = parseFloat(calcFace) || 0
+    const disc = parseFloat(calcDiscount) || 0
+    const cost = face * (1 - disc / 100)
+    const roi = face > 0 ? ((face - cost) / cost) * 100 : 0
+    const maturityDate = new Date(Date.now() + 5 * 86400000)
+    const annualized = roi > 0 ? roi * (365 / 5) : 0
+    return { cost, roi, maturityDate, annualized, profit: face - cost }
+  }, [calcFace, calcDiscount])
 
   // ============ Not Connected ============
   if (!isConnected) {
@@ -140,8 +184,77 @@ export default function BondsPage() {
         </div>
       </Section>
 
-      {/* ============ 3. Bond Purchase Form ============ */}
-      <Section num="03" title="Purchase Bond" delay={0.18}>
+      {/* ============ 3. Bond Maturity Curves ============ */}
+      <Section num="03" title="Maturity Curves" delay={0.16}>
+        <GlassCard glowColor="terminal" className="p-5">
+          <div className="text-[10px] font-mono text-gray-500 mb-3">Discount rate vs days-to-maturity for active bond types</div>
+          <svg viewBox="0 0 350 140" className="w-full" preserveAspectRatio="xMidYMid meet">
+            {[0, 1, 2, 3].map((i) => <line key={i} x1="35" y1={15 + i * 28} x2="340" y2={15 + i * 28} stroke="#1f2937" strokeWidth="0.5" />)}
+            {['12%', '8%', '4%', '0%'].map((l, i) => <text key={l} x="30" y={19 + i * 28} fill="#6b7280" fontSize="7" fontFamily="monospace" textAnchor="end">{l}</text>)}
+            {MATURITY_CURVE.map((d, i) => (
+              <text key={i} x={55 + i * 52} y={125} fill="#6b7280" fontSize="7" fontFamily="monospace" textAnchor="middle">{d.day.toFixed(1)}d</text>
+            ))}
+            {[{ key: 'lp', stroke: '#a78bfa', field: 'lp' }, { key: 'eth', stroke: '#627eea', field: 'eth' },
+              { key: 'usdc', stroke: '#2775ca', field: 'usdc' }].map((line, li) => (
+              <motion.path key={line.key} fill="none" stroke={line.stroke} strokeWidth="2" strokeLinecap="round"
+                d={MATURITY_CURVE.map((d, i) => `${i === 0 ? 'M' : 'L'}${55 + i * 52},${99 - (d[line.field] / 12) * 84}`).join(' ')}
+                initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: PHI, ease: 'easeOut', delay: li * 0.15 }} />
+            ))}
+            {MATURITY_CURVE.map((d, i) => (
+              <g key={i}>
+                {[{ v: d.lp, c: '#a78bfa' }, { v: d.eth, c: '#627eea' }, { v: d.usdc, c: '#2775ca' }].map((p) => (
+                  <motion.circle key={p.c} cx={55 + i * 52} cy={99 - (p.v / 12) * 84} r="2.5" fill={p.c}
+                    initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.5 + i * 0.06 }} />
+                ))}
+              </g>
+            ))}
+          </svg>
+          <div className="flex items-center justify-center gap-4 mt-2">
+            {[{ label: 'LP Bond', color: '#a78bfa' }, { label: 'ETH Bond', color: '#627eea' }, { label: 'USDC Bond', color: '#2775ca' }].map((l) => (
+              <div key={l.label} className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm" style={{ background: l.color }} />
+                <span className="text-[10px] font-mono text-gray-500">{l.label}</span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      </Section>
+
+      {/* ============ 4. Bond Calculator ============ */}
+      <Section num="04" title="Bond Calculator" delay={0.2}>
+        <GlassCard glowColor="terminal" className="p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-mono text-gray-500 block mb-1">Face Value (JUL received at maturity)</label>
+                <input type="number" value={calcFace} onChange={(e) => setCalcFace(e.target.value)} placeholder="5000"
+                  className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-2.5 text-white font-mono text-sm placeholder-gray-600 focus:outline-none"
+                  style={{ borderColor: calcFace ? `${CYAN}60` : undefined }} />
+              </div>
+              <div>
+                <label className="text-[10px] font-mono text-gray-500 block mb-1">Discount (%)</label>
+                <input type="number" value={calcDiscount} onChange={(e) => setCalcDiscount(e.target.value)} placeholder="8" step="0.1"
+                  className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-2.5 text-white font-mono text-sm placeholder-gray-600 focus:outline-none"
+                  style={{ borderColor: calcDiscount ? `${CYAN}60` : undefined }} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ l: 'You Pay', v: `$${fmt(calcResult.cost)}` }, { l: 'You Receive', v: `${fmt(parseFloat(calcFace) || 0)} JUL`, cy: true },
+                { l: 'ROI', v: `${calcResult.roi.toFixed(2)}%`, g: true }, { l: 'Profit', v: `$${fmt(calcResult.profit)}`, g: true },
+                { l: 'Maturity Date', v: fmtDate(calcResult.maturityDate) }, { l: 'Effective APY', v: `${calcResult.annualized.toFixed(0)}%`, cy: true },
+              ].map((x) => (
+                <div key={x.l} className="p-2.5 rounded-xl border text-center" style={{ background: 'rgba(0,0,0,0.3)', borderColor: x.cy ? `${CYAN}20` : '#1f2937' }}>
+                  <div className="text-[9px] font-mono text-gray-500">{x.l}</div>
+                  <div className={`text-sm font-mono font-bold ${x.g ? 'text-green-400' : 'text-white'}`} style={x.cy ? { color: CYAN } : undefined}>{x.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </GlassCard>
+      </Section>
+
+      {/* ============ 5. Purchase Bond ============ */}
+      <Section num="05" title="Purchase Bond" delay={0.24}>
         <GlassCard glowColor="terminal" className="p-5">
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             {BONDS.map((b, i) => (
@@ -203,76 +316,57 @@ export default function BondsPage() {
         </GlassCard>
       </Section>
 
-      {/* ============ 4. Your Active Bonds ============ */}
-      <Section num="04" title="Your Active Bonds" delay={0.22}>
+      {/* ============ 6. Active Bonds Dashboard ============ */}
+      <Section num="06" title="Active Bonds Dashboard" delay={0.28}>
         <GlassCard glowColor="terminal" className="overflow-hidden">
-          <div className="hidden sm:grid grid-cols-5 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
-            <div>Bond Type</div><div>Payout Remaining</div><div>Fully Vested</div><div>Progress</div><div className="text-right">Action</div>
+          <div className="hidden sm:grid grid-cols-6 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
+            <div>Bond Type</div><div>Payout Remaining</div><div>Current Value</div><div>Countdown</div><div>Progress</div><div className="text-right">Action</div>
           </div>
-          {USER_BONDS.map((bond, i) => (
-            <motion.div key={bond.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
-              className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-3 border-b border-gray-800/50 items-center">
-              <div>
-                <div className="font-mono text-sm text-white font-bold">{bond.type}</div>
-                <div className="text-[10px] font-mono text-gray-600">Purchased {fmtDate(bond.purchased)}</div>
-              </div>
-              <div>
-                <div className="font-mono text-sm" style={{ color: CYAN }}>{fmt(bond.remaining)} JUL</div>
-                <div className="text-[10px] font-mono text-gray-600">of {fmt(bond.payout)} total</div>
-              </div>
-              <div className="font-mono text-sm text-gray-300">{fmtDate(bond.vested)}
-                <div className="text-[10px] text-gray-600">{daysUntil(bond.vested)}d left</div></div>
-              <div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
-                  <motion.div className="h-full rounded-full" style={{ background: bond.progress >= 1 ? '#34d399' : CYAN }}
-                    initial={{ width: 0 }} animate={{ width: `${bond.progress * 100}%` }} transition={{ duration: PHI, ease: 'easeOut' }} />
+          {USER_BONDS.map((bond, i) => {
+            const claimable = bond.payout - bond.remaining
+            const currentValue = (claimable * 0.948 + bond.remaining * 0.87).toFixed(0)
+            const hrs = hoursUntil(bond.vested)
+            return (
+              <motion.div key={bond.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+                className="grid grid-cols-2 sm:grid-cols-6 gap-2 px-5 py-3 border-b border-gray-800/50 items-center">
+                <div>
+                  <div className="font-mono text-sm text-white font-bold">{bond.type}</div>
+                  <div className="text-[10px] font-mono text-gray-600">Purchased {fmtDate(bond.purchased)}</div>
                 </div>
-                <div className="text-[10px] font-mono text-gray-600 mt-0.5">{(bond.progress * 100).toFixed(0)}% vested</div>
-              </div>
-              <div className="flex gap-1 justify-end">
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold"
-                  style={{ background: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}30` }}>Claim</motion.button>
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                  className="px-2 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-400"
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #374151' }}>Partial</motion.button>
-              </div>
-            </motion.div>
-          ))}
+                <div>
+                  <div className="font-mono text-sm" style={{ color: CYAN }}>{fmt(bond.remaining)} JUL</div>
+                  <div className="text-[10px] font-mono text-gray-600">of {fmt(bond.payout)} total</div>
+                </div>
+                <div>
+                  <div className="font-mono text-sm text-white">${fmt(parseFloat(currentValue))}</div>
+                  <div className="text-[10px] font-mono text-green-400">{fmt(claimable)} claimable</div>
+                </div>
+                <div>
+                  <div className="font-mono text-sm text-white">{hrs}h</div>
+                  <div className="text-[10px] font-mono text-gray-600">{fmtDate(bond.vested)}</div>
+                </div>
+                <div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
+                    <motion.div className="h-full rounded-full" style={{ background: bond.progress >= 1 ? '#34d399' : CYAN }}
+                      initial={{ width: 0 }} animate={{ width: `${bond.progress * 100}%` }} transition={{ duration: PHI, ease: 'easeOut' }} />
+                  </div>
+                  <div className="text-[10px] font-mono text-gray-600 mt-0.5">{(bond.progress * 100).toFixed(0)}% vested</div>
+                </div>
+                <div className="flex gap-1 justify-end">
+                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold"
+                    style={{ background: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}30` }}>Claim</motion.button>
+                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    className="px-2 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-400"
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #374151' }}>Partial</motion.button>
+                </div>
+              </motion.div>
+            )
+          })}
         </GlassCard>
       </Section>
 
-      {/* ============ 5. Vesting Progress Bars ============ */}
-      <Section num="05" title="Vesting Progress" delay={0.26}>
-        <GlassCard glowColor="terminal" className="p-5">
-          <div className="space-y-4">
-            {USER_BONDS.map((bond) => (
-              <div key={bond.id}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono text-xs font-bold text-white">{bond.type}</span>
-                  <span className="font-mono text-[10px] text-gray-500">{fmt(bond.payout - bond.remaining)} claimable / {fmt(bond.payout)} total</span>
-                </div>
-                <div className="h-3 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
-                  <motion.div className="h-full rounded-full relative" style={{ background: `linear-gradient(90deg, ${CYAN}80, ${CYAN})` }}
-                    initial={{ width: 0 }} animate={{ width: `${bond.progress * 100}%` }} transition={{ duration: PHI, ease: 'easeOut' }}>
-                    {bond.progress > 0.05 && (
-                      <motion.div className="absolute inset-0 rounded-full"
-                        style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)' }}
-                        animate={{ x: ['-100%', '200%'] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 3, ease: 'easeInOut' }} />
-                    )}
-                  </motion.div>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[9px] font-mono text-gray-600">{fmtDate(bond.purchased)}</span>
-                  <span className="text-[9px] font-mono text-gray-600">{fmtDate(bond.vested)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </GlassCard>
-      </Section>
-
-      {/* ============ 6. Protocol Treasury Visualization ============ */}
-      <Section num="06" title="Protocol Treasury" delay={0.3}>
+      {/* ============ 7. Treasury Backing ============ */}
+      <Section num="07" title="Treasury Backing" delay={0.32}>
         <GlassCard glowColor="terminal" className="p-5">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="relative w-36 h-36 shrink-0">
@@ -291,46 +385,64 @@ export default function BondsPage() {
                 <div className="text-[10px] font-mono text-gray-500">Treasury</div>
               </div>
             </div>
-            <div className="flex-1 w-full grid grid-cols-2 gap-2">
+            <div className="flex-1 w-full space-y-2">
               {TREASURY.map((seg) => (
-                <div key={seg.label} className="flex items-center gap-2 p-2 rounded-lg border" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
+                <div key={seg.label} className="flex items-center gap-3 p-2.5 rounded-lg border" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
                   <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: seg.color }} />
-                  <div><div className="font-mono text-xs text-white font-bold">{seg.label}</div>
-                    <div className="font-mono text-[10px] text-gray-500">{seg.value}%</div></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs text-white font-bold">{seg.label}</span>
+                      <span className="font-mono text-xs text-gray-400">{seg.amount}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: '#1f2937' }}>
+                      <motion.div className="h-full rounded-full" style={{ background: seg.color }}
+                        initial={{ width: 0 }} animate={{ width: `${seg.value}%` }} transition={{ duration: PHI, ease: 'easeOut' }} />
+                    </div>
+                  </div>
+                  <span className="font-mono text-[10px] text-gray-500 shrink-0">{seg.value}%</span>
                 </div>
               ))}
             </div>
           </div>
-        </GlassCard>
-      </Section>
-
-      {/* ============ 7. Bond Math Explainer ============ */}
-      <Section num="07" title="How Bonds Work" delay={0.34}>
-        <GlassCard glowColor="terminal" className="p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[{ step: '1', title: 'You Bond Assets', desc: 'Deposit ETH, USDC, or LP tokens to the protocol treasury. In return, receive JUL at a discount to market price.' },
-              { step: '2', title: 'Protocol Owns Liquidity', desc: 'Unlike liquidity mining, bonded assets become permanent protocol-owned liquidity (POL). No mercenary capital that leaves when incentives dry up.' },
-              { step: '3', title: 'Linear Vesting', desc: 'Your discounted JUL vests linearly over 5 days. Claim partially at any time or wait for full vesting. Aligns bonder incentives with protocol.' },
-            ].map((item) => (
-              <div key={item.step}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center mb-2 font-mono font-bold text-sm"
-                  style={{ background: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}30` }}>{item.step}</div>
-                <div className="font-mono text-sm text-white font-bold mb-1">{item.title}</div>
-                <div className="font-mono text-[10px] text-gray-500 leading-relaxed">{item.desc}</div>
-              </div>
-            ))}
-          </div>
           <div className="mt-4 p-3 rounded-xl border" style={{ background: `${CYAN}06`, borderColor: `${CYAN}15` }}>
             <div className="font-mono text-[10px] text-gray-400 leading-relaxed">
-              <span className="font-bold text-gray-300">Why POL &gt; mercenary capital:</span>{' '}
-              Traditional LP mining rents liquidity temporarily. Bonds purchase it permanently. The protocol never loses its own liquidity,
-              ensuring deep markets regardless of conditions. Bonders get a discount, protocol gets permanent liquidity, traders get reliable depth.</div>
+              <span className="font-bold text-gray-300">Backing ratio: $0.87 per JUL.</span>{' '}
+              Treasury reserves are diversified across ETH, stablecoins, LP positions, and JUL buybacks.
+              If JUL price falls below backing, inverse bonds activate to defend the floor.</div>
           </div>
         </GlassCard>
       </Section>
 
-      {/* ============ 8. Treasury Health Metrics ============ */}
-      <Section num="08" title="Treasury Health" delay={0.38}>
+      {/* ============ 8. Bond History ============ */}
+      <Section num="08" title="Bond History" delay={0.36}>
+        <GlassCard glowColor="terminal" className="overflow-hidden">
+          <div className="hidden sm:grid grid-cols-5 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
+            <div>Bond Type</div><div>Face Value</div><div>Discount</div><div>ROI Achieved</div><div className="text-right">Matured</div>
+          </div>
+          {BOND_HISTORY.map((bond, i) => (
+            <motion.div key={bond.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
+              className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-2.5 border-b border-gray-800/50 items-center">
+              <div className="font-mono text-xs text-white">{bond.type}</div>
+              <div className="font-mono text-xs" style={{ color: CYAN }}>{fmt(bond.faceValue)} JUL</div>
+              <div className="font-mono text-xs text-gray-400">{bond.discount}%</div>
+              <div className="font-mono text-xs text-green-400">+{bond.roiAchieved}%</div>
+              <div className="font-mono text-xs text-gray-500 sm:text-right flex items-center sm:justify-end gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: '#34d39920', color: '#34d399' }}>{bond.status}</span>
+                {fmtDate(bond.maturedAt)}
+              </div>
+            </motion.div>
+          ))}
+          <div className="px-5 py-3 flex items-center justify-between border-t border-gray-800">
+            <span className="text-[10px] font-mono text-gray-500">
+              Total earned: <span className="text-green-400 font-bold">{fmt(BOND_HISTORY.reduce((s, b) => s + b.faceValue * b.roiAchieved / 100, 0))} JUL</span> from {BOND_HISTORY.length} bonds
+            </span>
+            <span className="text-[10px] font-mono text-gray-600">Avg ROI: <span className="text-white">{(BOND_HISTORY.reduce((s, b) => s + b.roiAchieved, 0) / BOND_HISTORY.length).toFixed(1)}%</span></span>
+          </div>
+        </GlassCard>
+      </Section>
+
+      {/* ============ 9. Treasury Health Metrics ============ */}
+      <Section num="09" title="Treasury Health" delay={0.4}>
         <GlassCard glowColor="terminal" className="p-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[{ title: 'Backing per JUL', value: '$0.87', desc: 'Risk-free value per token. If JUL trades below this, inverse bonds activate.', pct: 87 },
@@ -354,8 +466,8 @@ export default function BondsPage() {
         </GlassCard>
       </Section>
 
-      {/* ============ 9. Historical Bond Discounts Chart ============ */}
-      <Section num="09" title="Historical Bond Discounts" delay={0.42}>
+      {/* ============ 10. Historical Bond Discounts Chart ============ */}
+      <Section num="10" title="Historical Bond Discounts" delay={0.44}>
         <GlassCard glowColor="terminal" className="p-5">
           <svg viewBox="0 0 350 130" className="w-full" preserveAspectRatio="xMidYMid meet">
             {[0, 1, 2, 3].map((i) => <line key={i} x1="30" y1={15 + i * 28} x2="340" y2={15 + i * 28} stroke="#1f2937" strokeWidth="0.5" />)}
@@ -387,8 +499,8 @@ export default function BondsPage() {
         </GlassCard>
       </Section>
 
-      {/* ============ 10. Inverse Bonds ============ */}
-      <Section num="10" title="Inverse Bonds" delay={0.46}>
+      {/* ============ 11. Inverse Bonds ============ */}
+      <Section num="11" title="Inverse Bonds" delay={0.48}>
         <GlassCard glowColor="terminal" className="p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -424,8 +536,27 @@ export default function BondsPage() {
         </GlassCard>
       </Section>
 
-      {/* ============ 11. Cooperative Capitalism ============ */}
-      <Section num="11" title="Cooperative Capitalism" delay={0.5}>
+      {/* ============ 12. How Bonds Work ============ */}
+      <Section num="12" title="How Bonds Work" delay={0.52}>
+        <GlassCard glowColor="terminal" className="p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[{ step: '1', title: 'You Bond Assets', desc: 'Deposit ETH, USDC, or LP tokens to the protocol treasury. In return, receive JUL at a discount to market price.' },
+              { step: '2', title: 'Protocol Owns Liquidity', desc: 'Unlike liquidity mining, bonded assets become permanent protocol-owned liquidity (POL). No mercenary capital.' },
+              { step: '3', title: 'Linear Vesting', desc: 'Your discounted JUL vests linearly over 5 days. Claim partially at any time or wait for full vesting.' },
+            ].map((item) => (
+              <div key={item.step}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center mb-2 font-mono font-bold text-sm"
+                  style={{ background: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}30` }}>{item.step}</div>
+                <div className="font-mono text-sm text-white font-bold mb-1">{item.title}</div>
+                <div className="font-mono text-[10px] text-gray-500 leading-relaxed">{item.desc}</div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      </Section>
+
+      {/* ============ 13. Cooperative Capitalism ============ */}
+      <Section num="13" title="Cooperative Capitalism" delay={0.56}>
         <GlassCard glowColor="terminal" className="p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[{ side: 'Individual Incentives', color: CYAN, items: [
@@ -458,8 +589,8 @@ export default function BondsPage() {
           </div>
           <div className="mt-4 p-3 rounded-xl border text-center" style={{ background: `${CYAN}06`, borderColor: `${CYAN}15` }}>
             <div className="font-mono text-xs text-gray-300 leading-relaxed">
-              Bonds align individual profit motives with collective protocol strength. Every bond purchased deepens liquidity for all traders,
-              strengthens the treasury for all holders, and reduces inflationary emissions. <span style={{ color: CYAN }}>Cooperation is the optimal strategy.</span>
+              Bonds align individual profit motives with collective protocol strength. Every bond deepens liquidity,
+              strengthens the treasury, and reduces emissions. <span style={{ color: CYAN }}>Cooperation is the optimal strategy.</span>
             </div>
           </div>
         </GlassCard>

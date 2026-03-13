@@ -109,6 +109,7 @@ const AgenticEconomyPage = lazy(() => import('./components/AgenticEconomyPage'))
 const GracefulInversionPage = lazy(() => import('./components/GracefulInversionPage'))
 const MemehunterPage = lazy(() => import('./components/MemehunterPage'))
 const CommitRevealPage = lazy(() => import('./components/CommitRevealPage'))
+const CRPCPage = lazy(() => import('./components/CRPCPage'))
 const TradingPage = lazy(() => import('./components/TradingPage'))
 const OptionsPage = lazy(() => import('./components/OptionsPage'))
 const YieldPage = lazy(() => import('./components/YieldPage'))
@@ -297,6 +298,7 @@ function AnimatedRoutes() {
             <Route path="/inversion" element={<GracefulInversionPage />} />
             <Route path="/memehunter" element={<MemehunterPage />} />
             <Route path="/commit-reveal" element={<CommitRevealPage />} />
+            <Route path="/crpc" element={<CRPCPage />} />
             <Route path="/trade" element={<TradingPage />} />
             {/* New DeFi primitives */}
             <Route path="/options" element={<OptionsPage />} />

@@ -126,8 +126,9 @@ import { getMorningBriefing, getMarketHours, getRandomFact, getOnThisDay, getRan
 import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextStats, initGroupContext, flushGroupContext, stopGroupContext } from './group-context.js';
 import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
 import { scanNewTokens, getNewPairs, getHotTokens, dexSearch, getPairDetails } from './tools-scanner.js';
-// Memecoin Hunter — composite scoring + background monitor
+// Memecoin Hunter — composite scoring + background monitor + human-in-the-loop trading
 let huntMemecoins, getMemeScore, startMemeMonitor, stopMemeMonitor, getMonitorStatus_Meme;
+let handleMemeCallback, getPendingApprovals, alertHuman_mh;
 try {
   const mh = await import('./tools-memehunter.js');
   huntMemecoins = mh.huntMemecoins;
@@ -135,6 +136,9 @@ try {
   startMemeMonitor = mh.startMemeMonitor;
   stopMemeMonitor = mh.stopMemeMonitor;
   getMonitorStatus_Meme = mh.getMonitorStatus;
+  handleMemeCallback = mh.handleMemeCallback;
+  getPendingApprovals = mh.getPendingApprovals;
+  alertHuman_mh = mh.alertHuman;
   registerModule('memehunter', true);
 } catch (err) {
   console.error(`[jarvis] tools-memehunter.js FAILED: ${err.message}`);
@@ -142,6 +146,9 @@ try {
   huntMemecoins = stubFn('hunt'); getMemeScore = stubFn('score');
   startMemeMonitor = stubFn('mememonitor'); stopMemeMonitor = stubFn('memestop');
   getMonitorStatus_Meme = stubFn('memestatus');
+  handleMemeCallback = async () => 'Module not loaded.';
+  getPendingApprovals = () => 'Module not loaded.';
+  alertHuman_mh = async () => null;
 }
 import { getLiquidations, getFundingRates, getOpenInterest, getLongShortRatio, getETFFlows } from './tools-derivatives.js';
 import { initXP, flushXP, awardXP, getXPStatus, getAchievements, getXPLeaderboard } from './tools-xp.js';
@@ -1256,9 +1263,11 @@ SCANNER (DEXScreener)
 MEMECOIN HUNTER
   /hunt [chain] — Scan + score new tokens (default: base)
   /memescore <addr> [chain] — Deep risk analysis (0-100)
-  /mememonitor [chain] — Start auto-alert monitor
+  /mememonitor [chain] — Start monitor with trade alerts
   /memestop — Stop monitor
   /memestatus — Monitor status
+  /memepending — Show pending trade approvals
+  /memealert <addr> — Manual trade alert for a token
 
 DERIVATIVES
   /liquidations [token] — Liquidation data
@@ -3057,11 +3066,16 @@ bot.command('mememonitor', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
   const chain = ctx.message.text.split(/\s+/)[1];
   const chatId = ctx.chat.id;
-  const result = startMemeMonitor(chain, (alertMsg) => {
-    bot.telegram.sendMessage(chatId, alertMsg).catch(err => {
-      console.error(`[memehunter] Alert send failed: ${err.message}`);
-    });
-  });
+  // Pass both postAlert (info-only) and sendTg (trade alerts with inline keyboards)
+  const result = startMemeMonitor(
+    chain,
+    (alertMsg) => {
+      bot.telegram.sendMessage(chatId, alertMsg).catch(err => {
+        console.error(`[memehunter] Alert send failed: ${err.message}`);
+      });
+    },
+    (targetChatId, text, opts) => bot.telegram.sendMessage(targetChatId, text, opts),
+  );
   ctx.reply(result);
 });
 
@@ -3072,6 +3086,52 @@ bot.command('memestop', async (ctx) => {
 
 bot.command('memestatus', async (ctx) => {
   ctx.reply(getMonitorStatus_Meme());
+});
+
+bot.command('memepending', async (ctx) => {
+  ctx.reply(getPendingApprovals());
+});
+
+bot.command('memealert', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  const addr = ctx.message.text.split(/\s+/)[1];
+  if (!addr) return ctx.reply('Usage: /memealert 0x... — Manually trigger trade alert for a token');
+  const scoreResult = await getMemeScore(addr, 'base');
+  ctx.reply(scoreResult);
+  // TODO: if score is high enough, trigger alertHuman
+});
+
+// ============ Memecoin Approve/Reject Callback Handler ============
+
+bot.on('callback_query', async (ctx) => {
+  const data = ctx.callbackQuery?.data;
+  if (!data) return ctx.answerCbQuery('Invalid callback.');
+
+  // Handle meme trade approve/reject
+  if (data.startsWith('meme_approve:') || data.startsWith('meme_reject:')) {
+    // Only authorized users can approve trades
+    if (!isAuthorized(ctx)) return ctx.answerCbQuery('Not authorized.');
+
+    const colonIdx = data.indexOf(':');
+    const action = data.substring(0, colonIdx);
+    const callbackId = data.substring(colonIdx + 1);
+
+    const result = await handleMemeCallback(
+      action,
+      callbackId,
+      (chatId, text, opts) => bot.telegram.sendMessage(chatId, text, opts),
+    );
+
+    // Update the original message to remove buttons
+    try {
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+    } catch { /* message may be old */ }
+
+    return ctx.answerCbQuery(result.slice(0, 200)); // TG callback answer limit
+  }
+
+  // Unknown callback
+  ctx.answerCbQuery('Unknown action.');
 });
 
 // ============ Derivatives Data ============
@@ -7791,16 +7851,28 @@ async function main() {
           return;
         }
 
+        // CORS for CRPC endpoints (frontend at Vercel needs cross-origin access)
+        const crpcCors = {
+          'Access-Control-Allow-Origin': config.web?.corsOrigins?.[0] || '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        };
+        if (req.url?.startsWith('/crpc/') && req.method === 'OPTIONS') {
+          res.writeHead(204, crpcCors);
+          res.end();
+          return;
+        }
+
         // CRPC endpoints
         const crpcHandler = handleCRPCRequest(path, req.method);
         if (crpcHandler) {
           if (crpcHandler === 'stats' || crpcHandler === 'protocol' || crpcHandler === 'dashboard') {
             const data = await processCRPCBody(crpcHandler);
             if (data?._html) {
-              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...crpcCors });
               res.end(data._html);
             } else {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.writeHead(200, { 'Content-Type': 'application/json', ...crpcCors });
               res.end(JSON.stringify(data, null, 2));
             }
           } else if (crpcHandler === 'demo') {
@@ -7813,10 +7885,10 @@ async function main() {
                 if (body) prompt = JSON.parse(body).prompt;
               }
               const trace = await runCRPCDemo(prompt);
-              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.writeHead(200, { 'Content-Type': 'application/json', ...crpcCors });
               res.end(JSON.stringify(trace, null, 2));
             } catch (err) {
-              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.writeHead(500, { 'Content-Type': 'application/json', ...crpcCors });
               res.end(JSON.stringify({ error: err.message, stack: err.stack?.split('\n').slice(0, 3) }));
             }
           } else {
@@ -7863,6 +7935,58 @@ async function main() {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
         }
+      // ============ Shard Update Receiver ============
+      // Receives dispatched TG updates from the shard router
+      } else if (req.url === '/shard/update' && req.method === 'POST') {
+        try {
+          const body = await readBody(req);
+          const update = JSON.parse(body);
+          // Feed the update directly into Telegraf's processing pipeline
+          await bot.handleUpdate(update);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          console.error(`[shard] Update processing failed: ${err.message}`);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+
+      // ============ Cross-Shard Learning Bus Receiver ============
+      // Receives learned insights from other shards (via router broadcast)
+      } else if (req.url === '/shard/learn' && req.method === 'POST') {
+        try {
+          const body = await readBody(req);
+          const { type, data, fromShard } = JSON.parse(body);
+          console.log(`[shard] Learning from ${fromShard}: ${type}`);
+
+          // Process different learning types
+          switch (type) {
+            case 'token_alert':
+              // Another shard found a good token — surface it here too
+              if (data.chatId && data.message) {
+                await bot.telegram.sendMessage(data.chatId, `[Cross-shard from ${fromShard}]\n${data.message}`).catch(() => {});
+              }
+              break;
+            case 'insight':
+              // General insight — log for now, will integrate into context later
+              console.log(`[shard] Insight from ${fromShard}: ${JSON.stringify(data).slice(0, 200)}`);
+              break;
+            case 'ckb_update':
+              // CKB knowledge propagation — another shard learned something important
+              console.log(`[shard] CKB update from ${fromShard}: ${data.key}`);
+              break;
+            default:
+              console.log(`[shard] Unknown learning type: ${type}`);
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          console.error(`[shard] Learn processing failed: ${err.message}`);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+
       } else {
         res.writeHead(404);
         res.end('Not found');
@@ -7876,6 +8000,7 @@ async function main() {
       console.log(`[jarvis] Claude Code API: http://0.0.0.0:${healthPort}/api/* ${config.claudeCodeApiSecret ? '(secured)' : '(NO SECRET SET — disabled)'}`);
       console.log(`[jarvis] Web Portal API: http://0.0.0.0:${healthPort}/web/* (public, rate-limited)`);
       console.log(`[jarvis] Mini App: http://0.0.0.0:${healthPort}/app/ (Telegram WebApp)`);
+      console.log(`[jarvis] Shard endpoints: /shard/update, /shard/learn`);
     });
   }
 

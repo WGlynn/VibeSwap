@@ -78,7 +78,7 @@ export const config = {
     stateBackend: process.env.STATE_BACKEND || 'file', // 'file' | 'redis'
     redisUrl: process.env.REDIS_URL || null,
     routerUrl: process.env.ROUTER_URL || null,
-    // Worker mode: shard runs without Telegram bot, participates in consensus/CRPC only
+    // Modes: 'primary' (full TG bot), 'worker' (headless, CRPC only), 'router' (TG update dispatcher)
     // Auto-detected when TELEGRAM_BOT_TOKEN is missing and SHARD_MODE=worker
     mode: process.env.SHARD_MODE || (process.env.TELEGRAM_BOT_TOKEN ? 'primary' : 'worker'),
     // Shared secret for inter-shard HMAC authentication (required for multi-shard)
@@ -141,6 +141,25 @@ export const config = {
     persistIntervalMs: parseInt(process.env.MI_PERSIST_INTERVAL, 10) || 300000,
     hotReloadDebounceMs: parseInt(process.env.MI_HOT_RELOAD_DEBOUNCE, 10) || 2000,
     lifecycleCheckIntervalMs: parseInt(process.env.MI_LIFECYCLE_CHECK_INTERVAL, 10) || 60000,
+  },
+  // Memecoin Hunter — human-in-the-loop trading
+  memehunter: {
+    // TG chat/group where trade alerts are sent for approval
+    reviewChatId: process.env.MEME_REVIEW_CHAT_ID
+      ? parseInt(process.env.MEME_REVIEW_CHAT_ID, 10)
+      : null, // Falls back to ownerUserId DM if not set
+    // Max ETH per meme trade (conservative start)
+    maxPositionEth: parseFloat(process.env.MEME_MAX_POSITION_ETH || '0.005'),
+    // Minimum score to trigger alert (0-100)
+    minAlertScore: parseInt(process.env.MEME_MIN_ALERT_SCORE, 10) || 55,
+    // Approval timeout in ms (default 5 min)
+    approvalTimeoutMs: parseInt(process.env.MEME_APPROVAL_TIMEOUT_MS, 10) || 300_000,
+    // Uniswap V3 fee tiers to try for meme tokens (higher fee = less liquid but more memes)
+    feeTiers: [10000, 3000, 500], // 1%, 0.3%, 0.05%
+    // Slippage for meme trades (higher than blue-chip)
+    slippageBps: parseInt(process.env.MEME_SLIPPAGE_BPS, 10) || 500, // 5%
+    // Max pending approvals at once
+    maxPending: 5,
   },
   // Tip jar — ETH address for voluntary contributions
   tipJarAddress: process.env.TIP_JAR_ADDRESS || '0xa-EOFc55d6f6478918076B5Bb85E8Cf3738549a2',

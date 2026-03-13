@@ -16,6 +16,7 @@ import BackToTop from './components/ui/BackToTop'
 import NetworkBanner from './components/ui/NetworkBanner'
 import Footer from './components/ui/Footer'
 import { useSynaptic } from './hooks/useSynaptic'
+import { usePageTitle } from './hooks/usePageTitle'
 import { remember } from './utils/sankofa'
 
 // Error boundary to catch React errors
@@ -281,6 +282,7 @@ function App() {
   const isVoicePage = location.pathname === '/voice'
   const { fire } = useSynaptic()
   useKeyboardNav() // Ctrl+K swap, Ctrl+J jarvis, Ctrl+M mesh, etc.
+  usePageTitle() // Auto-set document title from route
 
   // Synaptic plasticity — strengthen pathways on navigation
   useEffect(() => {

@@ -26,6 +26,7 @@ import { handleNyxRequest } from './nyx.js';
 import { handleTheAIRequest } from './theai-dashboard.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
 import { loadWorkflowStats, handleWillIntercept, getWorkflowStats } from './workflow-router.js';
+import { submitIdea, getIdeas, approveIdea, getIdeaStats, formatSubmitterResponse, buildOwnerNotification } from './idea-pipeline.js';
 // ============ Module Health Registry ============
 // Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
 // MUST be before all dynamic imports so registerModule() is available in catch blocks
@@ -4677,6 +4678,63 @@ bot.command('mesh', async (ctx) => {
   } catch (err) {
     ctx.reply(`Mesh check failed: ${err.message}`);
   }
+});
+
+// ============ /idea + /suggest — Community Idea Pipeline ============
+// People submit ideas, Jarvis evaluates against primitives, credits the contributor.
+// Every voice evaluated by the same standard. Contributor gets Shapley credit.
+
+bot.command(['idea', 'suggest'], async (ctx) => {
+  const ideaText = ctx.message.text.replace(/^\/(?:idea|suggest)(@\S+)?/, '').trim();
+  if (!ideaText || ideaText.length < 20) {
+    return ctx.reply('Share your idea (at least 20 chars). Example:\n/idea What if we added conviction voting to the governance module?');
+  }
+
+  const userId = String(ctx.from.id);
+  const username = ctx.from.username || ctx.from.first_name || 'anon';
+
+  try {
+    await ctx.sendChatAction('typing');
+    const result = await submitIdea(userId, username, ideaText);
+
+    // Credit the contributor — human input IS labor, not free data extraction
+    try {
+      const { creditFact } = await import('./compute-economics.js');
+      creditFact(userId); // Shapley credit for contribution
+    } catch {}
+
+    // Respond to submitter
+    const response = formatSubmitterResponse(result);
+    await ctx.reply(response);
+
+    // Notify Will for high-scoring ideas (80+)
+    if (result.accepted && result.score >= 80) {
+      try {
+        const notice = buildOwnerNotification(result, result.evaluation);
+        await ctx.telegram.sendMessage(config.ownerUserId, notice);
+      } catch {}
+    }
+  } catch (err) {
+    console.error(`[idea-pipeline] Error: ${err.message}`);
+    await ctx.reply('Something went wrong evaluating your idea. Try again.');
+  }
+});
+
+// /ideas — View pipeline stats (owner only)
+bot.command('ideas', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const stats = await getIdeaStats();
+  const lines = [
+    'Idea Pipeline Stats',
+    '',
+    `Total submitted: ${stats.total}`,
+    `Accepted: ${stats.accepted} (avg score: ${stats.avgScore})`,
+    `Pending review: ${stats.pending}`,
+    `Implemented: ${stats.implemented}`,
+    '',
+    `Top contributors: ${stats.topContributors?.map(c => `@${c.username} (${c.count})`).join(', ') || 'none yet'}`,
+  ];
+  ctx.reply(lines.join('\n'));
 });
 
 // ============ /workflow — Autonomy Stats (Cincinnatus Metric) ============

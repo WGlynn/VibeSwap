@@ -139,6 +139,9 @@ const ROUTE_LABELS = {
   education: 'Education',
   'price-impact': 'Price Impact',
   backtest: 'Backtester',
+  snapshot: 'Snapshots',
+  tax: 'Tax Reports',
+  'referral-dashboard': 'Referral Dashboard',
 }
 
 export default function Breadcrumb({ className = '' }) {

@@ -149,6 +149,9 @@ const COMMANDS = [
   { id: 'education', label: 'Education', description: 'Learn-to-earn DeFi courses', path: '/education', category: 'Knowledge' },
   { id: 'price-impact', label: 'Price Impact', description: 'Simulate trade price impact', path: '/price-impact', category: 'DeFi' },
   { id: 'backtest', label: 'Backtester', description: 'Backtest trading strategies', path: '/backtest', category: 'Intelligence' },
+  { id: 'snapshot', label: 'Snapshots', description: 'Off-chain governance voting', path: '/snapshot', category: 'Community' },
+  { id: 'tax', label: 'Tax Reports', description: 'Generate crypto tax reports', path: '/tax', category: 'Account' },
+  { id: 'referral-dashboard', label: 'Referral Dashboard', description: 'Detailed referral analytics', path: '/referral-dashboard', category: 'Account' },
 ]
 
 const CATEGORY_COLORS = {

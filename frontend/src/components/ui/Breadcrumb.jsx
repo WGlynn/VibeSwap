@@ -127,6 +127,9 @@ const ROUTE_LABELS = {
   revenue: 'Revenue Share',
   vesting: 'Vesting',
   liquidations: 'Liquidations',
+  delegate: 'Delegate',
+  migrate: 'Migration',
+  competitions: 'Competitions',
 }
 
 export default function Breadcrumb({ className = '' }) {

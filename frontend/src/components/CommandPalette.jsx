@@ -137,6 +137,9 @@ const COMMANDS = [
   { id: 'revenue', label: 'Revenue Share', description: 'Protocol fee distribution to stakers and LPs', path: '/revenue', category: 'DeFi' },
   { id: 'vesting', label: 'Token Vesting', description: 'Vesting schedules, cliffs, and unlock timelines', path: '/vesting', category: 'Account' },
   { id: 'liquidations', label: 'Liquidations', description: 'At-risk positions and liquidation auctions', path: '/liquidations', category: 'Protocol' },
+  { id: 'delegate', label: 'Delegate', description: 'Delegate voting power to representatives', path: '/delegate', category: 'Community' },
+  { id: 'migrate', label: 'Migration', description: 'Upgrade tokens from V1 to V2', path: '/migrate', category: 'System' },
+  { id: 'competitions', label: 'Competitions', description: 'Trading tournaments with prizes', path: '/competitions', category: 'Community' },
 ]
 
 const CATEGORY_COLORS = {

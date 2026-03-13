@@ -130,6 +130,9 @@ const ROUTE_LABELS = {
   delegate: 'Delegate',
   migrate: 'Migration',
   competitions: 'Competitions',
+  streaks: 'Streaks',
+  health: 'Protocol Health',
+  'fee-calculator': 'Fee Calculator',
 }
 
 export default function Breadcrumb({ className = '' }) {

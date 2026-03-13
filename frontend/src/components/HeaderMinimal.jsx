@@ -309,6 +309,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/faq', label: 'FAQ', icon: '?' },
       { path: '/changelog', label: 'Changelog', icon: '📝' },
       { path: '/migrate', label: 'Migration', icon: '🔄' },
+      { path: '/health', label: 'Protocol Health', icon: '💚' },
+      { path: '/fee-calculator', label: 'Fee Calculator', icon: '🧮' },
       { path: '/about', label: 'About', icon: 'i' },
       { path: '/partners', label: 'Partners', icon: '🤝' },
       { path: '/brand', label: 'Brand', icon: '🎨' },
@@ -462,6 +464,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             { path: '/portfolio-analytics', label: 'Analytics', icon: '📈' },
             { path: '/bridge-history', label: 'Bridge History', icon: '🌉' },
             { path: '/approvals', label: 'Approvals', icon: '✅' },
+            { path: '/streaks', label: 'Streaks', icon: '🔥' },
+            { path: '/vesting', label: 'Vesting', icon: '🔐' },
           ].map((item) => (
             <Link
               key={item.path}

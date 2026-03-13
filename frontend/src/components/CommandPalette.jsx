@@ -140,6 +140,9 @@ const COMMANDS = [
   { id: 'delegate', label: 'Delegate', description: 'Delegate voting power to representatives', path: '/delegate', category: 'Community' },
   { id: 'migrate', label: 'Migration', description: 'Upgrade tokens from V1 to V2', path: '/migrate', category: 'System' },
   { id: 'competitions', label: 'Competitions', description: 'Trading tournaments with prizes', path: '/competitions', category: 'Community' },
+  { id: 'streaks', label: 'Streaks', description: 'Daily activity streaks and rewards', path: '/streaks', category: 'Account' },
+  { id: 'health', label: 'Protocol Health', description: 'Safety systems and risk metrics', path: '/health', category: 'Protocol' },
+  { id: 'fee-calculator', label: 'Fee Calculator', description: 'Estimate costs before you execute', path: '/fee-calculator', category: 'Protocol' },
 ]
 
 const CATEGORY_COLORS = {

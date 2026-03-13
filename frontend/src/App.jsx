@@ -185,6 +185,9 @@ const LiquidationPage = lazy(() => import('./components/LiquidationPage'))
 const GovernanceDelegatePage = lazy(() => import('./components/GovernanceDelegatePage'))
 const MigrationPage = lazy(() => import('./components/MigrationPage'))
 const CompetitionsPage = lazy(() => import('./components/CompetitionsPage'))
+const StreakTrackerPage = lazy(() => import('./components/StreakTrackerPage'))
+const ProtocolHealthPage = lazy(() => import('./components/ProtocolHealthPage'))
+const FeeCalculatorPage = lazy(() => import('./components/FeeCalculatorPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -351,6 +354,9 @@ function AnimatedRoutes() {
             <Route path="/delegate" element={<GovernanceDelegatePage />} />
             <Route path="/migrate" element={<MigrationPage />} />
             <Route path="/competitions" element={<CompetitionsPage />} />
+            <Route path="/streaks" element={<StreakTrackerPage />} />
+            <Route path="/health" element={<ProtocolHealthPage />} />
+            <Route path="/fee-calculator" element={<FeeCalculatorPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

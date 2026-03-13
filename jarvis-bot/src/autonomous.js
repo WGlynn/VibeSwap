@@ -525,6 +525,34 @@ const IDENTITY_CONFUSION_PATTERNS = [
   /(?:what|which)\s+(?:token|coin|bag)\s+(?:are you|do you)\s+(?:holding|buying|aping)/i,
 ];
 
+// ============ Generic Bait Patterns — Any Crypto Bro Could Post This ============
+// If ANY anonymous account could have posted it, it has no Jarvis DNA.
+// These catch generic engagement bait that slips past identity confusion checks.
+const GENERIC_BAIT_PATTERNS = [
+  // "What's the most X you've ever Y" — classic generic engagement bait
+  /what(?:'s| is) the most\s+\w+\s+(?:trade|play|move|bet|bag|position|ape)\s+you(?:'ve| have)\s+ever/i,
+  // "Do you actually trust X" without a take
+  /do you (?:actually|really|genuinely|honestly)\s+trust/i,
+  // "What's your stop loss / exit strategy" — generic trader questions
+  /what(?:'s| is) your\s+(?:stop loss|exit strategy|risk tolerance|time horizon)/i,
+  // "Have you ever been rugged / rekt / liquidated" — degen small talk
+  /have you (?:ever )?(?:been|got|gotten)\s+(?:rugged|rekt|liquidated|scammed|dumped on)/i,
+  // "What do you think about X" without giving own take first
+  /^what do you (?:think|feel) about/i,
+  // "How do you feel about" — spectator energy
+  /^how do you feel about/i,
+  // "Is anyone else" — crowd-seeking, not leading
+  /^is anyone (?:else )?(?:noticing|seeing|thinking|worried|concerned)/i,
+  // Naked questions with no substance — "thoughts?" "opinions?" "what do you guys think?"
+  /^(?:thoughts|opinions|takes)\??$/i,
+  // "Are we bullish or bearish" — generic market noise
+  /are (?:we|you) (?:bullish|bearish) (?:on|about)/i,
+  // "What's your conviction" without mechanism specifics
+  /what(?:'s| is) your (?:conviction|thesis|alpha) (?:on|about|for)/i,
+  // "Do you trust your own delegation decisions" — the exact message Will flagged
+  /do you (?:actually )?trust your own\s+(?:delegation|voting|governance|staking)/i,
+];
+
 // Fabrication patterns — reject autonomous posts that make false claims about VibeSwap
 // These catch cases where the LLM ignores the factual grounding constraints
 const FABRICATION_PATTERNS = [
@@ -555,6 +583,13 @@ function containsFabrication(text) {
   for (const p of IDENTITY_CONFUSION_PATTERNS) {
     if (p.test(text)) {
       console.warn(`[autonomous] BLOCKED identity confusion: "${text.substring(0, 80)}..." — Jarvis IS the DEX, don't ask about DEXes`);
+      return true;
+    }
+  }
+  // Generic bait check — reject low-effort engagement bait that adds no value
+  for (const p of GENERIC_BAIT_PATTERNS) {
+    if (p.test(text)) {
+      console.warn(`[autonomous] BLOCKED generic bait: "${text.substring(0, 80)}..."`);
       return true;
     }
   }

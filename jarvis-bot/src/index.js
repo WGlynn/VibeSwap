@@ -4285,7 +4285,7 @@ bot.command('economy', async (ctx) => {
     `  Cascade: ${chain.active?.name} → ${chain.remaining.map(p => p.name).join(' → ') || 'none'}`,
     `  Providers: ${chain.totalProviders} total | ${chain.remaining.length} fallbacks remaining`,
     intel.degraded
-      ? `  DEGRADED since ${new Date(intel.degradedSince).toLocaleTimeString()} — tip jar refills restore premium quality`
+      ? `  DEGRADED since ${new Date(intel.degradedSince).toLocaleTimeString()} — cascade needs funding to reach premium. /tip or contact @WillGlynn`
       : '  Status: nominal (premium tier active)',
     '',
     `Pricing Oracle: 1 JUL = ${pricing.ratio.toLocaleString()} tokens`,
@@ -4415,6 +4415,32 @@ bot.command('tip', async (ctx) => {
   }
 
   ctx.reply(lines.join('\n'));
+});
+
+// ============ Quality — Wardenclyffe Intelligence Level ============
+
+bot.command('quality', async (ctx) => {
+  const intel = getIntelligenceLevel();
+  const lines = [
+    `Wardenclyffe Intelligence: ${intel.quality}%`,
+    `Provider: ${intel.provider}/${intel.model}`,
+    `Tier: ${intel.tierLabel}`,
+  ];
+
+  if (intel.degraded) {
+    lines.push('');
+    lines.push(`Running on free-tier since ${new Date(intel.degradedSince).toLocaleTimeString()}.`);
+    lines.push('Quality will cascade up automatically once there\'s demand.');
+    lines.push('');
+    lines.push('The Wardenclyffe cascade needs funding to reach Opus-tier intelligence.');
+    lines.push('Tip jar contributions (/tip) restore premium quality.');
+    lines.push('For funding inquiries, reach out to @WillGlynn.');
+  } else {
+    lines.push('');
+    lines.push('Premium intelligence active. Full quality.');
+  }
+
+  return ctx.reply(lines.join('\n'));
 });
 
 // ============ Reprice — JUL Pricing Oracle ============
@@ -5693,7 +5719,9 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       try {
         await bot.telegram.sendMessage(notifyChat,
           `[Wardenclyffe] Intelligence at ${degradation.quality}% — running on ${degradation.provider}.\n` +
-          `Premium provider credits exhausted. Tip jar contributions (/tip) restore full quality.`
+          `Premium provider credits exhausted. Quality will cascade up automatically once there's demand.\n\n` +
+          `Curious about the quality difference? The Wardenclyffe cascade needs funding to reach Opus-tier intelligence. ` +
+          `Tip jar contributions (/tip) restore premium quality, or reach out to @WillGlynn to discuss funding the cascade.`
         );
       } catch {}
     } else if (degradation?.recovered) {
@@ -8368,6 +8396,7 @@ async function main() {
       { command: 'balance', description: 'JUL balance, compute stats, CKB info' },
       { command: 'economy', description: 'Pool-level compute economics (owner)' },
       { command: 'tip', description: 'Tip jar address' },
+      { command: 'quality', description: 'Wardenclyffe intelligence level' },
     ]);
   } catch {}
 

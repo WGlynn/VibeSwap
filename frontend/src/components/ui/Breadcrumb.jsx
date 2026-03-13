@@ -104,6 +104,8 @@ const ROUTE_LABELS = {
   proposals: 'Proposals',
   farming: 'Liquidity Mining',
   'portfolio-analytics': 'Portfolio Analytics',
+  'bridge-history': 'Bridge History',
+  token: 'Token',
 }
 
 export default function Breadcrumb({ className = '' }) {

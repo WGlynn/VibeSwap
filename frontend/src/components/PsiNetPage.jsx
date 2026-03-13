@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import PageHero from './ui/PageHero'
 import GlassCard from './ui/GlassCard'
+import { MARKETPLACE_PRIMITIVES, CATEGORIES, getPrimitivesByCategory, getTotalRewardPool, getUnclaimedPrimitives } from '../data/marketplace-primitives'
 
 // ============ Constants ============
 
@@ -263,8 +264,19 @@ function PsiNetPage() {
     types[3].count = 6   // reference
   }, [])
 
+  const [marketCategory, setMarketCategory] = useState('all')
+  const [marketTier, setMarketTier] = useState(0)
+
+  const filteredPrimitives = useMemo(() => {
+    let prims = MARKETPLACE_PRIMITIVES
+    if (marketCategory !== 'all') prims = prims.filter(p => p.category === marketCategory)
+    if (marketTier > 0) prims = prims.filter(p => p.tier === marketTier)
+    return prims
+  }, [marketCategory, marketTier])
+
   const tabs = [
     { id: 'overview', label: 'Overview' },
+    { id: 'marketplace', label: `Marketplace (${MARKETPLACE_PRIMITIVES.length})` },
     { id: 'registry', label: 'DID Registry' },
     { id: 'mechanisms', label: 'Mechanism Design' },
     { id: 'ckb', label: 'CKB Integration' },
@@ -385,6 +397,111 @@ function PsiNetPage() {
                   <div className="text-[10px] text-black-500">→ zero access → zero reward</div>
                 </div>
               </div>
+            </GlassCard>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Marketplace Tab */}
+      {activeTab === 'marketplace' && (
+        <div className="space-y-6">
+          {/* Stats row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Primitives', value: MARKETPLACE_PRIMITIVES.length, color: CYAN },
+              { label: 'Unclaimed', value: getUnclaimedPrimitives().length, color: '#22c55e' },
+              { label: 'Total Rewards', value: `${(getTotalRewardPool() / 1000).toFixed(1)}K JUL`, color: '#f59e0b' },
+              { label: 'Categories', value: CATEGORIES.length, color: '#a855f7' },
+            ].map((s, i) => (
+              <motion.div key={s.label} custom={i} initial="hidden" animate="visible" variants={sectionVariants}>
+                <GlassCard className="p-4 text-center">
+                  <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-xs text-gray-400 mt-1">{s.label}</div>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setMarketCategory('all')}
+              className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${marketCategory === 'all' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' : 'bg-white/5 text-gray-400 border border-white/10 hover:border-white/20'}`}
+            >All</button>
+            {CATEGORIES.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setMarketCategory(c.id)}
+                className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${marketCategory === c.id ? `${c.bg} ${c.color} border ${c.border}` : 'bg-white/5 text-gray-400 border border-white/10 hover:border-white/20'}`}
+              >{c.name}</button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {[0, 1, 2, 3].map(t => (
+              <button
+                key={t}
+                onClick={() => setMarketTier(t)}
+                className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${marketTier === t ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' : 'bg-white/5 text-gray-400 border border-white/10 hover:border-white/20'}`}
+              >{t === 0 ? 'All Tiers' : `Tier ${t}`}</button>
+            ))}
+          </div>
+
+          {/* Primitives grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredPrimitives.map((p, i) => {
+              const cat = CATEGORIES.find(c => c.id === p.category)
+              return (
+                <motion.div
+                  key={p.id}
+                  custom={i % 6}
+                  initial="hidden"
+                  animate="visible"
+                  variants={sectionVariants}
+                >
+                  <GlassCard className="p-4 h-full flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded ${cat?.bg || 'bg-white/5'} ${cat?.color || 'text-gray-400'}`}>
+                        {cat?.name || p.category}
+                      </span>
+                      <span className="text-xs text-gray-500">Tier {p.tier}</span>
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-1">{p.name}</h3>
+                    <p className="text-xs text-gray-400 flex-1 mb-3">{p.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-amber-400">{p.reward} JUL</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${p.claimedBy ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-gray-500'}`}>
+                        {p.claimedBy ? 'Claimed' : 'Open'}
+                      </span>
+                    </div>
+                    {p.connections.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {p.connections.slice(0, 3).map(cid => (
+                          <span key={cid} className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">{cid}</span>
+                        ))}
+                        {p.connections.length > 3 && <span className="text-[10px] text-gray-500">+{p.connections.length - 3}</span>}
+                      </div>
+                    )}
+                  </GlassCard>
+                </motion.div>
+              )
+            })}
+          </div>
+
+          {filteredPrimitives.length === 0 && (
+            <div className="text-center text-gray-500 py-12">No primitives match your filters.</div>
+          )}
+
+          {/* CTA */}
+          <motion.div custom={0} initial="hidden" animate="visible" variants={sectionVariants}>
+            <GlassCard className="p-6 text-center" style={{ borderColor: 'rgba(6, 182, 212, 0.2)' }}>
+              <h3 className="text-lg font-bold text-cyan-400 mb-2">Claim a Primitive</h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Contribute documentation, code, or analysis for any unclaimed primitive.
+                Earn JUL rewards and Shapley credit in the ContributionDAG.
+              </p>
+              <p className="text-xs text-gray-500">
+                Join Telegram and use <span className="font-mono text-cyan-400">/idea</span> to submit your contribution.
+              </p>
             </GlassCard>
           </motion.div>
         </div>

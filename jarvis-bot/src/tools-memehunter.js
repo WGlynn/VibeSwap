@@ -5,6 +5,8 @@
 // 2. New token hunting with auto-security-check
 // 3. Momentum + volume/liquidity ratio analysis
 // 4. Background monitor that auto-posts alerts to TG
+// 5. Human-in-the-loop approval flow (TG inline keyboards)
+// 6. Trade execution via Uniswap V3 on Base
 //
 // Commands:
 //   /hunt [chain]           — Scan new tokens, score them, show best candidates
@@ -12,9 +14,57 @@
 //   /mememonitor [chain]    — Start background memecoin monitor (posts alerts)
 //   /memestop              — Stop background monitor
 //   /memestatus            — Monitor status
+//   /memepending           — Show pending approval queue
 // ============
 
+import { ethers } from 'ethers';
+import { sendTransaction, addToWhitelist, getWalletInfo } from './wallet.js';
+import { config } from './config.js';
+import { appendFile } from 'fs/promises';
+import { join } from 'path';
+
 const HTTP_TIMEOUT = 12000;
+const DATA_DIR = process.env.DATA_DIR || './data';
+const MEME_TRADE_LOG = join(DATA_DIR, 'meme-trades.jsonl');
+
+// ============ Uniswap V3 on Base (for meme swaps) ============
+
+const BASE_RPC = 'https://mainnet.base.org';
+const memeProvider = new ethers.JsonRpcProvider(BASE_RPC);
+
+const SWAP_ROUTER = '0x2626664c2603336E57B271c5C0b26F421741e481';
+const QUOTER_V2 = '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a';
+const WETH = '0x4200000000000000000000000000000000000006';
+
+const QUOTER_ABI = [
+  'function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
+];
+const ROUTER_ABI = [
+  'function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)',
+  'function multicall(uint256 deadline, bytes[] data) external payable returns (bytes[] results)',
+];
+const ERC20_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+];
+
+const quoterIface = new ethers.Interface(QUOTER_ABI);
+const routerIface = new ethers.Interface(ROUTER_ABI);
+
+// ============ Pending Approvals (Human-in-the-Loop) ============
+
+const pendingApprovals = new Map(); // callbackId -> { token, scored, ethAmount, expiresAt, messageId, chatId }
+
+// Cleanup expired approvals every 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, approval] of pendingApprovals) {
+    if (now > approval.expiresAt) {
+      pendingApprovals.delete(id);
+    }
+  }
+}, 60_000);
 
 // Chains where GoPlus has GOOD coverage (EVM chains)
 const GOPLUS_SUPPORTED = new Set(['1', '56', '137', '42161', '10', '43114', '8453']);
@@ -235,13 +285,14 @@ export async function getMemeScore(address, chain) {
 let monitorInterval = null;
 let monitorState = { chain: 'base', seenTokens: new Set(), alertCount: 0, startedAt: null };
 
-export function startMemeMonitor(chain, postAlert) {
+export function startMemeMonitor(chain, postAlert, sendTg) {
   if (monitorInterval) {
     return 'Monitor already running. Use /memestop to stop it first.';
   }
 
   const dexChain = resolveDexChain(chain);
   const goplusChain = resolveChainId(chain);
+  const minScore = config.memehunter?.minAlertScore || 55;
   monitorState = { chain: dexChain, seenTokens: new Set(), alertCount: 0, startedAt: Date.now() };
 
   monitorInterval = setInterval(async () => {
@@ -258,7 +309,17 @@ export function startMemeMonitor(chain, postAlert) {
       for (const pair of newPairs.slice(0, 3)) {
         try {
           const scored = await scoreToken(pair, goplusChain);
-          if (scored && scored.score >= 40) {
+          if (!scored) continue;
+
+          // High-scoring tokens: send human-in-the-loop trade alert
+          if (scored.score >= minScore && sendTg) {
+            monitorState.alertCount++;
+            await alertHuman(scored, sendTg);
+            continue;
+          }
+
+          // Medium-scoring tokens: info-only alert (no trade button)
+          if (scored.score >= 40) {
             monitorState.alertCount++;
             const emoji = scored.score >= 70 ? '🟢' : '🟡';
             const tags = [];
@@ -268,7 +329,7 @@ export function startMemeMonitor(chain, postAlert) {
             const tagStr = tags.length > 0 ? ` [${tags.join(' ')}]` : '';
 
             const msg = [
-              `${emoji} NEW TOKEN ALERT (#${monitorState.alertCount})${tagStr}`,
+              `${emoji} NEW TOKEN (#${monitorState.alertCount})${tagStr}`,
               `${scored.name} (${scored.symbol}) — ${scored.score}/100`,
               `Price: ${scored.price} | Liq: ${scored.liquidity} | V/L: ${scored.volLiqRatio.toFixed(1)}x`,
               `Age: ${scored.age} | ${scored.buys} buys / ${scored.sells} sells`,
@@ -291,7 +352,7 @@ export function startMemeMonitor(chain, postAlert) {
     }
   }, 60_000);
 
-  return `Memecoin monitor started on ${dexChain.toUpperCase()}. Checking every 60s. Alerts for tokens scoring 40+. Use /memestop to stop.`;
+  return `Memecoin monitor started on ${dexChain.toUpperCase()}. Checking every 60s.\nTrade alerts for score ≥${minScore} (with approve/reject buttons).\nInfo alerts for score 40-${minScore - 1}.\nUse /memestop to stop.`;
 }
 
 export function stopMemeMonitor() {
@@ -611,6 +672,270 @@ async function fetchDexPair(address) {
   if (pairs.length === 0) return null;
   // Return highest liquidity pair
   return pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+}
+
+// ============ Human-in-the-Loop: Alert → Approve → Execute ============
+
+/**
+ * Send a trade alert to the review chat with approve/reject inline keyboard.
+ * @param {object} scored - Token data from scoreToken()
+ * @param {function} sendTg - (chatId, text, opts) => Promise - sends TG message
+ * @returns {string|null} callback ID if alert sent, null if skipped
+ */
+export async function alertHuman(scored, sendTg) {
+  if (!sendTg) return null;
+
+  const mc = config.memehunter;
+  const chatId = mc.reviewChatId || config.ownerUserId;
+  if (!chatId) return null;
+
+  // Check pending limit
+  if (pendingApprovals.size >= mc.maxPending) return null;
+
+  const ethAmount = mc.maxPositionEth;
+  const callbackId = `meme_${scored.address.slice(2, 10)}_${Date.now()}`;
+
+  // Format alert
+  const scoreEmoji = scored.score >= 70 ? '🟢' : scored.score >= 40 ? '🟡' : '🔴';
+  const tags = [];
+  if (scored.ageMs > 0 && scored.ageMs < 7200000) tags.push('EARLY');
+  if (scored.volLiqRatio >= 2) tags.push('HOT');
+  if (scored.momentum > 0) tags.push('PUMPING');
+  const tagStr = tags.length ? ` [${tags.join(' ')}]` : '';
+
+  const text = [
+    `${scoreEmoji} MEME TRADE ALERT${tagStr}`,
+    ``,
+    `${scored.name} (${scored.symbol}) — ${scored.score}/100`,
+    `Price: ${scored.price} | Liq: ${scored.liquidity}`,
+    `Vol: ${scored.volume} | V/L: ${scored.volLiqRatio.toFixed(1)}x`,
+    `Age: ${scored.age} | ${scored.buys} buys / ${scored.sells} sells`,
+    scored.flags.length > 0 ? `\nFlags: ${scored.flags.join(', ')}` : '',
+    ``,
+    `Proposed: Buy ${ethAmount} ETH worth`,
+    `Address: ${scored.address}`,
+    ``,
+    `Expires in ${Math.round(mc.approvalTimeoutMs / 60000)}min`,
+  ].filter(Boolean).join('\n');
+
+  try {
+    const msg = await sendTg(chatId, text, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '✅ Ape In', callback_data: `meme_approve:${callbackId}` },
+          { text: '❌ Skip', callback_data: `meme_reject:${callbackId}` },
+        ]],
+      },
+    });
+
+    pendingApprovals.set(callbackId, {
+      token: scored.address,
+      symbol: scored.symbol,
+      name: scored.name,
+      scored,
+      ethAmount,
+      expiresAt: Date.now() + mc.approvalTimeoutMs,
+      messageId: msg?.message_id,
+      chatId,
+    });
+
+    return callbackId;
+  } catch (err) {
+    console.error(`[memehunter] Alert send failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Handle approve/reject callback from TG inline keyboard.
+ * @param {string} action - 'meme_approve' or 'meme_reject'
+ * @param {string} callbackId - The callback ID from the alert
+ * @param {function} sendTg - (chatId, text) => Promise
+ * @returns {string} Result message
+ */
+export async function handleMemeCallback(action, callbackId, sendTg) {
+  const approval = pendingApprovals.get(callbackId);
+  if (!approval) return 'Expired or already handled.';
+
+  pendingApprovals.delete(callbackId);
+
+  if (action === 'meme_reject') {
+    return `❌ Skipped ${approval.symbol}`;
+  }
+
+  // action === 'meme_approve'
+  if (sendTg) {
+    await sendTg(approval.chatId, `⏳ Executing swap: ${approval.ethAmount} ETH → ${approval.symbol}...`);
+  }
+
+  const result = await executeMemeSwap(approval.token, approval.ethAmount, approval.scored);
+
+  if (result.error) {
+    const msg = `❌ Trade failed: ${result.error}`;
+    if (sendTg) await sendTg(approval.chatId, msg);
+    return msg;
+  }
+
+  const msg = [
+    `✅ TRADE EXECUTED`,
+    `${approval.ethAmount} ETH → ${approval.symbol}`,
+    `Expected: ~${result.expectedTokens} ${approval.symbol}`,
+    `Fee tier: ${result.feeTier / 10000}%`,
+    `TX: ${result.explorer}`,
+  ].join('\n');
+
+  if (sendTg) await sendTg(approval.chatId, msg);
+  return msg;
+}
+
+/**
+ * Get pending approvals for display.
+ */
+export function getPendingApprovals() {
+  if (pendingApprovals.size === 0) return 'No pending trade alerts.';
+
+  const lines = [`PENDING APPROVALS (${pendingApprovals.size}/${config.memehunter.maxPending})\n`];
+  for (const [id, a] of pendingApprovals) {
+    const remaining = Math.max(0, Math.round((a.expiresAt - Date.now()) / 1000));
+    lines.push(`${a.symbol} — ${a.ethAmount} ETH — ${remaining}s remaining`);
+    lines.push(`  Score: ${a.scored.score}/100 | ${a.token.slice(0, 10)}...`);
+  }
+  return lines.join('\n');
+}
+
+// ============ Trade Execution: ETH → Meme Token via Uniswap V3 ============
+
+/**
+ * Find the best fee tier for a token pair by trying quotes.
+ */
+async function findBestFeeTier(tokenAddress, amountIn) {
+  const feeTiers = config.memehunter.feeTiers;
+  let bestQuote = null;
+  let bestFee = null;
+
+  for (const fee of feeTiers) {
+    try {
+      const calldata = quoterIface.encodeFunctionData('quoteExactInputSingle', [{
+        tokenIn: WETH,
+        tokenOut: tokenAddress,
+        amountIn,
+        fee,
+        sqrtPriceLimitX96: 0n,
+      }]);
+
+      const result = await memeProvider.call({ to: QUOTER_V2, data: calldata });
+      const decoded = quoterIface.decodeFunctionResult('quoteExactInputSingle', result);
+      const amountOut = decoded[0];
+
+      if (!bestQuote || amountOut > bestQuote) {
+        bestQuote = amountOut;
+        bestFee = fee;
+      }
+    } catch {
+      // This fee tier doesn't have a pool — skip
+    }
+  }
+
+  return bestQuote ? { amountOut: bestQuote, fee: bestFee } : null;
+}
+
+/**
+ * Execute a swap: ETH → meme token on Uniswap V3 (Base).
+ */
+async function executeMemeSwap(tokenAddress, ethAmount, scored) {
+  const walletInfo = getWalletInfo();
+  if (!walletInfo.address) return { error: 'Wallet not initialized.' };
+  if (walletInfo.unlocked === false) return { error: 'Wallet locked. Unlock first.' };
+
+  const amountWei = ethers.parseEther(ethAmount.toString());
+
+  // Find best pool
+  const quote = await findBestFeeTier(tokenAddress, amountWei);
+  if (!quote) return { error: `No Uniswap V3 pool found for ${scored?.symbol || tokenAddress.slice(0, 10)}` };
+
+  // Get token decimals for display
+  let decimals = 18;
+  try {
+    const token = new ethers.Contract(tokenAddress, ERC20_ABI, memeProvider);
+    decimals = await token.decimals();
+  } catch { /* default 18 */ }
+
+  const slippageBps = config.memehunter.slippageBps;
+  const minOut = quote.amountOut * BigInt(10000 - slippageBps) / 10000n;
+  const expectedTokens = Number(quote.amountOut) / (10 ** Number(decimals));
+
+  // Whitelist router
+  addToWhitelist(SWAP_ROUTER);
+
+  // Encode swap
+  const swapCalldata = routerIface.encodeFunctionData('exactInputSingle', [{
+    tokenIn: WETH,
+    tokenOut: tokenAddress,
+    fee: quote.fee,
+    recipient: walletInfo.address,
+    amountIn: amountWei,
+    amountOutMinimum: minOut,
+    sqrtPriceLimitX96: 0n,
+  }]);
+
+  const deadline = Math.floor(Date.now() / 1000) + 120;
+  const data = routerIface.encodeFunctionData('multicall', [deadline, [swapCalldata]]);
+
+  // Estimate USD value for spending limit check
+  let ethPrice = 2000;
+  try {
+    const priceQuote = quoterIface.encodeFunctionData('quoteExactInputSingle', [{
+      tokenIn: WETH,
+      tokenOut: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+      amountIn: ethers.parseEther('1'),
+      fee: 500,
+      sqrtPriceLimitX96: 0n,
+    }]);
+    const priceResult = await memeProvider.call({ to: QUOTER_V2, data: priceQuote });
+    const priceDecoded = quoterIface.decodeFunctionResult('quoteExactInputSingle', priceResult);
+    ethPrice = Number(priceDecoded[0]) / 1e6;
+  } catch { /* use default */ }
+
+  const usdValue = parseFloat(ethAmount) * ethPrice;
+
+  const result = await sendTransaction({
+    to: SWAP_ROUTER,
+    value: ethAmount.toString(),
+    data,
+    chain: 'base',
+    usdValue,
+  });
+
+  if (result.error) return result;
+
+  // Log the meme trade
+  const trade = {
+    timestamp: new Date().toISOString(),
+    type: 'meme_buy',
+    tokenAddress,
+    symbol: scored?.symbol || '?',
+    name: scored?.name || '?',
+    ethIn: ethAmount.toString(),
+    expectedTokens: expectedTokens.toFixed(4),
+    feeTier: quote.fee,
+    score: scored?.score || 0,
+    txHash: result.hash,
+    ethPrice,
+    usdValue: usdValue.toFixed(2),
+  };
+
+  try {
+    await appendFile(MEME_TRADE_LOG, JSON.stringify(trade) + '\n');
+  } catch (err) {
+    console.warn(`[memehunter] Trade log failed: ${err.message}`);
+  }
+
+  return {
+    ...result,
+    trade,
+    expectedTokens: expectedTokens.toFixed(4),
+    feeTier: quote.fee,
+  };
 }
 
 // ============ Formatters ============

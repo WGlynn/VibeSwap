@@ -62,20 +62,11 @@ Each layer progressively narrows the attacker's capability until it reaches zero
 
 **Attack it prevents:** Free reordering. Without a cost floor, anyone can submit competing state transitions at negligible cost.
 
-On CKB, state lives in cells. The auction cell's **lock script** requires proof-of-work to consume. You want to update the auction state? Solve a SHA-256 puzzle first.
+The auction cell's **lock script** requires proof-of-work to consume. Difficulty adjusts dynamically — high-volume pairs see difficulty rise until PoW cost exceeds extractable value. Low-volume pairs stay cheap. Self-balancing economics enforced by thermodynamics, not protocol rules.
 
-```
-PoWLockArgs {
-    pair_id: [u8; 32],       // Identifies the trading pair
-    min_difficulty: u8,       // Minimum difficulty (bits of leading zeros)
-}
-```
+**Without this layer:** Write access defaults to native transaction ordering. The miner becomes a centralized sequencer — functionally identical to the problem we are solving.
 
-The difficulty adjusts dynamically. High-volume trading pairs where MEV extraction would be profitable see difficulty rise until the PoW cost exceeds the extractable value. Low-volume pairs stay cheap. The economics are self-balancing — enforced by thermodynamics, not by protocol rules that can be gamed.
-
-**Without this layer:** Write access defaults to CKB's native transaction ordering. Whichever transaction the miner includes first wins. The miner becomes a centralized sequencer with full control over participation — functionally identical to the exact problem we are trying to solve.
-
-**The key property:** PoW creates a cost floor for ordering manipulation that scales with the value at stake. This cost is enforced by energy expenditure, not by validator collusion or MEV auctions.
+**Key property:** PoW creates a cost floor that scales with value at stake, enforced by energy expenditure, not validator collusion.
 
 ---
 
@@ -228,8 +219,6 @@ The fundamental difference is structural versus economic. EVM defenses rely on e
 
 ## Implementation Architecture
 
-The implementation maps cleanly to CKB's script model:
-
 ```
 Auction Cell:
   Lock Script:  pow-lock            (Layer 1)
@@ -242,15 +231,9 @@ Commit Cell (per user):
   Data:         hash(order || secret), deposit amount, batch ID
 ```
 
-Transaction flow per 10-second batch:
+**Commit (8s):** Users create personal commit cells (zero contention). PoW miners aggregate into shared auction cell. **Reveal (2s):** Users reveal orders/secrets. Invalid reveals trigger 50% slashing. **Settlement:** Type script computes XOR seed, Fisher-Yates shuffle, uniform clearing price, verifies fills, distributes tokens.
 
-**Commit Phase (8s):** Each user creates a personal commit cell. No contention — every user writes to their own cell. PoW miners compete to aggregate commit cells into the shared auction cell.
-
-**Reveal Phase (2s):** Users reveal orders and secrets via reveal cells. Miners aggregate reveals. Type script validates hash matches. Invalid reveals trigger 50% slashing.
-
-**Settlement:** Miner submits settlement transaction. Type script computes `seed = XOR(all secrets)`, performs Fisher-Yates shuffle, computes uniform clearing price, verifies all fills, distributes tokens.
-
-Multiple auction cells run concurrently — one per trading pair. Each is an independent PoW mini-chain settled on CKB L1. They share no state. The system scales horizontally.
+Multiple auction cells run concurrently — one per pair, independent PoW mini-chains. Horizontal scaling.
 
 ---
 

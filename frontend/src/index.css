@@ -50,9 +50,11 @@
    ============================================ */
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
+  overflow-x: hidden;
   background: var(--black-900);
   color: var(--text-primary);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;

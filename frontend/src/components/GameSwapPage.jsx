@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBatchState } from '../hooks/useBatchState'
 import TradingPost from './TradingPost'
 import Inventory from './Inventory'
@@ -24,7 +25,9 @@ function useSoundEffects(enabled) {
 }
 
 function GameSwapPage() {
-  const { isConnected, connect, isConnecting } = useWallet()
+  const { isConnected: isExternalConnected, connect, isConnecting } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const { phase, PHASES } = useBatchState()
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [showMobileInventory, setShowMobileInventory] = useState(false)

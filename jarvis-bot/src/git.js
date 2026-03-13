@@ -110,6 +110,61 @@ export async function gitCommitAndPush(message) {
   });
 }
 
+export async function gitPush() {
+  if (!git) return NO_REPO;
+  return withGitLock(async () => {
+    try {
+      const status = await git.status();
+      if (status.conflicted.length > 0) {
+        console.error(`[git] Cannot push — conflicts detected`);
+        await git.reset(['--hard', 'HEAD']);
+        return 'Cannot push — conflicts found and reset. Try again.';
+      }
+
+      // Stage all changes
+      await git.add('-A');
+
+      // Push to all configured remotes
+      await git.push(config.repo.remoteOrigin, 'master');
+      try {
+        await git.push(config.repo.remoteStealth, 'master');
+      } catch (stealthErr) {
+        console.warn(`[git] Stealth push failed (non-fatal): ${stealthErr.message}`);
+      }
+      await pushMirrors('master');
+
+      return 'Pushed to both remotes (origin + stealth).';
+    } catch (error) {
+      console.error(`[git] Push failed: ${error.message}`);
+      return `Push failed: ${error.message}`;
+    }
+  });
+}
+
+export async function gitStatusShort() {
+  if (!git) return NO_REPO;
+  return withGitLock(async () => {
+    try {
+      const result = await git.raw(['status', '--short']);
+      return result.trim() || 'Working tree clean.';
+    } catch (error) {
+      return `git status failed: ${error.message}`;
+    }
+  });
+}
+
+export async function gitLogOneline(count = 10) {
+  if (!git) return NO_REPO;
+  return withGitLock(async () => {
+    try {
+      const result = await git.raw(['log', '--oneline', `-${count}`]);
+      return result.trim() || 'No commits found.';
+    } catch (error) {
+      return `git log failed: ${error.message}`;
+    }
+  });
+}
+
 export async function gitLog(count = 5) {
   if (!git) return NO_REPO;
   return withGitLock(async () => {

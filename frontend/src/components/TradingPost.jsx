@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBatchState } from '../hooks/useBatchState'
 
 // Token rarity tiers (like item quality in games)
@@ -21,7 +22,9 @@ const TIER_LABELS = {
 
 // The main trading interface - feels like a Grand Exchange
 function TradingPost() {
-  const { isConnected } = useWallet()
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const { phase, timeLeft, batchQueue, PHASES } = useBatchState()
 
   const [offering, setOffering] = useState({ token: 'ETH', amount: '' })

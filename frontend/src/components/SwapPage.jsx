@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useBatchState } from '../hooks/useBatchState'
 import TokenSelector from './TokenSelector'
 import BatchTimer from './BatchTimer'
@@ -31,7 +32,9 @@ const TOKENS = {
 function SwapPage() {
   const [searchParams] = useSearchParams()
   const isDemo = searchParams.get('demo') === 'true'
-  const { isConnected, connect } = useWallet()
+  const { isConnected: isExternalConnected, connect } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const {
     phase,
     commitOrder,

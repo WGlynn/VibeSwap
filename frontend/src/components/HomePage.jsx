@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 
 // ============ Constants ============
 const PHI = 1.618033988749895
@@ -209,7 +210,9 @@ function ProtocolPulse() {
 
 // ============ Main Component ============
 function HomePage() {
-  const { isConnected, connect, isConnecting } = useWallet()
+  const { isConnected: isExternalConnected, connect, isConnecting } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
 

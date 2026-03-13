@@ -161,24 +161,17 @@ function CurrentBatch() {
 
       {/* Batch Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {[
-          { label: 'Orders', value: orderCount, icon: '~', color: '#3b82f6' },
+        {[{ label: 'Orders', value: orderCount, icon: '~', color: '#3b82f6' },
           { label: 'Volume', value: `$${Number(totalVolume).toLocaleString()}`, icon: '$', color: '#22c55e' },
           { label: 'Priority Bids', value: totalBidsInBatch, icon: '#', color: PURPLE },
           { label: 'Highest Bid', value: `${highestBid} JUL`, icon: '^', color: '#f59e0b' },
         ].map((metric, i) => (
-          <motion.div
-            key={metric.label}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <motion.div key={metric.label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 + i * (0.06 * PHI), duration: 0.3 }}
             className="rounded-lg p-3 text-center"
-            style={{ background: `${metric.color}06`, border: `1px solid ${metric.color}15` }}
-          >
+            style={{ background: `${metric.color}06`, border: `1px solid ${metric.color}15` }}>
             <div className="w-6 h-6 rounded-md mx-auto mb-1.5 flex items-center justify-center text-[10px] font-mono font-bold"
-              style={{ background: `${metric.color}12`, color: metric.color }}>
-              {metric.icon}
-            </div>
+              style={{ background: `${metric.color}12`, color: metric.color }}>{metric.icon}</div>
             <p className="text-sm font-mono font-bold" style={{ color: metric.color }}>{metric.value}</p>
             <p className="text-[8px] font-mono text-black-500 uppercase tracking-wider mt-0.5">{metric.label}</p>
           </motion.div>
@@ -202,23 +195,15 @@ function BidPlacement({ isConnected }) {
     const estimatedPosition = Math.max(1, Math.ceil(12 - amount * 2.2 + r() * 2))
     const totalBidders = 11 + Math.floor(r() * 6)
     const percentile = Math.max(1, Math.min(99, Math.floor((1 - estimatedPosition / totalBidders) * 100)))
-    const expectedSavings = (amount * 0.3 + r() * amount * 0.5).toFixed(2)
-    const costPerPosition = (amount / Math.max(1, totalBidders - estimatedPosition + 1)).toFixed(3)
-    const breakEvenSlippage = (0.1 + amount * 0.08).toFixed(2)
-
-    return {
-      estimatedPosition,
-      totalBidders,
-      percentile,
-      expectedSavings,
-      costPerPosition,
-      breakEvenSlippage,
-      efficiency: percentile > 70 ? 'high' : percentile > 40 ? 'medium' : 'low',
-    }
+    return { estimatedPosition, totalBidders, percentile,
+      expectedSavings: (amount * 0.3 + r() * amount * 0.5).toFixed(2),
+      costPerPosition: (amount / Math.max(1, totalBidders - estimatedPosition + 1)).toFixed(3),
+      breakEvenSlippage: (0.1 + amount * 0.08).toFixed(2),
+      efficiency: percentile > 70 ? 'high' : percentile > 40 ? 'medium' : 'low' }
   }, [bidAmount])
 
-  const efficiencyColors = { high: '#22c55e', medium: '#f59e0b', low: '#ef4444' }
-  const efficiencyLabels = { high: 'Efficient', medium: 'Moderate', low: 'Expensive' }
+  const effColors = { high: '#22c55e', medium: '#f59e0b', low: '#ef4444' }
+  const effLabels = { high: 'Efficient', medium: 'Moderate', low: 'Expensive' }
 
   return (
     <div>
@@ -280,12 +265,12 @@ function BidPlacement({ isConnected }) {
             <span
               className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full"
               style={{
-                background: `${efficiencyColors[analysis.efficiency]}10`,
-                border: `1px solid ${efficiencyColors[analysis.efficiency]}30`,
-                color: efficiencyColors[analysis.efficiency],
+                background: `${effColors[analysis.efficiency]}10`,
+                border: `1px solid ${effColors[analysis.efficiency]}30`,
+                color: effColors[analysis.efficiency],
               }}
             >
-              {efficiencyLabels[analysis.efficiency]}
+              {effLabels[analysis.efficiency]}
             </span>
           </div>
 
@@ -321,7 +306,7 @@ function BidPlacement({ isConnected }) {
             <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
               <div className="h-full rounded-full" style={{
                 width: `${analysis.percentile}%`,
-                background: `linear-gradient(90deg, ${PURPLE}80, ${efficiencyColors[analysis.efficiency]})`,
+                background: `linear-gradient(90deg, ${PURPLE}80, ${effColors[analysis.efficiency]})`,
               }} />
             </div>
           </div>
@@ -363,48 +348,34 @@ function BidHistory() {
   const history = useMemo(() => generateBidHistory(12), [])
   const [visibleCount, setVisibleCount] = useState(6)
 
-  const outcomeStyles = {
-    filled: { color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' },
+  const outcomeStyles = { filled: { color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' },
     partial: { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
-    missed: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' },
-  }
+    missed: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' } }
 
   return (
     <div>
       {/* Table Header */}
       <div className="grid grid-cols-[0.7fr_0.8fr_0.6fr_0.6fr_0.6fr] gap-2 px-3 mb-2">
-        <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider">Batch</span>
-        <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider">Bid</span>
-        <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider text-center">Priority</span>
-        <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider text-center">Outcome</span>
-        <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider text-right">Time</span>
+        {['Batch', 'Bid', 'Priority', 'Outcome', 'Time'].map((h, i) => (
+          <span key={h} className={`text-[9px] font-mono text-black-500 uppercase tracking-wider ${i === 2 || i === 3 ? 'text-center' : i === 4 ? 'text-right' : ''}`}>{h}</span>
+        ))}
       </div>
 
       {/* Table Rows */}
       <div className="space-y-1.5">
         {history.slice(0, visibleCount).map((row, i) => {
-          const style = outcomeStyles[row.outcome]
+          const os = outcomeStyles[row.outcome]
           return (
-            <motion.div
-              key={row.batchId}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
+            <motion.div key={row.batchId} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * (0.04 * PHI), duration: 0.3, ease }}
               className="grid grid-cols-[0.7fr_0.8fr_0.6fr_0.6fr_0.6fr] gap-2 items-center rounded-lg px-3 py-2.5"
-              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)' }}
-            >
+              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)' }}>
               <span className="text-[10px] font-mono text-white font-bold">#{row.batchId}</span>
               <span className="text-[10px] font-mono" style={{ color: PURPLE }}>{row.bidAmount} JUL</span>
-              <span className="text-[10px] font-mono text-center" style={{ color: CYAN }}>
-                #{row.priority}<span className="text-black-500">/{row.totalBids}</span>
-              </span>
+              <span className="text-[10px] font-mono text-center" style={{ color: CYAN }}>#{row.priority}<span className="text-black-500">/{row.totalBids}</span></span>
               <div className="flex justify-center">
-                <span
-                  className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: style.bg, border: `1px solid ${style.border}`, color: style.color }}
-                >
-                  {row.outcome}
-                </span>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ background: os.bg, border: `1px solid ${os.border}`, color: os.color }}>{row.outcome}</span>
               </div>
               <span className="text-[10px] font-mono text-black-500 text-right">{row.timestamp}</span>
             </motion.div>
@@ -425,8 +396,7 @@ function BidHistory() {
 
       {/* Summary */}
       <div className="mt-3 grid grid-cols-3 gap-2">
-        {[
-          { label: 'Total Bids', value: history.length, color: PURPLE },
+        {[{ label: 'Total Bids', value: history.length, color: PURPLE },
           { label: 'Fill Rate', value: `${Math.round((history.filter((h) => h.outcome === 'filled').length / history.length) * 100)}%`, color: '#22c55e' },
           { label: 'Avg Priority', value: `#${Math.round(history.reduce((s, h) => s + h.priority, 0) / history.length)}`, color: CYAN },
         ].map((stat) => (
@@ -559,18 +529,12 @@ function Statistics() {
       {/* Primary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         {cards.map((card, i) => (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <motion.div key={card.label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * (0.06 * PHI), duration: 0.3 }}
             className="rounded-xl p-3 text-center"
-            style={{ background: `${card.color}06`, border: `1px solid ${card.color}15` }}
-          >
+            style={{ background: `${card.color}06`, border: `1px solid ${card.color}15` }}>
             <div className="w-7 h-7 rounded-md mx-auto mb-1.5 flex items-center justify-center text-[10px] font-mono font-bold"
-              style={{ background: `${card.color}12`, color: card.color }}>
-              {card.icon}
-            </div>
+              style={{ background: `${card.color}12`, color: card.color }}>{card.icon}</div>
             <p className="text-sm font-mono font-bold" style={{ color: card.color }}>{card.value}</p>
             <p className="text-[8px] font-mono text-black-500 uppercase tracking-wider mt-0.5">{card.label}</p>
           </motion.div>
@@ -580,20 +544,15 @@ function Statistics() {
       {/* Secondary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {secondaryCards.map((card, i) => (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
+          <motion.div key={card.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 + i * (0.05 * PHI), duration: 0.3 }}
             className="rounded-lg p-2.5 text-center"
-            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)' }}
-          >
+            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)' }}>
             <p className="text-xs font-mono font-bold" style={{ color: card.color }}>{card.value}</p>
             <p className="text-[8px] font-mono text-black-500 uppercase tracking-wider mt-0.5">{card.label}</p>
           </motion.div>
         ))}
       </div>
-
       {/* MEV Capture Visual */}
       <div className="mt-4 rounded-xl p-4" style={{ background: `${CYAN}04`, border: `1px solid ${CYAN}12` }}>
         <div className="flex items-center justify-between mb-2">

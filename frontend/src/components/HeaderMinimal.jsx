@@ -272,6 +272,11 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/faq', label: 'FAQ', icon: '?' },
       { path: '/changelog', label: 'Changelog', icon: '📝' },
       { path: '/about', label: 'About', icon: 'i' },
+      { path: '/partners', label: 'Partners', icon: '🤝' },
+      { path: '/brand', label: 'Brand', icon: '🎨' },
+      { path: '/careers', label: 'Careers', icon: '💼' },
+      { path: '/legal', label: 'Legal', icon: '📄' },
+      { path: '/contact', label: 'Contact', icon: '✉️' },
     ]},
   ]
 

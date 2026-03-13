@@ -54,6 +54,7 @@ const COLUMNS = [
       { to: '/philosophy', label: 'Philosophy' },
       { to: '/faq', label: 'FAQ' },
       { to: '/research', label: 'Research' },
+      { to: '/api', label: 'API Docs' },
     ],
   },
   {
@@ -123,6 +124,8 @@ export default function Footer() {
               className="text-[10px] font-mono text-black-500 hover:text-white transition-colors">Telegram</a>
             <Link to="/about" className="text-[10px] font-mono text-black-500 hover:text-white transition-colors">About</Link>
             <Link to="/changelog" className="text-[10px] font-mono text-black-500 hover:text-white transition-colors">Changelog</Link>
+            <Link to="/legal" className="text-[10px] font-mono text-black-500 hover:text-white transition-colors">Legal</Link>
+            <Link to="/careers" className="text-[10px] font-mono text-black-500 hover:text-white transition-colors">Careers</Link>
           </div>
 
           <p className="text-[9px] font-mono text-black-700">

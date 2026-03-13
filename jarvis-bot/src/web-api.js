@@ -103,8 +103,19 @@ setInterval(() => {
 // ============ Telegram initData HMAC Validation ============
 
 function validateTelegramInitData(initData) {
-  const botToken = config.telegram?.token;
-  if (!botToken) return false; // Fail-closed: reject if bot token not configured
+  // Support multiple bot tokens — main bot + shard bots all need valid initData
+  // SHARD_BOT_TOKENS env var: comma-separated list of additional bot tokens
+  const tokens = [config.telegram?.token];
+  if (process.env.SHARD_BOT_TOKENS) {
+    tokens.push(...process.env.SHARD_BOT_TOKENS.split(',').map(t => t.trim()).filter(Boolean));
+  }
+  // Also add chatterbox token if configured
+  if (process.env.CHATTERBOX_BOT_TOKEN) {
+    tokens.push(process.env.CHATTERBOX_BOT_TOKEN.trim());
+  }
+
+  const validTokens = tokens.filter(Boolean);
+  if (validTokens.length === 0) return false; // Fail-closed: reject if no tokens configured
 
   try {
     const params = new URLSearchParams(initData);
@@ -115,10 +126,15 @@ function validateTelegramInitData(initData) {
     const entries = [...params.entries()].sort(([a], [b]) => a.localeCompare(b));
     const dataCheckString = entries.map(([k, v]) => `${k}=${v}`).join('\n');
 
-    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const computed = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+    // Try each token — initData is signed by whichever bot launched the Mini App
+    for (const botToken of validTokens) {
+      const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+      const computed = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+      if (computed === hash) return true;
+    }
 
-    return computed === hash;
+    console.warn(`[web-api] initData validation failed against ${validTokens.length} token(s)`);
+    return false;
   } catch {
     return false;
   }
@@ -626,6 +642,13 @@ export async function handleWebRequest(req, res, pathname) {
           return true;
         }
         authenticatedUserId = `wallet:${wallet}`;
+      } else if (userId && userId.startsWith('mobile-') && /^mobile-[0-9a-f]{16}$/.test(userId)) {
+        // Path 3: Mobile shard ID fallback — when Mini App SDK doesn't provide initData
+        // (e.g., opened via direct link, or TG SDK failed to load).
+        // Accept the mobile shard ID as identity. Rate limiting per IP prevents abuse.
+        // These proofs can be linked to a Telegram account later via /linkminer.
+        authenticatedUserId = userId;
+        console.log(`[web-api] Mining with mobile shard ID fallback: ${userId} (IP: ${ip})`);
       } else {
         jsonResponse(res, 403, { error: 'Authentication required: provide initData (Telegram) or walletAddress (web)' });
         return true;
@@ -653,7 +676,7 @@ export async function handleWebRequest(req, res, pathname) {
       const result = submitProof(authenticatedUserId, nonce, hash, challenge);
       const status = result.accepted ? 200 : 400;
       if (!result.accepted) {
-        console.log(`[mining] Proof rejected for ${authenticatedUserId}: ${result.reason || 'unknown'} (IP: ${ip})`);
+        console.log(`[mining] Proof REJECTED: user=${authenticatedUserId} reason=${result.reason || 'unknown'} details=${JSON.stringify(result.details || {})} challenge_match=${challenge === state?.challenge} IP=${ip}`);
       }
       jsonResponse(res, status, result);
     } catch (err) {

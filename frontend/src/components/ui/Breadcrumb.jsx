@@ -148,6 +148,9 @@ const ROUTE_LABELS = {
   rebalance: 'Rebalancer',
   'lp-optimizer': 'LP Optimizer',
   claims: 'Airdrop Claims',
+  sentiment: 'Market Sentiment',
+  priority: 'Priority Auction',
+  compare: 'Protocol Comparison',
 }
 
 export default function Breadcrumb({ className = '' }) {

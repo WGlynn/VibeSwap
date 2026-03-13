@@ -74,6 +74,7 @@ const COLUMNS = [
       { to: '/research', label: 'Research' },
       { to: '/api', label: 'API Docs' },
       { to: '/education', label: 'Education' },
+      { to: '/compare', label: 'Comparison' },
     ],
   },
   {

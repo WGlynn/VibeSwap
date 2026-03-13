@@ -63,6 +63,7 @@ contract DAOTreasuryTest is Test {
     address public owner;
     address public feeSender;
     address public recipient;
+    address public guardian;
 
     event ProtocolFeesReceived(
         address indexed token,
@@ -94,6 +95,7 @@ contract DAOTreasuryTest is Test {
         owner = address(this);
         feeSender = makeAddr("feeSender");
         recipient = makeAddr("recipient");
+        guardian = makeAddr("guardian");
 
         // Deploy tokens
         tokenA = new MockERC20("Token A", "TKA");
@@ -129,6 +131,9 @@ contract DAOTreasuryTest is Test {
 
         // Fund treasury with ETH
         vm.deal(address(treasury), 10 ether);
+
+        // Configure emergency guardian (required for emergency withdrawals)
+        treasury.setEmergencyGuardian(guardian);
     }
 
     // ============ Initialization Tests ============
@@ -372,11 +377,16 @@ contract DAOTreasuryTest is Test {
         assertEq(executeAfter, block.timestamp + 6 hours);
         assertFalse(executed);
         assertFalse(cancelled);
-        assertTrue(guardianApproved); // no guardian set, auto-approved
+        assertFalse(guardianApproved); // guardian must explicitly approve
     }
 
     function test_executeEmergencyWithdraw_token() public {
         uint256 emergencyId = treasury.queueEmergencyWithdraw(address(tokenA), recipient, 50 ether);
+
+        // Guardian approves
+        vm.prank(guardian);
+        treasury.approveEmergencyWithdraw(emergencyId);
+
         vm.warp(block.timestamp + 6 hours + 1);
 
         uint256 balanceBefore = tokenA.balanceOf(recipient);
@@ -386,6 +396,11 @@ contract DAOTreasuryTest is Test {
 
     function test_executeEmergencyWithdraw_eth() public {
         uint256 emergencyId = treasury.queueEmergencyWithdraw(address(0), recipient, 5 ether);
+
+        // Guardian approves
+        vm.prank(guardian);
+        treasury.approveEmergencyWithdraw(emergencyId);
+
         vm.warp(block.timestamp + 6 hours + 1);
 
         uint256 balanceBefore = recipient.balance;

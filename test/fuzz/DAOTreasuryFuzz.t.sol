@@ -41,11 +41,13 @@ contract DAOTreasuryFuzzTest is Test {
     address public owner;
     address public feeSender;
     address public recipient;
+    address public guardian;
 
     function setUp() public {
         owner = address(this);
         feeSender = makeAddr("feeSender");
         recipient = makeAddr("recipient");
+        guardian = makeAddr("guardian");
 
         token = new MockTreasuryFToken("USDC", "USDC");
         mockAMM = new MockTreasuryFAMM();
@@ -60,6 +62,9 @@ contract DAOTreasuryFuzzTest is Test {
         treasury = DAOTreasury(payable(address(proxy)));
 
         treasury.setAuthorizedFeeSender(feeSender, true);
+
+        // Configure emergency guardian (required for emergency withdrawals)
+        treasury.setEmergencyGuardian(guardian);
     }
 
     // ============ Fuzz: fees accumulate correctly ============
@@ -159,6 +164,10 @@ contract DAOTreasuryFuzzTest is Test {
         // Cannot execute before emergency timelock
         vm.expectRevert("Emergency timelock active");
         treasury.executeEmergencyWithdraw(emergencyId);
+
+        // Guardian approves
+        vm.prank(guardian);
+        treasury.approveEmergencyWithdraw(emergencyId);
 
         // Warp past 6-hour emergency timelock
         vm.warp(block.timestamp + 6 hours + 1);

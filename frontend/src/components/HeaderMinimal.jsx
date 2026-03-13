@@ -270,6 +270,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/dao-tools', label: 'DAO Tools', icon: '🛠' },
       { path: '/delegate', label: 'Delegate', icon: '🗳' },
       { path: '/competitions', label: 'Competitions', icon: '🏆' },
+      { path: '/contributors', label: 'Contributors', icon: '⭐' },
     ]},
     { label: 'Intelligence', items: [
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
@@ -311,6 +312,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/migrate', label: 'Migration', icon: '🔄' },
       { path: '/health', label: 'Protocol Health', icon: '💚' },
       { path: '/fee-calculator', label: 'Fee Calculator', icon: '🧮' },
+      { path: '/mev', label: 'MEV Dashboard', icon: '🛡' },
       { path: '/about', label: 'About', icon: 'i' },
       { path: '/partners', label: 'Partners', icon: '🤝' },
       { path: '/brand', label: 'Brand', icon: '🎨' },
@@ -466,6 +468,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             { path: '/approvals', label: 'Approvals', icon: '✅' },
             { path: '/streaks', label: 'Streaks', icon: '🔥' },
             { path: '/vesting', label: 'Vesting', icon: '🔐' },
+            { path: '/multichain', label: 'Multi-Chain', icon: '🌐' },
           ].map((item) => (
             <Link
               key={item.path}

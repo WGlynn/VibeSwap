@@ -133,6 +133,9 @@ const ROUTE_LABELS = {
   streaks: 'Streaks',
   health: 'Protocol Health',
   'fee-calculator': 'Fee Calculator',
+  mev: 'MEV Dashboard',
+  contributors: 'Contributors',
+  multichain: 'Multi-Chain',
 }
 
 export default function Breadcrumb({ className = '' }) {

@@ -22,7 +22,7 @@ import { getRecentContext } from './group-context.js';
 import { recordUsage } from './compute-economics.js';
 import { getActivePersonaId, getResponseModifier } from './persona.js';
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -175,8 +175,8 @@ async function autonomousTick() {
 
       const silence = now - activity.lastMessage;
       if (silence > timings.quietThreshold && silence < timings.maxQuietWindow) {
-        // 25% chance to skip — "nah, not feeling it right now"
-        if (Math.random() < 0.25) {
+        // 50% chance to skip — less spam, more signal
+        if (Math.random() < 0.50) {
           console.log(`[autonomous] Editorial skip — decided not to break silence in ${chatId}`);
           continue;
         }
@@ -386,16 +386,32 @@ async function generateBoredomMessage(chatId, silenceMs) {
     const persona = getActivePersonaId();
     const minutesQuiet = Math.round(silenceMs / 60000);
 
+    // Load DID registry for grounded topics
+    let didTopic = null;
+    try {
+      const didPath = join(process.env.DATA_DIR || './data', 'did-registry.json');
+      if (existsSync(didPath)) {
+        const reg = JSON.parse(readFileSync(didPath, 'utf8'));
+        const hotEntries = Object.entries(reg.entries || {}).filter(([_, e]) => e.tier === 'HOT');
+        if (hotEntries.length) {
+          const [did, entry] = hotEntries[Math.floor(Math.random() * hotEntries.length)];
+          didTopic = `${entry.title}: ${entry.description}`;
+        }
+      }
+    } catch { /* no registry */ }
+
     const boredomPrompts = persona === 'degen'
       ? [
-        `Ask the group a question about THEM — their bags, their trades, their opinions. Something easy and fun to answer. 1 sentence. Do NOT mention silence. Do NOT share your own thoughts. ASK something.`,
-        `Drop a "would you rather" or "which one and why" question about crypto. Make it fun and low-effort to answer. 1 sentence. No silence commentary.`,
-        `Ask something personal but crypto-related. "what is your most controversial portfolio position rn" energy. 1 sentence. Make THEM the subject, not you.`,
+        didTopic
+          ? `Share a SHORT provocative insight grounded in: "${didTopic}". Make it specific and technical. 1-2 sentences. End with something that baits a reply.`
+          : `Share a specific technical observation about DeFi mechanisms — commit-reveal, MEV, bonding curves, Shapley value. NOT a generic question. 1-2 sentences. Make it opinionated.`,
+        `React to something from the recent conversation with a sharp, specific take. NOT a generic question like "what do you think?" — give YOUR take and let people disagree. 1-2 sentences.`,
       ]
       : [
-        `Ask the group a question about their experience — trading habits, portfolio strategy, tool preferences, unpopular opinions. Make it easy to answer. 1 sentence. Do NOT comment on silence.`,
-        `Drop a close-ended question that invites quick replies. "does anyone actually use stop losses in DeFi or is that just a CEX thing" energy. 1 sentence. Reader-focused.`,
-        `Ask something that makes people want to share their own take. Not a philosophical question — a practical one about their actual experience. 1 sentence.`,
+        didTopic
+          ? `Share a SHORT insight grounded in: "${didTopic}". Be specific and technical. 1-2 sentences. Frame it as a surprising fact or counterintuitive observation.`
+          : `Share a specific observation about a DeFi mechanism, protocol design pattern, or game theory concept. NOT a generic engagement question. 1-2 sentences. Be opinionated.`,
+        `React to something from the recent conversation with a thoughtful, specific insight. Add context or a counterpoint. NOT a generic "what do you guys think?" question. 1-2 sentences.`,
       ];
 
     const prompt = boredomPrompts[Math.floor(Math.random() * boredomPrompts.length)];

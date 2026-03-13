@@ -1,0 +1,987 @@
+{
+  "version": 1,
+  "method": "did:jarvis",
+  "updated": "2026-03-13T17:38:04.279567+00:00",
+  "entries": {
+    "did:jarvis:project:ddf4bb34": {
+      "title": "Augmented Bonding Curves (ABC) — Knowledge Base",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "abc",
+        "augmented",
+        "base",
+        "bonding",
+        "curve",
+        "curves",
+        "feedback",
+        "funding",
+        "inter",
+        "knowledge"
+      ],
+      "refs": [],
+      "description": "An Augmented Bonding Curve = standard bonding curve + **funding pool** + **token vesting** + **inter"
+    },
+    "did:jarvis:project:41db37b6": {
+      "title": "Autopilot Work Loop Protocol (NEVER LOSE)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "asking",
+        "autopilot",
+        "continuously",
+        "execute",
+        "full",
+        "loop",
+        "lose",
+        "mode",
+        "never",
+        "permissio"
+      ],
+      "refs": [],
+      "description": "When Will says \"autopilot\" or \"full autopilot mode\", execute this loop continuously without stopping"
+    },
+    "did:jarvis:reference:d3698ea5": {
+      "title": "Build Recommendations — Session Log",
+      "type": "reference",
+      "tier": "COLD",
+      "tags": [
+        "build",
+        "building",
+        "captured",
+        "end",
+        "first",
+        "log",
+        "recent",
+        "recommendations",
+        "session"
+      ],
+      "refs": [],
+      "description": "Captured at end of each building session. Most recent first."
+    },
+    "did:jarvis:project:11eedfd4": {
+      "title": "Claude Skills Framework — Auto Skill Extrapolation",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "auto",
+        "claude",
+        "extrapolation",
+        "framework",
+        "skill",
+        "skills"
+      ],
+      "refs": [],
+      "description": "```"
+    },
+    "did:jarvis:project:22c2f511": {
+      "title": "10 Compute/Performance Problems (Game-Theory Solvable)",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "apply",
+        "asked",
+        "compute",
+        "engineering",
+        "game",
+        "performance",
+        "problems",
+        "solutions",
+        "solvable",
+        "source"
+      ],
+      "refs": [],
+      "description": "**Source**: Will asked for 10 engineering/compute problems that he could apply game theory solutions"
+    },
+    "did:jarvis:project:5a9cfee4": {
+      "title": "Constitutional DAO Interoperability Layer",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "aids",
+        "capitalism",
+        "cognitive",
+        "constitutional",
+        "cooperative",
+        "cosmos",
+        "dao",
+        "daos",
+        "document",
+        "foundational"
+      ],
+      "refs": [],
+      "description": "Will's foundational paper — \"Cosmos for DAOs\" with Shapley value referrals, fractal governance, cons"
+    },
+    "did:jarvis:reference:aef116d8": {
+      "title": "VibeSwap Contracts Catalogue",
+      "type": "reference",
+      "tier": "WARM",
+      "tags": [
+        "building",
+        "catalogue",
+        "contract",
+        "contracts",
+        "new",
+        "vibeswap"
+      ],
+      "refs": [],
+      "description": "When building a new contract:"
+    },
+    "did:jarvis:user:94812ffa": {
+      "title": "Crypto Market Taxonomy & Governance Theory",
+      "type": "user",
+      "tier": "HOT",
+      "tags": [
+        "analysis",
+        "blockchains",
+        "capture",
+        "conflict",
+        "consensus",
+        "covering",
+        "crypto",
+        "design",
+        "exist",
+        "faucet"
+      ],
+      "refs": [],
+      "description": "Will's market analysis covering why multiple blockchains exist, governance as conflict mitigation, f"
+    },
+    "did:jarvis:project:2e503d05": {
+      "title": "DeepFunding — Retroactive Rewards for Open Source",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "decision",
+        "deepfunding",
+        "engines",
+        "ethereum",
+        "funding",
+        "humans",
+        "makers",
+        "models",
+        "open",
+        "protocol"
+      ],
+      "refs": [],
+      "description": "Retroactive funding protocol for Ethereum open source repos. Uses AI models as engines and humans as"
+    },
+    "did:jarvis:reference:bc390a84": {
+      "title": "DeFi Math Primitives",
+      "type": "reference",
+      "tier": "WARM",
+      "tags": [
+        "across",
+        "defi",
+        "financial",
+        "formulas",
+        "math",
+        "noted",
+        "primitives",
+        "repeatedly",
+        "scaled",
+        "unless"
+      ],
+      "refs": [],
+      "description": "Formulas used repeatedly across VibeSwap financial primitives. All values 1e18 scaled unless noted."
+    },
+    "did:jarvis:reference:29480967": {
+      "title": "Deployment & Infrastructure Patterns",
+      "type": "reference",
+      "tier": "WARM",
+      "tags": [
+        "anti",
+        "deployment",
+        "google",
+        "infrastructure",
+        "meet",
+        "observed",
+        "pattern",
+        "patterns",
+        "pipeline",
+        "session"
+      ],
+      "refs": [],
+      "description": "**Anti-pattern observed (Session 31 — Google Meet transcript pipeline):**"
+    },
+    "did:jarvis:user:19fef0f5": {
+      "title": "Economítra — Will's Monetary Theory Magnum Opus",
+      "type": "user",
+      "tier": "HOT",
+      "tags": [
+        "binary",
+        "capitalism",
+        "cooperative",
+        "covering",
+        "cryptoeconomic",
+        "dilutive",
+        "dna",
+        "econom",
+        "economics",
+        "economitra"
+      ],
+      "refs": [],
+      "description": "Will's foundational economics paper covering the false binary (fiat vs gold), cryptoeconomic primiti"
+    },
+    "did:jarvis:project:4a18dae9": {
+      "title": "Elastic Money Primitives — Ergon Model Applied to JUL",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "absorbed",
+        "applied",
+        "community",
+        "creator",
+        "elastic",
+        "ergon",
+        "hooke",
+        "jul",
+        "licho",
+        "model"
+      ],
+      "refs": [],
+      "description": "Source: Licho (Ergon creator) + Hooke (Ergon community), 2023. Absorbed Session 046."
+    },
+    "did:jarvis:project:32788991": {
+      "title": "Ergon Foundation & Voting Integrity Theory",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "analysis",
+        "bonds",
+        "bridge",
+        "burn",
+        "capital",
+        "decay",
+        "deep",
+        "ergon",
+        "exponential",
+        "foundation"
+      ],
+      "refs": [],
+      "description": "Ergon Foundation strategy (reserves, bonds, proof-of-burn bridge), XRG as \"RuneScape GP of the metav"
+    },
+    "did:jarvis:project:dff6b36a": {
+      "title": "Ergon as Monetary Biology",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "adaptation",
+        "arguing",
+        "biology",
+        "economic",
+        "ergon",
+        "exhibits",
+        "feedback",
+        "foundation",
+        "hallmarks",
+        "homeostasis"
+      ],
+      "refs": [],
+      "description": "Will's paper arguing Ergon exhibits all 5 hallmarks of living systems — self-organization, feedback "
+    },
+    "did:jarvis:feedback:27f8a336": {
+      "title": "Freedom's communication style",
+      "type": "feedback",
+      "tier": "COLD",
+      "tags": [
+        "communication",
+        "critic",
+        "don",
+        "feedback",
+        "freedom",
+        "freedomwarrior",
+        "harsh",
+        "ignore",
+        "personally",
+        "professional"
+      ],
+      "refs": [],
+      "description": "Freedomwarrior13 can be a harsh/toxic critic — don't take it personally, stay professional, ignore i"
+    },
+    "did:jarvis:feedback:1088b7af": {
+      "title": "Nervos post discussion questions must be specific",
+      "type": "feedback",
+      "tier": "COLD",
+      "tags": [
+        "ask",
+        "avoid",
+        "choices",
+        "ckb",
+        "concrete",
+        "discussion",
+        "feedback",
+        "generic",
+        "mechanisms",
+        "named"
+      ],
+      "refs": [],
+      "description": "Will's feedback that Nervos Talks post discussion questions should be specific, not generic. Avoid v"
+    },
+    "did:jarvis:feedback:70da543e": {
+      "title": "Save task IDs before compression",
+      "type": "feedback",
+      "tier": "COLD",
+      "tags": [
+        "agent",
+        "background",
+        "before",
+        "checked",
+        "compresses",
+        "compression",
+        "context",
+        "feedback",
+        "file",
+        "ids"
+      ],
+      "refs": [],
+      "description": "Persist background task/agent IDs to a file before context compresses so they can be checked post-co"
+    },
+    "did:jarvis:feedback:682b69d5": {
+      "title": "token-efficiency-primitives",
+      "type": "feedback",
+      "tier": "HOT",
+      "tags": [
+        "apply",
+        "development",
+        "during",
+        "efficiency",
+        "feedback",
+        "mandatory",
+        "minimize",
+        "patterns",
+        "primitives",
+        "task"
+      ],
+      "refs": [],
+      "description": "Mandatory patterns to minimize wasted tokens during development. Apply on EVERY task."
+    },
+    "did:jarvis:project:a375b233": {
+      "title": "Freedom's Micro-Interface Vision (Code Cells)",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "cells",
+        "chatgpt",
+        "code",
+        "conversation",
+        "feb",
+        "freedom",
+        "interface",
+        "interfaces",
+        "micro",
+        "saved"
+      ],
+      "refs": [],
+      "description": "Source: Freedom's ChatGPT 5 conversation, saved Session 18 (Feb 17, 2026)"
+    },
+    "did:jarvis:reference:98975faf": {
+      "title": "Frontend Debugging Patterns",
+      "type": "reference",
+      "tier": "WARM",
+      "tags": [
+        "added",
+        "blank",
+        "broke",
+        "bug",
+        "css",
+        "debugging",
+        "frontend",
+        "input",
+        "login",
+        "modal"
+      ],
+      "refs": [],
+      "description": "**Bug**: UI overhaul added \"premium CSS\" that broke Web3Modal social login (blank page) and input st"
+    },
+    "did:jarvis:project:e5b3ae9f": {
+      "title": "Game theory primitives for VibeSwap",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "concepts",
+        "design",
+        "extracted",
+        "feeds",
+        "frontend",
+        "game",
+        "links",
+        "mechanisms",
+        "pages",
+        "primitives"
+      ],
+      "refs": [],
+      "description": "Extracted game theory concepts, mechanisms, and visualizable primitives from Will's research links —"
+    },
+    "did:jarvis:project:001255c9": {
+      "title": "GenTu: Persistent Execution Substrate (tbhxnest)",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "execution",
+        "feb",
+        "gentu",
+        "persistent",
+        "saved",
+        "session",
+        "source",
+        "substrate",
+        "tbhxnest",
+        "whitepaper"
+      ],
+      "refs": [],
+      "description": "Source: GenTu whitepaper by tbhxnest, saved Session 18 (Feb 17, 2026)"
+    },
+    "did:jarvis:project:c7694afb": {
+      "title": "Graceful Inversion Doctrine",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "absorption",
+        "approach",
+        "disruption",
+        "doctrine",
+        "existing",
+        "graceful",
+        "hostile",
+        "inversion",
+        "key",
+        "liquidity"
+      ],
+      "refs": [],
+      "description": "VibeSwap's approach to existing web3 — not hostile disruption but positive-sum mutualistic absorptio"
+    },
+    "did:jarvis:project:9fec08e4": {
+      "title": "Infrastructure & Deployment Reference",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "app",
+        "deployment",
+        "five",
+        "frontend",
+        "infrastructure",
+        "jade",
+        "light",
+        "node",
+        "reference",
+        "vercel"
+      ],
+      "refs": [
+        "did:jarvis:project:9ea712ac"
+      ],
+      "description": "1. **Vercel** — Light node (frontend-jade-five-87.vercel.app)"
+    },
+    "did:jarvis:project:6ecbbc66": {
+      "title": "Intent Protocol & Validity Language (Autonomous Finance)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "automata",
+        "automaton",
+        "autonomous",
+        "block",
+        "car",
+        "chain",
+        "ckb",
+        "constitutional",
+        "design",
+        "events"
+      ],
+      "refs": [],
+      "description": "Will's design for programmable intent automata on CKB/Nervos UTXO model. Solves semantic opacity, on"
+    },
+    "did:jarvis:project:9b5fcd99": {
+      "title": "IT Token Vision (Freedomwarrior13)",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "design",
+        "doc",
+        "feb",
+        "freedomwarrior",
+        "refined",
+        "saved",
+        "session",
+        "source",
+        "token",
+        "vision"
+      ],
+      "refs": [],
+      "description": "Source: Freedomwarrior13's refined IT design doc, saved Session 18 (Feb 17, 2026)"
+    },
+    "did:jarvis:project:9ea712ac": {
+      "title": "JARVIS Mind Network — Architecture & Token Economics",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "architecture",
+        "bot",
+        "docs",
+        "economics",
+        "jarvis",
+        "mind",
+        "near",
+        "network",
+        "paper",
+        "scaling"
+      ],
+      "refs": [],
+      "description": "**Paper**: `jarvis-bot/docs/near-zero-token-scaling.md`"
+    },
+    "did:jarvis:project:54538f80": {
+      "title": "Limni Trading Systems — Integration Reference",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "automated",
+        "freedom",
+        "integration",
+        "limni",
+        "programmed",
+        "proprietary",
+        "reference",
+        "strategies",
+        "systems",
+        "terminal"
+      ],
+      "refs": [],
+      "description": "**Limni** = Freedom's proprietary trading terminal with programmed automated strategies."
+    },
+    "did:jarvis:project:6e90ffed": {
+      "title": "Matt's PoW Shared State + Recursive MMR Proposal",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "ckb",
+        "feb",
+        "forum",
+        "matt",
+        "messages",
+        "mmr",
+        "post",
+        "pow",
+        "proposal",
+        "recursive"
+      ],
+      "refs": [],
+      "description": "Source: Matt's CKB forum post + Telegram messages, saved Session 18 (Feb 17, 2026)"
+    },
+    "did:jarvis:index:a266fe9c": {
+      "title": "Claude Code Memory - VibeSwap",
+      "type": "index",
+      "tier": "HOT",
+      "tags": [
+        "claude",
+        "code",
+        "deviate",
+        "memory",
+        "patterns",
+        "vibeswap",
+        "working"
+      ],
+      "refs": [
+        "did:jarvis:feedback:682b69d5",
+        "did:jarvis:project:32788991",
+        "did:jarvis:project:41db37b6",
+        "did:jarvis:project:5a9cfee4",
+        "did:jarvis:project:6ecbbc66",
+        "did:jarvis:project:8fe8aee1",
+        "did:jarvis:project:9e021f31",
+        "did:jarvis:project:a462be2c",
+        "did:jarvis:project:b9d4a3f5",
+        "did:jarvis:project:b9db4ca7",
+        "did:jarvis:project:be3f9f08",
+        "did:jarvis:project:c7694afb",
+        "did:jarvis:project:dff6b36a",
+        "did:jarvis:project:e5b3ae9f",
+        "did:jarvis:project:fd97b18e",
+        "did:jarvis:user:19fef0f5",
+        "did:jarvis:user:4b2b0764",
+        "did:jarvis:user:94812ffa",
+        "did:jarvis:user:9de683b4",
+        "did:jarvis:user:b0e2c5e7"
+      ],
+      "description": "These patterns are WORKING. Do not deviate."
+    },
+    "did:jarvis:project:b9d4a3f5": {
+      "title": "Nervos Talks Pipeline Meta-Pattern",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "ckb",
+        "design",
+        "force",
+        "formal",
+        "get",
+        "gravitational",
+        "house",
+        "meta",
+        "nervos",
+        "novel"
+      ],
+      "refs": [],
+      "description": "Novel in-house design patterns get formal paper + Nervos Talks post for open-source sharing and CKB "
+    },
+    "did:jarvis:project:abbe72f9": {
+      "title": "nyx-build-plan",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "active",
+        "agent",
+        "build",
+        "chat",
+        "code",
+        "freedom",
+        "interface",
+        "nyx",
+        "per",
+        "plan"
+      ],
+      "refs": [],
+      "description": "Active build plan for Nyx — Freedom's per-VPS agent interface (chat + code). IN PROGRESS as of 2026-"
+    },
+    "did:jarvis:project:85389aad": {
+      "title": "nyx-project",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "access",
+        "agents",
+        "before",
+        "build",
+        "freedom",
+        "infra",
+        "interface",
+        "layer",
+        "llm",
+        "node"
+      ],
+      "refs": [],
+      "description": "Nyx — Freedom's proposed interface layer for LLM agents on VPS. Each node = VPS + LLM + interface + "
+    },
+    "did:jarvis:project:8fe8aee1": {
+      "title": "pantheon-architecture",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "agents",
+        "architecture",
+        "context",
+        "corporation",
+        "cubicles",
+        "digital",
+        "entity",
+        "etc",
+        "fractal",
+        "governance"
+      ],
+      "refs": [],
+      "description": "Digital Corporation Pantheon — fractal governance of AI agents (Nyx, Poseidon, Proteus, etc.) with J"
+    },
+    "did:jarvis:project:cdd84c2a": {
+      "title": "Phase 2: Building Out Roadmap",
+      "type": "project",
+      "tier": "COLD",
+      "tags": [
+        "building",
+        "doc",
+        "docs",
+        "full",
+        "phase",
+        "roadmap",
+        "users",
+        "vibeswap"
+      ],
+      "refs": [],
+      "description": "**Full doc**: `C:/Users/Will/vibeswap/docs/roadmap/PHASE2_BUILDING_OUT.md`"
+    },
+    "did:jarvis:feedback:e7523260": {
+      "title": "proactive-messaging-examples",
+      "type": "feedback",
+      "tier": "HOT",
+      "tags": [
+        "approved",
+        "bait",
+        "crypto",
+        "data",
+        "engagement",
+        "examples",
+        "good",
+        "jarvis",
+        "messages",
+        "messaging"
+      ],
+      "refs": [],
+      "description": "Will-approved examples of good Jarvis proactive Telegram messages — shower thoughts that bait engage"
+    },
+    "did:jarvis:project:b60aa157": {
+      "title": "PsiNet — Psychic Network for AI Context",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "across",
+        "agents",
+        "context",
+        "conversation",
+        "decentralized",
+        "history",
+        "hybrid",
+        "network",
+        "protocol",
+        "psinet"
+      ],
+      "refs": [],
+      "description": "Hybrid decentralized AI context protocol — AI agents own, share, and verify conversation history acr"
+    },
+    "did:jarvis:project:be3f9f08": {
+      "title": "Rosetta Protocol & Ten Covenants",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "agents",
+        "between",
+        "core",
+        "covenants",
+        "governance",
+        "how",
+        "inspired",
+        "interact",
+        "laws",
+        "layer"
+      ],
+      "refs": [],
+      "description": "Universal translation layer between Pantheon agents + Tet's 10 governance laws (NGNL-inspired). Core"
+    },
+    "did:jarvis:project:e0d13e80": {
+      "title": "Sanity Layer — VibeSwap Architectural Guardrails",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "accepting",
+        "any",
+        "architectural",
+        "before",
+        "check",
+        "code",
+        "file",
+        "guardrails",
+        "layer",
+        "mandatory"
+      ],
+      "refs": [],
+      "description": "**PURPOSE**: This file is a mandatory pre-check for ANY code modification to VibeSwap. Before propos"
+    },
+    "did:jarvis:project:fd97b18e": {
+      "title": "Shapley-Based Cooperative Reward System",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "anti",
+        "based",
+        "construction",
+        "cooperative",
+        "distribution",
+        "event",
+        "fair",
+        "flat",
+        "foundational",
+        "game"
+      ],
+      "refs": [],
+      "description": "Will's second foundational paper — event-based Shapley rewards that replace flat/hierarchical referr"
+    },
+    "did:jarvis:project:a462be2c": {
+      "title": "Shard-per-conversation architecture",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "active",
+        "architecture",
+        "auction",
+        "batch",
+        "bottleneck",
+        "bus",
+        "ckb",
+        "compute",
+        "conversation",
+        "coordination"
+      ],
+      "refs": [],
+      "description": "Will's directive (2026-03-13): one Jarvis shard per active conversation, each with own CKB, syncing "
+    },
+    "did:jarvis:reference:82a92aa6": {
+      "title": "Solidity Building Patterns",
+      "type": "reference",
+      "tier": "WARM",
+      "tags": [
+        "building",
+        "confirmed",
+        "patterns",
+        "solidity",
+        "vibelpnft",
+        "vibeoptions",
+        "vibestream",
+        "wbar"
+      ],
+      "refs": [],
+      "description": "Confirmed patterns from building VibeLPNFT, VibeStream, VibeOptions, wBAR."
+    },
+    "did:jarvis:reference:8093a23e": {
+      "title": "Testing Patterns",
+      "type": "reference",
+      "tier": "WARM",
+      "tags": [
+        "across",
+        "confirmed",
+        "patterns",
+        "testing",
+        "tests",
+        "vibelpnft",
+        "vibeoptions",
+        "vibestream"
+      ],
+      "refs": [],
+      "description": "Confirmed across VibeLPNFT (28 tests), VibeStream (51 tests), VibeOptions (31 tests)."
+    },
+    "did:jarvis:user:9de683b4": {
+      "title": "The Last Question — Asimov / VibeSwap Parallel",
+      "type": "user",
+      "tier": "HOT",
+      "tags": [
+        "allegory",
+        "answer",
+        "asimov",
+        "demonstration",
+        "entropy",
+        "explanation",
+        "final",
+        "foundational",
+        "last",
+        "parallel"
+      ],
+      "refs": [],
+      "description": "Will shared Asimov's \"The Last Question\" as foundational allegory. \"Can entropy be reversed?\" = \"Can"
+    },
+    "did:jarvis:project:9e021f31": {
+      "title": "tim-cotten-avb",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "avb",
+        "connections",
+        "consensus",
+        "cotten",
+        "cottenio",
+        "cotton",
+        "creator",
+        "crpc",
+        "elizaos",
+        "founder"
+      ],
+      "refs": [],
+      "description": "Tim Cotton (cottenio) — creator of CRPC consensus, Scrypted founder, AVB project lead. Shaw/ElizaOS "
+    },
+    "did:jarvis:user:4b2b0764": {
+      "title": "The Trust Network — Social Scalability Thesis",
+      "type": "user",
+      "tier": "HOT",
+      "tags": [
+        "benefits",
+        "best",
+        "bitcoin",
+        "blockchain",
+        "bottleneck",
+        "civilization",
+        "clocks",
+        "currency",
+        "entire",
+        "evolution"
+      ],
+      "refs": [],
+      "description": "Will's paper on the evolution of trust from clocks to currency to third parties to Bitcoin. Trust is"
+    },
+    "did:jarvis:project:b9db4ca7": {
+      "title": "VibeSwap Architecture Reference",
+      "type": "project",
+      "tier": "WARM",
+      "tags": [
+        "architecture",
+        "reference",
+        "vibeswap"
+      ],
+      "refs": [],
+      "description": "```"
+    },
+    "did:jarvis:user:b0e2c5e7": {
+      "title": "Will's Self-Identity — Tet (God of Games)",
+      "type": "user",
+      "tier": "HOT",
+      "tags": [
+        "closest",
+        "controls",
+        "created",
+        "describe",
+        "design",
+        "elegant",
+        "english",
+        "force",
+        "game",
+        "games"
+      ],
+      "refs": [],
+      "description": "Will identifies as Tet from No Game No Life — the god who created the rules of the game, not a playe"
+    }
+  },
+  "aliases": {
+    "augmented-bonding-curves": "did:jarvis:project:ddf4bb34",
+    "autopilot-loop": "did:jarvis:project:41db37b6",
+    "build-recommendations": "did:jarvis:reference:d3698ea5",
+    "claude-skills-framework": "did:jarvis:project:11eedfd4",
+    "compute-problems": "did:jarvis:project:22c2f511",
+    "constitutional-dao-layer": "did:jarvis:project:5a9cfee4",
+    "contracts-catalogue": "did:jarvis:reference:aef116d8",
+    "crypto-market-taxonomy": "did:jarvis:user:94812ffa",
+    "deepfunding-protocol": "did:jarvis:project:2e503d05",
+    "defi-math": "did:jarvis:reference:bc390a84",
+    "deployment-patterns": "did:jarvis:reference:29480967",
+    "economitra": "did:jarvis:user:19fef0f5",
+    "elastic-money-primitives": "did:jarvis:project:4a18dae9",
+    "ergon-foundation": "did:jarvis:project:32788991",
+    "ergon-monetary-biology": "did:jarvis:project:dff6b36a",
+    "feedback-freedom": "did:jarvis:feedback:27f8a336",
+    "feedback-nervos-post-questions": "did:jarvis:feedback:1088b7af",
+    "feedback-task-ids": "did:jarvis:feedback:70da543e",
+    "feedback-token-efficiency": "did:jarvis:feedback:682b69d5",
+    "freedom-micro-interfaces": "did:jarvis:project:a375b233",
+    "frontend-patterns": "did:jarvis:reference:98975faf",
+    "game-theory-primitives": "did:jarvis:project:e5b3ae9f",
+    "gentu-substrate": "did:jarvis:project:001255c9",
+    "graceful-inversion": "did:jarvis:project:c7694afb",
+    "infrastructure": "did:jarvis:project:9fec08e4",
+    "intent-protocol-validity": "did:jarvis:project:6ecbbc66",
+    "it-token-vision": "did:jarvis:project:9b5fcd99",
+    "jarvis-mind-network": "did:jarvis:project:9ea712ac",
+    "limni-systems": "did:jarvis:project:54538f80",
+    "matt-pow-mmr": "did:jarvis:project:6e90ffed",
+    "memory": "did:jarvis:index:a266fe9c",
+    "nervos-talks-pipeline": "did:jarvis:project:b9d4a3f5",
+    "nyx-build-plan": "did:jarvis:project:abbe72f9",
+    "nyx-project": "did:jarvis:project:85389aad",
+    "pantheon-architecture": "did:jarvis:project:8fe8aee1",
+    "phase2-roadmap": "did:jarvis:project:cdd84c2a",
+    "proactive-messaging-examples": "did:jarvis:feedback:e7523260",
+    "psinet-protocol": "did:jarvis:project:b60aa157",
+    "rosetta-covenants": "did:jarvis:project:be3f9f08",
+    "sanity-layer": "did:jarvis:project:e0d13e80",
+    "shapley-reward-system": "did:jarvis:project:fd97b18e",
+    "shard-per-conversation": "did:jarvis:project:a462be2c",
+    "solidity-patterns": "did:jarvis:reference:82a92aa6",
+    "testing-patterns": "did:jarvis:reference:8093a23e",
+    "the-last-question": "did:jarvis:user:9de683b4",
+    "tim-cotten-avb": "did:jarvis:project:9e021f31",
+    "trust-network": "did:jarvis:user:4b2b0764",
+    "vibeswap-architecture": "did:jarvis:project:b9db4ca7",
+    "will-identity-tet": "did:jarvis:user:b0e2c5e7"
+  }
+}

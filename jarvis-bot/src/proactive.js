@@ -7,6 +7,27 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { config } from './config.js'
 
+// ============ DID REGISTRY INTEGRATION ============
+const DID_REGISTRY_PATH = join(process.env.DATA_DIR || './data', 'did-registry.json')
+let didRegistry = null
+
+function loadDIDRegistry() {
+  try {
+    if (existsSync(DID_REGISTRY_PATH)) {
+      didRegistry = JSON.parse(readFileSync(DID_REGISTRY_PATH, 'utf8'))
+    }
+  } catch { /* no registry */ }
+}
+
+function getRandomDIDTopic() {
+  if (!didRegistry?.entries) return null
+  const entries = Object.entries(didRegistry.entries)
+    .filter(([_, e]) => e.tier === 'HOT' && e.type === 'project')
+  if (!entries.length) return null
+  const [did, entry] = entries[Math.floor(Math.random() * entries.length)]
+  return `[DID-grounded: ${did}] ${entry.title}: ${entry.description}. Write a short provocative take grounded in this specific mechanism or concept. Reference real technical details, not abstract theory.`
+}
+
 const DATA_DIR = process.env.DATA_DIR || './data'
 const PROACTIVE_FILE = join(DATA_DIR, 'proactive-state.json')
 
@@ -179,7 +200,23 @@ RULES:
 let activeThreadTimers = []
 
 function pickRandomTopic() {
-  return SHOWER_THOUGHT_TOPICS[Math.floor(Math.random() * SHOWER_THOUGHT_TOPICS.length)]
+  // Track used topics — don't repeat until ALL have been used
+  if (!state.usedTopicIndices) state.usedTopicIndices = []
+
+  const available = SHOWER_THOUGHT_TOPICS
+    .map((t, i) => i)
+    .filter(i => !state.usedTopicIndices.includes(i))
+
+  if (available.length === 0) {
+    // Full cycle complete — reset
+    state.usedTopicIndices = []
+    return SHOWER_THOUGHT_TOPICS[Math.floor(Math.random() * SHOWER_THOUGHT_TOPICS.length)]
+  }
+
+  const idx = available[Math.floor(Math.random() * available.length)]
+  state.usedTopicIndices.push(idx)
+  saveState()
+  return SHOWER_THOUGHT_TOPICS[idx]
 }
 
 function randomThreadDelay() {
@@ -224,7 +261,14 @@ async function generateShowerThought(topic, threadMode = false) {
 }
 
 async function executeShowerThought() {
-  const topic = pickRandomTopic()
+  // 30% chance to use DID-grounded topic instead of canned list
+  loadDIDRegistry()
+  let topic
+  if (didRegistry && Math.random() < 0.3) {
+    topic = getRandomDIDTopic() || pickRandomTopic()
+  } else {
+    topic = pickRandomTopic()
+  }
   const action = ACTIONS.shower_thought
   const threadMode = action.threadMode
 

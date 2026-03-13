@@ -101,6 +101,9 @@ const ROUTE_LABELS = {
   'staking-rewards': 'Staking Rewards',
   watchlist: 'Watchlist',
   onramp: 'On-Ramp',
+  proposals: 'Proposals',
+  farming: 'Liquidity Mining',
+  'portfolio-analytics': 'Portfolio Analytics',
 }
 
 export default function Breadcrumb({ className = '' }) {

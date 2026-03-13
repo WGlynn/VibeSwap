@@ -32,6 +32,7 @@ const COLUMNS = [
       { to: '/lend', label: 'Lending' },
       { to: '/bonds', label: 'Bonds' },
       { to: '/rewards', label: 'Rewards' },
+      { to: '/farming', label: 'Farming' },
     ],
   },
   {

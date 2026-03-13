@@ -236,6 +236,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/limit', label: 'Limit Orders', icon: '📋' },
       { path: '/staking-rewards', label: 'Staking Rewards', icon: '💎' },
       { path: '/onramp', label: 'Buy with Fiat', icon: '💵' },
+      { path: '/farming', label: 'Liquidity Mining', icon: '🌾' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },

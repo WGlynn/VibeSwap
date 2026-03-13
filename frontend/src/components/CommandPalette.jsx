@@ -113,6 +113,9 @@ const COMMANDS = [
   { id: 'watchlist', label: 'Watchlist', description: 'Track favorite tokens & prices', path: '/watchlist', category: 'Account' },
   { id: 'staking-rewards', label: 'Staking Rewards', description: 'Calculator & reward dashboard', path: '/staking-rewards', category: 'DeFi' },
   { id: 'onramp', label: 'On-Ramp', description: 'Buy crypto with fiat currency', path: '/onramp', category: 'DeFi' },
+  { id: 'proposals', label: 'Proposals', description: 'Governance proposals & voting', path: '/proposals', category: 'Community' },
+  { id: 'farming', label: 'Liquidity Mining', description: 'Farm rewards in liquidity pools', path: '/farming', category: 'DeFi' },
+  { id: 'portfolio-analytics', label: 'Portfolio Analytics', description: 'Advanced portfolio metrics & PnL', path: '/portfolio-analytics', category: 'Account' },
 ]
 
 const CATEGORY_COLORS = {

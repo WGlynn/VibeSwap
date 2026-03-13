@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
@@ -26,6 +26,15 @@ function HeaderMinimal() {
   const { here } = useUbuntu()
   const [showDrawer, setShowDrawer] = useState(false)
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
+  const [gasGwei, setGasGwei] = useState(18)
+
+  // Simulated live gas price
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setGasGwei((prev) => Math.max(5, Math.min(80, prev + (Math.random() - 0.48) * 2)))
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Combined wallet state - connected if EITHER wallet type is connected
   const isConnected = isExternalConnected || isDeviceConnected
@@ -61,6 +70,32 @@ function HeaderMinimal() {
 
             {/* Right side */}
             <div className="flex items-center space-x-3">
+              {/* Gas indicator */}
+              <Link
+                to="/gas"
+                className="hidden sm:flex items-center space-x-1 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-black-500 transition-colors"
+                title="Gas Tracker"
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: gasGwei > 40 ? '#ef4444' : gasGwei > 25 ? '#f59e0b' : '#22c55e' }} />
+                <span className="text-[10px] font-mono text-black-400">{Math.round(gasGwei)}</span>
+              </Link>
+
+              {/* Notification bell */}
+              <Link
+                to="/notifications"
+                className="relative p-1.5 rounded-lg hover:bg-black-800/60 transition-colors"
+                title="Notifications"
+              >
+                <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {isConnected && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 text-[7px] font-mono font-bold text-black flex items-center justify-center">
+                    3
+                  </span>
+                )}
+              </Link>
+
               {/* Mesh indicator — cells within cells interlinked */}
               <Link
                 to="/mesh"
@@ -225,10 +260,13 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     { label: 'System', items: [
       { path: '/status', label: 'System Status', icon: '|' },
       { path: '/analytics', label: 'Analytics', icon: '📊' },
+      { path: '/gas', label: 'Gas Tracker', icon: '⛽' },
       { path: '/oracle', label: 'Oracle', icon: '👁' },
       { path: '/circuit-breaker', label: 'Circuit Breaker', icon: '⚡' },
       { path: '/crosschain', label: 'Cross-Chain', icon: '🔗' },
       { path: '/security', label: 'Security', icon: '🛡' },
+      { path: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
+      { path: '/referral', label: 'Referrals', icon: '🤝' },
       { path: '/roadmap', label: 'Roadmap', icon: '🗺' },
       { path: '/team', label: 'Team', icon: '👥' },
       { path: '/faq', label: 'FAQ', icon: '?' },
@@ -359,6 +397,33 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
               </details>
             )
           })}
+        </div>
+
+        {/* Account links */}
+        <div className="mx-4 h-px bg-black-700" />
+        <div className="p-2">
+          <div className="px-4 py-2 text-xs text-black-500 uppercase">Account</div>
+          {[
+            { path: '/wallet', label: 'Wallet', icon: '👛' },
+            { path: '/notifications', label: 'Notifications', icon: '🔔' },
+            { path: '/profile', label: 'Profile', icon: '👤' },
+            { path: '/settings', label: 'Settings', icon: '⚙️' },
+            { path: '/tutorial', label: 'Getting Started', icon: '📖' },
+          ].map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={onClose}
+              className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+                location.pathname === item.path
+                  ? 'bg-black-700 text-white'
+                  : 'hover:bg-black-700/50 text-black-400'
+              }`}
+            >
+              <span className="text-sm">{item.icon}</span>
+              <span className="text-sm">{item.label}</span>
+            </Link>
+          ))}
         </div>
 
         {/* Security Section - Account Protection */}

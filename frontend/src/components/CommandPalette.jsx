@@ -143,6 +143,9 @@ const COMMANDS = [
   { id: 'streaks', label: 'Streaks', description: 'Daily activity streaks and rewards', path: '/streaks', category: 'Account' },
   { id: 'health', label: 'Protocol Health', description: 'Safety systems and risk metrics', path: '/health', category: 'Protocol' },
   { id: 'fee-calculator', label: 'Fee Calculator', description: 'Estimate costs before you execute', path: '/fee-calculator', category: 'Protocol' },
+  { id: 'mev', label: 'MEV Dashboard', description: 'MEV protection savings and attack prevention', path: '/mev', category: 'Protocol' },
+  { id: 'contributors', label: 'Contributors', description: 'Shapley value contributor leaderboard', path: '/contributors', category: 'Community' },
+  { id: 'multichain', label: 'Multi-Chain', description: 'Unified portfolio across all chains', path: '/multichain', category: 'Account' },
 ]
 
 const CATEGORY_COLORS = {

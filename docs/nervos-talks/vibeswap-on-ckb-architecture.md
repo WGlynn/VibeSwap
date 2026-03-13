@@ -224,4 +224,23 @@ All 9 scripts compile to RISC-V via `riscv64imac-unknown-none-elf` with `no_std`
 
 ---
 
+## Discussion
+
+Some questions for the community:
+
+1. **What is the practical latency impact of PoW-gated state transitions for real-time trading?** Our architecture prioritizes MEV elimination over speed. For CKB's block time and network conditions, what is the expected commit-to-settlement latency, and is this acceptable for the target user base?
+
+2. **How should CKB DeFi applications handle the lock/type separation in upgradeable designs?** We separate PoW access control (lock script) from auction logic (type script). What patterns exist for upgrading type scripts without disrupting active trading pairs that depend on the lock script?
+
+3. **Can CKB-VM's RISC-V execution guarantee deterministic Fisher-Yates shuffle across all implementations?** We verify bit-for-bit parity between x86 tests and RISC-V deployment. Are there edge cases in CKB-VM's instruction semantics that could produce different results across node implementations?
+
+4. **What is the right granularity for cell decomposition in DeFi applications?** We decompose EVM monolithic state into shared, per-user, and singleton cells. Is there a design framework for determining optimal cell granularity on CKB?
+
+5. **How can 190 tests across adversarial, fuzz, and math parity categories serve as a reference for CKB testing standards?** Would the community benefit from a shared testing framework or adversarial scenario library for CKB DeFi applications?
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*
+
 *VibeSwap is open source. Technical questions and collaboration proposals are welcome.*

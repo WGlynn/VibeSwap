@@ -251,4 +251,23 @@ This economic equilibrium is only possible because CKB uses PoW at the L1 level.
 
 ---
 
+## Discussion
+
+Some questions for the community:
+
+1. **What are the optimal difficulty adjustment parameters for CKB's block time?** We target 5 blocks between state transitions with a 10-transition adjustment window and 4x maximum adjustment. Are there CKB-specific considerations (uncle rate, propagation delay, NC-Max dynamics) that suggest different parameters?
+
+2. **Can PoW-gated shared state be applied to CKB governance?** Proposal submission, voting, and parameter changes all involve shared state contention. Would PoW access control provide better censorship resistance than the current governance patterns on CKB?
+
+3. **How should the miner reward structure evolve as trading volume scales?** Our model uses base reward plus per-commit aggregation reward. Should rewards incorporate CKB's issuance schedule, or remain independent of L1 economics?
+
+4. **What is the security boundary for recursive MMR in cross-batch historical proofs?** We claim O(log n) verification at both inner and outer levels. Are there adversarial scenarios where MMR proof size or verification cost becomes a bottleneck for light clients?
+
+5. **Are there other CKB applications with cell contention problems that could benefit from Matt's PoW shared state pattern?** Gaming, prediction markets, and identity registries all involve shared mutable state. What would adoption of this pattern look like across the ecosystem?
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*
+
 *We acknowledge Matt's foundational work on PoW shared state and recursive MMR. VibeSwap's implementation builds directly on these ideas. Collaboration with the CKB community on parameter tuning and testnet deployment is welcome.*

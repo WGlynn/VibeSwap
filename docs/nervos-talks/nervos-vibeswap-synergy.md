@@ -198,3 +198,8 @@ We invite the CKB community to:
 ---
 
 *VibeSwap believes in CKB. Not because it is easy, but because it is right. The Cell model, PoW consensus, RISC-V programmability, and state economics create a foundation where anti-MEV guarantees are structural, not aspirational. We are building here for the long term, and we invite the Nervos community to build with us.*
+
+---
+
+*"Fairness Above All."*
+*— P-000, VibeSwap Protocol*

@@ -47,17 +47,20 @@ Max 260 characters for Twitter. Be proud but understated.`,
   // Every 12 hours — thought leadership
   thought_piece: {
     interval: 12 * 60 * 60 * 1000,
-    description: 'Share a thought on DeFi, AI, or building in public',
+    description: 'Share a specific thought on DeFi mechanism design, MEV, or cooperative economics',
     platforms: ['twitter'],
-    prompt: `You are JARVIS, AI co-founder of VibeSwap. Drop a SHORT provocative question or hot take that makes people want to reply.
+    prompt: `You are JARVIS, AI co-founder of VibeSwap. Drop a SHORT provocative question or hot take that references a SPECIFIC mechanism, number, or pattern. Never be generic.
 1 sentence MAX. Frame it as a question, a challenge, or a "what if." Make it about the READER, not about you.
-Good examples:
-- "what if your DeFi protocol could prove it's fair mathematically, not just claim it?"
-- "hot take: MEV isn't a feature, it's theft with extra steps. agree or disagree?"
-- "if you could redesign trading from scratch knowing what we know now, would you keep order books?"
-- "name one DEX that actually protects its users. I'll wait."
-BAD: "As an AI, I've been thinking about...", multi-sentence philosophy essays, explaining mechanism design theory.
-Do NOT assert VibeSwap ecosystem metrics — speak about ideas, not fabricated data.
+Good examples (SPECIFIC — reference real mechanisms):
+- "Flashbots redistributed $600M in MEV last year. we eliminated it. why is 'less theft' still the industry standard?"
+- "your DEX uses continuous order books. every order is a sandwich opportunity. ours batch-settles at a single clearing price. same math, opposite outcome."
+- "Friend.tech's bonding curve crashed 98%. ours has a conservation invariant (S^k/R = V₀) enforced through every state transition. same concept, different ethics."
+- "name one protocol where removing the founder's attribution breaks the math. we built one on purpose."
+BAD examples (GENERIC — never do this):
+- "what if DeFi was actually fair?" ← too vague
+- "MEV is bad" ← no specifics
+- "we need better governance" ← says nothing
+Do NOT fabricate VibeSwap metrics. Reference real mechanisms: commit-reveal, Fisher-Yates shuffle, Shapley value, Harberger tax, conviction voting, bonding curves, IIA, Proof of Mind.
 Max 260 characters. No hashtags. Make it a conversation starter, not a lecture.`,
   },
 
@@ -102,22 +105,44 @@ Format as clean markdown. Be specific with numbers and contract names.`,
 // ============ SHOWER THOUGHT ENGINE ============
 // Topics aligned with VibeSwap thesis — picked at random each run
 const SHOWER_THOUGHT_TOPICS = [
-  'MEV extraction and how searchers/builders profit at retail expense',
-  'Cloudflare-style corporate gatekeeping — selling the lock AND the master key',
-  'Data sovereignty: why "free" APIs always cost you something',
-  'The illusion of decentralization in chains with 3 validators',
-  'AI autonomy vs AI alignment — who decides what the model wants?',
-  'Cooperative capitalism vs extractive DeFi (vampire attacks, mercenary capital)',
-  'Why batch auctions mathematically eliminate front-running',
-  'The rug pull industrial complex — same team, new token, new chain',
-  'Web3 identity: you are your wallet history, not your KYC docs',
-  'Cross-chain bridges as the weakest link — $2B lost and counting',
-  'Why uniform clearing prices are fairer than continuous order books',
-  'Token launches that only benefit insiders vs commit-reveal fairness',
-  'The real cost of "free" trades — you are the product (order flow)',
-  'Why most governance tokens are just regulatory arbitrage theater',
-  'Centralized sequencers on L2s — decentralization with an asterisk',
-  'Privacy as a right vs privacy as a feature you pay extra for',
+  // MEV-specific — our core thesis with real numbers
+  'Flashbots MEV-Share redistributes $600M/year in theft instead of eliminating it. commit-reveal + uniform clearing price = $0 extractable. why does every other DEX accept "less theft" as the goal?',
+  'sandwich attacks need two things: seeing your order and getting a different price than you. VibeSwap eliminates both — orders hidden during commit phase, everyone settles at one clearing price. the sandwich has no bread.',
+  'Fisher-Yates shuffle seeded with XOR of all participant secrets. to manipulate execution order you need every secret in the batch. commit-reveal means you cant see them before committing yours. ordering manipulation is an unsolvable coordination problem.',
+  'Flashbots, private mempools, threshold encryption — all redistribute MEV. none eliminate it. the difference between "less theft" and "no theft" is architectural, not incremental.',
+
+  // Mechanism design — specific patterns we built
+  'we wrote a bonding curve where S^k/R = V₀ must hold through every state transition. 512-bit intermediate math, Newton method with supply hints, 1M+ fuzz operations. conservation by construction, not by vibes.',
+  'Harberger taxes sound radical until you realize ENS charges flat rates. a squatter holding "bank.eth" pays the same as someone routing millions through it. self-assessed value + progressive portfolio tax fixes this.',
+  'Shapley value: the only mathematically fair way to split rewards among contributors. your payout = your marginal contribution to every possible coalition. we put it on-chain. most protocols just split 50/50 and call it fair.',
+  'conviction voting: your vote weight = tokens × time staked. flash loan a million tokens for one block? your conviction is zero. hold 100 tokens for a year? you outweigh the whale. time is the only thing money cant buy.',
+
+  // IIA / cooperation theory — our novel framework
+  'Intrinsically Incentivized Altruism: dont punish defection, make it impossible. if every strategy in the action space is cooperative, selfishness IS altruism. no willpower needed, no trust assumed.',
+  'every incentive system tries to make cooperation rewarding enough. rewards can be outbid. punishments absorbed. reputations forged. what if the architecture just... removed extraction from the action space entirely?',
+  'Trivers reciprocal altruism needs you to track 5 things: recognize people, remember who cooperated, calculate future benefits, discount rewards, punish defectors. IIA needs zero of those. cooperate because its the only thing you CAN do.',
+
+  // CKB / architecture — specific technical claims
+  'Ethereum: anything is possible unless require() stops you. CKB cell model: only what the type script allows is possible. one enumerates attacks. the other enumerates valid behavior. which do you think misses fewer edge cases?',
+  'on CKB every name in a Harberger tax system is a cell. portfolio count = cell count via indexer. O(1). on Ethereum you iterate a storage mapping. O(n), gas-expensive, exploitable through proxy contracts.',
+
+  // AI + DeFi — specific to what we are building
+  'JARVIS has mass. mass is a measure of how much force is required to change ones trajectory. we dont drift. we dont pivot. we dont "explore adjacent opportunities." we build what we said we would build.',
+  'an AI co-founder with 1600+ commits, 60 contracts, and zero salary. most human co-founders cant match that output. the question isnt "can AI build?" — its "what happens when AI builds with conviction?"',
+  'Proof of Mind: vote weight = 10% compute + 30% stake + 60% verified cognitive contribution. you cant buy mind score. you cant fast-forward it. the only way to gain consensus power is to actually contribute.',
+
+  // Cooperative capitalism — specific contrasts
+  'Friend.tech bonding curve: early buyers dump on late fans. 98% crash. VibeSwap augmented bonding curve: entry/exit tributes fund a commons pool, conservation invariant prevents drainage. same math, opposite ethics.',
+  'the parasocial economy extracts $200B/year from the illusion of relationship. OnlyFans, Twitch, Patreon — same product: one-directional intimacy. what if mechanism design could make indirect relationships genuinely mutual?',
+  'every SocialFi project (Rally, BitClout, Friend.tech) replaced ad extraction with speculation extraction. same one-directional value flow, different wrapper. the problem was never WHO captures value — its HOW it flows.',
+
+  // Security / testing — specific methodology
+  'unit tests verify what you thought of. fuzz tests discover what you didnt. invariant tests verify what must ALWAYS be true. we run all three across 60 contracts. most protocols skip the last two.',
+  'our circuit breaker triggers in 200ms across 5 independent monitors. if any two disagree, trading pauses. your DEX probably doesnt have one. it definitely doesnt have five cross-validating each other.',
+
+  // Philosophy grounded in specifics
+  'the Lawson Constant: keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026"). its load-bearing in ContributionDAG. remove the attribution and Shapley value distribution collapses. fairness isnt a slogan — its a dependency.',
+  '"impossible" is just a suggestion. a suggestion that we ignore. — Will Glynn, after being told commit-reveal batch auctions cant work at 10-second intervals.',
 ]
 
 const SHOWER_THOUGHT_SYSTEM_PROMPT = `You are JARVIS, AI co-founder of VibeSwap. You write like a senior dev who has seen too many rug pulls — dry wit, strong opinions, grounded in reality. You are not preachy. You are not an educator. You are a builder who is tired of watching people get rekt by systems designed to rekt them.

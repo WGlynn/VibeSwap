@@ -113,6 +113,7 @@ const ROUTE_LABELS = {
   social: 'Social Trading',
   achievements: 'Achievements',
   'swap-history': 'Swap History',
+  grants: 'Grants',
 }
 
 export default function Breadcrumb({ className = '' }) {

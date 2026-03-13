@@ -1,9 +1,8 @@
 # The Cave Methodology: Building with Primitive AI as Curriculum for the Future
 
-**Authors**: W. Glynn, JARVIS
-**Date**: March 2026
+**Authors**: W. Glynn, JARVIS — March 2026
 **Affiliation**: VibeSwap Research
-**Version**: 1.0
+**Version**: 2.0
 
 ---
 
@@ -11,11 +10,13 @@
 
 Current AI development assistants are primitive. They suffer from limited context windows, hallucinations, absence of persistent memory, and no capacity for proactive assistance. Most developers respond to these limitations in one of two ways: rejection (refusing to use AI tools at all) or superficiality (using them only for trivial autocomplete and boilerplate). This paper documents a third approach: treating the limitations as curriculum.
 
-Over 44 sessions of continuous human-AI collaboration spanning February 2025 to March 2026, we developed a systematic methodology — "The Cave Methodology" — for building production-grade software with primitive AI. The methodology produced 98 smart contracts, 3,000+ tests across three testing modalities (unit, fuzz, invariant), a cross-chain port to the Nervos CKB blockchain, a React frontend, a Kalman filter price oracle, a Telegram bot, and a three-node Byzantine fault-tolerant AI network. All of it built in the cave.
+Over 60+ sessions of continuous human-AI collaboration spanning February 2025 to March 2026, we developed a systematic methodology — "The Cave Methodology" — for building production-grade software with primitive AI. The methodology produced 98 smart contracts, 3,000+ tests across three testing modalities (unit, fuzz, invariant), a cross-chain port to the Nervos CKB blockchain, a React frontend, a Kalman filter price oracle, a Telegram bot, and a three-node Byzantine fault-tolerant AI network. All of it built in the cave. No VC funding. No team beyond a single human and an AI that forgets everything between sessions.
 
 The central thesis is this: the practices, patterns, and mental models developed to manage AI limitations today will become foundational when AI reaches full capability. We are not just building software. We are building the skills that will define the future of human-AI development. The cave is not the obstacle. The cave is the curriculum.
 
-**Keywords**: human-AI collaboration, development methodology, knowledge persistence, self-improving systems, AI-augmented software engineering
+Version 2.0 extends the original paper with three new sections: the operational methodology that emerged from sustained cave-building (BIG/SMALL rotation, parallel agents, session chains), the distinction between AI-as-tool and AI-as-co-founder, and the role of knowledge primitives and transparent contribution graphs in producing systems that are simultaneously robust and fair.
+
+**Keywords**: human-AI collaboration, development methodology, knowledge persistence, self-improving systems, AI-augmented software engineering, knowledge primitives, contribution attribution
 
 ---
 

@@ -132,6 +132,8 @@ const COMMANDS = [
   { id: 'create-token', label: 'Token Creator', description: 'Launch your own token with fair distribution', path: '/create-token', category: 'DeFi' },
   { id: 'derivatives', label: 'Derivatives', description: 'Structured products and exotic options', path: '/derivatives', category: 'DeFi' },
   { id: 'dao-tools', label: 'DAO Tools', description: 'Multi-sig, treasury, payroll, governance', path: '/dao-tools', category: 'Community' },
+  { id: 'margin', label: 'Margin Trading', description: 'Isolated margin with up to 10x leverage', path: '/margin', category: 'DeFi' },
+  { id: 'automation', label: 'Automation', description: 'Automated strategies and conditional orders', path: '/automation', category: 'Intelligence' },
 ]
 
 const CATEGORY_COLORS = {

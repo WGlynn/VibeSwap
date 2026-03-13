@@ -176,6 +176,9 @@ const MarketOverviewPage = lazy(() => import('./components/MarketOverviewPage'))
 const TokenCreatorPage = lazy(() => import('./components/TokenCreatorPage'))
 const DerivativesPage = lazy(() => import('./components/DerivativesPage'))
 const DAOToolsPage = lazy(() => import('./components/DAOToolsPage'))
+const MarginTradingPage = lazy(() => import('./components/MarginTradingPage'))
+const SocialProfilePage = lazy(() => import('./components/SocialProfilePage'))
+const AutomationPage = lazy(() => import('./components/AutomationPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -333,6 +336,9 @@ function AnimatedRoutes() {
             <Route path="/create-token" element={<TokenCreatorPage />} />
             <Route path="/derivatives" element={<DerivativesPage />} />
             <Route path="/dao-tools" element={<DAOToolsPage />} />
+            <Route path="/margin" element={<MarginTradingPage />} />
+            <Route path="/user/:address" element={<SocialProfilePage />} />
+            <Route path="/automation" element={<AutomationPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

@@ -155,6 +155,9 @@ const COMMANDS = [
   { id: 'screener', label: 'DEX Screener', description: 'Token analytics and screening', path: '/screener', category: 'DeFi' },
   { id: 'offramp', label: 'Off-Ramp', description: 'Sell crypto to fiat', path: '/offramp', category: 'DeFi' },
   { id: 'whales', label: 'Whale Watcher', description: 'Track large wallet movements', path: '/whales', category: 'Intelligence' },
+  { id: 'rebalance', label: 'Rebalancer', description: 'Auto-rebalance portfolio allocations', path: '/rebalance', category: 'DeFi' },
+  { id: 'lp-optimizer', label: 'LP Optimizer', description: 'Maximize liquidity provision returns', path: '/lp-optimizer', category: 'DeFi' },
+  { id: 'claims', label: 'Airdrop Claims', description: 'Claim all pending airdrop rewards', path: '/claims', category: 'Account' },
 ]
 
 const CATEGORY_COLORS = {

@@ -161,6 +161,19 @@ const COMMANDS = [
   { id: 'sentiment', label: 'Market Sentiment', description: 'Fear & greed index, social signals', path: '/sentiment', category: 'Intelligence' },
   { id: 'priority', label: 'Priority Auction', description: 'Bid for batch execution priority', path: '/priority', category: 'Protocol' },
   { id: 'compare', label: 'Protocol Comparison', description: 'Compare VibeSwap vs other DEXs', path: '/compare', category: 'Knowledge' },
+  { id: 'arbitrage', label: 'Arbitrage Scanner', description: 'Cross-chain arbitrage opportunities', path: '/arbitrage', category: 'Intelligence' },
+  { id: 'contracts', label: 'Smart Contracts', description: 'Contract explorer & interaction', path: '/contracts', category: 'Protocol' },
+  { id: 'unlocks', label: 'Token Unlocks', description: 'Vesting schedules & unlock calendar', path: '/unlocks', category: 'DeFi' },
+  { id: 'jul', label: 'JUL Token', description: 'JUL token info, staking & utility', path: '/jul', category: 'DeFi' },
+  { id: 'trust', label: 'Trust Timeline', description: 'Protocol trust history', path: '/trust', category: 'Knowledge' },
+  { id: 'agentic', label: 'Agentic Economy', description: 'AI-native economic systems', path: '/agentic', category: 'Intelligence' },
+  { id: 'inversion', label: 'Graceful Inversion', description: 'Positive-sum liquidity absorption', path: '/inversion', category: 'Knowledge' },
+  { id: 'rosetta', label: 'Rosetta Protocol', description: 'Universal agent translation', path: '/rosetta', category: 'Protocol' },
+  { id: 'prompts', label: 'Prompt Feed', description: 'Community prompts & responses', path: '/prompts', category: 'Community' },
+  { id: 'abstraction', label: 'Abstraction Ladder', description: 'Protocol complexity layers', path: '/abstraction', category: 'Knowledge' },
+  { id: 'wheel', label: 'Medicine Wheel', description: 'Balanced protocol design', path: '/wheel', category: 'Knowledge' },
+  { id: 'privacy', label: 'Privacy', description: 'Privacy policy', path: '/privacy', category: 'System' },
+  { id: 'proposal', label: 'Proposal Detail', description: 'View a specific governance proposal', path: '/proposal', category: 'Community' },
 ]
 
 const CATEGORY_COLORS = {

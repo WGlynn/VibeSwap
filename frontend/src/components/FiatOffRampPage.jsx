@@ -430,48 +430,27 @@ export default function FiatOffRampPage() {
                     </span>
                   </div>
 
-                  {/* Gross Amount */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">Gross amount</span>
-                    <span className="text-[11px] text-white font-mono">
-                      {formatFiat(grossFiatAmount, selectedCurrency.code)}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-gray-700/30" />
-
-                  {/* Network Fee */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">Network fee</span>
-                    <span className="text-[11px] text-amber-400 font-mono">
-                      -{formatFiat(networkFee, selectedCurrency.code)}
-                    </span>
-                  </div>
-
-                  {/* Bank Fee */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">{selectedPaymentMethod.name} fee</span>
-                    <span className="text-[11px] text-amber-400 font-mono">
-                      -{formatFiat(bankFee, selectedCurrency.code)}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-gray-700/30" />
-
-                  {/* You Receive */}
+                  {/* Fee Breakdown */}
+                  {[
+                    ['Gross amount', formatFiat(grossFiatAmount, selectedCurrency.code), 'text-white'],
+                    ['---'],
+                    ['Network fee', `-${formatFiat(networkFee, selectedCurrency.code)}`, 'text-amber-400'],
+                    [`${selectedPaymentMethod.name} fee`, `-${formatFiat(bankFee, selectedCurrency.code)}`, 'text-amber-400'],
+                    ['---'],
+                  ].map((row, i) => row[0] === '---'
+                    ? <div key={i} className="border-t border-gray-700/30" />
+                    : <div key={i} className="flex justify-between items-center">
+                        <span className="text-[11px] text-gray-500">{row[0]}</span>
+                        <span className={`text-[11px] ${row[2]} font-mono`}>{row[1]}</span>
+                      </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-white font-bold">You receive</span>
-                    <span className="text-sm font-bold font-mono" style={{ color: CYAN }}>
-                      {formatFiat(youReceive, selectedCurrency.code)}
-                    </span>
+                    <span className="text-sm font-bold font-mono" style={{ color: CYAN }}>{formatFiat(youReceive, selectedCurrency.code)}</span>
                   </div>
-
-                  {/* Processing Time */}
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-gray-500">Processing time</span>
-                    <span className="text-[10px] text-cyan-400 font-mono">
-                      {selectedPaymentMethod.processingTime}
-                    </span>
+                    <span className="text-[10px] text-cyan-400 font-mono">{selectedPaymentMethod.processingTime}</span>
                   </div>
                 </div>
 
@@ -511,47 +490,38 @@ export default function FiatOffRampPage() {
             <h2 className="text-lg font-bold text-white mt-1">Payment Methods</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {PAYMENT_METHODS.map((method, i) => (
-              <motion.div
-                key={method.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: (i * 0.08) + (1 / PHI), duration: 1 / (PHI * PHI) }}
-              >
-                <GlassCard
-                  glowColor={method.id === selectedPaymentMethod.id ? 'terminal' : 'none'}
-                  className={`p-4 cursor-pointer transition-all ${
-                    method.id === selectedPaymentMethod.id ? 'ring-1 ring-cyan-500/30' : ''
-                  }`}
-                  onClick={() => setSelectedPaymentMethod(method)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{method.icon}</span>
+            {PAYMENT_METHODS.map((method, i) => {
+              const active = method.id === selectedPaymentMethod.id
+              return (
+                <motion.div key={method.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: (i * 0.08) + (1 / PHI), duration: 1 / (PHI * PHI) }}>
+                  <GlassCard glowColor={active ? 'terminal' : 'none'}
+                    className={`p-4 cursor-pointer transition-all ${active ? 'ring-1 ring-cyan-500/30' : ''}`}
+                    onClick={() => setSelectedPaymentMethod(method)}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{method.icon}</span>
+                        <div>
+                          <div className="text-sm font-bold text-white">{method.name}</div>
+                          <div className="text-[10px] text-gray-500">{method.processingTime}</div>
+                        </div>
+                      </div>
+                      {active && <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
                       <div>
-                        <div className="text-sm font-bold text-white">{method.name}</div>
-                        <div className="text-[10px] text-gray-500">{method.processingTime}</div>
+                        <div className="text-[9px] text-gray-600 uppercase">Fee</div>
+                        <div className="text-xs text-cyan-400 font-mono">{method.fee}</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-gray-600 uppercase">Min / Max</div>
+                        <div className="text-xs text-gray-300 font-mono">${method.minAmount.toLocaleString()} / ${method.maxAmount.toLocaleString()}</div>
                       </div>
                     </div>
-                    {method.id === selectedPaymentMethod.id && (
-                      <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div>
-                      <div className="text-[9px] text-gray-600 uppercase">Fee</div>
-                      <div className="text-xs text-cyan-400 font-mono">{method.fee}</div>
-                    </div>
-                    <div>
-                      <div className="text-[9px] text-gray-600 uppercase">Min / Max</div>
-                      <div className="text-xs text-gray-300 font-mono">
-                        ${method.minAmount.toLocaleString()} / ${method.maxAmount.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </GlassCard>
-              </motion.div>
-            ))}
+                  </GlassCard>
+                </motion.div>
+              )
+            })}
           </div>
         </motion.div>
 
@@ -677,12 +647,9 @@ export default function FiatOffRampPage() {
           <GlassCard glowColor="none" className="overflow-hidden">
             {/* Table Header */}
             <div className="hidden md:grid grid-cols-7 gap-2 px-4 py-2.5 border-b border-gray-700/30 bg-black/20">
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Date</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Token</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Amount</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Received</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Method</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Destination</span>
+              {['Date', 'Token', 'Amount', 'Received', 'Method', 'Destination'].map(h => (
+                <span key={h} className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">{h}</span>
+              ))}
               <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono text-right">Status</span>
             </div>
             {/* Table Rows */}
@@ -692,28 +659,16 @@ export default function FiatOffRampPage() {
               </div>
             ) : (
               filteredHistory.map((row, i) => (
-                <motion.div
-                  key={row.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
+                <motion.div key={row.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.2 }}
-                  className="grid grid-cols-2 md:grid-cols-7 gap-2 px-4 py-3 border-b border-gray-700/10 hover:bg-white/[0.02] transition-colors"
-                >
+                  className="grid grid-cols-2 md:grid-cols-7 gap-2 px-4 py-3 border-b border-gray-700/10 hover:bg-white/[0.02] transition-colors">
                   <div className="text-[11px] text-gray-400 font-mono">{row.date}</div>
-                  <div className="text-[11px] text-white font-mono font-bold">
-                    {TOKENS.find(t => t.symbol === row.token)?.icon || ''} {row.tokenAmount} {row.token}
-                  </div>
-                  <div className="text-[11px] text-gray-300 font-mono hidden md:block">
-                    {formatFiat(row.fiatAmount, row.currency)}
-                  </div>
-                  <div className="text-[11px] text-cyan-400 font-mono hidden md:block">
-                    {formatFiat(row.fiatAmount, row.currency)}
-                  </div>
+                  <div className="text-[11px] text-white font-mono font-bold">{TOKENS.find(t => t.symbol === row.token)?.icon || ''} {row.tokenAmount} {row.token}</div>
+                  <div className="text-[11px] text-gray-300 font-mono hidden md:block">{formatFiat(row.fiatAmount, row.currency)}</div>
+                  <div className="text-[11px] text-cyan-400 font-mono hidden md:block">{formatFiat(row.fiatAmount, row.currency)}</div>
                   <div className="text-[11px] text-gray-400 font-mono hidden md:block">{row.method}</div>
                   <div className="text-[11px] text-gray-500 font-mono hidden md:block">{row.destination}</div>
-                  <div className="text-right">
-                    <StatusBadge status={row.status} />
-                  </div>
+                  <div className="text-right"><StatusBadge status={row.status} /></div>
                 </motion.div>
               ))
             )}
@@ -731,18 +686,14 @@ export default function FiatOffRampPage() {
           </div>
           <GlassCard glowColor="terminal" className="p-5">
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2">
-              {SUPPORTED_COUNTRIES.map((country, i) => (
-                <motion.div
-                  key={country.code}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
+              {SUPPORTED_COUNTRIES.map((c, i) => (
+                <motion.div key={c.code} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: (i * 0.03) + (4 / PHI), duration: 1 / (PHI * PHI * PHI) }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20 border border-gray-700/20 hover:border-cyan-500/20 hover:bg-cyan-500/5 transition-all cursor-default"
-                >
-                  <span className="text-lg">{country.flag}</span>
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20 border border-gray-700/20 hover:border-cyan-500/20 hover:bg-cyan-500/5 transition-all cursor-default">
+                  <span className="text-lg">{c.flag}</span>
                   <div>
-                    <div className="text-[11px] text-white font-mono">{country.name}</div>
-                    <div className="text-[9px] text-gray-600 font-mono">{country.code}</div>
+                    <div className="text-[11px] text-white font-mono">{c.name}</div>
+                    <div className="text-[9px] text-gray-600 font-mono">{c.code}</div>
                   </div>
                 </motion.div>
               ))}
@@ -762,98 +713,52 @@ export default function FiatOffRampPage() {
           <GlassCard glowColor="matrix" className="overflow-hidden">
             {/* Comparison Header */}
             <div className="hidden md:grid grid-cols-6 gap-2 px-4 py-2.5 border-b border-gray-700/30 bg-black/20">
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Provider</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Fee</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Spread</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Speed</span>
-              <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">Rating</span>
+              {['Provider', 'Fee', 'Spread', 'Speed', 'Rating'].map(h => (
+                <span key={h} className="text-[9px] text-gray-600 uppercase tracking-wider font-mono">{h}</span>
+              ))}
               <span className="text-[9px] text-gray-600 uppercase tracking-wider font-mono text-right">
                 {sellAmount && parseFloat(sellAmount) > 0 ? 'You Receive' : 'Effective Cost'}
               </span>
             </div>
-            {/* Provider Rows */}
-            {PROVIDERS.map((provider, i) => {
-              const effectiveFeeRate = parseFloat(provider.fee) / 100 + parseFloat(provider.spread) / 100
-              const effectiveReceive = grossFiatAmount > 0
-                ? grossFiatAmount * (1 - effectiveFeeRate)
-                : 0
-
+            {PROVIDERS.map((p, i) => {
+              const totalFee = parseFloat(p.fee) / 100 + parseFloat(p.spread) / 100
+              const recv = grossFiatAmount > 0 ? grossFiatAmount * (1 - totalFee) : 0
+              const hl = p.highlight
               return (
-                <motion.div
-                  key={provider.name}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
+                <motion.div key={p.name} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06 + (5 / PHI), duration: 0.2 }}
-                  className={`grid grid-cols-3 md:grid-cols-6 gap-2 px-4 py-3 border-b border-gray-700/10 transition-colors ${
-                    provider.highlight
-                      ? 'bg-cyan-500/5 hover:bg-cyan-500/10'
-                      : 'hover:bg-white/[0.02]'
-                  }`}
-                >
+                  className={`grid grid-cols-3 md:grid-cols-6 gap-2 px-4 py-3 border-b border-gray-700/10 transition-colors ${hl ? 'bg-cyan-500/5 hover:bg-cyan-500/10' : 'hover:bg-white/[0.02]'}`}>
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold font-mono ${provider.highlight ? 'text-cyan-400' : 'text-white'}`}>
-                      {provider.name}
-                    </span>
-                    {provider.highlight && (
-                      <span className="px-1.5 py-0.5 rounded text-[8px] font-mono bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                        BEST
-                      </span>
-                    )}
+                    <span className={`text-sm font-bold font-mono ${hl ? 'text-cyan-400' : 'text-white'}`}>{p.name}</span>
+                    {hl && <span className="px-1.5 py-0.5 rounded text-[8px] font-mono bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">BEST</span>}
                   </div>
-                  <div className={`text-[11px] font-mono ${provider.highlight ? 'text-green-400' : 'text-gray-300'}`}>
-                    {provider.fee}
-                  </div>
-                  <div className={`text-[11px] font-mono hidden md:block ${provider.highlight ? 'text-green-400' : 'text-gray-300'}`}>
-                    {provider.spread}
-                  </div>
-                  <div className="text-[11px] text-gray-400 font-mono hidden md:block">
-                    {provider.speed}
-                  </div>
+                  <div className={`text-[11px] font-mono ${hl ? 'text-green-400' : 'text-gray-300'}`}>{p.fee}</div>
+                  <div className={`text-[11px] font-mono hidden md:block ${hl ? 'text-green-400' : 'text-gray-300'}`}>{p.spread}</div>
+                  <div className="text-[11px] text-gray-400 font-mono hidden md:block">{p.speed}</div>
                   <div className="hidden md:flex items-center gap-0.5">
                     {Array.from({ length: 5 }).map((_, si) => (
-                      <div
-                        key={si}
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          si < provider.rating ? 'bg-cyan-400' : 'bg-gray-700'
-                        }`}
-                      />
+                      <div key={si} className={`w-1.5 h-1.5 rounded-full ${si < p.rating ? 'bg-cyan-400' : 'bg-gray-700'}`} />
                     ))}
                   </div>
                   <div className="text-right">
-                    {grossFiatAmount > 0 ? (
-                      <span className={`text-[11px] font-bold font-mono ${
-                        provider.highlight ? 'text-cyan-400' : 'text-gray-300'
-                      }`}>
-                        {formatFiat(effectiveReceive, selectedCurrency.code)}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-gray-500 font-mono">
-                        {(effectiveFeeRate * 100).toFixed(2)}% total
-                      </span>
-                    )}
+                    {grossFiatAmount > 0
+                      ? <span className={`text-[11px] font-bold font-mono ${hl ? 'text-cyan-400' : 'text-gray-300'}`}>{formatFiat(recv, selectedCurrency.code)}</span>
+                      : <span className="text-[11px] text-gray-500 font-mono">{(totalFee * 100).toFixed(2)}% total</span>
+                    }
                   </div>
                 </motion.div>
               )
             })}
             {/* Savings Callout */}
             {grossFiatAmount > 0 && (
-              <div className="px-4 py-3 bg-green-500/5 border-t border-green-500/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                    <span className="text-[11px] text-green-400 font-mono">
-                      You save up to{' '}
-                      {formatFiat(
-                        grossFiatAmount * (parseFloat(PROVIDERS[1].fee) / 100 + parseFloat(PROVIDERS[1].spread) / 100),
-                        selectedCurrency.code
-                      )}{' '}
-                      vs {PROVIDERS[1].name}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-gray-500 font-mono">
-                    Based on {sellAmount || '0'} {selectedToken.symbol}
+              <div className="px-4 py-3 bg-green-500/5 border-t border-green-500/20 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-[11px] text-green-400 font-mono">
+                    You save up to {formatFiat(grossFiatAmount * (parseFloat(PROVIDERS[1].fee) / 100 + parseFloat(PROVIDERS[1].spread) / 100), selectedCurrency.code)} vs {PROVIDERS[1].name}
                   </span>
                 </div>
+                <span className="text-[10px] text-gray-500 font-mono">Based on {sellAmount || '0'} {selectedToken.symbol}</span>
               </div>
             )}
           </GlassCard>

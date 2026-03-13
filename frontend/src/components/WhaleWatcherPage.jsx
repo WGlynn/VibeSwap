@@ -533,103 +533,55 @@ export default function WhaleWatcherPage() {
             <GlassCard glowColor="warning" className="p-6">
               <SectionHeader tag="alerts" title="Whale Alerts" subtitle="Configure notifications for large wallet movements" />
 
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-3 gap-4">
                 {/* Threshold */}
                 <div className="bg-black-800/40 rounded-xl p-4 border border-black-800">
-                  <div className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider mb-3">
-                    Alert Threshold
-                  </div>
-                  <div className="space-y-3">
+                  <div className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider mb-3">Alert Threshold</div>
+                  <div className="space-y-2">
                     {[50_000, 100_000, 250_000, 500_000, 1_000_000].map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => setAlertThreshold(val)}
-                        className={`w-full px-3 py-2 rounded-lg text-xs font-mono text-left transition-colors border ${
-                          alertThreshold === val
-                            ? 'bg-cyan-400/10 border-cyan-400/30 text-cyan-400'
-                            : 'bg-black-800/30 border-black-700/50 text-black-400 hover:text-black-300 hover:border-black-600'
-                        }`}
-                      >
+                      <button key={val} onClick={() => setAlertThreshold(val)}
+                        className={`w-full px-3 py-1.5 rounded-lg text-xs font-mono text-left transition-colors border ${
+                          alertThreshold === val ? 'bg-cyan-400/10 border-cyan-400/30 text-cyan-400'
+                          : 'bg-black-800/30 border-black-700/50 text-black-400 hover:text-black-300'}`}>
                         {'>'} {fmt(val)} moves
                       </button>
                     ))}
                   </div>
                 </div>
-
                 {/* Token Selection */}
                 <div className="bg-black-800/40 rounded-xl p-4 border border-black-800">
-                  <div className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider mb-3">
-                    Tracked Tokens
-                  </div>
+                  <div className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider mb-3">Tracked Tokens</div>
                   <div className="grid grid-cols-2 gap-2">
                     {TOKENS.map((token) => (
-                      <button
-                        key={token}
-                        onClick={() => toggleAlertToken(token)}
-                        className={`px-3 py-2 rounded-lg text-xs font-mono transition-colors border ${
-                          alertTokens.includes(token)
-                            ? 'bg-cyan-400/10 border-cyan-400/30 text-cyan-400'
-                            : 'bg-black-800/30 border-black-700/50 text-black-500 hover:text-black-300'
-                        }`}
-                      >
+                      <button key={token} onClick={() => toggleAlertToken(token)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-colors border ${
+                          alertTokens.includes(token) ? 'bg-cyan-400/10 border-cyan-400/30 text-cyan-400'
+                          : 'bg-black-800/30 border-black-700/50 text-black-500 hover:text-black-300'}`}>
                         {token}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                {/* Notification Toggle + Summary */}
+                {/* Status + Recent */}
                 <div className="bg-black-800/40 rounded-xl p-4 border border-black-800">
-                  <div className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider mb-3">
-                    Notification Status
+                  <div className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider mb-3">Status</div>
+                  <button onClick={() => setAlertsEnabled(!alertsEnabled)}
+                    className={`w-full px-4 py-2.5 rounded-xl text-sm font-mono font-medium transition-all border mb-3 ${
+                      alertsEnabled ? 'bg-green-400/10 border-green-400/30 text-green-400' : 'bg-black-800/30 border-black-700/50 text-black-500'}`}>
+                    {alertsEnabled ? 'Alerts Enabled' : 'Alerts Disabled'}
+                  </button>
+                  <div className="space-y-1.5 text-xs font-mono mb-3">
+                    <div className="flex justify-between text-black-400"><span>Threshold</span><span className="text-black-300">{fmt(alertThreshold)}</span></div>
+                    <div className="flex justify-between text-black-400"><span>Tokens</span><span className="text-black-300">{alertTokens.length} selected</span></div>
                   </div>
-                  <div className="space-y-4">
-                    <button
-                      onClick={() => setAlertsEnabled(!alertsEnabled)}
-                      className={`w-full px-4 py-3 rounded-xl text-sm font-mono font-medium transition-all border ${
-                        alertsEnabled
-                          ? 'bg-green-400/10 border-green-400/30 text-green-400'
-                          : 'bg-black-800/30 border-black-700/50 text-black-500'
-                      }`}
-                    >
-                      {alertsEnabled ? 'Alerts Enabled' : 'Alerts Disabled'}
-                    </button>
-
-                    <div className="space-y-2 text-xs font-mono">
-                      <div className="flex justify-between text-black-400">
-                        <span>Threshold</span>
-                        <span className="text-black-300">{fmt(alertThreshold)}</span>
+                  <div className="border-t border-black-700/50 pt-2">
+                    <div className="text-[10px] font-mono text-black-500 uppercase tracking-wider mb-1.5">Recent Alerts</div>
+                    {[{ token: 'ETH', amount: 2_340_000, dir: 'in', time: '12m' }, { token: 'WBTC', amount: 890_000, dir: 'out', time: '47m' }, { token: 'ETH', amount: 1_120_000, dir: 'in', time: '2h' }].map((a, i) => (
+                      <div key={i} className="flex items-center justify-between py-0.5 text-[11px] font-mono">
+                        <div className="flex items-center gap-1.5"><div className={`w-1 h-1 rounded-full ${a.dir === 'in' ? 'bg-green-400' : 'bg-red-400'}`} /><span className="text-black-400">{a.token}</span></div>
+                        <span className="text-black-300">{fmt(a.amount)}</span><span className="text-black-500">{a.time}</span>
                       </div>
-                      <div className="flex justify-between text-black-400">
-                        <span>Tokens</span>
-                        <span className="text-black-300">{alertTokens.length} selected</span>
-                      </div>
-                      <div className="flex justify-between text-black-400">
-                        <span>Status</span>
-                        <span className={alertsEnabled ? 'text-green-400' : 'text-red-400'}>
-                          {alertsEnabled ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Recent Alert History */}
-                    <div className="border-t border-black-700/50 pt-3">
-                      <div className="text-[10px] font-mono text-black-500 uppercase tracking-wider mb-2">Recent Alerts</div>
-                      {[
-                        { token: 'ETH', amount: 2_340_000, dir: 'in', time: '12m' },
-                        { token: 'WBTC', amount: 890_000, dir: 'out', time: '47m' },
-                        { token: 'ETH', amount: 1_120_000, dir: 'in', time: '2h' },
-                      ].map((alert, i) => (
-                        <div key={i} className="flex items-center justify-between py-1 text-[11px] font-mono">
-                          <div className="flex items-center gap-1.5">
-                            <div className={`w-1 h-1 rounded-full ${alert.dir === 'in' ? 'bg-green-400' : 'bg-red-400'}`} />
-                            <span className="text-black-400">{alert.token}</span>
-                          </div>
-                          <span className="text-black-300">{fmt(alert.amount)}</span>
-                          <span className="text-black-500">{alert.time} ago</span>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>

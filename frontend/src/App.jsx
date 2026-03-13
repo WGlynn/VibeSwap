@@ -18,6 +18,7 @@ import Footer from './components/ui/Footer'
 import { useSynaptic } from './hooks/useSynaptic'
 import { usePageTitle } from './hooks/usePageTitle'
 import { FavoritesProvider } from './contexts/FavoritesContext'
+import { GasProvider } from './contexts/GasContext'
 import MobileNav from './components/ui/MobileNav'
 import { remember } from './utils/sankofa'
 
@@ -354,6 +355,7 @@ function App() {
 
   return (
     <ToastProvider>
+    <GasProvider>
     <FavoritesProvider>
     <MessagingProvider>
     <ContributionsProvider>
@@ -394,6 +396,7 @@ function App() {
     </ContributionsProvider>
     </MessagingProvider>
     </FavoritesProvider>
+    </GasProvider>
     </ToastProvider>
   )
 }

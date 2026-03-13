@@ -237,6 +237,9 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/staking-rewards', label: 'Staking Rewards', icon: '💎' },
       { path: '/onramp', label: 'Buy with Fiat', icon: '💵' },
       { path: '/farming', label: 'Liquidity Mining', icon: '🌾' },
+      { path: '/otc', label: 'OTC Desk', icon: '🏢' },
+      { path: '/lp-positions', label: 'LP Positions', icon: '📐' },
+      { path: '/markets', label: 'Markets', icon: '📊' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },
@@ -257,6 +260,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/live', label: 'Live', icon: '🔴' },
       { path: '/proposals', label: 'Proposals', icon: '📋' },
       { path: '/treasury', label: 'Treasury', icon: '🏛' },
+      { path: '/grants', label: 'Grants', icon: '💰' },
     ]},
     { label: 'Intelligence', items: [
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
@@ -285,6 +289,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/oracle', label: 'Oracle', icon: '👁' },
       { path: '/circuit-breaker', label: 'Circuit Breaker', icon: '⚡' },
       { path: '/crosschain', label: 'Cross-Chain', icon: '🔗' },
+      { path: '/networks', label: 'Networks', icon: '🌐' },
+      { path: '/fees', label: 'Fee Tiers', icon: '💲' },
       { path: '/security', label: 'Security', icon: '🛡' },
       { path: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
       { path: '/referral', label: 'Referrals', icon: '🤝' },
@@ -442,6 +448,9 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             { path: '/watchlist', label: 'Watchlist', icon: '👁' },
             { path: '/achievements', label: 'Achievements', icon: '🏆' },
             { path: '/swap-history', label: 'Swap History', icon: '📜' },
+            { path: '/portfolio-analytics', label: 'Analytics', icon: '📈' },
+            { path: '/bridge-history', label: 'Bridge History', icon: '🌉' },
+            { path: '/approvals', label: 'Approvals', icon: '✅' },
           ].map((item) => (
             <Link
               key={item.path}

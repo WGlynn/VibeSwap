@@ -36,6 +36,13 @@ function HeaderMinimal() {
     return () => clearInterval(interval)
   }, [])
 
+  // Listen for MobileNav "More" button
+  useEffect(() => {
+    const handler = () => setShowDrawer(true)
+    window.addEventListener('vibeswap:open-drawer', handler)
+    return () => window.removeEventListener('vibeswap:open-drawer', handler)
+  }, [])
+
   // Combined wallet state - connected if EITHER wallet type is connected
   const isConnected = isExternalConnected || isDeviceConnected
   const shortAddress = externalShortAddress || deviceShortAddress
@@ -219,6 +226,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/launchpad', label: 'Launchpad', icon: '🚀' },
       { path: '/rewards', label: 'Rewards', icon: '🎁' },
       { path: '/mine', label: 'Mine JUL', icon: '⛏' },
+      { path: '/multisend', label: 'Multi-Send', icon: '📨' },
+      { path: '/limit', label: 'Limit Orders', icon: '📋' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },
@@ -414,6 +423,10 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             { path: '/profile', label: 'Profile', icon: '👤' },
             { path: '/settings', label: 'Settings', icon: '⚙️' },
             { path: '/tutorial', label: 'Getting Started', icon: '📖' },
+            { path: '/badges', label: 'Badges', icon: '🏅' },
+            { path: '/alerts', label: 'Price Alerts', icon: '🔔' },
+            { path: '/export', label: 'Export Data', icon: '📤' },
+            { path: '/airdrop', label: 'Airdrop', icon: '🪂' },
           ].map((item) => (
             <Link
               key={item.path}

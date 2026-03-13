@@ -152,6 +152,9 @@ const COMMANDS = [
   { id: 'snapshot', label: 'Snapshots', description: 'Off-chain governance voting', path: '/snapshot', category: 'Community' },
   { id: 'tax', label: 'Tax Reports', description: 'Generate crypto tax reports', path: '/tax', category: 'Account' },
   { id: 'referral-dashboard', label: 'Referral Dashboard', description: 'Detailed referral analytics', path: '/referral-dashboard', category: 'Account' },
+  { id: 'screener', label: 'DEX Screener', description: 'Token analytics and screening', path: '/screener', category: 'DeFi' },
+  { id: 'offramp', label: 'Off-Ramp', description: 'Sell crypto to fiat', path: '/offramp', category: 'DeFi' },
+  { id: 'whales', label: 'Whale Watcher', description: 'Track large wallet movements', path: '/whales', category: 'Intelligence' },
 ]
 
 const CATEGORY_COLORS = {

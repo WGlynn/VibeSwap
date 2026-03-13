@@ -119,6 +119,8 @@ const COMMANDS = [
   { id: 'bridge-history', label: 'Bridge History', description: 'Cross-chain transfer history', path: '/bridge-history', category: 'Protocol' },
   { id: 'token-vibe', label: 'VIBE Token', description: 'Token details & analytics', path: '/token/VIBE', category: 'DeFi' },
   { id: 'treasury', label: 'Treasury', description: 'DAO treasury dashboard & assets', path: '/treasury', category: 'Community' },
+  { id: 'otc', label: 'OTC Desk', description: 'Large block trades & RFQs', path: '/otc', category: 'DeFi' },
+  { id: 'fees', label: 'Fee Structure', description: 'Fee tiers, volume discounts', path: '/fees', category: 'Protocol' },
 ]
 
 const CATEGORY_COLORS = {

@@ -108,6 +108,8 @@ const ROUTE_LABELS = {
   token: 'Token',
   pool: 'Pool',
   treasury: 'Treasury',
+  otc: 'OTC Desk',
+  fees: 'Fee Structure',
 }
 
 export default function Breadcrumb({ className = '' }) {

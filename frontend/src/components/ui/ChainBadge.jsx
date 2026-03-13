@@ -1,54 +1,105 @@
-import { memo } from 'react'
-
 // ============================================================
-// Chain Badge — Reusable blockchain network indicator
-// Shows chain name with colored dot, used in Bridge, CrossChain, etc.
+// ChainBadge — Reusable chain/network identifier badge
+// Variants: dot (8px colored circle) | pill (colored pill w/ abbreviation)
+// Used in Bridge, CrossChain, token selectors, etc.
 // ============================================================
 
-const CHAINS = {
-  ethereum: { name: 'Ethereum', color: '#627eea', shortName: 'ETH' },
-  arbitrum: { name: 'Arbitrum', color: '#28a0f0', shortName: 'ARB' },
-  base: { name: 'Base', color: '#0052ff', shortName: 'BASE' },
-  optimism: { name: 'Optimism', color: '#ff0420', shortName: 'OP' },
-  solana: { name: 'Solana', color: '#9945ff', shortName: 'SOL' },
-  nervos: { name: 'Nervos CKB', color: '#3cc68a', shortName: 'CKB' },
-  avalanche: { name: 'Avalanche', color: '#e84142', shortName: 'AVAX' },
-  polygon: { name: 'Polygon', color: '#8247e5', shortName: 'MATIC' },
-  bsc: { name: 'BNB Chain', color: '#f0b90b', shortName: 'BSC' },
-  fantom: { name: 'Fantom', color: '#1969ff', shortName: 'FTM' },
+// ============ Chain Color Map ============
+const CHAIN_MAP = {
+  Ethereum:  { color: '#627eea', abbr: 'ET' },
+  Base:      { color: '#0052ff', abbr: 'BA' },
+  Arbitrum:  { color: '#28a0f0', abbr: 'AR' },
+  Optimism:  { color: '#ff0420', abbr: 'OP' },
+  Polygon:   { color: '#8247e5', abbr: 'PO' },
+  BNB:       { color: '#f3ba2f', abbr: 'BN' },
+  Avalanche: { color: '#e84142', abbr: 'AV' },
+  Solana:    { color: '#9945ff', abbr: 'SO' },
+  CKB:       { color: '#3cc68a', abbr: 'CK' },
 }
 
-function ChainBadge({ chain, size = 'sm', showName = true, active = true, className = '' }) {
-  const info = CHAINS[chain] || { name: chain, color: '#666', shortName: chain?.slice(0, 4)?.toUpperCase() }
+// ============ Fallback Resolver ============
+function resolveChain(chain) {
+  if (CHAIN_MAP[chain]) return CHAIN_MAP[chain]
 
-  const sizes = {
-    xs: { dot: 'w-1.5 h-1.5', text: 'text-[9px]', px: 'px-1.5 py-0.5' },
-    sm: { dot: 'w-2 h-2', text: 'text-[10px]', px: 'px-2 py-1' },
-    md: { dot: 'w-2.5 h-2.5', text: 'text-xs', px: 'px-3 py-1.5' },
+  // Case-insensitive lookup
+  const key = Object.keys(CHAIN_MAP).find(
+    (k) => k.toLowerCase() === chain.toLowerCase()
+  )
+  if (key) return CHAIN_MAP[key]
+
+  // Unknown chain fallback
+  return {
+    color: '#6b7280',
+    abbr: chain.slice(0, 2).toUpperCase(),
   }
-  const s = sizes[size] || sizes.sm
+}
 
+// ============ Dot Variant ============
+function DotBadge({ color, className }) {
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 rounded-full font-mono ${s.px} ${className}`}
+    <span
+      className={`inline-block shrink-0 rounded-full ${className}`}
       style={{
-        backgroundColor: `${info.color}10`,
-        border: `1px solid ${info.color}30`,
-        opacity: active ? 1 : 0.5,
+        width: 8,
+        height: 8,
+        backgroundColor: color,
+        boxShadow: `0 0 4px ${color}40`,
       }}
-    >
-      <div
-        className={`${s.dot} rounded-full shrink-0 ${active ? 'animate-pulse' : ''}`}
-        style={{ backgroundColor: info.color }}
-      />
-      {showName && (
-        <span className={`${s.text} font-medium`} style={{ color: info.color }}>
-          {info.shortName}
-        </span>
-      )}
-    </div>
+    />
   )
 }
 
-export default memo(ChainBadge)
-export { CHAINS }
+// ============ Pill Variant ============
+function PillBadge({ color, abbr, name, showName, className }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full font-mono ${className}`}
+      style={{
+        padding: '2px 8px',
+        fontSize: showName ? 10 : 8,
+        lineHeight: 1.4,
+        backgroundColor: `${color}14`,
+        border: `1px solid ${color}30`,
+        color: color,
+      }}
+    >
+      <span
+        className="inline-block shrink-0 rounded-full"
+        style={{
+          width: 6,
+          height: 6,
+          backgroundColor: color,
+        }}
+      />
+      <span className="font-semibold tracking-wide">
+        {showName ? name : abbr}
+      </span>
+    </span>
+  )
+}
+
+// ============ ChainBadge Component ============
+export default function ChainBadge({
+  chain = 'Ethereum',
+  variant = 'pill',
+  showName = false,
+  className = '',
+}) {
+  const { color, abbr } = resolveChain(chain)
+
+  if (variant === 'dot') {
+    return <DotBadge color={color} className={className} />
+  }
+
+  return (
+    <PillBadge
+      color={color}
+      abbr={abbr}
+      name={chain}
+      showName={showName}
+      className={className}
+    />
+  )
+}
+
+export { CHAIN_MAP }

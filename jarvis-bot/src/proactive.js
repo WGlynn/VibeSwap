@@ -5,6 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
+import { config } from './config.js'
 
 const DATA_DIR = process.env.DATA_DIR || './data'
 const PROACTIVE_FILE = join(DATA_DIR, 'proactive-state.json')
@@ -271,15 +272,22 @@ async function postToShowerThoughtPlatforms(content, topic, postNum, totalPosts)
             results.twitter = await socialFn.postTweet(content)
           }
           break
-        case 'telegram':
+        case 'telegram': {
+          const tgChatId = parseInt(process.env.COMMUNITY_CHAT_ID, 10)
+          // Respect tag-only restriction — no proactive posts to tag-only chats
+          if (tgChatId && config.tagOnlyChatIds?.includes(tgChatId)) {
+            results.telegram = { skipped: 'tag-only chat — no proactive posting' }
+            break
+          }
           if (socialFn.postTelegram) {
             results.telegram = await socialFn.postTelegram(content)
-          } else if (chatFn && process.env.COMMUNITY_CHAT_ID) {
+          } else if (chatFn && tgChatId) {
             // Fallback: post to community Telegram group directly
-            chatFn(process.env.COMMUNITY_CHAT_ID, content)
+            chatFn(tgChatId, content)
             results.telegram = { sent: true }
           }
           break
+        }
         case 'discord':
           if (socialFn.postDiscord) {
             results.discord = await socialFn.postDiscord(content)

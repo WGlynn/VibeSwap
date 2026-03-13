@@ -258,6 +258,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/rwa', label: 'Real World Assets', icon: '🏠' },
       { path: '/infofi', label: 'InfoFi', icon: '💡' },
       { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
+      { path: '/names', label: '.vibe Names', icon: '🏷' },
       { path: '/govern', label: 'Governance', icon: '🗳️' },
     ]},
     { label: 'Community', items: [

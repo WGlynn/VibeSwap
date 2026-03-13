@@ -209,6 +209,7 @@ const ProtocolComparisonPage = lazy(() => import('./components/ProtocolCompariso
 const ArbitragePage = lazy(() => import('./components/ArbitragePage'))
 const SmartContractPage = lazy(() => import('./components/SmartContractPage'))
 const TokenUnlockPage = lazy(() => import('./components/TokenUnlockPage'))
+const VibeNamesPage = lazy(() => import('./components/VibeNamesPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -399,6 +400,7 @@ function AnimatedRoutes() {
             <Route path="/arbitrage" element={<ArbitragePage />} />
             <Route path="/contracts" element={<SmartContractPage />} />
             <Route path="/unlocks" element={<TokenUnlockPage />} />
+            <Route path="/names" element={<VibeNamesPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

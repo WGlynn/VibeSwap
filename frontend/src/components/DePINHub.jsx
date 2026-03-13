@@ -1,18 +1,26 @@
-import { useState, useEffect, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import GlassCard from './ui/GlassCard'
 
 // ============================================================
 // DePIN Hub — Decentralized Physical Infrastructure Networks
-// Node registration, network health, rewards, leaderboard
+// Node map, hardware registry, earnings calculator,
+// network health with sparklines, registration flow
 // ============================================================
 
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
 const CYAN_DIM = 'rgba(6,182,212,0.12)'
 const CYAN_GLOW = 'rgba(6,182,212,0.35)'
+
+// ============ Seeded PRNG ============
+
+function seededRandom(seed) {
+  let s = seed
+  return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647 }
+}
 
 // ============ Section Wrapper ============
 
@@ -28,6 +36,23 @@ function Section({ title, subtitle, children, delay = 0 }) {
       )}
       {children}
     </motion.section>
+  )
+}
+
+// ============ Sparkline ============
+
+function Sparkline({ data, width = 80, height = 24, color = CYAN }) {
+  const max = Math.max(...data), min = Math.min(...data)
+  const range = max - min || 1
+  const points = data.map((v, i) =>
+    `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * (height - 4) - 2}`
+  ).join(' ')
+  return (
+    <svg width={width} height={height} className="inline-block align-middle">
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.8} />
+      <circle cx={(data.length - 1) / (data.length - 1) * width} cy={height - ((data[data.length - 1] - min) / range) * (height - 4) - 2}
+        r="2" fill={color} opacity={0.9} />
+    </svg>
   )
 }
 
@@ -63,12 +88,12 @@ const MY_NODES_MOCK = [
   { id: 'node-003', type: 'Bandwidth', region: 'AP-South', status: 'degraded', uptime: 97.12, earned: 214.5, pending: 3.2 },
 ]
 
-const HARDWARE_REQS = [
-  { type: 'Compute', cpu: '8+ cores', ram: '32 GB', storage: '500 GB SSD', network: '1 Gbps', gpu: 'RTX 3080+' },
-  { type: 'Storage', cpu: '4+ cores', ram: '16 GB', storage: '10 TB HDD', network: '500 Mbps', gpu: 'N/A' },
-  { type: 'Bandwidth', cpu: '2+ cores', ram: '8 GB', storage: '100 GB SSD', network: '10 Gbps', gpu: 'N/A' },
-  { type: 'Oracle', cpu: '4+ cores', ram: '16 GB', storage: '256 GB SSD', network: '1 Gbps', gpu: 'N/A' },
-  { type: 'Sensor', cpu: 'ARM Cortex', ram: '512 MB', storage: '8 GB eMMC', network: 'LoRa/WiFi', gpu: 'N/A' },
+const HARDWARE_REGISTRY = [
+  { type: 'Compute', cpu: '8+ cores (x86_64)', ram: '32 GB DDR4', storage: '500 GB NVMe', network: '1 Gbps symmetric', gpu: 'RTX 3080+ / A4000+', power: '350W', rewardRate: 18.4, tier: 'Pro' },
+  { type: 'Storage', cpu: '4+ cores', ram: '16 GB DDR4', storage: '10 TB HDD (RAID)', network: '500 Mbps', gpu: 'N/A', power: '120W', rewardRate: 12.7, tier: 'Standard' },
+  { type: 'Bandwidth', cpu: '2+ cores', ram: '8 GB', storage: '100 GB SSD', network: '10 Gbps symmetric', gpu: 'N/A', power: '65W', rewardRate: 8.2, tier: 'Lite' },
+  { type: 'Oracle', cpu: '4+ cores', ram: '16 GB DDR4', storage: '256 GB NVMe', network: '1 Gbps low-latency', gpu: 'N/A', power: '90W', rewardRate: 24.1, tier: 'Pro' },
+  { type: 'Sensor', cpu: 'ARM Cortex-A72+', ram: '512 MB', storage: '8 GB eMMC', network: 'LoRa / WiFi 6', gpu: 'N/A', power: '5W', rewardRate: 6.9, tier: 'Micro' },
 ]
 
 const LEADERBOARD = [
@@ -80,8 +105,6 @@ const LEADERBOARD = [
   { rank: 6, addr: '0x5fC3...a09B', type: 'Compute', uptime: 99.93, rewards: 3421.7 },
   { rank: 7, addr: '0x8dA7...e42F', type: 'Oracle', uptime: 99.91, rewards: 3198.5 },
   { rank: 8, addr: '0x2eB1...6fC8', type: 'Storage', uptime: 99.89, rewards: 2987.3 },
-  { rank: 9, addr: '0xC14a...3bD2', type: 'Sensor', uptime: 99.87, rewards: 2756.1 },
-  { rank: 10, addr: '0x9F6e...1aE4', type: 'Bandwidth', uptime: 99.84, rewards: 2534.9 },
 ]
 
 const PARTNERS = [
@@ -93,29 +116,6 @@ const PARTNERS = [
   { name: 'Akash', desc: 'Cloud compute marketplace', color: '#FF5A47' },
 ]
 
-const REWARD_DIST = [
-  { type: 'Compute', amount: 98400, pct: 34.6 }, { type: 'Oracle', amount: 57200, pct: 20.1 },
-  { type: 'Storage', amount: 52300, pct: 18.4 }, { type: 'Bandwidth', amount: 48700, pct: 17.1 },
-  { type: 'Sensor', amount: 27750, pct: 9.8 },
-]
-
-const PULSE_PATHS = [
-  { from: { x: 60, y: 50 }, to: { x: 180, y: 30 }, dur: 2.2 },
-  { from: { x: 180, y: 30 }, to: { x: 320, y: 45 }, dur: 1.8 },
-  { from: { x: 320, y: 45 }, to: { x: 380, y: 70 }, dur: 2.5 },
-  { from: { x: 100, y: 80 }, to: { x: 250, y: 60 }, dur: 3.0 },
-  { from: { x: 250, y: 60 }, to: { x: 400, y: 35 }, dur: 2.0 },
-  { from: { x: 200, y: 20 }, to: { x: 60, y: 50 }, dur: 2.8 },
-]
-
-const PULSE_NODES = [
-  { x: 60, y: 50, label: 'Sensor' }, { x: 180, y: 30, label: 'Oracle' },
-  { x: 200, y: 70, label: 'Storage' }, { x: 320, y: 45, label: 'Compute' },
-  { x: 380, y: 70, label: 'Bandwidth' }, { x: 400, y: 25, label: 'User' },
-  { x: 100, y: 80, label: 'Relay' }, { x: 250, y: 15, label: 'Bridge' },
-]
-
-const REGIONS = ['US-East', 'US-West', 'EU-West', 'EU-Central', 'AP-South', 'AP-East']
 const CONTINENT_PATHS = [
   'M40,30 Q55,20 75,28 L85,25 Q100,20 110,30 L105,45 Q95,55 80,50 L60,48 Q45,45 40,30Z',
   'M100,50 Q115,55 120,70 L110,82 Q100,85 95,75 L100,50Z',
@@ -125,16 +125,30 @@ const CONTINENT_PATHS = [
   'M350,55 Q365,50 380,55 L385,70 Q375,82 360,78 L350,65Z',
 ]
 
-const HEALTH_METRICS = [
-  { label: 'Total Bandwidth', value: '847 Tbps', sub: '+12.4% this week' },
-  { label: 'Compute Hours', value: '2.1M hrs', sub: '67 active clusters' },
-  { label: 'Storage Capacity', value: '14.2 PB', sub: '89.3% utilization' },
+const REGIONS = ['US-East', 'US-West', 'EU-West', 'EU-Central', 'AP-South', 'AP-East']
+
+const REG_STEPS = [
+  { step: 1, title: 'Select Hardware', desc: 'Choose your node type and confirm your device meets minimum specifications.' },
+  { step: 2, title: 'Install Agent', desc: 'Download and run the VibeSwap node agent. It benchmarks CPU, RAM, disk, and network.' },
+  { step: 3, title: 'Hardware Verification', desc: 'On-chain proof-of-physical-work validates your hardware signature and uptime capability.' },
+  { step: 4, title: 'Stake & Activate', desc: 'Stake the minimum VIBE bond. Your node goes live and begins earning rewards immediately.' },
 ]
 
-const ECON_STEPS = [
-  { step: '1', title: 'Contribute Hardware', desc: 'Deploy physical infrastructure -- compute servers, storage drives, bandwidth relays, oracle feeds, or IoT sensors. Your hardware joins the decentralized network.' },
-  { step: '2', title: 'Verify & Earn', desc: 'Nodes are verified through proof-of-physical-work. Uptime, data accuracy, and throughput are measured on-chain. Valid contributions earn VIBE tokens proportional to value delivered.' },
-  { step: '3', title: 'Network Effects', desc: 'More nodes increase coverage, reliability, and capacity. Token incentives create a flywheel: better infrastructure attracts more users, generating more fees for operators.' },
+// ============ Seeded sparkline data ============
+
+const rng = seededRandom(42)
+const HEALTH_SPARKLINES = {
+  bandwidth: Array.from({ length: 14 }, () => 720 + rng() * 200),
+  compute: Array.from({ length: 14 }, () => 1.6 + rng() * 0.8),
+  storage: Array.from({ length: 14 }, () => 12.1 + rng() * 2.5),
+  uptime: Array.from({ length: 14 }, () => 98.2 + rng() * 1.7),
+}
+
+const NETWORK_HEALTH = [
+  { label: 'Total Bandwidth', value: '847 Tbps', sub: '+12.4% this week', spark: HEALTH_SPARKLINES.bandwidth },
+  { label: 'Compute Hours', value: '2.1M hrs', sub: '67 active clusters', spark: HEALTH_SPARKLINES.compute },
+  { label: 'Storage Capacity', value: '14.2 PB', sub: '89.3% utilization', spark: HEALTH_SPARKLINES.storage },
+  { label: 'Network Uptime', value: '99.82%', sub: 'Last 30 days', spark: HEALTH_SPARKLINES.uptime },
 ]
 
 // ============ Main Component ============
@@ -148,6 +162,9 @@ export default function DePINHub() {
   const [selectedNodeType, setSelectedNodeType] = useState('Compute')
   const [formRegion, setFormRegion] = useState('US-East')
   const [hoveredMapNode, setHoveredMapNode] = useState(null)
+  const [calcType, setCalcType] = useState('Compute')
+  const [calcUptime, setCalcUptime] = useState(95)
+  const [regStep, setRegStep] = useState(0)
 
   useEffect(() => {
     let frame
@@ -160,7 +177,25 @@ export default function DePINHub() {
   const userNodeCount = myNodes.length
   const overviewStats = useMemo(() =>
     OVERVIEW_STATS.map(s => s.userStat ? { ...s, value: userNodeCount } : s), [userNodeCount])
-  const selHw = HARDWARE_REQS.find(h => h.type === selectedNodeType)
+
+  // ============ Earnings Calculator Logic ============
+
+  const calcNode = HARDWARE_REGISTRY.find(h => h.type === calcType)
+  const calcEarnings = useMemo(() => {
+    if (!calcNode) return { daily: 0, monthly: 0, yearly: 0 }
+    const uptimeMul = calcUptime / 100
+    // Below 90% uptime triggers a penalty curve (quadratic drop)
+    const penalty = calcUptime < 90 ? Math.pow(uptimeMul, PHI) : uptimeMul
+    const daily = calcNode.rewardRate * penalty
+    return { daily: daily.toFixed(2), monthly: (daily * 30).toFixed(1), yearly: (daily * 365).toFixed(0) }
+  }, [calcType, calcUptime, calcNode])
+
+  // ============ Seeded background grid dots for map ============
+
+  const gridDots = useMemo(() => {
+    const rngGrid = seededRandom(1337)
+    return Array.from({ length: 60 }, () => ({ x: rngGrid() * 440, y: rngGrid() * 100, r: 0.3 + rngGrid() * 0.6 }))
+  }, [])
 
   return (
     <div className="min-h-screen bg-black text-white px-4 py-6 max-w-6xl mx-auto">
@@ -190,26 +225,46 @@ export default function DePINHub() {
         </div>
       </Section>
 
-      {/* 2. Network Map */}
-      <Section title="Global Node Distribution" subtitle="Hover a region to see node count" delay={0.15}>
+      {/* 2. Node Map — Animated Globe Grid */}
+      <Section title="Global Node Distribution" subtitle="Active nodes pulsing across the network" delay={0.12}>
         <GlassCard glowColor="terminal" className="p-4">
           <svg viewBox="0 0 440 100" className="w-full" style={{ minHeight: 180 }}>
-            {CONTINENT_PATHS.map((d, i) => (
-              <path key={i} d={d} fill="rgba(6,182,212,0.08)" stroke={CYAN_DIM} strokeWidth="0.5" />
+            {/* Background grid dots */}
+            {gridDots.map((d, i) => (
+              <circle key={`g-${i}`} cx={d.x} cy={d.y} r={d.r} fill={CYAN} opacity={0.06 + 0.04 * Math.sin(pulsePhase + i * 0.5)} />
             ))}
+            {/* Continent outlines */}
+            {CONTINENT_PATHS.map((d, i) => (
+              <path key={i} d={d} fill="rgba(6,182,212,0.06)" stroke={CYAN_DIM} strokeWidth="0.5" />
+            ))}
+            {/* Connection lines between nearby nodes */}
+            {MAP_NODES.map((a, i) => MAP_NODES.slice(i + 1).filter(b => {
+              const dist = Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
+              return dist < 80
+            }).map((b, j) => (
+              <line key={`c-${i}-${j}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke={CYAN} strokeWidth="0.3" opacity={0.08 + 0.04 * Math.sin(pulsePhase + i)} />
+            )))}
+            {/* Node dots */}
             {MAP_NODES.map((node, i) => {
               const scale = 0.6 + (node.nodes / 2200) * 0.8
               const isHov = hoveredMapNode === i
               return (
                 <g key={node.label} onMouseEnter={() => setHoveredMapNode(i)} onMouseLeave={() => setHoveredMapNode(null)} style={{ cursor: 'pointer' }}>
+                  {/* Outer pulse ring */}
+                  <circle cx={node.x} cy={node.y} r={8 * scale} fill="none" stroke={CYAN} strokeWidth="0.3"
+                    opacity={0.15 + 0.12 * Math.sin(pulsePhase + i * PHI)} />
+                  {/* Inner glow */}
                   <motion.circle cx={node.x} cy={node.y} r={3 * scale} fill={CYAN}
                     initial={{ scale: 0 }} animate={{ scale: 1, opacity: 0.6 + 0.4 * Math.sin(pulsePhase + i * PHI) }}
                     transition={{ delay: 0.2 + i * 0.06, duration: 0.4 }} />
-                  <circle cx={node.x} cy={node.y} r={6 * scale} fill="none" stroke={CYAN} strokeWidth="0.4" opacity={0.25 + 0.2 * Math.sin(pulsePhase + i)} />
+                  {/* Core dot */}
+                  <circle cx={node.x} cy={node.y} r={1.5 * scale} fill="#fff" opacity={0.9} />
+                  {/* Tooltip */}
                   {isHov && (
                     <g>
-                      <rect x={node.x - 30} y={node.y - 22} width="60" height="16" rx="3" fill="rgba(0,0,0,0.85)" stroke={CYAN} strokeWidth="0.5" />
-                      <text x={node.x} y={node.y - 11} textAnchor="middle" fill={CYAN} fontSize="5" fontWeight="bold">{node.label}: {node.nodes.toLocaleString()}</text>
+                      <rect x={node.x - 32} y={node.y - 24} width="64" height="18" rx="3" fill="rgba(0,0,0,0.9)" stroke={CYAN} strokeWidth="0.5" />
+                      <text x={node.x} y={node.y - 12} textAnchor="middle" fill={CYAN} fontSize="5" fontWeight="bold">{node.label}: {node.nodes.toLocaleString()}</text>
                     </g>
                   )}
                 </g>
@@ -219,8 +274,24 @@ export default function DePINHub() {
         </GlassCard>
       </Section>
 
-      {/* 3. Node Types Grid */}
-      <Section title="Node Types" subtitle="Infrastructure categories powering the network" delay={0.25}>
+      {/* 3. Network Health with Sparklines */}
+      <Section title="Network Health" subtitle="14-day trend across infrastructure metrics" delay={0.2}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {NETWORK_HEALTH.map((m, i) => (
+            <GlassCard key={m.label} glowColor="terminal" className="p-4">
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.08, duration: 0.35 }}>
+                <div className="text-lg font-bold" style={{ color: CYAN }}>{m.value}</div>
+                <div className="text-xs text-gray-400 mt-1">{m.label}</div>
+                <div className="mt-2"><Sparkline data={m.spark} width={100} height={20} /></div>
+                <div className="text-xs text-gray-600 mt-1">{m.sub}</div>
+              </motion.div>
+            </GlassCard>
+          ))}
+        </div>
+      </Section>
+
+      {/* 4. Node Types Grid */}
+      <Section title="Node Types" subtitle="Infrastructure categories powering the network" delay={0.28}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {NODE_TYPES.map((nt, i) => (
             <GlassCard key={nt.type} glowColor="terminal" className="p-4">
@@ -235,8 +306,100 @@ export default function DePINHub() {
         </div>
       </Section>
 
-      {/* 4. Your Nodes Dashboard */}
-      <Section title="Your Nodes" subtitle={isConnected ? `${userNodeCount} registered node${userNodeCount !== 1 ? 's' : ''}` : 'Connect wallet to view'} delay={0.35}>
+      {/* 5. Hardware Registry */}
+      <Section title="Hardware Registry" subtitle="Supported hardware, minimum specs, and reward tiers" delay={0.35}>
+        <GlassCard glowColor="terminal" className="p-4 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-500 border-b border-gray-800">
+                {['Type', 'Tier', 'CPU', 'RAM', 'Storage', 'Network', 'GPU', 'Power', 'VIBE/day'].map(h => (
+                  <th key={h} className="text-left py-2 px-2 font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {HARDWARE_REGISTRY.map((hw, i) => (
+                <motion.tr key={hw.type} className="border-b border-gray-800/50 hover:bg-white/[0.02] transition-colors"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 + i * 0.06 }}>
+                  <td className="py-2 px-2 font-medium" style={{ color: CYAN }}>{hw.type}</td>
+                  <td className="py-2 px-2"><span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                    style={{ background: CYAN_DIM, color: CYAN }}>{hw.tier}</span></td>
+                  <td className="py-2 px-2 text-gray-300">{hw.cpu}</td>
+                  <td className="py-2 px-2 text-gray-300">{hw.ram}</td>
+                  <td className="py-2 px-2 text-gray-300">{hw.storage}</td>
+                  <td className="py-2 px-2 text-gray-300">{hw.network}</td>
+                  <td className="py-2 px-2 text-gray-300">{hw.gpu}</td>
+                  <td className="py-2 px-2 text-gray-300">{hw.power}</td>
+                  <td className="py-2 px-2 font-semibold" style={{ color: CYAN }}>{hw.rewardRate}</td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </GlassCard>
+      </Section>
+
+      {/* 6. Earnings Calculator */}
+      <Section title="Earnings Calculator" subtitle="Estimate your projected rewards based on device and uptime" delay={0.42}>
+        <GlassCard glowColor="terminal" className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Inputs */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 block mb-2">Device Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {NODE_TYPES.map(nt => (
+                    <button key={nt.type} onClick={() => setCalcType(nt.type)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={{ background: calcType === nt.type ? CYAN_DIM : 'rgba(255,255,255,0.04)',
+                        color: calcType === nt.type ? CYAN : '#9ca3af',
+                        border: `1px solid ${calcType === nt.type ? CYAN : 'rgba(255,255,255,0.08)'}` }}>
+                      {nt.type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-2">
+                  Uptime: <span style={{ color: CYAN }} className="font-semibold">{calcUptime}%</span>
+                  {calcUptime < 90 && <span className="text-yellow-400 ml-2">(penalty active below 90%)</span>}
+                </label>
+                <input type="range" min={50} max={100} step={1} value={calcUptime}
+                  onChange={e => setCalcUptime(Number(e.target.value))}
+                  className="w-full accent-cyan-500 h-1.5 bg-gray-800 rounded-full appearance-none cursor-pointer" />
+                <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                  <span>50%</span><span>75%</span><span>90%</span><span>100%</span>
+                </div>
+              </div>
+            </div>
+            {/* Projected earnings */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Daily', value: calcEarnings.daily },
+                { label: 'Monthly', value: calcEarnings.monthly },
+                { label: 'Yearly', value: calcEarnings.yearly },
+              ].map((e, i) => (
+                <motion.div key={e.label} className="text-center p-3 rounded-xl"
+                  style={{ background: 'rgba(6,182,212,0.06)', border: `1px solid rgba(6,182,212,0.15)` }}
+                  initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.48 + i * 0.08 }}>
+                  <div className="text-lg font-bold" style={{ color: CYAN }}>{e.value}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">VIBE / {e.label.toLowerCase()}</div>
+                  <div className="text-xs text-gray-400 mt-1">{e.label}</div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+          {calcNode && (
+            <div className="mt-4 pt-3 border-t border-gray-800 text-xs text-gray-500">
+              Base rate: {calcNode.rewardRate} VIBE/day for {calcNode.type} ({calcNode.tier} tier) at 100% uptime.
+              Power draw: ~{calcNode.power}. Requires: {calcNode.cpu}, {calcNode.ram}, {calcNode.network}.
+            </div>
+          )}
+        </GlassCard>
+      </Section>
+
+      {/* 7. Your Nodes Dashboard */}
+      <Section title="Your Nodes" subtitle={isConnected ? `${userNodeCount} registered node${userNodeCount !== 1 ? 's' : ''}` : 'Connect wallet to view'} delay={0.5}>
         {!isConnected ? (
           <GlassCard glowColor="terminal" className="p-6 text-center">
             <p className="text-gray-500 text-sm">Connect your wallet to manage nodes and view rewards.</p>
@@ -245,7 +408,7 @@ export default function DePINHub() {
           <div className="space-y-2">
             {myNodes.map((node, i) => (
               <GlassCard key={node.id} glowColor="terminal" className="p-4">
-                <motion.div className="flex flex-wrap items-center justify-between gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 + i * 0.1 }}>
+                <motion.div className="flex flex-wrap items-center justify-between gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 + i * 0.1 }}>
                   <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${node.status === 'online' ? 'bg-emerald-400' : 'bg-yellow-400'}`}
                       style={{ boxShadow: node.status === 'online' ? '0 0 6px #34d399' : '0 0 6px #facc15' }} />
@@ -266,116 +429,104 @@ export default function DePINHub() {
         )}
       </Section>
 
-      {/* 5. Register a Node */}
-      <Section title="Register a Node" subtitle="Add your hardware to the VibeSwap DePIN network" delay={0.42}>
+      {/* 8. Registration Flow */}
+      <Section title="Register a Node" subtitle="Step-by-step registration with hardware verification" delay={0.56}>
         <GlassCard glowColor="terminal" className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Node Type</label>
-              <div className="flex flex-wrap gap-2">
-                {NODE_TYPES.map(nt => (
-                  <button key={nt.type} onClick={() => setSelectedNodeType(nt.type)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                    style={{ background: selectedNodeType === nt.type ? CYAN_DIM : 'rgba(255,255,255,0.04)',
-                      color: selectedNodeType === nt.type ? CYAN : '#9ca3af',
-                      border: `1px solid ${selectedNodeType === nt.type ? CYAN : 'rgba(255,255,255,0.08)'}` }}>
-                    {nt.type}
-                  </button>
-                ))}
+          {/* Step indicators */}
+          <div className="flex items-center justify-between mb-6">
+            {REG_STEPS.map((s, i) => (
+              <div key={s.step} className="flex items-center flex-1">
+                <motion.button onClick={() => setRegStep(i)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all"
+                  style={{ background: i <= regStep ? CYAN : 'rgba(255,255,255,0.06)',
+                    color: i <= regStep ? '#000' : '#6b7280',
+                    border: `1px solid ${i <= regStep ? CYAN : 'rgba(255,255,255,0.1)'}` }}
+                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+                  {i < regStep ? '\u2713' : s.step}
+                </motion.button>
+                {i < REG_STEPS.length - 1 && (
+                  <div className="flex-1 h-px mx-2" style={{ background: i < regStep ? CYAN : 'rgba(255,255,255,0.08)' }} />
+                )}
               </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Region</label>
-              <select value={formRegion} onChange={e => setFormRegion(e.target.value)}
-                className="w-full bg-black/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none">
-                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Hardware Specs</label>
-              <div className="text-xs text-gray-500 bg-black/40 rounded-lg p-2 border border-gray-800">
-                {selHw ? `CPU: ${selHw.cpu}, RAM: ${selHw.ram}` : 'Select a node type'}
-              </div>
-            </div>
+            ))}
           </div>
-          <motion.button className="mt-4 px-6 py-2 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: isConnected ? CYAN : '#374151', color: isConnected ? '#000' : '#6b7280' }}
-            whileHover={isConnected ? { scale: 1.02, boxShadow: `0 0 20px ${CYAN_GLOW}` } : {}}
-            whileTap={isConnected ? { scale: 0.98 } : {}} disabled={!isConnected}>
-            {isConnected ? 'Register Node' : 'Connect Wallet to Register'}
-          </motion.button>
-        </GlassCard>
-      </Section>
-
-      {/* 6. Network Health Metrics */}
-      <Section title="Network Health" subtitle="Real-time aggregate infrastructure metrics" delay={0.5}>
-        <div className="grid grid-cols-3 gap-3">
-          {HEALTH_METRICS.map((m, i) => (
-            <GlassCard key={m.label} glowColor="terminal" className="p-4 text-center">
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 + i * 0.08, duration: 0.35 }}>
-                <div className="text-lg font-bold" style={{ color: CYAN }}>{m.value}</div>
-                <div className="text-xs text-gray-400 mt-1">{m.label}</div>
-                <div className="text-xs text-gray-600 mt-0.5">{m.sub}</div>
-              </motion.div>
-            </GlassCard>
-          ))}
-        </div>
-      </Section>
-
-      {/* 7. Reward Distribution Chart */}
-      <Section title="Reward Distribution by Node Type" delay={0.58}>
-        <GlassCard glowColor="terminal" className="p-5">
-          <svg viewBox="0 0 400 120" className="w-full">
-            {REWARD_DIST.map((rd, i) => {
-              const barW = (rd.pct / 100) * 300, y = 8 + i * 22
-              return (
-                <g key={rd.type}>
-                  <text x="0" y={y + 14} fill="#9ca3af" fontSize="10">{rd.type}</text>
-                  <motion.rect x={80} y={y + 2} height="14" rx="3" fill={CYAN} opacity={0.15 + i * 0.15}
-                    initial={{ width: 0 }} animate={{ width: barW }} transition={{ delay: 0.65 + i * 0.1, duration: 0.6, ease: 'easeOut' }} />
-                  <motion.rect x={80} y={y + 2} height="14" rx="3" fill={CYAN} style={{ opacity: 0.6 + i * 0.08 }}
-                    initial={{ width: 0 }} animate={{ width: barW }} transition={{ delay: 0.65 + i * 0.1, duration: 0.6, ease: 'easeOut' }} />
-                  <motion.text x={85 + barW} y={y + 14} fill="#e5e7eb" fontSize="9"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.0 + i * 0.1 }}>
-                    {rd.amount.toLocaleString()} VIBE ({rd.pct}%)
-                  </motion.text>
-                </g>
-              )
-            })}
-          </svg>
-        </GlassCard>
-      </Section>
-
-      {/* 8. Hardware Requirements Table */}
-      <Section title="Hardware Requirements" subtitle="Minimum specs to run each node type" delay={0.65}>
-        <GlassCard glowColor="terminal" className="p-4 overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-gray-500 border-b border-gray-800">
-                {['Type', 'CPU', 'RAM', 'Storage', 'Network', 'GPU'].map(h => (
-                  <th key={h} className="text-left py-2 px-2 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {HARDWARE_REQS.map((hw, i) => (
-                <motion.tr key={hw.type} className="border-b border-gray-800/50 hover:bg-white/[0.02] transition-colors"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 + i * 0.06 }}>
-                  <td className="py-2 px-2 font-medium" style={{ color: CYAN }}>{hw.type}</td>
-                  <td className="py-2 px-2 text-gray-300">{hw.cpu}</td>
-                  <td className="py-2 px-2 text-gray-300">{hw.ram}</td>
-                  <td className="py-2 px-2 text-gray-300">{hw.storage}</td>
-                  <td className="py-2 px-2 text-gray-300">{hw.network}</td>
-                  <td className="py-2 px-2 text-gray-300">{hw.gpu}</td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Active step content */}
+          <AnimatePresence mode="wait">
+            <motion.div key={regStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }}>
+              <h3 className="text-sm font-semibold text-white mb-2">{REG_STEPS[regStep].title}</h3>
+              <p className="text-xs text-gray-400 leading-relaxed mb-4">{REG_STEPS[regStep].desc}</p>
+              {/* Step-specific controls */}
+              {regStep === 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Node Type</label>
+                    <div className="flex flex-wrap gap-2">
+                      {NODE_TYPES.map(nt => (
+                        <button key={nt.type} onClick={() => setSelectedNodeType(nt.type)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                          style={{ background: selectedNodeType === nt.type ? CYAN_DIM : 'rgba(255,255,255,0.04)',
+                            color: selectedNodeType === nt.type ? CYAN : '#9ca3af',
+                            border: `1px solid ${selectedNodeType === nt.type ? CYAN : 'rgba(255,255,255,0.08)'}` }}>
+                          {nt.type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Region</label>
+                    <select value={formRegion} onChange={e => setFormRegion(e.target.value)}
+                      className="w-full bg-black/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none">
+                      {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {regStep === 1 && (
+                <div className="bg-black/40 rounded-lg p-3 border border-gray-800 font-mono text-xs text-gray-400">
+                  <span style={{ color: CYAN }}>$</span> curl -sSL https://depin.vibeswap.io/install | bash<br />
+                  <span style={{ color: CYAN }}>$</span> vibenode benchmark --type {selectedNodeType.toLowerCase()}
+                </div>
+              )}
+              {regStep === 2 && (
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" style={{ boxShadow: '0 0 8px #34d399' }} />
+                  <span className="text-gray-300">Hardware signature verified on-chain. Proof-of-physical-work accepted.</span>
+                </div>
+              )}
+              {regStep === 3 && (
+                <div className="text-xs text-gray-400">
+                  Minimum stake: <span style={{ color: CYAN }} className="font-semibold">100 VIBE</span>. Slash conditions: &lt;90% uptime over 7 days.
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+          {/* Navigation */}
+          <div className="flex justify-between mt-5 pt-3 border-t border-gray-800">
+            <button onClick={() => setRegStep(s => Math.max(0, s - 1))} disabled={regStep === 0}
+              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{ color: regStep === 0 ? '#4b5563' : '#9ca3af', background: 'rgba(255,255,255,0.04)' }}>
+              Back
+            </button>
+            {regStep < REG_STEPS.length - 1 ? (
+              <button onClick={() => setRegStep(s => Math.min(REG_STEPS.length - 1, s + 1))}
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" style={{ background: CYAN, color: '#000' }}>
+                Next
+              </button>
+            ) : (
+              <motion.button className="px-5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{ background: isConnected ? CYAN : '#374151', color: isConnected ? '#000' : '#6b7280' }}
+                whileHover={isConnected ? { scale: 1.02, boxShadow: `0 0 20px ${CYAN_GLOW}` } : {}}
+                whileTap={isConnected ? { scale: 0.98 } : {}} disabled={!isConnected}>
+                {isConnected ? 'Stake & Activate' : 'Connect Wallet'}
+              </motion.button>
+            )}
+          </div>
         </GlassCard>
       </Section>
 
       {/* 9. Leaderboard */}
-      <Section title="Leaderboard" subtitle="Top 10 nodes by uptime and total rewards" delay={0.72}>
+      <Section title="Leaderboard" subtitle="Top operators by uptime and total rewards" delay={0.62}>
         <GlassCard glowColor="terminal" className="p-4 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -388,7 +539,7 @@ export default function DePINHub() {
             <tbody>
               {LEADERBOARD.map((e, i) => (
                 <motion.tr key={e.rank} className="border-b border-gray-800/50 hover:bg-white/[0.02] transition-colors"
-                  initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.78 + i * 0.05 }}>
+                  initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.68 + i * 0.04 }}>
                   <td className="py-2 px-2"><span className={`font-bold ${i < 3 ? 'text-yellow-400' : 'text-gray-400'}`}>#{e.rank}</span></td>
                   <td className="py-2 px-2 text-gray-300 font-mono">{e.addr}</td>
                   <td className="py-2 px-2 text-gray-400">{e.type}</td>
@@ -401,39 +552,12 @@ export default function DePINHub() {
         </GlassCard>
       </Section>
 
-      {/* 10. DePIN Economics Explainer */}
-      <Section title="How DePIN Works" subtitle="Physical infrastructure earning crypto rewards" delay={0.8}>
-        <GlassCard glowColor="terminal" className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {ECON_STEPS.map((item, i) => (
-              <motion.div key={item.step} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.85 + i * 0.12 * PHI, duration: 0.4 }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ background: CYAN_DIM, color: CYAN, border: `1px solid ${CYAN}` }}>{item.step}</div>
-                  <span className="text-sm font-semibold text-white">{item.title}</span>
-                </div>
-                <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-800">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              DePIN replaces centralized infrastructure monopolies with open, permissionless networks.
-              Instead of AWS, Cloudflare, or AT&T owning the hardware, individual operators own and
-              monetize their own equipment. VibeSwap integrates with leading DePIN protocols to
-              provide unified access to decentralized compute, storage, bandwidth, and data.
-            </p>
-          </div>
-        </GlassCard>
-      </Section>
-
-      {/* 11. Integration Partners */}
-      <Section title="Integration Partners" subtitle="Bridging VibeSwap to leading DePIN ecosystems" delay={0.88}>
+      {/* 10. Integration Partners */}
+      <Section title="Integration Partners" subtitle="Bridging VibeSwap to leading DePIN ecosystems" delay={0.7}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {PARTNERS.map((p, i) => (
             <GlassCard key={p.name} glowColor="terminal" className="p-4 text-center">
-              <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.92 + i * 0.06, duration: 0.35 }}>
+              <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.74 + i * 0.06, duration: 0.35 }}>
                 <div className="w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center text-sm font-bold"
                   style={{ background: `${p.color}22`, color: p.color, border: `1px solid ${p.color}44` }}>{p.name.charAt(0)}</div>
                 <div className="text-xs font-semibold text-white">{p.name}</div>
@@ -442,41 +566,6 @@ export default function DePINHub() {
             </GlassCard>
           ))}
         </div>
-      </Section>
-
-      {/* 12. Animated Network Pulse */}
-      <Section title="Network Pulse" subtitle="Live data flow between infrastructure nodes" delay={0.95}>
-        <GlassCard glowColor="terminal" className="p-4">
-          <svg viewBox="0 0 460 100" className="w-full" style={{ minHeight: 140 }}>
-            {PULSE_NODES.map((n, i) => (
-              <g key={n.label}>
-                <circle cx={n.x} cy={n.y} r={8} fill="rgba(6,182,212,0.1)" stroke={CYAN} strokeWidth="0.8"
-                  opacity={0.5 + 0.3 * Math.sin(pulsePhase + i * 0.8)} />
-                <circle cx={n.x} cy={n.y} r={3} fill={CYAN} opacity={0.7} />
-                <text x={n.x} y={n.y + 16} textAnchor="middle" fill="#6b7280" fontSize="5">{n.label}</text>
-              </g>
-            ))}
-            {PULSE_PATHS.map((pp, i) => (
-              <line key={`l-${i}`} x1={pp.from.x} y1={pp.from.y} x2={pp.to.x} y2={pp.to.y} stroke={CYAN} strokeWidth="0.5" opacity={0.15} />
-            ))}
-            {PULSE_PATHS.map((pp, i) => {
-              const progress = ((pulsePhase / (Math.PI * 2)) * pp.dur + i * 0.3) % 1
-              const cx = pp.from.x + (pp.to.x - pp.from.x) * progress
-              const cy = pp.from.y + (pp.to.y - pp.from.y) * progress
-              return (
-                <g key={`p-${i}`}>
-                  <circle cx={cx} cy={cy} r={2.5} fill={CYAN} opacity={0.8}>
-                    <animate attributeName="r" values="1.5;3;1.5" dur={`${pp.dur}s`} repeatCount="indefinite" />
-                  </circle>
-                  <circle cx={cx} cy={cy} r={6} fill="none" stroke={CYAN} strokeWidth="0.4" opacity={0.2}>
-                    <animate attributeName="r" values="4;8;4" dur={`${pp.dur}s`} repeatCount="indefinite" />
-                    <animate attributeName="opacity" values="0.3;0.05;0.3" dur={`${pp.dur}s`} repeatCount="indefinite" />
-                  </circle>
-                </g>
-              )
-            })}
-          </svg>
-        </GlassCard>
       </Section>
 
       <div className="h-16" />

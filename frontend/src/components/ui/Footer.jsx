@@ -89,6 +89,7 @@ const COLUMNS = [
       { to: '/treasury', label: 'Treasury' },
       { to: '/delegate', label: 'Delegate' },
       { to: '/competitions', label: 'Competitions' },
+      { to: '/snapshot', label: 'Snapshots' },
       { to: '/team', label: 'Team' },
     ],
   },

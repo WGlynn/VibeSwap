@@ -54,6 +54,8 @@ const COLUMNS = [
       { to: '/margin', label: 'Margin Trading' },
       { to: '/liquidations', label: 'Liquidations' },
       { to: '/automation', label: 'Automation' },
+      { to: '/price-impact', label: 'Price Impact' },
+      { to: '/backtest', label: 'Backtester' },
     ],
   },
   {
@@ -67,6 +69,7 @@ const COLUMNS = [
       { to: '/faq', label: 'FAQ' },
       { to: '/research', label: 'Research' },
       { to: '/api', label: 'API Docs' },
+      { to: '/education', label: 'Education' },
     ],
   },
   {

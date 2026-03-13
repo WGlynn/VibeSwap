@@ -136,6 +136,9 @@ const ROUTE_LABELS = {
   mev: 'MEV Dashboard',
   contributors: 'Contributors',
   multichain: 'Multi-Chain',
+  education: 'Education',
+  'price-impact': 'Price Impact',
+  backtest: 'Backtester',
 }
 
 export default function Breadcrumb({ className = '' }) {

@@ -146,6 +146,9 @@ const COMMANDS = [
   { id: 'mev', label: 'MEV Dashboard', description: 'MEV protection savings and attack prevention', path: '/mev', category: 'Protocol' },
   { id: 'contributors', label: 'Contributors', description: 'Shapley value contributor leaderboard', path: '/contributors', category: 'Community' },
   { id: 'multichain', label: 'Multi-Chain', description: 'Unified portfolio across all chains', path: '/multichain', category: 'Account' },
+  { id: 'education', label: 'Education', description: 'Learn-to-earn DeFi courses', path: '/education', category: 'Knowledge' },
+  { id: 'price-impact', label: 'Price Impact', description: 'Simulate trade price impact', path: '/price-impact', category: 'DeFi' },
+  { id: 'backtest', label: 'Backtester', description: 'Backtest trading strategies', path: '/backtest', category: 'Intelligence' },
 ]
 
 const CATEGORY_COLORS = {

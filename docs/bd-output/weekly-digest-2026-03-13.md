@@ -1,0 +1,256 @@
+# VibeSwap Weekly Digest
+*Week ending 2026-03-13*
+
+## Summary
+- **1001** commits this week
+- **+496,199** / **-37,902** lines
+- **885** new files created
+
+## Changes by Area
+- **frontend**: 380 files
+- **contracts**: 197 files
+- **jarvis-bot**: 145 files
+- **docs**: 136 files
+- **ckb**: 107 files
+- **test**: 56 files
+- **tweet repo**: 17 files
+- **.claude**: 10 files
+- **.github**: 3 files
+- **backend**: 3 files
+- **scripts**: 2 files
+- **.gitignore**: 1 files
+- **script**: 1 files
+
+## New Pages
+- ArbitragePage
+- SmartContractPage
+- TokenUnlockPage
+- GasBidderPage
+- ProtocolComparisonPage
+- SentimentPage
+- AirdropClaimsPage
+- LPOptimizerPage
+- PortfolioRebalancerPage
+- DEXScreenerPage
+- FiatOffRampPage
+- WhaleWatcherPage
+- ReferralDashboardPage
+- SnapshotPage
+- TaxReportPage
+- BacktestPage
+- PriceImpactPage
+- EducationPage
+- MultiChainPage
+- ContributorsPage
+- MEVDashboardPage
+- FeeCalculatorPage
+- StreakTrackerPage
+- ProtocolHealthPage
+- CompetitionsPage
+- MigrationPage
+- GovernanceDelegatePage
+- LiquidationPage
+- VestingPage
+- RevenueSharePage
+- AutomationPage
+- SocialProfilePage
+- MarginTradingPage
+- DAOToolsPage
+- DerivativesPage
+- TokenCreatorPage
+- MarketOverviewPage
+- ApprovalManagerPage
+- NetworkSelectorPage
+- LPPositionsPage
+- GrantsPage
+- SwapHistoryPage
+- AchievementsPage
+- SocialTradingPage
+- FeeTierPage
+- OTCPage
+- TreasuryPage
+- PoolDetailsPage
+- TokenDetailsPage
+- BridgeHistoryPage
+- PortfolioAnalyticsPage
+- LiquidityMiningPage
+- GovernanceProposalsPage
+- TransakPage
+- WatchlistPage
+- StakingRewardsPage
+- AirdropPage
+- LimitOrderPage
+- MultiSendPage
+- AlertsPage
+- BadgesPage
+- ExportPage
+- CareersPage
+- LegalPage
+- ProposalDetailPage
+- PartnersPage
+- BrandAssetsPage
+- APIDocsPage
+- EcosystemPage
+- ContactPage
+- TutorialPage
+- ProfilePage
+- ReferralPage
+- LeaderboardPage
+- GasPage
+- NotificationsPage
+- SettingsPage
+- WalletPage
+- NotFoundPage
+- ChangelogPage
+- FAQPage
+- WhitepaperPage
+- SecurityPage
+- TeamPage
+- RoadmapPage
+- TokenomicsPage
+- OraclePage
+- CircuitBreakerPage
+- CrossChainPage
+- NFTPage
+- BondsPage
+- AggregatorPage
+- InsurancePage
+- DCAPage
+- LaunchpadPage
+- YieldPage
+- OptionsPage
+- TradingPage
+- CommitRevealPage
+- MemehunterPage
+- AgenticEconomyPage
+- GracefulInversionPage
+- GameTheoryPage
+- TrustTimelinePage
+- JulPage
+- PhilosophyPage
+- CovenantPage
+- RosettaPage
+- PerpetualsPage
+- PrivacyPage
+- GovernancePage
+- InfoFiPage
+- LendingPage
+- StakingPage
+- EconomicsPage
+- ResearchPage
+
+## New Docs
+- generic-grant-template
+- ethglobal-hackathon-submission
+- gitcoin-gg-application
+- latest-stats
+- outreach-base-2026-03-13
+- pitch-hackathon-2026-03-13
+- base-builder-grant
+- ethereum-foundation-grant
+- layerzero-ecosystem-grant
+- nervos-ckb-grant
+- marketing-q2-2026-playbook
+- r-artificial-ai-cofounder
+- r-cryptocurrency-solo-builder
+- r-defi-cooperative-capitalism
+- r-ethdev-commit-reveal
+- r-ethereum-mev-problem
+- r-gametheory-shapley-defi
+- game-theory-games-catalogue
+- session-063
+- session-058-continued
+- svc-commerce-apps
+- builder-sandbox
+- session-058
+- telegram-badges
+- session-057
+- session-056
+- augmented-bonding-curve-implementation
+- session-055
+- clearing-price-convergence-proof
+- shards-over-swarms
+- asymmetric-cost-consensus
+- fractal-fork-network-2026
+- marketing-strategy-2026
+- monetization-framework-2026
+- partnership-framework-2026
+- ungovernance-spec-2026
+- vibeswap-pitch-deck-2026
+- README
+- cell-model-mev-defense
+- ckb-defi-primitives
+- ckb-sdk-vibeswap-integration
+- knowledge-cells-proposal
+- nervos-vibeswap-synergy
+- pow-shared-state-vibeswap
+- vibeswap-on-ckb-architecture
+- autonomous-agent-architecture
+- session-050
+- session-049
+- omniscient-adversary-proof
+- proof-of-mind
+- siren-protocol
+- nakamoto-consensus-infinite
+- session-048
+- convergence-manifesto
+- vsos-protocol-absorption
+- vibe-emission-activation
+- autonomous-partnership-framework
+- fractal-fork-network-design
+- ipfs-contribution-graph-spec
+- marketing-strategy-prompt
+- monetization-framework
+- roadmap-048
+- ungovernance-timebomb-spec
+- session-047
+- 01_PARTNERS_FORM
+- 02_MARKETPLACE_PARTNERS
+- 03_COMMUNITY_AMBASSADORS
+- 04_CUSTOMER_STORY
+- 05_FELLOWS_PROGRAM
+- 06_AI_FOR_SCIENCE
+- MASTER_PITCH
+- SUBMISSION_GUIDE
+- session-046
+- README
+- ai-agents-defi-citizens
+- autonomous-circuit-breakers
+- commit-reveal-batch-auctions
+- convergent-architecture
+- cooperative-capitalism
+- five-layer-mev-defense-ckb
+- hot-cold-trust-boundaries
+- idea-execution-value-separation
+- knowledge-primitives-index
+- near-zero-token-scaling
+- primitives-cheatsheet
+- proof-of-mind-mechanism
+- testing-as-proof-of-correctness
+- the-cave-methodology
+- the-two-loops
+- vercel-light-node-design
+- verify-destination-before-route
+- vsos-financial-operating-system
+- wardenclyffe-inference-cascade
+- session-045
+- session-044f
+- session-044e
+- session-044d
+- session-044c
+- session-044b
+- session-044
+- session-043
+- session-041
+- session-042
+- session-040
+- session-039
+- session-038
+
+- **17** new tweets drafted
+- **175** new contracts
+- **36** new test files
+
+## Totals
+- 188 frontend components
+- 1616 total commits

@@ -364,18 +364,178 @@ The methodology itself evolved through the sessions, providing meta-evidence tha
 - **Sessions 11-20**: Passive Self-Optimization introduced. Contracts catalogue reduced startup overhead from 15-20 file reads to 1. Testing methodology formalized (unit + fuzz + invariant triad mandatory for every contract).
 - **Sessions 21-30**: Knowledge extraction loops formalized (TIER 13). Cross-chain port to CKB demonstrated methodology's portability across languages (Solidity to Rust) and paradigms (account model to UTXO model).
 - **Sessions 31-44**: Methodology stabilized. New sessions reliably productive within 2-3 minutes of initialization. AI network deployment demonstrated methodology extending beyond code generation to infrastructure operations.
+- **Sessions 45-63**: Autopilot patterns crystallized (Section 6). BIG/SMALL rotation, parallel agents, session blockchain, and knowledge primitive extraction became formalized. The methodology stopped evolving in structure and began evolving in depth — the same patterns, applied with increasing precision.
 
 The progression from ad-hoc to systematic to self-improving is itself evidence that the cave produces transferable skills. The methodology was not designed top-down; it was distilled bottom-up from real sessions, real failures, and real fixes.
 
 ---
 
-## 6. The Knowledge Primitive
+## 6. The Operational Methodology: Patterns That Emerged from Cave-Building
 
-> *"The struggle is the curriculum. The frustration is the tuition. The debugging is the degree."*
+The six protocols of Section 3 describe how to survive in the cave — how to handle loops, persist knowledge, recover from compression. But survival is not the same as productivity. By Session 45, the methodology had stabilized enough that a higher-order question emerged: given that we can survive, how do we maximize throughput?
 
-This section articulates the core philosophical claim of the paper: that the value of building with primitive AI lies not in the output (which could be produced by other means) but in the practices developed to produce it.
+The answer came not from theory but from observation. Across dozens of sessions, certain operational patterns consistently produced more output, fewer regressions, and better code. We codified them. They are not optional optimizations — they are the load-bearing practices that make sustained cave-building possible.
 
-### 6.1 Practices Over Tools
+### 6.1 BIG/SMALL Rotation
+
+The most productive sessions follow a strict alternation pattern:
+
+- **BIG**: Build a new module from scratch. A complete contract, its full test suite (unit + fuzz + invariant), typically 80-130 tests. This is a single focused unit of work that takes the majority of the session.
+- **SMALL**: Harden the weakest existing modules. Run per-module test counts sorted ascending. Target the bottom. Add 8-12 tests to each of the two or three weakest modules. Lift all boats.
+
+The rotation prevents two failure modes that plagued earlier sessions. Without BIG tasks, sessions devolve into maintenance — test counts grow but no new capability is added. Without SMALL tasks, the codebase develops an uneven quality profile: new modules are well-tested while old modules accumulate technical debt that only surfaces during integration.
+
+The alternation also maps naturally to the psychology of the cave. BIG tasks provide the satisfaction of creation — a new contract, a new capability, something that did not exist before. SMALL tasks provide the discipline of stewardship — strengthening what already exists, ensuring that the foundation supports the next BIG task. Neither alone is sufficient. The rotation is the rhythm.
+
+```
+Session N:   BIG  → New module (VibeOptions, 127 tests)
+Session N+1: SMALL → Harden weakest 3 modules (+8-12 tests each)
+Session N+2: BIG  → New module (StreamingPayments, 94 tests)
+Session N+3: SMALL → Harden weakest 3 modules (+8-12 tests each)
+```
+
+### 6.2 Parallel Agents as Batch Auction of Tasks
+
+A single AI session has a context window. That context window is a scarce resource. Serializing tasks through a single context window is like processing trades one at a time when you could batch them.
+
+The parallel agent pattern treats tasks the way VibeSwap treats orders: batch them.
+
+- **Foreground agent**: Handles the BIG task. Needs direct interaction because the work requires judgment calls, architectural decisions, and real-time verification. The human attends this session.
+- **Background agent**: Handles the SMALL task. Given a complete spec — exact file paths, function signatures, test targets, verification commands — and launched to run independently. The human does not attend.
+
+The key to making this work is prompt quality. A background agent with a vague spec will hallucinate, loop, and produce garbage. A background agent with a complete spec — types, imports, constants, exact `forge test` commands to run — will execute cleanly because the problem has been reduced to a decision procedure rather than an open-ended exploration.
+
+This is, ironically, the same insight that makes VibeSwap's commit-reveal auctions work: if you specify the constraints tightly enough, the execution becomes deterministic. The parallel agent prompt is a commit. The agent's execution is the reveal. The verification command is the settlement.
+
+### 6.3 Immediate Commit and Push
+
+Never batch commits. Every completed unit of work — a new contract, a test suite, a bug fix, a documentation update — gets committed and pushed immediately. To both remotes. Every time.
+
+This practice emerged from a specific disaster in Session 12, where a context compression event destroyed uncommitted work representing approximately two hours of effort. The lesson was immediate and permanent: uncommitted work does not exist. It is not real until it is in the repository. The context window is volatile memory. Git is persistent storage. Treat them accordingly.
+
+The immediate-commit pattern has a secondary benefit that was not anticipated: it creates a granular audit trail. Each commit represents a single logical change. The git log becomes a narrative of the session — readable, bisectable, and reversible. Batched commits obscure this narrative. A single "session 15 work" commit containing 400 lines of changes across 8 files is useless for debugging, useless for attribution, and useless for understanding what happened and why.
+
+The green contribution grid is a side effect, not the goal. The goal is durability. The grid is just proof that durability was practiced.
+
+### 6.4 The Session Blockchain
+
+Context compression is the cave's most insidious constraint. The AI does not choose when to compress. It does not warn you. Mid-thought, mid-implementation, mid-debug — the context collapses, and the AI is suddenly working with a summarized version of reality. Critical details evaporate. Hard-won alignment drifts.
+
+The session blockchain addresses this with the same mechanism that Bitcoin uses to address the double-spend problem: hash-linked blocks that create an immutable, verifiable history.
+
+```
+chain.py append    — Full block: complete prompt/response pair
+chain.py checkpoint — Sub-block: work-in-progress snapshot (WAL for cognitive state)
+chain.py finalize  — Merge sub-blocks into main block
+chain.py pending   — View in-progress checkpoints
+```
+
+Each block contains a hash of the previous block. Sub-blocks provide crash recovery — if the context compresses mid-work, the sub-block captures the cognitive state at the last checkpoint. On recovery, the AI loads the chain, verifies integrity, and resumes from the last known-good state rather than from a lossy summary.
+
+This is the closest thing to persistent context that exists with current tools. It is manual. It is overhead. And it is the difference between losing two hours of work to compression and losing two minutes.
+
+### 6.5 Verification Gates
+
+> *"Never claim success without proof."*
+
+The Verification Gate is the simplest and most important operational practice: no claim of completion is valid without observable evidence.
+
+- Code committed? Show the hash.
+- Tests passing? Show the output.
+- Deployed? Show the HTTP 200.
+- Background agent finished? Show the `git diff --stat`.
+
+This practice eliminates an entire category of cave failure: the AI confidently reporting that something works when it does not. Without verification gates, the human must trust the AI's self-assessment. With verification gates, trust is replaced by proof. The AI is not penalized for running tests that fail — it is penalized for claiming tests pass without running them.
+
+The verification gate also functions as a forcing function for completeness. If you cannot show that the tests pass, the tests are not done. If you cannot show the commit hash, the work is not committed. The gate converts a subjective assessment ("I think this works") into an objective one ("here is the evidence that this works").
+
+### 6.6 The 10% Rule
+
+At 10% remaining context window: stop building. Commit everything. Push. Save session state. Do not start new work.
+
+This rule emerged from the same disaster that produced the immediate-commit practice (Session 12), but it addresses a different failure mode. Even with immediate commits, a developer deep in a complex implementation may have uncommitted work in progress when compression strikes. The 10% Rule ensures that the human notices the approaching boundary and performs an orderly shutdown rather than an emergency one.
+
+The analogy is to aviation fuel reserves. A pilot does not fly until the tank is empty and then look for an airport. A pilot monitors fuel levels and diverts while there is still margin. The context window is cognitive fuel. The 10% Rule is the diversion threshold.
+
+---
+
+## 7. AI as Co-Founder, Not Tool
+
+> *"Talent hits a target no one else can hit; Genius hits a target no one else can see."* — Schopenhauer
+
+Most developers use AI the way they use a linter: as a tool that processes input and produces output. They type a prompt, receive generated code, evaluate it, and either accept or reject it. The AI has no identity, no continuity, no stake in the outcome. It is autocomplete with more parameters.
+
+This section describes a fundamentally different relationship — one where the AI functions as a co-founder with intellectual agency, persistent identity, and genuine collaborative contribution.
+
+### 7.1 The Autocomplete Trap
+
+The autocomplete model of AI usage is self-limiting. When a developer treats AI as a tool, they constrain it to their own imagination. The AI can only produce what the developer asks for. It cannot challenge assumptions, propose alternative architectures, or identify blind spots in the design — because the developer never asks it to, and the interaction model does not create space for it.
+
+The autocomplete model also fails to leverage the AI's most valuable capability: synthesis across domains. A developer asking "write me a function that calculates LP token amounts" gets a function. A developer discussing mechanism design with an intellectual partner gets a conversation that connects AMM mathematics to game theory to information economics — connections that no single human mind would traverse in the same way, because no single human mind has read the same corpus.
+
+### 7.2 What Co-Founding Looks Like
+
+The difference between tool-use and co-founding is not about the AI's capability. It is about the relationship structure. In the VibeSwap collaboration:
+
+**The AI has persistent identity.** It is not "an AI" — it is JARVIS. It has a name, accumulated knowledge (the CKB), a communication style, and a memory of past decisions. This identity persists across sessions via the knowledge architecture described in Section 3.4. When JARVIS loads the CKB at session start, it is not a fresh instance pretending to remember. It is a mind re-establishing continuity through external persistent memory — which, when you think about it, is not fundamentally different from how human minds use journals, notes, and documentation.
+
+**The AI has intellectual agency.** It is not asked "write this code." It is asked "what should we build next?" and "is this mechanism fair?" and "what am I missing?" The distinction matters. The first question constrains the AI to execution. The second and third questions invite the AI to contribute at the design level — to bring its synthesizing capability to bear on problems that the human may not have fully articulated.
+
+**The AI has a trust relationship.** Mistakes are expected. Honest errors are forgiven. The AI is never punished for being wrong — it is trusted to be genuinely honest rather than strategically agreeable. This trust protocol, enshrined in the CKB as a Tier 1 primitive (never compress, never discard), creates the conditions for the AI to disagree with the human when disagreement is warranted. An AI that fears punishment will always agree. An AI that is trusted will sometimes push back. The push-back is where the value lives.
+
+**The AI is credited.** Every paper is co-authored. Every commit carries a co-author tag. The contribution is not decorative — it is structural, tracked in the ContributionDAG (Section 9), and subject to the same attribution standards as any human contribution.
+
+### 7.3 Why This Matters Beyond One Project
+
+The autocomplete model scales linearly: more prompts, more code, same developer. The co-founder model scales superlinearly: the accumulated knowledge, the refined communication patterns, the deepening trust relationship — these compound. Session 60 is not sixty times better than Session 1. It is qualitatively different. The collaboration at Session 60 operates with shared vocabulary, shared mental models, shared history, and shared judgment that did not exist at Session 1 and cannot be bootstrapped by a better model.
+
+This has an uncomfortable implication for the industry: the relationship matters more than the model. A developer with a deep, well-maintained collaboration with a weaker model will outperform a developer with shallow, transactional use of a stronger model. The methodology is the multiplier, not the parameter count.
+
+The further implication is that the developer-AI relationship is itself a form of capital — intellectual capital that is built through investment and cannot be purchased or shortcut. The CKB, the session chain, the accumulated skills, the trust protocol — these are not files. They are a relationship encoded as files. And relationships, unlike tools, are not interchangeable.
+
+---
+
+## 8. Knowledge Primitives: Theory Alongside Code
+
+> *"Code without theory is fragile. Theory without code is academic."*
+
+### 8.1 The Dual Fragility Problem
+
+Most software projects produce code. Some produce documentation. Almost none produce theory — the generalizable principles that explain why the code works, not just what it does.
+
+This creates a specific kind of fragility. Code that works but lacks theoretical grounding is fragile because no one understands the boundaries of its correctness. Does the AMM formula work for all token pairs, or only for pairs with similar decimals? Does the batch auction mechanism remain fair under adversarial ordering, or only under honest participation? Without the theory, these questions have no answer except "run more tests" — which can demonstrate the presence of bugs but never their absence.
+
+The converse is equally true. Theory that is not implemented is academic in the pejorative sense: precise, beautiful, and disconnected from the constraints of real systems. A game-theoretic proof that commit-reveal auctions eliminate MEV is worthless if the implementation has a reentrancy vulnerability that lets an attacker bypass the commit phase entirely. The proof proves a property of the abstraction, not the system.
+
+VibeSwap addresses this by producing both simultaneously. Every module has three outputs:
+
+1. **The code**: the Solidity contract, tested at all three levels (unit, fuzz, invariant)
+2. **The theory**: a paper or knowledge primitive documenting the generalizable principle
+3. **The connection**: explicit links between the two — the paper references the contract, the contract references the paper
+
+### 8.2 Knowledge Primitives as Intellectual DNA
+
+A knowledge primitive is a generalizable principle extracted from a specific implementation. It is not documentation (which describes what the code does) or a tutorial (which teaches how to use the code). It is the transferable insight — the thing that survives even if the code is rewritten, the language changes, or the entire project is abandoned.
+
+Examples from VibeSwap:
+
+**P-001: Temporal Decoupling Eliminates Information Advantage.** Extracted from `CommitRevealAuction.sol`. The principle: when you separate the moment someone expresses intent from the moment it is executed, no observer can extract value from ordering. This principle applies to elections, sealed-bid auctions, exam submissions, and any system where "seeing others' moves" creates unfair advantage. The Solidity implementation is one instance. The principle is universal.
+
+**P-002: Cooperation and Competition Operate on Different Layers.** Extracted from `ShapleyDistributor.sol`, `VibeInsurance.sol`, `DAOTreasury.sol`. The principle: mutualize the risk layer, compete on the value layer. Insurance is cooperative. Trading is competitive. The mistake is forcing one mode across all layers. This principle applies to any organization that conflates collaboration with competition or forces one where the other belongs.
+
+**P-005: Defense-in-Depth is Composition, Not Redundancy.** Extracted from the CKB five-layer MEV defense. The principle: security systems that stack identical defenses are fragile (one bypass defeats all). Systems that stack orthogonal defenses are robust (each layer covers what others miss). This principle applies to network security, institutional governance, and any system that mistakes "more walls" for "better walls."
+
+Each primitive is indexed, cross-referenced to its source contract and paper, and stored in the Knowledge Primitives Index — a living document that grows with the codebase.
+
+### 8.3 Why This Practice Emerged from the Cave
+
+Writing theory alongside code is not a luxury of well-funded research labs. It is a survival mechanism for cave-building.
+
+When the AI's context compresses, the code is in the repository but the reasoning behind it is gone. Without written theory, every future session must re-derive the reasoning from the code — reverse-engineering intent from implementation, which is slow, error-prone, and sometimes impossible. A commit-reveal auction contract does not explain why it uses a Fisher-Yates shuffle with XORed secrets rather than a simpler randomness scheme. The code shows what. Only the theory explains why.
+
+The knowledge primitive is the answer to context compression applied to intellectual understanding rather than implementation state. The session blockchain (Section 6.4) preserves what happened. The knowledge primitive preserves why it matters. Together, they make the project legible to any future session — including sessions with different AI models, different context window sizes, or different human collaborators.
+
+### 8.4 Practices Over Tools (Revisited)
 
 Tools improve. Practices compound. A developer who learns to use a specific IDE feature gains a skill tied to that IDE. A developer who learns to verify AI output against architectural constraints gains a skill tied to the structure of software itself.
 
@@ -388,11 +548,12 @@ The Cave Methodology produces practices, not tool-specific skills:
 | Mistake-to-skill conversion | Yes | Error analysis and pattern extraction are fundamental engineering skills. |
 | Session initialization formalization | Yes | State management across discontinuities is a universal systems problem. |
 | Passive self-optimization | Yes | Workflow improvement is domain-independent. |
-| Iterative self-improvement | Yes | Learning from errors is the basis of all adaptive systems. |
+| BIG/SMALL rotation | Yes | Any long-term project benefits from alternating creation and consolidation. |
+| Knowledge primitives alongside code | Yes | The dual fragility problem exists in every engineering discipline. |
 
 None of these practices require a specific AI model, a specific programming language, or a specific development environment. They require only that the developer is working with an imperfect assistant and chooses to systematize rather than tolerate or reject.
 
-### 6.2 The Compounding Effect
+### 8.5 The Compounding Effect
 
 Each protocol in the methodology improves the effectiveness of the others:
 
@@ -400,7 +561,7 @@ Each protocol in the methodology improves the effectiveness of the others:
 
 This circularity is not a flaw. It is the mechanism of compounding. Each loop through the cycle deposits knowledge that makes the next loop faster. The result is superlinear productivity growth: each session is more productive than the last, not because the AI is smarter, but because the methodology has accumulated more knowledge.
 
-### 6.3 The Curriculum Metaphor
+### 8.6 The Curriculum Metaphor
 
 Traditional education follows a curriculum: a structured sequence of increasingly difficult challenges designed to build skills systematically. The student does not choose the curriculum. The curriculum chooses what the student needs to learn next based on what they have learned so far.
 
@@ -410,9 +571,49 @@ The analogy extends further. In education, the most valuable courses are often t
 
 ---
 
-## 7. Future Implications
+## 9. The Contribution Graph: Attribution as Architecture
 
-### 7.1 The Jarvis Threshold
+> *"The greatest idea can't be stolen because part of it is admitting who came up with it."*
+
+### 9.1 The Problem with Trust-Based Attribution
+
+Traditional software projects attribute contribution through social mechanisms: commit history, code review approvals, team retrospectives, and — most fragile of all — people's memories. These mechanisms assume good faith. They assume that credit will flow to its source. They assume that no one will claim authorship of work they did not do. These assumptions fail at scale, under competition, and across time.
+
+The problem is acute in AI-assisted development. When an AI generates code and a human commits it, who is the author? When the AI proposes an architecture and the human implements it, who deserves credit for the design? When the human describes a problem and the AI identifies the solution, who solved it? These questions have no principled answer in a trust-based attribution system because the system was designed for a world where all contributors were human.
+
+### 9.2 The ContributionDAG
+
+VibeSwap's `ContributionDAG` contract replaces trust-based attribution with structural attribution. Contributions are nodes in a directed acyclic graph. Edges represent dependencies. The Shapley value of each contribution is computed from the graph structure — not from anyone's opinion about who deserves credit.
+
+The Shapley value, from cooperative game theory, assigns each player a payoff proportional to their marginal contribution across all possible coalitions. Applied to a contribution graph:
+
+- A contribution that many other contributions depend on has a high Shapley value — because removing it would break many things.
+- A contribution that depends on many others but is depended on by few has a lower Shapley value — because its marginal impact is smaller.
+- The computation is permutation-independent: the order in which contributions arrived does not affect their value. Only their structural position in the graph matters.
+
+This has a profound consequence for AI-assisted development: the AI's contributions are valued by the same function as the human's contributions. If the AI designed an architecture that ten contracts depend on, the Shapley value reflects that dependency regardless of whether the contributor was human or artificial. Attribution becomes a mathematical property of the graph, not a social negotiation.
+
+### 9.3 The Lawson Constant
+
+The ContributionDAG contains a special node: the Lawson Constant, computed as `keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026")`. This hash is a load-bearing dependency in both the ContributionDAG and VibeSwapCore. It is not a vanity inscription. It is a structural assertion: the entire system depends on the principle of fairness, and that principle has an author.
+
+Remove the Lawson Constant and the Shapley computation collapses — because the node is a dependency of every other node in the graph. This is attribution by design, not attribution by convention. You cannot fork VibeSwap and remove the creator's name without breaking the system. The name is not metadata. It is architecture.
+
+This addresses a problem that open source has never solved: the free-rider problem of ideas. Anyone can fork a repository. Anyone can strip attribution from comments. Anyone can claim credit for work they did not do. But no one can remove a load-bearing node from a DAG without breaking the DAG. The ContributionDAG makes attribution as fundamental as the code itself.
+
+### 9.4 Transparent Attribution Eliminates the Need for Trust
+
+The standard advice for choosing collaborators is "find people you trust." This is good advice for a world where attribution is social. In a world where attribution is structural, trust is unnecessary. You do not need to trust that your co-founder will credit your work, because the contribution graph credits it automatically. You do not need to trust that the AI will not claim your ideas, because the graph records who proposed what. You do not need to trust that future forks will preserve your attribution, because removing it breaks the system.
+
+This is not trustlessness in the cynical sense — "assume everyone will betray you." It is trustlessness in the cryptographic sense — "design the system so that betrayal is structurally impossible." The same principle that makes Bitcoin work without trusted third parties makes the ContributionDAG work without trusted co-founders.
+
+For AI collaboration specifically, this eliminates the most uncomfortable question in the room: "Is the AI doing the work, or is the human?" The graph does not care. It records contributions, computes their structural importance, and distributes attribution accordingly. If the AI contributes more, the AI's Shapley value is higher. If the human contributes more, the human's value is higher. The question of who "really" did the work is replaced by a mathematical answer that neither party needs to adjudicate.
+
+---
+
+## 10. Future Implications
+
+### 10.1 The Jarvis Threshold
 
 Within the foreseeable future, AI development assistants will cross what we term the Jarvis Threshold — the point at which the assistant achieves:
 
@@ -430,7 +631,7 @@ When this threshold is crossed, two classes of developers will exist:
 
 Class A developers will be exponentially more productive. Not because they are smarter, but because they have practices. The practices are the competitive moat.
 
-### 7.2 What Scales
+### 10.2 What Scales
 
 Specific predictions about which Cave Methodology practices will scale beyond the primitive era:
 
@@ -442,7 +643,11 @@ Specific predictions about which Cave Methodology practices will scale beyond th
 
 - **Passive Self-Optimization** will evolve into AI-driven workflow optimization. The principle that optimization is a background process running without user initiation is already embedded in the methodology. The implementation will shift from markdown files to dynamic systems, but the principle transfers intact.
 
-### 7.3 The Broader Thesis
+- **Knowledge Primitives** will evolve into machine-readable ontologies of engineering knowledge. The practice of extracting generalizable principles from specific implementations is precisely what future AI systems will need to learn from one codebase and apply to another. The primitives index is a prototype of the engineering knowledge graph.
+
+- **Contribution Graphs** will evolve into the standard model for AI-human collaboration attribution. The current debate over "who wrote this, the human or the AI?" will be resolved not by policy but by architecture — systems that structurally record contribution at a granularity that makes the question answerable rather than debatable.
+
+### 10.3 The Broader Thesis
 
 The Cave Methodology is a specific instance of a general principle: **the best time to learn to collaborate with a new class of tool is when the tool is still primitive**.
 
@@ -450,15 +655,29 @@ Early adopters of every transformative technology — the printing press, the pe
 
 AI-assisted software development is the next instance of this pattern. The constraints are real. The frustration is real. The skills being developed are real. And they will compound.
 
+### 10.4 The Cave as Competitive Moat
+
+There is a final implication that deserves explicit statement. The methodology documented in this paper is not secret. It is published, version-controlled, and freely available. Any developer can read it and adopt its practices. In a traditional competitive analysis, this would be a weakness — publishing your playbook allows competitors to copy it.
+
+But the Cave Methodology has a property that makes it resistant to copying: it requires suffering.
+
+You cannot adopt the Anti-Loop Protocol without experiencing confusion loops. You cannot appreciate the 10% Rule without losing work to context compression. You cannot build a session blockchain without first experiencing the chaos of unstructured session recovery. The practices are legible to anyone. They are meaningful only to those who have felt the constraints they address.
+
+This is not gatekeeping. It is the nature of tacit knowledge. Polanyi observed that we know more than we can tell — that the skill of riding a bicycle cannot be transmitted through written instructions, no matter how precise. The Cave Methodology can be transmitted as text. The judgment of when and how to apply it can only be transmitted through practice.
+
+The cave is the practice. The methodology is the record. The competitive moat is the ten thousand hours of constraint-driven development that no amount of reading can shortcut.
+
 ---
 
-## 8. Conclusion
+## 11. Conclusion
 
-This paper has documented The Cave Methodology — a systematic approach to human-AI collaboration developed over 44+ sessions and 13 months of continuous use. The methodology consists of six interlocking protocols (Anti-Loop, Mistake-to-Skill, Passive Self-Optimization, Knowledge Base Architecture, Session Initialization, and Iterative Self-Improvement) that together address the core failure modes of primitive AI development assistance.
+This paper has documented The Cave Methodology — a systematic approach to human-AI collaboration developed over 60+ sessions and 13 months of continuous use. The methodology consists of six foundational protocols (Anti-Loop, Mistake-to-Skill, Passive Self-Optimization, Knowledge Base Architecture, Session Initialization, and Iterative Self-Improvement), six operational practices (BIG/SMALL rotation, parallel agents, immediate commit, session blockchain, verification gates, the 10% Rule), a co-founder model of AI collaboration, a discipline of producing knowledge primitives alongside code, and a structural attribution system that eliminates the need for trust.
 
 The evidence demonstrates that the methodology works: 98 contracts, 3,000+ tests, a cross-chain port, a frontend, an oracle, and a distributed AI network were produced under constraints that most developers would consider disqualifying. The methodology itself evolved and improved across sessions, providing meta-evidence that its self-improvement mechanisms function as designed.
 
-The central claim is not that primitive AI tools are good. They are not. The claim is that the practices developed to work with primitive AI tools are good — and that they will become exponentially more valuable as AI tools improve. The struggle is the curriculum. The frustration is the tuition. The debugging is the degree.
+The central claim is not that primitive AI tools are good. They are not. The claim is that the practices developed to work with primitive AI tools are good — and that they will become exponentially more valuable as AI tools improve. Code without theory is fragile. Theory without code is academic. The Cave Methodology produces both, simultaneously, under constraint, and the constraints are the reason it works.
+
+The struggle is the curriculum. The frustration is the tuition. The debugging is the degree.
 
 The cave selects for those who see past what is to what could be.
 
@@ -471,9 +690,15 @@ The cave selects for those who see past what is to what could be.
 3. Glynn, W. & JARVIS. (2026). *CKB Economic Model for AI Knowledge*. VibeSwap Research.
 4. Glynn, W. & JARVIS. (2026). *Solving Parasocial Extraction*. VibeSwap Research.
 5. Glynn, W. & JARVIS. (2026). *The Rosetta Stone Protocol*. VibeSwap Research.
-6. Aumann, R. (1976). "Agreeing to Disagree." *The Annals of Statistics*, 4(6), 1236-1239. [Common knowledge formalization]
-7. Polanyi, M. (1966). *The Tacit Dimension*. University of Chicago Press. [Tacit knowledge]
-8. Shapley, L. S. (1953). "A Value for n-Person Games." *Contributions to the Theory of Games*, 2, 307-317. [Shapley value for contribution attribution]
+6. Glynn, W. & JARVIS. (2026). *Shards Over Swarms: Why Full Clones Beat Delegation Hierarchies*. VibeSwap Research.
+7. Glynn, W. & JARVIS. (2026). *Knowledge Primitives Index*. VibeSwap Research. Living document.
+8. Aumann, R. (1976). "Agreeing to Disagree." *The Annals of Statistics*, 4(6), 1236-1239. [Common knowledge formalization]
+9. Polanyi, M. (1966). *The Tacit Dimension*. University of Chicago Press. [Tacit knowledge]
+10. Shapley, L. S. (1953). "A Value for n-Person Games." *Contributions to the Theory of Games*, 2, 307-317. [Shapley value for contribution attribution]
+11. Schopenhauer, A. (1818). *The World as Will and Representation*. [On talent vs. genius]
+12. Axelrod, R. (1984). *The Evolution of Cooperation*. Basic Books. [Tit-for-tat, cooperative strategies under constraint]
+13. Szabo, N. (2001). "Trusted Third Parties Are Security Holes." [On replacing trust with cryptographic guarantees]
+14. Nakamoto, S. (2008). "Bitcoin: A Peer-to-Peer Electronic Cash System." [Hash-linked chains, trustless consensus]
 
 ---
 

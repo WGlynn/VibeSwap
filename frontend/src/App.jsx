@@ -144,6 +144,9 @@ const PartnersPage = lazy(() => import('./components/PartnersPage'))
 const ProposalDetailPage = lazy(() => import('./components/ProposalDetailPage'))
 const LegalPage = lazy(() => import('./components/LegalPage'))
 const CareersPage = lazy(() => import('./components/CareersPage'))
+const BadgesPage = lazy(() => import('./components/BadgesPage'))
+const AlertsPage = lazy(() => import('./components/AlertsPage'))
+const ExportPage = lazy(() => import('./components/ExportPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -272,6 +275,9 @@ function AnimatedRoutes() {
             <Route path="/proposal" element={<ProposalDetailPage />} />
             <Route path="/legal" element={<LegalPage />} />
             <Route path="/careers" element={<CareersPage />} />
+            <Route path="/badges" element={<BadgesPage />} />
+            <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/export" element={<ExportPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

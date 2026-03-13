@@ -268,7 +268,7 @@ The "failure mode" of IIA is real — it requires getting the architecture right
 The full whitepaper develops the formal framework, including proofs of how IIA resolves Trivers' paradox, connections to multilevel selection theory, and the complete mathematical verification of VibeSwap against the three IIA conditions.
 
 - **Full paper**: [INTRINSIC_ALTRUISM_WHITEPAPER.md](https://github.com/wglynn/vibeswap/blob/master/DOCUMENTATION/INTRINSIC_ALTRUISM_WHITEPAPER.md)
-- **Related**: [Augmented Mechanism Design post](https://talk.nervos.org/) (our previous Nervos Talks post on AMD)
+- **Related**: [Augmented Mechanism Design paper](https://github.com/wglynn/vibeswap/blob/master/docs/papers/augmented-mechanism-design.md) (formal AMD framework)
 - **Code**: [github.com/wglynn/vibeswap](https://github.com/wglynn/vibeswap) (1,612+ commits, 60 contracts, $0 funding)
 
 ---

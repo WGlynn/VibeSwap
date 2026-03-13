@@ -14,6 +14,7 @@ import { ToastProvider } from './contexts/ToastContext'
 import PageSkeleton from './components/ui/PageSkeleton'
 import BackToTop from './components/ui/BackToTop'
 import NetworkBanner from './components/ui/NetworkBanner'
+import Footer from './components/ui/Footer'
 import { useSynaptic } from './hooks/useSynaptic'
 import { remember } from './utils/sankofa'
 
@@ -125,6 +126,9 @@ const SecurityPage = lazy(() => import('./components/SecurityPage'))
 const TeamPage = lazy(() => import('./components/TeamPage'))
 const FAQPage = lazy(() => import('./components/FAQPage'))
 const ChangelogPage = lazy(() => import('./components/ChangelogPage'))
+const NotFoundPage = lazy(() => import('./components/NotFoundPage'))
+const WalletPage = lazy(() => import('./components/WalletPage'))
+const SettingsPage = lazy(() => import('./components/SettingsPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -236,8 +240,13 @@ function AnimatedRoutes() {
             <Route path="/team" element={<TeamPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/changelog" element={<ChangelogPage />} />
+            {/* Account */}
+            <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
+            {/* 404 catch-all */}
+            <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>
@@ -288,6 +297,7 @@ function App() {
           <HeaderMinimal />
           <main className="flex-1 overflow-y-auto allow-scroll">
             <AnimatedRoutes />
+            <Footer />
           </main>
         </div>
       )}

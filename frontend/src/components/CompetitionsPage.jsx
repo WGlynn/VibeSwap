@@ -68,8 +68,6 @@ const ACTIVE_COMPETITION = {
   participants: 1847, maxParticipants: 5000, entryFee: 0,
 }
 
-// ============ Mock Data: Leaderboard ============
-
 function generateLeaderboard() {
   const rng = seededRandom(3141)
   return Array.from({ length: 15 }, (_, i) => {
@@ -82,10 +80,7 @@ function generateLeaderboard() {
     return { rank: i + 1, address: addr, pnlPct, volume, trades, prizeAlloc }
   })
 }
-
 const LEADERBOARD = generateLeaderboard()
-
-// ============ Mock Data: Prize Structure ============
 
 const PRIZE_TIERS = [
   { place: '1st Place', jul: 75_000, pct: 30, badge: 'Champion', badgeColor: '#fbbf24' },
@@ -94,66 +89,22 @@ const PRIZE_TIERS = [
   { place: '4th - 10th', jul: 15_000, pct: 6, badge: 'Top 10', badgeColor: '#8b5cf6', note: 'Split among 7 traders' },
 ]
 
-// ============ Mock Data: Past Competitions ============
-
 const PAST_COMPETITIONS = [
-  {
-    name: 'New Year Sprint',
-    winner: '0x7a3b...f291',
-    winnerPnl: '+62.4%',
-    dates: 'Jan 1 - Jan 14, 2026',
-    totalVolume: 18_400_000,
-    participants: 2103,
-    prizePool: 200_000,
-  },
-  {
-    name: 'Valentine Volatility',
-    winner: '0x9c1d...a847',
-    winnerPnl: '+48.7%',
-    dates: 'Feb 7 - Feb 21, 2026',
-    totalVolume: 14_700_000,
-    participants: 1654,
-    prizePool: 180_000,
-  },
-  {
-    name: 'DeFi Decathlon',
-    winner: '0x2e8f...c503',
-    winnerPnl: '+55.1%',
-    dates: 'Dec 1 - Dec 15, 2025',
-    totalVolume: 22_100_000,
-    participants: 2891,
-    prizePool: 300_000,
-  },
+  { name: 'New Year Sprint', winner: '0x7a3b...f291', winnerPnl: '+62.4%', dates: 'Jan 1 - Jan 14, 2026', totalVolume: 18_400_000, participants: 2103, prizePool: 200_000 },
+  { name: 'Valentine Volatility', winner: '0x9c1d...a847', winnerPnl: '+48.7%', dates: 'Feb 7 - Feb 21, 2026', totalVolume: 14_700_000, participants: 1654, prizePool: 180_000 },
+  { name: 'DeFi Decathlon', winner: '0x2e8f...c503', winnerPnl: '+55.1%', dates: 'Dec 1 - Dec 15, 2025', totalVolume: 22_100_000, participants: 2891, prizePool: 300_000 },
 ]
-
-// ============ Mock Data: Upcoming Competitions ============
 
 const UPCOMING_COMPETITIONS = [
-  {
-    name: 'Spring Surge',
-    description: 'Cross-chain volume competition across all LayerZero-connected chains. Highest cumulative volume wins.',
-    registrationOpens: 'Mar 20, 2026',
-    startDate: 'Apr 1, 2026',
-    endDate: 'Apr 14, 2026',
-    prizePool: 300_000,
-    maxParticipants: 5000,
-    scoring: 'Total cross-chain volume',
-    rules: ['Minimum 10 trades across 2+ chains', 'All VibeSwap pairs eligible', 'No wash trading'],
-  },
-  {
-    name: 'Arbitrage Arena',
-    description: 'Profit from price discrepancies across chains. Best risk-adjusted return (Sharpe ratio) wins.',
-    registrationOpens: 'Apr 20, 2026',
-    startDate: 'May 1, 2026',
-    endDate: 'May 14, 2026',
-    prizePool: 350_000,
-    maxParticipants: 3000,
-    scoring: 'Risk-adjusted PnL (Sharpe ratio)',
-    rules: ['Minimum $1,000 starting capital', 'Cross-chain trades only', 'Automated strategies permitted'],
-  },
+  { name: 'Spring Surge', description: 'Cross-chain volume competition across all LayerZero-connected chains. Highest cumulative volume wins.',
+    registrationOpens: 'Mar 20, 2026', startDate: 'Apr 1, 2026', endDate: 'Apr 14, 2026',
+    prizePool: 300_000, scoring: 'Total cross-chain volume',
+    rules: ['Minimum 10 trades across 2+ chains', 'All VibeSwap pairs eligible', 'No wash trading'] },
+  { name: 'Arbitrage Arena', description: 'Profit from price discrepancies across chains. Best risk-adjusted return (Sharpe ratio) wins.',
+    registrationOpens: 'Apr 20, 2026', startDate: 'May 1, 2026', endDate: 'May 14, 2026',
+    prizePool: 350_000, scoring: 'Risk-adjusted PnL (Sharpe ratio)',
+    rules: ['Minimum $1,000 starting capital', 'Cross-chain trades only', 'Automated strategies permitted'] },
 ]
-
-// ============ Mock Data: Rules ============
 
 const RULES = {
   entry: [
@@ -177,12 +128,7 @@ const RULES = {
   ],
 }
 
-// ============ Time Remaining Helper ============
-
-function getTimeRemaining() {
-  // Mock: always show some time remaining for the active competition
-  return { days: 3, hours: 14, minutes: 27, seconds: 52 }
-}
+const TIME_REMAINING = { days: 3, hours: 14, minutes: 27, seconds: 52 }
 
 // ============ Component ============
 
@@ -192,12 +138,10 @@ export default function CompetitionsPage() {
   const isConnected = isExternalConnected || isDeviceConnected
 
   const [activeTab, setActiveTab] = useState('leaderboard')
-  const timeRemaining = useMemo(() => getTimeRemaining(), [])
 
   // Mock user performance
   const userPerformance = useMemo(() => {
     if (!isConnected) return null
-    const rng = seededRandom(9999)
     return {
       rank: 42,
       totalParticipants: ACTIVE_COMPETITION.participants,
@@ -251,7 +195,7 @@ export default function CompetitionsPage() {
                       {['days', 'hours', 'minutes', 'seconds'].map((unit) => (
                         <div key={unit} className="text-center">
                           <div className="text-xl sm:text-2xl font-bold font-mono" style={{ color: CYAN }}>
-                            {String(timeRemaining[unit]).padStart(2, '0')}
+                            {String(TIME_REMAINING[unit]).padStart(2, '0')}
                           </div>
                           <div className="text-[10px] text-black-500 uppercase">{unit.slice(0, 3)}</div>
                         </div>
@@ -378,58 +322,22 @@ export default function CompetitionsPage() {
               {/* Table rows */}
               {LEADERBOARD.map((trader, i) => {
                 const medal = rankMedal(trader.rank)
-                const isUser = isConnected && trader.rank === 42
                 return (
-                  <motion.div
-                    key={trader.address}
-                    variants={cardV}
-                    initial="hidden"
-                    animate="visible"
-                    custom={i}
-                    className={`grid grid-cols-12 gap-2 px-4 py-3 items-center border-b border-black-800/30 transition-colors hover:bg-black-800/30 ${
-                      trader.rank <= 3 ? 'bg-black-800/20' : ''
-                    }`}
-                  >
-                    {/* Rank */}
+                  <motion.div key={trader.address} variants={cardV} initial="hidden" animate="visible" custom={i}
+                    className={`grid grid-cols-12 gap-2 px-4 py-3 items-center border-b border-black-800/30 transition-colors hover:bg-black-800/30 ${trader.rank <= 3 ? 'bg-black-800/20' : ''}`}>
                     <div className="col-span-1">
-                      {medal ? (
-                        <span className="text-lg">{medal.symbol}</span>
-                      ) : (
-                        <span className="text-sm font-mono text-black-400">{trader.rank}</span>
-                      )}
+                      {medal ? <span className="text-lg">{medal.symbol}</span> : <span className="text-sm font-mono text-black-400">{trader.rank}</span>}
                     </div>
-
-                    {/* Address */}
-                    <div className="col-span-3">
-                      <span className="font-mono text-sm">{shortenAddr(trader.address)}</span>
-                    </div>
-
-                    {/* PnL % */}
+                    <div className="col-span-3"><span className="font-mono text-sm">{shortenAddr(trader.address)}</span></div>
                     <div className="col-span-2 text-right">
-                      <span className={`font-mono text-sm font-semibold ${
-                        trader.pnlPct >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
+                      <span className={`font-mono text-sm font-semibold ${trader.pnlPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {trader.pnlPct >= 0 ? '+' : ''}{trader.pnlPct.toFixed(2)}%
                       </span>
                     </div>
-
-                    {/* Volume */}
+                    <div className="col-span-2 text-right"><span className="font-mono text-sm text-black-300">{fmt(trader.volume)}</span></div>
+                    <div className="col-span-2 text-right"><span className="font-mono text-sm text-black-400">{trader.trades}</span></div>
                     <div className="col-span-2 text-right">
-                      <span className="font-mono text-sm text-black-300">{fmt(trader.volume)}</span>
-                    </div>
-
-                    {/* Trades */}
-                    <div className="col-span-2 text-right">
-                      <span className="font-mono text-sm text-black-400">{trader.trades}</span>
-                    </div>
-
-                    {/* Prize */}
-                    <div className="col-span-2 text-right">
-                      {trader.prizeAlloc > 0 ? (
-                        <span className="font-mono text-sm text-green-400">{fmtJul(trader.prizeAlloc)}</span>
-                      ) : (
-                        <span className="text-xs text-black-600">--</span>
-                      )}
+                      {trader.prizeAlloc > 0 ? <span className="font-mono text-sm text-green-400">{fmtJul(trader.prizeAlloc)}</span> : <span className="text-xs text-black-600">--</span>}
                     </div>
                   </motion.div>
                 )
@@ -448,15 +356,13 @@ export default function CompetitionsPage() {
                 {' '} distributed to top 10 finishers plus soulbound NFT trophies.
               </p>
 
-              <div className="space-y-4">
-                {PRIZE_TIERS.map((tier, i) => (
-                  <motion.div key={tier.place} variants={cardV} initial="hidden" animate="visible" custom={i}>
-                    <div className={`flex items-center justify-between p-4 rounded-xl border ${
-                      i === 0 ? 'border-yellow-500/30 bg-yellow-500/5' :
-                      i === 1 ? 'border-gray-400/20 bg-gray-400/5' :
-                      i === 2 ? 'border-orange-500/20 bg-orange-500/5' :
-                      'border-black-700/50 bg-black-800/30'
-                    }`}>
+              <div className="space-y-3">
+                {PRIZE_TIERS.map((tier, i) => {
+                  const bg = i === 0 ? 'border-yellow-500/30 bg-yellow-500/5' : i === 1 ? 'border-gray-400/20 bg-gray-400/5'
+                    : i === 2 ? 'border-orange-500/20 bg-orange-500/5' : 'border-black-700/50 bg-black-800/30'
+                  return (
+                    <motion.div key={tier.place} variants={cardV} initial="hidden" animate="visible" custom={i}
+                      className={`flex items-center justify-between p-4 rounded-xl border ${bg}`}>
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold"
                           style={{ backgroundColor: `${tier.badgeColor}20`, color: tier.badgeColor }}>
@@ -467,22 +373,19 @@ export default function CompetitionsPage() {
                           {tier.note && <div className="text-[10px] text-black-500">{tier.note}</div>}
                         </div>
                       </div>
-
                       <div className="flex items-center gap-6">
                         <div className="text-right">
                           <div className="font-bold font-mono text-green-400">{fmtJul(tier.jul)}</div>
                           <div className="text-[10px] text-black-500">{tier.pct}% of pool</div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs font-medium px-2 py-1 rounded-full"
-                            style={{ backgroundColor: `${tier.badgeColor}20`, color: tier.badgeColor }}>
-                            {tier.badge} NFT
-                          </div>
+                        <div className="text-xs font-medium px-2 py-1 rounded-full"
+                          style={{ backgroundColor: `${tier.badgeColor}20`, color: tier.badgeColor }}>
+                          {tier.badge} NFT
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </div>
 
               {/* Additional prize info */}
@@ -545,26 +448,18 @@ export default function CompetitionsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4 pt-4 border-t border-black-800/50">
-                    <div>
-                      <div className="text-[10px] text-black-500 uppercase tracking-wider mb-1">Winner</div>
-                      <div className="font-mono text-sm">{comp.winner}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-black-500 uppercase tracking-wider mb-1">Winning PnL</div>
-                      <div className="font-mono text-sm text-green-400">{comp.winnerPnl}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-black-500 uppercase tracking-wider mb-1">Total Volume</div>
-                      <div className="font-mono text-sm">{fmt(comp.totalVolume)}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-black-500 uppercase tracking-wider mb-1">Participants</div>
-                      <div className="font-mono text-sm">{comp.participants.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-black-500 uppercase tracking-wider mb-1">Prize Pool</div>
-                      <div className="font-mono text-sm text-green-400">{fmtJul(comp.prizePool)}</div>
-                    </div>
+                    {[
+                      { label: 'Winner', value: comp.winner },
+                      { label: 'Winning PnL', value: comp.winnerPnl, color: 'text-green-400' },
+                      { label: 'Total Volume', value: fmt(comp.totalVolume) },
+                      { label: 'Participants', value: comp.participants.toLocaleString() },
+                      { label: 'Prize Pool', value: fmtJul(comp.prizePool), color: 'text-green-400' },
+                    ].map((s) => (
+                      <div key={s.label}>
+                        <div className="text-[10px] text-black-500 uppercase tracking-wider mb-1">{s.label}</div>
+                        <div className={`font-mono text-sm ${s.color || ''}`}>{s.value}</div>
+                      </div>
+                    ))}
                   </div>
                 </GlassCard>
               </motion.div>
@@ -637,43 +532,29 @@ export default function CompetitionsPage() {
         {/* ============ Rules Tab ============ */}
         {activeTab === 'rules' && (
           <motion.div variants={sectionV} initial="hidden" animate="visible" custom={3} className="space-y-6">
-            {/* Entry Requirements */}
-            <GlassCard className="p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold">E</span>
-                Entry Requirements
-              </h3>
-              <ul className="space-y-3">
-                {RULES.entry.map((rule, i) => (
-                  <motion.li key={i} variants={cardV} initial="hidden" animate="visible" custom={i}
-                    className="flex items-start gap-3 text-sm text-black-300">
-                    <span className="w-5 h-5 rounded-full bg-black-800 text-black-500 flex items-center justify-center text-[10px] font-mono flex-shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    {rule}
-                  </motion.li>
-                ))}
-              </ul>
-            </GlassCard>
-
-            {/* Scoring Methodology */}
-            <GlassCard className="p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-md bg-green-500/20 text-green-400 flex items-center justify-center text-xs font-bold">S</span>
-                Scoring Methodology
-              </h3>
-              <ul className="space-y-3">
-                {RULES.scoring.map((rule, i) => (
-                  <motion.li key={i} variants={cardV} initial="hidden" animate="visible" custom={i}
-                    className="flex items-start gap-3 text-sm text-black-300">
-                    <span className="w-5 h-5 rounded-full bg-black-800 text-black-500 flex items-center justify-center text-[10px] font-mono flex-shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    {rule}
-                  </motion.li>
-                ))}
-              </ul>
-            </GlassCard>
+            {/* Rules sections rendered from config */}
+            {[
+              { title: 'Entry Requirements', icon: 'E', iconBg: 'bg-cyan-500/20 text-cyan-400', items: RULES.entry, marker: 'number' },
+              { title: 'Scoring Methodology', icon: 'S', iconBg: 'bg-green-500/20 text-green-400', items: RULES.scoring, marker: 'number' },
+            ].map((section) => (
+              <GlassCard key={section.title} className="p-6">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <span className={`w-6 h-6 rounded-md ${section.iconBg} flex items-center justify-center text-xs font-bold`}>{section.icon}</span>
+                  {section.title}
+                </h3>
+                <ul className="space-y-3">
+                  {section.items.map((rule, i) => (
+                    <motion.li key={i} variants={cardV} initial="hidden" animate="visible" custom={i}
+                      className="flex items-start gap-3 text-sm text-black-300">
+                      <span className="w-5 h-5 rounded-full bg-black-800 text-black-500 flex items-center justify-center text-[10px] font-mono flex-shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      {rule}
+                    </motion.li>
+                  ))}
+                </ul>
+              </GlassCard>
+            ))}
 
             {/* Prohibited Strategies */}
             <GlassCard className="p-6" glowColor="warning">
@@ -685,9 +566,7 @@ export default function CompetitionsPage() {
                 {RULES.prohibited.map((rule, i) => (
                   <motion.li key={i} variants={cardV} initial="hidden" animate="visible" custom={i}
                     className="flex items-start gap-3 text-sm text-black-300">
-                    <span className="w-5 h-5 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">
-                      x
-                    </span>
+                    <span className="w-5 h-5 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">x</span>
                     {rule}
                   </motion.li>
                 ))}

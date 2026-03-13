@@ -33,6 +33,8 @@ const COLUMNS = [
       { to: '/bonds', label: 'Bonds' },
       { to: '/rewards', label: 'Rewards' },
       { to: '/farming', label: 'Farming' },
+      { to: '/revenue', label: 'Revenue Share' },
+      { to: '/vesting', label: 'Vesting' },
     ],
   },
   {
@@ -49,6 +51,9 @@ const COLUMNS = [
       { to: '/derivatives', label: 'Derivatives' },
       { to: '/create-token', label: 'Token Creator' },
       { to: '/markets', label: 'Markets' },
+      { to: '/margin', label: 'Margin Trading' },
+      { to: '/liquidations', label: 'Liquidations' },
+      { to: '/automation', label: 'Automation' },
     ],
   },
   {
@@ -79,6 +84,8 @@ const COLUMNS = [
       { to: '/dao-tools', label: 'DAO Tools' },
       { to: '/grants', label: 'Grants' },
       { to: '/treasury', label: 'Treasury' },
+      { to: '/delegate', label: 'Delegate' },
+      { to: '/competitions', label: 'Competitions' },
       { to: '/team', label: 'Team' },
     ],
   },

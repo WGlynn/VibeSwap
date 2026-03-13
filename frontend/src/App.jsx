@@ -17,6 +17,8 @@ import NetworkBanner from './components/ui/NetworkBanner'
 import Footer from './components/ui/Footer'
 import { useSynaptic } from './hooks/useSynaptic'
 import { usePageTitle } from './hooks/usePageTitle'
+import { FavoritesProvider } from './contexts/FavoritesContext'
+import MobileNav from './components/ui/MobileNav'
 import { remember } from './utils/sankofa'
 
 // Error boundary to catch React errors
@@ -312,6 +314,7 @@ function App() {
 
   return (
     <ToastProvider>
+    <FavoritesProvider>
     <MessagingProvider>
     <ContributionsProvider>
       <AmbientBackground />
@@ -347,8 +350,10 @@ function App() {
     {location.pathname !== '/jarvis' && location.pathname !== '/voice' && <JarvisBubble />}
     <OnboardingTour />
     <BackToTop />
+    <MobileNav onOpenMenu={() => window.dispatchEvent(new CustomEvent('vibeswap:open-drawer'))} />
     </ContributionsProvider>
     </MessagingProvider>
+    </FavoritesProvider>
     </ToastProvider>
   )
 }

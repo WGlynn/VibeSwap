@@ -30,7 +30,7 @@ export function useReferral(userAddress) {
     [userAddress]
   )
 
-  const referralLink = `vibeswap.xyz/ref/${referralCode}`
+  const referralLink = `vibeswap.io/ref/${referralCode}`
 
   const referrals = MOCK_REFERRALS
 

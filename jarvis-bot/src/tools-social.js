@@ -171,7 +171,7 @@ export function getQuotes(chatId, count = 5) {
 // ============ Tags (reusable text snippets) ============
 
 export function setTag(userId, name, text) {
-  if (!name || !text) return 'Usage: /tag <name> <text>\n\nExample: /tag links Check vibeswap.xyz and our TG group';
+  if (!name || !text) return 'Usage: /tag <name> <text>\n\nExample: /tag links Check vibeswap.io and our TG group';
 
   if (!tags.has(userId)) tags.set(userId, new Map());
   const userTags = tags.get(userId);

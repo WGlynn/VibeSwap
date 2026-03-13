@@ -84,7 +84,7 @@ Link IPFS-based identities to VibeCodes.
   "publicKey": [...],
   "service": [
     { "type": "ContributionGraph", "endpoint": "ipfs://QmGraph..." },
-    { "type": "VibeSwap", "endpoint": "https://vibeswap.xyz" }
+    { "type": "VibeSwap", "endpoint": "https://vibeswap.io" }
   ]
 }
 ```

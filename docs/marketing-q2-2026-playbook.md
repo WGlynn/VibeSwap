@@ -390,7 +390,7 @@ Every week follows this rhythm:
 | Medium | $0 | Free publication |
 | Mirror.xyz | $0 | Free (gas only for posts) |
 | Vercel hosting | $0 | Free tier |
-| Domain (if needed) | ~$12/year | vibeswap.xyz or similar |
+| Domain (if needed) | ~$12/year | vibeswap.io or similar |
 | Video editing (DIY) | $0 | Screen recordings + free editing tools |
 | **Total** | **$0-1/month** | Bootstrapped means bootstrapped |
 

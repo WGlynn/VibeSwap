@@ -1762,7 +1762,7 @@ bot.command('remind', (ctx) => {
 // /qr <text or URL> — Generate QR code
 bot.command('qr', async (ctx) => {
   const text = ctx.message.text.replace(/^\/qr(@\w+)?/i, '').trim();
-  if (!text) return ctx.reply('Usage: /qr https://vibeswap.xyz\n\nGenerates a QR code for any text or URL.');
+  if (!text) return ctx.reply('Usage: /qr https://vibeswap.io\n\nGenerates a QR code for any text or URL.');
   try {
     await ctx.replyWithPhoto(getQRUrl(text), { caption: `QR: ${text.slice(0, 100)}` });
   } catch {
@@ -2121,7 +2121,7 @@ bot.command('quotes', (ctx) => {
 bot.command('tag', (ctx) => {
   const args = ctx.message.text.replace(/^\/tag(@\w+)?/i, '').trim();
   const spaceIdx = args.indexOf(' ');
-  if (spaceIdx < 1) return ctx.reply('Usage: /tag links Check vibeswap.xyz and our TG group\n\nCreate reusable text snippets. Recall with /t <name>');
+  if (spaceIdx < 1) return ctx.reply('Usage: /tag links Check vibeswap.io and our TG group\n\nCreate reusable text snippets. Recall with /t <name>');
   const name = args.slice(0, spaceIdx);
   const text = args.slice(spaceIdx + 1);
   const result = setTag(ctx.from.id, name, text);

@@ -908,7 +908,7 @@ function HomePage() {
           </svg>
           <span>join the community</span>
         </a>
-        <p className="text-xs text-black-500">vibeswap.org</p>
+        <p className="text-xs text-black-500">vibeswap.io</p>
       </motion.footer>
     </div>
   )

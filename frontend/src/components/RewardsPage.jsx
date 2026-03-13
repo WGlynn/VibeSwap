@@ -177,7 +177,7 @@ export default function RewardsPage() {
   const daysActive = 127
   const referralCount = 14
   const referralEarnings = 284.60
-  const referralLink = 'vibeswap.xyz/r/0x7F3a'
+  const referralLink = 'vibeswap.io/r/0x7F3a'
 
   const rewardSources = useMemo(() => [
     { label: 'Trading Fees',    amount: 1842.30, pct: 43.7, seed: 5001, color: '#22c55e' },

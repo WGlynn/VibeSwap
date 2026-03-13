@@ -318,7 +318,7 @@ function PositionCard({ position, isExpanded, onToggle }) {
 
           {/* Apply button */}
           <motion.a
-            href="mailto:careers@vibeswap.xyz"
+            href="mailto:careers@vibeswap.io"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg text-white transition-colors"
@@ -482,7 +482,7 @@ export default function CareersPage() {
               </p>
 
               <motion.a
-                href="mailto:careers@vibeswap.xyz"
+                href="mailto:careers@vibeswap.io"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-white transition-all shadow-lg"
@@ -498,7 +498,7 @@ export default function CareersPage() {
               </motion.a>
 
               <p className="text-[11px] text-black-500 mt-4 font-mono">
-                careers@vibeswap.xyz
+                careers@vibeswap.io
               </p>
             </div>
           </div>

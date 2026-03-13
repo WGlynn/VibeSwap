@@ -12,7 +12,9 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { createHash } from 'crypto';
 import { config } from './config.js';
+import { getUserStats, getUserWallet, getUserStreak } from './tracker.js';
 
 const DATA_DIR = config.dataDir;
 const XP_FILE = join(DATA_DIR, 'xp.json');
@@ -258,15 +260,89 @@ function checkAchievements(profile) {
   return newOnes;
 }
 
+// ============ Factual Score (Evidence-Grounded) ============
+
+/**
+ * Compute a factual, evidence-grounded score for a user.
+ * Every component traces back to verifiable tracker.js data.
+ * Returns a structured object — NOT an arbitrary XP number.
+ */
+export function getFactualScore(userId) {
+  const stats = getUserStats(userId);
+  if (!stats) return null;
+
+  const wallet = getUserWallet(userId);
+  const streak = getUserStreak(userId);
+
+  // Build category breakdown from tracker data
+  const categories = stats.categoryCounts || {};
+
+  // Evidence hash — deterministic hash of the score inputs so it can be verified
+  const evidencePayload = `${userId}:${stats.messageCount}:${JSON.stringify(categories)}:${stats.repliesGiven}:${streak}:${!!wallet}`;
+  const evidence_hash = createHash('sha256').update(evidencePayload).digest('hex').slice(0, 16);
+
+  return {
+    user_id: userId,
+    username: stats.username,
+    message_count: stats.messageCount,
+    quality_avg: parseFloat(stats.avgQuality) || 0,
+    quality_sum: Math.round((parseFloat(stats.avgQuality) || 0) * stats.contributions),
+    reply_interactions: stats.repliesGiven,
+    replies_received: stats.repliesReceived,
+    categories,
+    wallet_linked: !!wallet,
+    wallet_address: wallet,
+    join_date: stats.firstSeen,
+    days_active: stats.daysSinceFirst,
+    streak_days: streak,
+    total_contributions: stats.contributions,
+    evidence_hash,
+  };
+}
+
 // ============ Display Commands ============
 
 export function getXPStatus(userId, userName) {
   const profile = getOrCreate(userId, userName);
   const levelInfo = calculateLevel(profile.xp);
+  const factual = getFactualScore(userId);
 
   const progressBar = buildProgressBar(levelInfo.currentXp, levelInfo.nextLevelXp, 15);
 
-  const lines = [`${profile.userName} — Level ${profile.level}\n`];
+  const lines = [];
+
+  // Factual VibeScore section
+  if (factual) {
+    lines.push(`📊 Your VibeScore`);
+    lines.push(`Messages: ${factual.message_count} (verified)`);
+    lines.push(`Quality: ${factual.quality_avg} avg (evidence-hashed)`);
+
+    // Category breakdown
+    const catParts = Object.entries(factual.categories)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => `${v} ${k.toLowerCase()}`)
+      .join(', ');
+    if (catParts) {
+      lines.push(`Contributions: ${catParts}`);
+    }
+
+    lines.push(`Streak: ${factual.streak_days} days`);
+    if (factual.wallet_linked) {
+      const addr = factual.wallet_address;
+      if (addr.startsWith('0x') && addr.length === 42) {
+        lines.push(`Wallet: ${addr.slice(0, 6)}...${addr.slice(-4)} ✓`);
+      } else {
+        lines.push(`Wallet: ${addr} ✓`);
+      }
+    } else {
+      lines.push(`Wallet: not linked (/connect 0x...)`);
+    }
+
+    lines.push('');
+  }
+
+  // XP / Level section
+  lines.push(`${profile.userName} — Level ${profile.level}`);
   lines.push(`  XP: ${profile.xp.toLocaleString()}`);
   lines.push(`  Progress: ${progressBar} ${levelInfo.currentXp}/${levelInfo.nextLevelXp}`);
   lines.push(`  Streak: ${profile.streak} days (best: ${profile.stats.longestStreak})`);

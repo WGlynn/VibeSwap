@@ -298,6 +298,55 @@ export function getAllUsers() {
   return { ...users };
 }
 
+// ============ Wallet Lookup ============
+
+export function getUserWallet(telegramId) {
+  const id = String(telegramId);
+  const user = users[id];
+  if (!user) return null;
+  return user.walletAddress || null;
+}
+
+// ============ Streak Calculation ============
+
+/**
+ * Compute consecutive active days from contribution timestamps.
+ * A "day" is a UTC calendar day with at least one contribution.
+ */
+export function getUserStreak(telegramId) {
+  const userContributions = contributions.filter(c => c.telegramUserId === telegramId);
+  if (userContributions.length === 0) return 0;
+
+  // Get unique active days (UTC)
+  const activeDays = new Set();
+  for (const c of userContributions) {
+    activeDays.add(new Date(c.timestamp).toISOString().split('T')[0]);
+  }
+
+  const sorted = [...activeDays].sort().reverse(); // newest first
+  if (sorted.length === 0) return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  // Streak must include today or yesterday to be "current"
+  if (sorted[0] !== today && sorted[0] !== yesterday) return 0;
+
+  let streak = 1;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = new Date(sorted[i]);
+    const prev = new Date(sorted[i + 1]);
+    const diffMs = current - prev;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 // ============ Flush ============
 
 export async function flushTracker() {

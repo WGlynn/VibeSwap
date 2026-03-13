@@ -249,11 +249,14 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     ]},
     { label: 'Community', items: [
       { path: '/feed', label: 'VibeFeed', icon: '📡' },
+      { path: '/social', label: 'Social Trading', icon: '👥' },
       { path: '/wiki', label: 'VibeWiki', icon: '📚' },
       { path: '/board', label: 'Discussions', icon: '💬' },
       { path: '/forum', label: 'Community', icon: '🗨️' },
       { path: '/prompts', label: 'Prompt Feed', icon: '>' },
       { path: '/live', label: 'Live', icon: '🔴' },
+      { path: '/proposals', label: 'Proposals', icon: '📋' },
+      { path: '/treasury', label: 'Treasury', icon: '🏛' },
     ]},
     { label: 'Intelligence', items: [
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
@@ -437,6 +440,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             { path: '/export', label: 'Export Data', icon: '📤' },
             { path: '/airdrop', label: 'Airdrop', icon: '🪂' },
             { path: '/watchlist', label: 'Watchlist', icon: '👁' },
+            { path: '/achievements', label: 'Achievements', icon: '🏆' },
+            { path: '/swap-history', label: 'Swap History', icon: '📜' },
           ].map((item) => (
             <Link
               key={item.path}

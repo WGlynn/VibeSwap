@@ -105,10 +105,9 @@ contract ContributionDAGTest is Test {
 
     function test_addFounder_duplicate_reverts() public {
         // Queue adding alice again — she's already a founder
-        uint256 changeId = dag.queueAddFounder(alice);
-        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        // queueAddFounder checks _isFounder and reverts at queue time
         vm.expectRevert(IContributionDAG.AlreadyFounder.selector);
-        dag.executeFounderChange(changeId);
+        dag.queueAddFounder(alice);
     }
 
     function test_addFounder_onlyOwner_reverts() public {
@@ -124,10 +123,9 @@ contract ContributionDAGTest is Test {
     }
 
     function test_removeFounder_notFounder_reverts() public {
-        uint256 changeId = dag.queueRemoveFounder(bob);
-        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        // queueRemoveFounder checks _isFounder and reverts at queue time
         vm.expectRevert(IContributionDAG.NotFounder.selector);
-        dag.executeFounderChange(changeId);
+        dag.queueRemoveFounder(bob);
     }
 
     function test_addFounder_maxFounders_reverts() public {
@@ -135,17 +133,15 @@ contract ContributionDAGTest is Test {
         for (uint256 i = 1; i < 20; i++) {
             _addFounder(address(uint160(1000 + i)));
         }
-        // 21st should revert
-        uint256 changeId = dag.queueAddFounder(address(uint160(9999)));
-        vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
+        // 21st should revert at queue time
         vm.expectRevert(IContributionDAG.MaxFoundersReached.selector);
-        dag.executeFounderChange(changeId);
+        dag.queueAddFounder(address(uint160(9999)));
     }
 
     function test_founderChange_beforeTimelock_reverts() public {
         uint256 changeId = dag.queueAddFounder(bob);
         // Don't warp — try to execute immediately
-        vm.expectRevert("Timelock not expired");
+        vm.expectRevert("Timelock active");
         dag.executeFounderChange(changeId);
     }
 
@@ -154,7 +150,7 @@ contract ContributionDAGTest is Test {
         dag.cancelFounderChange(changeId);
         // After cancel, execution should revert
         vm.warp(block.timestamp + dag.FOUNDER_CHANGE_TIMELOCK() + 1);
-        vm.expectRevert("Already executed or cancelled");
+        vm.expectRevert("Cancelled");
         dag.executeFounderChange(changeId);
     }
 

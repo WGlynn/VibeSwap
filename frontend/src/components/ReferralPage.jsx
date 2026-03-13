@@ -97,7 +97,7 @@ export default function ReferralPage() {
 
   // ============ Mock User State ============
 
-  const referralLink = 'vibeswap.xyz/ref/0x1234'
+  const referralLink = 'vibeswap.io/ref/0x1234'
   const totalReferrals = 24
   const totalVolume = 560_600
   const totalEarnings = 1_681.80

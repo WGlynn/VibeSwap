@@ -393,7 +393,7 @@ export default function SecurityPage() {
               <p className="text-[10px] font-mono text-black-400 leading-relaxed">
                 <span className="text-white font-bold">Total bounties paid:</span>{' '}
                 <span style={{ color: '#22c55e' }}>$340,000</span> across 28 valid submissions.
-                Report vulnerabilities to <span style={{ color: CYAN }}>security@vibeswap.xyz</span> or
+                Report vulnerabilities to <span style={{ color: CYAN }}>security@vibeswap.io</span> or
                 through our Immunefi program. Responsible disclosure earns a 10% bonus.
               </p>
             </div>

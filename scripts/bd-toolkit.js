@@ -539,6 +539,231 @@ An omnichain DEX that eliminates MEV through batch auctions. ${stats.contracts} 
   console.log(`\nSaved to ${outFile}`);
 }
 
+// ============ Today: 1-Click Daily Package ============
+
+function cmdToday() {
+  const today = new Date();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = dayNames[today.getDay()];
+  const dateStr = today.toISOString().split('T')[0];
+
+  console.log(`\n=== VibeSwap Daily Package — ${dayName} ${dateStr} ===\n`);
+
+  // Show today's calendar tasks
+  const dailyTasks = {
+    Monday: ['Post 1 engagement tweet', 'Share 1 hook thread', 'Check Reddit for relevant discussions'],
+    Tuesday: ['Post 1 feature spotlight tweet', 'Reply to 3 crypto Twitter threads', 'Post to r/defi or r/ethereum'],
+    Wednesday: ['Post 1 philosophy tweet', 'Share build update in Telegram', 'Engage with 5 community messages'],
+    Thursday: ['Post 1 narrative tweet', 'Post 1 stats-flex tweet', 'Check grant deadlines'],
+    Friday: ['Post 1 mission-driven tweet', 'Weekly digest in Telegram', 'Post to r/CryptoCurrency'],
+    Saturday: ['Post 1 hook thread (longer form)', 'Community AMA or discussion'],
+    Sunday: ["Plan next week's content", 'Review analytics', 'Queue tweets for the week'],
+  };
+
+  console.log('TODAY\'S TASKS:');
+  (dailyTasks[dayName] || []).forEach(t => console.log(`  [ ] ${t}`));
+  console.log('');
+
+  // Pick today's tweet
+  const tweetCats = {
+    Monday: 'engagement', Tuesday: 'hook-threads', Wednesday: 'philosophy',
+    Thursday: 'narrative', Friday: 'mission', Saturday: 'hook-threads', Sunday: null,
+  };
+  const todayCat = tweetCats[dayName];
+  if (todayCat) {
+    const catDir = path.join(TWEETS, todayCat);
+    let tweetFiles = [];
+    if (fs.existsSync(catDir)) {
+      tweetFiles = fs.readdirSync(catDir).filter(f => f.endsWith('.md'));
+    }
+    // Fallback to random from all categories
+    if (tweetFiles.length === 0) {
+      if (fs.existsSync(TWEETS)) {
+        fs.readdirSync(TWEETS).filter(f => {
+          const fp = path.join(TWEETS, f);
+          try { return fs.statSync(fp).isDirectory(); } catch { return false; }
+        }).forEach(d => {
+          fs.readdirSync(path.join(TWEETS, d)).filter(f => f.endsWith('.md')).forEach(f => {
+            tweetFiles.push(path.join(d, f));
+          });
+        });
+      }
+      if (tweetFiles.length > 0) {
+        const pick = tweetFiles[Math.floor(Math.random() * tweetFiles.length)];
+        const full = pick.includes('/') ? path.join(TWEETS, pick) : path.join(catDir, pick);
+        if (fs.existsSync(full)) {
+          console.log('TODAY\'S TWEET:');
+          console.log('─'.repeat(50));
+          console.log(fs.readFileSync(full, 'utf8').trim());
+          console.log('─'.repeat(50));
+          console.log('');
+        }
+      }
+    } else {
+      const pick = tweetFiles[Math.floor(Math.random() * tweetFiles.length)];
+      const full = path.join(catDir, pick);
+      console.log(`TODAY'S TWEET (${todayCat}/${pick}):`);
+      console.log('─'.repeat(50));
+      console.log(fs.readFileSync(full, 'utf8').trim());
+      console.log('─'.repeat(50));
+      console.log('');
+    }
+  }
+
+  // Pick a Reddit post if it's a posting day
+  if (['Tuesday', 'Friday'].includes(dayName) && fs.existsSync(REDDIT)) {
+    const posts = fs.readdirSync(REDDIT).filter(f => f.endsWith('.md'));
+    if (posts.length > 0) {
+      const pick = posts[Math.floor(Math.random() * posts.length)];
+      console.log(`TODAY'S REDDIT POST (${pick}):`);
+      console.log('─'.repeat(50));
+      const content = fs.readFileSync(path.join(REDDIT, pick), 'utf8');
+      // Just show the title and first few lines
+      const lines = content.split('\n').filter(Boolean);
+      console.log(lines.slice(0, 5).join('\n'));
+      console.log('  ... (run `node scripts/bd-toolkit.js reddit ' + pick.replace('.md', '') + '` for full post)');
+      console.log('─'.repeat(50));
+      console.log('');
+    }
+  }
+
+  // Grant status check on Thursdays
+  if (dayName === 'Thursday') {
+    console.log('GRANT CHECK:');
+    cmdGrantStatus();
+  }
+
+  // Quick stats
+  const stats = getStats();
+  console.log('CURRENT STATS:');
+  console.log(`  ${stats.contracts} contracts | ${stats.frontendPages} pages | ${stats.commits} commits | ${stats.tweetDrafts} tweets ready`);
+  console.log('');
+  console.log('QUICK ACTIONS:');
+  console.log('  node scripts/bd-toolkit.js tweet random     — Different tweet');
+  console.log('  node scripts/bd-toolkit.js reddit           — Browse Reddit posts');
+  console.log('  node scripts/bd-toolkit.js outreach         — Send outreach');
+  console.log('  node scripts/bd-toolkit.js grant-status     — Check grants');
+  console.log('');
+}
+
+// ============ Grant Status: At-a-Glance Tracker ============
+
+function cmdGrantStatus() {
+  const trackerPath = path.join(GRANTS, 'TRACKER.md');
+  if (!fs.existsSync(trackerPath)) {
+    console.log('  No TRACKER.md found.');
+    return;
+  }
+
+  const content = fs.readFileSync(trackerPath, 'utf8');
+  const lines = content.split('\n');
+
+  // Parse the table
+  const tableLines = lines.filter(l => l.startsWith('|') && !l.startsWith('|--') && !l.startsWith('| Program'));
+
+  console.log('\n  GRANT TRACKER:');
+  let draftReady = 0, submitted = 0, pending = 0, watching = 0;
+
+  tableLines.forEach(line => {
+    const cols = line.split('|').map(c => c.trim()).filter(Boolean);
+    if (cols.length >= 2) {
+      const [program, status, , amount] = cols;
+      const icon = status === 'Draft ready' ? '📝' : status === 'Submitted' ? '✅' : status === 'Pending' ? '⏳' : status === 'Watching' ? '👀' : '❓';
+      console.log(`  ${icon} ${program} — ${status}${amount ? ` (${amount})` : ''}`);
+      if (status === 'Draft ready') draftReady++;
+      if (status === 'Submitted') submitted++;
+      if (status === 'Pending') pending++;
+      if (status === 'Watching') watching++;
+    }
+  });
+
+  console.log('');
+  console.log(`  Summary: ${draftReady} ready to submit | ${submitted} submitted | ${pending} pending | ${watching} watching`);
+  console.log('  Generate: node scripts/bd-toolkit.js all-grants');
+  console.log('');
+}
+
+// ============ Social Blast: All Content at Once ============
+
+function cmdSocialBlast() {
+  const stats = getStats();
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  console.log('\n=== VibeSwap Social Blast — All Content Generated ===\n');
+
+  // Generate 3 tweets (different categories)
+  const categories = [];
+  if (fs.existsSync(TWEETS)) {
+    fs.readdirSync(TWEETS).filter(f => {
+      const fp = path.join(TWEETS, f);
+      try { return fs.statSync(fp).isDirectory(); } catch { return false; }
+    }).forEach(d => categories.push(d));
+  }
+
+  const picked = [];
+  const usedCats = new Set();
+  for (let i = 0; i < 3 && categories.length > 0; i++) {
+    // Pick a category we haven't used
+    const available = categories.filter(c => !usedCats.has(c));
+    if (available.length === 0) break;
+    const cat = available[Math.floor(Math.random() * available.length)];
+    usedCats.add(cat);
+    const files = fs.readdirSync(path.join(TWEETS, cat)).filter(f => f.endsWith('.md'));
+    if (files.length > 0) {
+      const file = files[Math.floor(Math.random() * files.length)];
+      picked.push({ cat, file, content: fs.readFileSync(path.join(TWEETS, cat, file), 'utf8').trim() });
+    }
+  }
+
+  if (picked.length > 0) {
+    console.log('TWEETS (pick 1-3 to post today):');
+    picked.forEach((t, i) => {
+      console.log(`\n  [${i + 1}] ${t.cat}/${t.file}`);
+      console.log('  ' + '─'.repeat(45));
+      t.content.split('\n').forEach(l => console.log('  ' + l));
+      console.log('  ' + '─'.repeat(45));
+    });
+    console.log('');
+  }
+
+  // Pick a Reddit post
+  if (fs.existsSync(REDDIT)) {
+    const posts = fs.readdirSync(REDDIT).filter(f => f.endsWith('.md'));
+    if (posts.length > 0) {
+      const pick = posts[Math.floor(Math.random() * posts.length)];
+      console.log(`REDDIT POST: ${pick}`);
+      const content = fs.readFileSync(path.join(REDDIT, pick), 'utf8');
+      const lines = content.split('\n').filter(Boolean);
+      console.log('  ' + lines[0]); // Title
+      console.log(`  (run: node scripts/bd-toolkit.js reddit ${pick.replace('.md', '')})`);
+      console.log('');
+    }
+  }
+
+  // Telegram digest snippet
+  console.log('TELEGRAM UPDATE:');
+  console.log('  ' + '─'.repeat(45));
+  console.log(`  VibeSwap build update — ${dateStr}`);
+  console.log(`  ${stats.contracts} contracts | ${stats.frontendPages} pages | ${stats.commits} commits`);
+  console.log(`  Zero VC. Zero pre-mine. All open source.`);
+  console.log(`  ${stats.website}`);
+  console.log('  ' + '─'.repeat(45));
+  console.log('');
+
+  // Save the package
+  let packageContent = `# Social Blast Package — ${dateStr}\n\n`;
+  packageContent += `## Tweets\n`;
+  picked.forEach((t, i) => {
+    packageContent += `\n### Tweet ${i + 1} (${t.cat})\n\n${t.content}\n`;
+  });
+  packageContent += `\n## Telegram Update\n\nVibeSwap build update — ${dateStr}\n${stats.contracts} contracts | ${stats.frontendPages} pages | ${stats.commits} commits\nZero VC. Zero pre-mine. All open source.\n${stats.website}\n`;
+
+  const outFile = path.join(OUTPUT, `social-blast-${dateStr}.md`);
+  fs.writeFileSync(outFile, packageContent);
+  console.log(`Package saved to ${outFile}`);
+  console.log('');
+}
+
 // ============ Main ============
 
 const [,, command, ...args] = process.argv;
@@ -551,9 +776,12 @@ switch (command) {
   case 'outreach': cmdOutreach(args[0]); break;
   case 'calendar': cmdCalendar(); break;
   case 'pitch': cmdPitch(args[0]); break;
+  case 'today': cmdToday(); break;
+  case 'grant-status': cmdGrantStatus(); break;
+  case 'social-blast': cmdSocialBlast(); break;
   case 'all-grants':
     if (fs.existsSync(GRANTS)) {
-      fs.readdirSync(GRANTS).filter(f => f.endsWith('.md')).forEach(f => {
+      fs.readdirSync(GRANTS).filter(f => f.endsWith('.md') && f !== 'TRACKER.md').forEach(f => {
         cmdGrant(f.replace('.md', ''));
       });
     }
@@ -563,8 +791,11 @@ switch (command) {
 VibeSwap BD Toolkit — 1-Click Business Development
 
 Commands:
+  today                — YOUR DAILY PACKAGE: tasks + tweet + reddit + stats (START HERE)
+  social-blast         — Generate ALL social content at once (tweets + reddit + telegram)
   stats                — Pull live project stats (auto-counted)
   grant <template>     — Generate grant application with live stats
+  grant-status         — At-a-glance view of all grant applications
   pitch <audience>     — Generate tailored pitch (investor/partner/hackathon)
   tweet <category>     — Pick a tweet to post (or 'random')
   reddit <post>        — Format a Reddit post for copy-paste
@@ -572,12 +803,14 @@ Commands:
   calendar             — Show this week's content calendar
   all-grants           — Generate ALL grant applications at once
 
+Lazy Mode (start here):
+  node scripts/bd-toolkit.js today          — What do I do today?
+  node scripts/bd-toolkit.js social-blast   — Give me everything to post
+
 Examples:
-  node scripts/bd-toolkit.js stats
-  node scripts/bd-toolkit.js grant ethereum-foundation
+  node scripts/bd-toolkit.js grant ethereum-foundation-grant
   node scripts/bd-toolkit.js pitch hackathon
   node scripts/bd-toolkit.js tweet random
   node scripts/bd-toolkit.js outreach base
-  node scripts/bd-toolkit.js calendar
 `);
 }

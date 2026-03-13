@@ -122,9 +122,9 @@ function generateLeaderboard(rng) {
 
 function generateLinks(rng) {
   return [
-    { slug: 'vibeswap.xyz/ref/0x1234', clicks: Math.floor(340 + rng() * 200), conversions: Math.floor(24 + rng() * 12), created: '2026-01-15', isDefault: true },
-    { slug: 'vibeswap.xyz/ref/defi-crew', clicks: Math.floor(120 + rng() * 100), conversions: Math.floor(8 + rng() * 6), created: '2026-02-08', isDefault: false },
-    { slug: 'vibeswap.xyz/ref/twitter-bio', clicks: Math.floor(80 + rng() * 60), conversions: Math.floor(3 + rng() * 5), created: '2026-03-01', isDefault: false },
+    { slug: 'vibeswap.io/ref/0x1234', clicks: Math.floor(340 + rng() * 200), conversions: Math.floor(24 + rng() * 12), created: '2026-01-15', isDefault: true },
+    { slug: 'vibeswap.io/ref/defi-crew', clicks: Math.floor(120 + rng() * 100), conversions: Math.floor(8 + rng() * 6), created: '2026-02-08', isDefault: false },
+    { slug: 'vibeswap.io/ref/twitter-bio', clicks: Math.floor(80 + rng() * 60), conversions: Math.floor(3 + rng() * 5), created: '2026-03-01', isDefault: false },
   ]
 }
 
@@ -726,7 +726,7 @@ export default function ReferralDashboardPage() {
                     <label className="text-[10px] font-mono text-gray-500 mb-1 block">Custom Slug</label>
                     <div className="flex items-center gap-0">
                       <span className="text-[11px] font-mono text-gray-600 px-3 py-2 rounded-l-lg border border-r-0 border-gray-700/40" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                        vibeswap.xyz/ref/
+                        vibeswap.io/ref/
                       </span>
                       <input
                         type="text"

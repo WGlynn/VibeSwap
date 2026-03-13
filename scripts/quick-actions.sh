@@ -77,23 +77,44 @@ case "${1:-help}" in
     echo ""
     echo "Create: echo 'Your tweet text' > 'tweet repo/<category>/<number>-<name>.md'"
     ;;
+  daily)
+    node scripts/bd-toolkit.js today
+    ;;
+  blast)
+    node scripts/bd-toolkit.js social-blast
+    ;;
+  grant-status)
+    node scripts/bd-toolkit.js grant-status
+    ;;
   help|*)
     echo ""
     echo "VibeSwap Quick Actions — for lazy builders"
     echo ""
-    echo "  today        What to do today"
+    echo "  === START HERE ==="
+    echo "  daily        Your daily package (tasks + tweet + stats)"
+    echo "  blast        Generate ALL social content at once"
+    echo ""
+    echo "  === CONTENT ==="
+    echo "  today        What to do today (calendar)"
     echo "  tweet        Random tweet to post"
-    echo "  stats        Live project stats"
     echo "  digest       Weekly summary"
     echo "  digest-tg    Telegram-formatted digest"
     echo "  digest-tweet Tweet thread digest"
-    echo "  grants       Grant tracker"
-    echo "  ship         Build + commit + push"
-    echo "  ship-deploy  Build + commit + push + deploy"
-    echo "  outreach     Email templates"
     echo "  new-tweet    Start a new tweet"
     echo ""
+    echo "  === BD ==="
+    echo "  stats        Live project stats"
+    echo "  grants       Grant tracker document"
+    echo "  grant-status At-a-glance grant status"
+    echo "  outreach     Email templates"
+    echo ""
+    echo "  === SHIP ==="
+    echo "  ship         Build + commit + push"
+    echo "  ship-deploy  Build + commit + push + deploy"
+    echo ""
     echo "Aliases for .bashrc:"
+    echo "  alias vd='$ROOT/scripts/quick-actions.sh daily'"
+    echo "  alias vb='$ROOT/scripts/quick-actions.sh blast'"
     echo "  alias vt='$ROOT/scripts/quick-actions.sh tweet'"
     echo "  alias vs='$ROOT/scripts/quick-actions.sh stats'"
     echo "  alias vship='$ROOT/scripts/quick-actions.sh ship'"

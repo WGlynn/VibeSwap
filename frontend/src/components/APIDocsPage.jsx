@@ -729,7 +729,7 @@ function BaseURLBanner() {
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900/40 border border-zinc-800/40">
         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
         <span className="text-[11px] font-mono text-zinc-500">Base URL</span>
-        <code className="text-[12px] font-mono text-cyan-400">https://api.vibeswap.io/api/v1</code>
+        <code className="text-[12px] font-mono text-cyan-400">https://api.vibeswap.io/v1</code>
       </div>
     </motion.div>
   )

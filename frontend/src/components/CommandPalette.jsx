@@ -129,6 +129,9 @@ const COMMANDS = [
   { id: 'networks', label: 'Networks', description: 'Chain status & switching', path: '/networks', category: 'Protocol' },
   { id: 'approvals', label: 'Approvals', description: 'Manage token approvals & revoke', path: '/approvals', category: 'System' },
   { id: 'markets', label: 'Markets', description: 'Market overview, heatmap, trending', path: '/markets', category: 'DeFi' },
+  { id: 'create-token', label: 'Token Creator', description: 'Launch your own token with fair distribution', path: '/create-token', category: 'DeFi' },
+  { id: 'derivatives', label: 'Derivatives', description: 'Structured products and exotic options', path: '/derivatives', category: 'DeFi' },
+  { id: 'dao-tools', label: 'DAO Tools', description: 'Multi-sig, treasury, payroll, governance', path: '/dao-tools', category: 'Community' },
 ]
 
 const CATEGORY_COLORS = {

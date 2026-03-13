@@ -240,6 +240,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/otc', label: 'OTC Desk', icon: '🏢' },
       { path: '/lp-positions', label: 'LP Positions', icon: '📐' },
       { path: '/markets', label: 'Markets', icon: '📊' },
+      { path: '/derivatives', label: 'Derivatives', icon: '📉' },
+      { path: '/create-token', label: 'Token Creator', icon: '🪄' },
     ]},
     { label: 'Ecosystem', items: [
       { path: '/nft', label: 'NFT Market', icon: '🖼' },
@@ -261,6 +263,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/proposals', label: 'Proposals', icon: '📋' },
       { path: '/treasury', label: 'Treasury', icon: '🏛' },
       { path: '/grants', label: 'Grants', icon: '💰' },
+      { path: '/dao-tools', label: 'DAO Tools', icon: '🛠' },
     ]},
     { label: 'Intelligence', items: [
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },

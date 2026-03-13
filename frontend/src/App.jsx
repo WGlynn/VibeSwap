@@ -167,6 +167,7 @@ const FeeTierPage = lazy(() => import('./components/FeeTierPage'))
 const SocialTradingPage = lazy(() => import('./components/SocialTradingPage'))
 const AchievementsPage = lazy(() => import('./components/AchievementsPage'))
 const SwapHistoryPage = lazy(() => import('./components/SwapHistoryPage'))
+const GrantsPage = lazy(() => import('./components/GrantsPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -316,6 +317,7 @@ function AnimatedRoutes() {
             <Route path="/social" element={<SocialTradingPage />} />
             <Route path="/achievements" element={<AchievementsPage />} />
             <Route path="/swap-history" element={<SwapHistoryPage />} />
+            <Route path="/grants" element={<GrantsPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

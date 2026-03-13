@@ -124,6 +124,7 @@ const COMMANDS = [
   { id: 'social', label: 'Social Trading', description: 'Copy trade top traders', path: '/social', category: 'Community' },
   { id: 'achievements', label: 'Achievements', description: 'Quests, XP, daily challenges', path: '/achievements', category: 'Account' },
   { id: 'swap-history', label: 'Swap History', description: 'Detailed swap transaction log', path: '/swap-history', category: 'Account' },
+  { id: 'grants', label: 'Grants', description: 'Ecosystem grants program', path: '/grants', category: 'Community' },
 ]
 
 const CATEGORY_COLORS = {

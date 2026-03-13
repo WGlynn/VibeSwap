@@ -25,6 +25,7 @@ import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
 import { handleNyxRequest } from './nyx.js';
 import { handleTheAIRequest } from './theai-dashboard.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
+import { loadWorkflowStats, handleWillIntercept, getWorkflowStats } from './workflow-router.js';
 // ============ Module Health Registry ============
 // Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
 // MUST be before all dynamic imports so registerModule() is available in catch blocks
@@ -4678,6 +4679,27 @@ bot.command('mesh', async (ctx) => {
   }
 });
 
+// ============ /workflow — Autonomy Stats (Cincinnatus Metric) ============
+bot.command('workflow', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const wf = getWorkflowStats();
+  const lines = [
+    'Workflow Router — Autonomy Metrics',
+    '',
+    `Total interactions: ${wf.total}`,
+    `Jarvis handled: ${wf.intercepted}`,
+    `Escalated to Will: ${wf.escalated}`,
+    `Autonomy ratio: ${wf.autonomyRatio}`,
+    '',
+    'Recent:',
+    ...wf.recent.map(r => {
+      const ago = Math.round((Date.now() - r.timestamp) / 60000);
+      return `  ${r.type === 'intercepted' ? '✓' : '↑'} @${r.user} (${ago}m ago): "${r.text.slice(0, 50)}"`;
+    }),
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
 bot.command('health', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
   const report = await diagnoseContext();
@@ -6292,7 +6314,17 @@ bot.on('text', async (ctx) => {
               }
               analysis = { action: 'engage', response_hint: `User shared a link. Here's the content:\n${groupWebContext}\n\nComment on it naturally — what's interesting, what you notice, or how it relates to what the group is working on. Be concise.`, confidence: 0.9 };
             } else {
-              analysis = await analyzeMessage(msgText, userName, recentCtx);
+              // ============ Workflow Router — Intercept Will-Targeted Messages ============
+              // "The whole point of making you was so people didn't have to depend on me."
+              // If someone asks for Will, Jarvis handles it. Only escalates for legal/financial.
+              const willIntercept = await handleWillIntercept(ctx, msgText, recentCtx);
+              if (willIntercept.action === 'intercepted' && willIntercept.response) {
+                analysis = { action: 'engage', response_hint: willIntercept.response, confidence: 0.95 };
+              } else if (willIntercept.action === 'escalated') {
+                analysis = { action: 'observe', reason: 'escalated_to_will' };
+              } else {
+                analysis = await analyzeMessage(msgText, userName, recentCtx);
+              }
             }
           }
         }
@@ -7026,6 +7058,7 @@ async function main() {
     initSocial(),
     initCKB(),
     initEmissions(),
+    loadWorkflowStats(),
   ]);
 
   // Group C: MI Host (depends on nothing but may fail — keep isolated)

@@ -106,6 +106,7 @@ const ROUTE_LABELS = {
   'portfolio-analytics': 'Portfolio Analytics',
   'bridge-history': 'Bridge History',
   token: 'Token',
+  pool: 'Pool',
 }
 
 export default function Breadcrumb({ className = '' }) {

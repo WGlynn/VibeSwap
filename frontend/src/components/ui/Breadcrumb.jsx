@@ -114,6 +114,8 @@ const ROUTE_LABELS = {
   achievements: 'Achievements',
   'swap-history': 'Swap History',
   grants: 'Grants',
+  'lp-positions': 'LP Positions',
+  networks: 'Networks',
 }
 
 export default function Breadcrumb({ className = '' }) {

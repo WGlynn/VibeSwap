@@ -1,11 +1,42 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-11 (Session 063, Claude Code Opus 4.6)
+**Last Updated**: 2026-03-14 (Session 066, Claude Code Opus 4.6)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
 ---
 
-## CURRENT (Session 065 — Mar 13-14, 2026)
+## CURRENT (Session 066 — Mar 14, 2026)
+
+### Delta from Session 065
+**Marketing Deployment + Anthropic Partnership + Team Solidification**
+
+**Anthropic Partnership:**
+- Drafted multimodal Wardenclyffe framing for TG shards (tip jar billboard)
+- Wrote `docs/anthropic-partnership-onepager.md` — "The Last Bottleneck" pitch
+- Submitted rate limit increase request via claude.com/contact-sales
+- Saved partnership pitch + fork argument to memory
+
+**Team Solidified (6 members):**
+- Freedom (BD/partnerships), Fate (Twitter/X), Catto (Reddit/forums)
+- Defaibro (DeFi communities), John Paul (grants/hackathons), Karma (TG growth)
+- Created `docs/team-marketing-assignments.md` with per-person lanes
+- Updated Q2 playbook with team assignments (was all "Will", now distributed)
+
+**Stats Refreshed:**
+- 342 contracts, 371 test files, 401 frontend components, 73 CKB modules
+- 15,155 CKB SDK tests (last verified), 1,684 commits, 55 papers, 154 tweets
+- Updated `docs/bd-output/latest-stats.md`
+
+**Memory Updated:**
+- Core team roster expanded with 6 new members + marketing lanes
+- `feedback_multimodal-wardenclyffe-framing.md` — TG multimodal response directive
+- `project_anthropic-partnership-pitch.md` — partnership framing + fork argument
+
+**Commits:** 51f8069, 78e9ee1, 8266a43
+
+---
+
+## PREVIOUS (Session 065 — Mar 13-14, 2026)
 
 ### Delta from Session 064
 **Full Autonomy Sprint — Bot Infrastructure + Fixes + Community Seeding**

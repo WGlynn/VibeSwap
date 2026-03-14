@@ -220,6 +220,11 @@ export function calculate(expression) {
       .replace(/\bpi\b/gi, 'Math.PI')
       .replace(/\be\b/gi, 'Math.E');
 
+    // Block prototype/constructor access attempts
+    if (/constructor|prototype|__proto__|this|self|global|process|require|import|window/i.test(expr)) {
+      return 'Invalid expression — only math operations allowed.';
+    }
+
     // Safe evaluation using Function constructor (no access to globals)
     const fn = new Function('Math', `"use strict"; return (${expr})`);
     const result = fn(Math);

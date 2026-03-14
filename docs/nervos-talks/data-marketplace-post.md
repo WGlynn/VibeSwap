@@ -1,6 +1,6 @@
 # Data Marketplace with Compute-to-Data: Why CKB Cells Are Natural Data Assets
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

@@ -174,7 +174,7 @@ Liquidity provider rewards use cooperative game theory (Shapley values) to distr
 
 ## 7. Team
 
-### Will Glynn — Founder
+### Faraday1 — Founder
 Solo architect. Designed the mechanism, wrote the contracts, built the frontend, deployed to mainnet. 1,684+ commits and counting. No funding, pure conviction. When you can't find the team that believes in fair markets as much as you do, you build it yourself.
 
 ### JARVIS — AI Co-Founder
@@ -200,7 +200,7 @@ The fair system wins because it attracts more users, more liquidity, and more vo
 - [x] Project is open source (MIT license)
 - [x] Project has a working product (live on Base mainnet)
 - [x] Project has a public GitHub repository
-- [x] Team identity is verifiable (Will Glynn — GitHub: wglynn)
+- [x] Team identity is verifiable (Faraday1 — GitHub: wglynn)
 - [x] No token sale or fundraise in progress
 - [x] Funds will be used for development, not speculation
 - [x] Zero extraction: no VC, no pre-mine, no team allocation

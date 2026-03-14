@@ -80,7 +80,7 @@ const PILLARS = [
       {
         type: 'quote',
         text: 'The greatest idea can\'t be stolen because part of it is admitting who came up with it.',
-        attribution: '— Will Glynn',
+        attribution: '— Faraday1',
       },
       {
         type: 'thesis',
@@ -237,7 +237,7 @@ const PILLARS = [
       {
         type: 'quote',
         text: '\'Impossible\' is just a suggestion. A suggestion that we ignore.',
-        attribution: '— Will Glynn',
+        attribution: '— Faraday1',
       },
       {
         type: 'thesis',

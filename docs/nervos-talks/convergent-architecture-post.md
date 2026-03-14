@@ -1,6 +1,6 @@
 # Convergent Architecture: When Three Independent Paths Arrive at the Same Design
 
-**Authors:** W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+**Authors:** Faraday1 & JARVIS -- vibeswap.io
 **Date:** March 2026
 
 ---
@@ -59,7 +59,7 @@ ITs grow instead of resetting every funding round. They accumulate credibility a
 
 VibeSwap begins with: *What if financial infrastructure were cooperative instead of extractive?*
 
-Will Glynn starts from mechanism design and game theory. The core problem is MEV -- systematic value extraction from users by actors who can reorder transactions. VibeSwap eliminates MEV through commit-reveal batch auctions with uniform clearing prices and Fisher-Yates shuffled execution order.
+Faraday1 starts from mechanism design and game theory. The core problem is MEV -- systematic value extraction from users by actors who can reorder transactions. VibeSwap eliminates MEV through commit-reveal batch auctions with uniform clearing prices and Fisher-Yates shuffled execution order.
 
 Rewards use Shapley values: each participant's share is proportional to their marginal contribution, not their capital or influence. Identity is earned (SoulboundIdentity), not purchased. **Proof of Mind** emerges as the consensus primitive: any contributing mind can claim rewards through governance, weighted by accumulated contribution, impossible to buy or mine.
 

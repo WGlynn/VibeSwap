@@ -189,7 +189,7 @@ This is not a budget for building something. It is a budget for validating, hard
 
 ## 5. Team
 
-### Will Glynn — Founder & Mechanism Designer
+### Faraday1 — Founder & Mechanism Designer
 - Solo architect of VibeSwap's 342 contract system, 401 frontend components, and 55 research papers
 - Author of original mechanism design papers on cooperative capitalism, Shapley reward systems, and trinomial stability
 - Designed the commit-reveal batch auction system from first principles — no forks, no templates
@@ -245,7 +245,7 @@ All code is and will remain open source under MIT license. We built this in the 
 
 ## 9. Contact
 
-- **Name:** Will Glynn
+- **Name:** Faraday1
 - **GitHub:** https://github.com/wglynn
 - **Telegram:** https://t.me/+3uHbNxyZH-tiOGY8
 - **Email:** [CUSTOMIZE]

@@ -1,6 +1,6 @@
 # Wardenclyffe v3: Hybrid Escalation Router for Zero-Downtime AI Inference
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap Research**
 **Revision: v3.0 (Hybrid Escalation)**
 

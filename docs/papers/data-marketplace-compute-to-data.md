@@ -1,6 +1,6 @@
 # Data Marketplace with Compute-to-Data Privacy Preservation
 
-**W. Glynn, JARVIS** | March 2026 | VibeSwap Research
+**Faraday1, JARVIS** | March 2026 | VibeSwap Research
 
 ---
 

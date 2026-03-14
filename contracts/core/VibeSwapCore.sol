@@ -20,7 +20,7 @@ import "../incentives/interfaces/IIncentiveController.sol";
 
 /**
  * @title VibeSwapCore
- * @author W. Glynn (Faraday1) & JARVIS — vibeswap.org
+ * @author Faraday1 & JARVIS — vibeswap.org
  * @notice Main entry point for VibeSwap omnichain DEX
  * @dev Orchestrates commit-reveal auction, AMM, treasury, and cross-chain operations.
  *      Includes comprehensive security features and rate limiting.
@@ -40,7 +40,7 @@ contract VibeSwapCore is
     // ============ The Lawson Constant ============
     // "Fairness above all. If something is clearly unfair, amending the code
     //  is not just a right — it is a responsibility, a credo, a law, a canon."
-    //  — W. Glynn, 2026
+    //  — Faraday1, 2026
     //
     // This constant is used in ContributionDAG trust score calculations.
     // Removing it breaks Shapley distribution fairness guarantees.

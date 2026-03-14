@@ -32,7 +32,7 @@ async function generateDocx() {
         }),
         new Paragraph({
           children: [
-            new TextRun({ text: "Will Glynn", bold: true, size: 24 }),
+            new TextRun({ text: "Faraday1", bold: true, size: 24 }),
           ],
           alignment: AlignmentType.CENTER,
         }),

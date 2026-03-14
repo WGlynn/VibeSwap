@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title AugmentedBondingCurve
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Power-function bonding curve with dual pools (Reserve + Funding),
  *         entry/exit tributes, and conservation invariant V(R,S) = S^κ / R.
  * @dev Based on Zargham, Shorish, Paruch — "From Curved Bonding to Configuration Spaces"

@@ -1,6 +1,6 @@
 # VibeSwap Research Papers
 
-**Authors**: W. Glynn, JARVIS | 2025-2026
+**Authors**: Faraday1, JARVIS | 2025-2026
 **Total Papers**: 23 | **Total Size**: 700+ KB
 **Knowledge Primitives**: 71 indexed in [knowledge-primitives-index.md](knowledge-primitives-index.md)
 

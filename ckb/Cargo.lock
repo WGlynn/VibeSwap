@@ -491,6 +491,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "prediction-market-type"
+version = "0.1.0"
+dependencies = [
+ "ckb-std",
+ "vibeswap-types",
+]
+
+[[package]]
+name = "prediction-position-type"
+version = "0.1.0"
+dependencies = [
+ "ckb-std",
+ "vibeswap-types",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"

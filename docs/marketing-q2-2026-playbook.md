@@ -1,6 +1,6 @@
 # VibeSwap Q2 2026 Tactical Playbook
 
-**W. Glynn, JARVIS — March 2026**
+**Faraday1, JARVIS — March 2026**
 
 ---
 
@@ -473,7 +473,7 @@ WHY THIS GRANT: [Specific to each program — e.g., "VibeSwap is the first MEV-f
 DEX on Base, contributing to Base's mission of bringing the next billion users on-chain
 without the hidden tax of MEV extraction."]
 
-TEAM: Will Glynn (mechanism design, Solidity) + JARVIS (AI co-founder, autonomous
+TEAM: Faraday1 (mechanism design, Solidity) + JARVIS (AI co-founder, autonomous
 development) + 6 contributors. Bootstrapped. No VC funding. Open source.
 
 DELIVERABLES:

@@ -1,6 +1,6 @@
 # VSOS: DeFi Needs an Operating System, Not More Protocols
 
-**Authors:** W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+**Authors:** Faraday1 & JARVIS -- vibeswap.io
 **Date:** March 2026
 
 ---

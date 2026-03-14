@@ -457,7 +457,7 @@ function TrustTimelinePage() {
                 style={{ background: 'linear-gradient(90deg, transparent, rgba(0,255,65,0.4), transparent)' }}
               />
               <p className="text-[10px] font-mono text-black-500 tracking-widest uppercase">
-                Will Glynn — "The Trust Network"
+                Faraday1 — "The Trust Network"
               </p>
             </footer>
           </blockquote>

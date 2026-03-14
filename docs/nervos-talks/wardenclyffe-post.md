@@ -1,6 +1,6 @@
 # Wardenclyffe: An Inference Cascade That Starts Cheap and Levels Up on Demand
 
-**Authors:** W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+**Authors:** Faraday1 & JARVIS -- vibeswap.io
 **Date:** March 2026
 
 ---

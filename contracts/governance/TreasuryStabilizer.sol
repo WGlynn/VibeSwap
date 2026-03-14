@@ -14,7 +14,7 @@ import "../core/interfaces/IDAOTreasury.sol";
 
 /**
  * @title TreasuryStabilizer
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Counter-cyclical treasury operations for market stabilization
  * @dev Monitors market conditions and deploys treasury backstop during bear markets
  */

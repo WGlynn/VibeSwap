@@ -10,7 +10,7 @@ import "./interfaces/IContributionDAG.sol";
 
 /**
  * @title RewardLedger
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Retroactive + active Shapley reward tracking — direct port of shapleyTrust.js.
  *
  * Two modes:

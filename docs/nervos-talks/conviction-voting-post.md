@@ -1,6 +1,6 @@
 # Conviction Voting: Governance Where Time Is the Franchise
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

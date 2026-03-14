@@ -1,6 +1,6 @@
 # Intrinsically Incentivized Altruism: Don't Punish Defection — Make It Impossible
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VibeLiquidStaking
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Liquid staking derivative for the VSOS DeFi operating system.
  *         Stake ETH or VIBE, receive stVIBE — a rebasing liquid staking token
  *         whose share price increases over time from protocol revenue and

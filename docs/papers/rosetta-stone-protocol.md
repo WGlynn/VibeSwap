@@ -2,7 +2,7 @@
 
 ### Ending Information Asymmetry Through Privacy-Preserving Cognitive Translation
 
-**Author**: Will Glynn & JARVIS (AI Co-author) | **Date**: February 2026 | **Version**: 0.1 (Design Prompt)
+**Author**: Faraday1 & JARVIS (AI Co-author) | **Date**: February 2026 | **Version**: 0.1 (Design Prompt)
 
 ---
 

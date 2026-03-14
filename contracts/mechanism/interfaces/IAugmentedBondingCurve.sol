@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title IAugmentedBondingCurve
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Interface for Augmented Bonding Curve with dual pools and conservation invariant
  */
 interface IAugmentedBondingCurve {

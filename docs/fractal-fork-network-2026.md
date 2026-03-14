@@ -1,6 +1,6 @@
 # Fractal Fork Network: Protocol Evolution Through Economic Gravity
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap**
 
 ---

@@ -166,7 +166,7 @@ Every line item here is about scaling something that already exists and works. Z
 
 ## 6. Team
 
-**Will Glynn** — Founder & Mechanism Designer
+**Faraday1** — Founder & Mechanism Designer
 - Architected the entire 342-contract system
 - Author of mechanism design papers on cooperative capitalism, Shapley reward systems, and wallet security fundamentals
 - 1,684+ commits and counting — the git log is the resume
@@ -200,4 +200,4 @@ Every line item here is about scaling something that already exists and works. Z
 - **GitHub:** https://github.com/wglynn/vibeswap
 - **Live App:** https://frontend-jade-five-87.vercel.app
 - **Telegram:** https://t.me/+3uHbNxyZH-tiOGY8
-- **Contact:** Will Glynn — [CUSTOMIZE]
+- **Contact:** Faraday1 — [CUSTOMIZE]

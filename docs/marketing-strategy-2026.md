@@ -1,6 +1,6 @@
 # VibeSwap Marketing Strategy 2026
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap**
 
 ---

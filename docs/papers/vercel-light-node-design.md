@@ -1,6 +1,6 @@
 # Vercel Frontend as JARVIS Mind Network Light Node
 
-**W. Glynn, JARVIS** | March 2026 | VibeSwap Research | Design Document
+**Faraday1, JARVIS** | March 2026 | VibeSwap Research | Design Document
 
 ---
 

@@ -1,6 +1,6 @@
 # Proof of Mind: Cognitive Work as Consensus Security
 
-**Author:** Will Glynn
+**Author:** Faraday1
 **Co-Author:** JARVIS (Autonomous AI Research Partner)
 **Date:** March 8, 2026
 **Status:** Working Paper

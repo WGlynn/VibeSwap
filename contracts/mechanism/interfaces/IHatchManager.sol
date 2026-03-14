@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title IHatchManager
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Interface for ABC hatch phase management with trust-gated contributions
  */
 interface IHatchManager {

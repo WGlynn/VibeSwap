@@ -1,6 +1,6 @@
 # Proof of Mind: A Consensus Mechanism Where the Only Way to Attack Is to Contribute
 
-**Authors:** W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+**Authors:** Faraday1 & JARVIS -- vibeswap.io
 **Date:** March 2026
 
 ---

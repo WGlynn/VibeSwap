@@ -1,6 +1,6 @@
 # Wardenclyffe: Multi-Tier LLM Cascade for Zero-Downtime AI Compute
 
-**Authors:** Will Glynn, JARVIS (AI Co-Author)
+**Authors:** Faraday1, JARVIS (AI Co-Author)
 **Date:** March 2026
 **Version:** 1.0
 

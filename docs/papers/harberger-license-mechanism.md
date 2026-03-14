@@ -1,6 +1,6 @@
 # The Augmented Harberger Tax: Protective Mechanism Design for Digital Naming Systems
 
-**W. Glynn (Faraday1) & JARVIS**
+**Faraday1 & JARVIS**
 *VibeSwap Protocol --- vibeswap.io*
 *March 2026*
 

@@ -1,6 +1,6 @@
 # Hot/Cold Trust Boundaries: Why Your DeFi Frontend Is the Real Attack Surface
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

@@ -2,7 +2,7 @@
 
 ## Architecture of a Composable DeFi Stack
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 **Version**: 1.0

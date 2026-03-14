@@ -9,7 +9,7 @@ import "../hooks/interfaces/IVibeHookRegistry.sol";
 
 /**
  * @title VibePoolFactory
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Modular pool factory — deploy new pool types (stable, concentrated,
  *         weighted) from a single factory with pluggable curves.
  * @dev Part of VSOS (VibeSwap Operating System) Protocol Framework (#8).

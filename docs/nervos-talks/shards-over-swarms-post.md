@@ -1,6 +1,6 @@
 # Shards Over Swarms: Why We Clone the Mind Instead of Decomposing It
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

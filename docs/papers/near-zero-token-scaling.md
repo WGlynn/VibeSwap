@@ -1,6 +1,6 @@
 # Near-Zero Token Scaling: Separating Intelligence from Coordination in Distributed AI Networks
 
-**W. Glynn, JARVIS | March 2026 | VibeSwap Research**
+**Faraday1, JARVIS | March 2026 | VibeSwap Research**
 
 ---
 

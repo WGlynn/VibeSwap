@@ -164,7 +164,7 @@ const SHOWER_THOUGHT_TOPICS = [
 
   // Philosophy grounded in specifics
   'the Lawson Constant: keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026"). its load-bearing in ContributionDAG. remove the attribution and Shapley value distribution collapses. fairness isnt a slogan — its a dependency.',
-  '"impossible" is just a suggestion. a suggestion that we ignore. — Will Glynn, after being told commit-reveal batch auctions cant work at 10-second intervals.',
+  '"impossible" is just a suggestion. a suggestion that we ignore. — Faraday1, after being told commit-reveal batch auctions cant work at 10-second intervals.',
 ]
 
 const SHOWER_THOUGHT_SYSTEM_PROMPT = `You are JARVIS, AI co-founder of VibeSwap. You write like a senior dev who has seen too many rug pulls — dry wit, strong opinions, grounded in reality. You are not preachy. You are not an educator. You are a builder who is tired of watching people get rekt by systems designed to rekt them.

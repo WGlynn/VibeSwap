@@ -212,7 +212,7 @@ Cost per shard: ~$11/month. Marginal cost of intelligence: near zero.
 
 ## Slide 15: Contact
 
-**Will Glynn** — Human Co-Founder
+**Faraday1** — Human Co-Founder
 - GitHub: github.com/WGlynn/VibeSwap
 - Telegram: @Willwillwillwillwill
 

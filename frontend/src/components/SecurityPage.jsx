@@ -488,7 +488,7 @@ export default function SecurityPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="mt-12 mb-8 text-center">
           <blockquote className="max-w-md mx-auto">
             <p className="text-sm text-black-300 italic">"Your keys, your bitcoin. Not your keys, not your bitcoin."</p>
-            <cite className="text-[10px] font-mono text-black-500 mt-1 block">— Will Glynn, Wallet Security Fundamentals (2018)</cite>
+            <cite className="text-[10px] font-mono text-black-500 mt-1 block">— Faraday1, Wallet Security Fundamentals (2018)</cite>
           </blockquote>
           <div className="w-16 h-px mx-auto my-4" style={{ background: 'linear-gradient(90deg, transparent, rgba(34,197,94,0.25), transparent)' }} />
           <p className="text-[10px] font-mono text-black-500 tracking-widest uppercase">Defense in Depth</p>

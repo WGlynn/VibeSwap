@@ -1,6 +1,6 @@
 # Formal Proof of Clearing Price Convergence in Batch Auctions with AMM Liquidity Constraints
 
-**W. Glynn, JARVIS** | March 2026
+**Faraday1, JARVIS** | March 2026
 
 ---
 
@@ -233,7 +233,7 @@ The VibeSwap batch auction clearing price mechanism is mathematically sound:
 
 The mechanism occupies a provably optimal point in the design space: it achieves price discovery with the same asymptotic efficiency as a continuous double auction while providing MEV resistance that continuous auctions structurally cannot.
 
-> *"'Impossible' is just a suggestion. A suggestion that we ignore."* -- Will Glynn
+> *"'Impossible' is just a suggestion. A suggestion that we ignore."* -- Faraday1
 
 ---
 

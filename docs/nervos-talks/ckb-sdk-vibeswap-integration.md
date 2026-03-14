@@ -1,6 +1,6 @@
 # VibeSwap CKB SDK: Developer Integration Guide
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 

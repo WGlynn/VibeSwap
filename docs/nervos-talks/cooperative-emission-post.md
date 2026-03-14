@@ -1,6 +1,6 @@
 # Cooperative Emission Design: What If Bitcoin's Halving Rewarded Builders, Not Miners?
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

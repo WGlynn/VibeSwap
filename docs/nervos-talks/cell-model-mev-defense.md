@@ -1,6 +1,6 @@
 # Cell Model MEV Defense: Why CKB Provides Structural Guarantees That EVM Cannot
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 

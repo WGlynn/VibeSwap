@@ -78,7 +78,7 @@ Help us remove it. The protocol runs itself. That's the point.
 
 ## Contact
 
-**Will Glynn** — Mechanism Designer, VibeSwap
+**Faraday1** — Mechanism Designer, VibeSwap
 - GitHub: [@WGlynn](https://github.com/WGlynn)
 - Telegram: @JarvisVibeBot (talk to JARVIS directly)
 - Live: https://frontend-jade-five-87.vercel.app

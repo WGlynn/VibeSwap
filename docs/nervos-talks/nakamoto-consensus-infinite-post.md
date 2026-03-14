@@ -1,6 +1,6 @@
 # Nakamoto Consensus ∞: What If 51% Attacks Were Not Just Expensive, But Counterproductive?
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

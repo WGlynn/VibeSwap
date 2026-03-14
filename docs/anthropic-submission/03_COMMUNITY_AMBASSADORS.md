@@ -2,7 +2,7 @@
 # URL: https://claude.com/community/ambassadors
 
 ## About You
-Will Glynn — solo founder of VibeSwap, an omnichain DEX and AI coordination protocol built entirely with Claude Code across 45+ development sessions. I've built one of the most comprehensive Claude Code projects in existence: 130 Solidity contracts, 3000+ tests, 51 React components, 23 research papers, an autonomous AI agent (JARVIS) on a 3-node BFT network, and a Nervos CKB integration in Rust — all with Claude as my only engineering partner.
+Faraday1 — solo founder of VibeSwap, an omnichain DEX and AI coordination protocol built entirely with Claude Code across 45+ development sessions. I've built one of the most comprehensive Claude Code projects in existence: 130 Solidity contracts, 3000+ tests, 51 React components, 23 research papers, an autonomous AI agent (JARVIS) on a 3-node BFT network, and a Nervos CKB integration in Rust — all with Claude as my only engineering partner.
 
 ## Experience with Claude Code
 - 45+ documented pair-programming sessions (full session reports in docs/session-reports/)

@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title CrossChainEndToEnd
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice End-to-end cross-chain integration test simulating two independent chains
  *         connected via LayerZero V2 with a mock relayer
  * @dev Task 4 of the 5-task stress test: Cross-chain deployment + verification

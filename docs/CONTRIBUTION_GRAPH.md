@@ -10,7 +10,7 @@ Retroactive Shapley reward ledger. Every contribution is recorded here with type
 
 | ID | Name | Role | Trust Chain |
 |----|------|------|-------------|
-| `will` | Will Glynn | Founder, architect, core dev | [will] |
+| `faraday1` | Faraday1 | Founder, architect, core dev | [will] |
 | `jarvis` | Jarvis (Claude) | AI co-founder, core dev | [will, jarvis] |
 | `matt` | Matt (NervosNation) | CKB researcher, mechanism designer | [will, matt] |
 | `jayme` | Jayme Lawson | Cultural inspiration, cooperative ethos | [will, jayme] |

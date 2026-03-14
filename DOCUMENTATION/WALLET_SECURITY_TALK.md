@@ -2,7 +2,7 @@
 ## Wallet Security Design That Doesn't Compromise
 
 **Talk for Nervos Community**
-**Speaker**: Will Glynn
+**Speaker**: Faraday1
 **Draft**: v0.1
 
 ---

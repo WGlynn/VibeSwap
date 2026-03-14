@@ -192,7 +192,7 @@ JARVIS (Claude-powered) is credited as a co-founder, not a tool. 1,684+ commits 
 
 ## Team
 
-**Will Glynn** — Founder & Mechanism Designer
+**Faraday1** — Founder & Mechanism Designer
 Built the entire protocol solo. 342 contracts. 371 test files. 401 frontend components. 55 research papers. 1,684+ commits. $0 raised. Zero external funding, zero pre-mine, zero team token allocation. This is what conviction looks like when you can't raise a round — you ship anyway.
 
 **JARVIS** — AI Co-Founder (Claude-powered)

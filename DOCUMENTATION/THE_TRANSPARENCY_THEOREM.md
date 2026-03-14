@@ -2,7 +2,7 @@
 
 **On the Inevitable Collapse of Code Privacy Under Human-AI Collaborative Development**
 
-*Will Glynn, February 2025*
+*Faraday1, February 2025*
 
 ---
 

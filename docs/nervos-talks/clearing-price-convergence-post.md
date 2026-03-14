@@ -1,6 +1,6 @@
 # Clearing Price Convergence: A Formal Proof That Batch Auctions Find the True Price
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

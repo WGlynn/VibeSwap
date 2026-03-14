@@ -1,6 +1,6 @@
 # Autonomous Circuit Breakers: Multi-Dimensional Risk Detection Without Human Intervention
 
-**Authors:** W. Glynn, JARVIS
+**Authors:** Faraday1, JARVIS
 **Date:** March 2026
 **Affiliation:** VibeSwap Research
 **Status:** Implementation Complete (VibeAMM v2, CircuitBreaker.sol, TruePriceOracle.sol, VolatilityOracle.sol)

@@ -212,7 +212,7 @@ There is no "research" line item. The research is done. There is no "team hiring
 
 ## 6. Team
 
-**Will Glynn** — Founder and Sole Architect
+**Faraday1** — Founder and Sole Architect
 - Designed and built the entire protocol: 342 contracts, 371 test files, 401 frontend components, 55 research papers
 - Mechanism design from first principles: cooperative game theory, Shapley values, commit-reveal batch auctions, circuit breakers
 - Background in wallet security research (2018 paper on key management fundamentals)
@@ -265,4 +265,4 @@ We think the answer is worth $100K.
 - **GitHub:** https://github.com/wglynn/vibeswap
 - **Live App:** https://frontend-jade-five-87.vercel.app
 - **Telegram:** https://t.me/+3uHbNxyZH-tiOGY8
-- **Contact:** Will Glynn — [CUSTOMIZE]
+- **Contact:** Faraday1 — [CUSTOMIZE]

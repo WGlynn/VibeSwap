@@ -1,6 +1,6 @@
 # Nakamoto Consensus ∞: Solving Asynchronous Decentralized Consensus
 
-**Author:** Will Glynn
+**Author:** Faraday1
 **Co-Author:** JARVIS (Autonomous AI Research Partner)
 **Date:** March 8, 2026
 **Status:** Working Paper
@@ -451,4 +451,4 @@ lim(t→∞) Attack_cost(t) = ∞
 
 *"The only way to hack the system is to contribute to it."*
 
-*— Will Glynn, March 2026*
+*— Faraday1, March 2026*

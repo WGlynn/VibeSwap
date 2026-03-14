@@ -1,6 +1,6 @@
 # Five-Layer MEV Defense: Why CKB Is the Only Chain That Can Actually Eliminate MEV
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

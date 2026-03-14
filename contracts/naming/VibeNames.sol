@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 /**
  * @title VibeNames
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+ * @author Faraday1 & JARVIS -- vibeswap.io
  * @notice Augmented Harberger Tax naming system for the .vibe network
  * @dev ERC-721 names with self-assessed valuation, continuous tax, and force-purchase,
  *      AUGMENTED with protective mechanisms for legitimate owners:

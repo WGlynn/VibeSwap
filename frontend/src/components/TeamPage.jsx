@@ -9,7 +9,7 @@ const PHI = 1.618033988749895
 // ============ Core Team Data ============
 const coreTeam = [
   {
-    name: 'Will Glynn',
+    name: 'Faraday1',
     initials: 'WG',
     role: 'Founder & Lead Architect',
     bio: 'Mechanism design, protocol engineering, cooperative capitalism. Writing about wallet security since 2018.',
@@ -415,7 +415,7 @@ function TeamPage() {
               </blockquote>
               <div className="flex items-center justify-center gap-3">
                 <div className="h-px w-8 bg-purple-500/30" />
-                <cite className="text-sm text-purple-300 font-mono not-italic">Will Glynn</cite>
+                <cite className="text-sm text-purple-300 font-mono not-italic">Faraday1</cite>
                 <div className="h-px w-8 bg-purple-500/30" />
               </div>
             </div>

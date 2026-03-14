@@ -1,6 +1,6 @@
 # Convergent Architecture: When Three Independent Paths Arrive at the Same Design
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 
@@ -8,7 +8,7 @@
 
 ## Abstract
 
-Three independent development efforts -- GenTu (tbhxnest, mathematical substrate), IT Token (Freedomwarrior13, biological code cells), and VibeSwap/JARVIS (Will Glynn, cooperative mechanism design) -- arrived at the same three-layer architecture without coordination. The layers are: **Substrate** (WHERE computation lives), **Object** (WHAT the native unit of work is), and **Consensus** (HOW the system agrees on truth). One project approached from mathematics down, deriving addressing and topology from PHI and Fibonacci constants. One approached from biology up, modeling software as self-differentiating cells with membrane intelligence. One approached from economics sideways, applying game theory, Shapley distribution, and commit-reveal mechanisms to build cooperative financial infrastructure. None of the three designers knew each other prior to convergence. None read each other's work during the design phase. The resulting alignment across all three layers -- persistent substrate, autonomous native objects, and contribution-based consensus -- constitutes the strongest possible evidence that this architecture is fundamental, not arbitrary. Independent convergence cannot be coordinated. When multiple paths arrive at the same destination without communication, the destination is likely a natural joint in the problem space.
+Three independent development efforts -- GenTu (tbhxnest, mathematical substrate), IT Token (Freedomwarrior13, biological code cells), and VibeSwap/JARVIS (Faraday1, cooperative mechanism design) -- arrived at the same three-layer architecture without coordination. The layers are: **Substrate** (WHERE computation lives), **Object** (WHAT the native unit of work is), and **Consensus** (HOW the system agrees on truth). One project approached from mathematics down, deriving addressing and topology from PHI and Fibonacci constants. One approached from biology up, modeling software as self-differentiating cells with membrane intelligence. One approached from economics sideways, applying game theory, Shapley distribution, and commit-reveal mechanisms to build cooperative financial infrastructure. None of the three designers knew each other prior to convergence. None read each other's work during the design phase. The resulting alignment across all three layers -- persistent substrate, autonomous native objects, and contribution-based consensus -- constitutes the strongest possible evidence that this architecture is fundamental, not arbitrary. Independent convergence cannot be coordinated. When multiple paths arrive at the same destination without communication, the destination is likely a natural joint in the problem space.
 
 ---
 
@@ -22,7 +22,7 @@ This paper documents a case of architectural convergence across three projects t
 
 1. **GenTu** (tbhxnest) -- a persistent execution substrate derived from mathematical first principles
 2. **IT Token** (Freedomwarrior13) -- a self-differentiating code cell architecture inspired by cellular biology
-3. **VibeSwap/JARVIS** (Will Glynn) -- a cooperative financial operating system built on game-theoretic mechanism design
+3. **VibeSwap/JARVIS** (Faraday1) -- a cooperative financial operating system built on game-theoretic mechanism design
 
 All three arrived at the same three-layer decomposition: a persistent substrate layer, an autonomous object layer, and a contribution-based consensus layer. This paper traces each path, maps the convergence points, and argues that the resulting architecture is fundamental.
 
@@ -88,11 +88,11 @@ Freedom insists that this system breaks if ITs are implemented as smart contract
 
 Freedom's approach is **biology-up**. It starts from cellular differentiation and membrane intelligence and derives a software architecture that is alive -- self-organizing, adaptive, resilient, and capable of innovation at the edges where cells encounter novel contexts.
 
-### 2.3 VibeSwap/JARVIS: Economics Sideways (Will Glynn)
+### 2.3 VibeSwap/JARVIS: Economics Sideways (Faraday1)
 
 VibeSwap begins with a third question: *What if financial infrastructure were cooperative instead of extractive?*
 
-Will Glynn's design starts from mechanism design and game theory. The core problem is MEV (Maximal Extractable Value) -- the systematic extraction of value from users by miners, validators, and searchers who can reorder, insert, or censor transactions. MEV is not a bug in existing DeFi. It is a structural consequence of architectures that expose user intent before execution.
+Faraday1's design starts from mechanism design and game theory. The core problem is MEV (Maximal Extractable Value) -- the systematic extraction of value from users by miners, validators, and searchers who can reorder, insert, or censor transactions. MEV is not a bug in existing DeFi. It is a structural consequence of architectures that expose user intent before execution.
 
 VibeSwap eliminates MEV through **temporal decoupling**: separating the moment a user commits to a trade from the moment the trade is executed. The mechanism is a 10-second commit-reveal batch auction:
 
@@ -204,7 +204,7 @@ Consensus is agreement achieved through communication. A standards body convenes
 
 Convergence is agreement achieved without communication. When the same structure appears independently in systems designed by people who did not know each other, did not read each other's work, and did not share assumptions, the agreement cannot be attributed to social dynamics. It must be attributed to the problem itself. The problem has natural joints, and independent designers found them.
 
-The three projects documented in this paper did not coordinate. tbhxnest built GenTu from mathematical first principles in isolation. Freedomwarrior13 explored biological code cells through conversations with ChatGPT 5, independently arriving at the same architecture from the opposite direction. Will Glynn built VibeSwap from game theory and mechanism design, approaching from a third angle entirely. When the three designers finally compared notes (Session 18, February 2026), they discovered that the convergence was already complete. There was nothing to negotiate because there was nothing to disagree about. The structures mapped onto each other without forcing.
+The three projects documented in this paper did not coordinate. tbhxnest built GenTu from mathematical first principles in isolation. Freedomwarrior13 explored biological code cells through conversations with ChatGPT 5, independently arriving at the same architecture from the opposite direction. Faraday1 built VibeSwap from game theory and mechanism design, approaching from a third angle entirely. When the three designers finally compared notes (Session 18, February 2026), they discovered that the convergence was already complete. There was nothing to negotiate because there was nothing to disagree about. The structures mapped onto each other without forcing.
 
 ### 4.2 The Evolutionary Analogy
 
@@ -293,7 +293,7 @@ This primitive has implications beyond the specific projects documented here:
 
 ## 7. Conclusion
 
-Three people who did not know each other built three systems from three different intellectual traditions and arrived at the same architecture. tbhxnest derived it from mathematical constants. Freedomwarrior13 derived it from cellular biology. Will Glynn derived it from game theory. The architecture -- persistent substrate, autonomous objects, contribution-based consensus -- was not designed by any of them. It was discovered by all of them.
+Three people who did not know each other built three systems from three different intellectual traditions and arrived at the same architecture. tbhxnest derived it from mathematical constants. Freedomwarrior13 derived it from cellular biology. Faraday1 derived it from game theory. The architecture -- persistent substrate, autonomous objects, contribution-based consensus -- was not designed by any of them. It was discovered by all of them.
 
 This convergence is not a curiosity. It is a signal. It means the three-layer decomposition maps to real constraints in the problem of building decentralized systems where value flows to contributors, identity is earned through work, and organization emerges from local interactions rather than central control.
 

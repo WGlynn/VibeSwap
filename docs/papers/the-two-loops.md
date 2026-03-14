@@ -1,6 +1,6 @@
 # The Two Loops: Knowledge Extraction and Documentation as Development Methodology
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 **Category**: Meta-Methodology
@@ -25,7 +25,7 @@ This paper argues that this evaporation is not inevitable. It is a methodologica
 
 We present The Two Loops: a development methodology where every build step feeds two parallel processes. Loop 1 extracts generalizable principles and codifies them into a persistent knowledge base. Loop 2 transforms those principles into standalone papers and pushes them to public repositories. Together, the two loops ensure that the intellectual output of development is captured with the same rigor as the code output.
 
-The methodology was developed and refined over 44+ sessions of human-AI collaborative development on VibeSwap, an omnichain decentralized exchange. The collaboration between a human developer (W. Glynn) and an AI partner (JARVIS) provided a uniquely demanding test environment: AI context windows impose hard limits on memory, making knowledge persistence not merely desirable but existentially necessary for project continuity.
+The methodology was developed and refined over 44+ sessions of human-AI collaborative development on VibeSwap, an omnichain decentralized exchange. The collaboration between a human developer (Faraday1) and an AI partner (JARVIS) provided a uniquely demanding test environment: AI context windows impose hard limits on memory, making knowledge persistence not merely desirable but existentially necessary for project continuity.
 
 ---
 

@@ -1,6 +1,6 @@
 # Nervos and VibeSwap: The Case for CKB as the Settlement Layer for Omnichain DeFi
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 

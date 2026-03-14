@@ -1,6 +1,6 @@
 # DIDs as Economic Primitives: How CKB Cells Solve the AI Context Problem
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

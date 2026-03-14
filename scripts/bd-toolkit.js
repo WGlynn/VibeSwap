@@ -279,7 +279,7 @@ function cmdOutreach(target) {
       subject: 'VibeSwap — Omnichain DEX using LayerZero V2 OApp',
       body: `Hi team,
 
-I'm Will Glynn, builder of VibeSwap — an omnichain DEX that eliminates MEV through commit-reveal batch auctions.
+I'm Faraday1, builder of VibeSwap — an omnichain DEX that eliminates MEV through commit-reveal batch auctions.
 
 We're using LayerZero V2's OApp protocol for cross-chain swaps and messaging. Our CrossChainRouter is live and we're looking to deepen the integration.
 
@@ -303,7 +303,7 @@ Would love to connect. Best, Will`
       subject: 'VibeSwap — MEV-Free DEX Live on Base',
       body: `Hi Base team,
 
-I'm Will Glynn, builder of VibeSwap — the first fair-launch DEX on Base that structurally eliminates MEV.
+I'm Faraday1, builder of VibeSwap — the first fair-launch DEX on Base that structurally eliminates MEV.
 
 We're live on Base mainnet with:
 - ${stats.contracts} smart contracts
@@ -328,7 +328,7 @@ Best, Will`
       subject: 'VibeSwap CKB Integration — UTXO-Based DEX',
       body: `Hi Nervos team,
 
-I'm Will Glynn, building VibeSwap — an omnichain DEX with commit-reveal batch auctions. We're actively building a CKB integration using Rust.
+I'm Faraday1, building VibeSwap — an omnichain DEX with commit-reveal batch auctions. We're actively building a CKB integration using Rust.
 
 Our CKB work includes:
 - Rust SDK for VibeSwap on CKB
@@ -350,7 +350,7 @@ Best, Will`
       subject: 'JARVIS x ElizaOS — AI Agent Collaboration',
       body: `Hey Shaw,
 
-Will Glynn here — builder of VibeSwap. Tim Cotten mentioned you two have been talking.
+Faraday1 here — builder of VibeSwap. Tim Cotten mentioned you two have been talking.
 
 JARVIS is our Claude-powered AI co-founder that runs our Telegram community autonomously. We've built:
 - Autonomous community management (moderation, digests, contribution tracking)
@@ -368,7 +368,7 @@ Best, Will`
       subject: 'VibeSwap — [CUSTOMIZE: specific angle]',
       body: `Hi [NAME],
 
-I'm Will Glynn, builder of VibeSwap — an omnichain DEX that eliminates MEV through commit-reveal batch auctions with uniform clearing prices.
+I'm Faraday1, builder of VibeSwap — an omnichain DEX that eliminates MEV through commit-reveal batch auctions with uniform clearing prices.
 
 [CUSTOMIZE: Why this matters to them specifically]
 

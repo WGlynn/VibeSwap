@@ -12,7 +12,7 @@ DeFi / Cross-Chain DEX / OApp Protocol
 
 We built an omnichain DEX with $0.
 
-341 smart contracts. 370 test files. 1,617 commits. 325 frontend components. 157 pages of documentation. A live deployment on Base mainnet. A CrossChainRouter already implemented as a LayerZero V2 OApp.
+342 smart contracts. 371 test files. 1,684 commits. 401 frontend components. 55 research papers. A live deployment on Base mainnet. A CrossChainRouter already implemented as a LayerZero V2 OApp.
 
 No VC funding. No pre-mine. No team token allocation. No grants. No runway.
 
@@ -26,7 +26,7 @@ We didn't write a whitepaper and go fundraising. We wrote the whitepaper, then w
 
 This is not a pitch deck. This is a finished protocol.
 
-### 341 Solidity Contracts — Production Architecture
+### 342 Solidity Contracts — Production Architecture
 
 | Layer | What It Does | Key Contracts |
 |---|---|---|
@@ -40,15 +40,15 @@ This is not a pitch deck. This is a finished protocol.
 
 All contracts: Solidity 0.8.20, OpenZeppelin v5.0.1, UUPS upgradeable proxies, `nonReentrant` guards.
 
-### 370 Test Files — Full Coverage
+### 371 Test Files — Full Coverage
 
 Unit tests, fuzz tests, invariant tests, integration tests, and dedicated security tests. Not placeholder tests — real adversarial testing of MEV resistance, flash loan protection, cross-chain settlement edge cases, and circuit breaker triggers.
 
-### 325 Frontend Components — Live Application
+### 401 Frontend Components — Live Application
 
 React 18 + Vite 5 + Tailwind CSS. Dual wallet support (MetaMask/WalletConnect + WebAuthn passkeys). Chain selector with LayerZero route discovery. Bridge page with 0% protocol fees. Deployed and live on Vercel.
 
-### 157 Pages of Documentation
+### 55 Research Papers
 
 Mechanism design papers, game theory analysis, security models, deployment guides, API references. Not afterthoughts — the documentation drove the implementation.
 
@@ -206,14 +206,14 @@ We built it for VibeSwap. This milestone gives it to the LayerZero community.
 | Security review of cross-chain logic | $10,000 | Audit the CrossChainRouter and settlement flow |
 | **Total** | **$100,000** | |
 
-There is no "research" line item. The research is done. There is no "team hiring" line item. The team that built 341 contracts with $0 is the team that will deploy them. Every dollar goes directly into deploying, testing, and scaling what already exists.
+There is no "research" line item. The research is done. There is no "team hiring" line item. The team that built 342 contracts with $0 is the team that will deploy them. Every dollar goes directly into deploying, testing, and scaling what already exists.
 
 ---
 
 ## 6. Team
 
 **Will Glynn** — Founder and Sole Architect
-- Designed and built the entire protocol: 341 contracts, 370 test files, 325 frontend components, 157 pages of documentation
+- Designed and built the entire protocol: 342 contracts, 371 test files, 401 frontend components, 55 research papers
 - Mechanism design from first principles: cooperative game theory, Shapley values, commit-reveal batch auctions, circuit breakers
 - Background in wallet security research (2018 paper on key management fundamentals)
 - GitHub: https://github.com/wglynn
@@ -222,7 +222,9 @@ There is no "research" line item. The research is done. There is no "team hiring
 - Full-stack implementation across Solidity, React, Python, and Rust
 - Autonomous community management via Telegram bot
 - Novel AI-augmented development methodology — a single founder building at the speed of a team
-- 1,617 commits and counting
+- 1,684 commits and counting
+
+**6 additional contributors** across trading bots, infrastructure, and community.
 
 This is a team that has already shipped. Not a team that promises to ship.
 
@@ -240,7 +242,7 @@ This is a team that has already shipped. Not a team that promises to ship.
 
 5. **Narrative amplification:** "The omnichain DEX where you can't get frontrun" is a story that benefits both VibeSwap and LayerZero. It positions LayerZero as infrastructure for novel DeFi mechanisms, not just bridging.
 
-6. **Proof of what OApps can do:** A solo founder building a 341-contract omnichain DEX on LayerZero V2 is a powerful developer experience story. If one person can build this, the OApp framework is more accessible than anyone realizes.
+6. **Proof of what OApps can do:** A solo founder building a 342-contract omnichain DEX on LayerZero V2 is a powerful developer experience story. If one person can build this, the OApp framework is more accessible than anyone realizes.
 
 ---
 

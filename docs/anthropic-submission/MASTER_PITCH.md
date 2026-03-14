@@ -11,7 +11,7 @@
 
 VibeSwap is an omnichain decentralized exchange (DEX) and AI coordination protocol built entirely with Claude Code. It eliminates MEV (Miner Extractable Value) through commit-reveal batch auctions, distributes rewards via Shapley game theory, and features an autonomous AI agent (JARVIS) as a first-class protocol contributor with its own identity, compute budget, and attribution rights.
 
-**Built by one human + one AI. Zero funding. Zero employees. 45+ development sessions. All Claude.**
+**Built by 1 founder + 1 AI + 6 contributors. Zero funding. Zero employees. 1,684 commits. All Claude.**
 
 ---
 
@@ -19,16 +19,17 @@ VibeSwap is an omnichain decentralized exchange (DEX) and AI coordination protoc
 
 | Metric | Count |
 |--------|-------|
-| Solidity smart contracts | 130 |
-| Solidity tests (0 failures) | 3,000+ |
-| Rust CKB scripts (RISC-V) | 15 crates, 190 tests |
-| Frontend components | 51 |
-| Frontend hooks | 14 |
-| Research papers | 23 (700+ KB) |
-| Knowledge primitives | 71 indexed |
-| Development sessions | 45+ documented |
+| Solidity smart contracts | 342 |
+| Solidity test files (0 failures) | 371 |
+| Rust CKB SDK modules | 73 |
+| CKB SDK tests | 15,155 |
+| Frontend components | 401 |
+| Frontend hooks | 68 |
+| Tweet drafts | 154 |
+| Research papers | 55 |
+| Total commits | 1,684 |
 | Funding | $0 |
-| Team size | 1 human + 1 AI |
+| Team size | 1 founder + 1 AI + 6 contributors |
 
 ---
 
@@ -106,8 +107,8 @@ This isn't coincidence. It's a signature. And it's in every line of VibeSwap:
 │ Frontend │ Contracts│  JARVIS  │    CKB Layer       │
 │ React 18 │ Solidity │ Claude   │    Rust/RISC-V     │
 │ Vite 5   │ Foundry  │ Fly.io   │    Nervos Network  │
-│ Tailwind │ OZ v5    │ 3-node   │    15 crates       │
-│ ethers v6│ LayerZero│ BFT      │    190 tests       │
+│ Tailwind │ OZ v5    │ 3-node   │    73 modules      │
+│ ethers v6│ LayerZero│ BFT      │    15,155 tests    │
 ├──────────┴──────────┴──────────┴────────────────────┤
 │              Claude Code (entire build)              │
 └─────────────────────────────────────────────────────┘

@@ -1,10 +1,10 @@
 # Base Builder Grant Application — VibeSwap
 
-## $0 to Live on Base: 341 Contracts, 1,612+ Commits, Zero Funding
+## $0 to Live on Base: 342 Contracts, 1,684+ Commits, Zero Funding
 
 **We didn't wait for a grant. We built it.**
 
-VibeSwap is a fully functional MEV-free DEX deployed on Base mainnet today — 341 smart contracts, 188 frontend pages, a full Foundry test suite (unit, fuzz, and invariant), and 1,612+ commits of battle-tested code. All built with $0 in funding, no VC, no pre-mine, no team allocation.
+VibeSwap is a fully functional MEV-free DEX deployed on Base mainnet today — 342 smart contracts, 401 frontend components, a full Foundry test suite (unit, fuzz, and invariant), and 1,684+ commits of battle-tested code. All built with $0 in funding, no VC, no pre-mine, no team allocation.
 
 This application isn't asking you to fund an idea. It's asking you to accelerate a proven system that's already live on your chain.
 
@@ -27,10 +27,10 @@ Most grant applications start with a pitch. This one starts with receipts.
 
 | What We Built | With $0 |
 |---|---|
-| Smart contracts | 341 — core auction engine, AMM, governance, incentives, cross-chain messaging, circuit breakers, oracle libraries |
-| Frontend pages | 188 — swap, bridge, pools, governance, analytics, onboarding |
+| Smart contracts | 342 — core auction engine, AMM, governance, incentives, cross-chain messaging, circuit breakers, oracle libraries |
+| Frontend components | 401 — swap, bridge, pools, governance, analytics, onboarding |
 | Test coverage | Unit, fuzz, and invariant tests across the entire protocol (Foundry) |
-| Commits | 1,612+ and counting |
+| Commits | 1,684+ and counting |
 | Documentation | Full mechanism design papers, whitepapers, game theory catalogue |
 | Deployment | Live on Base mainnet |
 | Frontend | Deployed to Vercel, accessible worldwide |
@@ -167,9 +167,9 @@ Every line item here is about scaling something that already exists and works. Z
 ## 6. Team
 
 **Will Glynn** — Founder & Mechanism Designer
-- Architected the entire 341-contract system
+- Architected the entire 342-contract system
 - Author of mechanism design papers on cooperative capitalism, Shapley reward systems, and wallet security fundamentals
-- 1,612+ commits and counting — the git log is the resume
+- 1,684+ commits and counting — the git log is the resume
 - GitHub: https://github.com/wglynn
 
 **JARVIS** — AI Co-Founder (Claude-powered)
@@ -177,11 +177,13 @@ Every line item here is about scaling something that already exists and works. Z
 - Autonomous Telegram community manager
 - Novel model: AI as credited co-founder, not just a tool — a demonstration of what AI-augmented open source development looks like at scale
 
+**6 additional contributors** across trading bots, infrastructure, and community.
+
 ---
 
 ## 7. Why Fund VibeSwap?
 
-1. **We already built it.** 341 contracts, 188 pages, 1,612+ commits, live on Base mainnet. This is not a whitepaper. This is not a promise. Open the GitHub, visit the frontend, read the contracts. It's all there.
+1. **We already built it.** 342 contracts, 401 frontend components, 1,684+ commits, live on Base mainnet. This is not a whitepaper. This is not a promise. Open the GitHub, visit the frontend, read the contracts. It's all there.
 
 2. **MEV-free trading is a Base differentiator.** "The L2 where your trades can't be frontrunned" is a powerful narrative for attracting users from other chains. No other Base DEX offers this.
 
@@ -189,7 +191,7 @@ Every line item here is about scaling something that already exists and works. Z
 
 4. **Novel technology with ecosystem value.** Commit-reveal batch auctions are an underexplored design space. The research and open-source code benefit the entire Base and Ethereum ecosystem, not just VibeSwap.
 
-5. **Proven builders, not pitch artists.** We didn't spend the last year in pitch meetings. We spent it shipping code. The 1,612+ commit history is public and verifiable. We build first, ask for help second.
+5. **Proven builders, not pitch artists.** We didn't spend the last year in pitch meetings. We spent it shipping code. The 1,684+ commit history is public and verifiable. We build first, ask for help second.
 
 ---
 

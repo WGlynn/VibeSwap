@@ -1,0 +1,33 @@
+# ============ JARVIS VPS — Caddy Reverse Proxy ============
+# Auto-SSL via Let's Encrypt, security headers.
+# Proxies to shard-0 on Docker network (exposed on host:8080)
+# Rate limiting handled at application level (web-api.js)
+#
+# Deploy: copy to /etc/caddy/Caddyfile on VPS, then:
+#   chown -R caddy:caddy /var/log/caddy
+#   systemctl reload caddy
+
+46-225-173-213.sslip.io {
+	# Security headers
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		X-XSS-Protection "1; mode=block"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Reverse proxy to shard-0
+	reverse_proxy localhost:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	# Logging
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+	}
+}

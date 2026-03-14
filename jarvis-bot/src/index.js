@@ -28,6 +28,7 @@ import { initCKB, processConversation as processCKBConversation, getUserCKB, get
 import { loadWorkflowStats, handleWillIntercept, getWorkflowStats } from './workflow-router.js';
 import { submitIdea, getIdeas, approveIdea, getIdeaStats, formatSubmitterResponse, buildOwnerNotification } from './idea-pipeline.js';
 import { detectSuggestion, reportSuggestion, acceptVIP, rejectVIP, getVIPStats, flushVIPs } from './vip-detector.js';
+import { initBroadcast, generateContent, broadcastNow, getBroadcastStats, setBroadcastEnabled, flushBroadcast } from './broadcast.js';
 // ============ Module Health Registry ============
 // Tracks which dynamic-import modules loaded vs failed — surfaced in /health endpoint
 // MUST be before all dynamic imports so registerModule() is available in catch blocks
@@ -4825,6 +4826,56 @@ bot.command('workflow', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
+// ============ /broadcast — Autonomous Content Distribution ============
+
+bot.command('broadcast', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  const sub = args[0];
+
+  if (sub === 'on') {
+    setBroadcastEnabled(true);
+    return ctx.reply('Broadcast autopilot enabled. Generating every 2h, posting every 30m.');
+  }
+  if (sub === 'off') {
+    setBroadcastEnabled(false);
+    return ctx.reply('Broadcast autopilot disabled.');
+  }
+  if (sub === 'generate') {
+    const type = args[1] || 'shower_thought';
+    const content = await generateContent(type);
+    if (!content) return ctx.reply('Generation failed or was blocked by filters.');
+    return ctx.reply(`Generated (${type}):\n\n${content.text}\n\nQueued for: ${content.platforms?.join(', ') || 'auto'}`);
+  }
+  if (sub === 'now') {
+    const type = args[1] || 'shower_thought';
+    const content = await generateContent(type);
+    if (!content) return ctx.reply('Generation failed or was blocked by filters.');
+    const result = await broadcastNow(content);
+    return ctx.reply(`Broadcast: ${result.sent} sent, ${result.failed} failed\n\n${content.text}`);
+  }
+
+  // Default: show stats
+  const stats = getBroadcastStats();
+  const lines = [
+    'Broadcast Engine',
+    '',
+    `Autopilot: ${stats.enabled ? 'ON' : 'OFF'}`,
+    `Queue: ${stats.queueLength} pending`,
+    `History: ${stats.totalSent} sent`,
+    `Today: ${stats.todayCount} posts`,
+    '',
+    'Commands:',
+    '  /broadcast on — enable autopilot',
+    '  /broadcast off — disable autopilot',
+    '  /broadcast generate <type> — generate content',
+    '  /broadcast now <type> — generate + post immediately',
+    '',
+    'Types: shower_thought, knowledge_drop, primitive_spotlight, builder_update, challenge',
+  ];
+  ctx.reply(lines.join('\n'));
+});
+
 bot.command('health', async (ctx) => {
   if (!isAuthorized(ctx)) return unauthorized(ctx);
   const report = await diagnoseContext();
@@ -7295,7 +7346,13 @@ async function main() {
       bot.telegram.sendMessage(config.ownerUserId, `⚠ LIMNI ALERT [${alert.type}]\n${alert.message}`);
     } catch {}
   });
-  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining + deep storage + hell + limni loaded.');
+  // Initialize broadcast engine (autonomous content distribution)
+  await initBroadcast({
+    telegramSend: (chatId, text) => bot.telegram.sendMessage(chatId, text),
+    chatIds: config.authorizedGroups || [],
+  });
+
+  console.log('[jarvis] Behavior flags + comms + learning + inner dialogue + stickers + shadow + compute economics + mining + deep storage + hell + limni + broadcast loaded.');
 
   // Security posture check (runs every startup)
   await runSecurityChecks();
@@ -8678,6 +8735,7 @@ async function main() {
       ['predictions', flushPredictions],
       ['social', flushSocial],
       ['autonomous', flushAutonomous],
+      ['broadcast', flushBroadcast],
       ['directives', flushDirectives],
       ['reputation', flushReputation],
       ['comms', saveComms],

@@ -9,20 +9,27 @@
 
 ---
 
-## Current State (March 13, 2026)
+## Current State (March 14, 2026)
 
 | Asset | Status |
 |-------|--------|
 | Base mainnet | **LIVE** |
-| Smart contracts | 200+ deployed |
-| Frontend pages | 170+ |
+| Smart contracts | 342 |
+| Solidity test files | 371 |
+| Frontend components | 401 |
+| CKB Rust SDK modules | 73 (15,155 tests) |
+| Total commits | 1,684 |
+| Research papers | 55 |
 | JARVIS Telegram bot | Autonomous, live |
 | CKB/Nervos integration | In progress |
 | Tim Cotten (CRPC) | Talking to Shaw (ElizaOS), speaking EthDC April 16 |
+| Anthropic rate limit request | **SUBMITTED** (2026-03-14) |
 | VC funding | None. Bootstrapped. |
-| GitHub | github.com/wglynn/vibeswap |
+| Team | 1 founder + 1 AI + 6 contributors |
+| GitHub | github.com/WGlynn/VibeSwap |
 | Vercel | frontend-jade-five-87.vercel.app |
 | Twitter/X | Integration spec written, pending deployment |
+| Marketing materials | 221 files ready (tweets, grants, Reddit, pitch deck, BD toolkit) |
 
 ---
 
@@ -33,45 +40,45 @@
 | Day | Task | Owner | Deliverable |
 |-----|------|-------|-------------|
 | Mon Mar 31 | Finalize JARVIS Twitter integration (see `docs/twitter.md`) | Will/Freedom | `jarvis-bot/src/twitter.js` live, posting to @VibeSwap |
-| Tue Apr 1 | Publish thread: "What is VibeSwap? (for humans)" — 10-tweet explainer | JARVIS | Twitter thread, pin to profile |
-| Wed Apr 2 | Publish Reddit post to r/ethereum: "How batch auctions eliminate MEV" | Will | Expand `docs/reddit-posts/r-ethereum-mev-problem.md` |
-| Thu Apr 3 | DM 5 crypto podcasters pitching Will as guest (Bankless, The Defiant, Unchained, ZK Podcast, Epicenter) | Will | 5 outreach DMs sent |
+| Tue Apr 1 | Publish thread: "What is VibeSwap? (for humans)" — 10-tweet explainer | Fate/JARVIS | Twitter thread, pin to profile |
+| Wed Apr 2 | Publish Reddit post to r/ethereum: "How batch auctions eliminate MEV" | Catto | Expand `docs/reddit-posts/r-ethereum-mev-problem.md` |
+| Thu Apr 3 | DM 5 crypto podcasters pitching Will as guest (Bankless, The Defiant, Unchained, ZK Podcast, Epicenter) | Freedom | 5 outreach DMs sent |
 | Fri Apr 4 | Create "VibeSwap in 60 seconds" video — screen recording of a batch auction settling | Will | Upload to YouTube + Twitter clip |
-| Sat-Sun | JARVIS autonomous posting: 2 shower-thought tweets per day, engage with MEV-related threads | JARVIS | 4 tweets |
+| Sat-Sun | JARVIS autonomous posting: 2 shower-thought tweets per day, engage with MEV-related threads | Fate/JARVIS | 4 tweets |
 
 ### Week 2 (April 7 — April 13): EthDC Week Minus One
 
 | Day | Task | Owner | Deliverable |
 |-----|------|-------|-------------|
 | Mon Apr 7 | Publish Medium article: "Why Every DEX Trade Robs You (And How to Fix It)" | Will | Medium + Mirror cross-post |
-| Tue Apr 8 | Twitter thread: "Tim Cotten built CRPC. We built VibeSwap. Here's what happens when they meet." — tease EthDC talk | JARVIS | Thread |
-| Wed Apr 9 | Submit VibeSwap to DeFi Llama listing (if not already listed) | Will | DeFi Llama PR submitted |
-| Thu Apr 10 | Reddit post to r/defi: "No VC funding. No pre-mine. 200 smart contracts. Here's what we built." | Will | Reddit post |
-| Fri Apr 11 | Coordinate with Tim Cotten: confirm VibeSwap mention in EthDC talk, prepare co-branded slide if appropriate | Will/Tim | Slide or talking points shared |
+| Tue Apr 8 | Twitter thread: "Tim Cotten built CRPC. We built VibeSwap. Here's what happens when they meet." — tease EthDC talk | Fate/JARVIS | Thread |
+| Wed Apr 9 | Submit VibeSwap to DeFi Llama listing (if not already listed) | John Paul | DeFi Llama PR submitted |
+| Thu Apr 10 | Reddit post to r/defi: "No VC funding. No pre-mine. 200 smart contracts. Here's what we built." | Catto | Reddit post |
+| Fri Apr 11 | Coordinate with Tim Cotten: confirm VibeSwap mention in EthDC talk, prepare co-branded slide if appropriate | Freedom/Tim | Slide or talking points shared |
 | Sat-Sun | JARVIS engagement: reply to every EthDC-related tweet mentioning MEV, batch auctions, or fair ordering | JARVIS | 10+ replies |
 
 ### Week 3 (April 14 — April 20): EthDC Week
 
 | Day | Task | Owner | Deliverable |
 |-----|------|-------|-------------|
-| Mon Apr 14 | Twitter thread: "5 things to watch at EthDC this week (and why batch auctions matter)" | JARVIS | Thread |
-| Tue Apr 15 | Pre-event tweet: "Tomorrow @TimCotten talks CRPC at EthDC. VibeSwap is where CRPC meets DeFi." | Will | Tweet with event link |
-| **Wed Apr 16** | **TIM COTTEN ETHDC TALK** — Live-tweet key moments, quote-tweet Tim, engage every reply | Will + JARVIS | 15+ tweets during/after talk |
-| Wed Apr 16 | Post-talk Twitter thread: "What Tim just showed at EthDC and what it means for VibeSwap" | Will | Thread within 2 hours of talk |
-| Thu Apr 17 | Reddit post to r/CryptoCurrency: recap of EthDC talk + VibeSwap connection | Will | Reddit post |
-| Fri Apr 18 | Follow up with every new Twitter follower from EthDC week — DM top 10 with personal note | Will | 10 DMs |
-| Sat-Sun | Telegram community AMA: "Ask JARVIS Anything" — let the AI field questions for 2 hours | JARVIS | Telegram event |
+| Mon Apr 14 | Twitter thread: "5 things to watch at EthDC this week (and why batch auctions matter)" | Fate/JARVIS | Thread |
+| Tue Apr 15 | Pre-event tweet: "Tomorrow @TimCotten talks CRPC at EthDC. VibeSwap is where CRPC meets DeFi." | Fate | Tweet with event link |
+| **Wed Apr 16** | **TIM COTTEN ETHDC TALK** — Live-tweet key moments, quote-tweet Tim, engage every reply | Fate + JARVIS + Karma | 15+ tweets during/after talk |
+| Wed Apr 16 | Post-talk Twitter thread: "What Tim just showed at EthDC and what it means for VibeSwap" | Fate/Will | Thread within 2 hours of talk |
+| Thu Apr 17 | Reddit post to r/CryptoCurrency: recap of EthDC talk + VibeSwap connection | Catto | Reddit post |
+| Fri Apr 18 | Follow up with every new Twitter follower from EthDC week — DM top 10 with personal note | Freedom | 10 DMs |
+| Sat-Sun | Telegram community AMA: "Ask JARVIS Anything" — let the AI field questions for 2 hours | Karma/JARVIS | Telegram event |
 
 ### Week 4 (April 21 — April 27): Post-EthDC Momentum
 
 | Day | Task | Owner | Deliverable |
 |-----|------|-------|-------------|
 | Mon Apr 21 | Publish blog post: "EthDC Recap: CRPC, Batch Auctions, and the Future of Fair DeFi" | Will | Medium + Mirror |
-| Tue Apr 22 | Outreach to Shaw (ElizaOS) — direct message referencing Tim's intro, propose VibeSwap x ElizaOS integration | Will | DM or email sent |
-| Wed Apr 23 | Twitter thread: "JARVIS wrote 200 smart contracts. Here's what an AI co-founder actually does." | JARVIS | Thread |
-| Thu Apr 24 | Submit grant application to Base Ecosystem Fund (see May actions for more grants) | Will | Application submitted |
-| Fri Apr 25 | Reddit post to r/ethereum: "We built an AI co-founder that writes Solidity. AMA." | Will | Reddit AMA post |
-| Sat-Sun | Weekly metrics review — document Twitter followers, Telegram members, GitHub stars | Will | Metrics logged |
+| Tue Apr 22 | Outreach to Shaw (ElizaOS) — direct message referencing Tim's intro, propose VibeSwap x ElizaOS integration | Freedom | DM or email sent |
+| Wed Apr 23 | Twitter thread: "JARVIS wrote 200 smart contracts. Here's what an AI co-founder actually does." | Fate/JARVIS | Thread |
+| Thu Apr 24 | Submit grant application to Base Ecosystem Fund (see May actions for more grants) | John Paul | Application submitted |
+| Fri Apr 25 | Reddit post to r/ethereum: "We built an AI co-founder that writes Solidity. AMA." | Catto | Reddit AMA post |
+| Sat-Sun | Weekly metrics review — document Twitter followers, Telegram members, GitHub stars | Karma | Metrics logged |
 
 ### April Targets
 
@@ -354,15 +361,30 @@ For each Tier A target, execute the following by April 30:
 
 Every week follows this rhythm:
 
-| Day | Marketing Actions |
-|-----|-------------------|
-| **Monday** | Telegram dev update. Plan week's content. Review last week's metrics. |
-| **Tuesday** | Publish blog post (if scheduled). 2 Twitter threads. |
-| **Wednesday** | Reddit post #1. Partnership outreach (1-2 emails). Engage Twitter. |
-| **Thursday** | Twitter thread. Reddit engagement (reply to comments). JARVIS autonomous posting. |
-| **Friday** | Reddit post #2. Twitter thread. Follow up on partnership outreach. |
-| **Saturday** | JARVIS autonomous posting. Community engagement. |
-| **Sunday** | Metrics review. Log all KPIs. Update this playbook with actuals vs. targets. |
+| Day | Marketing Actions | Primary Owner |
+|-----|-------------------|---------------|
+| **Monday** | Telegram dev update. Plan week's content. Review last week's metrics. | Karma (TG), Will (planning) |
+| **Tuesday** | Publish blog post (if scheduled). 2 Twitter threads. | Will (blog), Fate (threads) |
+| **Wednesday** | Reddit post #1. Partnership outreach (1-2 emails). Engage Twitter. | Catto (Reddit), Freedom (outreach) |
+| **Thursday** | Twitter thread. Reddit engagement (reply to comments). DeFi community engagement. | Fate (Twitter), Catto (Reddit), Defaibro (communities) |
+| **Friday** | Reddit post #2. Twitter thread. Follow up on partnership outreach. Grant work. | Catto (Reddit), Fate (Twitter), John Paul (grants) |
+| **Saturday** | JARVIS autonomous posting. Community engagement. Cross-pollination. | Fate + Karma + JARVIS |
+| **Sunday** | Metrics review. Log all KPIs. Update this playbook with actuals vs. targets. | Karma (metrics), Will (review) |
+
+### Team Roster & Lanes (Updated 2026-03-14)
+
+| Person | Primary Lane | Secondary |
+|--------|-------------|-----------|
+| **Will** | Strategy, blog posts, mechanism design content | Final review on all |
+| **Freedom** | Partnerships & BD outreach, grant coordination | Tim Cotten/ElizaOS pipeline |
+| **Fate** | Twitter/X content deployment (154 tweets queued) | Live-tweeting events |
+| **Catto** | Reddit & forum seeding (6 posts ready) | Hacker News, new subreddits |
+| **Defaibro** | DeFi community infiltration (TG/Discord) | KOL relationship building |
+| **John Paul** | Grants & hackathon submissions (7 apps ready) | DeFi Llama listing |
+| **Karma** | Telegram growth & community engagement | Weekly metrics tracking |
+| **JARVIS** | Autonomous posting, AMAs, shower thoughts | Engagement, replies |
+
+See `docs/team-marketing-assignments.md` for detailed per-person assignments.
 
 ---
 
@@ -452,7 +474,7 @@ DEX on Base, contributing to Base's mission of bringing the next billion users o
 without the hidden tax of MEV extraction."]
 
 TEAM: Will Glynn (mechanism design, Solidity) + JARVIS (AI co-founder, autonomous
-development). Bootstrapped. No VC funding. Open source.
+development) + 6 contributors. Bootstrapped. No VC funding. Open source.
 
 DELIVERABLES:
 1. [Specific deliverable 1]

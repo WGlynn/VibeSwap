@@ -315,6 +315,45 @@ export async function createGitHubIssue(title, body, labels = []) {
   }
 }
 
+// ============ TWITTER SEARCH ============
+export async function searchTwitterMentions(query = 'VibeSwap OR @VibeSwap', maxResults = 10) {
+  const creds = state.credentials.twitter
+  if (!creds?.bearerToken) return { error: 'Twitter bearer token not configured.' }
+
+  try {
+    const params = new URLSearchParams({
+      query,
+      max_results: String(Math.min(maxResults, 100)),
+      'tweet.fields': 'created_at,author_id,text',
+    })
+    const url = `https://api.twitter.com/2/tweets/search/recent?${params}`
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${creds.bearerToken}`,
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(HTTP_TIMEOUT),
+    })
+
+    if (!res.ok) {
+      return { error: `Twitter search API: ${res.status}` }
+    }
+
+    const data = await res.json()
+    return {
+      tweets: (data.data || []).map(t => ({
+        id: t.id,
+        text: t.text,
+        authorId: t.author_id,
+        createdAt: t.created_at,
+      })),
+      count: data.meta?.result_count || 0,
+    }
+  } catch (err) {
+    return { error: err.message }
+  }
+}
+
 // ============ CONTENT QUEUE ============
 export function queuePost(platform, content, metadata = {}) {
   if (state.queue.length >= 50) {

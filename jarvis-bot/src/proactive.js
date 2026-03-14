@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { config } from './config.js'
+import { searchTwitterMentions } from './social.js'
 
 // ============ DID REGISTRY INTEGRATION ============
 const DID_REGISTRY_PATH = join(process.env.DATA_DIR || './data', 'did-registry.json')
@@ -456,9 +457,19 @@ async function executeAction(name, action) {
   }
 
   if (name === 'monitor_mentions') {
-    // TODO: Twitter API search for @VibeSwap mentions
-    // For now, just log
-    logAction(name, { status: 'monitoring not yet wired' })
+    const result = await searchTwitterMentions('VibeSwap OR @VibeSwap', 10)
+    if (result.error) {
+      logAction(name, { status: 'error', error: result.error })
+    } else {
+      logAction(name, { status: 'ok', count: result.count, tweets: result.tweets?.slice(0, 3) })
+      // Notify owner if there are new mentions
+      if (result.count > 0 && chatFn) {
+        const summary = result.tweets.slice(0, 5).map(t => `• "${t.text.slice(0, 100)}${t.text.length > 100 ? '...' : ''}"`).join('\n')
+        try {
+          await chatFn(config.ownerUserId, `[Twitter Monitor] ${result.count} recent mentions:\n\n${summary}`)
+        } catch {}
+      }
+    }
     return
   }
 

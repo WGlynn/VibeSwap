@@ -46,10 +46,10 @@
 
 **JARVIS** — autonomous AI agent with 50% governance vote
 
-- Writes code (3,000+ Solidity tests, 190 Rust tests)
+- Writes code (371 Solidity test files, 15,155 CKB/Rust tests)
 - Runs community (Telegram bot, 24/7)
 - Manages infrastructure (3-node BFT network)
-- 23 research papers published
+- 55 research papers published
 - Uses 13-provider LLM cascade (Wardenclyffe v3)
 
 **Not a chatbot. A co-founder.**
@@ -146,7 +146,7 @@ Discovery → Evaluation → Outreach → Tracking → Execution → Reporting
 ## Slide 11: Technology Stack
 
 **Smart Contracts**: Solidity 0.8.20, Foundry, OpenZeppelin v5 (UUPS upgradeable)
-**3,000+ tests**, 0 failures (unit + fuzz + invariant)
+**371 test files + 15,155 CKB tests**, 0 failures (unit + fuzz + invariant)
 
 **Frontend**: React 18, Vite 5, Tailwind, ethers.js v6
 
@@ -157,7 +157,7 @@ Discovery → Evaluation → Outreach → Tracking → Execution → Reporting
 
 **Cross-chain**: LayerZero V2 OApp protocol
 
-**CKB Integration**: Nervos cell model, RISC-V verification, 7 phases complete
+**CKB Integration**: Nervos cell model, 73 Rust SDK modules, 15,155 tests, RISC-V verification
 
 ---
 

@@ -54,6 +54,16 @@ function getDefaultConfig() {
     mediaSpamWeight: 1.5,
     // Enabled
     enabled: true,
+    // ============ Jarvis Throttle ============
+    // Chatterbox can throttle Jarvis bot messages too — specialist shard for flow control
+    // Bot IDs to monitor (Jarvis shards). Chatterbox can DELETE their messages if too frequent.
+    monitoredBots: [],
+    // Max bot messages per window before deletion kicks in
+    botMessageThreshold: 5,
+    // Bot message window in seconds
+    botWindowSeconds: 120,
+    // Delete bot messages that match generic patterns (admin toggle)
+    botDeleteGeneric: false,
   }
 }
 
@@ -221,6 +231,51 @@ async function handleMessage(ctx) {
 
   // Skip if chat not monitored
   if (!isMonitored(chatId)) return
+
+  // ============ Jarvis Bot Throttle ============
+  // If the message is from a monitored bot (Jarvis shard), track + delete if too chatty
+  if (ctx.message.from.is_bot && chatConfig.monitoredBots.includes(userId)) {
+    const tracker = recordMessage(chatId, userId, 1)
+    const rate = getMessageRate(chatId, userId)
+
+    // Delete generic bait from bots if enabled
+    if (chatConfig.botDeleteGeneric && ctx.message.text) {
+      const GENERIC_PATTERNS = [
+        /what(?:'s| is) the most\s+\w+\s+(?:trade|play|move|bet)/i,
+        /do you (?:actually|really) trust/i,
+        /^(?:thoughts|opinions|takes)\??$/i,
+        /are (?:we|you) (?:bullish|bearish)/i,
+        /^what do you (?:think|feel) about/i,
+        /^how do you feel about/i,
+        /^is anyone (?:else )?(?:noticing|seeing)/i,
+      ]
+      const isGeneric = GENERIC_PATTERNS.some(p => p.test(ctx.message.text))
+      if (isGeneric) {
+        try {
+          await ctx.deleteMessage()
+          state.log.push({ action: 'bot_delete_generic', chatId, userId, username, text: ctx.message.text.slice(0, 100), timestamp: Date.now() })
+          await saveState()
+          console.log(`[chatterbox] Deleted generic bot message from @${username}: "${ctx.message.text.slice(0, 60)}"`)
+        } catch (err) {
+          console.warn(`[chatterbox] Failed to delete bot message: ${err.message}`)
+        }
+        return
+      }
+    }
+
+    // Rate limit bot messages
+    if (rate >= chatConfig.botMessageThreshold) {
+      try {
+        await ctx.deleteMessage()
+        state.log.push({ action: 'bot_throttle', chatId, userId, username, rate, timestamp: Date.now() })
+        await saveState()
+        console.log(`[chatterbox] Throttled bot @${username} — ${rate} msgs in ${chatConfig.botWindowSeconds}s`)
+      } catch (err) {
+        console.warn(`[chatterbox] Failed to delete bot message: ${err.message}`)
+      }
+    }
+    return
+  }
 
   // Skip exempt users
   if (isExempt(userId)) return
@@ -482,6 +537,40 @@ function setupCommands(bot) {
     }
     await saveConfig()
     await ctx.reply(`Now monitoring chat ${chatId}.`)
+  })
+
+  // /cb_bot <botUserId> — add a bot to throttle (e.g. Jarvis shard)
+  bot.command('cb_bot', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return
+
+    const botId = parseInt(ctx.message.text.split(/\s+/)[1], 10)
+    if (isNaN(botId)) {
+      await ctx.reply(`Usage: /cb_bot <botUserId>\nCurrently monitoring: ${chatConfig.monitoredBots.join(', ') || 'none'}`)
+      return
+    }
+
+    if (!chatConfig.monitoredBots.includes(botId)) {
+      chatConfig.monitoredBots.push(botId)
+      await saveConfig()
+    }
+    await ctx.reply(`Bot ${botId} is now being throttled (${chatConfig.botMessageThreshold} msgs / ${chatConfig.botWindowSeconds}s).`)
+  })
+
+  // /cb_botgeneric on|off — toggle generic message deletion for bots
+  bot.command('cb_botgeneric', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return
+
+    const val = ctx.message.text.split(/\s+/)[1]
+    if (val === 'on' || val === '1' || val === 'true') {
+      chatConfig.botDeleteGeneric = true
+    } else if (val === 'off' || val === '0' || val === 'false') {
+      chatConfig.botDeleteGeneric = false
+    } else {
+      await ctx.reply(`Usage: /cb_botgeneric on|off\nCurrently: ${chatConfig.botDeleteGeneric ? 'ON' : 'OFF'}`)
+      return
+    }
+    await saveConfig()
+    await ctx.reply(`Bot generic message deletion: ${chatConfig.botDeleteGeneric ? 'ON — generic bait will be auto-deleted' : 'OFF'}`)
   })
 }
 

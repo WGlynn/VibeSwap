@@ -1,7 +1,7 @@
 # ============ JARVIS Mind Network — Hetzner VPS Production Stack ============
 #
 # Full production deployment for self-managed VPS (Hetzner CX31 or similar).
-# Includes: primary shard, worker shard, Ollama local LLM, Nginx reverse proxy.
+# Includes: primary shard, worker shard, Ollama local LLM.
 #
 # Prerequisites:
 #   1. Run scripts/vps-deploy.sh on fresh VPS (installs Docker, firewall, SSL)
@@ -15,46 +15,30 @@
 #
 # Architecture:
 #   ┌─────────────────────────────────────────────────────┐
-#   │                    Nginx (443/80)                    │
-#   │              SSL termination + proxy                │
-#   └───────────┬────────────────────┬────────────────────┘
-#               │                    │
-#   ┌───────────▼──────────┐  ┌─────▼────────────────────┐
-#   │   shard-0 (primary)  │  │   shard-1 (worker)       │
-#   │   Telegram bot       │  │   Consensus + CRPC       │
-#   │   Router + BFT       │  │   No Telegram            │
-#   │   Port 8080          │  │   Port 8080              │
-#   └───────────┬──────────┘  └─────┬────────────────────┘
-#               │                    │
-#   ┌───────────▼────────────────────▼────────────────────┐
-#   │              Ollama (11434)                          │
-#   │         Local LLM — zero API cost                   │
-#   └─────────────────────────────────────────────────────┘
+#   │              Caddy (system service)                  │
+#   │      SSL auto + reverse proxy → localhost:8080      │
+#   └───────────────────────┬─────────────────────────────┘
+#                           │
+#   ┌───────────────────────▼──────────────────────────────┐
+#   │   shard-0 (primary) — port 8080 exposed to host     │
+#   │   Telegram bot + Router + BFT                       │
+#   └───────────┬──────────────────────────────────────────┘
+#               │ (Docker network)
+#   ┌───────────▼──────────┐  ┌────────────────────────────┐
+#   │   shard-1 (worker)   │  │   Ollama (11434)           │
+#   │   Consensus + CRPC   │  │   Local LLM — zero cost    │
+#   └──────────────────────┘  └────────────────────────────┘
 # ============
 
 services:
-  # ============ Nginx Reverse Proxy ============
-  # SSL termination, rate limiting, health endpoint forwarding
-  nginx:
-    image: nginx:alpine
-    container_name: jarvis-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
-      - nginx-cache:/var/cache/nginx
-    networks:
-      - mind-network
-    depends_on:
-      - shard-0
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "3"
+  # ============ Nginx Reverse Proxy (DISABLED) ============
+  # VPS uses Caddy (system service) for SSL + reverse proxy → localhost:8080
+  # Caddy config: /etc/caddy/Caddyfile
+  # If migrating away from Caddy, re-enable this and stop caddy.service
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: jarvis-nginx
+  #   ...
 
   # ============ Ollama — Local LLM Server ============
   # Runs independently so shards can share it. Persists models on volume.
@@ -116,6 +100,8 @@ services:
     build: .
     container_name: jarvis-shard-0
     restart: unless-stopped
+    ports:
+      - "8080:8080"   # Exposed to host — Caddy reverse proxies from 443 → localhost:8080
     environment:
       # Telegram
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -230,8 +216,6 @@ volumes:
     name: jarvis-vps-shard1-data
   ollama-models:
     name: jarvis-vps-ollama-models
-  nginx-cache:
-    name: jarvis-vps-nginx-cache
 
 networks:
   mind-network:

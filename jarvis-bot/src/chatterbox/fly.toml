@@ -1,0 +1,26 @@
+app = 'chatterbox-vibeswap'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/app/data'
+  NODE_ENV = 'production'
+
+[[mounts]]
+  source = 'chatterbox_data'
+  destination = '/app/data'
+
+# No HTTP service — pure polling bot
+# Fly needs something to health check, so we'll add a minimal one
+[processes]
+  app = "node index.js"
+
+[[restart]]
+  policy = 'always'
+  max_retries = 10
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'

@@ -37,10 +37,24 @@
 - GitHub Discussion #2 created — VIP Ideas submission guide
 - GitHub Discussion #3 created — Wardenclyffe compute economics explainer
 
-**Commits:** 14a7e36, fcd587e, 262c861, 5b645bb, e650aab, 4480132, 89ae101, 17bc55d, 9181022, 79a16ce + agent commits
+**VPS Infrastructure (Post-Compaction):**
+- Nginx → Caddy migration: removed nginx from Docker compose (port 80/443 conflict)
+- Enhanced Caddy config with security headers (HSTS, X-Frame-Options, nosniff, Referrer-Policy, -Server)
+- VPS shards set to WORKER mode (was primary, causing 409 TG polling conflicts with Fly.io)
+- Shard IDs renamed to vps-shard-0/vps-shard-1, router URL → Fly.io primary
+- Peer seeds configured for router-independent discovery
+- shard-0 port 8080 exposed to host for Caddy → Docker routing
+- Orphan jarvis-bot container cleaned up
+- Caddy log permissions fixed (chown caddy:caddy /var/log/caddy)
 
-**Still Running:**
-- Test fix agent (DonationAttack x3 + AgentRegistry x1)
+**Commits:** 14a7e36, fcd587e, 262c861, 5b645bb, e650aab, 4480132, 89ae101, 17bc55d, 9181022, 79a16ce, c2d41c4, 76d97f3, 089ce35, 65ea3db, 8e02b16, 0402bb4, 414546d + agent commits
+
+**Pending for Will:**
+- Verify SHARD_SECRET matches between Fly.io and VPS (consensus HMAC rejections)
+- Set free-tier API keys (SambaNova, OpenRouter, Mistral, Together, Fireworks, Novita, xAI)
+- Add Jarvis to more TG groups
+- Discord webhook URL
+- Test /idea pipeline in TG
 
 ---
 

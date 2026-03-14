@@ -2,7 +2,7 @@
 
 ### A Two-Page Introduction to VibeSwap for Smart People Who Don't Want to Learn Solidity
 
-**Author**: Will Glynn & JARVIS (AI Co-author) | **Date**: February 2026 | **Technical Depth**: 1/5 (by explicit request from the capo himself)
+**Author**: Faraday1 & JARVIS (AI Co-author) | **Date**: February 2026 | **Technical Depth**: 1/5 (by explicit request from the capo himself)
 
 ---
 
@@ -55,4 +55,4 @@ One fixes the incentives. The other fixes the foundation. Together: trust is unn
 
 ---
 
-**References** — [1] Linktree Creator Report 2024; Oxford Economics. [2] W. Glynn & JARVIS, "Solving Parasocial Extraction Methods with VibeSwap's Codebase," Feb. 2025. [3] VibeSwap Research, "The Trinomial Stability Theorem," v2.0, Feb. 2026. — *Written with a conspicuous lack of blockchain jargon, on purpose. Capisce?*
+**References** — [1] Linktree Creator Report 2024; Oxford Economics. [2] Faraday1 & JARVIS, "Solving Parasocial Extraction Methods with VibeSwap's Codebase," Feb. 2025. [3] VibeSwap Research, "The Trinomial Stability Theorem," v2.0, Feb. 2026. — *Written with a conspicuous lack of blockchain jargon, on purpose. Capisce?*

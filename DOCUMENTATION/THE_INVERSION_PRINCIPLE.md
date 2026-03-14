@@ -2,7 +2,7 @@
 
 **Why Secrecy Is Now the Only Way Your Ideas Can Be Stolen**
 
-*Will Glynn, February 2025*
+*Faraday1, February 2025*
 
 *Sequel to: The Transparency Theorem & The Provenance Thesis (Glynn, 2025)*
 

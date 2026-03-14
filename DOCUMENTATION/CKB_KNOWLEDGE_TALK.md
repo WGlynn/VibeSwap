@@ -2,7 +2,7 @@
 ## Why the Cell Model is Perfect for Common Knowledge
 
 **Talk for Nervos Community**
-**Speaker**: Will Glynn
+**Speaker**: Faraday1
 **Draft**: v0.1
 
 ---

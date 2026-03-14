@@ -1,6 +1,6 @@
 # In a Cave, With a Box of Scraps: A Thesis on Solo Building with Vibe Coding in the Pre-Jarvis Era
 
-**Will Glynn**
+**Faraday1**
 *February 2025*
 
 ---

@@ -12,7 +12,7 @@ import "../core/interfaces/IVibeAMM.sol";
 
 /**
  * @title DAOTreasury
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice DAO treasury with backstop liquidity and timelock-controlled withdrawals
  * @dev Receives protocol fees and auction proceeds, provides price smoothing for store-of-value assets
  */

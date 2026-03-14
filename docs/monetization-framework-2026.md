@@ -1,6 +1,6 @@
 # VibeSwap Monetization Framework: Zero Rent-Seeking Revenue Model
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap**
 
 ---

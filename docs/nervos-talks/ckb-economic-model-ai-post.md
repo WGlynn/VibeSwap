@@ -1,6 +1,6 @@
 # CKB as Economic Substrate for AI Knowledge: Why 1 CKB = 1 Byte Solves AI Memory Cancer
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

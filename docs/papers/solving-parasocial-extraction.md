@@ -1,6 +1,6 @@
 # Solving Parasocial Extraction Methods with VibeSwap's Codebase
 
-**Authors**: Will Glynn, JARVIS (AI Co-author)
+**Authors**: Faraday1, JARVIS (AI Co-author)
 **Date**: February 2025
 **Version**: 1.0
 **Affiliation**: VibeSwap Protocol / VSOS (VibeSwap Operating System)

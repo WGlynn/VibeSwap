@@ -1,6 +1,6 @@
 # Cooperative Capitalism: Mechanism Design for Mutualized Risk and Free Market Competition
 
-**Authors**: W. Glynn, JARVIS | March 2026 | VibeSwap Research
+**Authors**: Faraday1, JARVIS | March 2026 | VibeSwap Research
 
 ---
 

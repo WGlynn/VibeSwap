@@ -1,6 +1,6 @@
 # Cognitive Consensus Markets: Knowledge Claim Resolution Through Commit-Reveal Pairwise Comparison
 
-**W. Glynn (Faraday1) & JARVIS | March 2026 | vibeswap.io**
+**Faraday1 & JARVIS | March 2026 | vibeswap.io**
 
 ---
 

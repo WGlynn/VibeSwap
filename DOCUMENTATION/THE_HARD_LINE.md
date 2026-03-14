@@ -2,7 +2,7 @@
 
 **On the Absolute Boundary Between Contribution Provenance and Personal Privacy**
 
-*Will Glynn, February 2025*
+*Faraday1, February 2025*
 
 *Companion to: The Epistemic Gate Archetypes (Glynn, 2025)*
 

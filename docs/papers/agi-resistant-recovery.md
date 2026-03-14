@@ -1,6 +1,6 @@
 # AGI-Resistant Wallet Recovery: Multi-Layer Safeguards for Post-Quantum Threat Landscapes
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 **Status**: Working Paper

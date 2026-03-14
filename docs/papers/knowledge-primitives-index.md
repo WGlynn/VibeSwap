@@ -1,6 +1,6 @@
 # VibeSwap Knowledge Primitives Index
 
-**W. Glynn, JARVIS** | March 2026 | Living Document
+**Faraday1, JARVIS** | March 2026 | Living Document
 
 ---
 

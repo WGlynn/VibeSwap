@@ -2,7 +2,7 @@
 
 Hi Base team,
 
-I'm Will Glynn, builder of VibeSwap — the first fair-launch DEX on Base that structurally eliminates MEV.
+I'm Faraday1, builder of VibeSwap — the first fair-launch DEX on Base that structurally eliminates MEV.
 
 We're live on Base mainnet with:
 - 341 smart contracts

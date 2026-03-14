@@ -2,7 +2,7 @@
 
 **Logical Archetype Primitives for the VibeSwap Protocol**
 
-*Will Glynn, February 2025*
+*Faraday1, February 2025*
 
 *Depends on: The Transparency Theorem, The Provenance Thesis, The Inversion Principle (Glynn, 2025)*
 

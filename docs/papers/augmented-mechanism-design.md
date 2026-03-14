@@ -1,6 +1,6 @@
 # Augmented Mechanism Design: Protective Extensions for Pure Economic Mechanisms
 
-**W. Glynn (Faraday1) & JARVIS**
+**Faraday1 & JARVIS**
 *VibeSwap Protocol — vibeswap.io*
 *March 2026*
 

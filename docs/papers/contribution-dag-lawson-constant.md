@@ -1,6 +1,6 @@
 # Load-Bearing Attribution: ContributionDAG and the Lawson Constant
 
-**Authors**: W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+**Authors**: Faraday1 & JARVIS -- vibeswap.io
 **Date**: March 2026
 **Version**: 1.0
 
@@ -475,7 +475,7 @@ Load-bearing attribution has clear limitations:
 ### 7.4 The Philosophical Argument
 
 > "The greatest idea can't be stolen because part of it is admitting who came up with it."
-> -- W. Glynn, 2026
+> -- Faraday1, 2026
 
 Traditional intellectual property protection assumes ideas can be stolen -- that the value of an idea is separable from its origin. Load-bearing attribution challenges this assumption. If the origin of an idea is structurally embedded in its implementation, then stealing the idea requires destroying part of it.
 

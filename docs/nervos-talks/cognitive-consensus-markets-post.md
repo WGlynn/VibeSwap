@@ -1,6 +1,6 @@
 # Cognitive Consensus Markets: Evaluating Truth Without Central Authority on CKB
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

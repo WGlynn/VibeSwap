@@ -11,7 +11,7 @@ import "../oracle/IReputationOracle.sol";
 
 /**
  * @title VibeRevShare
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice ERC-20 Revenue Share Tokens — stakeable, tradeable, collateral-eligible
  *         tokens that auto-receive a percentage of protocol revenue.
  * @dev Part of VSOS (VibeSwap Operating System) Financial Primitives.

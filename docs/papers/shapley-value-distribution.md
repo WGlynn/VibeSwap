@@ -1,6 +1,6 @@
 # Shapley Value Distribution: Fair Reward Allocation Through Cooperative Game Theory
 
-**W. Glynn (Faraday1) & JARVIS**
+**Faraday1 & JARVIS**
 **vibeswap.io | March 2026**
 
 ---

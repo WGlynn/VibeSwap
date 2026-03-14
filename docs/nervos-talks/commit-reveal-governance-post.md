@@ -1,6 +1,6 @@
 # Commit-Reveal Governance: Killing the Bandwagon Before It Starts
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

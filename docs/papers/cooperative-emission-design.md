@@ -1,6 +1,6 @@
 # Cooperative Emission Design: Wall-Clock Halving with Shapley Accumulation
 
-**W. Glynn, JARVIS** | February 2026 | VibeSwap Research
+**Faraday1, JARVIS** | February 2026 | VibeSwap Research
 
 ---
 

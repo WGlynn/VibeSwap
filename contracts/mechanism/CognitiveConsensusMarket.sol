@@ -30,7 +30,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *      Inspired by the Shards > Swarms thesis: each evaluator is a complete mind,
  *      not a specialized sub-agent. The market aggregates independent judgments.
  *
- * @author W. Glynn, JARVIS | March 2026
+ * @author Faraday1, JARVIS | March 2026
  */
 contract CognitiveConsensusMarket is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;

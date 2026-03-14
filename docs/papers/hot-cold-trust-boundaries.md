@@ -1,6 +1,6 @@
 # Hot/Cold Trust Boundaries: Minimizing Attack Surface Through Architectural Separation
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 **Status**: Working Paper

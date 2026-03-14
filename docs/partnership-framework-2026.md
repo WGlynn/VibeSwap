@@ -1,6 +1,6 @@
 # VibeSwap Autonomous Partnership Framework
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap**
 
 ---
@@ -124,7 +124,7 @@ Hi [Name],
 
 [1 sentence: next step — "15 min call this week?"]
 
-— Will Glynn, VibeSwap
+— Faraday1, VibeSwap
 ```
 
 ### 4.2 Personalization Rules

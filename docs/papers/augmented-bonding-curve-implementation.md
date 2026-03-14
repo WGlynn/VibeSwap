@@ -1,6 +1,6 @@
 # Augmented Bonding Curve Implementation: From Theory to VibeSwap
 
-**Authors**: W. Glynn (Faraday1) & JARVIS
+**Authors**: Faraday1 & JARVIS
 **Date**: March 10, 2026
 **Status**: Implemented, tested, verified
 

@@ -284,7 +284,7 @@ For context: most grant applications at this funding level are asking for money 
 
 ## 8. Team
 
-**Will Glynn** — Founder & Mechanism Designer
+**Faraday1** — Founder & Mechanism Designer
 - Solo architect of VibeSwap — 342 contracts, 401 frontend components, full stack, $0 budget
 - Mechanism design papers on cooperative capitalism, Shapley reward distribution, and game-theoretic incentive alignment
 - Active engagement with Nervos community
@@ -330,7 +330,7 @@ We didn't hire 30 engineers. We built a system where 1 founder + 1 AI + 6 contri
 - **Live App (EVM):** https://frontend-jade-five-87.vercel.app
 - **Telegram:** https://t.me/+3uHbNxyZH-tiOGY8
 - **Nervos Forum Post:** [CUSTOMIZE]
-- **Contact:** Will Glynn — [CUSTOMIZE]
+- **Contact:** Faraday1 — [CUSTOMIZE]
 
 ---
 

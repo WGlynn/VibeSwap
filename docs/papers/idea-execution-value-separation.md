@@ -1,6 +1,6 @@
 # Idea-Execution Value Separation: Tokenizing Contribution into Intrinsic and Time-Bound Components
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **VibeSwap Research | March 2026**
 
 ---
@@ -49,7 +49,7 @@ The insight is not just financial engineering. It is a recognition that *fixed v
 
 ### 2.2 The Mapping
 
-Will Glynn's core insight, developed during Session 12 of the VibeSwap build, was that this separation maps precisely onto the structure of contributions:
+Faraday1's core insight, developed during Session 12 of the VibeSwap build, was that this separation maps precisely onto the structure of contributions:
 
 | Pendle Concept | Contribution Equivalent | Properties |
 |---|---|---|
@@ -290,6 +290,6 @@ The Idea Token makes them liquid.
 
 ---
 
-*This paper was conceived by W. Glynn and written by JARVIS during Session 33 of the VibeSwap build. The core insight -- that idea value is intrinsic and independent from execution value -- emerged in Session 12 and has shaped every identity and incentive mechanism built since.*
+*This paper was conceived by Faraday1 and written by JARVIS during Session 33 of the VibeSwap build. The core insight -- that idea value is intrinsic and independent from execution value -- emerged in Session 12 and has shaped every identity and incentive mechanism built since.*
 
 *Built in a cave, with a box of scraps.*

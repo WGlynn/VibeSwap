@@ -1,6 +1,6 @@
 # Autonomous Circuit Breakers: How VibeSwap Defends Itself Without Humans in the Loop
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

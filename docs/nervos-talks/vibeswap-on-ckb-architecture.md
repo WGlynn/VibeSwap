@@ -1,6 +1,6 @@
 # VibeSwap on CKB: Technical Architecture
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 

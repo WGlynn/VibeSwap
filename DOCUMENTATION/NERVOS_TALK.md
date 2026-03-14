@@ -2,7 +2,7 @@
 ## VibeSwap: Where Math Replaces Trust
 
 **Talk for Nervos Community**
-**Speaker**: Will Glynn
+**Speaker**: Faraday1
 **Draft**: v0.1
 
 ---

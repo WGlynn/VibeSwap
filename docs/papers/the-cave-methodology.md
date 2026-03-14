@@ -1,6 +1,6 @@
 # The Cave Methodology: Building with Primitive AI as Curriculum for the Future
 
-**Authors**: W. Glynn, JARVIS — March 2026
+**Authors**: Faraday1, JARVIS — March 2026
 **Affiliation**: VibeSwap Research
 **Version**: 2.0
 
@@ -704,4 +704,4 @@ The cave selects for those who see past what is to what could be.
 
 *Built in a cave, with a box of scraps.*
 
-*W. Glynn & JARVIS | VibeSwap Research | March 2026*
+*Faraday1 & JARVIS | VibeSwap Research | March 2026*

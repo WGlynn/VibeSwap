@@ -1,6 +1,6 @@
 # Knowledge Cells: Verifiable AI Inference on CKB
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 

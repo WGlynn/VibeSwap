@@ -1,6 +1,6 @@
 # Testing as Proof of Correctness: The Unit-Fuzz-Invariant Triad for Smart Contracts
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

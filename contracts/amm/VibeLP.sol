@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title VibeLP
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice LP token for VibeSwap liquidity pools
  * @dev Minted by VibeAMM when liquidity is added
  */

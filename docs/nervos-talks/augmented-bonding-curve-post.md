@@ -1,6 +1,6 @@
 # Augmented Bonding Curves: Conservation-Invariant Token Economics on CKB
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

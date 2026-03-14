@@ -2,7 +2,7 @@
 
 Research papers and proposals for the Nervos CKB community, demonstrating VibeSwap's technical investment in the CKB ecosystem.
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 

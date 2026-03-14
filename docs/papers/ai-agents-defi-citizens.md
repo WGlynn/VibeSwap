@@ -1,6 +1,6 @@
 # AI Agents as First-Class DeFi Citizens: Identity, Reputation, and Economic Participation for Non-Human Actors
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 **Status**: Working Paper

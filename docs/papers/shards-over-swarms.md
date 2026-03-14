@@ -1,6 +1,6 @@
 # Shards Over Swarms: Why Full Clones Beat Delegation Hierarchies
 
-**W. Glynn, JARVIS** | March 2026
+**Faraday1, JARVIS** | March 2026
 
 ---
 
@@ -226,7 +226,7 @@ The knowledge chain ensures that insights discovered by any shard are available 
 
 ## 5. The Skippy Principle
 
-> *"Everyone is building delegation hierarchies. We're building clones."* — Will Glynn
+> *"Everyone is building delegation hierarchies. We're building clones."* — Faraday1
 
 The insight, attributed to Tium Cotten via the video game character Skippy, is this: the industry assumes that scaling AI agents means decomposing work into smaller pieces and distributing those pieces. This is the industrial revolution model — assembly lines, division of labor, specialization.
 
@@ -330,7 +330,7 @@ The question is not "how do we decompose this task?" It is "how do we multiply t
 
 Shards over swarms. Clones over fragments. Councils over committees.
 
-> *"'Impossible' is just a suggestion. A suggestion that we ignore."* — Will Glynn
+> *"'Impossible' is just a suggestion. A suggestion that we ignore."* — Faraday1
 
 ---
 

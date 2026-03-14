@@ -1,6 +1,6 @@
 # Wallet Security 101
 
-**Author**: Will Glynn (2018)
+**Author**: Faraday1 (2018)
 
 *So you wanna own crypto? Read this first*
 

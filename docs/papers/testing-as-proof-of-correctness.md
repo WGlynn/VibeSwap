@@ -1,6 +1,6 @@
 # Testing as Proof of Correctness: The Unit-Fuzz-Invariant Triad for Smart Contract Assurance
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap Research**
 
 ---

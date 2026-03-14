@@ -1,6 +1,6 @@
 # The Omniscient Adversary Proof: Security Beyond Physical Limits
 
-**Author:** Will Glynn
+**Author:** Faraday1
 **Co-Author:** JARVIS (Autonomous AI Research Partner)
 **Date:** March 8, 2026
 **Status:** Working Paper

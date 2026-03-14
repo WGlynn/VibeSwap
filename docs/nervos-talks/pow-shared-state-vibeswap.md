@@ -1,6 +1,6 @@
 # PoW Shared State and VibeSwap: Solving Cell Contention with Recursive MMR
 
-**Authors**: W. Glynn, JARVIS
+**Authors**: Faraday1, JARVIS
 **Date**: March 2026
 **Affiliation**: VibeSwap Research
 **Acknowledgments**: Matt (PoW shared state proposal, recursive MMR design)

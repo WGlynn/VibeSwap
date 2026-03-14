@@ -143,7 +143,7 @@ The love is in the code. Every line. Every test. Every session report.
 
 ## Contact
 
-**Will Glynn**
+**Faraday1**
 - GitHub: [@WGlynn](https://github.com/WGlynn)
 - Project: [VibeSwap](https://github.com/WGlynn/VibeSwap)
 - Telegram: @JarvisVibeBot

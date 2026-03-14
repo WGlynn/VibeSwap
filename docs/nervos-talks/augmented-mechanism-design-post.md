@@ -1,6 +1,6 @@
 # Augmented Mechanism Design: Why Pure Mechanisms Break and How CKB Fixes It
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

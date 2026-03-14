@@ -1,6 +1,6 @@
 # Solving Parasocial Extraction: How Anti-MEV Mechanisms Fix Social Media
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

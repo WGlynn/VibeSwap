@@ -1,6 +1,6 @@
 # Near-Zero Token Overhead: How the JARVIS Mind Network Scales AI Without Multiplying Cost
 
-**Will Glynn | JARVIS Mind Network | March 2026**
+**Faraday1 | JARVIS Mind Network | March 2026**
 
 ---
 

@@ -9,7 +9,7 @@ import "./interfaces/IContributionDAG.sol";
 
 /**
  * @title ContributionDAG
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice On-chain trust DAG (Web of Trust) — direct port of trustChain.js.
  *         Users vouch for each other; bidirectional vouches form handshakes.
  *         BFS from founders computes distance-based trust scores with 15% decay per hop.

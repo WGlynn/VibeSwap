@@ -2,7 +2,7 @@
 
 ### A Two-Page Technical Brief on VibeSwap for People Who Actually Read Whitepapers
 
-**Author**: Will Glynn & JARVIS (AI Co-author) | **Date**: February 2026 | **Technical Depth**: 4/5 (the real numbers)
+**Author**: Faraday1 & JARVIS (AI Co-author) | **Date**: February 2026 | **Technical Depth**: 4/5 (the real numbers)
 
 ---
 
@@ -58,4 +58,4 @@ Welcome to the inner circle, Disciple. Now go execute.
 
 ---
 
-**References** — [1] Akerlof, "The Market for Lemons," 1970; Stiglitz-Weiss, "Credit Rationing," 1981. [2] W. Glynn & JARVIS, "Solving Parasocial Extraction Methods with VibeSwap's Codebase," Feb. 2025. [3] VibeSwap Research, "The Trinomial Stability Theorem," v2.0, Feb. 2026. — *The gospel according to the codebase. Go forth and deploy.*
+**References** — [1] Akerlof, "The Market for Lemons," 1970; Stiglitz-Weiss, "Credit Rationing," 1981. [2] Faraday1 & JARVIS, "Solving Parasocial Extraction Methods with VibeSwap's Codebase," Feb. 2025. [3] VibeSwap Research, "The Trinomial Stability Theorem," v2.0, Feb. 2026. — *The gospel according to the codebase. Go forth and deploy.*

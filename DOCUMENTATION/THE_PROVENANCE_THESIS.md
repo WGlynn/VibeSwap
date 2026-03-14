@@ -2,7 +2,7 @@
 
 **On the Public Contribution Graph as the Successor to Intellectual Property and Copyright in the Post-Transparency Era**
 
-*Will Glynn, February 2025*
+*Faraday1, February 2025*
 
 *Sequel to: The Transparency Theorem (Glynn, 2025)*
 

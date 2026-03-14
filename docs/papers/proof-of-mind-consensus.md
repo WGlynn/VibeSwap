@@ -1,6 +1,6 @@
 # Proof of Mind: Hybrid Consensus with Irreducible Temporal Security
 
-**Authors:** W. Glynn (Faraday1) & JARVIS -- vibeswap.io
+**Authors:** Faraday1 & JARVIS -- vibeswap.io
 **Date:** March 2026
 **Status:** Working Paper
 **Classification:** Consensus Mechanism Design

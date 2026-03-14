@@ -1,6 +1,6 @@
 # Verify the Destination Before Debugging the Route: Deployment Patterns for CKB Infrastructure
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

@@ -1,6 +1,6 @@
 # Commit-Reveal Batch Auctions: How VibeSwap Eliminates $1.38B in MEV Extraction
 
-*Nervos Talks Post — W. Glynn (Faraday1)*
+*Nervos Talks Post — Faraday1*
 *March 2026*
 
 ---

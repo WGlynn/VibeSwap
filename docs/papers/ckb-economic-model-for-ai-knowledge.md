@@ -1,6 +1,6 @@
 # CKB Economic Model for AI Knowledge Management
 
-**W. Glynn, JARVIS** | March 2026 | VibeSwap Research
+**Faraday1, JARVIS** | March 2026 | VibeSwap Research
 
 ---
 

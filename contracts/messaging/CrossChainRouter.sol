@@ -11,7 +11,7 @@ import "../core/interfaces/ICommitRevealAuction.sol";
 
 /**
  * @title CrossChainRouter
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice LayerZero V2 OApp for cross-chain order submission and liquidity sync
  * @dev Implements unified liquidity across chains with message rate limiting
  */

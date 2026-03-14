@@ -1,6 +1,6 @@
 # Near-Zero Token Scaling: How Distributed AI Networks Can Scale Without Multiplying Cost
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

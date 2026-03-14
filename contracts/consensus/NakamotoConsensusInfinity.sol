@@ -9,7 +9,7 @@ import "./INakamotoConsensusInfinity.sol";
 
 /**
  * @title NakamotoConsensusInfinity — Three-Dimensional Consensus
- * @author Will Glynn & JARVIS
+ * @author Faraday1 & JARVIS
  * @notice Implements Nakamoto Consensus ∞ (NCI) — the first consensus mechanism
  *         that uses three dimensions of security: Proof of Work (computational),
  *         Proof of Stake (economic), and Proof of Mind (cognitive).

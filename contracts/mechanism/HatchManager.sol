@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title HatchManager
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice Manages the hatch (initialization) phase of an Augmented Bonding Curve.
  *         Founding members ("Hatchers") contribute reserve tokens during a controlled
  *         period. θ% goes to the Funding Pool, (1-θ)% goes to the Reserve Pool.

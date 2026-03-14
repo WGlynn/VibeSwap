@@ -281,7 +281,7 @@ the trajectory.
 
 ## 7. Team
 
-### Will Glynn — Founder & Mechanism Designer
+### Faraday1 — Founder & Mechanism Designer
 - Solo architect of 342-contract system and 401-component frontend
 - Author of mechanism design papers: cooperative capitalism, Shapley rewards, trinomial stability, wallet security fundamentals
 - 1,684+ commits of bootstrapped building

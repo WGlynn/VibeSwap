@@ -9,7 +9,7 @@ import "./interfaces/IContributionDAG.sol";
 
 /**
  * @title AgentRegistry
- * @author W. Glynn (Faraday1) & JARVIS -- vibeswap.org
+ * @author Faraday1 & JARVIS -- vibeswap.org
  * @notice ERC-8004 compatible AI agent registry — PsiNet × VibeSwap identity merge.
  *
  * Humans = SoulboundIdentity (non-transferable, one per address)

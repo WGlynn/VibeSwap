@@ -1,6 +1,6 @@
 # Ungovernance: Hardcoded Governance Decay to Protocol Autonomy
 
-**W. Glynn, JARVIS**
+**Faraday1, JARVIS**
 **March 2026 | VibeSwap**
 
 ---

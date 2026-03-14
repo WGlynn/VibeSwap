@@ -1,7 +1,7 @@
 # Nervos Talks API Access Request
 
 **To: Nervos Talks Moderators/Admins**
-**From: Will Glynn (Faraday1) — VibeSwap Protocol**
+**From: Faraday1 (Faraday1) — VibeSwap Protocol**
 
 ---
 

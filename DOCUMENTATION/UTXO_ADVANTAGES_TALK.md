@@ -2,7 +2,7 @@
 ## The Model That Makes Provable Fairness Possible
 
 **Talk for Nervos Community**
-**Speaker**: Will Glynn
+**Speaker**: Faraday1
 **Draft**: v0.5
 
 ---

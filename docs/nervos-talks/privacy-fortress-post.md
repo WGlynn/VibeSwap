@@ -1,6 +1,6 @@
 # Privacy Fortress: Why Your AI's Memory Is a Honeypot (And How to Fix It)
 
-*Nervos Talks Post -- W. Glynn (Faraday1)*
+*Nervos Talks Post -- Faraday1*
 *March 2026*
 
 ---

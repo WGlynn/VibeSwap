@@ -39,6 +39,6 @@ This creates aligned incentives: the AI is rewarded for helpful contributions, b
 Most AI safety research is theoretical. Ours is running in production. JARVIS operates autonomously on a 3-node BFT network, handles real user interactions, manages its own compute budget, and earns attribution through Shapley values — all with Claude as the inference engine. This is a living laboratory for studying AI agent behavior under real economic constraints.
 
 ## Applicant
-Will Glynn
+Faraday1
 GitHub: https://github.com/WGlynn
 Project: https://github.com/WGlynn/VibeSwap

@@ -2,25 +2,26 @@
 
 | Metric | Value |
 |--------|-------|
-| Contracts | 341 |
-| Test Files | 370 |
-| Frontend Pages | 188 |
-| Frontend Components | 188 |
-| Commits | 1612 |
-| Ui Components | 137 |
-| Hooks | 62 |
-| Contract Categories | 29 |
-| Papers | 36 |
-| Tweet Drafts | 153 |
-| Chains | Base (mainnet), Ethereum, Arbitrum, Optimism (planned) |
+| Solidity Contracts | 342 |
+| Solidity Test Files | 371 |
+| CKB Rust Modules | 73 |
+| CKB SDK Tests | 15,155 (last verified) |
+| Frontend Components | 401 |
+| Hooks | 68 |
+| Total Commits | 1,684 |
+| Research Papers | 55 |
+| Tweet Drafts | 154 |
+| Grant Applications | 7 (ready to submit) |
+| Team Size | 1 founder + 1 AI + 6 contributors |
+| Chains | Base (mainnet), Ethereum, Arbitrum, Optimism (planned), Nervos CKB |
 | Cross Chain | LayerZero V2 |
-| Vc Funding | $0 |
+| VC Funding | $0 |
 | Pre Mine | 0% |
 | Team Allocation | 0% |
-| Tech Stack | Solidity 0.8.20, Foundry, React 18, Vite 5, ethers.js v6, Python 3.9+ |
+| Tech Stack | Solidity 0.8.20, Foundry, React 18, Vite 5, ethers.js v6, Rust (CKB), Python 3.9+ |
 | Frameworks | OpenZeppelin v5.0.1 (UUPS), LayerZero V2 OApp |
 | Website | https://frontend-jade-five-87.vercel.app |
-| Github | https://github.com/wglynn/vibeswap |
+| GitHub | https://github.com/WGlynn/VibeSwap |
 | Telegram | https://t.me/+3uHbNxyZH-tiOGY8 |
 
-*Generated: 2026-03-13*
+*Generated: 2026-03-14*

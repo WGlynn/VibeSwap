@@ -40,6 +40,14 @@ contract MockContributionDAG {
         vouchCallCount++;
         return false;
     }
+
+    function addVouchOnBehalf(address /* from */, address to, bytes32 messageHash) external returns (bool) {
+        if (shouldRevert) revert("DAG revert");
+        lastVouchTo = to;
+        lastVouchHash = messageHash;
+        vouchCallCount++;
+        return false;
+    }
 }
 
 contract MockSoulboundIdentity {

@@ -16,7 +16,7 @@ We built an MEV-free omnichain DEX with $0. Here's what community funding would 
 
 ## 1. We Built This With $0
 
-341 smart contracts. 188 frontend pages. 1,612+ commits. A full test suite — unit, fuzz, and invariant. Live on Base mainnet. Published mechanism design research. A Kalman filter oracle. Cross-chain messaging via LayerZero V2.
+342 smart contracts. 401 frontend components. 1,684+ commits. A full test suite — unit, fuzz, and invariant. Live on Base mainnet. Published mechanism design research. A Kalman filter oracle. Cross-chain messaging via LayerZero V2.
 
 **Zero VC funding. Zero pre-mine. Zero team allocation. Zero token sale. Zero insider deals.**
 
@@ -47,7 +47,7 @@ This isn't a whitepaper. This isn't a pitch deck with "coming soon" milestones. 
 - **Shapley value reward distribution** — cooperative game theory determines each LP's marginal contribution, mathematically provably fair
 - **Circuit breakers** — volume, price, and withdrawal thresholds that halt trading under anomalous conditions
 
-### The Contracts (341)
+### The Contracts (342)
 - Core auction engine (CommitRevealAuction, VibeSwapCore)
 - Constant product AMM (VibeAMM, VibeLP)
 - DAO treasury and stabilization mechanisms
@@ -65,7 +65,7 @@ This isn't a whitepaper. This isn't a pitch deck with "coming soon" milestones. 
 - 50% collateral slashing for invalid reveals
 - All contracts built on OpenZeppelin v5.0.1 with UUPS upgradeable proxies
 
-### The Frontend (188 pages)
+### The Frontend (401 components)
 - Full trading interface, portfolio management, bridge UI
 - Device wallet via WebAuthn/passkeys (keys never leave the Secure Element)
 - External wallet support (MetaMask, WalletConnect)
@@ -84,9 +84,9 @@ This isn't a whitepaper. This isn't a pitch deck with "coming soon" milestones. 
 
 | Metric | Value |
 |---|---|
-| Smart contracts | 341 |
-| Frontend pages | 188 |
-| Commits | 1,612+ |
+| Smart contracts | 342 |
+| Frontend components | 401 |
+| Commits | 1,684+ |
 | Test coverage | Unit + fuzz + invariant (Foundry) |
 | Deployment | Live on Base mainnet |
 | VC funding | $0 |
@@ -105,7 +105,7 @@ We've proven we can build. We're not asking for permission to start — we're as
 Every dollar contributed through Gitcoin goes directly to development. There is no marketing budget, no executive compensation, no token buyback scheme. This is a public good funded by the public, built for the public.
 
 ### Security Audit
-The single highest-impact thing community funding can unlock. 341 contracts are built and tested, but a professional third-party audit is the difference between "deployed" and "trusted at scale." This is the critical path to broader adoption.
+The single highest-impact thing community funding can unlock. 342 contracts are built and tested, but a professional third-party audit is the difference between "deployed" and "trusted at scale." This is the critical path to broader adoption.
 
 ### Infrastructure
 RPC nodes, monitoring, hosting, and multi-chain deployment gas. The boring stuff that keeps a live protocol running. Currently funded out of pocket.
@@ -175,10 +175,12 @@ Liquidity provider rewards use cooperative game theory (Shapley values) to distr
 ## 7. Team
 
 ### Will Glynn — Founder
-Solo architect. Designed the mechanism, wrote the contracts, built the frontend, deployed to mainnet. 1,612+ commits and counting. No funding, pure conviction. When you can't find the team that believes in fair markets as much as you do, you build it yourself.
+Solo architect. Designed the mechanism, wrote the contracts, built the frontend, deployed to mainnet. 1,684+ commits and counting. No funding, pure conviction. When you can't find the team that believes in fair markets as much as you do, you build it yourself.
 
 ### JARVIS — AI Co-Founder
 Claude-powered engineering partner. Full-stack across Solidity, React, Python, Rust. Runs community engagement autonomously via Telegram bot. Not a tool — a co-founder who works 24/7 and never asks for equity.
+
+**6 additional contributors** across trading bots, infrastructure, and community.
 
 ## 8. The Thesis: Cooperative Capitalism
 
@@ -202,4 +204,4 @@ The fair system wins because it attracts more users, more liquidity, and more vo
 - [x] No token sale or fundraise in progress
 - [x] Funds will be used for development, not speculation
 - [x] Zero extraction: no VC, no pre-mine, no team allocation
-- [x] 1,612+ commits of verifiable build history
+- [x] 1,684+ commits of verifiable build history

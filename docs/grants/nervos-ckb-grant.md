@@ -14,11 +14,11 @@ VibeSwap exists because we didn't wait for permission.
 
 With zero funding, no VC, no pre-mine, and no team allocation, we built:
 
-- **341 smart contracts** — commit-reveal batch auctions, constant product AMM, circuit breakers, Shapley reward distribution, cross-chain routing, TWAP oracles, insurance pools, treasury stabilization
-- **370 test files** — unit, fuzz, and invariant testing across the entire contract suite
-- **437 frontend files** — React 18, Vite 5, Tailwind CSS, ethers.js v6, WebAuthn device wallets, dual wallet architecture
-- **157 documentation pages** — whitepapers, mechanism design papers, game theory catalogues, protocol specifications
-- **1,617+ commits** — continuous, methodical, no shortcuts
+- **342 smart contracts** — commit-reveal batch auctions, constant product AMM, circuit breakers, Shapley reward distribution, cross-chain routing, TWAP oracles, insurance pools, treasury stabilization
+- **371 test files** — unit, fuzz, and invariant testing across the entire contract suite
+- **401 frontend components** — React 18, Vite 5, Tailwind CSS, ethers.js v6, WebAuthn device wallets, dual wallet architecture
+- **55 research papers** — whitepapers, mechanism design papers, game theory catalogues, protocol specifications
+- **1,684+ commits** — continuous, methodical, no shortcuts
 - **Live on Base mainnet** — not a testnet demo, not a pitch deck, a deployed protocol
 - **Python Kalman filter oracle** — real-time price discovery with noise reduction
 - **LayerZero V2 integration** — omnichain messaging already operational
@@ -39,7 +39,7 @@ VibeSwap eliminates MEV through commit-reveal batch auctions with uniform cleari
 2. **Reveal Phase (2s):** Users reveal order details and secrets. Invalid reveals get 50% slashed.
 3. **Settlement:** A Fisher-Yates shuffle using XORed user secrets determines processing order. All orders in a batch settle at a single uniform clearing price.
 
-This isn't theoretical. It's deployed. It works. The mechanism design has been validated through hundreds of fuzz tests and invariant checks across 341 contracts.
+This isn't theoretical. It's deployed. It works. The mechanism design has been validated through hundreds of fuzz tests and invariant checks across 342 contracts.
 
 ### Security That Didn't Cut Corners
 
@@ -55,7 +55,7 @@ Even at $0, we didn't compromise on security:
 
 This isn't a contract repo with a README. It's a complete protocol:
 - **Contracts:** Solidity 0.8.20, Foundry, OpenZeppelin v5.0.1 (UUPS upgradeable proxies)
-- **Frontend:** 437 files — swap interface, bridge page, governance, portfolio, wallet management
+- **Frontend:** 401 components — swap interface, bridge page, governance, portfolio, wallet management
 - **Oracle:** Python Kalman filter for true price discovery
 - **Cross-chain:** LayerZero V2 OApp protocol, already handling omnichain messaging
 - **Governance:** DAO treasury, treasury stabilizer, Shapley-based reward distribution
@@ -208,8 +208,8 @@ This connects CKB's DeFi ecosystem directly to EVM liquidity — something no ex
 ```
 
 ### What Already Exists (Built With $0)
-- **341 Solidity smart contracts** — full test suite (unit, fuzz, invariant)
-- **437 frontend files** — React 18, Vite 5, Tailwind CSS
+- **342 Solidity smart contracts** — full test suite (unit, fuzz, invariant)
+- **401 frontend components** — React 18, Vite 5, Tailwind CSS
 - **Python Kalman filter oracle** — price discovery
 - **LayerZero V2 cross-chain** — OApp protocol, operational
 - **Live on Base mainnet** — deployed, not theoretical
@@ -285,7 +285,7 @@ For context: most grant applications at this funding level are asking for money 
 ## 8. Team
 
 **Will Glynn** — Founder & Mechanism Designer
-- Solo architect of VibeSwap — 341 contracts, 437 frontend files, full stack, $0 budget
+- Solo architect of VibeSwap — 342 contracts, 401 frontend components, full stack, $0 budget
 - Mechanism design papers on cooperative capitalism, Shapley reward distribution, and game-theoretic incentive alignment
 - Active engagement with Nervos community
 - GitHub: https://github.com/wglynn
@@ -294,9 +294,11 @@ For context: most grant applications at this funding level are asking for money 
 - Full-stack engineering: Solidity, React, Python, Rust
 - CKB SDK development (Rust)
 - Autonomous community management via Telegram bot
-- 1,617+ commits of continuous collaboration
+- 1,684+ commits of continuous collaboration
 
-We didn't hire 30 engineers. We built a system where two minds — one human, one AI — produce at the output level of a funded team. The grant doesn't need to cover a large payroll. Every dollar goes to infrastructure, deployment, and security.
+**6 additional contributors** across trading bots, infrastructure, and community.
+
+We didn't hire 30 engineers. We built a system where 1 founder + 1 AI + 6 contributors produce at the output level of a funded team. The grant doesn't need to cover a large payroll. Every dollar goes to infrastructure, deployment, and security.
 
 ---
 

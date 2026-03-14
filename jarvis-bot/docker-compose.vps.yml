@@ -103,7 +103,8 @@ services:
     ports:
       - "8080:8080"   # Exposed to host — Caddy reverse proxies from 443 → localhost:8080
     environment:
-      # Telegram
+      # Telegram — token for initData validation in web-api, NOT for polling
+      # Fly.io is the primary TG bot. VPS runs as worker (no TG polling).
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - BOT_USERNAME=${BOT_USERNAME:-JarvisMind1828383bot}
       - OWNER_USER_ID=${OWNER_USER_ID:-8366932263}
@@ -139,12 +140,14 @@ services:
       - ENCRYPTION_ENABLED=true
       # Network
       - HEALTH_PORT=8080
-      - SHARD_ID=shard-0
-      - SHARD_MODE=primary
-      - TOTAL_SHARDS=${TOTAL_SHARDS:-2}
+      - SHARD_ID=vps-shard-0
+      - SHARD_MODE=worker
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
       - NODE_TYPE=full
-      - ROUTER_URL=http://shard-0:8080
+      - ROUTER_URL=${ROUTER_URL:-https://jarvis-vibeswap.fly.dev}
       - SHARD_SECRET=${SHARD_SECRET:-}
+      # Fly.io primary peer seed for router-independent discovery
+      - PEER_SEEDS=https://jarvis-vibeswap.fly.dev
       # Web
       - WEB_CORS_ORIGINS=${WEB_CORS_ORIGINS:-https://frontend-jade-five-87.vercel.app,http://localhost:3000}
       - CLAUDE_CODE_API_SECRET=${CLAUDE_CODE_API_SECRET:-}
@@ -186,12 +189,13 @@ services:
       - ENCRYPTION_ENABLED=true
       - HEALTH_PORT=8080
       # Network — NO TELEGRAM = auto worker mode
-      - SHARD_ID=shard-1
+      - SHARD_ID=vps-shard-1
       - SHARD_MODE=worker
-      - TOTAL_SHARDS=${TOTAL_SHARDS:-2}
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-3}
       - NODE_TYPE=full
-      - ROUTER_URL=http://shard-0:8080
+      - ROUTER_URL=${ROUTER_URL:-https://jarvis-vibeswap.fly.dev}
       - SHARD_SECRET=${SHARD_SECRET:-}
+      - PEER_SEEDS=https://jarvis-vibeswap.fly.dev
     volumes:
       - shard1-data:/app/data
     networks:

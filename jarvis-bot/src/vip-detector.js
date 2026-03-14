@@ -156,9 +156,13 @@ export async function reportSuggestion(bot, ctx) {
   const formatted = await formatAsVIP(text, username, chatTitle);
   if (!formatted) return false;
 
-  // Assign next VIP number
+  // Assign next VIP number — must NEVER conflict with existing VIPs
+  // VIP-0 and VIP-1 are reserved (process doc + co-admin). Track highest assigned.
   await loadSuggestions();
-  const vipNumber = String(suggestions.length + 2).padStart(24, '0'); // +2 because VIP-0 and VIP-1 exist
+  const existingNumbers = suggestions.map(s => parseInt(s.vipNumber, 10)).filter(n => !isNaN(n));
+  const highestExisting = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 1;
+  const nextNumber = Math.max(highestExisting + 1, 2); // Never below 2 (0 and 1 are reserved)
+  const vipNumber = String(nextNumber).padStart(24, '0');
 
   const suggestion = {
     vipNumber,

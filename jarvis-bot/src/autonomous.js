@@ -383,8 +383,7 @@ async function generateMarketComment(event) {
 - "SOL down 5% — is anyone actually still building there or just trading?"`;
 
     const response = await llmChat({
-      _background: true, // Isolated circuit breaker — can't poison user-facing cascade
-      model: 'claude-haiku-4-5-20251001',
+      _background: true, // Let Wardenclyffe route to best available — Haiku was too weak for personality
       max_tokens: 150,
       system: `${getPersonaSystemPrompt()} You just noticed a price move. React in 1 sentence and end with a question or challenge aimed at the reader. Never say "I noticed" or "It appears that." ${examples}`,
       messages: [{
@@ -438,8 +437,7 @@ async function generateImpulse(chatId) {
     };
 
     const response = await llmChat({
-      _background: true, // Isolated circuit breaker — can't poison user-facing cascade
-      model: 'claude-haiku-4-5-20251001',
+      _background: true, // Let Wardenclyffe route to best available — Haiku was too weak for personality
       max_tokens: 150,
       system: getPersonaSystemPrompt(),
       messages: [{
@@ -494,8 +492,7 @@ async function generateBoredomMessage(chatId, silenceMs) {
     const prompt = boredomPrompts[Math.floor(Math.random() * boredomPrompts.length)];
 
     const response = await llmChat({
-      _background: true, // Isolated circuit breaker — can't poison user-facing cascade
-      model: 'claude-haiku-4-5-20251001',
+      _background: true, // Let Wardenclyffe route to best available — Haiku was too weak for personality
       max_tokens: 150,
       system: getPersonaSystemPrompt(),
       messages: [{

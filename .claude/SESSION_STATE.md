@@ -28,6 +28,9 @@
 - Main bot was suspended on Fly — restarted
 - DAOTreasury tests: guardian setup fix (6 tests)
 - ContributionDAG tests: custom error expectations (5 tests)
+- **TDZ crash bug**: memehunter catch block used `stubFn` before its const definition → ReferenceError on import failure
+- **Calculator eval hardening**: blocked prototype/constructor access patterns in `new Function()` call
+- **Duplicate getLeaderboard import**: aliased mining version to avoid SyntaxError crash
 
 **Tests Added:**
 - 13 TWAP fuzz edge case tests (underflow, stale data, identical timestamps, uint224 wrapping)
@@ -47,7 +50,12 @@
 - Orphan jarvis-bot container cleaned up
 - Caddy log permissions fixed (chown caddy:caddy /var/log/caddy)
 
-**Commits:** 14a7e36, fcd587e, 262c861, 5b645bb, e650aab, 4480132, 89ae101, 17bc55d, 9181022, 79a16ce, c2d41c4, 76d97f3, 089ce35, 65ea3db, 8e02b16, 0402bb4, 414546d + agent commits
+**Verified:**
+- Rust SDK: 15,155 tests — ALL PASSING (0 failed, 1610s runtime)
+- Fly.io: 12/12 modules, 0 failures, polling OK
+- VPS: worker mode healthy, Caddy + security headers active
+
+**Commits:** 14a7e36, fcd587e, 262c861, 5b645bb, e650aab, 4480132, 89ae101, 17bc55d, 9181022, 79a16ce, c2d41c4, 76d97f3, 089ce35, 65ea3db, 8e02b16, 0402bb4, 414546d, ea7a7e5, b427479 + agent commits
 
 **Pending for Will:**
 - Verify SHARD_SECRET matches between Fly.io and VPS (consensus HMAC rejections)

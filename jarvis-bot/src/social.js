@@ -286,7 +286,7 @@ async function postGitHubComment(issueNumber, body) {
   }
 }
 
-async function createGitHubIssue(title, body, labels = []) {
+export async function createGitHubIssue(title, body, labels = []) {
   const creds = state.credentials.github
   if (!creds) return { error: 'GitHub not configured.' }
 

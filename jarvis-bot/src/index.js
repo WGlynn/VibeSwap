@@ -309,7 +309,7 @@ import { initStickers, textToSticker, imageToSticker, imageWithText, addToSticke
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
 import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo, getUserTier, checkTieredBudget } from './compute-economics.js';
-import { initMining, flushMining, getMiningStats, getLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner, getTotalSupply, getEscapeVelocity, getHashCostIndex } from './mining.js';
+import { initMining, flushMining, getMiningStats, getLeaderboard as getMiningLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner, getTotalSupply, getEscapeVelocity, getHashCostIndex } from './mining.js';
 import { initInfoFi, shutdownInfoFi } from './infofi.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
@@ -1115,7 +1115,7 @@ bot.command('supply', async (ctx) => {
 
 // /leaderboard — Top JUL miners
 bot.command('leaderboard', async (ctx) => {
-  const lb = getLeaderboard(10);
+  const lb = getMiningLeaderboard(10);
   if (lb.leaderboard.length === 0) {
     return ctx.reply('No miners yet. Start mining with /mine or at vibeswap.io');
   }
@@ -4269,7 +4269,7 @@ bot.command('economy', async (ctx) => {
   if (!isOwner(ctx)) return ownerOnly(ctx);
 
   const compute = getComputeStats(null);
-  const mining = getLeaderboard(5);
+  const mining = getMiningLeaderboard(5);
   const treasury = getTreasuryStats();
   const pricing = getPricingInfo();
 

@@ -5,7 +5,46 @@
 
 ---
 
-## CURRENT (Session 064 — Mar 11, 2026)
+## CURRENT (Session 065 — Mar 13-14, 2026)
+
+### Delta from Session 064
+**Full Autonomy Sprint — Bot Infrastructure + Fixes + Community Seeding**
+
+**Deployed:**
+- Chatterbox bot — separate Fly app (`chatterbox-vibeswap`), specialist shard for flow control
+  - Throttles users AND Jarvis bots. `/cb_bot`, `/cb_botgeneric` for bot message control.
+- Broadcast engine wired — `/broadcast on|off|generate|now`, autopilot every 2h
+- VIP auto-creates GitHub Issue on `/vip_accept` with contributor credit
+- Twitter search monitoring — proactive.js queries mentions, notifies owner
+- Autonomous messages upgraded — Wardenclyffe routing instead of Haiku hard-pin
+- Wardenclyffe funding cascade warning — directs to @WillGlynn for funding
+- `/quality` command — shows current intelligence tier + funding info
+- Generic bait filter wired — GENERIC_BAIT_PATTERNS blocks low-effort engagement
+- Frontend redeployed to Vercel with marketplace tab
+
+**Fixed:**
+- TWAP oracle: 4 distinct fixes (underflow guard, stale data check, unchecked wrapping, oracle update ordering)
+- VIP numbering: never-conflict guarantee (tracks highest assigned number, reserves VIP-0 and VIP-1)
+- Main bot was suspended on Fly — restarted
+- DAOTreasury tests: guardian setup fix (6 tests)
+- ContributionDAG tests: custom error expectations (5 tests)
+
+**Tests Added:**
+- 13 TWAP fuzz edge case tests (underflow, stale data, identical timestamps, uint224 wrapping)
+
+**Community:**
+- GitHub Discussion #1 seeded with 2 primitive spotlights (commit-reveal, Shapley values)
+- GitHub Discussion #2 created — VIP Ideas submission guide
+- GitHub Discussion #3 created — Wardenclyffe compute economics explainer
+
+**Commits:** 14a7e36, fcd587e, 262c861, 5b645bb, e650aab, 4480132, 89ae101, 17bc55d, 9181022, 79a16ce + agent commits
+
+**Still Running:**
+- Test fix agent (DonationAttack x3 + AgentRegistry x1)
+
+---
+
+## PREVIOUS (Session 064 — Mar 11, 2026)
 
 ### Delta from Session 063
 **16 New Modules + Massive Hardening — 10,156+ Tests, 56 Modules**

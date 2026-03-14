@@ -131,8 +131,10 @@ import { pushGroupMessage, getGroupContext, getRecentContext, getGroupContextSta
 import { getAlphaReport, compareTokens, getCurrentNarrative } from './tools-alpha.js';
 import { scanNewTokens, getNewPairs, getHotTokens, dexSearch, getPairDetails } from './tools-scanner.js';
 // Memecoin Hunter — composite scoring + background monitor + human-in-the-loop trading
+// NOTE: stubFn is defined later (line ~201), so use inline stubs here to avoid TDZ ReferenceError
 let huntMemecoins, getMemeScore, startMemeMonitor, stopMemeMonitor, getMonitorStatus_Meme;
 let handleMemeCallback, getPendingApprovals, alertHuman_mh;
+const _mhStub = (name) => async () => `${name}: module not loaded. Bot is recovering.`;
 try {
   const mh = await import('./tools-memehunter.js');
   huntMemecoins = mh.huntMemecoins;
@@ -147,9 +149,9 @@ try {
 } catch (err) {
   console.error(`[jarvis] tools-memehunter.js FAILED: ${err.message}`);
   registerModule('memehunter', false, err.message);
-  huntMemecoins = stubFn('hunt'); getMemeScore = stubFn('score');
-  startMemeMonitor = stubFn('mememonitor'); stopMemeMonitor = stubFn('memestop');
-  getMonitorStatus_Meme = stubFn('memestatus');
+  huntMemecoins = _mhStub('hunt'); getMemeScore = _mhStub('score');
+  startMemeMonitor = _mhStub('mememonitor'); stopMemeMonitor = _mhStub('memestop');
+  getMonitorStatus_Meme = _mhStub('memestatus');
   handleMemeCallback = async () => 'Module not loaded.';
   getPendingApprovals = () => 'Module not loaded.';
   alertHuman_mh = async () => null;

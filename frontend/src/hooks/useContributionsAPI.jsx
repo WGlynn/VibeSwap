@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://46-225-173-213.sslip.io'
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
 
 /**
  * Hook to fetch real contribution data from the Jarvis attribution graph.

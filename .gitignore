@@ -49,3 +49,4 @@ __pycache__/
 
 # TLS certificates (NEVER commit)
 *.pem
+.cold-wallet

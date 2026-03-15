@@ -25,7 +25,10 @@ const TOKEN_NAMES = {
   OP: 'Optimism', BASE: 'Base',
 }
 
-// ============ Mock Data ============
+// ============ Token Symbols for Portfolio ============
+const PORTFOLIO_SYMBOLS = ['ETH', 'BTC', 'JUL', 'USDC', 'SOL', 'AVAX', 'MATIC', 'ARB', 'OP', 'BASE']
+
+// Mock data for demo mode only (no wallet connected)
 const MOCK_HOLDINGS = [
   { symbol: 'ETH',   amount: 3.247,  price: 3412.50,  change24h: 2.34 },
   { symbol: 'BTC',   amount: 0.1854, price: 67891.00, change24h: 1.12 },
@@ -262,8 +265,20 @@ export default function PortfolioDashboard() {
   const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
   const shortAddress = externalShortAddress || deviceShortAddress
+  const { getBalance } = useBalances()
+  const { getPrice, getChange } = usePriceFeed(PORTFOLIO_SYMBOLS)
 
-  const holdings = MOCK_HOLDINGS
+  // Use real balances when wallet connected, mock data when not (demo mode)
+  const holdings = useMemo(() => {
+    if (!isConnected) return MOCK_HOLDINGS
+    return PORTFOLIO_SYMBOLS.map(symbol => ({
+      symbol,
+      amount: getBalance(symbol),
+      price: getPrice(symbol),
+      change24h: getChange(symbol),
+    })).filter(h => h.amount > 0) // Only show tokens with a balance
+  }, [isConnected, getBalance, getPrice, getChange])
+
   const totalValue = useMemo(() => holdings.reduce((s, h) => s + h.amount * h.price, 0), [holdings])
   const change24h = useMemo(() => {
     if (totalValue === 0) return 0

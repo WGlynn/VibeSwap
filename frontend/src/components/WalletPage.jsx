@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useBalances } from '../hooks/useBalances'
+import { usePriceFeed } from '../hooks/usePriceFeed'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
@@ -24,11 +26,21 @@ const cardV = {
   visible: (i) => ({ opacity: 1, y: 0, transition: { duration: 0.4, delay: 0.1 + i * (0.06 * PHI), ease } }),
 }
 
-// ============ Mock Data ============
+// ============ Token Metadata ============
 
 const rng = seededRandom(7742)
 
-const TOKENS = [
+const TOKEN_META = [
+  { symbol: 'ETH', name: 'Ethereum', color: '#627eea' },
+  { symbol: 'USDC', name: 'USD Coin', color: '#2775ca' },
+  { symbol: 'USDT', name: 'Tether', color: '#4ea8a6' },
+  { symbol: 'WBTC', name: 'Wrapped BTC', color: '#f7931a' },
+  { symbol: 'ARB', name: 'Arbitrum', color: '#28a0f0' },
+  { symbol: 'OP', name: 'Optimism', color: '#ff0420' },
+]
+
+// Mock data for demo mode only (no wallet connected)
+const MOCK_TOKENS = [
   { symbol: 'ETH', name: 'Ethereum', balance: 4.2847, usd: 14996.45, change: 2.4, color: '#627eea' },
   { symbol: 'USDC', name: 'USD Coin', balance: 12450.0, usd: 12450.0, change: 0.01, color: '#2775ca' },
   { symbol: 'VIBE', name: 'VibeSwap', balance: 85000, usd: 4250.0, change: 8.7, color: '#06b6d4' },
@@ -127,14 +139,29 @@ function AllocationBar({ tokens }) {
 
 export default function WalletPage() {
   const { isConnected: isExternalConnected, address } = useWallet()
-  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const { getBalance, isLoading: balancesLoading } = useBalances()
+  const { getPrice, getChange } = usePriceFeed(['ETH', 'USDC', 'USDT', 'WBTC', 'ARB', 'OP'])
 
   const [txFilter, setTxFilter] = useState('all')
   const [showAllTokens, setShowAllTokens] = useState(false)
 
-  const displayAddress = address || '0x7f3a...b4c2'
-  const totalBalance = useMemo(() => TOKENS.reduce((s, t) => s + t.usd, 0), [])
+  const displayAddress = address || deviceAddress || '0x7f3a...b4c2'
+
+  // Build token list from real balances when wallet connected, mock when not
+  const TOKENS = useMemo(() => {
+    if (!isConnected) return MOCK_TOKENS
+    return TOKEN_META.map(meta => {
+      const balance = getBalance(meta.symbol)
+      const price = getPrice(meta.symbol)
+      const usd = balance * price
+      const change = getChange(meta.symbol)
+      return { ...meta, balance, usd, change }
+    }).filter(t => t.balance > 0 || t.symbol === 'ETH') // Always show ETH, hide zero-balance tokens
+  }, [isConnected, getBalance, getPrice, getChange])
+
+  const totalBalance = useMemo(() => TOKENS.reduce((s, t) => s + t.usd, 0), [TOKENS])
   const filteredTx = txFilter === 'all' ? TRANSACTIONS : TRANSACTIONS.filter((t) => t.type.toLowerCase() === txFilter)
   const visibleTokens = showAllTokens ? TOKENS : TOKENS.slice(0, 5)
 

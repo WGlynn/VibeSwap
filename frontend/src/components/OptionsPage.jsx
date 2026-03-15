@@ -413,7 +413,7 @@ export default function OptionsPage() {
     { label: 'Total Volume', value: '$48.2M', sub: '24h', color: CYAN },
     { label: 'Open Interest', value: '$124.6M', sub: 'All chains', color: '#10b981' },
     { label: 'Active Options', value: '3,847', sub: 'Live contracts', color: '#a855f7' },
-    { label: 'Your Positions', value: isConnected ? '3' : '--', sub: isConnected ? 'Open' : 'Connect', color: '#fbbf24' },
+    { label: 'Your Positions', value: isConnected ? '0' : '--', sub: isConnected ? 'None' : 'Connect', color: '#fbbf24' },
   ]
 
   // ============ Not Connected ============
@@ -599,7 +599,10 @@ export default function OptionsPage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_POSITIONS.map(pos => {
+              {isConnected && (
+                <tr><td colSpan="7" className="py-6 text-center text-black-500 text-sm font-mono">No open positions</td></tr>
+              )}
+              {(isConnected ? [] : MOCK_POSITIONS).map(pos => {
                 const itm = pos.type === 'Call' ? CURRENT_PRICE > pos.strike : CURRENT_PRICE < pos.strike
                 return (
                   <tr key={pos.id} className="border-b border-black-800 hover:bg-black-800/50">

@@ -12,6 +12,7 @@ import { BatchProvider } from './hooks/useBatchState'
 import { IncentivesProvider } from './hooks/useIncentives'
 import { TransactionsProvider } from './hooks/useTransactions'
 import { ThemeProvider } from './hooks/useTheme'
+import { PreferencesProvider } from './hooks/usePreferences'
 import { validateEnvironment } from './utils/envValidation'
 import { initErrorReporting, reportWebVitals } from './utils/webVitals'
 import './index.css'
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeProvider>
+      <PreferencesProvider>
       <WalletProvider>
         <DeviceWalletProvider>
           <CKBWalletProvider>
@@ -69,6 +71,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           </CKBWalletProvider>
         </DeviceWalletProvider>
       </WalletProvider>
+      </PreferencesProvider>
       </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,

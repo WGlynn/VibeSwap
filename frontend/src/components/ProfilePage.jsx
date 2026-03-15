@@ -197,16 +197,19 @@ function NotConnectedState() {
 // ============ Main Component ============
 
 export default function ProfilePage() {
-  const { isConnected: isExternalConnected } = useWallet()
-  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const { isConnected: isExternalConnected, shortAddress: externalShortAddress, account: externalAddress } = useWallet()
+  const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress, address: deviceAddress } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+
+  const fullAddress = externalAddress || deviceAddress || MOCK_FULL_ADDRESS
+  const shortAddr = externalShortAddress || deviceShortAddress || MOCK_ADDRESS
 
   const [copied, setCopied] = useState(false)
   const [showExportConfirm, setShowExportConfirm] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
 
   const handleCopyAddress = () => {
-    navigator.clipboard?.writeText(MOCK_FULL_ADDRESS)
+    navigator.clipboard?.writeText(fullAddress)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -254,13 +257,13 @@ export default function ProfilePage() {
               {/* Identity info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-bold font-mono text-white truncate">{MOCK_ENS}</h3>
+                  <h3 className="text-lg font-bold font-mono text-white truncate">{shortAddr}</h3>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
                     ENS
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-mono text-black-400 truncate">{MOCK_ADDRESS}</span>
+                  <span className="text-sm font-mono text-black-400 truncate">{shortAddr}</span>
                   <motion.button
                     onClick={handleCopyAddress}
                     whileTap={{ scale: 0.9 }}
@@ -270,7 +273,7 @@ export default function ProfilePage() {
                   </motion.button>
                 </div>
                 <p className="text-[11px] font-mono text-black-500">
-                  Member since {MOCK_MEMBER_SINCE}
+                  Member since connecting
                 </p>
               </div>
             </div>

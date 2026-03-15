@@ -153,7 +153,7 @@ export default function LimitOrderPage() {
   const [expiry, setExpiry] = useState(EXPIRY_OPTIONS[1])
   const [showPairDD, setShowPairDD] = useState(false)
   const [marketPrice, setMarketPrice] = useState(selectedPair.basePrice)
-  const [openOrders, setOpenOrders] = useState(MOCK_OPEN_ORDERS)
+  const [openOrders, setOpenOrders] = useState(isConnected ? [] : MOCK_OPEN_ORDERS)
   const [tab, setTab] = useState('order')
 
   // ---- Simulated live price ----
@@ -643,7 +643,8 @@ export default function LimitOrderPage() {
           <motion.div key="history" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.18 }}>
             <div className="space-y-2">
-              {MOCK_HISTORY.map((h, i) => {
+              {isConnected && <div className="text-center py-6 text-black-500 text-sm font-mono">No order history yet</div>}
+              {(isConnected ? [] : MOCK_HISTORY).map((h, i) => {
                 const statusColors = {
                   Filled:    'bg-green-500/10 text-green-400 border-green-500/20',
                   Cancelled: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',

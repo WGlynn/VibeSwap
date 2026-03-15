@@ -297,32 +297,18 @@ export function DeviceWalletProvider({ children }) {
     }
   }, [authenticate])
 
-  // Sign in to a stored wallet (requires biometric auth)
-  const signIn = useCallback(async () => {
-    if (!hasStoredWallet) {
+  // Sign in to a stored wallet — just loads address from localStorage (instant)
+  // Biometric auth is only required when signing transactions, not for viewing
+  const signIn = useCallback(() => {
+    if (!hasStoredWallet || !storedAddress) {
       setError('No stored wallet found')
       return null
     }
 
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const wallet = await authenticate()
-      if (wallet) {
-        setAddress(wallet.address)
-        setIsConnected(true)
-        setIsLoading(false)
-        return { address: wallet.address }
-      }
-      throw new Error('Authentication failed')
-    } catch (err) {
-      console.error('Failed to sign in:', err)
-      setError(err.message || 'Failed to sign in')
-      setIsLoading(false)
-      return null
-    }
-  }, [hasStoredWallet, authenticate])
+    setAddress(storedAddress)
+    setIsConnected(true)
+    return { address: storedAddress }
+  }, [hasStoredWallet, storedAddress])
 
   // Disconnect (remove stored wallet)
   const disconnect = useCallback(() => {

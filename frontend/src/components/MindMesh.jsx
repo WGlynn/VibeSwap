@@ -5,6 +5,7 @@ import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useMindMesh } from '../hooks/useMindMesh'
 
 // ============================================================
 // MindMesh — Distributed AI Consciousness Network
@@ -413,6 +414,12 @@ export default function MindMesh() {
   const { isConnected: isExternalConnected } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const { mesh: liveMesh, latency } = useMindMesh()
+
+  // Derive live stats from real mesh data
+  const liveCells = liveMesh?.cells || []
+  const onlineCount = liveCells.filter(c => c.status === 'interlinked' || c.status === 'active').length
+  const meshStatus = liveMesh?.status || 'disconnected'
 
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [feedMessages, setFeedMessages] = useState([])
@@ -491,11 +498,40 @@ export default function MindMesh() {
       />
 
       {/* ============ Stats Row ============ */}
+      {/* Live Status — real data from Jarvis mesh API */}
+      <motion.div variants={itemVariants} className="mb-4">
+        <GlassCard className="p-4" hover={false}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full ${meshStatus === 'fully-interlinked' ? 'bg-green-500 animate-pulse' : meshStatus === 'partial' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-sm font-mono text-white font-bold">
+                {meshStatus === 'fully-interlinked' ? 'FULLY INTERLINKED' : meshStatus === 'partial' ? 'PARTIAL MESH' : 'DISCONNECTED'}
+              </span>
+              <span className="text-xs font-mono text-black-500">
+                {onlineCount}/{liveCells.length} cells online
+              </span>
+            </div>
+            {latency && <span className="text-xs font-mono text-black-400">{latency}ms</span>}
+          </div>
+          {liveCells.length > 0 && (
+            <div className="flex gap-3 mt-3">
+              {liveCells.map(cell => (
+                <div key={cell.id} className="flex items-center gap-1.5 text-xs font-mono">
+                  <div className={`w-1.5 h-1.5 rounded-full ${cell.status === 'interlinked' || cell.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-black-300">{cell.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </motion.div>
+
+      {/* Pantheon Architecture — aspirational 10-node network */}
       <motion.div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" variants={itemVariants}>
-        <StatCard label="Active Nodes"      value={MESH_NODES.length} decimals={0} suffix=""       sparkSeed={42}  change={8.33} />
-        <StatCard label="Consensus Rate"    value={99.94}             decimals={2} suffix="%"      sparkSeed={137} change={0.12} />
-        <StatCard label="Network Bandwidth" value={847}               decimals={0} suffix=" MB/s"  sparkSeed={256} change={14.7} />
-        <StatCard label="Shard Count"       value={MESH_NODES.length} decimals={0} suffix=" shards" sparkSeed={314} change={25.0} />
+        <StatCard label="Pantheon Nodes"    value={MESH_NODES.length} decimals={0} suffix=""        sparkSeed={42}  />
+        <StatCard label="Live Cells"        value={onlineCount}       decimals={0} suffix={` / ${liveCells.length}`} sparkSeed={137} />
+        <StatCard label="Mesh Latency"      value={latency || 0}      decimals={0} suffix="ms"     sparkSeed={256} />
+        <StatCard label="Shard Architecture" value={MESH_NODES.length} decimals={0} suffix=" shards" sparkSeed={314} />
       </motion.div>
 
       {/* ============ Network Visualization ============ */}

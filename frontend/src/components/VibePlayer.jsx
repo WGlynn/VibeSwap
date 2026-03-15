@@ -194,7 +194,7 @@ export default function VibePlayer() {
   }, [isOpen])
 
   return (
-    <div className="fixed bottom-4 right-4" style={{ zIndex: 50 }}>
+    <div className="fixed bottom-20 sm:bottom-4 left-4" style={{ zIndex: 45 }}>
       {/* Hidden YT player container — 1x1px, invisible */}
       {isOpen && (
         <div

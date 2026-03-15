@@ -1233,6 +1233,7 @@ function SwapCore() {
             <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
               <motion.button
                 onClick={switchTokens}
+                aria-label="Switch token direction"
                 className="w-10 h-10 rounded-full bg-black-700 border-4 border-black-800 flex items-center justify-center hover:bg-black-600 transition-colors hover:shadow-glow-green-md animate-glow-breathe"
                 whileHover={{ rotate: 180, scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}

@@ -688,7 +688,7 @@ function SwapPage() {
 
             {/* Rabbit Hole - Documentation */}
             <a
-              href="https://github.com/WGlynn/vibeswap-private/tree/master/docs"
+              href="https://github.com/WGlynn/VibeSwap/tree/master/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="block mt-6"

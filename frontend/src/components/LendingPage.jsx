@@ -603,7 +603,8 @@ export default function LendingPage() {
       <Section title="Recent Transactions">
         <GlassCard glowColor="terminal" hover={false}>
           <div className="p-5 space-y-2">
-            {MOCK_TX_HISTORY.map((tx, i) => (
+            {isConnected && <div className="text-center py-4 text-black-500 text-sm font-mono">No lending activity yet</div>}
+            {(isConnected ? [] : MOCK_TX_HISTORY).map((tx, i) => (
               <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.06 * PHI }}
                 className="flex items-center justify-between bg-gray-900/40 rounded-lg p-2.5 text-xs font-mono">

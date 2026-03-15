@@ -234,6 +234,9 @@ function PositionManager({ positions }) {
         </div>
       </div>
       <div className="space-y-2">
+        {positions.length === 0 && (
+          <div className="text-center py-4 text-black-500 text-sm font-mono">No open positions</div>
+        )}
         {positions.map((pos, i) => (
           <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
             className="rounded-lg p-3" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${pos.positive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
@@ -705,7 +708,7 @@ export default function PerpetualsPage() {
                 <GlassCard glowColor="terminal">
                   <div className="p-4">
                     <h3 className="text-xs font-mono font-bold uppercase tracking-wider mb-3" style={{ color: CYAN }}>Your Positions</h3>
-                    <PositionManager positions={MOCK_POSITIONS} />
+                    <PositionManager positions={[]} />
                   </div>
                 </GlassCard>
               )}

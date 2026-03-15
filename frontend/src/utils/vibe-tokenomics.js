@@ -49,7 +49,8 @@ export const INITIAL_DAILY_EMISSION = 14.38356164 // ~21M / (4 * 365.25 * sum_of
 export const ERAS = []
 let remaining = TOTAL_SUPPLY
 for (let era = 0; era < 32; era++) {
-  const eraSupply = remaining / 2
+  const isLast = era === 31 || remaining / 2 / HALVING_INTERVAL_DAYS < 0.001
+  const eraSupply = isLast ? remaining : remaining / 2
   const dailyRate = eraSupply / HALVING_INTERVAL_DAYS
   ERAS.push({
     era,
@@ -59,7 +60,7 @@ for (let era = 0; era < 32; era++) {
     endDay: (era + 1) * HALVING_INTERVAL_DAYS,
   })
   remaining -= eraSupply
-  if (dailyRate < 0.001) break // Negligible
+  if (isLast) break
 }
 
 // ============ Genesis Timestamp ============
@@ -120,9 +121,8 @@ export function calculatePoolAccumulation(pool, nowTimestamp = Date.now()) {
  * @param {Array} contributors - [{author, shapleyWeight}] — weights must sum to 1
  * @returns {Object} New pool state + distribution details
  */
-export function breakPool(pool, triggerContributionId, contributors) {
-  const now = Date.now()
-  const updated = calculatePoolAccumulation(pool, now)
+export function breakPool(pool, triggerContributionId, contributors, timestamp = Date.now()) {
+  const updated = calculatePoolAccumulation(pool, timestamp)
   const amountToDistribute = updated.accumulated
 
   const distribution = contributors.map(c => ({
@@ -132,8 +132,8 @@ export function breakPool(pool, triggerContributionId, contributors) {
   }))
 
   const breakEvent = {
-    id: `break-${now}`,
-    timestamp: now,
+    id: `break-${timestamp}`,
+    timestamp,
     triggerContributionId,
     amount: amountToDistribute,
     distribution,
@@ -146,7 +146,7 @@ export function breakPool(pool, triggerContributionId, contributors) {
       totalDistributed: updated.totalDistributed + amountToDistribute,
       totalMined: updated.totalMined,
       breaks: [...updated.breaks, breakEvent],
-      lastBreakTimestamp: now,
+      lastBreakTimestamp: timestamp,
       currentEra: updated.currentEra,
     },
     breakEvent,

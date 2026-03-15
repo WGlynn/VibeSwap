@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useContributionsAPI } from '../hooks/useContributionsAPI'
+import { getPoolStatus, createResonancePool } from '../utils/vibe-tokenomics'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 
@@ -190,16 +191,14 @@ function Section({ index, title, subtitle, children }) {
 // ============ Stats Bar ============
 
 function StatsBar({ apiStats }) {
-  const stats = apiStats ? [
-    { label: 'Total Sources', value: apiStats.totalSources?.toLocaleString() || '0', color: PURPLE },
-    { label: 'Derivations', value: apiStats.totalDerivations?.toLocaleString() || '0', color: GREEN },
-    { label: 'Outputs Shipped', value: apiStats.totalOutputs?.toLocaleString() || '0', color: CYAN },
-    { label: 'Contributors', value: apiStats.topAuthors?.length?.toString() || '0', color: AMBER },
-  ] : [
-    { label: 'Total Sources', value: '—', color: PURPLE },
-    { label: 'Derivations', value: '—', color: GREEN },
-    { label: 'Outputs Shipped', value: '—', color: CYAN },
-    { label: 'Contributors', value: '—', color: AMBER },
+  // Resonance Pool — VIBE accumulates until a protocol-defining contribution breaks it
+  const pool = getPoolStatus(createResonancePool())
+
+  const stats = [
+    { label: 'Resonance Pool', value: `${pool.poolBalanceFormatted} VIBE`, color: AMBER },
+    { label: 'Era', value: `${pool.currentEra} / 32`, color: PURPLE },
+    { label: 'Daily Emission', value: `${pool.dailyRateFormatted} VIBE`, color: GREEN },
+    { label: 'Next Halving', value: `${Math.floor(pool.nextHalvingDays / 365)}y ${Math.floor(pool.nextHalvingDays % 365)}d`, color: CYAN },
   ]
 
   return (

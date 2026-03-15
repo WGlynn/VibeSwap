@@ -657,28 +657,38 @@ export function ContributionsProvider({ children }) {
   }, [extractionTracker])
 
   // Calculate user stats from contributions
+  // Weight = Proof of Mind — contributions accumulate weight via upvotes,
+  // implementation status, and Shapley attribution. When the Resonance Pool
+  // breaks, weight determines your share of VIBE distribution.
   const calculateUserStats = (username) => {
     const userContribs = contributions.filter(c => c.author === username)
-    const totalPoints = userContribs.reduce((sum, c) => sum + (c.rewardPoints || 0), 0)
     const totalUpvotes = userContribs.reduce((sum, c) => sum + (c.upvotes || 0), 0)
     const implementedCount = userContribs.filter(c => c.implemented).length
+
+    // Proof of Mind weight: implemented contributions worth 10x, upvotes add weight
+    const weight = userContribs.reduce((sum, c) => {
+      const implMultiplier = c.implemented ? 10 : 1
+      const upvoteWeight = (c.upvotes || 0) * 0.1
+      const isKeyInsight = c.isKeyInsight ? 5 : 1
+      return sum + (1 + upvoteWeight) * implMultiplier * isKeyInsight
+    }, 0)
 
     return {
       username,
       contributionCount: userContribs.length,
-      totalPoints,
+      weight, // Proof of Mind weight (replaces points)
       totalUpvotes,
       implementedCount,
-      rank: getRank(totalPoints),
+      rank: getRank(weight),
     }
   }
 
-  // Get rank based on points
-  const getRank = (points) => {
-    if (points >= 1000) return { title: 'Protocol Architect', color: 'text-yellow-400', tier: 5 }
-    if (points >= 500) return { title: 'Core Contributor', color: 'text-purple-400', tier: 4 }
-    if (points >= 200) return { title: 'Active Builder', color: 'text-matrix-500', tier: 3 }
-    if (points >= 50) return { title: 'Contributor', color: 'text-cyan-400', tier: 2 }
+  // Get rank based on Proof of Mind weight
+  const getRank = (weight) => {
+    if (weight >= 100) return { title: 'Protocol Architect', color: 'text-yellow-400', tier: 5 }
+    if (weight >= 50) return { title: 'Core Contributor', color: 'text-purple-400', tier: 4 }
+    if (weight >= 20) return { title: 'Active Builder', color: 'text-matrix-500', tier: 3 }
+    if (weight >= 5) return { title: 'Contributor', color: 'text-cyan-400', tier: 2 }
     return { title: 'Newcomer', color: 'text-black-400', tier: 1 }
   }
 
@@ -714,10 +724,10 @@ export function ContributionsProvider({ children }) {
     ))
   }
 
-  // Mark as implemented (awards points)
-  const markImplemented = (id, points = 100) => {
+  // Mark as implemented — increases Proof of Mind weight (no points, weight is computed)
+  const markImplemented = (id) => {
     setContributions(prev => prev.map(c =>
-      c.id === id ? { ...c, implemented: true, rewardPoints: points } : c
+      c.id === id ? { ...c, implemented: true } : c
     ))
   }
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useContributionsAPI } from '../hooks/useContributionsAPI'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 
@@ -188,12 +189,17 @@ function Section({ index, title, subtitle, children }) {
 
 // ============ Stats Bar ============
 
-function StatsBar() {
-  const stats = [
-    { label: 'Total Contributors', value: '1,247', color: PURPLE },
-    { label: 'Total Distributed', value: '$2.4M', color: GREEN },
-    { label: 'Avg Shapley Score', value: '0.634', color: CYAN },
-    { label: 'Active This Month', value: '389', color: AMBER },
+function StatsBar({ apiStats }) {
+  const stats = apiStats ? [
+    { label: 'Total Sources', value: apiStats.totalSources?.toLocaleString() || '0', color: PURPLE },
+    { label: 'Derivations', value: apiStats.totalDerivations?.toLocaleString() || '0', color: GREEN },
+    { label: 'Outputs Shipped', value: apiStats.totalOutputs?.toLocaleString() || '0', color: CYAN },
+    { label: 'Contributors', value: apiStats.topAuthors?.length?.toString() || '0', color: AMBER },
+  ] : [
+    { label: 'Total Sources', value: '—', color: PURPLE },
+    { label: 'Derivations', value: '—', color: GREEN },
+    { label: 'Outputs Shipped', value: '—', color: CYAN },
+    { label: 'Contributors', value: '—', color: AMBER },
   ]
 
   return (
@@ -550,6 +556,7 @@ export default function ContributorsPage() {
   const { isConnected: isExternalConnected } = useWallet()
   const { isConnected: isDeviceConnected } = useDeviceWallet()
   const isConnected = isExternalConnected || isDeviceConnected
+  const { stats: apiStats, isLoading: apiLoading } = useContributionsAPI()
 
   const filtered = useMemo(() => {
     if (category === 'all') return CONTRIBUTORS
@@ -566,8 +573,8 @@ export default function ContributorsPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 space-y-6">
-        {/* Stats Bar */}
-        <StatsBar />
+        {/* Stats Bar — pulls from Jarvis attribution graph API */}
+        <StatsBar apiStats={apiStats} />
 
         {/* Category Tabs + Contributors Grid */}
         <Section index={1} title="Top Contributors" subtitle="Ranked by Shapley value score across all contribution types">

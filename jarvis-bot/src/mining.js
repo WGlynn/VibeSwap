@@ -150,7 +150,9 @@ function verifyProof(challenge, nonce, claimedHash, difficulty) {
 
 // ============ Challenge Management ============
 
-const CHALLENGE_GRACE_PERIOD = 120; // 2 min grace after rotation (helps mobile miners)
+const CHALLENGE_GRACE_PERIOD = 180; // 3 min grace after rotation — fairness above all
+// People's phones are slow, networks are unreliable, timing is hard.
+// If they did the work, they deserve the reward. 3 min overlap is generous.
 
 function rotateChallenge() {
   // Keep old challenge valid during grace period (prevents stale_challenge rejections

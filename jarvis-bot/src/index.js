@@ -316,6 +316,7 @@ import { initInfoFi, shutdownInfoFi } from './infofi.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
+import { initShardMemory, observe as observeMemory, buildMemoryContext, getMemoryStats } from './shard-memory.js';
 import { initLimni, flushLimni, getLimniStats, registerTerminal, registerVPS, checkTerminalHealth, checkAllVPS, listStrategies, getStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, onAlert, strategyPipeline, deployStrategy, listBacktests, getBacktestResult, fetchTrades } from './limni.js';
 import { registerKataraktiStrategies, formatPerformanceSummary } from './katarakti.js';
 import { createServer } from 'http';
@@ -6781,6 +6782,19 @@ bot.on('text', async (ctx) => {
     // Passive attribution — scan message text for attribution signals (non-blocking)
     try { detectTextAttribution(ctx.message.text); } catch {}
 
+    // Shard memory — capture interaction for compressed semantic memory (non-blocking)
+    try {
+      observeMemory({
+        type: 'interaction',
+        userId: String(ctx.from.id),
+        chatId: String(chatId),
+        summary: `${userName}: ${ctx.message.text?.slice(0, 100)}`,
+        content: `Q: ${ctx.message.text?.slice(0, 250)}\nA: ${response.text?.slice(0, 250)}`,
+        tags: chatType === 'private' ? ['dm'] : ['group'],
+        importance: ctx.message.text?.length > 100 ? 0.7 : 0.5,
+      });
+    } catch {}
+
     // Detect timezone from message (non-blocking)
     const detectedTz = detectTimezone(ctx.message.text);
     if (detectedTz) {
@@ -7247,6 +7261,7 @@ async function main() {
     initCKB(),
     initEmissions(),
     loadWorkflowStats(),
+    initShardMemory().catch(err => console.warn(`[jarvis] Shard memory init failed: ${err.message}`)),
   ]);
 
   // Group C: MI Host (depends on nothing but may fail — keep isolated)

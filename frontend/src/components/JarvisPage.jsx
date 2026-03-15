@@ -722,17 +722,39 @@ function TipJarAddress({ address }) {
 // ============ Mind Panels ============
 
 function MindPanels({ mind }) {
+  const [waited, setWaited] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setWaited(true), 5000)
+    return () => clearTimeout(t)
+  }, [])
+
   if (!mind) {
+    // Show loading for 5s, then show offline state instead of perpetual spinner
+    if (!waited) {
+      return (
+        <div className="space-y-3">
+          <MindCard title="KNOWLEDGE CHAIN" icon="~">
+            <p className="text-black-400 animate-pulse">Connecting to mind network...</p>
+          </MindCard>
+          <MindCard title="SHARD NETWORK" icon="#">
+            <p className="text-black-400 animate-pulse">Discovering peers...</p>
+          </MindCard>
+          <MindCard title="SKILLS & LEARNING" icon="*">
+            <p className="text-black-400 animate-pulse">Loading cognitive state...</p>
+          </MindCard>
+        </div>
+      )
+    }
     return (
       <div className="space-y-3">
         <MindCard title="KNOWLEDGE CHAIN" icon="~">
-          <p className="text-black-400 animate-pulse">Connecting to mind network...</p>
+          <p className="text-black-500 text-xs">Mind network unavailable</p>
         </MindCard>
         <MindCard title="SHARD NETWORK" icon="#">
-          <p className="text-black-400 animate-pulse">Discovering peers...</p>
+          <p className="text-black-500 text-xs">No peers discovered</p>
         </MindCard>
         <MindCard title="SKILLS & LEARNING" icon="*">
-          <p className="text-black-400 animate-pulse">Loading cognitive state...</p>
+          <p className="text-black-500 text-xs">Cognitive state offline</p>
         </MindCard>
       </div>
     )

@@ -224,9 +224,10 @@ export default function YieldPage() {
   )
   const toggleAC = useCallback((id) => setAcToggles(p => ({ ...p, [id]: !p[id] })), [])
 
-  const totalDeposited = MOCK_POSITIONS.reduce((s, p) => s + p.deposited, 0)
-  const totalEarned = MOCK_POSITIONS.reduce((s, p) => s + p.earned, 0)
-  const avgApy = MOCK_POSITIONS.reduce((s, p) => s + p.apy, 0) / (MOCK_POSITIONS.length || 1)
+  const positions = isConnected ? [] : MOCK_POSITIONS
+  const totalDeposited = positions.reduce((s, p) => s + p.deposited, 0)
+  const totalEarned = positions.reduce((s, p) => s + p.earned, 0)
+  const avgApy = positions.length > 0 ? positions.reduce((s, p) => s + p.apy, 0) / positions.length : 0
 
   return (
     <div className="min-h-screen pb-20">
@@ -253,7 +254,7 @@ export default function YieldPage() {
             {[
               ['Total Deposited', `$${fmt(totalDeposited)}`, null],
               ['Average APY', `${avgApy.toFixed(1)}%`, CYAN],
-              ['Your Deposits', isConnected ? MOCK_POSITIONS.length : '--', null],
+              ['Your Deposits', isConnected ? positions.length : '--', null],
               ['Pending Harvest', null, null],
             ].map(([label, val, color], i) => (
               <div key={label} className="p-3 rounded-xl bg-black-700/50 text-center">
@@ -337,7 +338,10 @@ export default function YieldPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black-700/50">
-                    {MOCK_POSITIONS.map((pos) => {
+                    {positions.length === 0 && isConnected && (
+                      <tr><td colSpan="5" className="py-8 text-center text-black-500 text-sm font-mono">No yield positions yet</td></tr>
+                    )}
+                    {positions.map((pos) => {
                       const s = STRATEGIES.find(x => x.id === pos.strategyId)
                       return (
                         <tr key={pos.strategyId} className="hover:bg-black-700/20">

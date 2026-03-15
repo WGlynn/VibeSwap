@@ -236,7 +236,7 @@ export default function SocialTradingPage() {
     return [...traders].sort((a, b) => b[key] - a[key]).map((t, i) => ({ ...t, rank: i + 1 }))
   }, [traders, leaderPeriod])
 
-  const handleFollow = (address) => console.log('Toggle follow:', address)
+  const handleFollow = (_address) => { /* TODO: implement follow/unfollow */ }
   const avgWinRate = useMemo(() => Math.round(traders.reduce((s, t) => s + t.winRate, 0) / traders.length), [traders])
   const topPnl = useMemo(() => Math.max(...traders.map((t) => t.pnl30d)), [traders])
   const activeCopiers = useMemo(() => Math.round(820 + seededRandom(1919 + 100)() * 1600), [])

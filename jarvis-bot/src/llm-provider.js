@@ -1570,11 +1570,18 @@ const ESCALATION_CHAINS = {
 // Tier boundaries for logging
 const PROVIDER_TIER = {
   groq: 0, cerebras: 0, sambanova: 0, fireworks: 0, novita: 0, openrouter: 0, mistral: 0, together: 0,
-  deepseek: 1, gemini: 1, ollama: 1,
+  deepseek: 1, gemini: 1, ollama: -1, // Tier -1: local inference, zero cost
   claude: 2, openai: 2, xai: 2,
 };
 
 function getProviderForComplexity(complexity) {
+  // Tier -1: If Ollama is available and configured, try it first for ALL complexity levels.
+  // Local inference = zero cost, zero rate limit, zero dependency.
+  // The escape hatch from every API toll booth.
+  if (process.env.OLLAMA_URL && providerPool.has('ollama')) {
+    return providerPool.get('ollama');
+  }
+
   // Return first available provider from the escalation chain
   const chain = ESCALATION_CHAINS[complexity] || ESCALATION_CHAINS.moderate;
   for (const name of chain) {

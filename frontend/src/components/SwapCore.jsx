@@ -887,7 +887,6 @@ function SwapCore() {
   // Check if device wallet (Secure Element) is available
   useEffect(() => {
     isPlatformAuthenticatorAvailable().then(available => {
-      console.log('[SwapCore] deviceWalletAvailable:', available)
       setDeviceWalletAvailable(available)
     })
   }, [])
@@ -902,14 +901,14 @@ function SwapCore() {
     const hasSeenIntro = localStorage.getItem('vibeswap_jarvis_intro_seen')
 
     if (hasStoredWallet) {
-      console.log('[SwapCore] INIT -> existingWallet (found stored wallet)')
+
       return 'existingWallet' // Show sign-in or create new options
     }
     if (!hasSeenIntro) {
-      console.log('[SwapCore] INIT -> jarvisIntro (first visit)')
+
       return 'jarvisIntro' // First contact — meet JARVIS
     }
-    console.log('[SwapCore] INIT -> welcome (no wallet)')
+
     return 'welcome' // New user, already met JARVIS
   })
 
@@ -1002,23 +1001,18 @@ function SwapCore() {
 
   // Handle device wallet creation (from welcome modal)
   const handleUseDevice = async () => {
-    console.log('[handleUseDevice] CALLED, deviceWalletAvailable:', deviceWalletAvailable)
+
 
     // Clear any stale acknowledged flag
     localStorage.removeItem('vibeswap_wallet_acknowledged')
 
     try {
-      console.log('[handleUseDevice] calling createWallet...')
       const result = await deviceWallet.createWallet()
-      console.log('[handleUseDevice] createWallet result:', result)
 
       if (result && result.address) {
-        console.log('[handleUseDevice] SUCCESS - setting activeModal to walletCreated')
         toast.success('Device wallet created!')
         setActiveModal('walletCreated')
-        console.log('[handleUseDevice] setActiveModal called')
       } else {
-        console.log('[handleUseDevice] FAILED - no address in result')
         toast.error(deviceWallet.error || 'Failed to create wallet. Try enabling Windows Hello, Face ID, or Touch ID in your device settings.')
       }
     } catch (err) {
@@ -1115,7 +1109,7 @@ function SwapCore() {
         await mintIdentity(autoUsername)
       } catch (err) {
         // Silent fail - identity is optional for swap
-        console.log('Auto-identity creation skipped')
+        // Auto-identity creation skipped
       }
     }
   }

@@ -249,8 +249,9 @@ export default function ApprovalManagerPage() {
   const [filterRisk, setFilterRisk] = useState('all')
 
   // ============ Data ============
-  const allApprovals = useMemo(() => generateApprovals(), [])
-  const historyEvents = useMemo(() => generateHistory(), [])
+  // Real approval data when connected (empty until on-chain scanner built), mock for demo
+  const allApprovals = useMemo(() => isConnected ? [] : generateApprovals(), [isConnected])
+  const historyEvents = useMemo(() => isConnected ? [] : generateHistory(), [isConnected])
   const activeApprovals = useMemo(() => allApprovals.filter((a) => !revokedIds.has(a.id)), [allApprovals, revokedIds])
   const filteredApprovals = useMemo(
     () => filterRisk === 'all' ? activeApprovals : activeApprovals.filter((a) => a.risk === filterRisk),

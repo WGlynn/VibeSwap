@@ -316,9 +316,25 @@ import { initInfoFi, shutdownInfoFi } from './infofi.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
-import { initShardMemory, observe as observeMemory, buildMemoryContext, getMemoryStats } from './shard-memory.js';
-import { initRewardSignals, extractSignal } from './reward-signal.js';
-import { initSelfImprove, recordRollout, getSelfImproveStats } from './self-improve.js';
+// Shard memory + self-improve — graceful imports (don't break bot if modules fail)
+let observeMemory = () => {}, initShardMemory = async () => {};
+let extractSignal = () => null, initRewardSignals = async () => {};
+let recordRollout = () => {}, initSelfImprove = async () => {};
+try {
+  const sm = await import('./shard-memory.js');
+  observeMemory = sm.observe;
+  initShardMemory = sm.initShardMemory;
+} catch (e) { console.warn(`[jarvis] shard-memory import failed: ${e.message}`); }
+try {
+  const rs = await import('./reward-signal.js');
+  extractSignal = rs.extractSignal;
+  initRewardSignals = rs.initRewardSignals;
+} catch (e) { console.warn(`[jarvis] reward-signal import failed: ${e.message}`); }
+try {
+  const si = await import('./self-improve.js');
+  recordRollout = si.recordRollout;
+  initSelfImprove = si.initSelfImprove;
+} catch (e) { console.warn(`[jarvis] self-improve import failed: ${e.message}`); }
 import { initLimni, flushLimni, getLimniStats, registerTerminal, registerVPS, checkTerminalHealth, checkAllVPS, listStrategies, getStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, onAlert, strategyPipeline, deployStrategy, listBacktests, getBacktestResult, fetchTrades } from './limni.js';
 import { registerKataraktiStrategies, formatPerformanceSummary } from './katarakti.js';
 import { createServer } from 'http';

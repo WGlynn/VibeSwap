@@ -96,6 +96,10 @@ export default function ExportPage() {
   const [selectedTypes, setSelectedTypes] = useState(['swaps', 'lp', 'bridge', 'rewards', 'gas'])
   const [exportingId, setExportingId] = useState(null)
 
+  // Real data when connected (empty), mock for demo
+  const exportHistory = isConnected ? [] : MOCK_HISTORY
+  const taxSummary = isConnected ? { year: 2025, totalGains: 0, totalLosses: 0, netGainLoss: 0, shortTerm: 0, longTerm: 0, totalTransactions: 0 } : TAX_SUMMARY
+
   const toggleType = (id) => {
     setSelectedTypes((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
@@ -372,18 +376,18 @@ export default function ExportPage() {
               <span className="text-sm font-medium text-white">Tax Year Summary</span>
             </div>
             <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-black-800 border border-black-700 text-black-300">
-              {TAX_SUMMARY.year}
+              {taxSummary.year}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="p-3 rounded-xl bg-black-800/60 border border-black-700/40">
               <div className="text-xs font-mono text-black-500 mb-1">Total Gains</div>
-              <div className="text-lg font-semibold font-mono text-green-400">{fmtUsd(TAX_SUMMARY.totalGains)}</div>
+              <div className="text-lg font-semibold font-mono text-green-400">{fmtUsd(taxSummary.totalGains)}</div>
             </div>
             <div className="p-3 rounded-xl bg-black-800/60 border border-black-700/40">
               <div className="text-xs font-mono text-black-500 mb-1">Total Losses</div>
-              <div className="text-lg font-semibold font-mono text-red-400">{fmtUsd(TAX_SUMMARY.totalLosses)}</div>
+              <div className="text-lg font-semibold font-mono text-red-400">{fmtUsd(taxSummary.totalLosses)}</div>
             </div>
           </div>
 
@@ -392,11 +396,11 @@ export default function ExportPage() {
               <div>
                 <div className="text-xs font-mono text-black-400 mb-0.5">Net Gain/Loss</div>
                 <div className="text-2xl font-bold font-mono" style={{ color: CYAN }}>
-                  {fmtUsd(TAX_SUMMARY.netGainLoss)}
+                  {fmtUsd(taxSummary.netGainLoss)}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-mono text-black-500">{TAX_SUMMARY.totalTransactions} transactions</div>
+                <div className="text-xs font-mono text-black-500">{taxSummary.totalTransactions} transactions</div>
               </div>
             </div>
           </div>
@@ -404,12 +408,12 @@ export default function ExportPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-black-800/60 border border-black-700/40">
               <div className="text-xs font-mono text-black-500 mb-1">Short-term</div>
-              <div className="text-sm font-semibold font-mono text-amber-400">{fmtUsd(TAX_SUMMARY.shortTerm)}</div>
+              <div className="text-sm font-semibold font-mono text-amber-400">{fmtUsd(taxSummary.shortTerm)}</div>
               <div className="text-[10px] font-mono text-black-600 mt-0.5">Held &lt; 1 year</div>
             </div>
             <div className="p-3 rounded-xl bg-black-800/60 border border-black-700/40">
               <div className="text-xs font-mono text-black-500 mb-1">Long-term</div>
-              <div className="text-sm font-semibold font-mono text-purple-400">{fmtUsd(TAX_SUMMARY.longTerm)}</div>
+              <div className="text-sm font-semibold font-mono text-purple-400">{fmtUsd(taxSummary.longTerm)}</div>
               <div className="text-[10px] font-mono text-black-600 mt-0.5">Held &gt; 1 year</div>
             </div>
           </div>
@@ -482,7 +486,8 @@ export default function ExportPage() {
             <span className="text-sm font-medium text-white">Export History</span>
           </div>
           <div className="space-y-2">
-            {MOCK_HISTORY.map((item, i) => (
+            {exportHistory.length === 0 && <div className="text-center py-4 text-black-500 text-sm font-mono">No exports yet</div>}
+            {exportHistory.map((item, i) => (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, x: -8 }}

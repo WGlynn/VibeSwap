@@ -602,7 +602,10 @@ export default function AggregatorPage() {
         {/* 11. Route History */}
         <Section index={10} title="Route History" subtitle="Your last 10 aggregated swaps">
           <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-            {MOCK_HISTORY.map((s, i) => (
+            {(isConnected ? [] : MOCK_HISTORY).length === 0 && isConnected && (
+              <div className="text-center py-6 text-black-500 text-sm font-mono">No swap history yet</div>
+            )}
+            {(isConnected ? [] : MOCK_HISTORY).map((s, i) => (
               <motion.div key={s.id} custom={i} variants={rowV} initial="hidden" animate="visible" className="flex items-center justify-between p-3 rounded-xl bg-black-900/40 border border-black-800/50">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="text-xs font-mono text-black-500 w-12 flex-shrink-0">{s.time}</div>

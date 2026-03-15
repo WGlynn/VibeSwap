@@ -191,9 +191,12 @@ export default function MarginTradingPage() {
   const estimatedFee = useMemo(() => notionalValue * 0.0005, [notionalValue])
   const currentFunding = FUNDING_RATES.find(f => f.pair === `${pair.base}/${pair.quote}`) || FUNDING_RATES[0]
 
+  // ---- Positions: real when connected, mock for demo ----
+  const positions = isConnected ? [] : MOCK_POSITIONS
+
   // ---- Risk Metrics ----
-  const totalMarginUsed = MOCK_POSITIONS.reduce((sum, p) => sum + p.collateral, 0)
-  const totalAccountValue = 25000
+  const totalMarginUsed = positions.reduce((sum, p) => sum + p.collateral, 0)
+  const totalAccountValue = isConnected ? 0 : 25000
   const availableMargin = totalAccountValue - totalMarginUsed
   const marginRatio = (availableMargin / totalAccountValue) * 100
   const maintenanceMargin = totalMarginUsed * 0.05
@@ -408,7 +411,7 @@ export default function MarginTradingPage() {
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: CYAN }}>Open Positions</h3>
-                    <span className="text-[9px] font-mono text-black-500">{MOCK_POSITIONS.length} active</span>
+                    <span className="text-[9px] font-mono text-black-500">{positions.length} active</span>
                   </div>
 
                   {/* Table Header — desktop only */}
@@ -421,7 +424,10 @@ export default function MarginTradingPage() {
 
                   {/* Position Rows */}
                   <div className="space-y-1.5">
-                    {MOCK_POSITIONS.map((pos, i) => (
+                    {positions.length === 0 && isConnected && (
+                      <div className="text-center py-6 text-black-500 text-sm font-mono">No open positions</div>
+                    )}
+                    {positions.map((pos, i) => (
                       <motion.div key={pos.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 + i * 0.06 }}
                         className="rounded-lg p-2.5 transition-all hover:bg-white/[0.02]"
@@ -475,7 +481,7 @@ export default function MarginTradingPage() {
                   <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: `1px solid ${CYAN}10` }}>
                     <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Total Unrealized PnL</span>
                     {(() => {
-                      const total = MOCK_POSITIONS.reduce((s, p) => s + p.pnlRaw, 0)
+                      const total = positions.reduce((s, p) => s + p.pnlRaw, 0)
                       return (
                         <span className={`text-sm font-mono font-bold ${total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {total >= 0 ? '+' : ''}${total.toFixed(2)}

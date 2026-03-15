@@ -217,7 +217,7 @@ export default function DCAPage() {
   const [notifyEmail, setNotifyEmail] = useState(false), [notifyPush, setNotifyPush] = useState(true)
   const [email, setEmail] = useState('')
   const [lumpAmount, setLumpAmount] = useState('5000'), [lumpMonths, setLumpMonths] = useState(12)
-  const [strategies, setStrategies] = useState(MOCK_STRATEGIES)
+  const [strategies, setStrategies] = useState(isConnected ? [] : MOCK_STRATEGIES)
   const [savingsAmount, setSavingsAmount] = useState('200'), [savingsFreq, setSavingsFreq] = useState('weekly')
 
   const overview = useMemo(() => {

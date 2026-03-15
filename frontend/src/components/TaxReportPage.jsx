@@ -207,8 +207,8 @@ export default function TaxReportPage() {
   const [txFilter, setTxFilter] = useState('all')
 
   const rng = useMemo(() => seededRandom(selectedYear * 1000 + 42), [selectedYear])
-  const transactions = useMemo(() => generateMockTransactions(selectedYear, rng), [selectedYear])
-  const defiActivity = useMemo(() => generateDefiActivity(), [selectedYear])
+  const transactions = useMemo(() => isConnected ? [] : generateMockTransactions(selectedYear, rng), [selectedYear, isConnected])
+  const defiActivity = useMemo(() => isConnected ? [] : generateDefiActivity(), [selectedYear, isConnected])
   const filteredTxs = useMemo(() => txFilter === 'all' ? transactions : transactions.filter(tx => tx.type === txFilter), [transactions, txFilter])
 
   // ============ Tax Summary ============

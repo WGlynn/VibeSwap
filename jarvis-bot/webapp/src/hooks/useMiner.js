@@ -63,13 +63,25 @@ export function useMiner(shardId) {
         setProofsAccepted(prev => prev + 1);
         setJulMined(result.julBalance || 0);
         addLog(`Proof accepted! +${result.reward?.toFixed(2)} JUL`);
+      } else if (result.reason === 'stale_challenge') {
+        // Stale challenge is a TIMING issue, not invalid work.
+        // The user did real computation — don't penalize them.
+        // Refresh challenge and restart workers immediately.
+        addLog('Challenge rotated — refreshing...');
+        const newTarget = await refreshChallenge();
+        if (newTarget && miningRef.current) {
+          workersRef.current.forEach(w => {
+            w.postMessage({ type: 'stop' });
+            w.postMessage({
+              type: 'start',
+              challenge: newTarget.challenge,
+              difficulty: newTarget.difficulty,
+            });
+          });
+        }
       } else {
         setProofsRejected(prev => prev + 1);
         addLog(`Proof rejected: ${result.reason}`);
-        // Refresh challenge if stale
-        if (result.reason === 'stale_challenge') {
-          refreshChallenge();
-        }
       }
     } catch (err) {
       addLog(`Submit error: ${err.message}`);

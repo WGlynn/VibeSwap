@@ -56,6 +56,7 @@ export default function MobileNav({ onOpenMenu }) {
 
   return (
     <nav
+      aria-label="Main navigation"
       className="fixed bottom-0 left-0 right-0 z-50 sm:hidden"
       style={{
         background: 'rgba(0, 0, 0, 0.8)',
@@ -104,6 +105,7 @@ export default function MobileNav({ onOpenMenu }) {
               <button
                 key="more"
                 onClick={onOpenMenu}
+                aria-label="Open menu"
                 className="flex-1 flex justify-center outline-none border-none bg-transparent cursor-pointer"
               >
                 {content}

@@ -296,23 +296,26 @@ function BridgeHistoryPage() {
   const [dateRange, setDateRange] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
 
+  // ============ Data — real when connected, mock for demo ============
+  const txs = useMemo(() => isConnected ? [] : MOCK_TXS, [isConnected])
+
   // ============ Computed Stats ============
   const stats = useMemo(() => {
-    const confirmed = MOCK_TXS.filter(t => t.status === 'confirmed')
-    const totalVolume = MOCK_TXS.reduce((acc, tx) => {
+    const confirmed = txs.filter(t => t.status === 'confirmed')
+    const totalVolume = txs.reduce((acc, tx) => {
       const price = tx.token === 'ETH' ? 3500 : tx.token === 'WBTC' ? 65000 : 1
       return acc + parseFloat(tx.amount) * price
     }, 0)
     const avgTime = confirmed.length > 0
       ? Math.round(confirmed.reduce((a, t) => a + t.bridgeTimeSec, 0) / confirmed.length) : 0
-    const successRate = MOCK_TXS.length > 0 ? ((confirmed.length / MOCK_TXS.length) * 100).toFixed(1) : '0.0'
-    const totalFees = MOCK_TXS.reduce((a, t) => a + parseFloat(t.lzFee), 0)
-    return { totalVolume, txCount: MOCK_TXS.length, avgTime, successRate, totalFees: totalFees.toFixed(4) }
-  }, [])
+    const successRate = txs.length > 0 ? ((confirmed.length / txs.length) * 100).toFixed(1) : '0.0'
+    const totalFees = txs.reduce((a, t) => a + parseFloat(t.lzFee), 0)
+    return { totalVolume, txCount: txs.length, avgTime, successRate, totalFees: totalFees.toFixed(4) }
+  }, [txs])
 
   // ============ Filtered Transactions ============
   const filteredTxs = useMemo(() => {
-    let list = [...MOCK_TXS]
+    let list = [...txs]
     if (statusFilter !== 'all') list = list.filter(t => t.status === statusFilter)
     if (chainPairFilter) list = list.filter(t => t.srcChain.id === chainPairFilter.srcId && t.dstChain.id === chainPairFilter.dstId)
     if (dateRange !== 'all') {
@@ -322,7 +325,7 @@ function BridgeHistoryPage() {
     return list
   }, [statusFilter, chainPairFilter, dateRange])
 
-  const pendingTxs = MOCK_TXS.filter(t => t.status === 'pending')
+  const pendingTxs = txs.filter(t => t.status === 'pending')
 
   return (
     <div className="max-w-4xl mx-auto px-4 pb-20">
@@ -337,7 +340,7 @@ function BridgeHistoryPage() {
             <StatBox label="Transactions" value={stats.txCount} sub="all chains" />
             <StatBox label="Average Time" value={fmtTime(stats.avgTime)} sub="confirmed txs" />
             <StatBox label="Success Rate" value={`${stats.successRate}%`}
-              sub={`${MOCK_TXS.filter(t => t.status === 'confirmed').length} confirmed`} />
+              sub={`${txs.filter(t => t.status === 'confirmed').length} confirmed`} />
           </div>
         </GlassCard>
       </motion.div>

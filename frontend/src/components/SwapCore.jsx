@@ -960,22 +960,14 @@ function SwapCore() {
     setActiveModal(null) // Close welcome, WalletConnect modal will open
   }
 
-  // Handle signing into existing wallet
-  const handleSignInExisting = async () => {
-    setIsSigningIn(true)
-    try {
-      const result = await deviceWallet.signIn()
-      if (result) {
-        toast.success('Signed in successfully!')
-        setActiveModal(null) // Close modal, user is now signed in
-      } else {
-        toast.error('Failed to sign in')
-      }
-    } catch (err) {
-      console.error('Sign in failed:', err)
-      toast.error('Sign in failed')
-    } finally {
-      setIsSigningIn(false)
+  // Handle signing into existing wallet — instant, just loads from localStorage
+  const handleSignInExisting = () => {
+    const result = deviceWallet.signIn()
+    if (result) {
+      toast.success('Signed in successfully!')
+      setActiveModal(null)
+    } else {
+      toast.error('No wallet found')
     }
   }
 

@@ -964,8 +964,8 @@ function SwapCore() {
   const handleSignInExisting = async () => {
     setIsSigningIn(true)
     try {
-      const wallet = await deviceWallet.authenticate()
-      if (wallet) {
+      const result = await deviceWallet.signIn()
+      if (result) {
         toast.success('Signed in successfully!')
         setActiveModal(null) // Close modal, user is now signed in
       } else {

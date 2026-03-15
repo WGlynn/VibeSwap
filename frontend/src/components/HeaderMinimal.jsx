@@ -21,7 +21,7 @@ import { useUbuntu } from '../hooks/useUbuntu'
 function HeaderMinimal() {
   const location = useLocation()
   const { isConnected: isExternalConnected, shortAddress: externalShortAddress, connect, disconnect: externalDisconnect, isConnecting } = useWallet()
-  const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress, disconnect: deviceDisconnect } = useDeviceWallet()
+  const { isConnected: isDeviceConnected, shortAddress: deviceShortAddress, disconnect: deviceDisconnect, hasStoredWallet, signIn } = useDeviceWallet()
   const { identity, hasIdentity } = useIdentity()
   const { mesh } = useMindMesh()
   const { here } = useUbuntu()
@@ -151,11 +151,11 @@ function HeaderMinimal() {
               ) : (
                 <InteractiveButton
                   variant="primary"
-                  onClick={connect}
+                  onClick={hasStoredWallet ? signIn : connect}
                   disabled={isConnecting}
                   className="px-4 py-2 rounded-full text-sm"
                 >
-                  {isConnecting ? 'Setting up...' : 'Get Started'}
+                  {isConnecting ? 'Setting up...' : hasStoredWallet ? 'Sign In' : 'Get Started'}
                 </InteractiveButton>
               )}
 

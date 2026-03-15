@@ -315,6 +315,7 @@ export default function VibePlayer() {
             {/* Previous */}
             <button
               onClick={prevTrack}
+              aria-label="Previous track"
               className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 active:text-white active:scale-90 transition-all"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
@@ -326,6 +327,7 @@ export default function VibePlayer() {
             {/* Pause */}
             <button
               onClick={togglePlayPause}
+              aria-label="Pause"
               className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 active:text-white active:scale-90 transition-all"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
@@ -337,6 +339,7 @@ export default function VibePlayer() {
             {/* Next */}
             <button
               onClick={nextTrack}
+              aria-label="Next track"
               className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 active:text-white active:scale-90 transition-all"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
             >

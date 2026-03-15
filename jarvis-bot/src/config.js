@@ -111,6 +111,8 @@ export const config = {
   // Web Portal — public-facing API for frontend
   web: {
     corsOrigins: (process.env.WEB_CORS_ORIGINS || 'https://frontend-jade-five-87.vercel.app,http://localhost:3000,http://localhost:5173').split(','),
+    // Also allow Vercel preview URLs (pattern: *.vercel.app)
+    corsPreviewPattern: /^https:\/\/.*\.vercel\.app$/,
     rateLimitPerMinute: parseInt(process.env.WEB_RATE_LIMIT, 10) || 5,
     sessionTtlMs: 2 * 60 * 60 * 1000, // 2 hours
   },

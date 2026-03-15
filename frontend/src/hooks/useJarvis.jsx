@@ -246,12 +246,14 @@ export function useJarvis() {
 
   const fetchMind = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/web/mind`)
+      const res = await fetch(`${API_URL}/web/mind`, {
+        signal: AbortSignal.timeout(10000),
+      })
       if (res.ok) {
         setMind(await res.json())
       }
     } catch {
-      // Silently fail — mind panels just show stale data
+      // Silently fail — mind panels show stale data or offline state
     }
   }, [])
 

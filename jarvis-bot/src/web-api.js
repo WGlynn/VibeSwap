@@ -146,7 +146,8 @@ const ALLOWED_ORIGINS = config.web?.corsOrigins || ['http://localhost:3000'];
 
 function addCorsHeaders(res, req) {
   const origin = req.headers.origin || '';
-  if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+  const previewPattern = config.web?.corsPreviewPattern;
+  if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*') || (previewPattern && previewPattern.test(origin))) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');

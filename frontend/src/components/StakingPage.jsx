@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useBalances } from '../hooks/useBalances'
+import { usePriceFeed } from '../hooks/usePriceFeed'
 
 // ============ Constants ============
 
@@ -194,19 +196,35 @@ export default function StakingPage() {
   const [calcLock, setCalcLock] = useState(2) // index into LOCK_STOPS
   const [autoCompound, setAutoCompound] = useState(false)
 
+  const { getBalance } = useBalances()
+  const { getPrice } = usePriceFeed(['JUL'])
+
+  // When connected, use real balance; demo mode uses mock
   const mockBalance = 25000
+  const userBalance = isConnected ? getBalance('JUL') : mockBalance
   const activeTier = TIERS[selectedTier]
 
-  // ============ veJUL Mock State ============
+  // ============ veJUL State ============
+  // When connected: real data (empty/zero for new wallet)
+  // When not connected: demo mock data
 
   const veJUL = useMemo(() => {
+    if (isConnected) {
+      return { locked: 0, lockDays: 0, elapsed: 0, remaining: 0, power: 0, maxPower: 0 }
+    }
     const locked = 15000
     const lockDays = 365
     const elapsed = 120
     const remaining = lockDays - elapsed
     const power = locked * (remaining / lockDays)
     return { locked, lockDays, elapsed, remaining, power: Math.round(power), maxPower: locked }
-  }, [])
+  }, [isConnected])
+
+  // Validators, unstaking queue, staking history, daily rewards — only show mock when NOT connected
+  const validators = isConnected ? [] : VALIDATORS
+  const unstakingQueue = isConnected ? [] : UNSTAKING_QUEUE
+  const stakingHistory = isConnected ? [] : STAKING_HISTORY
+  const dailyRewards = isConnected ? [] : DAILY_REWARDS
 
   // ============ Calculator Projections ============
 
@@ -265,10 +283,10 @@ export default function StakingPage() {
       <Section num="01" title="Staking Overview" delay={0.05}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total Staked', value: '2.4M JUL' },
+            { label: 'Total Staked', value: isConnected ? '0 JUL' : '2.4M JUL' },
             { label: 'Current APY', value: `${activeTier.apy}%` },
-            { label: 'Your Stake', value: '19.5K JUL' },
-            { label: 'Pending Rewards', value: '490.66 JUL' },
+            { label: 'Your Stake', value: isConnected ? '0 JUL' : '19.5K JUL' },
+            { label: 'Pending Rewards', value: isConnected ? '0 JUL' : '490.66 JUL' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.08 + i * (0.06 / PHI) }}>
@@ -380,7 +398,7 @@ export default function StakingPage() {
                 className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 pr-20 text-white font-mono text-lg placeholder-gray-600 focus:outline-none"
                 style={{ borderColor: stakeAmount ? `${CYAN}60` : undefined }} />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <button onClick={() => setStakeAmount(String(mockBalance))}
+                <button onClick={() => setStakeAmount(String(userBalance))}
                   className="px-2 py-1 rounded-md text-[10px] font-mono font-bold"
                   style={{ background: `${CYAN}20`, color: CYAN }}>MAX</button>
                 <span className="text-xs font-mono text-gray-500">JUL</span>
@@ -398,7 +416,7 @@ export default function StakingPage() {
             </motion.button>
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-gray-500">
-            <span>Balance: {fmt(mockBalance)} JUL</span>
+            <span>Balance: {fmt(userBalance)} JUL</span>
             <span>Tier: {activeTier.label} ({activeTier.mult}x) @ {activeTier.apy}% APY</span>
           </div>
         </GlassCard>
@@ -407,43 +425,49 @@ export default function StakingPage() {
       {/* ============ 5. Validator Grid ============ */}
       <Section num="05" title="Validator Grid" delay={0.26}>
         <GlassCard glowColor="terminal" className="overflow-hidden">
-          <div className="hidden sm:grid grid-cols-6 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
-            <div>Validator</div><div>Uptime</div><div>Commission</div><div>Delegated</div><div>Delegators</div><div className="text-right">Delegate</div>
-          </div>
-          {VALIDATORS.map((v, i) => (
-            <motion.div key={v.name} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.28 + i * (0.04 * PHI) }}
-              className={`grid grid-cols-2 sm:grid-cols-6 gap-2 px-5 py-3 border-b border-gray-800/50 items-center cursor-pointer transition-colors ${selectedValidator === i ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
-              onClick={() => setSelectedValidator(i)}>
-              <div className="font-mono text-sm text-white font-bold">{v.name}
-                <div className="text-[10px] text-gray-600">{v.address}</div>
+          {validators.length === 0 ? (
+            <div className="text-center font-mono text-sm text-gray-500 py-8">No validators delegated yet</div>
+          ) : (
+            <>
+              <div className="hidden sm:grid grid-cols-6 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
+                <div>Validator</div><div>Uptime</div><div>Commission</div><div>Delegated</div><div>Delegators</div><div className="text-right">Delegate</div>
               </div>
-              <div className="font-mono text-sm" style={{ color: v.uptime >= 99.9 ? '#34d399' : '#fbbf24' }}>{v.uptime}%</div>
-              <div className="font-mono text-sm text-gray-400">{v.commission}%</div>
-              <div className="font-mono text-sm text-gray-300">{fmt(v.delegated)}</div>
-              <div className="font-mono text-sm text-gray-400">{v.delegators}</div>
-              <div className="text-right">
-                {selectedValidator === i ? (
-                  <span className="px-2 py-1 rounded-md text-[10px] font-mono font-bold" style={{ background: `${CYAN}20`, color: CYAN }}>
-                    Delegated
-                  </span>
-                ) : (
-                  <div className="w-4 h-4 rounded-full border-2 inline-flex items-center justify-center" style={{ borderColor: '#4b5563' }} />
-                )}
-              </div>
-            </motion.div>
-          ))}
+              {validators.map((v, i) => (
+                <motion.div key={v.name} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.28 + i * (0.04 * PHI) }}
+                  className={`grid grid-cols-2 sm:grid-cols-6 gap-2 px-5 py-3 border-b border-gray-800/50 items-center cursor-pointer transition-colors ${selectedValidator === i ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
+                  onClick={() => setSelectedValidator(i)}>
+                  <div className="font-mono text-sm text-white font-bold">{v.name}
+                    <div className="text-[10px] text-gray-600">{v.address}</div>
+                  </div>
+                  <div className="font-mono text-sm" style={{ color: v.uptime >= 99.9 ? '#34d399' : '#fbbf24' }}>{v.uptime}%</div>
+                  <div className="font-mono text-sm text-gray-400">{v.commission}%</div>
+                  <div className="font-mono text-sm text-gray-300">{fmt(v.delegated)}</div>
+                  <div className="font-mono text-sm text-gray-400">{v.delegators}</div>
+                  <div className="text-right">
+                    {selectedValidator === i ? (
+                      <span className="px-2 py-1 rounded-md text-[10px] font-mono font-bold" style={{ background: `${CYAN}20`, color: CYAN }}>
+                        Delegated
+                      </span>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 inline-flex items-center justify-center" style={{ borderColor: '#4b5563' }} />
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </>
+          )}
         </GlassCard>
       </Section>
 
       {/* ============ 6. Unstaking Queue ============ */}
       <Section num="06" title="Unstaking Queue" delay={0.30}>
         <GlassCard glowColor="terminal" className="p-5">
-          {UNSTAKING_QUEUE.length === 0 ? (
+          {unstakingQueue.length === 0 ? (
             <div className="text-center font-mono text-sm text-gray-500 py-4">No pending unstakes</div>
           ) : (
             <div className="space-y-3">
-              {UNSTAKING_QUEUE.map((q) => {
+              {unstakingQueue.map((q) => {
                 const remaining = daysUntil(q.available)
                 const hrs = hoursUntil(q.available)
                 const progress = Math.min(1, 1 - remaining / q.cooldown)
@@ -480,62 +504,32 @@ export default function StakingPage() {
       {/* ============ 7. Reward History Chart ============ */}
       <Section num="07" title="Reward History (30d)" delay={0.34}>
         <GlassCard glowColor="terminal" className="p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="font-mono text-xs text-gray-400">Daily staking rewards (JUL)</div>
-            <div className="font-mono text-sm font-bold" style={{ color: CYAN }}>
-              {fmt(DAILY_REWARDS.reduce((s, d) => s + d.reward, 0))} JUL total
-            </div>
-          </div>
-          <RewardChart data={DAILY_REWARDS} />
+          {dailyRewards.length === 0 ? (
+            <div className="text-center font-mono text-sm text-gray-500 py-4">No rewards earned yet</div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-mono text-xs text-gray-400">Daily staking rewards (JUL)</div>
+                <div className="font-mono text-sm font-bold" style={{ color: CYAN }}>
+                  {fmt(dailyRewards.reduce((s, d) => s + d.reward, 0))} JUL total
+                </div>
+              </div>
+              <RewardChart data={dailyRewards} />
+            </>
+          )}
         </GlassCard>
       </Section>
 
       {/* ============ 8. veJUL Power ============ */}
       <Section num="08" title="veJUL Power" delay={0.38}>
         <GlassCard glowColor="terminal" className="p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="relative w-20 h-20 shrink-0">
-                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#1f2937" strokeWidth="8" />
-                    <motion.circle cx="50" cy="50" r="40" fill="none" stroke={CYAN} strokeWidth="8"
-                      strokeLinecap="round" strokeDasharray={2 * Math.PI * 40}
-                      initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
-                      animate={{ strokeDashoffset: 2 * Math.PI * 40 * (1 - veJUL.power / veJUL.maxPower) }}
-                      transition={{ duration: PHI, ease: 'easeOut' }}
-                      style={{ filter: `drop-shadow(0 0 6px ${CYAN}60)` }} />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-sm font-mono font-bold text-white">{fmt(veJUL.power)}</div>
-                    <div className="text-[8px] font-mono text-gray-500">veJUL</div>
-                  </div>
-                </div>
-                <div>
-                  <div className="font-mono text-xs text-gray-400">Locked</div>
-                  <div className="font-mono text-lg font-bold text-white">{fmt(veJUL.locked)} JUL</div>
-                  <div className="font-mono text-[10px] text-gray-500">{veJUL.remaining}d remaining of {veJUL.lockDays}d lock</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
-                  <div className="font-mono text-xs text-gray-400">Governance Weight</div>
-                  <div className="font-mono text-sm font-bold" style={{ color: CYAN }}>{((veJUL.power / veJUL.maxPower) * 100).toFixed(1)}%</div>
-                </div>
-                <div className="p-2 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
-                  <div className="font-mono text-xs text-gray-400">Decay Rate</div>
-                  <div className="font-mono text-sm font-bold text-gray-300">{(veJUL.locked / veJUL.lockDays).toFixed(1)}/d</div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <div className="font-mono text-xs text-gray-400 mb-2">veJUL Decay Curve</div>
-              <DecayCurve lockDays={veJUL.lockDays} currentDay={veJUL.elapsed} />
-              <p className="font-mono text-[10px] text-gray-500 mt-3 leading-relaxed">
-                veJUL decays linearly from lock amount to zero over the lock period.
-                Longer locks give more governance weight. Re-lock to restore full power.
+          {veJUL.locked === 0 ? (
+            <div className="text-center py-4">
+              <div className="font-mono text-sm text-gray-500 mb-2">No JUL locked yet</div>
+              <p className="font-mono text-[10px] text-gray-600 leading-relaxed max-w-sm mx-auto">
+                Lock JUL to earn veJUL governance power. Longer locks give more weight.
               </p>
-              <div className="grid grid-cols-3 gap-1 mt-3">
+              <div className="grid grid-cols-3 gap-1 mt-4 max-w-xs mx-auto">
                 {[
                   { lock: '3m', mult: '1.5x' },
                   { lock: '6m', mult: '2x' },
@@ -548,7 +542,64 @@ export default function StakingPage() {
                 ))}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative w-20 h-20 shrink-0">
+                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#1f2937" strokeWidth="8" />
+                      <motion.circle cx="50" cy="50" r="40" fill="none" stroke={CYAN} strokeWidth="8"
+                        strokeLinecap="round" strokeDasharray={2 * Math.PI * 40}
+                        initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
+                        animate={{ strokeDashoffset: 2 * Math.PI * 40 * (1 - veJUL.power / veJUL.maxPower) }}
+                        transition={{ duration: PHI, ease: 'easeOut' }}
+                        style={{ filter: `drop-shadow(0 0 6px ${CYAN}60)` }} />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <div className="text-sm font-mono font-bold text-white">{fmt(veJUL.power)}</div>
+                      <div className="text-[8px] font-mono text-gray-500">veJUL</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-xs text-gray-400">Locked</div>
+                    <div className="font-mono text-lg font-bold text-white">{fmt(veJUL.locked)} JUL</div>
+                    <div className="font-mono text-[10px] text-gray-500">{veJUL.remaining}d remaining of {veJUL.lockDays}d lock</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
+                    <div className="font-mono text-xs text-gray-400">Governance Weight</div>
+                    <div className="font-mono text-sm font-bold" style={{ color: CYAN }}>{((veJUL.power / veJUL.maxPower) * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="p-2 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
+                    <div className="font-mono text-xs text-gray-400">Decay Rate</div>
+                    <div className="font-mono text-sm font-bold text-gray-300">{(veJUL.locked / veJUL.lockDays).toFixed(1)}/d</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-xs text-gray-400 mb-2">veJUL Decay Curve</div>
+                <DecayCurve lockDays={veJUL.lockDays} currentDay={veJUL.elapsed} />
+                <p className="font-mono text-[10px] text-gray-500 mt-3 leading-relaxed">
+                  veJUL decays linearly from lock amount to zero over the lock period.
+                  Longer locks give more governance weight. Re-lock to restore full power.
+                </p>
+                <div className="grid grid-cols-3 gap-1 mt-3">
+                  {[
+                    { lock: '3m', mult: '1.5x' },
+                    { lock: '6m', mult: '2x' },
+                    { lock: '1y', mult: '3x' },
+                  ].map(v => (
+                    <div key={v.lock} className="p-1.5 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
+                      <div className="font-mono text-[10px] text-gray-500">{v.lock}</div>
+                      <div className="font-mono text-xs font-bold" style={{ color: CYAN }}>{v.mult} VP</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </GlassCard>
       </Section>
 
@@ -613,64 +664,72 @@ export default function StakingPage() {
       {/* ============ 11. Staking History Timeline ============ */}
       <Section num="11" title="Staking History" delay={0.50}>
         <GlassCard glowColor="terminal" className="p-5">
-          <div className="space-y-0">
-            {STAKING_HISTORY.map((ev, i) => (
-              <div key={ev.id} className="flex items-start gap-3 pb-4 relative">
-                {i < STAKING_HISTORY.length - 1 && (
-                  <div className="absolute left-[7px] top-5 w-px h-full" style={{ background: '#1f2937' }} />
-                )}
-                <div className="w-4 h-4 rounded-full shrink-0 mt-0.5 border-2 z-10"
-                  style={{
-                    borderColor: ev.action === 'Stake' ? CYAN : ev.action === 'Claim' ? '#34d399' : '#f87171',
-                    background: '#0a0a0a',
-                  }} />
-                <div className="flex-1 flex items-center justify-between">
-                  <div>
-                    <span className="font-mono text-sm font-bold" style={{
-                      color: ev.action === 'Stake' ? CYAN : ev.action === 'Claim' ? '#34d399' : '#f87171',
-                    }}>{ev.action}</span>
-                    <span className="font-mono text-sm text-white ml-2">{fmt(ev.amount)} JUL</span>
-                    {ev.tier && <span className="font-mono text-[10px] text-gray-500 ml-2">({ev.tier})</span>}
+          {stakingHistory.length === 0 ? (
+            <div className="text-center font-mono text-sm text-gray-500 py-4">No staking history yet</div>
+          ) : (
+            <div className="space-y-0">
+              {stakingHistory.map((ev, i) => (
+                <div key={ev.id} className="flex items-start gap-3 pb-4 relative">
+                  {i < stakingHistory.length - 1 && (
+                    <div className="absolute left-[7px] top-5 w-px h-full" style={{ background: '#1f2937' }} />
+                  )}
+                  <div className="w-4 h-4 rounded-full shrink-0 mt-0.5 border-2 z-10"
+                    style={{
+                      borderColor: ev.action === 'Stake' ? CYAN : ev.action === 'Claim' ? '#34d399' : '#f87171',
+                      background: '#0a0a0a',
+                    }} />
+                  <div className="flex-1 flex items-center justify-between">
+                    <div>
+                      <span className="font-mono text-sm font-bold" style={{
+                        color: ev.action === 'Stake' ? CYAN : ev.action === 'Claim' ? '#34d399' : '#f87171',
+                      }}>{ev.action}</span>
+                      <span className="font-mono text-sm text-white ml-2">{fmt(ev.amount)} JUL</span>
+                      {ev.tier && <span className="font-mono text-[10px] text-gray-500 ml-2">({ev.tier})</span>}
+                    </div>
+                    <span className="font-mono text-[10px] text-gray-600">{fmtDate(ev.date)}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-gray-600">{fmtDate(ev.date)}</span>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </GlassCard>
       </Section>
 
       {/* ============ 12. Your Staking Progress ============ */}
       <Section num="12" title="Your Staking Progress" delay={0.54}>
         <GlassCard glowColor="terminal" className="p-5">
-          <div className="space-y-4">
-            {TIERS.map((tier) => {
-              const staked = tier.id === 'bronze' ? 2000 : tier.id === 'silver' ? 5000 : tier.id === 'gold' ? 12500 : tier.id === 'platinum' ? 3200 : 0
-              const cap = 50000
-              const pct = (staked / cap) * 100
-              return (
-                <div key={tier.id}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-xs font-bold" style={{ color: tier.color }}>{tier.icon} {tier.label} ({tier.lock || 'none'})</span>
-                    <span className="font-mono text-[10px] text-gray-500">{fmt(staked)} / {fmt(cap)} JUL</span>
+          {isConnected ? (
+            <div className="text-center font-mono text-sm text-gray-500 py-4">No staking positions yet</div>
+          ) : (
+            <div className="space-y-4">
+              {TIERS.map((tier) => {
+                const staked = tier.id === 'bronze' ? 2000 : tier.id === 'silver' ? 5000 : tier.id === 'gold' ? 12500 : tier.id === 'platinum' ? 3200 : 0
+                const cap = 50000
+                const pct = (staked / cap) * 100
+                return (
+                  <div key={tier.id}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-mono text-xs font-bold" style={{ color: tier.color }}>{tier.icon} {tier.label} ({tier.lock || 'none'})</span>
+                      <span className="font-mono text-[10px] text-gray-500">{fmt(staked)} / {fmt(cap)} JUL</span>
+                    </div>
+                    <div className="h-3 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
+                      <motion.div className="h-full rounded-full relative"
+                        style={{ background: `linear-gradient(90deg, ${tier.color}80, ${tier.color})` }}
+                        initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                        transition={{ duration: PHI, ease: 'easeOut' }}>
+                        {pct > 5 && (
+                          <motion.div className="absolute inset-0 rounded-full"
+                            style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)' }}
+                            animate={{ x: ['-100%', '200%'] }}
+                            transition={{ duration: 2, repeat: Infinity, repeatDelay: 3, ease: 'easeInOut' }} />
+                        )}
+                      </motion.div>
+                    </div>
                   </div>
-                  <div className="h-3 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
-                    <motion.div className="h-full rounded-full relative"
-                      style={{ background: `linear-gradient(90deg, ${tier.color}80, ${tier.color})` }}
-                      initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                      transition={{ duration: PHI, ease: 'easeOut' }}>
-                      {pct > 5 && (
-                        <motion.div className="absolute inset-0 rounded-full"
-                          style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)' }}
-                          animate={{ x: ['-100%', '200%'] }}
-                          transition={{ duration: 2, repeat: Infinity, repeatDelay: 3, ease: 'easeInOut' }} />
-                      )}
-                    </motion.div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </GlassCard>
       </Section>
 

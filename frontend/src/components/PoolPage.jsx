@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
+import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
@@ -39,7 +41,7 @@ function buildPools() {
   })
 }
 
-const POSITIONS = [
+const MOCK_POSITIONS = [
   { id:'pos-1', tokenA:TK.ETH, tokenB:TK.USDC, share:0.0042, value:12480,
     unclaimedFees:34.21, ilPercent:-0.8, ilProtected:true, coveragePct:85, loyaltyTier:'Gold' },
   { id:'pos-2', tokenA:TK.WBTC, tokenB:TK.ETH, share:0.0018, value:5230,
@@ -346,13 +348,19 @@ function CreatePoolModal({ onClose }) {
 
 // ============ Main Component ============
 function PoolPage() {
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
+
   const [sort, setSort] = useState({ key: 'tvl', dir: 'desc' })
   const [selectedPool, setSelectedPool] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
 
+  // Protocol data: always show pools. User data: only show mock positions in demo mode.
   const pools = useMemo(() => buildPools(), [])
-  const userTotal = useMemo(() => POSITIONS.reduce((s, p) => s + p.value, 0), [])
+  const positions = isConnected ? [] : MOCK_POSITIONS
+  const userTotal = useMemo(() => positions.reduce((s, p) => s + p.value, 0), [positions])
 
   const sorted = useMemo(() => [...pools].sort((a, b) => {
     const m = sort.dir === 'desc' ? -1 : 1
@@ -387,15 +395,15 @@ function PoolPage() {
         </motion.div>
 
         {/* Your Positions */}
-        {POSITIONS.length > 0 && (
+        {positions.length > 0 && (
           <motion.section initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
             transition={{ delay: STAGGER * 2, duration: STAGGER * PHI }} className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Your Positions</h2>
-              <span className="text-[10px] font-mono text-black-500">{POSITIONS.length} active</span>
+              <span className="text-[10px] font-mono text-black-500">{positions.length} active</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {POSITIONS.map((pos, i) => <PositionCard key={pos.id} p={pos} i={i} />)}
+              {positions.map((pos, i) => <PositionCard key={pos.id} p={pos} i={i} />)}
             </div>
           </motion.section>
         )}

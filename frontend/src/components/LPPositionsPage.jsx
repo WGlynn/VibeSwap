@@ -424,10 +424,12 @@ export default function LPPositionsPage() {
   const [selectedPosition, setSelectedPosition] = useState(null)
   const [showRangeSelector, setShowRangeSelector] = useState(false)
   const [chartPosition, setChartPosition] = useState(null)
-  const positions = useMemo(() => buildPositions(), [])
+  const mockPositions = useMemo(() => buildPositions(), [])
+  // Only show mock positions in demo mode (no wallet connected). Connected wallets see real data (empty for now).
+  const positions = isConnected ? [] : mockPositions
   const totals = useMemo(() => ({
     value: positions.reduce((s, p) => s + p.value, 0), fees: positions.reduce((s, p) => s + p.feesEarned, 0),
-    ilTotal: positions.reduce((s, p) => s + p.ilAmount, 0), avgApr: positions.reduce((s, p) => s + p.apr, 0) / positions.length,
+    ilTotal: positions.reduce((s, p) => s + p.ilAmount, 0), avgApr: positions.length > 0 ? positions.reduce((s, p) => s + p.apr, 0) / positions.length : 0,
   }), [positions])
   const handleManage = useCallback((pos, action) => {
     if (action === 'add' || action === 'remove') { setSelectedPosition(pos); setShowRangeSelector(true) }
@@ -479,6 +481,11 @@ export default function LPPositionsPage() {
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={connect}
                   className="px-6 py-2.5 rounded-xl text-sm font-medium"
                   style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)`, color: '#000' }}>Connect Wallet</motion.button>
+              </div>
+            ) : positions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-black-400 text-sm mb-2">No liquidity positions found</p>
+                <p className="text-black-500 text-xs">Add liquidity to a pool to start earning fees and Shapley rewards</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

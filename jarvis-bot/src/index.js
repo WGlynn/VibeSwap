@@ -317,6 +317,8 @@ import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from '.
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
 import { initShardMemory, observe as observeMemory, buildMemoryContext, getMemoryStats } from './shard-memory.js';
+import { initRewardSignals, extractSignal } from './reward-signal.js';
+import { initSelfImprove, recordRollout, getSelfImproveStats } from './self-improve.js';
 import { initLimni, flushLimni, getLimniStats, registerTerminal, registerVPS, checkTerminalHealth, checkAllVPS, listStrategies, getStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, onAlert, strategyPipeline, deployStrategy, listBacktests, getBacktestResult, fetchTrades } from './limni.js';
 import { registerKataraktiStrategies, formatPerformanceSummary } from './katarakti.js';
 import { createServer } from 'http';
@@ -6795,6 +6797,30 @@ bot.on('text', async (ctx) => {
       });
     } catch {}
 
+    // Loop 3: Reward signal extraction — implicit score from user behavior (non-blocking)
+    // Uses previous bot response + current user message to detect re-asks, corrections, thanks
+    try {
+      const signal = extractSignal(
+        ctx.message.text,
+        response.text,           // What bot just said
+        ctx.message.reply_to_message?.text || null, // Previous context
+        { userId: String(ctx.from.id), chatId: String(chatId), chatType }
+      );
+
+      // Loop 2: Record complete rollout for adaptation engine
+      if (signal) {
+        recordRollout({
+          userId: String(ctx.from.id),
+          chatId: String(chatId),
+          userMessage: ctx.message.text?.slice(0, 200),
+          botResponse: response.text?.slice(0, 200),
+          signal: { type: signal.type, weight: signal.weight },
+          provider: response._provider || null,
+          timestamp: Date.now(),
+        });
+      }
+    } catch {}
+
     // Detect timezone from message (non-blocking)
     const detectedTz = detectTimezone(ctx.message.text);
     if (detectedTz) {
@@ -7262,6 +7288,8 @@ async function main() {
     initEmissions(),
     loadWorkflowStats(),
     initShardMemory().catch(err => console.warn(`[jarvis] Shard memory init failed: ${err.message}`)),
+    initRewardSignals().catch(err => console.warn(`[jarvis] Reward signals init failed: ${err.message}`)),
+    initSelfImprove().catch(err => console.warn(`[jarvis] Self-improve init failed: ${err.message}`)),
   ]);
 
   // Group C: MI Host (depends on nothing but may fail — keep isolated)

@@ -577,9 +577,8 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
 
 // ============ Position Summary ============
 function PositionSummary({ isConnected }) {
-  if (!isConnected) return null
-
-  const positions = useMemo(() => {
+  // Mock positions for demo mode (not connected)
+  const mockPositions = useMemo(() => {
     const rng = seededRandom(31337)
     return [
       { pair: 'ETH/USDC', side: 'Long', size: '1.5 ETH', entry: 2780, current: 2800 + (rng() - 0.3) * 40 },
@@ -595,6 +594,9 @@ function PositionSummary({ isConnected }) {
     })
   }, [])
 
+  // When connected, show real positions (empty for now); when not connected, show mock data
+  const positions = isConnected ? [] : mockPositions
+
   const [closingIdx, setClosingIdx] = useState(null)
 
   const handleClose = (idx) => {
@@ -603,6 +605,14 @@ function PositionSummary({ isConnected }) {
       toast.success(`Closed ${positions[idx].pair} position`)
       setClosingIdx(null)
     }, 800)
+  }
+
+  if (positions.length === 0) {
+    return (
+      <div className="text-center py-6 text-black-500 text-sm">
+        {isConnected ? 'No open positions' : 'Connect wallet to view positions'}
+      </div>
+    )
   }
 
   return (
@@ -861,11 +871,6 @@ export default function TradingPage() {
             {/* Position Summary */}
             <GlassCard glowColor="terminal" className="p-4">
               <PositionSummary isConnected={isConnected} />
-              {!isConnected && (
-                <div className="text-center py-6 text-black-500 text-sm">
-                  Connect wallet to view positions
-                </div>
-              )}
             </GlassCard>
           </div>
 

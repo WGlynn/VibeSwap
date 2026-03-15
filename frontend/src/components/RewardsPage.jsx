@@ -4,6 +4,8 @@ import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
 import Sparkline, { generateSparklineData } from './ui/Sparkline'
+import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 
 // ============ Rewards Dashboard ============
 // Comprehensive rewards page: overview stats, Shapley attribution,
@@ -166,27 +168,40 @@ function TierBadge({ tier, size = 'lg' }) {
 
 // ============ Main Component ============
 export default function RewardsPage() {
-  const [isClaiming, setIsClaiming] = useState(false)
-  // Seeded mock data — stable across renders
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
 
-  const totalEarned = 4_218.47
-  const unclaimed = 347.82
-  const streakBonus = 1.35
-  const currentTier = 'Gold'
-  const tierProgress = 68
-  const daysActive = 127
-  const referralCount = 14
-  const referralEarnings = 284.60
+  const [isClaiming, setIsClaiming] = useState(false)
+
+  // When connected: real data (zeros for new wallet)
+  // When not connected: demo mock data
+  const totalEarned = isConnected ? 0 : 4_218.47
+  const unclaimed = isConnected ? 0 : 347.82
+  const streakBonus = isConnected ? 1.0 : 1.35
+  const currentTier = isConnected ? 'Bronze' : 'Gold'
+  const tierProgress = isConnected ? 0 : 68
+  const daysActive = isConnected ? 0 : 127
+  const referralCount = isConnected ? 0 : 14
+  const referralEarnings = isConnected ? 0 : 284.60
   const referralLink = 'vibeswap.io/r/0x7F3a'
 
-  const rewardSources = useMemo(() => [
-    { label: 'Trading Fees',    amount: 1842.30, pct: 43.7, seed: 5001, color: '#22c55e' },
-    { label: 'LP Provision',    amount: 1523.17, pct: 36.1, seed: 5002, color: '#3b82f6' },
-    { label: 'Governance',      amount: 568.40,  pct: 13.5, seed: 5003, color: '#a855f7' },
-    { label: 'Referrals',       amount: 284.60,  pct: 6.7,  seed: 5004, color: '#f59e0b' },
-  ], [])
+  const rewardSources = useMemo(() => {
+    if (isConnected) return [
+      { label: 'Trading Fees',    amount: 0, pct: 0, seed: 5001, color: '#22c55e' },
+      { label: 'LP Provision',    amount: 0, pct: 0, seed: 5002, color: '#3b82f6' },
+      { label: 'Governance',      amount: 0, pct: 0, seed: 5003, color: '#a855f7' },
+      { label: 'Referrals',       amount: 0, pct: 0, seed: 5004, color: '#f59e0b' },
+    ]
+    return [
+      { label: 'Trading Fees',    amount: 1842.30, pct: 43.7, seed: 5001, color: '#22c55e' },
+      { label: 'LP Provision',    amount: 1523.17, pct: 36.1, seed: 5002, color: '#3b82f6' },
+      { label: 'Governance',      amount: 568.40,  pct: 13.5, seed: 5003, color: '#a855f7' },
+      { label: 'Referrals',       amount: 284.60,  pct: 6.7,  seed: 5004, color: '#f59e0b' },
+    ]
+  }, [isConnected])
 
-  const rewardHistory = useMemo(() => generateRewardHistory(8888, 20), [])
+  const rewardHistory = useMemo(() => isConnected ? [] : generateRewardHistory(8888, 20), [isConnected])
 
   const earnedSparkData = useMemo(() => generateSparklineData(6001, 20, 0.025), [])
   const unclaimedSparkData = useMemo(() => generateSparklineData(6002, 20, 0.04), [])
@@ -471,32 +486,38 @@ export default function RewardsPage() {
             transition={{ duration: 1 / PHI, ease: 'easeOut' }}
           >
             <GlassCard glowColor="matrix" className="p-5">
-              <div className="grid grid-cols-12 gap-2 pb-2 mb-2 border-b border-black-700/30 text-[10px] font-mono text-black-500 uppercase">
-                <div className="col-span-3">Date</div>
-                <div className="col-span-2 text-right">Amount</div>
-                <div className="col-span-3">Source</div>
-                <div className="col-span-2">Pool</div>
-                <div className="col-span-2 text-right">Batch</div>
-              </div>
-              <div className="space-y-0.5 max-h-[400px] overflow-y-auto scrollbar-hide">
-                {rewardHistory.map((entry, i) => {
-                  const sc = { 'Trading Fees': 'text-green-400', 'LP Provision': 'text-blue-400', 'Governance': 'text-purple-400', 'Referrals': 'text-amber-400' }
-                  const ts = entry.date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                  return (
-                    <motion.div key={entry.id} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.02, duration: 0.3 }} className="grid grid-cols-12 gap-2 py-2 border-b border-black-700/15 text-[11px] font-mono hover:bg-white/[0.02] rounded transition-colors">
-                      <div className="col-span-3 text-black-400 truncate">{ts}</div>
-                      <div className="col-span-2 text-right text-green-400 font-bold">+${entry.amount.toFixed(2)}</div>
-                      <div className={`col-span-3 ${sc[entry.source] || 'text-black-400'}`}>{entry.source}</div>
-                      <div className="col-span-2 text-black-400 truncate">{entry.pool}</div>
-                      <div className="col-span-2 text-right text-black-500">#{entry.batch}</div>
-                    </motion.div>
-                  )
-                })}
-              </div>
-              <div className="mt-3 pt-3 border-t border-black-700/30 flex items-center justify-between">
-                <span className="text-[10px] font-mono text-black-500">Showing last 20 distributions</span>
-                <span className="text-[10px] font-mono text-green-400">Total: ${rewardHistory.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}</span>
-              </div>
+              {rewardHistory.length === 0 ? (
+                <div className="text-center font-mono text-sm text-gray-500 py-8">No reward history yet</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-12 gap-2 pb-2 mb-2 border-b border-black-700/30 text-[10px] font-mono text-black-500 uppercase">
+                    <div className="col-span-3">Date</div>
+                    <div className="col-span-2 text-right">Amount</div>
+                    <div className="col-span-3">Source</div>
+                    <div className="col-span-2">Pool</div>
+                    <div className="col-span-2 text-right">Batch</div>
+                  </div>
+                  <div className="space-y-0.5 max-h-[400px] overflow-y-auto scrollbar-hide">
+                    {rewardHistory.map((entry, i) => {
+                      const sc = { 'Trading Fees': 'text-green-400', 'LP Provision': 'text-blue-400', 'Governance': 'text-purple-400', 'Referrals': 'text-amber-400' }
+                      const ts = entry.date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <motion.div key={entry.id} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.02, duration: 0.3 }} className="grid grid-cols-12 gap-2 py-2 border-b border-black-700/15 text-[11px] font-mono hover:bg-white/[0.02] rounded transition-colors">
+                          <div className="col-span-3 text-black-400 truncate">{ts}</div>
+                          <div className="col-span-2 text-right text-green-400 font-bold">+${entry.amount.toFixed(2)}</div>
+                          <div className={`col-span-3 ${sc[entry.source] || 'text-black-400'}`}>{entry.source}</div>
+                          <div className="col-span-2 text-black-400 truncate">{entry.pool}</div>
+                          <div className="col-span-2 text-right text-black-500">#{entry.batch}</div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-black-700/30 flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-black-500">Showing last 20 distributions</span>
+                    <span className="text-[10px] font-mono text-green-400">Total: ${rewardHistory.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}</span>
+                  </div>
+                </>
+              )}
             </GlassCard>
           </motion.div>
         </section>

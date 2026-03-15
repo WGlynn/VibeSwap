@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
+import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
@@ -315,7 +317,7 @@ function TransactionRow({ tx, index }) {
 
 // ============ Empty State ============
 
-function EmptyState({ filter }) {
+function EmptyState({ filter, isConnected }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -328,11 +330,15 @@ function EmptyState({ filter }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-white mb-1">No transactions found</h3>
+        <h3 className="text-lg font-semibold text-white mb-1">
+          {isConnected ? 'No recent activity' : 'No transactions found'}
+        </h3>
         <p className="text-sm text-black-500 max-w-xs mx-auto">
-          {filter === 'all'
+          {isConnected
             ? 'Your transaction history will appear here once you start trading.'
-            : `No ${filter} transactions yet. Try a different filter or start trading.`}
+            : filter === 'all'
+              ? 'Your transaction history will appear here once you start trading.'
+              : `No ${filter} transactions yet. Try a different filter or start trading.`}
         </p>
       </GlassCard>
     </motion.div>
@@ -342,10 +348,15 @@ function EmptyState({ filter }) {
 // ============ Main Component ============
 
 function ActivityPage() {
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
+
   const [activeFilter, setActiveFilter] = useState('all')
 
-  // Generate deterministic mock transactions once
-  const allTransactions = useMemo(() => generateMockTransactions(), [])
+  // Mock transactions for demo mode; real data (empty) when wallet connected
+  const mockTransactions = useMemo(() => generateMockTransactions(), [])
+  const allTransactions = isConnected ? [] : mockTransactions
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -506,7 +517,7 @@ function ActivityPage() {
 
         {/* ============ Transaction List ============ */}
         {filteredTransactions.length === 0 ? (
-          <EmptyState filter={activeFilter} />
+          <EmptyState filter={activeFilter} isConnected={isConnected} />
         ) : (
           <div className="space-y-6">
             {groupedTransactions.map(group => {

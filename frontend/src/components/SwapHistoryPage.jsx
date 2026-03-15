@@ -331,10 +331,13 @@ function SwapHistoryPage() {
   const [maxAmount, setMaxAmount] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const uniquePairs = useMemo(() => Array.from(new Set(MOCK_SWAPS.map(s => `${s.fromToken}/${s.toToken}`))).sort(), [])
+  // When connected, show real data (empty for now); when not connected, show mock data for demo
+  const allSwaps = isConnected ? [] : MOCK_SWAPS
+
+  const uniquePairs = useMemo(() => Array.from(new Set(allSwaps.map(s => `${s.fromToken}/${s.toToken}`))).sort(), [allSwaps])
 
   const filteredSwaps = useMemo(() => {
-    let list = [...MOCK_SWAPS]
+    let list = [...allSwaps]
     if (dateRange !== 'all') {
       const c = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '90d': 7776e6 }
       if (c[dateRange]) list = list.filter(s => Date.now() - s.timestamp <= c[dateRange])
@@ -344,14 +347,14 @@ function SwapHistoryPage() {
     const mn = parseFloat(minAmount); if (!isNaN(mn) && mn > 0) list = list.filter(s => s.fromUsd >= mn)
     const mx = parseFloat(maxAmount); if (!isNaN(mx) && mx > 0) list = list.filter(s => s.fromUsd <= mx)
     return list
-  }, [dateRange, pairFilter, chainFilter, minAmount, maxAmount])
+  }, [allSwaps, dateRange, pairFilter, chainFilter, minAmount, maxAmount])
 
   const stats = useMemo(() => {
-    const vol = MOCK_SWAPS.reduce((a, s) => a + s.fromUsd, 0)
-    const mev = MOCK_SWAPS.reduce((a, s) => a + s.mevSavings, 0)
-    const fees = MOCK_SWAPS.reduce((a, s) => a + s.feesPaid, 0)
-    return { totalSwaps: MOCK_SWAPS.length, totalVolume: vol, avgSaved: MOCK_SWAPS.length ? mev / MOCK_SWAPS.length : 0, totalFees: fees }
-  }, [])
+    const vol = allSwaps.reduce((a, s) => a + s.fromUsd, 0)
+    const mev = allSwaps.reduce((a, s) => a + s.mevSavings, 0)
+    const fees = allSwaps.reduce((a, s) => a + s.feesPaid, 0)
+    return { totalSwaps: allSwaps.length, totalVolume: vol, avgSaved: allSwaps.length ? mev / allSwaps.length : 0, totalFees: fees }
+  }, [allSwaps])
 
   const handleExportCSV = useCallback(() => {
     const hdr = 'Date,Time,From Token,From Amount,To Token,To Amount,Value (USD),Rate,Chain,Batch,MEV Saved,Fee,Price Impact,Gas,Block,Tx Hash'
@@ -464,7 +467,7 @@ function SwapHistoryPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-1">No swaps found</h3>
+              <h3 className="text-lg font-semibold text-white mb-1">{isConnected ? 'No swap history yet' : 'No swaps found'}</h3>
               <p className="text-sm text-black-500 max-w-xs mx-auto">Your swap history will appear here once you execute trades through VibeSwap batch auctions.</p>
             </GlassCard>
           </motion.div>
@@ -479,12 +482,12 @@ function SwapHistoryPage() {
 
         {/* Monthly Volume Chart */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: FADE, delay: STAGGER * 4, ease }} className="mt-8">
-          <MonthlyVolumeChart swaps={MOCK_SWAPS} />
+          <MonthlyVolumeChart swaps={allSwaps} />
         </motion.div>
 
         {/* Most Traded Pairs */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: FADE, delay: STAGGER * 5, ease }} className="mt-4">
-          <MostTradedPairs swaps={MOCK_SWAPS} />
+          <MostTradedPairs swaps={allSwaps} />
         </motion.div>
 
         {/* Footer */}

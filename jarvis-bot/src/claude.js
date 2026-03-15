@@ -11,6 +11,12 @@ import { summarizeIfNeeded, getContextSummary } from './context-memory.js';
 import { checkBudget, recordUsage } from './compute-economics.js';
 import { getGroupContext } from './group-context.js';
 import { evaluateOwnResponse, appendScoreLog } from './intelligence.js';
+// Shard memory — compressed semantic memory for cross-shard context
+let observeMemory = () => {};
+try {
+  const sm = await import('./shard-memory.js');
+  observeMemory = sm.observe;
+} catch {}
 import { getLimniStats, registerTerminal, registerVPS, listStrategies, getStrategy, registerStrategy, checkTerminalHealth, checkAllVPS, fetchTrades, verifyTrade, strategyPipeline, deployStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, runBacktest, listBacktests, getBacktestResult } from './limni.js';
 import { registerKataraktiStrategies, validateCryptoTrade, kellyPositionSize, formatPerformanceSummary } from './katarakti.js';
 import { gitCommitAndPush } from './git.js';

@@ -135,6 +135,9 @@ export function DeviceWalletProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false)
   const [address, setAddress] = useState(null)
   const [error, setError] = useState(null)
+  // Track whether a stored wallet exists (for showing "Sign In" vs "Get Started")
+  const [hasStoredWallet, setHasStoredWallet] = useState(false)
+  const [storedAddress, setStoredAddress] = useState(null)
 
   // Check support on mount
   useEffect(() => {
@@ -147,13 +150,14 @@ export function DeviceWalletProvider({ children }) {
         setIsAvailable(available)
       }
 
-      // Check if we have a stored wallet
+      // Check if we have a stored wallet — but do NOT auto-connect
+      // User must explicitly sign in each session
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         try {
-          const { address: storedAddress } = JSON.parse(stored)
-          setAddress(storedAddress)
-          setIsConnected(true)
+          const { address: addr } = JSON.parse(stored)
+          setHasStoredWallet(true)
+          setStoredAddress(addr)
         } catch (e) {
           console.error('Failed to parse stored wallet:', e)
         }
@@ -293,16 +297,50 @@ export function DeviceWalletProvider({ children }) {
     }
   }, [authenticate])
 
+  // Sign in to a stored wallet (requires biometric auth)
+  const signIn = useCallback(async () => {
+    if (!hasStoredWallet) {
+      setError('No stored wallet found')
+      return null
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const wallet = await authenticate()
+      if (wallet) {
+        setAddress(wallet.address)
+        setIsConnected(true)
+        setIsLoading(false)
+        return { address: wallet.address }
+      }
+      throw new Error('Authentication failed')
+    } catch (err) {
+      console.error('Failed to sign in:', err)
+      setError(err.message || 'Failed to sign in')
+      setIsLoading(false)
+      return null
+    }
+  }, [hasStoredWallet, authenticate])
+
   // Disconnect (remove stored wallet)
   const disconnect = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
     setAddress(null)
     setIsConnected(false)
+    setHasStoredWallet(false)
+    setStoredAddress(null)
   }, [])
 
-  // Get short address
+  // Get short address — only show when actually connected
   const shortAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : null
+
+  // Short address for the stored (not yet authenticated) wallet
+  const storedShortAddress = storedAddress
+    ? `${storedAddress.slice(0, 6)}...${storedAddress.slice(-4)}`
     : null
 
   const value = {
@@ -314,10 +352,14 @@ export function DeviceWalletProvider({ children }) {
     address,
     shortAddress,
     error,
+    hasStoredWallet,
+    storedAddress,
+    storedShortAddress,
 
     // Actions
     createWallet,
     authenticate,
+    signIn,
     signMessage,
     signTransaction,
     disconnect,

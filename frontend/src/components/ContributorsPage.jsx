@@ -572,6 +572,20 @@ export default function ContributorsPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 space-y-6">
+        {/* VIBE Announcement */}
+        <motion.div custom={0} variants={sectionV} initial="hidden" animate="visible">
+          <GlassCard glowColor="terminal" className="p-5 md:p-6 text-center" hover={false}>
+            <h3 className="text-lg font-bold font-mono mb-2" style={{ color: AMBER }}>VIBE TOKEN</h3>
+            <p className="text-sm text-black-200 max-w-2xl mx-auto leading-relaxed mb-3">
+              21,000,000 fixed supply. 4-year halvings. Emissions accumulate in the <span style={{ color: AMBER }}>Resonance Pool</span> until
+              a protocol-defining contribution is recognized — then the pool breaks and distributes to all contributors via Shapley values.
+            </p>
+            <p className="text-xs font-mono italic" style={{ color: CYAN }}>
+              "It's math, not a contract." Contracts live on one chain. Math lives everywhere. VIBE is math.
+            </p>
+          </GlassCard>
+        </motion.div>
+
         {/* Stats Bar — pulls from Jarvis attribution graph API */}
         <StatsBar apiStats={apiStats} />
 

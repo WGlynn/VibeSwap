@@ -26,6 +26,13 @@
 //
 // These are recognized by governance vote or Jarvis attribution graph.
 // When recognized, the Resonance Pool breaks.
+//
+// "It's math, not a contract." — That's the whole thesis.
+// Contracts live on one chain. Math lives everywhere. VIBE is math.
+//
+// Chain agnostic by construction. Deploy on any chain, bridge via
+// LayerZero, verify anywhere. The emission schedule is deterministic —
+// any node on any chain can independently compute the correct state.
 // ============
 
 // ============ Constants ============

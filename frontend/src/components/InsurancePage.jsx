@@ -198,7 +198,11 @@ export default function InsurancePage() {
     return amount * rate * (duration / 365)
   }, [coverAmount, selectedCoverage, selectedDuration])
 
-  const totalCoveredAmount = MOCK_POLICIES
+  // User-specific data: real when connected (empty), mock for demo
+  const policies = isConnected ? [] : MOCK_POLICIES
+  const userPositions = isConnected ? [] : MOCK_POSITIONS
+
+  const totalCoveredAmount = policies
     .filter(p => p.status === 'active')
     .reduce((sum, p) => sum + p.covered, 0)
 
@@ -279,7 +283,7 @@ export default function InsurancePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: 'Total Cover', value: fmt(totalCoveredAmount), color: CYAN },
-                { label: 'Active Policies', value: MOCK_POLICIES.filter(p => p.status === 'active').length.toString(), color: '#22c55e' },
+                { label: 'Active Policies', value: policies.filter(p => p.status === 'active').length.toString(), color: '#22c55e' },
                 { label: 'Claims Paid', value: '$0', color: '#a855f7' },
                 { label: 'Pool TVL', value: fmt(poolTVL), color: '#eab308' },
               ].map(({ label, value, color }) => (
@@ -556,7 +560,7 @@ export default function InsurancePage() {
                 We scan your DeFi positions and recommend coverage to protect your portfolio.
               </p>
               <div className="space-y-3">
-                {MOCK_POSITIONS.map((pos) => (
+                {userPositions.map((pos) => (
                   <div key={pos.protocol + pos.asset} className="flex items-center justify-between p-3 rounded-xl bg-black-800/50">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
@@ -592,9 +596,9 @@ export default function InsurancePage() {
                   <span className="text-yellow-400 text-sm mt-0.5">{'\u26A0'}</span>
                   <div className="text-xs text-black-300">
                     <span className="font-semibold text-yellow-400">
-                      {MOCK_POSITIONS.filter(p => !p.covered).length} positions unprotected
+                      {userPositions.filter(p => !p.covered).length} positions unprotected
                     </span>
-                    <span className="text-black-400"> &mdash; {fmt(MOCK_POSITIONS.filter(p => !p.covered).reduce((s, p) => s + p.value, 0))} at risk. </span>
+                    <span className="text-black-400"> &mdash; {fmt(userPositions.filter(p => !p.covered).reduce((s, p) => s + p.value, 0))} at risk. </span>
                     Consider purchasing coverage to protect your portfolio.
                   </div>
                 </div>
@@ -608,7 +612,7 @@ export default function InsurancePage() {
       {activeTab === 'policies' && (
         <Section num="01" title="Your Policies" delay={0.1}>
           <GlassCard glowColor="terminal" className="p-4">
-            {MOCK_POLICIES.length === 0 ? (
+            {policies.length === 0 ? (
               <div className="text-center py-8 text-black-400">
                 No active policies. Buy coverage to protect your positions.
               </div>
@@ -626,7 +630,7 @@ export default function InsurancePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_POLICIES.map((policy, i) => (
+                    {policies.map((policy, i) => (
                       <motion.tr
                         key={policy.id}
                         className="border-b border-black-800 last:border-0"
@@ -861,7 +865,7 @@ export default function InsurancePage() {
                 <div>
                   <label className="text-sm text-black-400 mb-2 block">Select Policy</label>
                   <select className="w-full bg-black-700 rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-terminal-500/50 text-sm">
-                    {MOCK_POLICIES.filter(p => p.status === 'active').map((p) => (
+                    {policies.filter(p => p.status === 'active').map((p) => (
                       <option key={p.id} value={p.id}>{p.type} &mdash; {fmt(p.covered)} cover</option>
                     ))}
                   </select>

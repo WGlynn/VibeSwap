@@ -640,7 +640,8 @@ export default function MultiSendPage() {
             >
               {/* History Tab */}
               <div className="space-y-3">
-                {MOCK_HISTORY.map((tx, i) => {
+                {isConnected && <div className="text-center py-6 text-black-500 text-sm font-mono">No multi-send history yet</div>}
+                {(isConnected ? [] : MOCK_HISTORY).map((tx, i) => {
                   const tokenDef = TOKENS.find((t) => t.symbol === tx.token) || TOKENS[0]
                   return (
                     <motion.div
@@ -695,7 +696,7 @@ export default function MultiSendPage() {
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <div className="text-lg font-bold font-mono text-white">
-                        {MOCK_HISTORY.length}
+                        {isConnected ? 0 : MOCK_HISTORY.length}
                       </div>
                       <div className="text-[10px] text-black-500 uppercase tracking-wider">
                         Batches
@@ -703,7 +704,7 @@ export default function MultiSendPage() {
                     </div>
                     <div>
                       <div className="text-lg font-bold font-mono text-white">
-                        {MOCK_HISTORY.reduce((s, tx) => s + tx.recipients, 0)}
+                        {isConnected ? 0 : MOCK_HISTORY.reduce((s, tx) => s + tx.recipients, 0)}
                       </div>
                       <div className="text-[10px] text-black-500 uppercase tracking-wider">
                         Recipients

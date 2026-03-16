@@ -417,9 +417,10 @@ export default function MindMesh() {
   const { mesh: liveMesh, latency } = useMindMesh()
 
   // Derive live stats from real mesh data
+  const isLoading = liveMesh === null
   const liveCells = liveMesh?.cells || []
   const onlineCount = liveCells.filter(c => c.status === 'interlinked' || c.status === 'active').length
-  const meshStatus = liveMesh?.status || 'disconnected'
+  const meshStatus = isLoading ? 'connecting' : (liveMesh?.status || 'disconnected')
 
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [feedMessages, setFeedMessages] = useState([])
@@ -503,13 +504,15 @@ export default function MindMesh() {
         <GlassCard className="p-4" hover={false}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-2.5 h-2.5 rounded-full ${meshStatus === 'fully-interlinked' ? 'bg-green-500 animate-pulse' : meshStatus === 'partial' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+              <div className={`w-2.5 h-2.5 rounded-full ${meshStatus === 'fully-interlinked' ? 'bg-green-500 animate-pulse' : meshStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : meshStatus === 'partial' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
               <span className="text-sm font-mono text-white font-bold">
-                {meshStatus === 'fully-interlinked' ? 'FULLY INTERLINKED' : meshStatus === 'partial' ? 'PARTIAL MESH' : 'DISCONNECTED'}
+                {meshStatus === 'fully-interlinked' ? 'FULLY INTERLINKED' : meshStatus === 'connecting' ? 'CONNECTING' : meshStatus === 'partial' ? 'PARTIAL MESH' : 'DISCONNECTED'}
               </span>
-              <span className="text-xs font-mono text-black-500">
-                {onlineCount}/{liveCells.length} cells online
-              </span>
+              {!isLoading && liveCells.length > 0 && (
+                <span className="text-xs font-mono text-black-500">
+                  {onlineCount}/{liveCells.length} cells online
+                </span>
+              )}
             </div>
             {latency && <span className="text-xs font-mono text-black-400">{latency}ms</span>}
           </div>
@@ -529,8 +532,8 @@ export default function MindMesh() {
       {/* Pantheon Architecture — aspirational 10-node network */}
       <motion.div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" variants={itemVariants}>
         <StatCard label="Pantheon Nodes"    value={MESH_NODES.length} decimals={0} suffix=""        sparkSeed={42}  />
-        <StatCard label="Live Cells"        value={onlineCount}       decimals={0} suffix={` / ${liveCells.length}`} sparkSeed={137} />
-        <StatCard label="Mesh Latency"      value={latency || 0}      decimals={0} suffix="ms"     sparkSeed={256} />
+        <StatCard label="Live Cells"        value={isLoading ? 0 : onlineCount} decimals={0} suffix={isLoading ? ' ...' : ` / ${liveCells.length}`} sparkSeed={137} />
+        <StatCard label="Mesh Latency"      value={latency || (isLoading ? 0 : 0)} decimals={0} suffix={isLoading ? ' ...' : 'ms'} sparkSeed={256} />
         <StatCard label="Shard Architecture" value={MESH_NODES.length} decimals={0} suffix=" shards" sparkSeed={314} />
       </motion.div>
 

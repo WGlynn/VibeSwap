@@ -93,6 +93,18 @@ function HeaderMinimal() {
                 <span className="text-[10px] font-mono text-black-400">{Math.round(gasGwei)}</span>
               </Link>
 
+              {/* Search button — opens CommandPalette */}
+              <button
+                onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, shiftKey: true }))}
+                className="p-1.5 rounded-lg hover:bg-black-800/60 transition-colors"
+                title="Search (Ctrl+Shift+K)"
+                aria-label="Search"
+              >
+                <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+
               {/* Notification bell */}
               <Link
                 to="/notifications"
@@ -278,6 +290,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/claims', label: 'Claim Rewards', icon: '🎁' },
     ]},
     { label: 'Intelligence', items: [
+      { path: '/trinity', label: 'The Trinity', icon: '🔺' },
       { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
       { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
       { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },

@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
+// Use Vercel proxy in production (same-origin, no CORS issues)
+// Fall back to direct Fly.io URL for local dev
+const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || (isVercel ? '' : 'https://jarvis-vibeswap.fly.dev')
+const MESH_PATH = isVercel ? '/jarvis-api/mesh' : `${API_URL}/web/mesh`
 const POLL_INTERVAL = 30_000 // 30 seconds — mesh should feel alive
 
 // Initial state while connecting — shows "connecting" not "disconnected"
@@ -18,7 +22,7 @@ export function useMindMesh() {
       const timeout = setTimeout(() => controller.abort(), 15000) // 15s timeout (Fly cold starts)
 
       const start = performance.now()
-      const res = await fetch(`${API_URL}/web/mesh`, { signal: controller.signal })
+      const res = await fetch(MESH_PATH, { signal: controller.signal })
       clearTimeout(timeout)
       const latency = Math.round(performance.now() - start)
       latencyRef.current = latency

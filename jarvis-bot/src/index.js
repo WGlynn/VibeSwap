@@ -336,11 +336,11 @@ try {
   initSelfImprove = si.initSelfImprove;
 } catch (e) { console.warn(`[jarvis] self-improve import failed: ${e.message}`); }
 // Shard dedup: coordinate responses when multiple Jarvis bots in same group
-let registerSiblings = () => {}, trackMessage = () => {}, checkSiblingResponse = () => ({ siblingResponded: false }), buildSiblingContext = () => '', shouldSuppress = () => false, getCoordinationDelay = () => 0;
+let registerSiblings = () => {}, trackSiblingMessage = () => {}, checkSiblingResponse = () => ({ siblingResponded: false }), buildSiblingContext = () => '', shouldSuppress = () => false, getCoordinationDelay = () => 0;
 try {
   const sd = await import('./shard-dedup.js');
   registerSiblings = sd.registerSiblings;
-  trackMessage = sd.trackMessage;
+  trackSiblingMessage = sd.trackMessage;
   checkSiblingResponse = sd.checkSiblingResponse;
   buildSiblingContext = sd.buildSiblingContext;
   shouldSuppress = sd.shouldSuppress;
@@ -6219,7 +6219,7 @@ bot.on('video_note', async (ctx) => {
 bot.on('text', async (ctx) => {
   // Track ALL group messages for shard dedup (sees sibling bot responses)
   if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
-    trackMessage(ctx.chat.id, ctx.message);
+    trackSiblingMessage(ctx.chat.id, ctx.message);
   }
 
   // Monitor auth intercept — if auth flow is active, capture phone/code/password

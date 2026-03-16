@@ -335,6 +335,15 @@ try {
   recordRollout = si.recordRollout;
   initSelfImprove = si.initSelfImprove;
 } catch (e) { console.warn(`[jarvis] self-improve import failed: ${e.message}`); }
+// Cross-context: DM ↔ Group awareness
+let initCrossContext = async () => {}, recordDMTopic = () => {}, getDMContextForGroup = () => '', recordGroupInteraction = () => {};
+try {
+  const cc = await import('./cross-context.js');
+  initCrossContext = cc.initCrossContext;
+  recordDMTopic = cc.recordDMTopic;
+  getDMContextForGroup = cc.getDMContextForGroup;
+  recordGroupInteraction = cc.recordGroupInteraction;
+} catch (e) { console.warn(`[jarvis] cross-context import failed: ${e.message}`); }
 import { initLimni, flushLimni, getLimniStats, registerTerminal, registerVPS, checkTerminalHealth, checkAllVPS, listStrategies, getStrategy, startMonitorLoop, stopMonitorLoop, getAlerts, onAlert, strategyPipeline, deployStrategy, listBacktests, getBacktestResult, fetchTrades } from './limni.js';
 import { registerKataraktiStrategies, formatPerformanceSummary } from './katarakti.js';
 import { createServer } from 'http';
@@ -6755,6 +6764,16 @@ bot.on('text', async (ctx) => {
       messageForLLM = `${messageForLLM}\n\n${memCtx}`;
     }
 
+    // Cross-context: if this is a GROUP message, inject DM awareness
+    const isGroupMsg = chatType === 'group' || chatType === 'supergroup';
+    if (isGroupMsg) {
+      const dmCtx = getDMContextForGroup(String(ctx.from.id));
+      if (dmCtx) {
+        messageForLLM = `${messageForLLM}\n\n${dmCtx}`;
+      }
+      recordGroupInteraction(String(ctx.from.id), userName);
+    }
+
     // ============ Resilient LLM Call — Retry on Network Failure ============
     // The Wardenclyffe cascade handles provider-level retries, but if the entire
     // network is down (all providers unreachable), the cascade exhausts and throws.
@@ -6812,6 +6831,13 @@ bot.on('text', async (ctx) => {
         importance: ctx.message.text?.length > 100 ? 0.7 : 0.5,
       });
     } catch {}
+
+    // Cross-context: if this is a DM, capture the topic for group awareness
+    if (!isGroupMsg) {
+      try {
+        recordDMTopic(String(ctx.from.id), userName, ctx.message.text, response.text, String(chatId));
+      } catch {}
+    }
 
     // Loop 3: Reward signal extraction — implicit score from user behavior (non-blocking)
     // Uses previous bot response + current user message to detect re-asks, corrections, thanks
@@ -7306,6 +7332,7 @@ async function main() {
     initShardMemory().catch(err => console.warn(`[jarvis] Shard memory init failed: ${err.message}`)),
     initRewardSignals().catch(err => console.warn(`[jarvis] Reward signals init failed: ${err.message}`)),
     initSelfImprove().catch(err => console.warn(`[jarvis] Self-improve init failed: ${err.message}`)),
+    initCrossContext().catch(err => console.warn(`[jarvis] Cross-context init failed: ${err.message}`)),
   ]);
 
   // Group C: MI Host (depends on nothing but may fail — keep isolated)

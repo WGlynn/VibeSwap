@@ -7557,6 +7557,14 @@ async function main() {
   });
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
 
+  // Mesh monitor — bidirectional health awareness across all nodes
+  try {
+    const { initMeshMonitor } = await import('./mesh-monitor.js');
+    initMeshMonitor(bot);
+  } catch (err) {
+    console.warn(`[jarvis] Mesh monitor init failed: ${err.message}`);
+  }
+
   // Polling liveness checker — restarts polling if no updates for 5 min
   setInterval(async () => {
     const silentMs = Date.now() - lastUpdateReceived;

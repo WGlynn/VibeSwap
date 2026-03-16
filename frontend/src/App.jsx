@@ -81,6 +81,7 @@ const JobMarket = lazy(() => import('./components/JobMarket'))
 const MinePage = lazy(() => import('./components/MinePage'))
 const FairnessRace = lazy(() => import('./components/FairnessRace'))
 const MindMesh = lazy(() => import('./components/MindMesh'))
+const TrinityPage = lazy(() => import('./components/TrinityPage'))
 const PredictionMarket = lazy(() => import('./components/PredictionMarket'))
 const PortfolioDashboard = lazy(() => import('./components/PortfolioDashboard'))
 const StatusDashboard = lazy(() => import('./components/StatusDashboard'))
@@ -269,6 +270,7 @@ function AnimatedRoutes() {
             <Route path="/mine" element={<MinePage />} />
             <Route path="/fairness" element={<FairnessRace />} />
             <Route path="/mesh" element={<MindMesh />} />
+            <Route path="/trinity" element={<TrinityPage />} />
             <Route path="/predict" element={<PredictionMarket />} />
             <Route path="/portfolio" element={<PortfolioDashboard />} />
             <Route path="/status" element={<StatusDashboard />} />

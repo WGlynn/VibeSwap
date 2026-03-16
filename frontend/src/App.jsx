@@ -9,6 +9,7 @@ import { MessagingProvider } from './contexts/MessagingContext'
 import { useKeyboardNav } from './hooks/useKeyboardNav'
 import JarvisBubble from './components/JarvisBubble'
 import OnboardingTour from './components/OnboardingTour'
+import SafariGuide from './components/SafariGuide'
 import CommandPalette from './components/CommandPalette'
 import { ToastProvider } from './contexts/ToastContext'
 import PageSkeleton from './components/ui/PageSkeleton'
@@ -475,6 +476,7 @@ function App() {
     <VibePlayer />
     {location.pathname !== '/jarvis' && location.pathname !== '/voice' && <JarvisBubble />}
     <OnboardingTour />
+    <SafariGuide />
     <BackToTop />
     <MobileNav onOpenMenu={() => window.dispatchEvent(new CustomEvent('vibeswap:open-drawer'))} />
     </ContributionsProvider>

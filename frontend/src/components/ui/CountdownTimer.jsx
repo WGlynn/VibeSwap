@@ -66,8 +66,8 @@ function CountdownTimer({ size = 64, showBatch = true, className = '' }) {
   const offset = circumference * phaseProgress
 
   // ============ Responsive Font Sizes ============
-  const labelSize = Math.max(8, size / 8)
-  const numberSize = Math.max(14, size / 3.2)
+  const labelSize = Math.max(6, size / 9)
+  const numberSize = Math.max(10, size / 3.8)
   const batchFontSize = Math.max(7, size / 10)
   const batchNumber = 847293
 

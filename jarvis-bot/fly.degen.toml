@@ -1,0 +1,32 @@
+# Diabolical Jarvis — the people's favorite
+# Same codebase as primary, different bot token, different personality
+app = 'jarvis-degen'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/app/data'
+  DOCKER = '1'
+  ENCRYPTION_ENABLED = 'true'
+  GITHUB_REPO_URL = 'https://github.com/WGlynn/vibeswap-private.git'
+  MEMORY_DIR = '/app/memory'
+  NODE_ENV = 'production'
+  VIBESWAP_REPO = '/repo'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[[mounts]]
+  source = 'jarvis_degen_data'
+  destination = '/app/data'

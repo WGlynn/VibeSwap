@@ -30,17 +30,17 @@ const CATEGORIES = [
 // ============ Course Data ============
 
 const COURSES = [
-  { id: 1, title: 'DeFi 101', description: 'Learn the fundamentals of decentralized finance — liquidity pools, yield, and trustless trading.', category: 'basics', difficulty: 'Beginner', lessons: 5, reward: 50, duration: '45 min', enrolled: 2847, tags: ['Liquidity', 'Swaps', 'Yield'] },
-  { id: 2, title: 'Understanding AMMs', description: 'Deep dive into automated market makers — constant product formula, impermanent loss, and LP strategies.', category: 'trading', difficulty: 'Intermediate', lessons: 4, reward: 75, duration: '60 min', enrolled: 1923, tags: ['AMM', 'x*y=k', 'Impermanent Loss'] },
-  { id: 3, title: 'MEV & Frontrunning', description: 'Understand maximal extractable value, sandwich attacks, and how commit-reveal auctions eliminate MEV.', category: 'trading', difficulty: 'Advanced', lessons: 3, reward: 100, duration: '50 min', enrolled: 1456, tags: ['MEV', 'Sandwich', 'Flashbots'] },
-  { id: 4, title: 'Commit-Reveal Explained', description: 'Master the cryptographic commit-reveal scheme that powers fair batch auctions on VibeSwap.', category: 'protocol', difficulty: 'Intermediate', lessons: 4, reward: 80, duration: '55 min', enrolled: 1102, tags: ['Commit-Reveal', 'Hashing', 'Batches'] },
-  { id: 5, title: 'Game Theory in DeFi', description: 'Explore Nash equilibria, Shapley values, mechanism design, and how incentives shape protocol behavior.', category: 'governance', difficulty: 'Advanced', lessons: 6, reward: 120, duration: '90 min', enrolled: 834, tags: ['Nash', 'Shapley', 'Mechanism Design'] },
-  { id: 6, title: 'Wallet Security', description: 'Protect your assets — cold storage, seed phrases, phishing defense, and hardware wallet best practices.', category: 'security', difficulty: 'Beginner', lessons: 3, reward: 40, duration: '30 min', enrolled: 3291, tags: ['Cold Storage', 'Seeds', 'Phishing'] },
+  { id: 1, title: 'DeFi 101', description: 'Learn the fundamentals of decentralized finance — liquidity pools, yield, and trustless trading.', category: 'basics', difficulty: 'Beginner', lessons: 5, reward: 50, duration: '45 min', tags: ['Liquidity', 'Swaps', 'Yield'] },
+  { id: 2, title: 'Understanding AMMs', description: 'Deep dive into automated market makers — constant product formula, impermanent loss, and LP strategies.', category: 'trading', difficulty: 'Intermediate', lessons: 4, reward: 75, duration: '60 min', tags: ['AMM', 'x*y=k', 'Impermanent Loss'] },
+  { id: 3, title: 'MEV & Frontrunning', description: 'Understand maximal extractable value, sandwich attacks, and how commit-reveal auctions eliminate MEV.', category: 'trading', difficulty: 'Advanced', lessons: 3, reward: 100, duration: '50 min', tags: ['MEV', 'Sandwich', 'Flashbots'] },
+  { id: 4, title: 'Commit-Reveal Explained', description: 'Master the cryptographic commit-reveal scheme that powers fair batch auctions on VibeSwap.', category: 'protocol', difficulty: 'Intermediate', lessons: 4, reward: 80, duration: '55 min', tags: ['Commit-Reveal', 'Hashing', 'Batches'] },
+  { id: 5, title: 'Game Theory in DeFi', description: 'Explore Nash equilibria, Shapley values, mechanism design, and how incentives shape protocol behavior.', category: 'governance', difficulty: 'Advanced', lessons: 6, reward: 120, duration: '90 min', tags: ['Nash', 'Shapley', 'Mechanism Design'] },
+  { id: 6, title: 'Wallet Security', description: 'Protect your assets — cold storage, seed phrases, phishing defense, and hardware wallet best practices.', category: 'security', difficulty: 'Beginner', lessons: 3, reward: 40, duration: '30 min', tags: ['Cold Storage', 'Seeds', 'Phishing'] },
 ]
 
-// ============ Mock User Progress ============
+// ============ User Progress (demo only) ============
 
-const MOCK_PROGRESS = {
+const DEMO_PROGRESS = {
   1: { completed: 3, started: true },
   4: { completed: 4, started: true },
   6: { completed: 3, started: true },
@@ -60,28 +60,18 @@ const QUIZ_QUESTION = {
   explanation: 'When a trader buys token X, they remove X from the pool and add Y. Since k must remain constant, reducing the X reserve increases its marginal price (price = y/x).',
 }
 
-// ============ Leaderboard Data ============
+// ============ Leaderboard — populated by real learners ============
 
 const rng = seededRandom(42)
-
-const LEADERBOARD = [
-  { rank: 1, name: 'CryptoScholar', xp: 4820, courses: 12, streak: 34, avatar: '\u{1F9E0}' },
-  { rank: 2, name: 'DeFiSensei', xp: 4350, courses: 11, streak: 28, avatar: '\u{1F3AF}' },
-  { rank: 3, name: 'BlockNerd', xp: 3980, courses: 10, streak: 21, avatar: '\u{1F4D6}' },
-  { rank: 4, name: 'YieldHunter', xp: 3640, courses: 9, streak: 19, avatar: '\u{1F50D}' },
-  { rank: 5, name: 'ProtocolPilot', xp: 3210, courses: 8, streak: 15, avatar: '\u{1F680}' },
-  { rank: 6, name: 'ChainLearner', xp: 2890, courses: 8, streak: 12, avatar: '\u{26D3}' },
-  { rank: 7, name: 'MevWatcher', xp: 2540, courses: 7, streak: 9, avatar: '\u{1F441}' },
-  { rank: 8, name: 'GasGuru', xp: 2180, courses: 6, streak: 7, avatar: '\u{26FD}' },
-]
+const LEADERBOARD = [] // Empty until real users complete courses
 
 // ============ Platform Stats ============
 
 const PLATFORM_STATS = [
-  { label: 'Total Courses', value: '24', icon: '\u{1F4DA}', delta: '+3 this month' },
-  { label: 'Graduates', value: '8,241', icon: '\u{1F393}', delta: '+412 this week' },
-  { label: 'JUL Distributed', value: '186.4K', icon: '\u{1FA99}', delta: '+12.8K this month' },
-  { label: 'Avg Completion', value: '74%', icon: '\u{1F4CA}', delta: '+2.1% vs last month' },
+  { label: 'Total Courses', value: String(COURSES.length), icon: '\u{1F4DA}', delta: 'More coming soon' },
+  { label: 'Topics Covered', value: String([...new Set(COURSES.flatMap(c => c.tags))].length), icon: '\u{1F393}', delta: 'DeFi fundamentals' },
+  { label: 'JUL Per Course', value: '40-120', icon: '\u{1FA99}', delta: 'Earn while you learn' },
+  { label: 'Difficulty Levels', value: '3', icon: '\u{1F4CA}', delta: 'Beginner to Advanced' },
 ]
 
 // ============ Helpers ============
@@ -164,7 +154,7 @@ function CourseCard({ course, progress }) {
         <span className="text-black-700">|</span>
         <span>{course.duration}</span>
         <span className="text-black-700">|</span>
-        <span>{fmtNum(course.enrolled)} enrolled</span>
+        <span>+{course.reward} JUL reward</span>
       </div>
       <div className="flex flex-wrap gap-1.5 mb-4">
         {course.tags.map((tag) => (
@@ -341,6 +331,21 @@ function QuizSection() {
 // ============ Leaderboard ============
 
 function LeaderboardSection() {
+  if (LEADERBOARD.length === 0) {
+    return (
+      <div className="mb-8">
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <span className="text-amber-400">{'\u{1F3C6}'}</span> Leaderboard
+        </h2>
+        <GlassCard className="p-8 text-center" hover={false}>
+          <div className="text-3xl mb-3">{'\u{1F3C6}'}</div>
+          <p className="text-sm text-black-300 font-medium mb-1">Be the first on the leaderboard</p>
+          <p className="text-xs text-black-500 font-mono">Complete a course to earn XP and claim your spot</p>
+        </GlassCard>
+      </div>
+    )
+  }
+
   const maxXp = LEADERBOARD[0].xp
   return (
     <div className="mb-8">
@@ -534,7 +539,7 @@ export default function EducationPage() {
                 <CourseCard
                   key={course.id}
                   course={course}
-                  progress={isConnected ? MOCK_PROGRESS[course.id] : null}
+                  progress={isConnected ? null : DEMO_PROGRESS[course.id]}
                 />
               ))}
               {filteredCourses.length === 0 && (

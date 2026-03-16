@@ -101,6 +101,12 @@ function formatUptime(seconds) {
 
 function HeroSection({ health }) {
   const isOnline = health?.status === 'online' || health?.status === 'ok'
+  const isConnecting = health === null  // Haven't heard back yet
+  const isOffline = health?.status === 'offline'
+
+  const statusColor = isOnline ? 'bg-matrix-500 animate-pulse' : isConnecting ? 'bg-amber-500 animate-pulse' : 'bg-red-500'
+  const statusTextColor = isOnline ? 'text-matrix-500' : isConnecting ? 'text-amber-400' : 'text-red-400'
+  const statusLabel = isOnline ? 'ONLINE' : isConnecting ? 'CONNECTING' : 'OFFLINE'
 
   return (
     <div className="text-center py-6 relative">
@@ -116,9 +122,9 @@ function HeroSection({ health }) {
 
       <div className="flex items-center justify-center mt-3 space-x-4">
         <div className="flex items-center space-x-2">
-          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-matrix-500 animate-pulse' : 'bg-red-500'}`} />
-          <span className={`text-xs font-mono ${isOnline ? 'text-matrix-500' : 'text-red-400'}`}>
-            {isOnline ? 'ONLINE' : 'OFFLINE'}
+          <span className={`w-2 h-2 rounded-full ${statusColor}`} />
+          <span className={`text-xs font-mono ${statusTextColor}`}>
+            {statusLabel}
           </span>
         </div>
         {health?.uptime && (

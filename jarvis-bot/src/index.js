@@ -6765,7 +6765,7 @@ bot.on('text', async (ctx) => {
     }
 
     // Cross-context: if this is a GROUP message, inject DM awareness
-    const isGroupMsg = chatType === 'group' || chatType === 'supergroup';
+    const isGroupMsg = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
     if (isGroupMsg) {
       const dmCtx = getDMContextForGroup(String(ctx.from.id));
       if (dmCtx) {
@@ -6827,7 +6827,7 @@ bot.on('text', async (ctx) => {
         chatId: String(chatId),
         summary: `${userName}: ${ctx.message.text?.slice(0, 100)}`,
         content: `Q: ${ctx.message.text?.slice(0, 250)}\nA: ${response.text?.slice(0, 250)}`,
-        tags: chatType === 'private' ? ['dm'] : ['group'],
+        tags: ctx.chat?.type === 'private' ? ['dm'] : ['group'],
         importance: ctx.message.text?.length > 100 ? 0.7 : 0.5,
       });
     } catch {}
@@ -6846,7 +6846,7 @@ bot.on('text', async (ctx) => {
         ctx.message.text,
         response.text,           // What bot just said
         ctx.message.reply_to_message?.text || null, // Previous context
-        { userId: String(ctx.from.id), chatId: String(chatId), chatType }
+        { userId: String(ctx.from.id), chatId: String(chatId), chatType: ctx.chat?.type }
       );
 
       // Loop 2: Record complete rollout for adaptation engine

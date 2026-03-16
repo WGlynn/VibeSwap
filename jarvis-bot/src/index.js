@@ -335,6 +335,18 @@ try {
   recordRollout = si.recordRollout;
   initSelfImprove = si.initSelfImprove;
 } catch (e) { console.warn(`[jarvis] self-improve import failed: ${e.message}`); }
+// Shard dedup: coordinate responses when multiple Jarvis bots in same group
+let registerSiblings = () => {}, trackMessage = () => {}, checkSiblingResponse = () => ({ siblingResponded: false }), buildSiblingContext = () => '', shouldSuppress = () => false, getCoordinationDelay = () => 0;
+try {
+  const sd = await import('./shard-dedup.js');
+  registerSiblings = sd.registerSiblings;
+  trackMessage = sd.trackMessage;
+  checkSiblingResponse = sd.checkSiblingResponse;
+  buildSiblingContext = sd.buildSiblingContext;
+  shouldSuppress = sd.shouldSuppress;
+  getCoordinationDelay = sd.getCoordinationDelay;
+} catch (e) { console.warn(`[jarvis] shard-dedup import failed: ${e.message}`); }
+
 // Cross-context: DM ↔ Group awareness
 let initCrossContext = async () => {}, recordDMTopic = () => {}, getDMContextForGroup = () => '', recordGroupInteraction = () => {};
 try {
@@ -6205,6 +6217,11 @@ bot.on('video_note', async (ctx) => {
 // ============ Message Handler ============
 
 bot.on('text', async (ctx) => {
+  // Track ALL group messages for shard dedup (sees sibling bot responses)
+  if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+    trackMessage(ctx.chat.id, ctx.message);
+  }
+
   // Monitor auth intercept — if auth flow is active, capture phone/code/password
   if (monitorAvailable && interceptAuthMessage && interceptAuthMessage(ctx.chat.id, ctx.from.id, ctx.message?.text?.trim())) {
     return; // Message consumed by auth flow
@@ -6764,7 +6781,7 @@ bot.on('text', async (ctx) => {
       messageForLLM = `${messageForLLM}\n\n${memCtx}`;
     }
 
-    // Cross-context: if this is a GROUP message, inject DM awareness
+    // Cross-context: if this is a GROUP message, inject DM awareness + shard coordination
     const isGroupMsg = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
     if (isGroupMsg) {
       const dmCtx = getDMContextForGroup(String(ctx.from.id));
@@ -6772,6 +6789,16 @@ bot.on('text', async (ctx) => {
         messageForLLM = `${messageForLLM}\n\n${dmCtx}`;
       }
       recordGroupInteraction(String(ctx.from.id), userName);
+
+      // Shard dedup: add coordination delay so siblings don't race
+      const delay = getCoordinationDelay(String(ctx.chat.id));
+      if (delay > 0) await new Promise(r => setTimeout(r, delay));
+
+      // Check if a sibling already responded to this message
+      const sibling = checkSiblingResponse(String(ctx.chat.id), ctx.message.message_id);
+      if (sibling.siblingResponded && sibling.siblingText) {
+        messageForLLM = `${messageForLLM}${buildSiblingContext(sibling.siblingText, sibling.siblingUsername)}`;
+      }
     }
 
     // ============ Resilient LLM Call — Retry on Network Failure ============
@@ -6804,6 +6831,12 @@ bot.on('text', async (ctx) => {
     }
 
     clearInterval(typingInterval);
+
+    // Shard dedup: if response is "." (nothing to add), suppress it silently
+    if (isGroupMsg && shouldSuppress(response.text)) {
+      console.log(`[shard-dedup] Suppressed response in ${chatId} — sibling already covered it`);
+      return;
+    }
 
     // Record compute usage (non-blocking)
     if (response.usage) {
@@ -7556,6 +7589,15 @@ async function main() {
     // Polling monitor will detect silence and attempt restart
   });
   console.log('[jarvis] ============ JARVIS IS ONLINE ============');
+
+  // Register sibling bots for deduplication
+  // Each Jarvis shard knows about the others so they don't echo
+  const myBotId = bot.botInfo?.id;
+  const KNOWN_SIBLINGS = [
+    { id: 7829498040, username: 'JarvisMind1828383bot' },   // Jarvis Prime
+    { id: 8170498637, username: 'diablojarvisbot' },         // Diabolical Jarvis
+  ].filter(s => s.id !== myBotId); // Don't register self
+  registerSiblings(KNOWN_SIBLINGS);
 
   // Mesh monitor — bidirectional health awareness across all nodes
   try {

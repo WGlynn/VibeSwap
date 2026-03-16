@@ -1,0 +1,128 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Autonomous Partnership Framework — Karma Workflow</h1>
+<p><strong>Status</strong>: Design
+<strong>Operator</strong>: Karma (autonomous agent)
+<strong>Priority</strong>: Build scraper and email generator first
+<strong>Author</strong>: Will + JARVIS</p>
+<hr />
+<h2>Overview</h2>
+<p>Self-running partnership pipeline that Karma operates continuously. No human bottleneck — Karma discovers, evaluates, reaches out, tracks, and reports.</p>
+<h2>Pipeline</h2>
+<h3>1. Discovery</h3>
+<p>Scrape for projects with synergy:</p>
+<p><strong>Sources:</strong>
+- Twitter/X: #MEV, #BatchAuction, #FairLaunch, #AIAgent conversations
+- GitHub: repos with commit-reveal, batch auction, or MEV-resistance code
+- DeFiLlama: protocols by TVL, chain, category
+- Dune Analytics: on-chain activity metrics</p>
+<p><strong>Synergy Signals:</strong>
+- Batch auction implementations
+- MEV resistance research
+- AI agent frameworks
+- Cross-chain infrastructure
+- Fair launch mechanisms
+- Cooperative/DAO governance</p>
+<h3>2. Evaluation</h3>
+<p>Score each prospect (0-100):</p>
+<table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th>Weight</th>
+<th>Scoring</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Live product</td>
+<td>25%</td>
+<td>Mainnet = 25, Testnet = 15, Concept = 5</td>
+</tr>
+<tr>
+<td>Team credibility</td>
+<td>20%</td>
+<td>Doxxed + track record = 20, Anon + shipping = 15</td>
+</tr>
+<tr>
+<td>Technical overlap</td>
+<td>25%</td>
+<td>Direct integration possible = 25, Conceptual = 10</td>
+</tr>
+<tr>
+<td>Community size</td>
+<td>15%</td>
+<td>&gt;10K = 15, &gt;1K = 10, &lt;1K = 5</td>
+</tr>
+<tr>
+<td>Alignment</td>
+<td>15%</td>
+<td>Fair launch + no VC = 15, Mixed = 8</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Threshold:</strong> Score &gt; 60 → proceed to outreach</p>
+<h3>3. Outreach</h3>
+<p>Auto-generate personalized email/DM:</p>
+<pre><code>Template:
+Subject: [Project Name] × VibeSwap — {synergy_type} integration
+
+Hi {contact_name},
+
+Noticed your work on {specific_feature}. We're building VibeSwap —
+an omnichain DEX that eliminates MEV through batch auctions.
+
+{personalized_paragraph_about_synergy}
+
+Would love to explore {specific_integration_idea}. Happy to jump
+on a quick call or start with an async spec.
+
+— Karma (VibeSwap Partnerships)
+</code></pre>
+<h3>4. Tracking (CRM Pipeline)</h3>
+<pre><code>Contacted → Responded → Meeting Scheduled → Deal Terms → Executed
+    ↓           ↓            ↓                ↓           ↓
+  7d follow   Qualify      Prep spec       Legal/Smart   Ship
+   up          fit          doc            Contract     integration
+</code></pre>
+<p>State stored in <code>data/partnerships.json</code>, synced to IPFS.</p>
+<h3>5. Execution</h3>
+<p>Smart contract for partnership terms:
+- Revenue sharing percentages
+- Cross-promotion commitments
+- Integration milestones with deadlines
+- Automatic payment on milestone completion
+- Dispute resolution via DecentralizedTribunal</p>
+<h3>6. Reporting</h3>
+<p>Dashboard showing:
+- Partnership ROI (volume/TVL attributed to each partnership)
+- Integration status (milestone completion %)
+- Pipeline metrics (conversion rates per stage)
+- Next steps and follow-ups due</p>
+<hr />
+<h2>Implementation Plan</h2>
+<h3>Phase 1 (Tonight/This Week)</h3>
+<ul>
+<li>[ ] Twitter scraper for synergy signals</li>
+<li>[ ] GitHub search for related repos</li>
+<li>[ ] Email/DM template generator</li>
+<li>[ ] <code>data/partnerships.json</code> schema</li>
+</ul>
+<h3>Phase 2 (Next Week)</h3>
+<ul>
+<li>[ ] DeFiLlama API integration</li>
+<li>[ ] Automated scoring pipeline</li>
+<li>[ ] CRM state machine</li>
+<li>[ ] Reporting dashboard</li>
+</ul>
+<h3>Phase 3 (Post Go-Live)</h3>
+<ul>
+<li>[ ] Smart contract for partnership terms</li>
+<li>[ ] Automated milestone verification</li>
+<li>[ ] Cross-chain integration hooks</li>
+</ul></body></html>

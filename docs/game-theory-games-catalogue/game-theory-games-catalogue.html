@@ -1,0 +1,494 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Comprehensive Catalogue of Games in Game Theory</h1>
+<p><strong>Source</strong>: Wikipedia — List of games in game theory
+<strong>Compiled</strong>: 2026-03-12
+<strong>Purpose</strong>: DeFi/auction/trading mechanism design reference for VibeSwap</p>
+<hr />
+<h2>Table Key</h2>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Players</td>
+<td>Number of participants</td>
+</tr>
+<tr>
+<td>Strategies</td>
+<td>Strategies per player</td>
+</tr>
+<tr>
+<td>Nash Eq.</td>
+<td>Number of pure strategy Nash equilibria</td>
+</tr>
+<tr>
+<td>Sequential</td>
+<td>Whether players move in order (vs simultaneous)</td>
+</tr>
+<tr>
+<td>Perfect Info</td>
+<td>Whether all previous moves are known</td>
+</tr>
+<tr>
+<td>Zero-Sum</td>
+<td>Whether one player's gain = another's loss</td>
+</tr>
+<tr>
+<td>Nature</td>
+<td>Whether random/chance moves are involved</td>
+</tr>
+<tr>
+<td>DeFi Relevance</td>
+<td>Direct applicability to DeFi/trading/auctions</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>CATEGORY 1: AUCTION &amp; MECHANISM DESIGN GAMES</h2>
+<p>These games directly model bidding, pricing, and allocation mechanisms.</p>
+<h3>1. Vickrey Auction (Sealed-Bid Second-Price Auction)</h3>
+<ul>
+<li><strong>Description</strong>: Bidders submit sealed bids without knowing others' bids. The highest bidder wins but pays the second-highest bid price. This creates a dominant strategy of truthful bidding.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: Yes</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- This is the foundational auction mechanism. VibeSwap's commit-reveal batch auction is a multi-asset generalization. Second-price auctions incentivize truthful value revelation, which is exactly what VibeSwap's priority fee mechanism targets. MEV-resistant ordering depends on this principle.</li>
+</ul>
+<h3>2. Dollar Auction</h3>
+<ul>
+<li><strong>Description</strong>: A sequential game where players bid on a dollar, but both the winner AND the second-highest bidder must pay their bids. Demonstrates how rational short-term decisions lead to irrational escalation -- bidders keep bidding past $1 to avoid losing their sunk cost.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 0 | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models gas price wars and MEV auction escalation perfectly. When multiple searchers/validators compete for the same MEV opportunity, they escalate bids irrationally. This is exactly the failure mode VibeSwap's batch auctions eliminate. Also models liquidation cascades where participants overpay to front-run.</li>
+</ul>
+<h3>3. Cournot Game (Cournot Competition)</h3>
+<ul>
+<li><strong>Description</strong>: Two firms simultaneously choose production quantities, and the market price is determined by total supply. Each firm's optimal quantity depends on the other's choice. The Nash equilibrium lies between monopoly (low output, high price) and perfect competition (high output, low price).</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models liquidity provision competition in AMMs. LPs simultaneously choose how much liquidity to deploy; total liquidity determines fee income per unit. Directly applicable to VibeSwap LP strategy and concentrated liquidity positioning. Also models competing DEX token emission strategies.</li>
+</ul>
+<hr />
+<h2>CATEGORY 2: COOPERATION &amp; TRUST GAMES</h2>
+<p>Games modeling cooperation, defection, and trust between parties.</p>
+<h3>4. Prisoner's Dilemma</h3>
+<ul>
+<li><strong>Description</strong>: Two rational agents can either cooperate for mutual benefit or defect for individual gain. While defecting is rational for each agent individually, mutual cooperation yields higher payoffs for both. The dominant strategy (defect) leads to a Pareto-inferior outcome.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- The foundational model for MEV extraction. Validators/searchers face a prisoner's dilemma: cooperate (fair ordering) or defect (extract MEV). Without mechanism design intervention (like VibeSwap's commit-reveal), defection dominates. Also models LP behavior: providing liquidity cooperatively vs. JIT sniping.</li>
+</ul>
+<h3>5. Optional Prisoner's Dilemma</h3>
+<ul>
+<li><strong>Description</strong>: Extension of the standard prisoner's dilemma where players have a third option: abstain from playing entirely ("reject the deal"). This outside option fundamentally changes equilibrium dynamics by giving players an exit.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 3 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models the choice to participate in a DEX vs. not trading at all. Users who perceive MEV extraction can opt out, reducing volume. VibeSwap's value proposition is making the "cooperate" strategy dominant so users don't choose the "abstain" option.</li>
+</ul>
+<h3>6. Trust Game</h3>
+<ul>
+<li><strong>Description</strong>: A sequential game where Player 1 sends some portion of an endowment to Player 2, the amount is multiplied (by the experimenter), and Player 2 decides how much to return. The Nash equilibrium is for Player 2 to return nothing, so Player 1 sends nothing -- but experiments show people often trust and reciprocate.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models smart contract interaction trust. Users "send" funds to a protocol (Player 1), the protocol multiplies value through DeFi yields, and the protocol returns value. Rug pulls = Player 2 defecting. Audits, timelocks, and VibeSwap's circuit breakers serve as trust mechanisms.</li>
+</ul>
+<h3>7. Gift-Exchange Game</h3>
+<ul>
+<li><strong>Description</strong>: Models reciprocity in labor relations (Akerlof &amp; Yellen). An employer offers a wage, and the worker responds with effort level. The Nash equilibrium is minimum wage/minimum effort, but experiments show higher wages elicit higher effort -- modeling reciprocal fairness.</li>
+<li><strong>Players</strong>: N (usually 2) | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models protocol incentive design. Higher token rewards (wages) should elicit more productive LP behavior (effort). VibeSwap's Shapley-based reward distribution is a formalization of this -- contributors who add more value receive proportionally more, incentivizing genuine contribution over mercenary capital.</li>
+</ul>
+<h3>8. Stag Hunt</h3>
+<ul>
+<li><strong>Description</strong>: Two hunters can cooperate to hunt a stag (high payoff, requires both) or individually hunt a hare (lower payoff, guaranteed). Features two Nash equilibria: both hunt stag (payoff-dominant) or both hunt hare (risk-dominant). The tension is between optimal cooperation and safe defection.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 2 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models liquidity bootstrapping. LPs face a stag hunt: if enough liquidity concentrates in one pool (stag), everyone earns high fees. If LPs hedge across many pools (hare), everyone earns less. Also models cross-chain liquidity coordination -- VibeSwap's LayerZero messaging helps coordinate the "stag hunt" across chains.</li>
+</ul>
+<h3>9. Public Goods Game</h3>
+<ul>
+<li><strong>Description</strong>: Players secretly choose how many private tokens to contribute to a public pot. The pot is multiplied and redistributed equally. The Nash equilibrium is to contribute nothing (free-ride), but collective welfare is maximized when everyone contributes fully.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models protocol treasury funding, public goods funding in DeFi (Gitcoin-style), and insurance pool contributions. VibeSwap's DAOTreasury and IL Protection pool are public goods -- users benefit from contributing but have incentive to free-ride. The Shapley distributor addresses this by tying rewards to marginal contribution.</li>
+</ul>
+<h3>10. Volunteer's Dilemma</h3>
+<ul>
+<li><strong>Description</strong>: Each player can make a small sacrifice that benefits everyone, or wait hoping someone else volunteers. If nobody volunteers, everyone suffers. The dilemma intensifies with more players (diffusion of responsibility).</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 2 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models oracle submission and liquidation. Someone must submit price updates or trigger liquidations (costly gas), but everyone benefits. VibeSwap's oracle system and keeper incentives must solve this -- making volunteering individually rational through rewards.</li>
+</ul>
+<h3>11. Diner's Dilemma (Unscrupulous Diner's Dilemma)</h3>
+<ul>
+<li><strong>Description</strong>: An N-player prisoner's dilemma. Diners agree to split the bill equally, creating incentive for each to order expensive items (individual cost is shared N ways but individual benefit is full). Everyone ordering expensively makes everyone worse off.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models shared-cost protocols where individual actions impose costs on the group. Gas cost socialization in batch transactions, shared slippage in large pools, and protocol fee structures all exhibit this dynamic.</li>
+</ul>
+<hr />
+<h2>CATEGORY 3: BARGAINING &amp; DIVISION GAMES</h2>
+<p>Games about dividing resources and negotiating outcomes.</p>
+<h3>12. Ultimatum Game</h3>
+<ul>
+<li><strong>Description</strong>: Player 1 proposes how to divide a sum of money. Player 2 either accepts (both get their share) or rejects (both get nothing). Rational theory predicts Player 1 offers the minimum and Player 2 accepts anything positive, but experiments show people reject "unfair" offers even at personal cost.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: Infinite | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models any take-it-or-leave-it DeFi offer: swap quotes, LP fee tiers, governance proposals. Users reject "unfair" MEV extraction by choosing alternative venues. VibeSwap's uniform clearing price is designed to produce outcomes users perceive as fair, preventing the "rejection" of switching to competitors.</li>
+</ul>
+<h3>13. Dictator Game</h3>
+<ul>
+<li><strong>Description</strong>: One player (the "dictator") decides how to split money with a passive recipient who has no say. The rational prediction is the dictator keeps everything, but experiments show most people share -- revealing inherent fairness preferences.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: N/A | <strong>Perfect Info</strong>: N/A | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models protocol governance where token-weighted voting gives "dictator" power to large holders. Also models validator MEV extraction -- the block proposer is a dictator choosing how to order transactions. VibeSwap's commit-reveal removes the dictator's information advantage.</li>
+</ul>
+<h3>14. Nash Bargaining Game</h3>
+<ul>
+<li><strong>Description</strong>: Two players negotiate how to share a surplus they can jointly generate. If they agree, they split per the agreement; if they fail to agree, both get a disagreement payoff. The Nash bargaining solution maximizes the product of both players' gains over disagreement.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: Infinite | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models any bilateral DeFi negotiation: OTC trades, LP-trader fee negotiation, cross-chain bridge pricing. The Nash bargaining solution is theoretically optimal and relates to VibeSwap's Shapley value distribution -- both are cooperative solution concepts that maximize joint surplus.</li>
+</ul>
+<h3>15. Cake Cutting (Fair Division)</h3>
+<ul>
+<li><strong>Description</strong>: N players must divide a heterogeneous resource (like a cake with different toppings) fairly. With homogeneous goods, "I cut, you choose" works for 2 players. With heterogeneous goods or more players, solutions become far more complex. Seeks envy-free or proportional allocations.</li>
+<li><strong>Players</strong>: N (usually 2) | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: Variable | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models fee distribution among LPs, reward allocation in liquidity mining, and MEV redistribution. VibeSwap's Shapley distributor is essentially a sophisticated cake-cutting algorithm -- dividing trading fee "cake" proportionally to each LP's marginal contribution.</li>
+</ul>
+<h3>16. Pirate Game</h3>
+<ul>
+<li><strong>Description</strong>: A multi-player ultimatum game. The most senior pirate proposes how to divide treasure; all pirates vote. If majority approves, treasure is split accordingly; otherwise the proposer is thrown overboard and the next pirate proposes. Backward induction yields a surprising equilibrium where the first pirate keeps almost everything.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: Infinite | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models sequential governance proposals and DAO voting dynamics. The proposer (first pirate) has enormous power -- similar to how Ethereum block proposers or DAO proposal initiators can structure deals in their favor. VibeSwap's batch auction prevents this first-mover proposer advantage.</li>
+</ul>
+<hr />
+<h2>CATEGORY 4: COORDINATION &amp; EQUILIBRIUM SELECTION GAMES</h2>
+<p>Games where multiple equilibria exist and the challenge is selecting among them.</p>
+<h3>17. Coordination Game</h3>
+<ul>
+<li><strong>Description</strong>: Players earn higher payoffs when they choose the same action as others. Features multiple Nash equilibria (one for each coordinated action). The challenge is not incentive alignment but equilibrium selection -- how do players converge on the same choice?</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: &gt;2 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models network effects in DeFi. Users coordinate on which DEX, chain, or token standard to use. Liquidity begets liquidity (coordination equilibrium). VibeSwap's cross-chain architecture via LayerZero helps solve coordination by making liquidity accessible regardless of which chain users coordinate on.</li>
+</ul>
+<h3>18. Battle of the Sexes</h3>
+<ul>
+<li><strong>Description</strong>: Two players prefer different activities but both prefer doing the same thing over doing different things. Has two pure-strategy Nash equilibria (one favoring each player) and one mixed equilibrium. Models situations where coordination is desired but preferences conflict.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 2 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models chain selection for cross-chain LPs. LP1 prefers Chain A, LP2 prefers Chain B, but both benefit from concentrating liquidity on the same chain. Also models token pair selection -- traders and LPs need to coordinate on which pairs to prioritize.</li>
+</ul>
+<h3>19. El Farol Bar Problem</h3>
+<ul>
+<li><strong>Description</strong>: N players independently decide whether to go to a bar. If fewer than 60% attend, attendees have more fun than staying home. If more than 60% attend, everyone at the bar has less fun than staying home. No strategy dominates because the optimal choice depends on what everyone else does.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: Variable | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models DEX congestion and pool capacity. Too many traders in a single batch/block causes slippage; too few means insufficient price discovery. Also models yield farming: when too many LPs join a pool, returns drop below opportunity cost. VibeSwap's batch auction naturally regulates this -- the clearing price adjusts to balance participation.</li>
+</ul>
+<h3>20. Minimum Effort Game (Weakest Link)</h3>
+<ul>
+<li><strong>Description</strong>: Each player chooses an effort level. Payoff depends on the MINIMUM effort anyone puts in (weakest link). High effort is costly, so players want to match the lowest effort in the group. Creates a coordination problem where fear of lazy participants drags everyone down.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: Infinite | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models cross-chain bridge security (only as secure as the weakest chain), oracle networks (only as reliable as the worst oracle), and multi-sig governance (weakest key compromises all). VibeSwap's circuit breakers are a response to weakest-link vulnerabilities.</li>
+</ul>
+<h3>21. Guess 2/3 of the Average</h3>
+<ul>
+<li><strong>Description</strong>: Players simultaneously guess a number 0-100. The winner is closest to 2/3 of the average guess. Iterated elimination of dominated strategies drives all guesses to 0, but real play depends on how many levels of reasoning players employ (level-k thinking).</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Maybe | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models Keynesian beauty contest dynamics in token pricing. Traders don't price based on fundamentals but on what they think others think the price should be. Directly relevant to speculative token markets. Also models gas price estimation -- users guess what gas price will clear, creating cascading reasoning.</li>
+</ul>
+<hr />
+<h2>CATEGORY 5: CONFLICT &amp; COMPETITION GAMES</h2>
+<p>Games modeling direct conflict, competition, and strategic aggression.</p>
+<h3>22. Chicken (Hawk-Dove Game)</h3>
+<ul>
+<li><strong>Description</strong>: Two players drive toward each other. Each can swerve (dove/chicken) or go straight (hawk). If both go straight, both crash (worst outcome). If one swerves, the swerver loses face but the straight-driver wins. Two Nash equilibria exist (one swerves, the other doesn't), plus a mixed equilibrium.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 2 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models MEV searcher competition. Two searchers targeting the same arbitrage opportunity play chicken -- both submitting causes higher gas costs (crash). One backing down lets the other profit. Also models liquidation bot competition and aggressive LP repositioning.</li>
+</ul>
+<h3>23. Blotto Games (Colonel Blotto)</h3>
+<ul>
+<li><strong>Description</strong>: Two players simultaneously distribute limited resources across multiple battlefields. The player who allocates more resources to a battlefield wins it. The overall winner captures the most battlefields. A constant-sum game with complex mixed-strategy equilibria.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: Variable | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models multi-pool liquidity allocation. LPs distribute capital across multiple trading pairs (battlefields). The LP with more capital in a pair captures more fees. Also models cross-chain capital allocation and protocol treasury deployment across DeFi strategies.</li>
+</ul>
+<h3>24. War of Attrition</h3>
+<ul>
+<li><strong>Description</strong>: A dynamic timing game where players choose when to stop competing. Players trade off the strategic gain of outlasting opponents against the real cost of continuing. The longer you hold out, the more you spend, but quitting means losing everything invested.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 0 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models gas price bidding wars, liquidity mining emission races between protocols (DeFi wars), and impermanent loss endurance (LPs waiting for price to revert). Also models governance attack/defense -- attackers and defenders burn resources until one side quits.</li>
+</ul>
+<h3>25. Matching Pennies</h3>
+<ul>
+<li><strong>Description</strong>: Two players simultaneously show heads or tails. If both match, Player 1 wins; if they differ, Player 2 wins. A pure zero-sum game with no pure strategy Nash equilibrium -- only a mixed strategy equilibrium (50/50 randomization).</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 0 (pure) | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models the adversarial nature of MEV extraction. The searcher tries to "match" (predict) trader behavior; the trader wants to be unpredictable. VibeSwap's commit-reveal forces the matching pennies equilibrium -- since commits are hashed, searchers cannot match trader strategies, forcing mixed (random) play.</li>
+</ul>
+<h3>26. Rock, Paper, Scissors</h3>
+<ul>
+<li><strong>Description</strong>: Two players simultaneously choose rock, paper, or scissors. Rock beats scissors, scissors beats paper, paper beats rock. A zero-sum game with no pure strategy Nash equilibrium -- the unique equilibrium is uniform randomization (1/3 each).</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 3 | <strong>Nash Eq.</strong>: 0 (pure) | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>LOW</strong> -- Intransitivity concept applies to token arbitrage cycles (A&gt;B&gt;C&gt;A) and circular trading routes. VibeSwap's batch settlement can handle multi-hop circular arbitrage.</li>
+</ul>
+<h3>27. Truel</h3>
+<ul>
+<li><strong>Description</strong>: A three-player duel. Players take turns shooting at each other, trying to eliminate opponents while surviving. Counter-intuitively, the weakest shooter often has the best survival odds (others target the strongest threat first).</li>
+<li><strong>Players</strong>: 3 | <strong>Strategies</strong>: 1-3 | <strong>Nash Eq.</strong>: Infinite | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>LOW</strong> -- Loosely models three-way DEX competition or three-party governance conflicts. The "weakest survives" paradox is interesting for protocol competition dynamics.</li>
+</ul>
+<h3>28. Peace War Game</h3>
+<ul>
+<li><strong>Description</strong>: An iterated game studying cooperation vs. aggression strategies. Players repeatedly choose peace or war. Over time, peacemakers accumulate more wealth as warfare proves costlier than anticipated.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: &gt;2 | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models protocol diplomacy. DeFi protocols can cooperate (composability, shared liquidity) or compete aggressively (vampire attacks, governance takeovers). Long-term cooperators (like the VibeSwap ecosystem approach) accumulate more value.</li>
+</ul>
+<h3>29. Hobbesian Trap</h3>
+<ul>
+<li><strong>Description</strong>: Explains preemptive strikes between two groups driven by bilateral fear of imminent attack. Without outside influence, fear leads to arms races which increase fear -- a spiral toward mutual destruction even when neither side wants conflict.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models DeFi protocol "arms races" (emission wars, fork wars). Two protocols fear the other will vampire-attack first, so both preemptively escalate incentives, destroying value. Also models bank run dynamics in stablecoin/lending protocols -- fear of insolvency causes the insolvency.</li>
+</ul>
+<hr />
+<h2>CATEGORY 6: INFORMATION ASYMMETRY GAMES</h2>
+<p>Games where players have different information or signal private knowledge.</p>
+<h3>30. Signaling Game</h3>
+<ul>
+<li><strong>Description</strong>: A dynamic Bayesian game where a sender (with private information about their type) sends a signal, and a receiver takes an action based on that signal. Equilibria can be separating (types send different signals), pooling (same signal), or semi-separating.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: Variable | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: Yes</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models token launches, audit signaling, and protocol credibility. Projects signal quality through audits, TVL, team doxxing. Also models order flow signaling -- large orders signal information, which is why VibeSwap's commit phase hides order details to prevent information leakage.</li>
+</ul>
+<h3>31. Screening Game</h3>
+<ul>
+<li><strong>Description</strong>: A principal-agent game where the uninformed party (principal) designs a menu of contracts to induce the informed party (agent) to reveal their type through self-selection. The principal screens rather than the agent signaling.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: Variable | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: Yes</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models tiered fee structures in DEXes. Different fee tiers (0.01%, 0.05%, 0.3%, 1%) screen LPs by risk tolerance and pair volatility. Also models KYC/AML compliance tiers and VibeSwap's priority auction -- the priority fee menu screens traders by urgency/information advantage.</li>
+</ul>
+<h3>32. Kuhn Poker</h3>
+<ul>
+<li><strong>Description</strong>: A simplified poker variant developed for game-theoretic analysis. A zero-sum, two-player, imperfect-information sequential game. Each player is dealt one card from a three-card deck and can bet or pass, with bluffing as a key strategic element.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 27 &amp; 64 | <strong>Nash Eq.</strong>: 0 (pure) | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: Yes</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models imperfect information trading with bluffing. Traders "bluff" with large orders to move prices. VibeSwap's batch auction prevents this bluffing by processing all orders at a uniform clearing price, making order size less manipulable as a signal.</li>
+</ul>
+<h3>33. Muddy Children Puzzle</h3>
+<ul>
+<li><strong>Description</strong>: An induction/common knowledge puzzle. N children play outside; some get muddy foreheads. Each can see others' foreheads but not their own. A parent announces "at least one child is muddy" and repeatedly asks "do you know if you're muddy?" The puzzle demonstrates how public announcements create common knowledge that enables iterative reasoning.</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: Yes</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models how public on-chain information creates common knowledge. Before a price oracle update (the "announcement"), traders may have private information. After the update, common knowledge enables iterative reasoning about fair prices. Relevant to VibeSwap's TWAP oracle validation.</li>
+</ul>
+<hr />
+<h2>CATEGORY 7: ESCALATION &amp; IRRATIONALITY GAMES</h2>
+<p>Games demonstrating how rational individual choices lead to collectively irrational outcomes.</p>
+<h3>34. Centipede Game</h3>
+<ul>
+<li><strong>Description</strong>: Two players alternate choosing to "take" a growing pot or "pass" to the other player. Each pass increases the total pot but shifts the larger share to the opponent. Backward induction says to take immediately (round 1), but experiments show players frequently pass, growing the pot.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Variable | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: Yes | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models yield compounding decisions. LPs can "take" (withdraw + claim rewards) at any point or "pass" (continue compounding). Passing grows the pot but risks impermanent loss or protocol failure. Also models protocol upgrade voting -- passing on early governance proposals allows better proposals to emerge.</li>
+</ul>
+<h3>35. Traveler's Dilemma</h3>
+<ul>
+<li><strong>Description</strong>: Two players independently name a price for identical lost luggage (between $2 and $100). The lower price is paid to both, but the low-bidder gets a bonus and the high-bidder gets a penalty. Nash equilibrium is $2, but experimental play clusters near $100 -- a famous example of Nash equilibrium failing to predict behavior.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: N &gt;&gt; 1 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>DIRECT</strong> -- Models DEX price competition. Competing DEXes should theoretically race to zero fees (Nash eq.), but real protocols maintain higher fees because users value other factors. Also models insurance claim dynamics and Schelling point pricing.</li>
+</ul>
+<h3>36. Deadlock</h3>
+<ul>
+<li><strong>Description</strong>: A 2x2 game where the mutually beneficial action is also the dominant strategy -- the opposite of the Prisoner's Dilemma. Both players rationally choose their best option, which also happens to be best for both. No dilemma exists.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>LOW</strong> -- The ideal DeFi mechanism design outcome. If a protocol can convert Prisoner's Dilemma interactions into Deadlock interactions (where cooperation is dominant), it eliminates the need for enforcement. VibeSwap's batch auction aspires to this -- making truthful bidding dominant.</li>
+</ul>
+<h3>37. Platonia Dilemma</h3>
+<ul>
+<li><strong>Description</strong>: 20 players each independently decide whether to send a telegram. If exactly one person sends, they win $1 billion. Zero or multiple telegrams means nobody wins. Cooperation is forbidden. Models the tension between individual rationality (everyone should send) and collective rationality (only one should).</li>
+<li><strong>Players</strong>: N | <strong>Strategies</strong>: 2 | <strong>Nash Eq.</strong>: 2^N - 1 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: Yes | <strong>Zero-Sum</strong>: No | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>MODERATE</strong> -- Models unique-action scenarios in DeFi: only one searcher should submit an arbitrage tx (multiple submissions waste gas), only one keeper should trigger a liquidation. VibeSwap's Fisher-Yates shuffle randomization addresses this by removing the advantage of being "the one."</li>
+</ul>
+<hr />
+<h2>CATEGORY 8: PURSUIT, SEARCH &amp; CONTINUOUS GAMES</h2>
+<p>Games involving continuous strategy spaces, search, or pursuit.</p>
+<h3>38. Princess and Monster Game</h3>
+<ul>
+<li><strong>Description</strong>: A pursuit-evasion game in a bounded region. The "monster" searches for the "princess" who is hiding and evading. Both have limited speed. Analyzes optimal search patterns and evasion strategies in continuous space.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 0 (pure) | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>LOW</strong> -- Abstractly models MEV searcher-trader dynamics. Searchers (monsters) hunt for extractable value; traders (princesses) try to execute without being caught. VibeSwap's commit phase is effectively a "hiding" mechanism.</li>
+</ul>
+<h3>39. Game Without a Value</h3>
+<ul>
+<li><strong>Description</strong>: In zero-sum continuous games, not every game has a minimax value. This occurs when the expected payoff to both players under perfect strategy cannot be determined -- the sup-inf and inf-sup of expected payoffs do not converge.</li>
+<li><strong>Players</strong>: 2 | <strong>Strategies</strong>: Infinite | <strong>Nash Eq.</strong>: 0 | <strong>Sequential</strong>: No | <strong>Perfect Info</strong>: No | <strong>Zero-Sum</strong>: Yes | <strong>Nature</strong>: No</li>
+<li><strong>DeFi Relevance</strong>: <strong>LOW</strong> -- Theoretical relevance: demonstrates that not all market interactions have well-defined equilibrium prices. Relevant to illiquid or exotic token pairs where no stable clearing price exists.</li>
+</ul>
+<hr />
+<h2>CROSS-REFERENCE: CLASSIFICATION MATRIX</h2>
+<h3>By Simultaneity</h3>
+<table>
+<thead>
+<tr>
+<th><strong>Simultaneous</strong></th>
+<th><strong>Sequential</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prisoner's Dilemma, Chicken, Stag Hunt, Battle of the Sexes, Matching Pennies, Rock Paper Scissors, Coordination Game, Cournot Game, Deadlock, Diner's Dilemma, El Farol Bar, Guess 2/3, Nash Bargaining, Optional PD, Public Goods, Volunteer's Dilemma, War of Attrition, Blotto, Minimum Effort, Traveler's Dilemma, Platonia, Princess &amp; Monster, Game Without a Value, Hobbesian Trap</td>
+<td>Centipede, Dollar Auction, Ultimatum, Dictator, Trust, Gift-Exchange, Pirate, Peace War, Cake Cutting, Signaling, Screening, Kuhn Poker, Muddy Children, Truel</td>
+</tr>
+</tbody>
+</table>
+<h3>By Zero-Sum Property</h3>
+<table>
+<thead>
+<tr>
+<th><strong>Zero-Sum</strong></th>
+<th><strong>Non-Zero-Sum</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Matching Pennies, Rock Paper Scissors, Blotto, Cake Cutting, Dictator, Kuhn Poker, Princess &amp; Monster, Game Without a Value</td>
+<td>Prisoner's Dilemma, Chicken, Stag Hunt, Battle of the Sexes, Coordination, Cournot, Deadlock, Diner's Dilemma, Dollar Auction, El Farol, Gift-Exchange, Centipede, Nash Bargaining, Optional PD, Peace War, Pirate, Platonia, Public Goods, Trust, Ultimatum, Traveler's Dilemma, Truel, Volunteer's Dilemma, War of Attrition, Vickrey Auction, Minimum Effort, Hobbesian Trap, Signaling, Screening, Muddy Children</td>
+</tr>
+<tr>
+<td>(Note: Guess 2/3 is "maybe" zero-sum depending on prize rules)</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3>By Perfect Information</h3>
+<table>
+<thead>
+<tr>
+<th><strong>Perfect Information</strong></th>
+<th><strong>Imperfect Information</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Centipede, Dollar Auction, Cake Cutting, Gift-Exchange, Pirate, Trust, Ultimatum, Truel, Platonia</td>
+<td>Battle of the Sexes, Blotto, Chicken, Coordination, Cournot, Deadlock, Diner's Dilemma, El Farol, Guess 2/3, Matching Pennies, Minimum Effort, Nash Bargaining, Optional PD, Prisoner's Dilemma, Public Goods, Rock Paper Scissors, Stag Hunt, Traveler's Dilemma, Volunteer's Dilemma, War of Attrition, Vickrey Auction, Signaling, Screening, Kuhn Poker, Muddy Children, Peace War, Princess &amp; Monster, Game Without a Value, Hobbesian Trap</td>
+</tr>
+</tbody>
+</table>
+<h3>By Nature/Chance Moves</h3>
+<table>
+<thead>
+<tr>
+<th><strong>Has Nature/Chance</strong></th>
+<th><strong>No Nature/Chance</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vickrey Auction, Screening, Signaling, Kuhn Poker, Muddy Children</td>
+<td>All others (34 games)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>DEFI RELEVANCE SUMMARY</h2>
+<h3>DIRECT Relevance (must-study for mechanism design)</h3>
+<ol>
+<li><strong>Vickrey Auction</strong> -- Truthful bidding, second-price mechanics</li>
+<li><strong>Dollar Auction</strong> -- MEV gas wars, escalation traps</li>
+<li><strong>Cournot Game</strong> -- LP competition, liquidity provision quantities</li>
+<li><strong>Prisoner's Dilemma</strong> -- MEV extraction incentives, validator behavior</li>
+<li><strong>Optional Prisoner's Dilemma</strong> -- User participation choice, venue selection</li>
+<li><strong>Trust Game</strong> -- Smart contract trust, rug pull modeling</li>
+<li><strong>Stag Hunt</strong> -- Liquidity bootstrapping, cross-chain coordination</li>
+<li><strong>Public Goods Game</strong> -- Treasury funding, insurance pools, Shapley rewards</li>
+<li><strong>Ultimatum Game</strong> -- Fair pricing, user fairness preferences</li>
+<li><strong>Nash Bargaining</strong> -- Bilateral trade, fee negotiation</li>
+<li><strong>Cake Cutting</strong> -- Fee distribution, reward allocation, Shapley division</li>
+<li><strong>Coordination Game</strong> -- Network effects, liquidity concentration</li>
+<li><strong>El Farol Bar</strong> -- Pool congestion, yield farming saturation</li>
+<li><strong>Guess 2/3 of the Average</strong> -- Token pricing, Keynesian beauty contests</li>
+<li><strong>Chicken (Hawk-Dove)</strong> -- MEV searcher competition, liquidation races</li>
+<li><strong>Blotto Games</strong> -- Multi-pool capital allocation</li>
+<li><strong>War of Attrition</strong> -- Gas bidding wars, emission races</li>
+<li><strong>Signaling Game</strong> -- Token launch credibility, order flow information</li>
+<li><strong>Screening Game</strong> -- Fee tier design, priority auction menus</li>
+<li><strong>Traveler's Dilemma</strong> -- DEX fee competition, Schelling pricing</li>
+</ol>
+<h3>MODERATE Relevance (useful conceptual models)</h3>
+<ol>
+<li><strong>Gift-Exchange Game</strong> -- Protocol incentive reciprocity</li>
+<li><strong>Volunteer's Dilemma</strong> -- Oracle/keeper incentive design</li>
+<li><strong>Diner's Dilemma</strong> -- Shared cost socialization</li>
+<li><strong>Dictator Game</strong> -- Validator ordering power, governance centralization</li>
+<li><strong>Pirate Game</strong> -- Sequential governance proposals</li>
+<li><strong>Minimum Effort Game</strong> -- Cross-chain weakest-link security</li>
+<li><strong>Kuhn Poker</strong> -- Imperfect info trading, bluffing</li>
+<li><strong>Muddy Children</strong> -- Common knowledge from on-chain data</li>
+<li><strong>Centipede Game</strong> -- Yield compounding decisions</li>
+<li><strong>Peace War Game</strong> -- Protocol diplomacy, composability vs. competition</li>
+<li><strong>Hobbesian Trap</strong> -- Protocol arms races, bank run dynamics</li>
+<li><strong>Platonia Dilemma</strong> -- Unique-action coordination (searchers, keepers)</li>
+<li><strong>Matching Pennies</strong> -- MEV adversarial randomization</li>
+</ol>
+<h3>LOW Relevance (theoretical interest only)</h3>
+<ol>
+<li><strong>Rock Paper Scissors</strong> -- Intransitivity in arbitrage cycles</li>
+<li><strong>Deadlock</strong> -- Ideal mechanism design target</li>
+<li><strong>Truel</strong> -- Three-party competition dynamics</li>
+<li><strong>Princess and Monster</strong> -- Abstract searcher-trader pursuit</li>
+<li><strong>Game Without a Value</strong> -- Illiquid market non-equilibrium</li>
+<li><strong>Public Goods Game</strong> (already listed above as DIRECT)</li>
+</ol>
+<hr />
+<h2>VIBESWAP MECHANISM MAPPING</h2>
+<table>
+<thead>
+<tr>
+<th>VibeSwap Component</th>
+<th>Primary Game Models</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Commit-Reveal Auction</strong></td>
+<td>Vickrey Auction, Signaling Game, Matching Pennies, Prisoner's Dilemma</td>
+</tr>
+<tr>
+<td><strong>Uniform Clearing Price</strong></td>
+<td>Ultimatum Game, Traveler's Dilemma, Nash Bargaining</td>
+</tr>
+<tr>
+<td><strong>Priority Fee Auction</strong></td>
+<td>Screening Game, Dollar Auction, Chicken</td>
+</tr>
+<tr>
+<td><strong>Fisher-Yates Shuffle</strong></td>
+<td>Platonia Dilemma, Matching Pennies</td>
+</tr>
+<tr>
+<td><strong>Shapley Distributor</strong></td>
+<td>Cake Cutting, Public Goods, Gift-Exchange</td>
+</tr>
+<tr>
+<td><strong>IL Protection Pool</strong></td>
+<td>Public Goods, Volunteer's Dilemma, Stag Hunt</td>
+</tr>
+<tr>
+<td><strong>Circuit Breakers</strong></td>
+<td>Minimum Effort (weakest link), Hobbesian Trap</td>
+</tr>
+<tr>
+<td><strong>Cross-Chain Router</strong></td>
+<td>Coordination Game, Stag Hunt, Blotto</td>
+</tr>
+<tr>
+<td><strong>TWAP Oracle</strong></td>
+<td>Guess 2/3, Muddy Children, Signaling</td>
+</tr>
+<tr>
+<td><strong>DAOTreasury</strong></td>
+<td>Public Goods, Pirate Game, Ultimatum</td>
+</tr>
+<tr>
+<td><strong>Rate Limiting</strong></td>
+<td>El Farol Bar, War of Attrition</td>
+</tr>
+<tr>
+<td><strong>Anti-MEV Design</strong></td>
+<td>Prisoner's Dilemma, Dollar Auction, Chicken, Signaling</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Total games catalogued: 39</em>
+<em>Direct DeFi relevance: 20 (51%)</em>
+<em>Moderate DeFi relevance: 13 (33%)</em>
+<em>Low DeFi relevance: 6 (15%)</em></p></body></html>

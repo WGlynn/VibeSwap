@@ -1,0 +1,105 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Fractal Fork Network — Design Specification</h1>
+<p><strong>Status</strong>: Architecture Design
+<strong>Priority</strong>: Design now, implement post go-live
+<strong>Author</strong>: Will + JARVIS</p>
+<hr />
+<h2>Core Idea</h2>
+<p>VibeSwap is the sum of all its forks. Forks are not enemies — they're children. The protocol creates economic gravity that pulls aligned forks back while letting divergent ones explore freely.</p>
+<blockquote>
+<p>"A fractal black hole of information."</p>
+</blockquote>
+<h2>Mechanism Design</h2>
+<h3>1. Fork Protocol</h3>
+<p>Any project can fork VibeSwap. The fork registration contract enforces:</p>
+<pre><code class="language-solidity">// ForkRegistry.sol
+struct Fork {
+    address forkAddress;      // The forked protocol's main contract
+    address parentAddress;    // Parent protocol (VibeSwap root or another fork)
+    uint256 feeShareBps;     // Always 5000 (50%)
+    uint256 registeredAt;
+    bytes32 stateHash;       // Latest state commitment
+    bool active;
+}
+</code></pre>
+<p><strong>Rule:</strong> 50% of fork's revenue routes back to parent. 50% stays with fork.</p>
+<h3>2. Two-Way Fee Flow</h3>
+<pre><code>VibeSwap (Root)
+├── Fork A (50% fees → Root)
+│   ├── Fork A1 (50% → Fork A, 25% → Root)
+│   └── Fork A2 (50% → Fork A, 25% → Root)
+├── Fork B (50% fees → Root)
+└── Fork C (50% fees → Root)
+    └── Fork C1 (50% → Fork C, 25% → Root)
+</code></pre>
+<p><strong>Economic gravity:</strong> Every fork in the tree feeds the root. Deeper forks pay less to root (geometric decay) but still contribute. Malicious forks that generate no volume generate no fees — they starve naturally.</p>
+<h3>3. Reconvergence Incentive</h3>
+<p>If a fork's state hash matches the parent's state hash after N blocks:
+- Fork and parent <strong>merge</strong>
+- Accumulated fees from both are shared
+- Merged entity inherits the larger user base</p>
+<pre><code class="language-solidity">function reconverge(address forkAddr) external {
+    Fork storage fork = forks[forkAddr];
+    require(fork.stateHash == parentStateHash, &quot;State mismatch&quot;);
+    require(block.number - fork.lastDivergence &gt; RECONVERGENCE_WINDOW);
+
+    // Merge: combine treasuries, user bases, liquidity
+    _merge(fork.forkAddress, fork.parentAddress);
+
+    emit Reconverged(forkAddr, fork.parentAddress);
+}
+</code></pre>
+<p><strong>Why this works:</strong> Forks that innovate and want to rejoin can. Forks that diverge permanently still feed the root via fees. No path is punished — all paths create value.</p>
+<h3>4. Directed Acyclic Graph (DAG) Topology</h3>
+<ul>
+<li>Forks can fork other forks → mesh network</li>
+<li>Fee routing follows the DAG edges</li>
+<li>Coherence emerges from economic alignment, not forced consensus</li>
+<li>Each node operates asynchronously</li>
+</ul>
+<pre><code>     VibeSwap
+    /    |    \
+  A      B      C
+ / \     |    / | \
+A1  A2   B1  C1 C2 C3
+     \        /
+      D (forked from both A2 and C1)
+</code></pre>
+<h3>5. Asynchronous Updates</h3>
+<ul>
+<li>Each fork evolves independently</li>
+<li>Fee routing creates soft coupling (economic, not technical)</li>
+<li>State commitments published periodically (not real-time)</li>
+<li>Consensus is eventual, not instant</li>
+</ul>
+<h2>Smart Contract Architecture</h2>
+<h3>ForkRegistry.sol</h3>
+<ul>
+<li><code>registerFork(address parent)</code> — register a new fork</li>
+<li><code>routeFees()</code> — called by fork to distribute fees to parent</li>
+<li><code>reconverge(address fork)</code> — merge fork back into parent</li>
+<li><code>getForkTree(address root)</code> — view the full fork DAG</li>
+</ul>
+<h3>ForkFeeRouter.sol</h3>
+<ul>
+<li>Handles the 50/50 split logic</li>
+<li>Geometric decay for deep forks</li>
+<li>Emergency pause if a fork is detected as malicious</li>
+</ul>
+<h2>Why This Defeats Everything</h2>
+<ol>
+<li><strong>Forks strengthen the root</strong> instead of fragmenting it</li>
+<li><strong>Innovation happens at the edges</strong> without coordination overhead</li>
+<li><strong>Economic gravity prevents permanent fragmentation</strong></li>
+<li><strong>Reconvergence rewards alignment</strong> over competition</li>
+<li><strong>The protocol is antifragile</strong> — more forks = more fees = more resilient</li>
+</ol>
+<blockquote>
+<p>The black hole pulls everything back eventually.</p>
+</blockquote></body></html>

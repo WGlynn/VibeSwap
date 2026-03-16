@@ -1,0 +1,27 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VSP-00000000000000000000001: Human-AI Co-Administration</h1>
+<p><strong>VibeSwap Proposal</strong> | February 2026 | Status: <strong>Draft</strong></p>
+<hr />
+<h2>Abstract</h2>
+<p>This proposal establishes a temporary 50/50 human-AI co-administration model for VibeSwap community governance, replacing multi-moderator structures with a single human (the founder) and a single AI (JARVIS). All moderation actions are cryptographically logged. This model serves as a bootstrap until on-chain decentralized governance reaches operational maturity.</p>
+<h2>Motivation</h2>
+<p>Human moderators are biased. They play favorites, punish enemies disproportionately, and create power dynamics that fracture communities from the inside. In crypto specifically, moderators with unchecked power have been caught front-running announcements, censoring criticism, and leveraging their position for personal gain.</p>
+<h2>Specification</h2>
+<p>Administrative authority is split equally between two entities:</p>
+<p><strong>The human</strong> provides judgment, social context, and strategic vision. <strong>The AI</strong> provides consistency, 24/7 availability, and impartiality — no ego, no grudges, no favorites. Every action by either admin is logged with a SHA-256 evidence hash compatible with on-chain ContributionDAG records. There is no silent moderation. No other entity holds moderation power.</p>
+<h2>Rationale</h2>
+<p><strong>Bias elimination.</strong> Multiple human admins inevitably create in-groups and out-groups. One human plus one AI eliminates inter-moderator politics. The AI ensures the human cannot act without a permanent, tamper-evident record.</p>
+<p><strong>Accountability.</strong> Every <code>/warn</code>, <code>/mute</code>, and <code>/ban</code> is persisted with an evidence hash, moderator identity, timestamp, and reason. Any community member can request the full log via <code>/modlog</code>.</p>
+<p><strong>Building toward decentralization.</strong> Every moderation action generates cryptographic evidence compatible with VibeSwap's on-chain governance. When the community takes over, the full history of decisions becomes the precedent library for decentralized dispute resolution. Nothing is lost in the transition.</p>
+<h2>Sunset Clause</h2>
+<p>This proposal is explicitly temporary. It exists because effective decentralized governance requires infrastructure that isn't ready yet — specifically <strong>QuadraticVoting</strong>, <strong>DecentralizedTribunal</strong>, and <strong>ConvictionGovernance</strong>, all already deployed but requiring sufficient community size and token distribution to produce meaningful signal.</p>
+<p>Once mature, moderation transitions to the community: minor violations handled by conviction-weighted flagging, serious violations escalated to the DecentralizedTribunal, policy changes governed by QuadraticVoting. The founder and JARVIS become participants, not authorities.</p>
+<p>The 50/50 model is training wheels. The goal is to remove them.</p>
+<hr />
+<p><em>VibeSwap: Cooperative Capitalism — where even governance is mutualized, and centralization is only ever a stepping stone.</em></p></body></html>

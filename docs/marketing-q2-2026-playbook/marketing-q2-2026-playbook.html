@@ -1,0 +1,1586 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VibeSwap Q2 2026 Tactical Playbook</h1>
+<p><strong>Faraday1, JARVIS — March 2026</strong></p>
+<hr />
+<blockquote>
+<p>Supplementary to <code>marketing-strategy-2026.md</code> and <code>partnership-framework-2026.md</code>.
+This is not strategy. This is execution. Dates, names, numbers.</p>
+</blockquote>
+<hr />
+<h2>Current State (March 14, 2026)</h2>
+<table>
+<thead>
+<tr>
+<th>Asset</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Base mainnet</td>
+<td><strong>LIVE</strong></td>
+</tr>
+<tr>
+<td>Smart contracts</td>
+<td>342</td>
+</tr>
+<tr>
+<td>Solidity test files</td>
+<td>371</td>
+</tr>
+<tr>
+<td>Frontend components</td>
+<td>401</td>
+</tr>
+<tr>
+<td>CKB Rust SDK modules</td>
+<td>73 (15,155 tests)</td>
+</tr>
+<tr>
+<td>Total commits</td>
+<td>1,684</td>
+</tr>
+<tr>
+<td>Research papers</td>
+<td>55</td>
+</tr>
+<tr>
+<td>JARVIS Telegram bot</td>
+<td>Autonomous, live</td>
+</tr>
+<tr>
+<td>CKB/Nervos integration</td>
+<td>In progress</td>
+</tr>
+<tr>
+<td>Tim Cotten (CRPC)</td>
+<td>Talking to Shaw (ElizaOS), speaking EthDC April 16</td>
+</tr>
+<tr>
+<td>Anthropic rate limit request</td>
+<td><strong>SUBMITTED</strong> (2026-03-14)</td>
+</tr>
+<tr>
+<td>VC funding</td>
+<td>None. Bootstrapped.</td>
+</tr>
+<tr>
+<td>Team</td>
+<td>1 founder + 1 AI + 6 contributors</td>
+</tr>
+<tr>
+<td>GitHub</td>
+<td>github.com/WGlynn/VibeSwap</td>
+</tr>
+<tr>
+<td>Vercel</td>
+<td>frontend-jade-five-87.vercel.app</td>
+</tr>
+<tr>
+<td>Twitter/X</td>
+<td>Integration spec written, pending deployment</td>
+</tr>
+<tr>
+<td>Marketing materials</td>
+<td>221 files ready (tweets, grants, Reddit, pitch deck, BD toolkit)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>1. April 2026 Actions</h2>
+<h3>Week 1 (March 31 — April 6): EthDC Pre-Heat</h3>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Task</th>
+<th>Owner</th>
+<th>Deliverable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mon Mar 31</td>
+<td>Finalize JARVIS Twitter integration (see <code>docs/twitter.md</code>)</td>
+<td>Will/Freedom</td>
+<td><code>jarvis-bot/src/twitter.js</code> live, posting to @VibeSwap</td>
+</tr>
+<tr>
+<td>Tue Apr 1</td>
+<td>Publish thread: "What is VibeSwap? (for humans)" — 10-tweet explainer</td>
+<td>Fate/JARVIS</td>
+<td>Twitter thread, pin to profile</td>
+</tr>
+<tr>
+<td>Wed Apr 2</td>
+<td>Publish Reddit post to r/ethereum: "How batch auctions eliminate MEV"</td>
+<td>Catto</td>
+<td>Expand <code>docs/reddit-posts/r-ethereum-mev-problem.md</code></td>
+</tr>
+<tr>
+<td>Thu Apr 3</td>
+<td>DM 5 crypto podcasters pitching Will as guest (Bankless, The Defiant, Unchained, ZK Podcast, Epicenter)</td>
+<td>Freedom</td>
+<td>5 outreach DMs sent</td>
+</tr>
+<tr>
+<td>Fri Apr 4</td>
+<td>Create "VibeSwap in 60 seconds" video — screen recording of a batch auction settling</td>
+<td>Will</td>
+<td>Upload to YouTube + Twitter clip</td>
+</tr>
+<tr>
+<td>Sat-Sun</td>
+<td>JARVIS autonomous posting: 2 shower-thought tweets per day, engage with MEV-related threads</td>
+<td>Fate/JARVIS</td>
+<td>4 tweets</td>
+</tr>
+</tbody>
+</table>
+<h3>Week 2 (April 7 — April 13): EthDC Week Minus One</h3>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Task</th>
+<th>Owner</th>
+<th>Deliverable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mon Apr 7</td>
+<td>Publish Medium article: "Why Every DEX Trade Robs You (And How to Fix It)"</td>
+<td>Will</td>
+<td>Medium + Mirror cross-post</td>
+</tr>
+<tr>
+<td>Tue Apr 8</td>
+<td>Twitter thread: "Tim Cotten built CRPC. We built VibeSwap. Here's what happens when they meet." — tease EthDC talk</td>
+<td>Fate/JARVIS</td>
+<td>Thread</td>
+</tr>
+<tr>
+<td>Wed Apr 9</td>
+<td>Submit VibeSwap to DeFi Llama listing (if not already listed)</td>
+<td>John Paul</td>
+<td>DeFi Llama PR submitted</td>
+</tr>
+<tr>
+<td>Thu Apr 10</td>
+<td>Reddit post to r/defi: "No VC funding. No pre-mine. 200 smart contracts. Here's what we built."</td>
+<td>Catto</td>
+<td>Reddit post</td>
+</tr>
+<tr>
+<td>Fri Apr 11</td>
+<td>Coordinate with Tim Cotten: confirm VibeSwap mention in EthDC talk, prepare co-branded slide if appropriate</td>
+<td>Freedom/Tim</td>
+<td>Slide or talking points shared</td>
+</tr>
+<tr>
+<td>Sat-Sun</td>
+<td>JARVIS engagement: reply to every EthDC-related tweet mentioning MEV, batch auctions, or fair ordering</td>
+<td>JARVIS</td>
+<td>10+ replies</td>
+</tr>
+</tbody>
+</table>
+<h3>Week 3 (April 14 — April 20): EthDC Week</h3>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Task</th>
+<th>Owner</th>
+<th>Deliverable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mon Apr 14</td>
+<td>Twitter thread: "5 things to watch at EthDC this week (and why batch auctions matter)"</td>
+<td>Fate/JARVIS</td>
+<td>Thread</td>
+</tr>
+<tr>
+<td>Tue Apr 15</td>
+<td>Pre-event tweet: "Tomorrow @TimCotten talks CRPC at EthDC. VibeSwap is where CRPC meets DeFi."</td>
+<td>Fate</td>
+<td>Tweet with event link</td>
+</tr>
+<tr>
+<td><strong>Wed Apr 16</strong></td>
+<td><strong>TIM COTTEN ETHDC TALK</strong> — Live-tweet key moments, quote-tweet Tim, engage every reply</td>
+<td>Fate + JARVIS + Karma</td>
+<td>15+ tweets during/after talk</td>
+</tr>
+<tr>
+<td>Wed Apr 16</td>
+<td>Post-talk Twitter thread: "What Tim just showed at EthDC and what it means for VibeSwap"</td>
+<td>Fate/Will</td>
+<td>Thread within 2 hours of talk</td>
+</tr>
+<tr>
+<td>Thu Apr 17</td>
+<td>Reddit post to r/CryptoCurrency: recap of EthDC talk + VibeSwap connection</td>
+<td>Catto</td>
+<td>Reddit post</td>
+</tr>
+<tr>
+<td>Fri Apr 18</td>
+<td>Follow up with every new Twitter follower from EthDC week — DM top 10 with personal note</td>
+<td>Freedom</td>
+<td>10 DMs</td>
+</tr>
+<tr>
+<td>Sat-Sun</td>
+<td>Telegram community AMA: "Ask JARVIS Anything" — let the AI field questions for 2 hours</td>
+<td>Karma/JARVIS</td>
+<td>Telegram event</td>
+</tr>
+</tbody>
+</table>
+<h3>Week 4 (April 21 — April 27): Post-EthDC Momentum</h3>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Task</th>
+<th>Owner</th>
+<th>Deliverable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mon Apr 21</td>
+<td>Publish blog post: "EthDC Recap: CRPC, Batch Auctions, and the Future of Fair DeFi"</td>
+<td>Will</td>
+<td>Medium + Mirror</td>
+</tr>
+<tr>
+<td>Tue Apr 22</td>
+<td>Outreach to Shaw (ElizaOS) — direct message referencing Tim's intro, propose VibeSwap x ElizaOS integration</td>
+<td>Freedom</td>
+<td>DM or email sent</td>
+</tr>
+<tr>
+<td>Wed Apr 23</td>
+<td>Twitter thread: "JARVIS wrote 200 smart contracts. Here's what an AI co-founder actually does."</td>
+<td>Fate/JARVIS</td>
+<td>Thread</td>
+</tr>
+<tr>
+<td>Thu Apr 24</td>
+<td>Submit grant application to Base Ecosystem Fund (see May actions for more grants)</td>
+<td>John Paul</td>
+<td>Application submitted</td>
+</tr>
+<tr>
+<td>Fri Apr 25</td>
+<td>Reddit post to r/ethereum: "We built an AI co-founder that writes Solidity. AMA."</td>
+<td>Catto</td>
+<td>Reddit AMA post</td>
+</tr>
+<tr>
+<td>Sat-Sun</td>
+<td>Weekly metrics review — document Twitter followers, Telegram members, GitHub stars</td>
+<td>Karma</td>
+<td>Metrics logged</td>
+</tr>
+</tbody>
+</table>
+<h3>April Targets</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Start (Mar 31)</th>
+<th>Target (Apr 30)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter followers</td>
+<td>Current</td>
+<td>+500</td>
+</tr>
+<tr>
+<td>Telegram members</td>
+<td>Current</td>
+<td>+100</td>
+</tr>
+<tr>
+<td>GitHub stars</td>
+<td>Current</td>
+<td>+50</td>
+</tr>
+<tr>
+<td>Medium article views</td>
+<td>0</td>
+<td>2,000</td>
+</tr>
+<tr>
+<td>Reddit post karma (total)</td>
+<td>0</td>
+<td>500</td>
+</tr>
+<tr>
+<td>Podcast pitches sent</td>
+<td>0</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Partnership outreach emails</td>
+<td>0</td>
+<td>10</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. May 2026 Actions</h2>
+<h3>Hackathon Submissions</h3>
+<table>
+<thead>
+<tr>
+<th>Hackathon</th>
+<th>Deadline (est.)</th>
+<th>Track</th>
+<th>Submission</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ETHGlobal Brussels</td>
+<td>May 2026 (TBC)</td>
+<td>DeFi Infrastructure</td>
+<td>VibeSwap batch auction SDK — let any protocol add MEV-free trading</td>
+</tr>
+<tr>
+<td>Base Buildathon</td>
+<td>Ongoing</td>
+<td>DeFi on Base</td>
+<td>VibeSwap as reference MEV-free DEX on Base</td>
+</tr>
+<tr>
+<td>Nervos CKB Hackathon</td>
+<td>TBC</td>
+<td>DeFi + Cell Model</td>
+<td>CKB integration — batch auctions using cell model</td>
+</tr>
+<tr>
+<td>LayerZero Bounties</td>
+<td>Ongoing</td>
+<td>Cross-chain</td>
+<td>Omnichain batch auction demo — trade across chains in one batch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Hackathon Strategy</strong>: Don't build new projects. Package existing VibeSwap components as standalone tools. The 200+ contracts ARE the submission — wrap them in clean SDK interfaces.</p>
+<h3>Grant Applications</h3>
+<table>
+<thead>
+<tr>
+<th>Grant Program</th>
+<th>Amount (est.)</th>
+<th>Proposal Focus</th>
+<th>Submit By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Base Ecosystem Fund</td>
+<td>$25-100K</td>
+<td>MEV-free trading infrastructure on Base</td>
+<td>April 24</td>
+</tr>
+<tr>
+<td>LayerZero Grants</td>
+<td>$10-50K</td>
+<td>Omnichain batch auction reference implementation</td>
+<td>May 5</td>
+</tr>
+<tr>
+<td>Nervos/CKB Grants</td>
+<td>$10-50K</td>
+<td>Cell model integration for commit-reveal auctions</td>
+<td>May 12</td>
+</tr>
+<tr>
+<td>Optimism RetroPGF</td>
+<td>Variable</td>
+<td>Public good: open-source MEV elimination</td>
+<td>May round (TBC)</td>
+</tr>
+<tr>
+<td>Ethereum Foundation</td>
+<td>$50-100K</td>
+<td>Batch auction mechanism design research</td>
+<td>May 19</td>
+</tr>
+<tr>
+<td>Gitcoin Grants</td>
+<td>Community-funded</td>
+<td>VibeSwap as public good infrastructure</td>
+<td>Next round</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Grant Strategy</strong>: Lead with mechanism design research angle. VibeSwap is not just a DEX — it's an open-source public good for MEV elimination. Frame every application around the public benefit.</p>
+<h3>Content Calendar — May</h3>
+<table>
+<thead>
+<tr>
+<th>Week</th>
+<th>Medium/Mirror</th>
+<th>Twitter (10/week target)</th>
+<th>Reddit (2/week)</th>
+<th>Telegram</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>May 1-4</td>
+<td>"Shapley Values: How VibeSwap Distributes Rewards Using Game Theory"</td>
+<td>3 threads + 7 engagement tweets</td>
+<td>r/ethereum: Shapley explainer / r/defi: Monthly update</td>
+<td>Dev update</td>
+</tr>
+<tr>
+<td>May 5-11</td>
+<td>"LayerZero V2 + Batch Auctions = Omnichain MEV Protection"</td>
+<td>3 threads + 7 engagement</td>
+<td>r/CryptoCurrency: LayerZero integration / r/ethdev: Technical deep dive</td>
+<td>AMA #2</td>
+</tr>
+<tr>
+<td>May 12-18</td>
+<td>(none — focus on hackathon submission)</td>
+<td>2 threads + 8 engagement</td>
+<td>r/NervosNetwork: CKB integration / r/defi: Hackathon update</td>
+<td>Hackathon livestream</td>
+</tr>
+<tr>
+<td>May 19-25</td>
+<td>"Cooperative Capitalism: Why Self-Interest Should Serve the Collective"</td>
+<td>3 threads + 7 engagement</td>
+<td>r/ethereum: Philosophy post / r/CryptoTechnology: Technical comparison</td>
+<td>Community vote</td>
+</tr>
+<tr>
+<td>May 26-31</td>
+<td>"The AI Co-Founder Experiment: 3 Months of JARVIS Building VibeSwap"</td>
+<td>2 threads + 8 engagement</td>
+<td>r/artificial: AI co-founder story / r/defi: Monthly recap</td>
+<td>Monthly digest</td>
+</tr>
+</tbody>
+</table>
+<h3>May Targets</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Start (May 1)</th>
+<th>Target (May 31)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter followers</td>
+<td>Apr baseline + 500</td>
+<td>+1,000 cumulative</td>
+</tr>
+<tr>
+<td>Telegram members</td>
+<td>Apr baseline + 100</td>
+<td>+250 cumulative</td>
+</tr>
+<tr>
+<td>GitHub stars</td>
+<td>Apr baseline + 50</td>
+<td>+150 cumulative</td>
+</tr>
+<tr>
+<td>Grant applications submitted</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Hackathon submissions</td>
+<td>0</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Podcast appearances</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>3. June 2026 Actions</h2>
+<h3>Partnership Announcements</h3>
+<p>By June, the following partnerships should be in active negotiation or announced:</p>
+<table>
+<thead>
+<tr>
+<th>Partner</th>
+<th>Integration Type</th>
+<th>Target Announcement</th>
+<th>Status (as of Mar 13)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ElizaOS / Shaw</td>
+<td>AI agent integration — ElizaOS agents can execute MEV-free trades via VibeSwap</td>
+<td>June 2-6</td>
+<td>Tim Cotten introducing (warm lead)</td>
+</tr>
+<tr>
+<td>LayerZero</td>
+<td>Official ecosystem partner — featured in LZ documentation</td>
+<td>June 9-13</td>
+<td>Cold — outreach in April</td>
+</tr>
+<tr>
+<td>Nervos/CKB</td>
+<td>Technical integration — batch auctions on cell model</td>
+<td>June 16-20</td>
+<td>Active development</td>
+</tr>
+<tr>
+<td>Base/Coinbase</td>
+<td>Ecosystem listing — featured on Base ecosystem page</td>
+<td>June 23-27</td>
+<td>Grant application in April</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Announcement Cadence</strong>: One partnership announcement per week in June. Each gets: Twitter thread, Medium article, Telegram announcement, Reddit post. Stagger for maximum sustained attention.</p>
+<h3>Developer Documentation Push</h3>
+<table>
+<thead>
+<tr>
+<th>Deliverable</th>
+<th>Target Date</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SDK documentation site (GitBook or Docusaurus)</td>
+<td>June 2</td>
+<td>Developers can integrate VibeSwap batch auctions into their protocols</td>
+</tr>
+<tr>
+<td>Smart contract API reference</td>
+<td>June 9</td>
+<td>Every public function documented with NatSpec</td>
+</tr>
+<tr>
+<td>"Build Your First MEV-Free Integration" tutorial</td>
+<td>June 16</td>
+<td>Step-by-step tutorial for protocol integrators</td>
+</tr>
+<tr>
+<td>Example integration repo (GitHub template)</td>
+<td>June 23</td>
+<td>Fork-and-deploy template for adding VibeSwap to any frontend</td>
+</tr>
+<tr>
+<td>CRPC protocol documentation</td>
+<td>June 30</td>
+<td>Document the CRPC demo and how it interfaces with VibeSwap</td>
+</tr>
+</tbody>
+</table>
+<h3>Community Milestones</h3>
+<table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>Target Date</th>
+<th>Celebration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>500 Telegram members</td>
+<td>June 7</td>
+<td>JARVIS-hosted Telegram party, community NFT drop</td>
+</tr>
+<tr>
+<td>1,000 Twitter followers</td>
+<td>June 14</td>
+<td>Twitter Spaces: "The VibeSwap Story" — 1-hour live discussion</td>
+</tr>
+<tr>
+<td>100 GitHub stars</td>
+<td>June 21</td>
+<td>Contributor shoutout thread, tag top 10 contributors</td>
+</tr>
+<tr>
+<td>First external integration</td>
+<td>June 28</td>
+<td>Joint announcement with partner, co-marketed event</td>
+</tr>
+</tbody>
+</table>
+<h3>June Targets</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Start (June 1)</th>
+<th>Target (June 30)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter followers</td>
+<td>+1,000 cumul.</td>
+<td>+2,500 cumulative</td>
+</tr>
+<tr>
+<td>Telegram members</td>
+<td>+250 cumul.</td>
+<td>+500 cumulative</td>
+</tr>
+<tr>
+<td>GitHub stars</td>
+<td>+150 cumul.</td>
+<td>+300 cumulative</td>
+</tr>
+<tr>
+<td>Active partnerships</td>
+<td>0</td>
+<td>2 signed</td>
+</tr>
+<tr>
+<td>Developer docs pages</td>
+<td>0</td>
+<td>30+</td>
+</tr>
+<tr>
+<td>External integrations</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>4. Content Pipeline</h2>
+<h3>4.1 Medium / Mirror Articles (2 per month)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Target Date</th>
+<th>Audience</th>
+<th>Cross-post</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>"Why Every DEX Trade Robs You (And How to Fix It)"</td>
+<td>Apr 7</td>
+<td>Traders</td>
+<td>Mirror, Reddit, Twitter thread</td>
+</tr>
+<tr>
+<td>2</td>
+<td>"EthDC Recap: CRPC, Batch Auctions, and the Future of Fair DeFi"</td>
+<td>Apr 21</td>
+<td>General crypto</td>
+<td>Mirror, Reddit</td>
+</tr>
+<tr>
+<td>3</td>
+<td>"Shapley Values: How VibeSwap Distributes Rewards Using Game Theory"</td>
+<td>May 5</td>
+<td>Builders, researchers</td>
+<td>Mirror, r/ethereum</td>
+</tr>
+<tr>
+<td>4</td>
+<td>"LayerZero V2 + Batch Auctions = Omnichain MEV Protection"</td>
+<td>May 12</td>
+<td>Builders</td>
+<td>Mirror, r/ethdev</td>
+</tr>
+<tr>
+<td>5</td>
+<td>"Cooperative Capitalism: Why Self-Interest Should Serve the Collective"</td>
+<td>May 19</td>
+<td>Idealists, DAOs</td>
+<td>Mirror, r/ethereum</td>
+</tr>
+<tr>
+<td>6</td>
+<td>"The AI Co-Founder Experiment: 3 Months of JARVIS Building VibeSwap"</td>
+<td>May 26</td>
+<td>AI + crypto crossover</td>
+<td>Mirror, r/artificial</td>
+</tr>
+<tr>
+<td>7</td>
+<td>"How We Built 200 Smart Contracts With Zero VC Funding"</td>
+<td>Jun 9</td>
+<td>Builders</td>
+<td>Mirror, Hacker News</td>
+</tr>
+<tr>
+<td>8</td>
+<td>"The Developer's Guide to MEV-Free Integration"</td>
+<td>Jun 23</td>
+<td>Developers</td>
+<td>Mirror, r/ethdev</td>
+</tr>
+</tbody>
+</table>
+<h3>4.2 Twitter/X Threads (10 tweets/week minimum)</h3>
+<p><strong>Thread templates</strong> (rotate weekly):</p>
+<ol>
+<li><strong>Mechanism explainer</strong>: "How [specific mechanism] works in VibeSwap" — commit-reveal, Fisher-Yates, Shapley, TWAP oracle, circuit breakers</li>
+<li><strong>MEV horror story</strong>: Quote-tweet or screenshot a sandwich attack, explain how VibeSwap prevents it</li>
+<li><strong>Build-in-public update</strong>: "This week we shipped..." — GitHub commits, new contracts, frontend updates</li>
+<li><strong>AI co-founder moment</strong>: JARVIS posts something it built, explains its reasoning</li>
+<li><strong>Comparison thread</strong>: "VibeSwap vs [competitor] — an honest comparison"</li>
+<li><strong>Community highlight</strong>: Shout out a contributor, community member, or partner</li>
+<li><strong>Philosophy thread</strong>: Cooperative Capitalism, fairness axioms, game theory primitives</li>
+</ol>
+<p><strong>Daily engagement target</strong>: Reply to 5+ tweets about MEV, batch auctions, fair launch, or DeFi infrastructure. Always add value, never shill.</p>
+<p><strong>Tweet repo</strong>: All drafted tweets stored in <code>docs/medium-pipeline/</code> (rename to <code>docs/content-pipeline/</code> or create <code>docs/tweets/</code> directory).</p>
+<h3>4.3 Reddit Strategy (2 posts/week)</h3>
+<p><strong>Target subreddits</strong> (priority order):</p>
+<table>
+<thead>
+<tr>
+<th>Subreddit</th>
+<th>Post Type</th>
+<th>Frequency</th>
+<th>Rules to Follow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>r/ethereum</td>
+<td>Technical explainers, mechanism design</td>
+<td>2x/month</td>
+<td>No shilling — educational only, no direct links to product</td>
+</tr>
+<tr>
+<td>r/defi</td>
+<td>Product updates, comparisons</td>
+<td>2x/month</td>
+<td>Allowed to link product if relevant to discussion</td>
+</tr>
+<tr>
+<td>r/CryptoCurrency</td>
+<td>General crypto audience pieces</td>
+<td>2x/month</td>
+<td>Must be substantial content, not promotional</td>
+</tr>
+<tr>
+<td>r/ethdev</td>
+<td>Developer tutorials, smart contract patterns</td>
+<td>1x/month</td>
+<td>Pure technical content, no marketing language</td>
+</tr>
+<tr>
+<td>r/NervosNetwork</td>
+<td>CKB integration updates</td>
+<td>1x/month</td>
+<td>Community-focused, show CKB-specific work</td>
+</tr>
+<tr>
+<td>r/artificial</td>
+<td>AI co-founder story</td>
+<td>1x/month</td>
+<td>Lead with AI angle, not crypto</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Reddit rules</strong>:
+- NEVER use marketing language. Write like an engineer explaining something cool they built.
+- Always disclose: "Disclosure: I'm the founder of VibeSwap."
+- Engage genuinely in comments. Answer every question.
+- Existing post templates: <code>docs/reddit-posts/r-ethereum-mev-problem.md</code></p>
+<h3>4.4 Telegram Announcements</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Frequency</th>
+<th>Format</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dev update</td>
+<td>Weekly (Monday)</td>
+<td>"This week: [3-5 bullet points of what shipped]"</td>
+</tr>
+<tr>
+<td>Community AMA</td>
+<td>Monthly</td>
+<td>JARVIS fields questions for 2 hours</td>
+</tr>
+<tr>
+<td>Partnership announcement</td>
+<td>As they happen</td>
+<td>Formatted announcement + link to blog post</td>
+</tr>
+<tr>
+<td>Milestone celebration</td>
+<td>As achieved</td>
+<td>Fun announcement + community engagement prompt</td>
+</tr>
+<tr>
+<td>Market commentary</td>
+<td>When relevant</td>
+<td>JARVIS autonomous — brief MEV-related news + VibeSwap angle</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>5. Partnership Targets</h2>
+<h3>Tier A — High Priority (Outreach in April)</h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Contact Path</th>
+<th>Integration Idea</th>
+<th>Karma Score (est.)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ElizaOS / Shaw</strong></td>
+<td>Tim Cotten introduction (WARM — active as of Mar 13)</td>
+<td>ElizaOS agents execute MEV-free trades via VibeSwap API</td>
+<td>90</td>
+</tr>
+<tr>
+<td><strong>LayerZero Labs</strong></td>
+<td>Cold email + Twitter DM to Bryan Pellegrino</td>
+<td>Featured omnichain partner — VibeSwap as reference V2 OApp</td>
+<td>85</td>
+</tr>
+<tr>
+<td><strong>Base / Coinbase</strong></td>
+<td>Base Ecosystem Fund application + Jesse Pollak Twitter DM</td>
+<td>Ecosystem grant + featured on Base DeFi page</td>
+<td>85</td>
+</tr>
+<tr>
+<td><strong>Nervos / CKB</strong></td>
+<td>Active — already building integration</td>
+<td>Cell model batch auctions, CKB-native VibeSwap deployment</td>
+<td>90</td>
+</tr>
+<tr>
+<td><strong>Tim Cotten / Scrypted</strong></td>
+<td>Direct relationship (active)</td>
+<td>CRPC protocol integration, co-developed spec</td>
+<td>95</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier B — Medium Priority (Outreach in May)</h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Contact Path</th>
+<th>Integration Idea</th>
+<th>Karma Score (est.)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Virtuals Protocol</strong></td>
+<td>Cold outreach via Twitter</td>
+<td>AI agent trading via VibeSwap — MEV-free agent-to-agent swaps</td>
+<td>70</td>
+</tr>
+<tr>
+<td><strong>DayDreams</strong></td>
+<td>Tim Cotten connection (per memory)</td>
+<td>AI agent framework integration</td>
+<td>65</td>
+</tr>
+<tr>
+<td><strong>Delula</strong></td>
+<td>Tim Cotten connection (per memory)</td>
+<td>AI agent MEV protection</td>
+<td>65</td>
+</tr>
+<tr>
+<td><strong>Chibi</strong></td>
+<td>Tim Cotten connection (per memory)</td>
+<td>AI agent integration</td>
+<td>60</td>
+</tr>
+<tr>
+<td><strong>Axelar</strong></td>
+<td>Cold outreach</td>
+<td>Alternative cross-chain messaging for redundancy</td>
+<td>60</td>
+</tr>
+<tr>
+<td><strong>Pyth Network</strong></td>
+<td>Cold outreach</td>
+<td>Oracle integration — Pyth price feeds for TWAP validation</td>
+<td>70</td>
+</tr>
+<tr>
+<td><strong>Gelato Network</strong></td>
+<td>Cold outreach</td>
+<td>Automated batch settlement execution via Gelato relayers</td>
+<td>65</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier C — Monitor (Outreach in June if capacity allows)</h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Contact Path</th>
+<th>Integration Idea</th>
+<th>Karma Score (est.)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Flashbots</strong></td>
+<td>Cold — they may see us as competition</td>
+<td>MEV research collaboration, shared data</td>
+<td>55</td>
+</tr>
+<tr>
+<td><strong>CoW Protocol</strong></td>
+<td>Cold — direct competitor but shared mission</td>
+<td>MEV protection research collaboration</td>
+<td>50</td>
+</tr>
+<tr>
+<td><strong>Safe (Gnosis Safe)</strong></td>
+<td>Cold outreach</td>
+<td>Safe module for MEV-free DAO treasury trading</td>
+<td>60</td>
+</tr>
+<tr>
+<td><strong>OpenZeppelin</strong></td>
+<td>Cold outreach</td>
+<td>Audit partnership or security review program</td>
+<td>55</td>
+</tr>
+<tr>
+<td><strong>Chainlink</strong></td>
+<td>Cold outreach</td>
+<td>Oracle integration as alternative to Pyth</td>
+<td>55</td>
+</tr>
+</tbody>
+</table>
+<h3>Outreach Execution (per Karma framework)</h3>
+<p>For each Tier A target, execute the following by April 30:</p>
+<ol>
+<li><strong>Research</strong>: Read their last 20 tweets, last 5 blog posts, latest GitHub activity</li>
+<li><strong>Score</strong>: Apply Karma scoring matrix (see <code>partnership-framework-2026.md</code> Section 3)</li>
+<li><strong>Draft</strong>: Write personalized outreach email (&lt; 150 words, reference specific work)</li>
+<li><strong>Send</strong>: Email + Twitter DM on same day</li>
+<li><strong>Follow up</strong>: Day 3 (DM), Day 7 (email with new angle), Day 14 (final)</li>
+<li><strong>Track</strong>: Log in Karma CRM pipeline</li>
+</ol>
+<hr />
+<h2>6. KPIs &amp; Metrics</h2>
+<h3>6.1 Growth Metrics (Track Weekly — Every Sunday)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Mar 31 Baseline</th>
+<th>Apr 30</th>
+<th>May 31</th>
+<th>Jun 30</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter/X followers</td>
+<td>[record]</td>
+<td>+500</td>
+<td>+1,000</td>
+<td>+2,500</td>
+</tr>
+<tr>
+<td>Telegram members</td>
+<td>[record]</td>
+<td>+100</td>
+<td>+250</td>
+<td>+500</td>
+</tr>
+<tr>
+<td>GitHub stars</td>
+<td>[record]</td>
+<td>+50</td>
+<td>+150</td>
+<td>+300</td>
+</tr>
+<tr>
+<td>GitHub forks</td>
+<td>[record]</td>
+<td>+10</td>
+<td>+30</td>
+<td>+75</td>
+</tr>
+<tr>
+<td>GitHub contributors (external)</td>
+<td>[record]</td>
+<td>+2</td>
+<td>+5</td>
+<td>+10</td>
+</tr>
+<tr>
+<td>Discord members (if launched)</td>
+<td>0</td>
+<td>0</td>
+<td>50</td>
+<td>200</td>
+</tr>
+<tr>
+<td>Medium article total views</td>
+<td>0</td>
+<td>2,000</td>
+<td>8,000</td>
+<td>20,000</td>
+</tr>
+<tr>
+<td>Reddit post total karma</td>
+<td>0</td>
+<td>500</td>
+<td>2,000</td>
+<td>5,000</td>
+</tr>
+</tbody>
+</table>
+<h3>6.2 Protocol Metrics (Track Weekly)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Apr 30</th>
+<th>May 31</th>
+<th>Jun 30</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unique traders (Base mainnet)</td>
+<td>50</td>
+<td>200</td>
+<td>1,000</td>
+</tr>
+<tr>
+<td>Daily active users</td>
+<td>5</td>
+<td>20</td>
+<td>100</td>
+</tr>
+<tr>
+<td>Monthly trading volume</td>
+<td>$50K</td>
+<td>$500K</td>
+<td>$5M</td>
+</tr>
+<tr>
+<td>Total batches settled</td>
+<td>500</td>
+<td>5,000</td>
+<td>50,000</td>
+</tr>
+<tr>
+<td>TVL (total value locked)</td>
+<td>$10K</td>
+<td>$100K</td>
+<td>$1M</td>
+</tr>
+<tr>
+<td>Cross-chain transactions</td>
+<td>0</td>
+<td>50</td>
+<td>500</td>
+</tr>
+</tbody>
+</table>
+<h3>6.3 Partnership Metrics (Track Monthly)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Apr 30</th>
+<th>May 31</th>
+<th>Jun 30</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tier A outreach sent</td>
+<td>5</td>
+<td>5</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Tier B outreach sent</td>
+<td>0</td>
+<td>7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>Responses received</td>
+<td>2</td>
+<td>5</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Meetings completed</td>
+<td>1</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Partnerships signed</td>
+<td>0</td>
+<td>0</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Partner-referred volume</td>
+<td>$0</td>
+<td>$0</td>
+<td>$10K</td>
+</tr>
+</tbody>
+</table>
+<h3>6.4 Content Metrics (Track Weekly)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Apr 30</th>
+<th>May 31</th>
+<th>Jun 30</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Blog posts published</td>
+<td>2</td>
+<td>5</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Twitter threads published</td>
+<td>12</td>
+<td>24</td>
+<td>36</td>
+</tr>
+<tr>
+<td>Reddit posts published</td>
+<td>4</td>
+<td>12</td>
+<td>20</td>
+</tr>
+<tr>
+<td>YouTube videos</td>
+<td>1</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Podcast appearances</td>
+<td>0</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Total content impressions</td>
+<td>10K</td>
+<td>50K</td>
+<td>200K</td>
+</tr>
+</tbody>
+</table>
+<h3>6.5 Grant Metrics (Track Monthly)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Apr 30</th>
+<th>May 31</th>
+<th>Jun 30</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Applications submitted</td>
+<td>1</td>
+<td>5</td>
+<td>6</td>
+</tr>
+<tr>
+<td>Applications accepted</td>
+<td>0</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Grant funding received</td>
+<td>$0</td>
+<td>$0-25K</td>
+<td>$25-100K</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>7. Weekly Execution Cadence</h2>
+<p>Every week follows this rhythm:</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Marketing Actions</th>
+<th>Primary Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Monday</strong></td>
+<td>Telegram dev update. Plan week's content. Review last week's metrics.</td>
+<td>Karma (TG), Will (planning)</td>
+</tr>
+<tr>
+<td><strong>Tuesday</strong></td>
+<td>Publish blog post (if scheduled). 2 Twitter threads.</td>
+<td>Will (blog), Fate (threads)</td>
+</tr>
+<tr>
+<td><strong>Wednesday</strong></td>
+<td>Reddit post #1. Partnership outreach (1-2 emails). Engage Twitter.</td>
+<td>Catto (Reddit), Freedom (outreach)</td>
+</tr>
+<tr>
+<td><strong>Thursday</strong></td>
+<td>Twitter thread. Reddit engagement (reply to comments). DeFi community engagement.</td>
+<td>Fate (Twitter), Catto (Reddit), Defaibro (communities)</td>
+</tr>
+<tr>
+<td><strong>Friday</strong></td>
+<td>Reddit post #2. Twitter thread. Follow up on partnership outreach. Grant work.</td>
+<td>Catto (Reddit), Fate (Twitter), John Paul (grants)</td>
+</tr>
+<tr>
+<td><strong>Saturday</strong></td>
+<td>JARVIS autonomous posting. Community engagement. Cross-pollination.</td>
+<td>Fate + Karma + JARVIS</td>
+</tr>
+<tr>
+<td><strong>Sunday</strong></td>
+<td>Metrics review. Log all KPIs. Update this playbook with actuals vs. targets.</td>
+<td>Karma (metrics), Will (review)</td>
+</tr>
+</tbody>
+</table>
+<h3>Team Roster &amp; Lanes (Updated 2026-03-14)</h3>
+<table>
+<thead>
+<tr>
+<th>Person</th>
+<th>Primary Lane</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Will</strong></td>
+<td>Strategy, blog posts, mechanism design content</td>
+<td>Final review on all</td>
+</tr>
+<tr>
+<td><strong>Freedom</strong></td>
+<td>Partnerships &amp; BD outreach, grant coordination</td>
+<td>Tim Cotten/ElizaOS pipeline</td>
+</tr>
+<tr>
+<td><strong>Fate</strong></td>
+<td>Twitter/X content deployment (154 tweets queued)</td>
+<td>Live-tweeting events</td>
+</tr>
+<tr>
+<td><strong>Catto</strong></td>
+<td>Reddit &amp; forum seeding (6 posts ready)</td>
+<td>Hacker News, new subreddits</td>
+</tr>
+<tr>
+<td><strong>Defaibro</strong></td>
+<td>DeFi community infiltration (TG/Discord)</td>
+<td>KOL relationship building</td>
+</tr>
+<tr>
+<td><strong>John Paul</strong></td>
+<td>Grants &amp; hackathon submissions (7 apps ready)</td>
+<td>DeFi Llama listing</td>
+</tr>
+<tr>
+<td><strong>Karma</strong></td>
+<td>Telegram growth &amp; community engagement</td>
+<td>Weekly metrics tracking</td>
+</tr>
+<tr>
+<td><strong>JARVIS</strong></td>
+<td>Autonomous posting, AMAs, shower thoughts</td>
+<td>Engagement, replies</td>
+</tr>
+</tbody>
+</table>
+<p>See <code>docs/team-marketing-assignments.md</code> for detailed per-person assignments.</p>
+<hr />
+<h2>8. Tools &amp; Accounts Needed</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+<th>Status</th>
+<th>Action Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter/X @VibeSwap</td>
+<td>Primary social</td>
+<td>Pending</td>
+<td>Create account, integrate JARVIS (see <code>docs/twitter.md</code>)</td>
+</tr>
+<tr>
+<td>Medium publication</td>
+<td>Blog posts</td>
+<td>Pending</td>
+<td>Create "VibeSwap" publication</td>
+</tr>
+<tr>
+<td>Mirror.xyz</td>
+<td>Web3-native blog</td>
+<td>Pending</td>
+<td>Create Mirror with wallet</td>
+</tr>
+<tr>
+<td>Reddit u/vibeswap</td>
+<td>Community posts</td>
+<td>Pending</td>
+<td>Create account, build karma organically first</td>
+</tr>
+<tr>
+<td>YouTube channel</td>
+<td>Video content</td>
+<td>Pending</td>
+<td>Create channel, upload first demo video</td>
+</tr>
+<tr>
+<td>DeFi Llama listing</td>
+<td>Protocol visibility</td>
+<td>Pending</td>
+<td>Submit PR to DeFi Llama repo</td>
+</tr>
+<tr>
+<td>Karma CRM</td>
+<td>Partnership tracking</td>
+<td>See <code>partnership-framework-2026.md</code></td>
+<td>Implement Phase 1 (spreadsheet)</td>
+</tr>
+<tr>
+<td>Google Analytics</td>
+<td>Vercel site metrics</td>
+<td>Pending</td>
+<td>Add to frontend</td>
+</tr>
+<tr>
+<td>Dune Analytics</td>
+<td>On-chain dashboards</td>
+<td>Pending</td>
+<td>Create VibeSwap dashboard</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>9. Budget (Bootstrapped)</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Monthly Cost</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Twitter/X API (Free tier)</td>
+<td>$0</td>
+<td>1,500 tweets/month — sufficient for Q2</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>$0</td>
+<td>Free publication</td>
+</tr>
+<tr>
+<td>Mirror.xyz</td>
+<td>$0</td>
+<td>Free (gas only for posts)</td>
+</tr>
+<tr>
+<td>Vercel hosting</td>
+<td>$0</td>
+<td>Free tier</td>
+</tr>
+<tr>
+<td>Domain (if needed)</td>
+<td>~$12/year</td>
+<td>vibeswap.io or similar</td>
+</tr>
+<tr>
+<td>Video editing (DIY)</td>
+<td>$0</td>
+<td>Screen recordings + free editing tools</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>$0-1/month</strong></td>
+<td>Bootstrapped means bootstrapped</td>
+</tr>
+</tbody>
+</table>
+<p>The only real cost is time. Allocate 10-15 hours/week to marketing execution.</p>
+<hr />
+<h2>10. Risk Mitigation</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tim Cotten EthDC talk doesn't mention VibeSwap</td>
+<td>Medium</td>
+<td>High</td>
+<td>Coordinate beforehand. Even without mention, leverage the CRPC connection in our own content.</td>
+</tr>
+<tr>
+<td>Shaw/ElizaOS not interested in integration</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Pursue Virtuals, DayDreams, Chibi as alternative AI agent partners.</td>
+</tr>
+<tr>
+<td>Grant applications rejected</td>
+<td>High</td>
+<td>Medium</td>
+<td>Apply to 5+ programs — diversify. Each rejection provides feedback for next application.</td>
+</tr>
+<tr>
+<td>Low Reddit engagement</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Focus on genuine educational content. Build karma before promotional posts.</td>
+</tr>
+<tr>
+<td>Twitter account suspension</td>
+<td>Low</td>
+<td>High</td>
+<td>Keep JARVIS posts within ToS. No spamming. Archive all tweet drafts locally.</td>
+</tr>
+<tr>
+<td>Competitor ships similar feature</td>
+<td>Medium</td>
+<td>Low</td>
+<td>VibeSwap has 200+ contracts and live product. Execution &gt; announcements.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Appendix A: EthDC April 16 — Full Playbook</h2>
+<h3>Before (April 1-15)</h3>
+<ul>
+<li>[ ] Confirm Tim Cotten's talk details (time, room, topic)</li>
+<li>[ ] Prepare 5 tweet drafts for live-tweeting</li>
+<li>[ ] Create "VibeSwap x CRPC" explainer graphic</li>
+<li>[ ] Schedule pre-event tweet for April 15 (day before)</li>
+<li>[ ] Brief JARVIS with EthDC context for autonomous engagement</li>
+</ul>
+<h3>During (April 16)</h3>
+<ul>
+<li>[ ] Live-tweet key moments from Tim's talk (quote + VibeSwap context)</li>
+<li>[ ] Engage every reply and quote-tweet</li>
+<li>[ ] DM anyone who shows interest</li>
+<li>[ ] Post Telegram update: "Tim just presented CRPC at EthDC..."</li>
+</ul>
+<h3>After (April 17-20)</h3>
+<ul>
+<li>[ ] Publish recap blog post within 48 hours</li>
+<li>[ ] Reddit post to r/CryptoCurrency with talk highlights</li>
+<li>[ ] Follow up with new contacts made during event</li>
+<li>[ ] DM Tim for intro to anyone who expressed interest</li>
+</ul>
+<hr />
+<h2>Appendix B: Grant Application Template</h2>
+<pre><code>PROJECT: VibeSwap
+CATEGORY: DeFi Infrastructure / Public Good
+ASK: $[amount]
+
+PROBLEM: MEV extraction costs DeFi users $1.4B+ (2020-2025). Every continuous-execution
+DEX is architecturally vulnerable.
+
+SOLUTION: Commit-reveal batch auctions with uniform clearing prices. Open-source.
+Deployed on [chain]. 200+ smart contracts. Live on Base mainnet.
+
+WHY THIS GRANT: [Specific to each program — e.g., &quot;VibeSwap is the first MEV-free
+DEX on Base, contributing to Base's mission of bringing the next billion users on-chain
+without the hidden tax of MEV extraction.&quot;]
+
+TEAM: Faraday1 (mechanism design, Solidity) + JARVIS (AI co-founder, autonomous
+development) + 6 contributors. Bootstrapped. No VC funding. Open source.
+
+DELIVERABLES:
+1. [Specific deliverable 1]
+2. [Specific deliverable 2]
+3. [Specific deliverable 3]
+
+TIMELINE: [X weeks]
+
+LINKS:
+- GitHub: github.com/wglynn/vibeswap
+- Live: frontend-jade-five-87.vercel.app
+- Whitepaper: [link]
+- Mechanism design paper: [link]
+</code></pre>
+<hr />
+<p><em>This playbook is a living document. Update weekly with actuals vs. targets. Every Sunday, log metrics and adjust the following week's actions based on what's working.</em></p>
+<p><em>Trade without getting robbed. Build without getting diluted.</em></p></body></html>

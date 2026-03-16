@@ -1,0 +1,96 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Disaster Recovery Guide</h1>
+<h2>If Will's Machine Goes Down</h2>
+<h3>What Still Works</h3>
+<ul>
+<li><strong>Jarvis Telegram Bot</strong> — runs on Fly.io (<code>jarvis-vibeswap.fly.dev</code>), has persistent volume</li>
+<li>Can still respond in Telegram, analyze ideas, generate code drafts</li>
+<li><code>/idea</code> command creates branches and pushes code</li>
+<li><code>/commit</code> pushes to both remotes</li>
+<li>Data backup every 30 minutes to private repo</li>
+<li><strong>GitHub Actions CI</strong> — runs on every push/PR automatically</li>
+<li>Frontend build + validation</li>
+<li>Backend tests (12 tests)</li>
+<li>Smart contract build + full test suite</li>
+<li>Oracle tests</li>
+<li>Docker build verification</li>
+<li>Security checks (Slither, dependency audits)</li>
+<li><strong>Frontend</strong> — deployed on Vercel, auto-redeploys from master</li>
+<li><strong>All code</strong> — mirrored on two GitHub repos (origin + stealth)</li>
+</ul>
+<h3>What Stops</h3>
+<ul>
+<li><strong>Claude Code sessions</strong> — interactive development, debugging, architecture work</li>
+<li><strong>Local Forge testing</strong> — fast iteration on contracts</li>
+<li><strong>Frontend local dev</strong> — hot reload development</li>
+</ul>
+<h3>Recovery Steps (Any Machine)</h3>
+<ol>
+<li>
+<p>Clone the repo:
+   <code>bash
+   git clone https://github.com/wglynn/vibeswap.git
+   cd vibeswap</code></p>
+</li>
+<li>
+<p>Read session state:
+   <code>bash
+   cat .claude/SESSION_STATE.md
+   cat docs/session-reports/  # Latest session report</code></p>
+</li>
+<li>
+<p>Set up Foundry:
+   <code>bash
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup</code></p>
+</li>
+<li>
+<p>Run tests:
+   <code>bash
+   forge build
+   forge test -vvv</code></p>
+</li>
+<li>
+<p>Set up frontend:
+   <code>bash
+   cd frontend &amp;&amp; npm ci &amp;&amp; npm run dev</code></p>
+</li>
+<li>
+<p>Jarvis bot (if Fly.io is also down):
+   <code>bash
+   cd jarvis-bot
+   cp .env.example .env  # Fill in tokens
+   npm install
+   npm start</code></p>
+</li>
+</ol>
+<h3>Critical Secrets (Stored in 1Password / Will's vault)</h3>
+<ul>
+<li><code>TELEGRAM_BOT_TOKEN</code> — Jarvis bot</li>
+<li><code>ANTHROPIC_API_KEY</code> — Claude API for Jarvis</li>
+<li><code>VERCEL_TOKEN</code> — Frontend deployment</li>
+<li><code>DEPLOYER_PRIVATE_KEY</code> — Contract deployment (Base mainnet)</li>
+<li><code>WALLETCONNECT_PROJECT_ID</code> — Wallet connections</li>
+<li>GitHub personal access tokens for both repos</li>
+</ul>
+<h3>Backup Operator Protocol</h3>
+<p>If Will is unreachable for 48+ hours:
+1. Any authorized contributor can fork the repo
+2. Jarvis bot continues operating autonomously on Fly.io
+3. Use <code>/idea</code> in Telegram to continue generating code
+4. PRs can be created and merged by any repo collaborator
+5. Vercel auto-deploys from master pushes</p>
+<h3>Data That Must Not Be Lost</h3>
+<ul>
+<li><code>.claude/SESSION_STATE.md</code> — current work state</li>
+<li><code>docs/session-reports/</code> — session history</li>
+<li><code>jarvis-bot/data/</code> — contribution tracking, user data, conversations</li>
+<li><code>docs/</code> — all whitepapers and mechanism design docs</li>
+<li>Smart contract code (obviously)</li>
+</ul></body></html>

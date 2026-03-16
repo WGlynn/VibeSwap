@@ -1,0 +1,163 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VibeSwap CKB Integration — Cell Model Architecture</h1>
+<h2>Overview</h2>
+<p>VibeSwap on Nervos CKB is not a bytecode translation — it's a fundamental architecture adaptation that leverages CKB's UTXO Cell Model to create a <strong>five-layer MEV defense</strong> that is structurally impossible on account-based chains like Ethereum.</p>
+<h2>Five-Layer MEV Defense</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Mechanism</th>
+<th>CKB Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Infrastructure</td>
+<td>PoW-gated write access</td>
+<td>Lock script on shared cells</td>
+</tr>
+<tr>
+<td>2. Accumulation</td>
+<td>Recursive MMR</td>
+<td>MMR peaks in auction cell data</td>
+</tr>
+<tr>
+<td>3. Compliance</td>
+<td>Protocol-enforced filtering</td>
+<td>ComplianceRegistry as cell_dep</td>
+</tr>
+<tr>
+<td>4. Ordering</td>
+<td>Fisher-Yates shuffle</td>
+<td>Type script validates shuffle seed</td>
+</tr>
+<tr>
+<td>5. Pricing</td>
+<td>Uniform clearing price</td>
+<td>Type script validates pricing math</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Layer 1 is unique to CKB</strong> — it provides MEV resistance at the infrastructure level. On Ethereum, anyone can write to shared state for the cost of gas. On CKB, writing to shared state requires solving a PoW challenge, making MEV extraction economically unviable.</p>
+<h2>Cell Architecture</h2>
+<h3>Shared State Cells (PoW-Gated)</h3>
+<ul>
+<li><strong>Auction Cell</strong>: Per trading pair, tracks batch auction lifecycle</li>
+<li><strong>Pool Cell</strong>: Per trading pair AMM, tracks reserves and TWAP</li>
+</ul>
+<h3>Per-User Cells (No Contention)</h3>
+<ul>
+<li><strong>Commit Cell</strong>: User's hidden order commitment</li>
+<li><strong>LP Position Cell</strong>: User's liquidity position</li>
+</ul>
+<h3>Singleton Cells (Read-Only Dependencies)</h3>
+<ul>
+<li><strong>Compliance Cell</strong>: Blocked address Merkle roots</li>
+<li><strong>Config Cell</strong>: Protocol parameters</li>
+<li><strong>Oracle Cell</strong>: Price feeds</li>
+</ul>
+<h2>Forced Inclusion Protocol</h2>
+<p>The most critical design element — prevents miner censorship:</p>
+<ol>
+<li>User creates CommitCell independently (zero contention)</li>
+<li>Miner finds PoW nonce for AuctionCell</li>
+<li>Miner MUST include ALL pending CommitCells (filtered by compliance)</li>
+<li>Type script verifies completeness — rejects incomplete aggregation</li>
+<li>Miner = compensated aggregator with ZERO discretion</li>
+</ol>
+<h2>Porting Map</h2>
+<table>
+<thead>
+<tr>
+<th>Solidity</th>
+<th>CKB Script</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CommitRevealAuction.sol</td>
+<td>batch-auction-type</td>
+<td>State machine → cell transitions</td>
+</tr>
+<tr>
+<td>VibeAMM.sol</td>
+<td>amm-pool-type</td>
+<td>Pool struct → cell data</td>
+</tr>
+<tr>
+<td>VibeSwapCore.sol</td>
+<td>Merged into batch-auction-type</td>
+<td>Atomic CKB tx</td>
+</tr>
+<tr>
+<td>CircuitBreaker.sol</td>
+<td>Config cell_dep + type script checks</td>
+<td>Abstract → config reads</td>
+</tr>
+<tr>
+<td>ComplianceRegistry.sol</td>
+<td>compliance-type + Merkle proofs</td>
+<td>mapping → Merkle root</td>
+</tr>
+<tr>
+<td>DeterministicShuffle.sol</td>
+<td>vibeswap-math::shuffle</td>
+<td>Direct port</td>
+</tr>
+<tr>
+<td>BatchMath.sol</td>
+<td>vibeswap-math::batch_math</td>
+<td>Direct port</td>
+</tr>
+<tr>
+<td>ProofOfWorkLib.sol</td>
+<td>vibeswap-pow</td>
+<td>Split: lock + type</td>
+</tr>
+<tr>
+<td>TWAPOracle.sol</td>
+<td>vibeswap-math::twap</td>
+<td>Direct port</td>
+</tr>
+</tbody>
+</table>
+<h2>Directory Structure</h2>
+<pre><code>ckb/
+├── Cargo.toml                          # Workspace root
+├── schemas/cells.mol                   # Molecule serialization schemas
+├── lib/
+│   ├── vibeswap-math/src/lib.rs       # BatchMath, Shuffle, TWAP
+│   ├── mmr/src/lib.rs                 # Recursive MMR
+│   ├── pow/src/lib.rs                 # PoW verification + difficulty
+│   └── types/src/lib.rs               # Shared types
+├── scripts/
+│   ├── pow-lock/src/main.rs           # PoW lock script
+│   ├── batch-auction-type/src/main.rs # Core auction state machine
+│   ├── commit-type/src/main.rs        # Commit cell validation
+│   ├── amm-pool-type/src/main.rs      # AMM pool validation
+│   ├── lp-position-type/src/main.rs   # LP position tracking
+│   ├── compliance-type/src/main.rs    # Compliance registry
+│   ├── config-type/src/main.rs        # Protocol config
+│   └── oracle-type/src/main.rs        # Oracle price feeds
+├── sdk/
+│   ├── src/lib.rs                     # Transaction builder
+│   └── src/miner.rs                   # PoW mining client
+└── tests/                             # Integration + adversarial tests
+</code></pre>
+<h2>Key Design Decisions</h2>
+<ol>
+<li><strong>PoW over Operator</strong>: Permissionless, self-adjusting, no centralization</li>
+<li><strong>Forced Inclusion</strong>: Zero miner discretion, structural censorship resistance</li>
+<li><strong>Recursive MMR</strong>: O(log n) historical proofs, Bitcoin SPV compatible</li>
+<li><strong>Merged Orchestrator</strong>: Single atomic tx replaces cross-contract calls</li>
+<li><strong>Merkle Compliance</strong>: O(1) storage, O(log n) verification per address</li>
+<li><strong>Epoch-Based Timing</strong>: CKB block numbers for phase transitions</li>
+</ol></body></html>

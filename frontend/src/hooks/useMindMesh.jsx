@@ -45,9 +45,14 @@ export function useMindMesh() {
   }, [])
 
   useEffect(() => {
+    // First fetch immediately, retry quickly if it fails, then settle into poll interval
     fetchMesh()
+    const quickRetry = setTimeout(fetchMesh, 3000)  // Retry after 3s if first attempt failed
     const interval = setInterval(fetchMesh, POLL_INTERVAL)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(quickRetry)
+      clearInterval(interval)
+    }
   }, [fetchMesh])
 
   return { mesh, loading, error, latency: latencyRef.current, refresh: fetchMesh }

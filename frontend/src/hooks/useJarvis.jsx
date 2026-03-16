@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
+// Use Vercel proxy in production (same-origin, no CORS issues)
+const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+const API_URL = import.meta.env.VITE_JARVIS_API_URL || (isVercel ? '' : 'https://jarvis-vibeswap.fly.dev')
+const webPath = (endpoint) => isVercel ? `/jarvis-api/${endpoint}` : `${API_URL}/web/${endpoint}`
 
 const INITIAL_GREETING = {
   role: 'jarvis',
@@ -60,7 +63,7 @@ export function useJarvis() {
     stopSpeaking()
     setIsSpeaking(true)
     try {
-      const res = await fetch(`${API_URL}/web/tts`, {
+      const res = await fetch(`${webPath('tts')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text.slice(0, 5000) }),
@@ -126,7 +129,7 @@ export function useJarvis() {
     setMessages(prev => [...prev, jarvisMsg])
 
     try {
-      const res = await fetch(`${API_URL}/web/chat/stream`, {
+      const res = await fetch(`${webPath('chat/stream')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -246,7 +249,7 @@ export function useJarvis() {
 
   const fetchMind = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/web/mind`, {
+      const res = await fetch(`${webPath('mind')}`, {
         signal: AbortSignal.timeout(10000),
       })
       if (res.ok) {
@@ -263,7 +266,7 @@ export function useJarvis() {
 
   const fetchHealth = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/web/health`, { signal: AbortSignal.timeout(10000) })
+      const res = await fetch(`${webPath('health')}`, { signal: AbortSignal.timeout(10000) })
       if (res.ok) {
         healthFailsRef.current = 0
         setHealth(await res.json())

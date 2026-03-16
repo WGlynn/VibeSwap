@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const API_URL = import.meta.env.VITE_JARVIS_API_URL || 'https://jarvis-vibeswap.fly.dev'
+const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+const webPath = (endpoint) => isVercel ? `/jarvis-api/${endpoint}` : `https://jarvis-vibeswap.fly.dev/web/${endpoint}`
 
 /**
  * Hook to fetch real contribution data from the Jarvis attribution graph.
@@ -15,7 +16,7 @@ export function useContributionsAPI() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/web/attribution`, {
+      const res = await fetch(`${webPath('attribution')}`, {
         signal: AbortSignal.timeout(10000),
       })
       if (res.ok) {

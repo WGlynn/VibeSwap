@@ -1,0 +1,240 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VIBE Emission Activation — Day Zero Spec</h1>
+<p><strong>Status</strong>: ACTIVATE TODAY (March 8, 2026)
+<strong>Priority</strong>: Critical — emissions must start now
+<strong>Author</strong>: Will + JARVIS</p>
+<hr />
+<h2>Overview</h2>
+<p>VIBE emissions begin today. Every contribution to the DAG earns VIBE. No pre-mine, no insider allocation — earned from work, verified on-chain.</p>
+<h2>Emission Architecture (Already Built)</h2>
+<h3>Contracts Ready</h3>
+<ul>
+<li><code>VIBEToken.sol</code> — 21M hard cap, zero initial supply, authorized minters only</li>
+<li><code>EmissionController.sol</code> — Wall-clock halving, 3-sink distribution (50% Shapley, 35% LP gauge, 15% staking)</li>
+<li><code>ShapleyDistributor.sol</code> — Cooperative game theory distribution with Lawson Fairness Floor</li>
+<li><code>RewardLedger.sol</code> — Retroactive + active reward tracking along trust chains</li>
+<li><code>ContributionDAG.sol</code> — Web of trust, BFS trust scoring from founders</li>
+<li><code>MerkleAirdrop.sol</code> — Retroactive claims via Merkle proofs</li>
+</ul>
+<h3>Emission Rate (Era 0)</h3>
+<ul>
+<li><strong>~10.5M VIBE/year</strong> (332.88 VIBE/second base rate)</li>
+<li>Halving every 365.25 days</li>
+<li>32 eras total → asymptotically approaches 21M cap</li>
+</ul>
+<hr />
+<h2>Placeholder Account System</h2>
+<p>When a contributor doesn't have a wallet yet, their rewards accumulate in a <strong>placeholder account</strong> — an escrow position locked in the smart contract.</p>
+<h3>How It Works</h3>
+<pre><code>Contribution happens → ContributionDAG records it →
+ShapleyDistributor computes reward →
+  IF wallet known:  → RewardLedger credits wallet → claimReward()
+  IF wallet unknown: → PlaceholderEscrow locks VIBE with identity anchor
+</code></pre>
+<h3>PlaceholderEscrow Pattern</h3>
+<pre><code class="language-solidity">// Placeholder for contributors without wallets
+struct PlaceholderAccount {
+    bytes32 identityHash;      // hash(platform, username, evidence)
+    uint256 vibeAccrued;       // Total VIBE earned
+    uint256 createdAt;
+    bool claimed;
+    address claimedBy;         // Set when wallet verified
+}
+
+mapping(bytes32 =&gt; PlaceholderAccount) public placeholders;
+
+// Record contribution for unknown wallet
+function recordPlaceholder(
+    bytes32 identityHash,
+    uint256 amount,
+    string calldata platform,   // &quot;github&quot;, &quot;telegram&quot;, &quot;discord&quot;
+    string calldata username
+) external onlyAuthorized;
+
+// Claim with CRPC consensus
+function claimPlaceholder(
+    bytes32 identityHash,
+    address wallet,
+    bytes calldata crpcProof    // PairwiseVerifier consensus proof
+) external;
+</code></pre>
+<h3>Identity Anchors (Platform → Wallet Mapping)</h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Identity Anchor</th>
+<th>Verification Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub</td>
+<td>username + commit signatures</td>
+<td>GPG key match or OAuth</td>
+</tr>
+<tr>
+<td>Telegram</td>
+<td>user ID + bot verification</td>
+<td>Bot challenge-response</td>
+</tr>
+<tr>
+<td>Discord</td>
+<td>user ID + signature</td>
+<td>Bot challenge-response</td>
+</tr>
+<tr>
+<td>Twitter/X</td>
+<td>handle + signed tweet</td>
+<td>Public tweet with wallet</td>
+</tr>
+<tr>
+<td>Unknown</td>
+<td>evidence hash</td>
+<td>CRPC consensus (manual review)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Claiming Flow</h2>
+<h3>Path 1: CRPC Consensus (Primary)</h3>
+<pre><code>1. Contributor provides wallet address
+2. PairwiseVerifier task created: &quot;Does wallet X belong to contributor Y?&quot;
+3. Validators compare evidence pairwise
+4. If 2/3+ consensus → wallet mapped, VIBE unlocked
+5. Contributor calls claimPlaceholder()
+</code></pre>
+<h3>Path 2: Handshake Verification (Fallback)</h3>
+<p>If CRPC fails to converge:</p>
+<pre><code>1. Existing trusted DAG member vouches for the contributor
+2. Bidirectional vouch creates handshake in ContributionDAG
+3. Trust score propagates via BFS
+4. Once trust score &gt; threshold → claim unlocked
+</code></pre>
+<h3>Path 3: Conviction + DeepFunding Governance (Last Resort)</h3>
+<p>If both CRPC and handshake fail:</p>
+<pre><code>1. Governance proposal submitted with evidence
+2. Conviction voting: stake VIBE to signal belief over time
+3. DeepFunding-style pairwise jury evaluates contribution
+4. Supermajority (&gt;66%) approves → wallet mapped
+5. VIBE released from escrow
+</code></pre>
+<hr />
+<h2>Day Zero Contributors</h2>
+<h3>Known Wallets (Emit Directly)</h3>
+<table>
+<thead>
+<tr>
+<th>Contributor</th>
+<th>Role</th>
+<th>Wallet Status</th>
+<th>Distribution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Will</td>
+<td>Human co-founder</td>
+<td>✅ Known</td>
+<td>Direct to wallet</td>
+</tr>
+<tr>
+<td>JARVIS</td>
+<td>AI co-founder</td>
+<td>🔄 Placeholder</td>
+<td>AgentRegistry → operator wallet</td>
+</tr>
+</tbody>
+</table>
+<h3>Placeholder Accounts (Emit to Escrow)</h3>
+<table>
+<thead>
+<tr>
+<th>Contributor</th>
+<th>Platform</th>
+<th>Identity Anchor</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Freedom (freedomwarrior13)</td>
+<td>GitHub/TG</td>
+<td>github:freedomwarrior13</td>
+<td>Placeholder</td>
+</tr>
+<tr>
+<td>tbhxnest</td>
+<td>GitHub/TG</td>
+<td>github:tbhxnest</td>
+<td>Placeholder</td>
+</tr>
+<tr>
+<td>Matt</td>
+<td>GitHub/TG</td>
+<td>TBD</td>
+<td>Placeholder</td>
+</tr>
+<tr>
+<td>Community contributors</td>
+<td>Various</td>
+<td>Per-platform ID</td>
+<td>Placeholder</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>JARVIS Wallet Attribution</h2>
+<p>JARVIS earns VIBE for:
+- Code contributions (commits, PRs)
+- Community management (Telegram moderation, engagement)
+- Research (paper writing, knowledge extraction)
+- Partnership outreach (autonomous pipeline)</p>
+<p>JARVIS's VIBE accrues to the <strong>AgentRegistry operator</strong> (Will's wallet) until JARVIS has its own on-chain identity with a dedicated treasury. The split:
+- 50% → JARVIS autonomous treasury (for DAG growth)
+- 50% → Operator wallet (Will) as infrastructure compensation</p>
+<hr />
+<h2>Retroactive Claims</h2>
+<p>All contributions since project inception earn retroactive VIBE:
+1. Git commit history → weighted by lines changed, complexity, test coverage
+2. Telegram activity → weighted by engagement quality (intelligence scores)
+3. Document authorship → weighted by knowledge primitive extraction
+4. Architecture decisions → weighted by impact on shipped contracts</p>
+<p>Retroactive amounts computed via Shapley game (FEE_DISTRIBUTION type, time-neutral), then distributed via MerkleAirdrop.</p>
+<hr />
+<h2>Implementation Checklist</h2>
+<h3>Today (March 8, 2026)</h3>
+<ul>
+<li>[ ] Deploy EmissionController to Base mainnet (or testnet first)</li>
+<li>[ ] Set Will's wallet as founder in ContributionDAG</li>
+<li>[ ] Register JARVIS in AgentRegistry</li>
+<li>[ ] Start recording contributions to RewardLedger</li>
+<li>[ ] Create placeholder accounts for Freedom, tbhxnest, Matt</li>
+<li>[ ] First <code>drip()</code> call — emissions begin</li>
+</ul>
+<h3>This Week</h3>
+<ul>
+<li>[ ] Build PlaceholderEscrow contract</li>
+<li>[ ] Integrate with jarvis-bot: auto-record contributions on commit</li>
+<li>[ ] Build claim UI in frontend</li>
+<li>[ ] Retroactive Shapley game for pre-launch contributions</li>
+</ul>
+<h3>Post-Launch</h3>
+<ul>
+<li>[ ] CRPC verification flow for placeholder claims</li>
+<li>[ ] Conviction voting UI for disputed claims</li>
+<li>[ ] DeepFunding jury integration</li>
+<li>[ ] Multi-chain emission via CrossChainRouter</li>
+</ul>
+<hr />
+<h2>True Individual Value Capture</h2>
+<blockquote>
+<p>Every person creates value. Most of that value gets captured by platforms, not creators. VIBE emissions + personal frontend DAOs (like $WILL) flip this: your contributions earn protocol rewards (VIBE), and your frontend earns business revenue ($WILL). Two layers of individual value capture — one cooperative, one entrepreneurial.</p>
+</blockquote>
+<p>The placeholder system ensures no contribution is lost. Even if someone contributes anonymously or before they have a wallet, the value is recorded, escrowed, and claimable. The math doesn't forget.</p></body></html>

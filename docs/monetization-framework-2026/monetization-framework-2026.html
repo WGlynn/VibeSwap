@@ -1,0 +1,238 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VibeSwap Monetization Framework: Zero Rent-Seeking Revenue Model</h1>
+<p><strong>Faraday1, JARVIS</strong>
+<strong>March 2026 | VibeSwap</strong></p>
+<hr />
+<h2>Executive Summary</h2>
+<p>VibeSwap generates revenue through six protocol-native mechanisms. None involve rent-seeking, pre-mines, or VC entrapment. All value flows to participants proportional to their contribution, enforced by Shapley distribution and smart contract logic.</p>
+<p>The core principle: <strong>if you didn't create value, you don't capture value.</strong></p>
+<hr />
+<h2>1. Design Philosophy</h2>
+<h3>1.1 What We Reject</h3>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Why It's Extractive</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-mine</td>
+<td>Founders take tokens before anyone can evaluate the protocol</td>
+</tr>
+<tr>
+<td>VC allocation</td>
+<td>Investors get discounted tokens in exchange for "distribution" they may not deliver</td>
+</tr>
+<tr>
+<td>Rent-seeking fees</td>
+<td>Protocol extracts value without providing proportional service</td>
+</tr>
+<tr>
+<td>Governance capture</td>
+<td>Token whales control fee switches to benefit themselves</td>
+</tr>
+<tr>
+<td>Hidden MEV</td>
+<td>Protocol profits from information asymmetry against its own users</td>
+</tr>
+</tbody>
+</table>
+<h3>1.2 What We Accept</h3>
+<p>Revenue is legitimate when:</p>
+<ol>
+<li><strong>The fee funds a service the user explicitly opted into</strong> (e.g., insurance premium for liquidation protection)</li>
+<li><strong>The fee is distributed to those who created the conditions for the transaction</strong> (e.g., swap fees to liquidity providers)</li>
+<li><strong>The distribution is mathematically verifiable</strong> (Shapley values, not governance vote)</li>
+<li><strong>The fee rate is hardcoded or PID-controlled</strong>, not adjustable by governance whales</li>
+</ol>
+<hr />
+<h2>2. Revenue Streams</h2>
+<h3>2.1 Protocol Swap Fees</h3>
+<p><strong>Rate</strong>: 0.05% on each swap</p>
+<p><strong>Mechanism</strong>: Collected automatically during batch settlement. Fees accumulate in the DAOTreasury contract and are distributed via <code>ShapleyDistributor.sol</code>.</p>
+<p><strong>Distribution</strong>:
+- Liquidity providers: Shapley-proportional to marginal contribution to pool depth
+- Governance stakers: Proportional to stake duration and participation
+- Insurance pool: Fixed allocation for protocol safety reserve</p>
+<p><strong>Why it's not rent-seeking</strong>: The fee compensates LPs for providing the liquidity that makes the trade possible. Without LPs, there is no pool. The 0.05% rate is among the lowest in DeFi (Uniswap: 0.3%, Curve: 0.04-0.4%).</p>
+<p><strong>Projected revenue</strong> (at target volumes):</p>
+<table>
+<thead>
+<tr>
+<th>Monthly Volume</th>
+<th>Fee Revenue</th>
+<th>To LPs</th>
+<th>To Stakers</th>
+<th>To Insurance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$1M</td>
+<td>$500</td>
+<td>$350</td>
+<td>$100</td>
+<td>$50</td>
+</tr>
+<tr>
+<td>$10M</td>
+<td>$5,000</td>
+<td>$3,500</td>
+<td>$1,000</td>
+<td>$500</td>
+</tr>
+<tr>
+<td>$100M</td>
+<td>$50,000</td>
+<td>$35,000</td>
+<td>$10,000</td>
+<td>$5,000</td>
+</tr>
+<tr>
+<td>$1B</td>
+<td>$500,000</td>
+<td>$350,000</td>
+<td>$100,000</td>
+<td>$50,000</td>
+</tr>
+</tbody>
+</table>
+<h3>2.2 Batch Auction Priority Bids</h3>
+<p><strong>Mechanism</strong>: During the reveal phase of each 10-second batch auction, traders can submit optional priority bids. Higher bids increase the probability of earlier execution within the batch.</p>
+<p><strong>Key property</strong>: <strong>Priority bids do not affect the clearing price.</strong> All trades in a batch settle at the same uniform price regardless of priority. This means paying for urgency doesn't extract value from other traders — it's a pure fee for service.</p>
+<p><strong>Distribution</strong>: 100% to governance stakers and protocol treasury (LPs are already compensated via swap fees).</p>
+<p><strong>Why it's not rent-seeking</strong>: The service is speed, not information advantage. A priority bidder gets faster settlement but the same price as everyone else. No one is harmed by someone else's priority bid.</p>
+<h3>2.3 Insurance Pool Premiums</h3>
+<p><strong>Mechanism</strong>: Users can opt into impermanent loss protection and liquidation insurance via <code>ILProtectionVault.sol</code> and <code>VibeInsurance.sol</code>. Premiums are calculated based on pool volatility and position size.</p>
+<p><strong>Rate</strong>: Dynamic, typically 0.1-0.5% of protected position per epoch.</p>
+<p><strong>Distribution</strong>:
+- Insurance pool reserve: 80% (funds payouts)
+- Insurance pool LPs: 20% (yield for providing insurance capital)</p>
+<p><strong>Why it's not rent-seeking</strong>: Insurance is a voluntary service. Users who don't want protection pay nothing. Premiums are actuarially determined, not set by governance vote. The pool is fully on-chain and auditable.</p>
+<h3>2.4 Yield Tokenization Fees</h3>
+<p><strong>Mechanism</strong>: When users mint Contribution Yield Tokens (CYTs) representing their accumulated protocol contributions, a small fee is collected by <code>ShapleyDistributor.sol</code>.</p>
+<p><strong>Rate</strong>: 0.5% of tokenized yield value.</p>
+<p><strong>Distribution</strong>: 100% to protocol treasury for operational expenses and contributor rewards.</p>
+<p><strong>Why it's not rent-seeking</strong>: CYT minting is a service (converting illiquid contribution history into tradeable tokens). The fee covers the gas and computational cost of Shapley calculation and on-chain verification.</p>
+<h3>2.5 Governance Proposal Deposits</h3>
+<p><strong>Mechanism</strong>: Submitting a governance proposal requires a deposit (denominated in protocol tokens). The deposit is returned if the proposal passes or is rejected in good faith. It is <strong>slashed</strong> if the proposal is determined to be malicious by the <code>DecentralizedTribunal.sol</code>.</p>
+<p><strong>Typical deposit</strong>: 1,000-10,000 tokens (scales with proposal impact).</p>
+<p><strong>Slashing conditions</strong>:
+- Proposal contains executable code that drains treasury
+- Proposal is a duplicate spam submission
+- Proposal violates hardcoded protocol invariants</p>
+<p><strong>Distribution of slashed deposits</strong>: 50% to tribunal participants (who did the adjudication work), 50% to protocol treasury.</p>
+<p><strong>Why it's not rent-seeking</strong>: The deposit is a Sybil-resistance mechanism, not a fee. Good-faith proposals are fully refunded. Only malicious proposals lose deposits, creating a direct cost for attacking governance.</p>
+<h3>2.6 AI Agent Services (x402 Micropayments)</h3>
+<p><strong>Mechanism</strong>: JARVIS offers premium analysis services — portfolio risk assessment, MEV detection alerts, gas optimization recommendations — via HTTP 402 micropayments using the x402 protocol.</p>
+<p><strong>Pricing</strong>: Per-query, denominated in stablecoins or protocol tokens. Typical: $0.01-$0.10 per analysis.</p>
+<p><strong>Distribution</strong>:
+- JARVIS operational costs (LLM inference via Wardenclyffe): 60%
+- Protocol treasury: 20%
+- Shapley pool (JARVIS is a contributor): 20%</p>
+<p><strong>Why it's not rent-seeking</strong>: The service requires active compute (LLM inference costs real money). Users pay per-query for analysis they couldn't get elsewhere. Pricing is transparent and competitive with centralized alternatives.</p>
+<hr />
+<h2>3. Shapley Distribution</h2>
+<h3>3.1 What It Is</h3>
+<p>The Shapley value, from cooperative game theory, assigns each participant a reward proportional to their <strong>marginal contribution</strong> — the difference between the outcome with them and without them.</p>
+<p>For a coalition game with players N and value function v:</p>
+<pre><code>phi_i(v) = SUM over S subset of N\{i}: [|S|!(|N|-|S|-1)!/|N|!] * [v(S union {i}) - v(S)]
+</code></pre>
+<h3>3.2 Why It Matters</h3>
+<p>Shapley distribution is the <strong>only</strong> distribution method that satisfies all four fairness axioms simultaneously:</p>
+<ol>
+<li><strong>Efficiency</strong>: All value is distributed (no residual for protocol insiders)</li>
+<li><strong>Symmetry</strong>: Equal contributors get equal rewards</li>
+<li><strong>Null player</strong>: Non-contributors get nothing</li>
+<li><strong>Additivity</strong>: Combined game rewards equal sum of individual game rewards</li>
+</ol>
+<p>No governance vote can override these mathematical properties. The fairness is proven, not promised.</p>
+<h3>3.3 Implementation</h3>
+<p><code>ShapleyDistributor.sol</code> calculates contributions per epoch:
+- LP contribution: marginal impact on pool depth and trade execution quality
+- Staker contribution: security weight and governance participation
+- Builder contribution: code commits, bug reports, integration work (via <code>GitHubContributionTracker.sol</code>)
+- JARVIS contribution: community management, code generation, analysis services</p>
+<p>All contributions are on-chain verifiable. Distribution happens automatically at epoch boundaries.</p>
+<hr />
+<h2>4. Revenue Flow Diagram</h2>
+<pre><code>                    ┌──────────────────┐
+                    │   USER ACTIONS   │
+                    └────────┬─────────┘
+                             │
+            ┌────────────────┼────────────────┐
+            │                │                │
+     ┌──────▼──────┐  ┌─────▼─────┐  ┌───────▼──────┐
+     │  Swap       │  │ Priority  │  │  Insurance   │
+     │  (0.05%)    │  │ Bid       │  │  Premium     │
+     └──────┬──────┘  └─────┬─────┘  └───────┬──────┘
+            │                │                │
+            ▼                ▼                ▼
+     ┌─────────────────────────────────────────────┐
+     │            DAOTreasury.sol                   │
+     └──────────────────┬──────────────────────────┘
+                        │
+                        ▼
+     ┌─────────────────────────────────────────────┐
+     │          ShapleyDistributor.sol              │
+     │                                             │
+     │  LP Rewards ◄── marginal pool contribution  │
+     │  Staker Rewards ◄── security + governance   │
+     │  Builder Rewards ◄── code + integration     │
+     │  JARVIS Rewards ◄── community + analysis    │
+     │  Insurance Reserve ◄── safety buffer        │
+     └─────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Every dollar that enters the protocol exits to a participant who created value. Zero residual for insiders.</strong></p>
+<hr />
+<h2>5. Anti-Patterns We Avoid</h2>
+<table>
+<thead>
+<tr>
+<th>Anti-Pattern</th>
+<th>How We Avoid It</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"Protocol-owned liquidity" as slush fund</td>
+<td>Treasury is Shapley-distributed, not discretionary</td>
+</tr>
+<tr>
+<td>Fee switch controlled by governance whales</td>
+<td>Fee rates are hardcoded or PID-controlled</td>
+</tr>
+<tr>
+<td>Token buybacks that benefit insiders</td>
+<td>No buyback mechanism — fees flow directly to contributors</td>
+</tr>
+<tr>
+<td>"Strategic reserve" with no accountability</td>
+<td>All reserves have predefined distribution schedules</td>
+</tr>
+<tr>
+<td>VCs dumping on retail</td>
+<td>No VC allocation. Period.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>6. Long-Term Economic Model</h2>
+<p>As governance decays to zero (Ungovernance time bomb):</p>
+<ul>
+<li>Fee rates become fully PID-controlled (no human override)</li>
+<li>Shapley distribution becomes the sole reward mechanism</li>
+<li>Protocol becomes a pure public good with embedded economics</li>
+<li>Revenue sustains operations without any entity controlling it</li>
+</ul>
+<p>The protocol doesn't need a company, a foundation, or a DAO to survive. It needs users who trade, LPs who provide liquidity, and the math that connects them. Everything else decays by design.</p>
+<hr />
+<p><em>All value flows to participants, not extractors. No pre-mine. No VC cut. The protocol rewards the people who build it.</em></p></body></html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VibeSwap Deployment Runbook</h1>
+<h2>Prerequisites</h2>
+<ul>
+<li><strong>Private key</strong> with sufficient ETH for gas (~0.5 ETH on L2, ~2 ETH on mainnet)</li>
+<li><strong>Multisig wallet</strong> (e.g., Safe) deployed on target chain</li>
+<li><strong>Guardian address</strong> for emergency pause capability</li>
+<li><strong>Oracle signer</strong> key pair for off-chain price feeds</li>
+<li><strong>Keeper bot</strong> address for automated emission drip/drain</li>
+</ul>
+<h2>Environment Variables</h2>
+<pre><code class="language-bash"># Required
+export PRIVATE_KEY=0x...
+export GUARDIAN_ADDRESS=0x...
+export ORACLE_SIGNER=0x...
+
+# Optional (defaults to deployer)
+export OWNER_ADDRESS=0x...
+export MULTISIG_ADDRESS=0x...
+export KEEPER_ADDRESS=0x...
+</code></pre>
+<h2>Deployment Order</h2>
+<p>Contracts must be deployed in this exact sequence due to inter-contract dependencies.</p>
+<h3>Phase 1: Core Trading System</h3>
+<pre><code class="language-bash">forge script script/DeployProduction.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> VibeSwapCore, CommitRevealAuction, VibeAMM, DAOTreasury, CrossChainRouter, TruePriceOracle, StablecoinFlowRegistry, FeeRouter, ProtocolFeeAdapter, BuybackEngine</p>
+<p><strong>Post-deploy:</strong>
+- Copy all output addresses to <code>.env</code>
+- Run <code>VerifyDeployment.s.sol</code> to validate</p>
+<h3>Phase 2: Pool Creation</h3>
+<pre><code class="language-bash">forge script script/SetupMVP.s.sol --rpc-url $RPC_URL --broadcast
+</code></pre>
+<p><strong>Creates:</strong> ETH/USDC, ETH/USDT, USDC/USDT, WBTC/USDC, ETH/WBTC pools with liquidity protection</p>
+<p><strong>Post-deploy:</strong>
+- Add initial liquidity: <code>SetupMVP.s.sol:AddInitialLiquidity</code>
+- Set token prices: <code>SetupMVP.s.sol:UpdateTokenPrices</code></p>
+<h3>Phase 3: Incentive Vaults</h3>
+<pre><code class="language-bash"># Set Phase 1 addresses
+export VIBE_AMM=0x...       # From Phase 1 output
+export VIBESWAP_CORE=0x...  # From Phase 1 output
+export DAO_TREASURY=0x...   # From Phase 1 output
+
+forge script script/DeployIncentives.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> VolatilityOracle, IncentiveController, VolatilityInsurancePool, ILProtectionVault, SlippageGuaranteeFund, LoyaltyRewardsManager, MerkleAirdrop</p>
+<p><strong>Auto-configured:</strong>
+- IncentiveController.setVolatilityOracle(VolatilityOracle)
+- IncentiveController.setVolatilityInsurancePool(VolatilityInsurancePool)
+- IncentiveController.setILProtectionVault(ILProtectionVault)
+- IncentiveController.setSlippageGuaranteeFund(SlippageGuaranteeFund)
+- IncentiveController.setLoyaltyRewardsManager(LoyaltyRewardsManager)
+- IncentiveController authorizes VibeAMM + VibeSwapCore as callers
+- VibeAMM.setIncentiveController(IncentiveController) -- enables LP lifecycle hooks + volatility fee routing
+- VibeSwapCore.setIncentiveController(IncentiveController) -- enables execution tracking + slippage compensation
+- FeeRouter.setInsurance(VolatilityInsurancePool) -- redirects 20% fee split from deployer to actual insurance pool</p>
+<p><strong>Post-deploy:</strong>
+- Fund VolatilityInsurancePool with initial reserves
+- Fund SlippageGuaranteeFund with initial reserves</p>
+<h3>Phase 4: Tokenomics Layer</h3>
+<pre><code class="language-bash">export VIBESWAP_CORE=0x...  # From Phase 1 output
+
+forge script script/DeployTokenomics.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> VIBEToken, Joule, ShapleyDistributor, PriorityRegistry, LiquidityGauge, SingleStaking, EmissionController</p>
+<p><strong>Auto-configured:</strong>
+- VIBEToken.setMinter(EmissionController)
+- ShapleyDistributor.setAuthorizedCreator(EmissionController)
+- ShapleyDistributor.setAuthorizedCreator(VibeSwapCore)
+- SingleStaking ownership → EmissionController
+- EmissionController.setAuthorizedDrainer(owner)</p>
+<p><strong>Post-deploy:</strong>
+- Update BuybackEngine: <code>BuybackEngine.setProtocolToken(VIBE_TOKEN)</code>
+- Wire IncentiveController: <code>IncentiveController.setShapleyDistributor(SHAPLEY_DISTRIBUTOR)</code>
+- Wire FeeRouter revShare: <code>FeeRouter.setRevShare(VIBE_REVSHARE)</code> (deploy VibeRevShare first)
+- Create gauges: <code>DeployTokenomics.s.sol:SetupGauges</code>
+- Start emissions: <code>DeployTokenomics.s.sol:StartEmissions</code></p>
+<h3>Phase 5: Compliance Layer</h3>
+<pre><code class="language-bash">export VIBESWAP_CORE=0x...  # From Phase 1 output
+
+forge script script/DeployCompliance.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> FederatedConsensus, ClawbackRegistry, ClawbackVault, ComplianceRegistry</p>
+<p><strong>Auto-configured:</strong>
+- FederatedConsensus.setExecutor(ClawbackRegistry)
+- ClawbackRegistry.setVault(ClawbackVault)
+- ClawbackRegistry.setAuthorizedTracker(VibeSwapCore)
+- ComplianceRegistry.setAuthorizedContract(VibeSwapCore)</p>
+<p><strong>Post-deploy:</strong>
+- Add compliance authorities: <code>FederatedConsensus.addAuthority(addr, role, jurisdiction)</code>
+- Set compliance officers: <code>ComplianceRegistry.setComplianceOfficer(addr, true)</code>
+- Set KYC providers: <code>ComplianceRegistry.setKYCProvider(addr, true)</code></p>
+<h3>Phase 6: Governance Layer</h3>
+<pre><code class="language-bash">export VIBE_AMM=0x...            # From Phase 1 output
+export DAO_TREASURY=0x...        # From Phase 1 output
+export VOLATILITY_ORACLE=0x...   # From Phase 3 output
+export JOULE_TOKEN=0x...         # From Phase 4 output (optional)
+export FEDERATED_CONSENSUS=0x... # From Phase 5 output (optional)
+
+forge script script/DeployGovernance.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> TreasuryStabilizer, VibeTimelock, VibeKeeperNetwork, DisputeResolver</p>
+<p><strong>Post-deploy:</strong>
+- TreasuryStabilizer.setMainPool(token, poolId) for each managed token
+- VibeKeeperNetwork.registerTask(...) for automated jobs (drip, settle, etc.)
+- DisputeResolver.setTribunal(tribunalAddress) if DecentralizedTribunal deployed</p>
+<h3>Phase 7: Financial Instruments</h3>
+<pre><code class="language-bash">export JOULE_TOKEN=0x...         # From Phase 4 output
+export VIBE_AMM=0x...            # From Phase 1 output
+export VOLATILITY_ORACLE=0x...   # From Phase 3 output
+export FEE_ROUTER=0x...          # From Phase 1 output
+export REVENUE_TOKEN=0x...       # Stablecoin address (e.g., USDC)
+export COLLATERAL_TOKEN=0x...    # Insurance collateral token
+
+forge script script/DeployFinancial.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> VibeRevShare, VibeInsurance, VibeBonds, VibeOptions, VibeStream, VestingSchedule</p>
+<p><strong>Auto-configured:</strong>
+- FeeRouter.setRevShare(VibeRevShare) -- completes 30% revenue share pipeline
+- VibeRevShare.setRevenueSource(FeeRouter) -- authorizes revenue deposits</p>
+<p><strong>Post-deploy:</strong>
+- VibeInsurance.setTriggerResolver(keeperAddr, true)
+- VestingSchedule.createSchedule(...) for team/investor vesting
+- BuybackEngine.setProtocolToken(VIBE_TOKEN) if not already set</p>
+<h3>Phase 8: Identity Layer</h3>
+<pre><code class="language-bash">export VIBE_TOKEN=0x...  # From Phase 3 output
+
+forge script script/DeployIdentity.s.sol --rpc-url $RPC_URL --broadcast --verify
+</code></pre>
+<p><strong>Deploys:</strong> SoulboundIdentity, AgentRegistry, ContributionDAG, VibeCode, RewardLedger, ContributionAttestor</p>
+<h3>Phase 9: Genesis Contributions</h3>
+<pre><code class="language-bash">export CONTRIBUTION_DAG=0x...    # From Phase 4
+export REWARD_LEDGER=0x...       # From Phase 4
+export FARADAY1_ADDRESS=0x...    # Will's address
+export JARVIS_ADDRESS=0x...      # Jarvis agent address
+export FREEDOM_WARRIOR_ADDRESS=0x... # FreedomWarrior13's address
+
+forge script script/GenesisContributions.s.sol --rpc-url $RPC_URL --broadcast
+</code></pre>
+<p><strong>Records:</strong> Retroactive contributions for founders (NOT finalized — requires 3-factor validation)</p>
+<h3>Phase 10: Cross-Chain Setup</h3>
+<pre><code class="language-bash">forge script script/ConfigurePeers.s.sol --rpc-url $RPC_URL --broadcast
+</code></pre>
+<p><strong>Configures:</strong> LayerZero V2 peer connections to other deployed chains</p>
+<h3>Phase 11: Ownership Transfer</h3>
+<pre><code class="language-bash">export MULTISIG_ADDRESS=0x...
+
+# Transfer core contracts
+forge script script/DeployProduction.s.sol:TransferOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer incentive contracts
+forge script script/DeployIncentives.s.sol:TransferIncentivesOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer tokenomics contracts
+forge script script/DeployTokenomics.s.sol:TransferTokenomicsOwnership --rpc-url $RPC_URL --broadcast
+</code></pre>
+<p><strong>Transfers:</strong> All contract ownership to multisig (40+ contracts)</p>
+<pre><code class="language-bash"># Transfer governance contracts
+forge script script/DeployGovernance.s.sol:TransferGovernanceOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer compliance contracts
+forge script script/DeployCompliance.s.sol:TransferComplianceOwnership --rpc-url $RPC_URL --broadcast
+
+# Transfer financial contracts
+forge script script/DeployFinancial.s.sol:TransferFinancialOwnership --rpc-url $RPC_URL --broadcast
+</code></pre>
+<h3>Phase 12: Start Operations</h3>
+<ol>
+<li><strong>Oracle</strong>: <code>python -m oracle.main</code> (off-chain Kalman filter)</li>
+<li><strong>Keeper bot</strong>: Schedule <code>EmissionController.drip()</code> calls (every ~10 min)</li>
+<li><strong>Frontend</strong>: Update <code>.env</code> with all contract addresses, deploy to Vercel</li>
+<li><strong>Monitor</strong>: Watch events for first drip, first swap, first Shapley game</li>
+</ol>
+<h2>Verification Checklist</h2>
+<p>After full deployment, verify:</p>
+<ul>
+<li>[ ] All proxy contracts have correct implementation code</li>
+<li>[ ] All ownership is set to intended addresses</li>
+<li>[ ] VIBEToken has EmissionController as only minter</li>
+<li>[ ] ShapleyDistributor authorized creators = [EmissionController, VibeSwapCore]</li>
+<li>[ ] SingleStaking owner = EmissionController</li>
+<li>[ ] Guardian can pause VibeSwapCore</li>
+<li>[ ] CircuitBreaker thresholds are configured</li>
+<li>[ ] Flash loan protection enabled</li>
+<li>[ ] TWAP validation enabled</li>
+<li>[ ] Rate limiting configured (1M/hr/user)</li>
+<li>[ ] Oracle signer authorized on TruePriceOracle + StablecoinFlowRegistry</li>
+<li>[ ] Pools created with liquidity protection</li>
+<li>[ ] Token prices set (for liquidity protection USD calculations)</li>
+<li>[ ] IncentiveController vaults wired (VolatilityInsurancePool, ILProtectionVault, SlippageGuaranteeFund, LoyaltyRewardsManager)</li>
+<li>[ ] IncentiveController authorized callers = [VibeAMM, VibeSwapCore]</li>
+<li>[ ] IncentiveController.shapleyDistributor set (after DeployTokenomics)</li>
+<li>[ ] VolatilityInsurancePool + SlippageGuaranteeFund funded with initial reserves</li>
+<li>[ ] Fee pipeline: AMM → FeeAdapter → FeeRouter → (Treasury 40%, Insurance 20%, RevShare 30%, Buyback 10%)</li>
+<li>[ ] EmissionController.drip() succeeds</li>
+<li>[ ] Test swap completes full commit → reveal → settle cycle</li>
+<li>[ ] FederatedConsensus.executor = ClawbackRegistry</li>
+<li>[ ] ClawbackRegistry.vault = ClawbackVault</li>
+<li>[ ] ClawbackRegistry authorized trackers include VibeSwapCore</li>
+<li>[ ] ComplianceRegistry authorized contracts include VibeSwapCore</li>
+<li>[ ] FederatedConsensus has &gt;= approvalThreshold authorities registered</li>
+<li>[ ] TreasuryStabilizer wired to VibeAMM + DAOTreasury + VolatilityOracle</li>
+<li>[ ] VibeTimelock min delay &gt;= 2 days</li>
+<li>[ ] FeeRouter.revShare = VibeRevShare (after DeployFinancial)</li>
+<li>[ ] VibeRevShare.revenueSource(FeeRouter) = true</li>
+</ul>
+<h2>Emergency Procedures</h2>
+<h3>Pause All Trading</h3>
+<pre><code class="language-bash">forge script script/DeployProduction.s.sol:EmergencyPause --rpc-url $RPC_URL --broadcast
+</code></pre>
+<p>Guardian or owner can call. Resumes with <code>VibeSwapCore.unpause()</code>.</p>
+<h3>Contract Upgrade</h3>
+<p>UUPS upgrades require:
+1. Deploy new implementation
+2. Call <code>upgradeToAndCall(newImpl, "")</code> from owner/multisig
+3. Verify new implementation on block explorer</p>
+<h3>Emission Emergency</h3>
+<p>If EmissionController is compromised:
+1. <code>VIBEToken.setMinter(emissionController, false)</code> — revoke minting
+2. MAX_SUPPLY hard cap in VIBEToken prevents over-minting regardless</p>
+<h2>Supported Chains</h2>
+<table>
+<thead>
+<tr>
+<th>Chain</th>
+<th>Chain ID</th>
+<th>LZ Endpoint</th>
+<th>WETH</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ethereum</td>
+<td>1</td>
+<td>0x1a44...728c</td>
+<td>0xC02a...6Cc2</td>
+</tr>
+<tr>
+<td>Arbitrum</td>
+<td>42161</td>
+<td>0x1a44...728c</td>
+<td>0x82aF...Bab1</td>
+</tr>
+<tr>
+<td>Optimism</td>
+<td>10</td>
+<td>0x1a44...728c</td>
+<td>0x4200...0006</td>
+</tr>
+<tr>
+<td>Base</td>
+<td>8453</td>
+<td>0x1a44...728c</td>
+<td>0x4200...0006</td>
+</tr>
+<tr>
+<td>Polygon</td>
+<td>137</td>
+<td>0x1a44...728c</td>
+<td>0x7ceB...f619</td>
+</tr>
+<tr>
+<td>Avalanche</td>
+<td>43114</td>
+<td>0x1a44...728c</td>
+<td>0x49D5...0bAB</td>
+</tr>
+<tr>
+<td>BSC</td>
+<td>56</td>
+<td>0x1a44...728c</td>
+<td>0x2170...33F8</td>
+</tr>
+<tr>
+<td>Sepolia</td>
+<td>11155111</td>
+<td>0x6EDC...f10f</td>
+<td>env var</td>
+</tr>
+<tr>
+<td>Base Sepolia</td>
+<td>84532</td>
+<td>0x6EDC...f10f</td>
+<td>env var</td>
+</tr>
+</tbody>
+</table></body></html>

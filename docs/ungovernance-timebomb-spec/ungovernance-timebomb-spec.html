@@ -1,0 +1,135 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Ungovernance Time Bomb — Specification</h1>
+<p><strong>Status</strong>: Architecture Design
+<strong>Priority</strong>: Design now, implement in governance contracts
+<strong>Endgame</strong>: Protocol becomes a natural system, not a political one
+<strong>Author</strong>: Will + JARVIS</p>
+<hr />
+<h2>Philosophy</h2>
+<blockquote>
+<p>You can't get to zero governance from zero. You have to start with some governance, but hardcode that it dwindles to nothing.</p>
+</blockquote>
+<p>Governance exists at launch as a necessary scaffolding. But unlike every other protocol, VibeSwap's governance is designed to self-destruct. The protocol becomes autonomous — a natural system governed by mechanism design, not politics.</p>
+<h2>Mechanism</h2>
+<h3>1. Decaying Governance Power</h3>
+<p>Each governance token has a <strong>half-life</strong> on its voting weight.</p>
+<pre><code class="language-solidity">function votingWeight(uint256 tokenId) public view returns (uint256) {
+    uint256 age = block.timestamp - mintedAt[tokenId];
+    uint256 halfLives = age / HALF_LIFE_PERIOD; // e.g., 365 days
+    // After 4 years (4 half-lives): weight = 1/16th of original
+    return baseWeight &gt;&gt; halfLives; // bitshift = divide by 2^n
+}
+</code></pre>
+<p><strong>Decay curve:</strong>
+| Year | Voting Weight |
+|------|--------------|
+| 0 | 100% |
+| 1 | 50% |
+| 2 | 25% |
+| 3 | 12.5% |
+| 4 | 6.25% |
+| 8 | 0.39% (effectively zero) |</p>
+<h3>2. Dispute Resolution Only</h3>
+<p>Governance scope is <strong>strictly limited</strong> to:
+- Slashing disputes (was the slash justified?)
+- Fork disputes (which fork is canonical?)
+- Emergency pauses (circuit breaker activation)
+- Parameter bound violations (is a parameter outside safe range?)</p>
+<p>Governance <strong>cannot</strong>:
+- Propose new features
+- Change core mechanism design
+- Allocate treasury funds
+- Modify the decay curve itself (immutable)
+- Upgrade contracts (upgrades are automatic via PID)</p>
+<h3>3. Automatic Upgrades via PID Controllers</h3>
+<p>Protocol parameters self-adjust based on metrics:</p>
+<pre><code class="language-solidity">// PID Controller for swap fee
+function adjustFee() external {
+    uint256 targetVolume = getTargetVolume();
+    uint256 actualVolume = get24hVolume();
+
+    int256 error = int256(targetVolume) - int256(actualVolume);
+
+    // PID calculation
+    int256 adjustment = (Kp * error + Ki * integral + Kd * derivative) / SCALE;
+
+    // Apply within bounds
+    swapFeeBps = uint256(int256(swapFeeBps) + adjustment);
+    swapFeeBps = bound(swapFeeBps, MIN_FEE, MAX_FEE);
+}
+</code></pre>
+<p><strong>Parameters that self-adjust:</strong>
+- Swap fee rate (targets optimal volume)
+- Insurance premium (targets pool utilization)
+- Circuit breaker thresholds (adapts to volatility)
+- Priority bid floor (adapts to demand)</p>
+<h3>4. Sunset Clause</h3>
+<p>The governance module has a <strong>predetermined end date</strong>.</p>
+<pre><code class="language-solidity">uint256 public immutable GOVERNANCE_SUNSET; // Set at deployment
+
+function propose(bytes calldata proposal) external {
+    require(block.number &lt; GOVERNANCE_SUNSET, &quot;Governance has sunset&quot;);
+    // ... normal proposal logic
+}
+
+// Extension requires 75% supermajority
+function extendSunset(uint256 newSunset) external onlyGovernance {
+    require(getApprovalRate() &gt;= 7500, &quot;Need 75% supermajority&quot;);
+    require(newSunset &lt;= GOVERNANCE_SUNSET + MAX_EXTENSION, &quot;Extension too long&quot;);
+    GOVERNANCE_SUNSET = newSunset;
+}
+</code></pre>
+<p><strong>Default sunset:</strong> 4 years post-launch. Extensions capped at 1 year each.</p>
+<h3>5. Fork Escape</h3>
+<p>If governance becomes corrupt despite all safeguards:
+- Users can fork with zero penalty
+- Fee split ensures economic continuity (50/50 with parent)
+- Forking is explicitly encouraged as a safety valve
+- No social stigma — forking IS the dispute resolution of last resort</p>
+<h2>Implementation Phases</h2>
+<h3>Phase 1: Launch</h3>
+<ul>
+<li>Full governance with decay enabled</li>
+<li>Dispute resolution scope enforced</li>
+<li>PID controllers for fee parameters</li>
+<li>Sunset block set to launch + 4 years</li>
+</ul>
+<h3>Phase 2: Year 1-2</h3>
+<ul>
+<li>Governance weight decays naturally</li>
+<li>PID controllers prove themselves</li>
+<li>Community learns to trust mechanism design</li>
+<li>Fork network provides additional safety valve</li>
+</ul>
+<h3>Phase 3: Year 3-4</h3>
+<ul>
+<li>Governance weight effectively negligible</li>
+<li>Only emergency disputes use remaining power</li>
+<li>Protocol is self-governing via PID + fork incentives</li>
+<li>Sunset approaching — community decides if extension needed</li>
+</ul>
+<h3>Phase 4: Post-Sunset</h3>
+<ul>
+<li>Governance module disabled</li>
+<li>Protocol runs on pure mechanism design</li>
+<li>Disputes handled by DecentralizedTribunal (automated)</li>
+<li>Fork escape remains as ultimate safety valve</li>
+</ul>
+<h2>Immutable Properties (Hardcoded, Never Changeable)</h2>
+<ol>
+<li>Half-life decay rate</li>
+<li>Dispute-only scope restriction</li>
+<li>Sunset clause existence</li>
+<li>Fork escape right</li>
+<li>Fee distribution formula (Shapley)</li>
+<li>Batch auction uniform clearing price</li>
+</ol>
+<blockquote>
+<p>The protocol becomes a natural system. No politics. Pure mechanism design. That's the endgame.</p>
+</blockquote></body></html>

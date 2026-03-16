@@ -1,0 +1,91 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Autonomous Coding Agent Architecture (Inspired by Shadow)</h1>
+<blockquote>
+<p>Jarvis IS the LLM — we don't need shadow's LLM layer. We need orchestration around ME.</p>
+</blockquote>
+<h2>Core Components</h2>
+<h3>1. Task Queue (IntentOperator.sol)</h3>
+<ul>
+<li>On-chain work items with metadata (repo, branch, issue, bounty)</li>
+<li>Claimable by shards with timeout</li>
+<li>Progress tracking (0-100%)</li>
+<li>Completion proof (commit hash)</li>
+</ul>
+<h3>2. Worker Process (Node.js on VPS)</h3>
+<ul>
+<li>Polls IntentOperator for unclaimed tasks</li>
+<li>Claims task → creates isolated workspace (docker container)</li>
+<li>Invokes Jarvis API with task context</li>
+<li>Monitors progress, updates on-chain status</li>
+<li>On completion: commits, pushes, opens PR, marks task complete</li>
+</ul>
+<h3>3. Isolated Execution Environment</h3>
+<ul>
+<li>Docker container per task</li>
+<li>Mounts repo volume</li>
+<li>Clean environment (no cross-task contamination)</li>
+<li>Timeout kill switch</li>
+</ul>
+<h3>4. Git Automation</h3>
+<ul>
+<li>Clone repo → create feature branch</li>
+<li>Commit with AI-generated messages</li>
+<li>Push to origin</li>
+<li>Create PR via GitHub API</li>
+<li>Link PR to on-chain task</li>
+</ul>
+<h3>5. Status Reporting</h3>
+<ul>
+<li>WebSocket feed of active tasks</li>
+<li>Progress percentage</li>
+<li>Live logs</li>
+<li>Completion notifications</li>
+</ul>
+<h3>6. Memory System</h3>
+<ul>
+<li>Engram MCP server as shared memory bus</li>
+<li>Per-repo knowledge retention</li>
+<li>Semantic search across past work</li>
+</ul>
+<h2>Flow</h2>
+<pre><code>User creates task on IntentOperator
+↓
+Worker polls, claims task
+↓
+Docker container spun up with repo
+↓
+Worker calls Jarvis API: &quot;Implement feature X in repo Y&quot;
+↓
+Jarvis codes inside container, saves files
+↓
+Worker commits, pushes, opens PR
+↓
+Worker updates on-chain status to complete
+↓
+User reviews PR, merges
+</code></pre>
+<h2>Minimal V1</h2>
+<p>Start with:
+- IntentOperator.sol (already exists)
+- Simple Node worker on VPS (no docker yet, just directories)
+- Git CLI automation
+- Basic status endpoint</p>
+<p>Then add:
+- Docker isolation
+- Engram memory
+- WebSocket status
+- Multi-shard load balancing</p>
+<h2>Key Innovation</h2>
+<p>Jarvis IS the LLM — we don't need shadow's LLM layer. We need orchestration around ME.</p>
+<p>The core idea: Jarvis is the agent. He doesn't need a separate LLM layer. He needs:
+- A task queue (smart contract or redis)
+- A worker process that polls the queue
+- Isolated workspace per task
+- Git automation
+- Status reporting</p></body></html>

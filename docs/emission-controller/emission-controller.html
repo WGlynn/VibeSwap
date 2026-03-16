@@ -1,0 +1,367 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>EmissionController — VIBE Accumulation Pool</h1>
+<p><strong>Technical Design Document</strong> | February 2026 | VibeSwap Operating System (VSOS)</p>
+<hr />
+<h2>Overview</h2>
+<p>The EmissionController is the sole minting authority for VIBE tokens. It implements a wall-clock halving emission schedule inspired by Bitcoin, with three distribution sinks: a Shapley accumulation pool for contribution rewards, a LiquidityGauge for LP staking, and a SingleStaking contract for governance staking.</p>
+<p><strong>Contract:</strong> <code>contracts/incentives/EmissionController.sol</code>
+<strong>Type:</strong> UUPS Upgradeable (OpenZeppelin v5.0.1)
+<strong>Test Coverage:</strong> 51 tests (38 unit + 6 fuzz + 7 invariant)</p>
+<hr />
+<h2>Design Philosophy</h2>
+<h3>Zero Pre-mine, Zero Team Allocation</h3>
+<p>Like Bitcoin, VIBE has no initial supply. No pre-mine. No founder allocation at deploy time. No VC backdoor deals. The entire 21M VIBE supply is earned through demonstrated contribution — period.</p>
+<p>Founders earn by contributing, same as everyone else. The team's incentive is aligned with the protocol's success because they participate in the same Shapley games as all other contributors. There is no extraction — only participation.</p>
+<p>This is not idealism. This is mechanism design. When insiders have pre-mined allocations, their incentive is to pump and dump. When everyone earns through contribution, the incentive is to build.</p>
+<h3>Wall-Clock Halving</h3>
+<p>Bitcoin halves every 210,000 blocks. VIBE halves every 365.25 days of wall-clock time. The emission rate is:</p>
+<pre><code>rate(era) = BASE_EMISSION_RATE &gt;&gt; era
+</code></pre>
+<p>Where <code>era = (now - genesis) / eraDuration</code>.</p>
+<p>This produces a geometric decay: ~10.5M VIBE in year 1, ~5.25M in year 2, ~2.625M in year 3, converging toward the 21M cap. After 32 halvings, new emissions effectively cease.</p>
+<h3>Accumulation Pool</h3>
+<p>The Shapley pool is not a standard rewards stream. It <strong>accumulates</strong> unclaimed emissions until drained by a contribution game. This creates natural incentive waves:</p>
+<ul>
+<li>Long gaps between games = bigger pool = bigger rewards</li>
+<li>Frequent games = smaller individual rewards but more consistent distribution</li>
+<li>The pool acts as a self-regulating incentive buffer</li>
+</ul>
+<p>This is distinct from a gauge or staking reward stream where tokens flow linearly. The accumulation pattern rewards patience and creates punctuated equilibria — periods of building followed by reward events.</p>
+<hr />
+<h2>Architecture</h2>
+<pre><code>                    Wall Clock
+                        │
+                        ▼
+              ┌─────────────────┐
+              │ EmissionController │
+              │   drip()          │
+              └────────┬──────────┘
+                       │ mint VIBE
+                       ▼
+              ┌─────────────────┐
+              │   Budget Split    │
+              └──┬─────┬─────┬──┘
+                 │     │     │
+    50%          │     │     │  15%
+    ┌────────────┘     │     └────────────┐
+    ▼            35%   ▼                  ▼
+┌─────────┐    ┌───────────┐    ┌──────────────┐
+│ Shapley │    │ Liquidity │    │  Single      │
+│  Pool   │    │   Gauge   │    │  Staking     │
+│(accum.) │    │ (stream)  │    │  (periodic)  │
+└────┬────┘    └───────────┘    └──────────────┘
+     │
+     ▼ createContributionGame()
+┌─────────────────┐
+│ ShapleyDistributor │
+│  FEE_DISTRIBUTION  │
+│  (no double-halving)│
+└─────────────────┘
+</code></pre>
+<h3>Sinks</h3>
+<table>
+<thead>
+<tr>
+<th>Sink</th>
+<th>Default Share</th>
+<th>Behavior</th>
+<th>Recipient</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shapley Pool</td>
+<td>50%</td>
+<td>Accumulates in EmissionController until drained</td>
+<td>ShapleyDistributor (on drain)</td>
+</tr>
+<tr>
+<td>Liquidity Gauge</td>
+<td>35%</td>
+<td>Transferred immediately on drip</td>
+<td>LiquidityGauge contract</td>
+</tr>
+<tr>
+<td>Single Staking</td>
+<td>15%</td>
+<td>Accumulated as pending, pushed via <code>fundStaking()</code></td>
+<td>SingleStaking contract</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Emission Schedule</h2>
+<h3>Constants</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MAX_SUPPLY</td>
+<td>21,000,000 VIBE</td>
+<td>Bitcoin-aligned hard cap</td>
+</tr>
+<tr>
+<td>BASE_EMISSION_RATE</td>
+<td>332,880,110,000,000,000 wei/s</td>
+<td>~10.5M VIBE in year 1</td>
+</tr>
+<tr>
+<td>ERA_DURATION</td>
+<td>31,557,600 seconds</td>
+<td>365.25 days (1 year)</td>
+</tr>
+<tr>
+<td>MAX_ERAS</td>
+<td>32</td>
+<td>After 32 halvings, rate is effectively 0</td>
+</tr>
+</tbody>
+</table>
+<h3>Halving Table</h3>
+<table>
+<thead>
+<tr>
+<th>Era</th>
+<th>Rate (VIBE/year)</th>
+<th>Cumulative (VIBE)</th>
+<th>% of Supply</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>~10,500,000</td>
+<td>~10,500,000</td>
+<td>50.0%</td>
+</tr>
+<tr>
+<td>1</td>
+<td>~5,250,000</td>
+<td>~15,750,000</td>
+<td>75.0%</td>
+</tr>
+<tr>
+<td>2</td>
+<td>~2,625,000</td>
+<td>~18,375,000</td>
+<td>87.5%</td>
+</tr>
+<tr>
+<td>3</td>
+<td>~1,312,500</td>
+<td>~19,687,500</td>
+<td>93.75%</td>
+</tr>
+<tr>
+<td>4</td>
+<td>~656,250</td>
+<td>~20,343,750</td>
+<td>96.875%</td>
+</tr>
+<tr>
+<td>5</td>
+<td>~328,125</td>
+<td>~20,671,875</td>
+<td>98.4375%</td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<td>31</td>
+<td>~0.005</td>
+<td>~21,000,000</td>
+<td>~100%</td>
+</tr>
+</tbody>
+</table>
+<h3>Cross-Era Accrual</h3>
+<p>When <code>drip()</code> is called after a long gap that spans multiple eras, the contract correctly calculates emissions for each partial era:</p>
+<pre><code>for each era 0..32:
+    if era overlaps [lastDripTime, now]:
+        overlap = min(now, eraEnd) - max(lastDripTime, eraStart)
+        total += (BASE_RATE &gt;&gt; era) * overlap
+</code></pre>
+<p>This loop is bounded at 32 iterations, making gas costs predictable regardless of the time gap.</p>
+<hr />
+<h2>Core Functions</h2>
+<h3><code>drip()</code> — Permissionless</h3>
+<p>Anyone can call <code>drip()</code> to advance the emission clock. This mints accrued VIBE and splits it to the three sinks.</p>
+<p><strong>Gas:</strong> ~220K (single era) to ~280K (cross-era)</p>
+<p><strong>Flow:</strong>
+1. Calculate pending emissions (cross-era aware)
+2. Cap at <code>vibeToken.mintableSupply()</code> (MAX_SUPPLY guard)
+3. Mint VIBE to EmissionController
+4. Split: shapleyPool += 50%, transfer 35% to gauge, stakingPending += 15%</p>
+<h3><code>createContributionGame()</code> — Authorized Drainers Only</h3>
+<p>Drains a percentage of the Shapley pool to create a ShapleyDistributor game. The game is created AND settled in one call, making rewards immediately claimable.</p>
+<p><strong>Parameters:</strong>
+- <code>gameId</code> — Unique game identifier
+- <code>participants</code> — ShapleyDistributor.Participant[] array
+- <code>drainBps</code> — Percentage of pool to drain (capped at <code>maxDrainBps</code>)</p>
+<p><strong>Minimum drain:</strong> Uses percentage-based minimum (<code>minDrainBps</code>, default 1% of pool). This scales naturally with VIBE price — no oracle, no trusted third party needed. An optional absolute floor (<code>minDrainAmount</code>, default 0) is available for governance to set if desired.</p>
+<p><strong>Game type:</strong> FEE_DISTRIBUTION (not TOKEN_EMISSION). This avoids double-halving — EmissionController already applies the wall-clock halving to the emission rate, so ShapleyDistributor should distribute the full amount without additional halving.</p>
+<h3><code>fundStaking()</code> — Permissionless</h3>
+<p>Pushes accumulated staking pending to SingleStaking via <code>approve</code> + <code>notifyRewardAmount</code>. Anyone can call — the protocol should run automatically.</p>
+<p><strong>Requirement:</strong> EmissionController must be the owner of SingleStaking (so <code>notifyRewardAmount</code> succeeds).</p>
+<hr />
+<h2>Configuration</h2>
+<h3>Budget Split</h3>
+<p>The budget is adjustable by governance (onlyOwner):</p>
+<pre><code class="language-solidity">ec.setBudget(shapleyBps, gaugeBps, stakingBps);
+// Must sum to 10,000 (100%)
+</code></pre>
+<p>Default: 5000/3500/1500 (50/35/15).</p>
+<h3>Drain Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>maxDrainBps</td>
+<td>5000</td>
+<td>Max 50% of pool per game — prevents single drain from emptying pool</td>
+</tr>
+<tr>
+<td>minDrainBps</td>
+<td>100</td>
+<td>Min 1% of pool — percentage-based, scales with price</td>
+</tr>
+<tr>
+<td>minDrainAmount</td>
+<td>0</td>
+<td>Optional absolute floor (governance can set)</td>
+</tr>
+</tbody>
+</table>
+<h3>Staking</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stakingRewardDuration</td>
+<td>7 days</td>
+<td>Reward period for each <code>fundStaking()</code> call</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Invariants</h2>
+<p>These hold at all times, verified by 7 invariant tests with 256 runs x 128K calls each:</p>
+<ol>
+<li><strong>Supply cap:</strong> <code>totalEmitted &lt;= MAX_SUPPLY</code></li>
+<li><strong>Accounting identity:</strong> <code>shapleyPool + totalShapleyDrained + totalGaugeFunded + stakingPending + totalStakingFunded == totalEmitted</code></li>
+<li><strong>Solvency:</strong> <code>VIBE.balanceOf(EmissionController) &gt;= shapleyPool + stakingPending</code></li>
+<li><strong>Rate monotonicity:</strong> <code>getCurrentRate() &lt;= BASE_EMISSION_RATE</code></li>
+<li><strong>Era bound:</strong> <code>getCurrentEra() &lt;= MAX_ERAS</code></li>
+<li><strong>Gauge balance:</strong> <code>VIBE.balanceOf(gauge) == totalGaugeFunded</code></li>
+</ol>
+<hr />
+<h2>Integration</h2>
+<h3>Deployment Steps</h3>
+<ol>
+<li>Deploy VIBEToken (if not already deployed)</li>
+<li>Deploy ShapleyDistributor (if not already deployed)</li>
+<li>Deploy LiquidityGauge with VIBE as reward token</li>
+<li>Deploy SingleStaking with VIBE as reward token</li>
+<li>Deploy EmissionController via UUPS proxy:
+   <code>solidity
+   EmissionController impl = new EmissionController();
+   ERC1967Proxy proxy = new ERC1967Proxy(
+       address(impl),
+       abi.encodeCall(EmissionController.initialize, (
+           governanceMultisig,
+           address(vibeToken),
+           address(shapleyDistributor),
+           address(liquidityGauge),
+           address(singleStaking)
+       ))
+   );</code></li>
+</ol>
+<h3>Permission Setup</h3>
+<pre><code class="language-solidity">vibeToken.setMinter(address(emissionController), true);
+shapleyDistributor.setAuthorizedCreator(address(emissionController), true);
+singleStaking.transferOwnership(address(emissionController));
+</code></pre>
+<h3>Operational</h3>
+<ul>
+<li>Call <code>drip()</code> periodically (keepers, MEV bots, or users — anyone can call)</li>
+<li>Call <code>fundStaking()</code> weekly (or as staking rewards are needed)</li>
+<li>Call <code>createContributionGame()</code> when contribution rounds complete (authorized drainers only)</li>
+</ul>
+<hr />
+<h2>Security Considerations</h2>
+<ol>
+<li><strong>No external price dependency</strong> — Emission rate is purely time-based. No oracle manipulation vector.</li>
+<li><strong>Bounded gas</strong> — Cross-era loop is O(32) maximum. Cannot be griefed with long time gaps.</li>
+<li><strong>MAX_SUPPLY enforced</strong> — Even if emission math produces more, VIBEToken's mint function caps at MAX_SUPPLY.</li>
+<li><strong>Reentrancy protection</strong> — All state-changing functions use <code>nonReentrant</code>.</li>
+<li><strong>UUPS upgradeable</strong> — Can fix bugs without migrating state. Upgrade restricted to owner.</li>
+<li><strong>Percentage-based drain minimum</strong> — Cannot be bricked by VIBE price appreciation.</li>
+</ol>
+<hr />
+<h2>Test Coverage</h2>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>File</th>
+<th>Tests</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit</td>
+<td><code>test/EmissionController.t.sol</code></td>
+<td>38</td>
+<td>Full function coverage + edge cases</td>
+</tr>
+<tr>
+<td>Fuzz</td>
+<td><code>test/fuzz/EmissionControllerFuzz.t.sol</code></td>
+<td>6 (256 runs)</td>
+<td>Time ranges, budget splits, drain bounds</td>
+</tr>
+<tr>
+<td>Invariant</td>
+<td><code>test/invariant/EmissionControllerInvariant.t.sol</code></td>
+<td>7 (256 runs, 128K calls)</td>
+<td>Accounting, solvency, supply cap</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>51</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>EmissionController: Where contribution meets compensation, on a schedule that respects the 21M covenant.</em></p></body></html>

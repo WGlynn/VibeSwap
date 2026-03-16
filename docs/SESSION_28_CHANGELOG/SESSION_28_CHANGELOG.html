@@ -1,0 +1,143 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Session 28 Changelog — EmissionController Build</h1>
+<p><strong>Date:</strong> February 21, 2026
+<strong>Duration:</strong> Single session
+<strong>Builder:</strong> JARVIS (Claude Opus 4.6) + Will</p>
+<hr />
+<h2>Summary</h2>
+<p>Built the EmissionController contract — the missing piece that connects VIBEToken minting to the incentive layer. Before this session, VIBE existed as a token with a 21M cap and authorized minters, but nothing actually minted or distributed it. Now it has a complete wall-clock halving emission system with three distribution sinks.</p>
+<hr />
+<h2>New Contract</h2>
+<h3><code>contracts/incentives/EmissionController.sol</code></h3>
+<ul>
+<li><strong>Type:</strong> UUPS Upgradeable</li>
+<li><strong>Lines:</strong> ~290 Solidity</li>
+<li><strong>Dependencies:</strong> VIBEToken (mint), ShapleyDistributor (games), LiquidityGauge (fund), SingleStaking (notify)</li>
+</ul>
+<p><strong>Core functions:</strong>
+- <code>drip()</code> — Permissionless. Mints accrued VIBE, splits 50/35/15
+- <code>createContributionGame()</code> — Authorized. Drains Shapley pool → creates + settles game
+- <code>fundStaking()</code> — Permissionless. Pushes pending staking rewards</p>
+<p><strong>Key features:</strong>
+- Wall-clock halving (baseRate &gt;&gt; era, 365.25 day eras, 32 max)
+- Cross-era accrual (bounded O(32) loop)
+- Accumulation pool (not streaming — creates incentive waves)
+- Percentage-based drain minimum (trustless price scaling)
+- MAX_SUPPLY guard (double-enforced: EC + VIBEToken)</p>
+<hr />
+<h2>New Tests</h2>
+<h3><code>test/EmissionController.t.sol</code> — 38 unit tests</h3>
+<ul>
+<li>Initialization, drip mechanics, cross-era, MAX_SUPPLY cap</li>
+<li>Contribution game creation, drain limits, authorization</li>
+<li>Staking funding, multiple drip accumulation</li>
+<li>View functions (era, rate, pending, dashboard)</li>
+<li>Admin functions, budget validation, access control</li>
+<li>Accounting invariant after mixed operations</li>
+</ul>
+<h3><code>test/fuzz/EmissionControllerFuzz.t.sol</code> — 6 fuzz tests (256 runs each)</h3>
+<ul>
+<li>Drip at any time gap (1s to 50 years)</li>
+<li>MAX_SUPPLY cap under extreme time ranges</li>
+<li>Cross-era accrual correctness (manual verification)</li>
+<li>Budget split accounting (any valid split)</li>
+<li>Game creation with valid drain bounds</li>
+<li>Sequential drips maintain accounting identity</li>
+</ul>
+<h3><code>test/invariant/EmissionControllerInvariant.t.sol</code> — 7 invariant tests (256 runs, 128K calls)</h3>
+<ul>
+<li><code>totalEmitted &lt;= MAX_SUPPLY</code></li>
+<li><code>shapleyPool + totalShapleyDrained + totalGaugeFunded + stakingPending + totalStakingFunded == totalEmitted</code></li>
+<li>EC balance covers shapleyPool + stakingPending</li>
+<li>Rate &lt;= BASE_EMISSION_RATE</li>
+<li>Era &lt;= MAX_ERAS</li>
+<li>Gauge balance == totalGaugeFunded</li>
+<li>Call summary (operational health)</li>
+</ul>
+<p><strong>Total new tests: 51 (all passing)</strong></p>
+<hr />
+<h2>New Documentation</h2>
+<ol>
+<li><strong><code>docs/emission-controller.md</code></strong> — Full technical design document</li>
+<li><strong><code>docs/VIBE_TOKENOMICS.md</code></strong> — Comprehensive tokenomics: zero pre-mine manifesto, halving schedule, two-token model, time neutrality</li>
+<li><strong><code>docs/papers/cooperative-emission-design.md</code></strong> — Academic-style research paper with proofs of all 5 invariants</li>
+<li><strong><code>docs/explainers/vibe-emission-explainer.md</code></strong> — Simple community-facing explainer</li>
+<li><strong><code>docs/VIBESWAP_BUILD_SUMMARY.md</code></strong> — Updated with EmissionController, test counts</li>
+<li><strong><code>docs/SESSION_28_CHANGELOG.md</code></strong> — This file</li>
+</ol>
+<hr />
+<h2>Design Decisions</h2>
+<h3>1. Zero Team Allocation (Will's directive)</h3>
+<p>Bitcoin didn't have team allocations. VIBE doesn't either. Founders earn through the same Shapley games as everyone else. "fuck that that's a premine" — Will</p>
+<h3>2. Percentage-Based Drain Minimum (Will's insight)</h3>
+<p>Fixed minimum (100 VIBE) is a ticking time bomb at high prices ($10K/VIBE = $1M minimum). Changed to <code>minDrainBps = 100</code> (1% of pool). Scales naturally. No oracle, no trusted third party. Optional absolute floor available for governance if needed.</p>
+<h3>3. FEE_DISTRIBUTION Game Type</h3>
+<p>EmissionController already applies wall-clock halving. Using TOKEN_EMISSION in ShapleyDistributor would apply halving again = double-halving. Using FEE_DISTRIBUTION (no halving in Shapley) avoids this.</p>
+<h3>4. Accumulation Over Streaming</h3>
+<p>Shapley pool accumulates rather than streams. This creates incentive waves: longer gaps = bigger pools = bigger rewards. Mirrors real value creation patterns (bursty, not continuous).</p>
+<h3>5. Separate fundStaking()</h3>
+<p>SingleStaking's <code>notifyRewardAmount</code> is <code>onlyOwner</code>. Rather than making drip() fail when staking isn't configured, staking rewards accumulate as <code>stakingPending</code> and are pushed separately via <code>fundStaking()</code>.</p>
+<hr />
+<h2>Security Hardening (Session 28 continued)</h2>
+<h3>Bugs Found &amp; Fixed</h3>
+<ol>
+<li>
+<p><strong>Orphaned Tokens (MEDIUM)</strong> — When <code>liquidityGauge == address(0)</code>, gaugeShare was minted but untracked, breaking accounting invariant. <strong>Fix:</strong> Redirect gaugeShare to Shapley pool when no gauge configured (1 <code>else if</code> branch added).</p>
+</li>
+<li>
+<p><strong>Zero-Drain Game Creation (LOW)</strong> — Empty pool + any drainBps = 0-value game creation attempt. <strong>Fix:</strong> Added explicit <code>if (drainAmount == 0) revert DrainTooSmall()</code> (1 line).</p>
+</li>
+</ol>
+<h3>New Security Test Suite</h3>
+<p><strong><code>test/security/EmissionControllerSecurity.t.sol</code></strong> — 41 adversarial tests:
+- 3 reentrancy attacks (malicious VIBEToken, ShapleyDistributor, SingleStaking)
+- 2 game ID collision / double-drain tests
+- 4 unauthorized access tests
+- 4 accounting invariant tests under adversarial conditions
+- 4 drain edge cases (zero max, min &gt; max, rapid-fire, exhaustion)
+- 3 MAX_SUPPLY boundary tests
+- 2 cross-era overflow safety tests
+- 3 external contract failure mode tests
+- 2 front-running / timing attack tests
+- 3 parameter boundary tests
+- 2 zero-value edge cases
+- 3 initialization safety tests
+- 2 token flow integrity tests
+- 2 upgrade safety tests
+- 2 drainer revocation tests</p>
+<h3>New Documentation</h3>
+<ol>
+<li><strong><code>docs/security/emission-controller-security-audit.md</code></strong> — Full security audit report with all findings</li>
+<li><strong><code>docs/security/protocol-wide-security-posture.md</code></strong> — Protocol-wide security architecture overview</li>
+</ol>
+<hr />
+<h2>Codebase Stats (Post-Session)</h2>
+<ul>
+<li><strong>Solidity contracts:</strong> 122 (+1)</li>
+<li><strong>Test files:</strong> 136 (+4)</li>
+<li><strong>Tests passing:</strong> 1200+ (+92)</li>
+<li><strong>Documentation files:</strong> 8 new</li>
+<li><strong>Contract size:</strong> 7.6KB (31% of 24KB Base limit)</li>
+</ul>
+<hr />
+<h2>Integration Requirements (Post-Deploy)</h2>
+<pre><code class="language-solidity">// 1. Authorize EmissionController as VIBE minter
+vibeToken.setMinter(address(emissionController), true);
+
+// 2. Authorize EmissionController as Shapley game creator
+shapleyDistributor.setAuthorizedCreator(address(emissionController), true);
+
+// 3. Transfer SingleStaking ownership to EmissionController
+singleStaking.transferOwnership(address(emissionController));
+
+// 4. Authorize drainers (governance, keeper contracts)
+emissionController.setAuthorizedDrainer(address(governance), true);
+</code></pre>
+<hr />
+<p><em>Session 28: The faucet is built, hardened, and tamperproof. VIBE flows from contribution, not allocation.</em></p></body></html>

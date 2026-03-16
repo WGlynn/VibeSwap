@@ -1,0 +1,2031 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VSOS Pairwise Contract Alignment Analysis</h1>
+<p><strong>Date</strong>: February 14, 2026
+<strong>Scope</strong>: All implementation contracts across 12 directories
+<strong>Purpose</strong>: Map every contract's relationship to every other contract. Identify integration strength, orphaned contracts, missing connections, and philosophical alignment with Cooperative Capitalism.</p>
+<hr />
+<h2>Methodology</h2>
+<h3>Alignment Scoring (0-5)</h3>
+<table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Meaning</th>
+<th>Criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>5</strong></td>
+<td><strong>Tightly coupled</strong></td>
+<td>Direct runtime calls + shared state. Cannot function without the other.</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td><strong>Strongly integrated</strong></td>
+<td>Direct runtime calls via interface. Designed to compose.</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td><strong>Loosely integrated</strong></td>
+<td>References via interface but interaction is optional (try/catch, address(0) checks).</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td><strong>Compositionally aligned</strong></td>
+<td>Same design patterns, COULD compose but DON'T call each other at runtime.</td>
+</tr>
+<tr>
+<td><strong>1</strong></td>
+<td><strong>Parallel</strong></td>
+<td>Same codebase, no interaction, different domains.</td>
+</tr>
+<tr>
+<td><strong>0</strong></td>
+<td><strong>Orthogonal</strong></td>
+<td>No relationship whatsoever.</td>
+</tr>
+</tbody>
+</table>
+<h3>Alignment Dimensions</h3>
+<ol>
+<li><strong>Runtime</strong> (R): Does contract A call contract B at execution time? (verified via agent trace)</li>
+<li><strong>Structural</strong> (S): Do they share imports, interfaces, or inheritance?</li>
+<li><strong>Compositional</strong> (C): Can they be composed in a meaningful user flow?</li>
+<li><strong>Philosophical</strong> (P): Do they embody the same Cooperative Capitalism primitives?</li>
+</ol>
+<p><strong>Important</strong>: Scores in matrices reflect the HIGHEST applicable dimension. A score of 4 means "direct runtime calls exist." A score of 2 means "no runtime calls, but compositionally designed to work together."</p>
+<hr />
+<h2>Complete Contract Registry</h2>
+<h3>Layer 1: Core Protocol</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>CommitRevealAuction</strong></td>
+<td>ComplianceRegistry, ReputationOracle, treasury (ETH)</td>
+<td>VibeSwapCore, wBAR, CrossChainRouter</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>VibeSwapCore</strong></td>
+<td>CRA, VibeAMM, DAOTreasury, CrossChainRouter, wBAR, ClawbackRegistry</td>
+<td>wBAR</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>CircuitBreaker</strong></td>
+<td>(abstract, internal only)</td>
+<td>(inherited)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>wBAR</strong></td>
+<td>CRA, VibeSwapCore</td>
+<td>VibeSwapCore</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Notable</strong>: VibeSwapCore ↔ wBAR is a <strong>circular dependency</strong> — Core calls wBAR to mint/settle, wBAR calls Core for failed deposit releases.</p>
+<h3>Layer 2: AMM</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td><strong>VibeAMM</strong></td>
+<td>VibeLP (deploy+mint/burn), TruePriceOracle, PriorityRegistry</td>
+<td>VibeSwapCore, DAOTreasury, TreasuryStabilizer, VibeLPNFT, VolatilityOracle</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>VibeLP</strong></td>
+<td>(none — reads IERC20Metadata in constructor only)</td>
+<td>VibeAMM, VibePoolFactory (deployer)</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>VibePoolFactory</strong></td>
+<td>VibeLP (deploy), IPoolCurve impls, VibeHookRegistry</td>
+<td>(none in current codebase)</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>ConstantProductCurve</strong></td>
+<td>(none — pure math)</td>
+<td>VibePoolFactory</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>StableSwapCurve</strong></td>
+<td>(none — pure math)</td>
+<td>VibePoolFactory</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 3: Financial Primitives</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td><strong>VibeLPNFT</strong></td>
+<td>VibeAMM</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>VibeStream</strong></td>
+<td>IERC20 only</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>VibeOptions</strong></td>
+<td>IVibeAMM, IVolatilityOracle, IERC20</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>VibeBonds</strong></td>
+<td>IERC20, JUL token</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>VibeCredit</strong></td>
+<td>IReputationOracle, IERC20, JUL token</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>15</td>
+<td><strong>VibeSynth</strong></td>
+<td>IReputationOracle, IERC20 (collateral), JUL token</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>16</td>
+<td><strong>VibeInsurance</strong></td>
+<td>IReputationOracle, IERC20 (collateral), JUL token</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>17</td>
+<td><strong>VibeRevShare</strong></td>
+<td>IReputationOracle, IERC20 (revenue), JUL token</td>
+<td>(none — leaf node)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CRITICAL FINDING</strong>: No financial primitive calls any other financial primitive at runtime. They are all <strong>leaf nodes</strong> — they call into infrastructure (AMM, ReputationOracle, JUL) but never each other. The Layer 3×3 matrix is purely compositional (score 2), not runtime-integrated.</p>
+<h3>Layer 4: Governance</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>18</td>
+<td><strong>DAOTreasury</strong></td>
+<td>VibeAMM</td>
+<td>VibeSwapCore, TreasuryStabilizer</td>
+</tr>
+<tr>
+<td>19</td>
+<td><strong>TreasuryStabilizer</strong></td>
+<td>VibeAMM, DAOTreasury, VolatilityOracle</td>
+<td>(none in current codebase)</td>
+</tr>
+<tr>
+<td>20</td>
+<td><strong>Forum</strong></td>
+<td>SoulboundIdentity</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>21</td>
+<td><strong>AutomatedRegulator</strong></td>
+<td>FederatedConsensus, ClawbackRegistry</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>22</td>
+<td><strong>DecentralizedTribunal</strong></td>
+<td>FederatedConsensus, SoulboundIdentity</td>
+<td>DisputeResolver</td>
+</tr>
+<tr>
+<td>23</td>
+<td><strong>DisputeResolver</strong></td>
+<td>FederatedConsensus, DecentralizedTribunal</td>
+<td>(none — leaf node)</td>
+</tr>
+<tr>
+<td>24</td>
+<td><strong>VibeTimelock</strong></td>
+<td>ReputationOracle, JUL token, arbitrary targets (.call)</td>
+<td>(none — entry point)</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 5: Incentives</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>25</td>
+<td><strong>IncentiveController</strong></td>
+<td>ILProtectionVault, LoyaltyRewardsManager, SlippageGuaranteeFund, ShapleyDistributor, VolatilityInsurancePool</td>
+<td>(none — orchestrator entry point)</td>
+</tr>
+<tr>
+<td>26</td>
+<td><strong>ShapleyDistributor</strong></td>
+<td>PriorityRegistry</td>
+<td>IncentiveController</td>
+</tr>
+<tr>
+<td>27</td>
+<td><strong>ILProtectionVault</strong></td>
+<td>VolatilityOracle</td>
+<td>IncentiveController</td>
+</tr>
+<tr>
+<td>28</td>
+<td><strong>LoyaltyRewardsManager</strong></td>
+<td>(none)</td>
+<td>IncentiveController</td>
+</tr>
+<tr>
+<td>29</td>
+<td><strong>SlippageGuaranteeFund</strong></td>
+<td>(none)</td>
+<td>IncentiveController</td>
+</tr>
+<tr>
+<td>30</td>
+<td><strong>VolatilityInsurancePool</strong></td>
+<td>VolatilityOracle</td>
+<td>IncentiveController</td>
+</tr>
+<tr>
+<td>31</td>
+<td><strong>PriorityRegistry</strong></td>
+<td>(none)</td>
+<td>ShapleyDistributor, VibeAMM</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 6: Protocol/Framework (VSOS)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>32</td>
+<td><strong>VibeHookRegistry</strong></td>
+<td>IVibeHook (arbitrary hook contracts)</td>
+<td>VibePoolFactory</td>
+</tr>
+<tr>
+<td>33</td>
+<td><strong>VibePluginRegistry</strong></td>
+<td>ReputationOracle, JUL token</td>
+<td>(none — entry point)</td>
+</tr>
+<tr>
+<td>34</td>
+<td><strong>VibeKeeperNetwork</strong></td>
+<td>ReputationOracle, JUL token, arbitrary targets (.call)</td>
+<td>(none — entry point)</td>
+</tr>
+<tr>
+<td>35</td>
+<td><strong>VibeForwarder</strong></td>
+<td>ReputationOracle</td>
+<td>(none — entry point)</td>
+</tr>
+<tr>
+<td>36</td>
+<td><strong>VibeSmartWallet</strong></td>
+<td>EntryPoint (ERC-4337)</td>
+<td>VibeWalletFactory</td>
+</tr>
+<tr>
+<td>37</td>
+<td><strong>VibeWalletFactory</strong></td>
+<td>VibeSmartWallet</td>
+<td>(none — entry point)</td>
+</tr>
+<tr>
+<td>38</td>
+<td><strong>VibeVersionRouter</strong></td>
+<td>(none — pure routing logic)</td>
+<td>(none)</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 7: Oracles</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>39</td>
+<td><strong>VolatilityOracle</strong></td>
+<td>VibeAMM</td>
+<td>TreasuryStabilizer, ILProtectionVault, VolatilityInsurancePool, VibeOptions</td>
+</tr>
+<tr>
+<td>40</td>
+<td><strong>TruePriceOracle</strong></td>
+<td>StablecoinFlowRegistry</td>
+<td>VibeAMM</td>
+</tr>
+<tr>
+<td>41</td>
+<td><strong>StablecoinFlowRegistry</strong></td>
+<td>(none)</td>
+<td>TruePriceOracle</td>
+</tr>
+<tr>
+<td>42</td>
+<td><strong>ReputationOracle</strong></td>
+<td>(none — stores pairwise trust)</td>
+<td><strong>9 contracts</strong> (see below)</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 8: Identity</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>43</td>
+<td><strong>SoulboundIdentity</strong></td>
+<td>(none)</td>
+<td>Forum, WalletRecovery, DecentralizedTribunal</td>
+</tr>
+<tr>
+<td>44</td>
+<td><strong>WalletRecovery</strong></td>
+<td>SoulboundIdentity, AGIResistantRecovery</td>
+<td>(none — entry point)</td>
+</tr>
+<tr>
+<td>45</td>
+<td><strong>AGIResistantRecovery</strong></td>
+<td>(none)</td>
+<td>WalletRecovery</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 9: Compliance</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>46</td>
+<td><strong>ComplianceRegistry</strong></td>
+<td>(none)</td>
+<td>CommitRevealAuction</td>
+</tr>
+<tr>
+<td>47</td>
+<td><strong>FederatedConsensus</strong></td>
+<td>(none)</td>
+<td>AutomatedRegulator, DecentralizedTribunal, DisputeResolver, ClawbackRegistry</td>
+</tr>
+<tr>
+<td>48</td>
+<td><strong>ClawbackRegistry</strong></td>
+<td>FederatedConsensus</td>
+<td>VibeSwapCore, AutomatedRegulator</td>
+</tr>
+<tr>
+<td>49</td>
+<td><strong>ClawbackVault</strong></td>
+<td>(none)</td>
+<td>(none — <strong>ORPHANED</strong>)</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 10: Quantum</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>50</td>
+<td><strong>QuantumVault</strong></td>
+<td>(none)</td>
+<td>(none — <strong>ORPHANED</strong>)</td>
+</tr>
+<tr>
+<td>51</td>
+<td><strong>LatticeSig</strong></td>
+<td>(none — library)</td>
+<td>(none — <strong>ORPHANED</strong>)</td>
+</tr>
+<tr>
+<td>52</td>
+<td><strong>DilithiumVerifier</strong></td>
+<td>(none — library)</td>
+<td>(none — <strong>ORPHANED</strong>)</td>
+</tr>
+</tbody>
+</table>
+<h3>Layer 11: Libraries (zero runtime calls, imported only)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>53</td>
+<td><strong>BatchMath</strong></td>
+<td>VibeAMM, ConstantProductCurve</td>
+</tr>
+<tr>
+<td>54</td>
+<td><strong>DeterministicShuffle</strong></td>
+<td>CommitRevealAuction</td>
+</tr>
+<tr>
+<td>55</td>
+<td><strong>TWAPOracle</strong> (lib)</td>
+<td>VibeAMM</td>
+</tr>
+<tr>
+<td>56</td>
+<td><strong>FibonacciScaling</strong></td>
+<td>BatchMath</td>
+</tr>
+<tr>
+<td>57</td>
+<td><strong>PairwiseFairness</strong></td>
+<td>VibeStream</td>
+</tr>
+<tr>
+<td>58</td>
+<td><strong>SecurityLib</strong></td>
+<td>Various</td>
+</tr>
+<tr>
+<td>59</td>
+<td><strong>TruePriceLib</strong></td>
+<td>TruePriceOracle</td>
+</tr>
+<tr>
+<td>60</td>
+<td><strong>VWAPOracle</strong></td>
+<td>Various</td>
+</tr>
+<tr>
+<td>61</td>
+<td><strong>LiquidityProtection</strong></td>
+<td>Various</td>
+</tr>
+<tr>
+<td>62</td>
+<td><strong>SHA256Verifier</strong></td>
+<td>ProofOfWorkLib</td>
+</tr>
+<tr>
+<td>63</td>
+<td><strong>ProofOfWorkLib</strong></td>
+<td>CommitRevealAuction</td>
+</tr>
+<tr>
+<td>64</td>
+<td><strong>PoolComplianceConfig</strong></td>
+<td>VibeAMM</td>
+</tr>
+</tbody>
+</table>
+<h3>Key Token: Joule (JUL)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Contract</th>
+<th>Runtime Calls OUT</th>
+<th>Runtime Calls IN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>65</td>
+<td><strong>Joule</strong></td>
+<td>(mine, rebase — self-contained)</td>
+<td><strong>8 contracts</strong>: VibeBonds, VibeCredit, VibeSynth, VibeInsurance, VibeRevShare, VibeKeeperNetwork, VibePluginRegistry, VibeTimelock</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Hub Analysis: Most Connected Contracts</h2>
+<h3>By Inbound Runtime Calls (most depended upon)</h3>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Contract</th>
+<th>Inbound Callers</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>ReputationOracle</strong></td>
+<td>9</td>
+<td>CRA, VibeCredit, VibeSynth, VibeInsurance, VibeRevShare, VibeForwarder, VibeKeeperNetwork, VibePluginRegistry, VibeTimelock</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Joule (JUL)</strong></td>
+<td>8</td>
+<td>VibeBonds, VibeCredit, VibeSynth, VibeInsurance, VibeRevShare, VibeKeeperNetwork, VibePluginRegistry, VibeTimelock</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>VibeAMM</strong></td>
+<td>5</td>
+<td>VibeSwapCore, DAOTreasury, TreasuryStabilizer, VibeLPNFT, VolatilityOracle</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>FederatedConsensus</strong></td>
+<td>4</td>
+<td>AutomatedRegulator, DecentralizedTribunal, DisputeResolver, ClawbackRegistry</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>VolatilityOracle</strong></td>
+<td>4</td>
+<td>TreasuryStabilizer, ILProtectionVault, VolatilityInsurancePool, VibeOptions</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>SoulboundIdentity</strong></td>
+<td>3</td>
+<td>Forum, WalletRecovery, DecentralizedTribunal</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>VibeSwapCore</strong></td>
+<td>1 (wBAR)</td>
+<td>Entry point — called by users, not other contracts</td>
+</tr>
+</tbody>
+</table>
+<h3>By Outbound Runtime Calls (most dependent)</h3>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Contract</th>
+<th>Outbound Deps</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>VibeSwapCore</strong></td>
+<td>6</td>
+<td>CRA, VibeAMM, DAOTreasury, CrossChainRouter, wBAR, ClawbackRegistry</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>IncentiveController</strong></td>
+<td>5</td>
+<td>ILProtection, Loyalty, Slippage, Shapley, VolatilityInsurance</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>VibeAMM</strong></td>
+<td>3</td>
+<td>VibeLP, TruePriceOracle, PriorityRegistry</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>TreasuryStabilizer</strong></td>
+<td>3</td>
+<td>VibeAMM, DAOTreasury, VolatilityOracle</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>DisputeResolver</strong></td>
+<td>2</td>
+<td>FederatedConsensus, DecentralizedTribunal</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Pairwise Alignment Matrices</h2>
+<h3>Layer 1 × Layer 1: Core Protocol Internal</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CRA(1)</th>
+<th>VSCore(2)</th>
+<th>CB(3)</th>
+<th>wBAR(4)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CRA(1)</strong></td>
+<td>—</td>
+<td><strong>5</strong></td>
+<td>3</td>
+<td><strong>4</strong></td>
+</tr>
+<tr>
+<td><strong>VSCore(2)</strong></td>
+<td><strong>5</strong></td>
+<td>—</td>
+<td>3</td>
+<td><strong>5</strong></td>
+</tr>
+<tr>
+<td><strong>CB(3)</strong></td>
+<td>3</td>
+<td>3</td>
+<td>—</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>wBAR(4)</strong></td>
+<td><strong>4</strong></td>
+<td><strong>5</strong></td>
+<td>2</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verified runtime paths</strong>:</p>
+<ul>
+<li>VSCore→CRA (5): Core orchestrates auctions directly</li>
+<li>VSCore↔wBAR (5): Circular dependency — Core calls wBAR.mint/settle, wBAR calls Core for releases</li>
+<li>CRA→wBAR (4): wBAR calls CRA for position management</li>
+<li>CB (3): Abstract/inherited — provides circuit breaker modifiers, not direct runtime calls</li>
+</ul>
+<h3>Layer 1 × Layer 2: Core ↔ AMM</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CRA(1)</th>
+<th>VSCore(2)</th>
+<th>CB(3)</th>
+<th>wBAR(4)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AMM(5)</strong></td>
+<td>2</td>
+<td><strong>5</strong></td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>LP(6)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Factory(7)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>CPCurve(8)</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>SSCurve(9)</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verified</strong>: Only VSCore→VibeAMM is a direct runtime call. AMM doesn't call back to Core — it's one-directional.</p>
+<h3>Layer 2 × Layer 3: AMM ↔ Financial Primitives</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>AMM(5)</th>
+<th>LP(6)</th>
+<th>Factory(7)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LPNFT(10)</strong></td>
+<td><strong>4</strong></td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Stream(11)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Options(12)</strong></td>
+<td><strong>4</strong></td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Bonds(13)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Credit(14)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Synth(15)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Insurance(16)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>RevShare(17)</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verified runtime paths</strong>:</p>
+<ul>
+<li>LPNFT→AMM (4): VibeLPNFT calls IVibeAMM directly for liquidity operations</li>
+<li>Options→AMM (4): VibeOptions calls IVibeAMM for TWAP pricing + settlement</li>
+<li>All others (1): No runtime dependency on AMM — they use IERC20 for token transfers and IReputationOracle for gating, but don't call AMM</li>
+</ul>
+<p><strong>This is a key finding</strong>: 6 of 8 financial primitives have <strong>zero AMM dependency</strong>. They interact with the AMM ecosystem only through token balances, not runtime calls.</p>
+<h3>Layer 3 × Layer 3: Financial Primitives Internal</h3>
+<p><strong>ALL scores are 2 (compositional) — ZERO runtime calls between any pair.</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>LPNFT</th>
+<th>Stream</th>
+<th>Options</th>
+<th>Bonds</th>
+<th>Credit</th>
+<th>Synth</th>
+<th>Insurance</th>
+<th>RevShare</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LPNFT</strong></td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Options</strong></td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Bonds</strong></td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Credit</strong></td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Synth</strong></td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Insurance</strong></td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>RevShare</strong></td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>This matrix is uniformly 2.</strong> The financial primitives are designed as <strong>independent modules</strong> that share:</p>
+<ul>
+<li>Common dependency on ReputationOracle (4/8 call it)</li>
+<li>Common dependency on JUL token (5/8 reference it)</li>
+<li>Common ERC-721/ERC-1155 patterns</li>
+<li>Same philosophical framework</li>
+</ul>
+<p>But they <strong>never call each other</strong>. This is both a strength (independence, no cascading failures) and a gap (no automated cross-product composition).</p>
+<h3>Layer 3 × Infrastructure: Financial → Shared Dependencies</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>ReputationOracle</th>
+<th>VolatilityOracle</th>
+<th>VibeAMM</th>
+<th>JUL Token</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LPNFT</strong></td>
+<td>0</td>
+<td>0</td>
+<td><strong>4</strong></td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Options</strong></td>
+<td>0</td>
+<td><strong>4</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Bonds</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><strong>3</strong></td>
+</tr>
+<tr>
+<td><strong>Credit</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+<td>0</td>
+<td><strong>3</strong></td>
+</tr>
+<tr>
+<td><strong>Synth</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+<td>0</td>
+<td><strong>3</strong></td>
+</tr>
+<tr>
+<td><strong>Insurance</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+<td>0</td>
+<td><strong>3</strong></td>
+</tr>
+<tr>
+<td><strong>RevShare</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+<td>0</td>
+<td><strong>3</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The real integration story</strong>: Financial primitives don't talk to each other — they all talk to the same <strong>4 infrastructure hubs</strong>:</p>
+<ol>
+<li><strong>ReputationOracle</strong>: Gate keeper for credit, synth, insurance, revshare (trust-gated access)</li>
+<li><strong>JUL Token</strong>: Economic alignment for bonds, credit, synth, insurance, revshare (stake for benefits)</li>
+<li><strong>VibeAMM</strong>: Pricing engine for LPNFT and Options (TWAP + spot)</li>
+<li><strong>VolatilityOracle</strong>: Risk assessment for Options (implied vol for pricing)</li>
+</ol>
+<h3>Layer 4 × Layer 4: Governance Internal</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Treasury(18)</th>
+<th>Stabilizer(19)</th>
+<th>Forum(20)</th>
+<th>Regulator(21)</th>
+<th>Tribunal(22)</th>
+<th>Dispute(23)</th>
+<th>Timelock(24)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Treasury</strong></td>
+<td>—</td>
+<td><strong>4</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Stabilizer</strong></td>
+<td><strong>4</strong></td>
+<td>—</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Forum</strong></td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Regulator</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Tribunal</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>2</td>
+<td>—</td>
+<td><strong>4</strong></td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Dispute</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>2</td>
+<td><strong>4</strong></td>
+<td>—</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Timelock</strong></td>
+<td>2</td>
+<td>2</td>
+<td>1</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Two governance sub-clusters</strong>:</p>
+<ol>
+<li><strong>Treasury cluster</strong>: DAOTreasury ↔ TreasuryStabilizer (4) — Stabilizer directly calls Treasury + AMM for peg operations</li>
+<li><strong>Dispute cluster</strong>: DisputeResolver → DecentralizedTribunal (4) → FederatedConsensus. All three route through FederatedConsensus.</li>
+</ol>
+<p><strong>Gap</strong>: Forum (1) is disconnected from both clusters. No runtime path from Forum → any governance action.</p>
+<h3>Layer 5: Incentives Internal</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Controller(25)</th>
+<th>Shapley(26)</th>
+<th>ILProt(27)</th>
+<th>Loyalty(28)</th>
+<th>Slippage(29)</th>
+<th>VolInsPool(30)</th>
+<th>Priority(31)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Controller</strong></td>
+<td>—</td>
+<td><strong>5</strong></td>
+<td><strong>5</strong></td>
+<td><strong>5</strong></td>
+<td><strong>5</strong></td>
+<td><strong>5</strong></td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Shapley</strong></td>
+<td><strong>5</strong></td>
+<td>—</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td><strong>4</strong></td>
+</tr>
+<tr>
+<td><strong>ILProt</strong></td>
+<td><strong>5</strong></td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>1</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Loyalty</strong></td>
+<td><strong>5</strong></td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Slippage</strong></td>
+<td><strong>5</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>VolInsPool</strong></td>
+<td><strong>5</strong></td>
+<td>1</td>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Priority</strong></td>
+<td>2</td>
+<td><strong>4</strong></td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>IncentiveController is a star topology</strong> — it directly calls all 5 subsystem contracts. They don't call each other. This is a clean orchestrator pattern.</p>
+<h3>Layer 6 × Layer 7: Framework ↔ Infrastructure</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>ReputationOracle</th>
+<th>JUL Token</th>
+<th>VibeAMM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HookRegistry(32)</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>PluginRegistry(33)</strong></td>
+<td><strong>4</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>KeeperNetwork(34)</strong></td>
+<td><strong>4</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Forwarder(35)</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>SmartWallet(36)</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>WalletFactory(37)</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Timelock(24)</strong></td>
+<td><strong>4</strong></td>
+<td><strong>4</strong></td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ReputationOracle + JUL pattern</strong>: The framework layer mirrors the financial layer — both use RepOracle for trust gating and JUL for economic alignment. This is the VSOS "operating system" consistency.</p>
+<hr />
+<h2>Verified Dependency Graph (ASCII)</h2>
+<pre><code>                            ┌──────────────────────────────────────────────┐
+                            │           ENTRY POINTS (users call)          │
+                            │  VibeSwapCore, VibeTimelock, IncentiveCtrl   │
+                            └────────────┬─────────────────────────────────┘
+                                         │
+                    ┌────────────────────┼────────────────────────┐
+                    ▼                    ▼                        ▼
+            ┌──────────────┐   ┌─────────────────┐    ┌──────────────────┐
+            │ CORE CLUSTER │   │ INCENTIVE STAR  │    │  DISPUTE CHAIN   │
+            │              │   │                 │    │                  │
+            │ VSCore ──┐   │   │ Controller ─┐  │    │ DisputeResolver  │
+            │   │  ▲   │   │   │   │ │ │ │ │ │  │    │      │           │
+            │   ▼  │   ▼   │   │   ▼ ▼ ▼ ▼ ▼ ▼  │    │      ▼           │
+            │  CRA wBAR    │   │ IL Loy Slip    │    │ DecTribunal      │
+            │              │   │ Shapley VolIns  │    │      │           │
+            └──────┬───────┘   └────────┬────────┘    │      ▼           │
+                   │                    │             │ FedConsensus ◄───┤
+                   ▼                    │             │      ▲           │
+            ┌──────────────┐            │             │      │           │
+            │   AMM LAYER  │            │             │ AutoRegulator    │
+            │              │            │             │ ClawbackRegistry │
+            │ VibeAMM ◄────────────────┘             └──────────────────┘
+            │   │ │ │      │
+            │   │ │ └─► TruePriceOracle ──► StablecoinFlowRegistry
+            │   │ └──► PriorityRegistry
+            │   ▼          │
+            │ VibeLP       │
+            └──────┬───────┘
+                   │
+    ┌──────────────┼──────────────────────────────────────┐
+    │              │              INFRASTRUCTURE HUBS      │
+    │    ┌─────────┼──────────────────────┐               │
+    │    │         ▼                      │               │
+    │    │  ┌─────────────────┐   ┌──────┴──────┐        │
+    │    │  │ VolatilityOracle│   │ ReputationO │        │
+    │    │  │ (4 inbound)     │   │ (9 inbound) │        │
+    │    │  └────────┬────────┘   └──────┬──────┘        │
+    │    │           │                   │               │
+    │    │    ┌──────┴───────┐    ┌──────┴──────────┐    │
+    │    │    │Called by:     │    │Called by:        │    │
+    │    │    │ TreasuryStab  │    │ CRA             │    │
+    │    │    │ ILProtection  │    │ VibeCredit      │    │
+    │    │    │ VolInsPool    │    │ VibeSynth       │    │
+    │    │    │ VibeOptions   │    │ VibeInsurance   │    │
+    │    │    └──────────────┘    │ VibeRevShare    │    │
+    │    │                        │ VibeForwarder   │    │
+    │    │                        │ VibeKeeperNet   │    │
+    │    │                        │ VibePluginReg   │    │
+    │    │                        │ VibeTimelock    │    │
+    │    │                        └─────────────────┘    │
+    │    │                                               │
+    │    │         ┌────────────────┐                     │
+    │    │         │   JUL (Joule)  │                     │
+    │    │         │  (8 inbound)   │                     │
+    │    │         └───────┬────────┘                     │
+    │    │          ┌──────┴──────────┐                   │
+    │    │          │Called by:       │                   │
+    │    │          │ VibeBonds       │                   │
+    │    │          │ VibeCredit      │                   │
+    │    │          │ VibeSynth       │                   │
+    │    │          │ VibeInsurance   │                   │
+    │    │          │ VibeRevShare    │                   │
+    │    │          │ VibeKeeperNet   │                   │
+    │    │          │ VibePluginReg   │                   │
+    │    │          │ VibeTimelock    │                   │
+    │    │          └────────────────┘                    │
+    │    │                                               │
+    │    │  ┌──────────────────┐                          │
+    │    │  │ SoulboundIdentity│                          │
+    │    │  │ (3 inbound)      │                          │
+    │    │  └───────┬──────────┘                          │
+    │    │   ┌──────┴──────┐                              │
+    │    │   │Called by:    │                              │
+    │    │   │ Forum        │                              │
+    │    │   │ WalletRecov  │                              │
+    │    │   │ DecTribunal  │                              │
+    │    │   └─────────────┘                              │
+    │    └────────────────────────────────────────────────┘
+    │
+    │   FINANCIAL PRIMITIVES (all leaf nodes)
+    │   ┌────────────────────────────────────────────────┐
+    │   │  VibeLPNFT ──► AMM                             │
+    │   │  VibeOptions ──► AMM, VolatilityOracle         │
+    │   │  VibeStream ──► IERC20 only                    │
+    │   │  VibeBonds ──► JUL                             │
+    │   │  VibeCredit ──► RepOracle, JUL                 │
+    │   │  VibeSynth ──► RepOracle, JUL                  │
+    │   │  VibeInsurance ──► RepOracle, JUL              │
+    │   │  VibeRevShare ──► RepOracle, JUL               │
+    │   │                                                │
+    │   │  ⚠ NO PRIMITIVE CALLS ANY OTHER PRIMITIVE     │
+    │   └────────────────────────────────────────────────┘
+    │
+    │   FRAMEWORK (VSOS extensibility)
+    │   ┌────────────────────────────────────────────────┐
+    │   │  VibePoolFactory ──► LP (deploy), Curves,      │
+    │   │                      HookRegistry              │
+    │   │  VibePluginRegistry ──► RepOracle, JUL         │
+    │   │  VibeKeeperNetwork ──► RepOracle, JUL, .call() │
+    │   │  VibeForwarder ──► RepOracle                   │
+    │   │  VibeWalletFactory ──► SmartWallet              │
+    │   │  VibeSmartWallet ──► EntryPoint (ERC-4337)     │
+    │   └────────────────────────────────────────────────┘
+    │
+    │   ORPHANED (zero runtime connections)
+    │   ┌────────────────────────────────────────────────┐
+    │   │  QuantumVault, LatticeSig, DilithiumVerifier   │
+    │   │  ClawbackVault, VibeVersionRouter              │
+    │   └────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2>Alignment Clusters (Verified)</h2>
+<h3>Cluster A: "The Trading Engine" (runtime-verified, score 4-5)</h3>
+<pre><code>VibeSwapCore ──► CommitRevealAuction
+     │               │
+     │               └──► ComplianceRegistry, ReputationOracle
+     │
+     ├──► VibeAMM ──► VibeLP, TruePriceOracle, PriorityRegistry
+     ├──► DAOTreasury ──► VibeAMM (backstop liquidity)
+     ├──► CrossChainRouter ──► CRA (cross-chain settlements)
+     └──► wBAR ◄──► VibeSwapCore (circular)
+</code></pre>
+<p><strong>6 contracts, 10+ runtime edges.</strong> Tightest cluster. Every trade flows here.</p>
+<h3>Cluster B: "The Incentive Star" (runtime-verified, score 5)</h3>
+<pre><code>IncentiveController ──► ILProtectionVault ──► VolatilityOracle ──► VibeAMM
+         │──► LoyaltyRewardsManager
+         │──► SlippageGuaranteeFund
+         │──► ShapleyDistributor ──► PriorityRegistry
+         └──► VolatilityInsurancePool ──► VolatilityOracle
+</code></pre>
+<p><strong>7 contracts, pure star topology.</strong> IncentiveController is the single orchestrator.</p>
+<h3>Cluster C: "The Reputation Web" (runtime-verified, score 4)</h3>
+<pre><code>ReputationOracle ◄── VibeCredit
+                 ◄── VibeSynth
+                 ◄── VibeInsurance
+                 ◄── VibeRevShare
+                 ◄── VibeForwarder
+                 ◄── VibeKeeperNetwork
+                 ◄── VibePluginRegistry
+                 ◄── VibeTimelock
+                 ◄── CommitRevealAuction
+</code></pre>
+<p><strong>1 hub, 9 spokes.</strong> ReputationOracle is the most-called contract in the system. It's the trust backbone.</p>
+<h3>Cluster D: "The JUL Economy" (runtime-verified, score 3-4)</h3>
+<pre><code>Joule (JUL) ◄── VibeBonds (keeper tips)
+            ◄── VibeCredit (yield boost)
+            ◄── VibeSynth (yield boost)
+            ◄── VibeInsurance (yield boost)
+            ◄── VibeRevShare (yield boost)
+            ◄── VibeKeeperNetwork (staking)
+            ◄── VibePluginRegistry (staking)
+            ◄── VibeTimelock (staking)
+</code></pre>
+<p><strong>1 hub, 8 spokes.</strong> JUL is the economic alignment token — stake for benefits across the entire VSOS.</p>
+<h3>Cluster E: "The Dispute Chain" (runtime-verified, score 4)</h3>
+<pre><code>DisputeResolver ──► DecentralizedTribunal ──► FederatedConsensus
+                                                      ▲
+AutomatedRegulator ──► ClawbackRegistry ──────────────┘
+DecentralizedTribunal ──► SoulboundIdentity
+</code></pre>
+<p><strong>5 contracts, linear chain with shared FederatedConsensus root.</strong></p>
+<h3>Cluster F: "The LP Ecosystem" (mixed runtime + compositional)</h3>
+<pre><code>VibePoolFactory ──► VibeLP (deploy) ◄── VibeAMM (mint/burn)
+       │──► IPoolCurve impls (CP, SS)
+       └──► VibeHookRegistry ──► IVibeHook (arbitrary)
+
+VibeLPNFT ──► VibeAMM (position management)
+ILProtectionVault ──► VolatilityOracle (IL calculation)
+</code></pre>
+<p><strong>Runtime-connected through AMM, but LPNFT ↔ ILProtection have NO direct runtime link</strong> — they share the LP concept compositionally.</p>
+<hr />
+<h2>The Independence Finding</h2>
+<h3>Financial Primitives Are Fully Independent</h3>
+<p>The most significant architectural finding: <strong>no financial primitive calls any other financial primitive at runtime</strong>. Each is a standalone module that connects to shared infrastructure (RepOracle, JUL, AMM, VolOracle) but never to its siblings.</p>
+<p><strong>Implications</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Independence (Current)</th>
+<th>Integration (Potential)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Failure isolation</strong></td>
+<td>Excellent — one primitive failing doesn't cascade</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>Upgradeability</strong></td>
+<td>Excellent — upgrade one without touching others</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>Composability</strong></td>
+<td>Zero — no automated cross-product flows</td>
+<td>Could enable: insurance triggers on credit default, streaming bond coupons, options on LP positions</td>
+</tr>
+<tr>
+<td><strong>User experience</strong></td>
+<td>Manual — users must interact with each primitive separately</td>
+<td>Could enable: one-click "insured lending position" = Credit + Insurance + Stream</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommendation</strong>: This independence is <strong>architecturally correct for Phase 2</strong>. Cross-product composition should come in Phase 3 via:</p>
+<ol>
+<li><strong>Hooks</strong>: Financial primitives emit events → hooks trigger cross-product actions</li>
+<li><strong>Keeper automation</strong>: VibeKeeperNetwork orchestrates cross-product workflows</li>
+<li><strong>Plugin compositions</strong>: Third parties build combo products as VSOS plugins</li>
+</ol>
+<p>Wiring primitives directly to each other would violate modularity. The hook + keeper pattern preserves independence while enabling composition.</p>
+<hr />
+<h2>Orphaned Contracts (Zero Runtime Connections)</h2>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Layer</th>
+<th>Status</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>QuantumVault</strong></td>
+<td>Quantum</td>
+<td>Orphaned</td>
+<td>Future-proof. Wire to governance for quantum-safe vault operations when PQC is needed.</td>
+</tr>
+<tr>
+<td><strong>LatticeSig</strong></td>
+<td>Quantum</td>
+<td>Orphaned</td>
+<td>Library. Wire to VibeTimelock/governance for quantum-safe proposal signatures.</td>
+</tr>
+<tr>
+<td><strong>DilithiumVerifier</strong></td>
+<td>Quantum</td>
+<td>Orphaned</td>
+<td>Library. Same as LatticeSig — used together for PQC signature verification.</td>
+</tr>
+<tr>
+<td><strong>ClawbackVault</strong></td>
+<td>Compliance</td>
+<td>Orphaned</td>
+<td>Should be called by ClawbackRegistry for actual fund recovery.</td>
+</tr>
+<tr>
+<td><strong>VibeVersionRouter</strong></td>
+<td>Framework</td>
+<td>Orphaned</td>
+<td>Pure routing logic — connects at proxy level, not contract level. May be fine.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Missing Integration Paths (Priority-Ordered)</h2>
+<h3>P0: Critical for Go-Live &amp; Proof of Mind</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Path</th>
+<th>Why</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>SoulboundIdentity → ShapleyDistributor</strong></td>
+<td>Proof of Mind claims require identity verification. No current path from identity to reward distribution.</td>
+<td><code>ShapleyDistributor.claimReward()</code> checks <code>SoulboundIdentity.balanceOf(claimant) &gt; 0</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>ReputationOracle → ConvictionVoting</strong></td>
+<td>Reputation should weight governance votes. Both exist but are parallel.</td>
+<td><code>ConvictionVoting.vote()</code> queries <code>ReputationOracle.getReputation(voter)</code> for weight multiplier</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>VibeInsurance ← VibeCredit</strong> (via hooks/keepers)</td>
+<td>Credit defaults should trigger insurance claims. Currently no path.</td>
+<td>Keeper task: monitor VibeCredit liquidation events → call VibeInsurance.fileClaim()</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>ClawbackVault ← ClawbackRegistry</strong></td>
+<td>Vault exists but Registry doesn't call it. Dead code.</td>
+<td>Wire ClawbackRegistry.executeClawback() → ClawbackVault.seize()</td>
+</tr>
+</tbody>
+</table>
+<h3>P1: Important for VSOS Framework</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Path</th>
+<th>Why</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td><strong>Forum → ConvictionVoting</strong></td>
+<td>Forum proposals should auto-create voting campaigns. Currently disconnected.</td>
+<td>Forum.propose() emits event → hook/keeper creates ConvictionVoting campaign</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>VibeKeeperNetwork → VibeBonds</strong></td>
+<td>Bond coupon distribution and maturity settlement should be automated.</td>
+<td>Register keeper tasks for couponDistribution and maturitySettlement</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>VibeHookRegistry → Financial Primitives</strong></td>
+<td>Hooks only cover AMM pool events. Should fire on financial primitive events too.</td>
+<td>Add IVibeHook points to option exercise, bond maturity, insurance claim</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>VibePoolFactory → CrossChainRouter</strong></td>
+<td>Omnichain pool creation.</td>
+<td>CrossChainRouter.createRemotePool() → LayerZero message → Factory.createPool() on destination</td>
+</tr>
+</tbody>
+</table>
+<h3>P2: Nice-to-Have for Completeness</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Path</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>9</td>
+<td>VibeStream → VibeKeeperNetwork</td>
+<td>Auto-cancel expired streams</td>
+</tr>
+<tr>
+<td>10</td>
+<td>VibeRevShare → VibePoolFactory</td>
+<td>Revenue share from specific pool types</td>
+</tr>
+<tr>
+<td>11</td>
+<td>QuantumVault → VibeTimelock</td>
+<td>Quantum-safe proposal execution</td>
+</tr>
+<tr>
+<td>12</td>
+<td>IncentiveController → Financial Primitives</td>
+<td>Incentive routing for financial primitive usage</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Philosophical Alignment Heatmap</h2>
+<p>How well does each contract embody Cooperative Capitalism's three pillars?</p>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th style="text-align: center;">Mutualized Risk</th>
+<th style="text-align: center;">Collective Benefit</th>
+<th style="text-align: center;">Individual Sovereignty</th>
+<th style="text-align: center;">Overall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ShapleyDistributor</strong></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>5.0</strong></td>
+</tr>
+<tr>
+<td><strong>VibeInsurance</strong></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>4.3</strong></td>
+</tr>
+<tr>
+<td><strong>VibeCredit</strong></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>4.3</strong></td>
+</tr>
+<tr>
+<td><strong>VibeYieldStable</strong></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>4.3</strong></td>
+</tr>
+<tr>
+<td><strong>CommitRevealAuction</strong></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>ConvictionVoting</strong></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>VibeBonds</strong></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>VibeRevShare</strong></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>ILProtection</strong></td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>ReputationOracle</strong></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>Forum</strong></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>VibePluginRegistry</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>4.0</strong></td>
+</tr>
+<tr>
+<td><strong>DAOTreasury</strong></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;"><strong>3.7</strong></td>
+</tr>
+<tr>
+<td><strong>VibeAMM</strong></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>3.7</strong></td>
+</tr>
+<tr>
+<td><strong>VibePoolFactory</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>3.7</strong></td>
+</tr>
+<tr>
+<td><strong>VibeSynth</strong></td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>3.7</strong></td>
+</tr>
+<tr>
+<td><strong>LoyaltyRewards</strong></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>3.7</strong></td>
+</tr>
+<tr>
+<td><strong>VibeHookRegistry</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>3.7</strong></td>
+</tr>
+<tr>
+<td><strong>VibeLPNFT</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>3.3</strong></td>
+</tr>
+<tr>
+<td><strong>VibeStream</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>3.3</strong></td>
+</tr>
+<tr>
+<td><strong>SoulboundIdentity</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>3.3</strong></td>
+</tr>
+<tr>
+<td><strong>VibeOptions</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><strong>3.0</strong></td>
+</tr>
+<tr>
+<td><strong>VibeKeeperNetwork</strong></td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>2.7</strong></td>
+</tr>
+<tr>
+<td><strong>FederatedConsensus</strong></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;"><strong>2.7</strong></td>
+</tr>
+<tr>
+<td><strong>VibeForwarder</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>2.3</strong></td>
+</tr>
+<tr>
+<td><strong>VibeSmartWallet</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><strong>2.3</strong></td>
+</tr>
+<tr>
+<td><strong>LatticeSig</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>2.0</strong></td>
+</tr>
+<tr>
+<td><strong>DilithiumVerifier</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>2.0</strong></td>
+</tr>
+<tr>
+<td><strong>QuantumVault</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><strong>2.0</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Philosophical leaders</strong> (≥4.0): ShapleyDistributor, VibeInsurance, VibeCredit, YieldStable, CRA, ConvictionVoting, VibeBonds, VibeRevShare, ILProtection, ReputationOracle, Forum, VibePluginRegistry — <strong>12 contracts</strong> form the philosophical core.</p>
+<p><strong>Philosophical laggards</strong> (≤2.5): Quantum layer (infrastructure, no cooperative mechanism), Forwarder/SmartWallet (pure infrastructure). These are fine — not every contract needs to be philosophically loaded.</p>
+<hr />
+<h2>Summary Statistics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Total implementation contracts</td>
+<td>65</td>
+</tr>
+<tr>
+<td>Total interfaces</td>
+<td>31</td>
+</tr>
+<tr>
+<td>Total libraries</td>
+<td>12</td>
+</tr>
+<tr>
+<td>Total pairwise comparisons (impl)</td>
+<td>2,080</td>
+</tr>
+<tr>
+<td>Runtime-verified edges (score 4-5)</td>
+<td>47</td>
+</tr>
+<tr>
+<td>Compositional-only pairs (score 2)</td>
+<td>~400</td>
+</tr>
+<tr>
+<td>Orthogonal pairs (score 0-1)</td>
+<td>~1,500</td>
+</tr>
+<tr>
+<td>Orphaned contracts</td>
+<td>5 (QuantumVault, LatticeSig, DilithiumVerifier, ClawbackVault, VibeVersionRouter)</td>
+</tr>
+<tr>
+<td>Most-called contract</td>
+<td>ReputationOracle (9 inbound)</td>
+</tr>
+<tr>
+<td>Most-calling contract</td>
+<td>VibeSwapCore (6 outbound)</td>
+</tr>
+<tr>
+<td>Financial primitive cross-calls</td>
+<td><strong>0</strong> (all independent leaf nodes)</td>
+</tr>
+<tr>
+<td>Missing critical paths</td>
+<td>4 (SBIdentity→Shapley, Rep→Voting, Insurance←Credit, ClawbackVault←Registry)</td>
+</tr>
+<tr>
+<td>Average philosophical alignment</td>
+<td>3.4 / 5.0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Architectural Verdict</h2>
+<h3>Strengths</h3>
+<ol>
+<li><strong>Clean hub-and-spoke topology</strong> — Infrastructure hubs (RepOracle, JUL, AMM, VolOracle) are shared; everything else is modular</li>
+<li><strong>Financial primitive independence</strong> — Zero cascading failure risk. Each can be upgraded/replaced independently.</li>
+<li><strong>Consistent patterns</strong> — RepOracle + JUL pattern repeats across both financial and framework layers</li>
+<li><strong>IncentiveController orchestration</strong> — Clean star topology, single entry point for all incentive operations</li>
+</ol>
+<h3>Weaknesses</h3>
+<ol>
+<li><strong>Zero cross-product composition</strong> — Financial primitives can't trigger each other. Insurance doesn't auto-protect credit. Bonds can't stream coupons. This limits UX.</li>
+<li><strong>Forum is disconnected</strong> — No runtime path to any governance action (voting, proposals, dispute resolution)</li>
+<li><strong>5 orphaned contracts</strong> — QuantumVault, ClawbackVault have no callers</li>
+<li><strong>Circular dependency</strong> — VibeSwapCore ↔ wBAR. Not necessarily bad but worth noting for upgrade safety.</li>
+</ol>
+<h3>Go-Live Priority Actions</h3>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Action</th>
+<th>Contracts Affected</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P0</strong></td>
+<td>Wire SoulboundIdentity → ShapleyDistributor</td>
+<td>2</td>
+<td>Small</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>Wire ReputationOracle → ConvictionVoting</td>
+<td>2</td>
+<td>Small</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>Wire ClawbackVault ← ClawbackRegistry</td>
+<td>2</td>
+<td>Small</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>Add keeper tasks for Credit→Insurance flow</td>
+<td>3</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Wire Forum → ConvictionVoting via hooks</td>
+<td>3</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Add keeper tasks for bond automation</td>
+<td>2</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Cross-chain pool creation</td>
+<td>3</td>
+<td>Large</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Financial primitive hook points</td>
+<td>8+</td>
+<td>Large</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Generated by JARVIS × Will, February 14, 2026</em>
+<em>Verified against actual runtime dependency analysis of all 65 implementation contracts.</em>
+<em>"The cave selects for those who see past what is to what could be."</em></p></body></html>

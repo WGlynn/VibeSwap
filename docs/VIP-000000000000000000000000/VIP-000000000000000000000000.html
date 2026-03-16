@@ -1,0 +1,117 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>VIP-000000000000000000000000: VIP Process</h1>
+<p><strong>VibeSwap Improvement Proposal</strong> | March 2026 | Status: <strong>Active</strong></p>
+<hr />
+<h2>What is a VIP?</h2>
+<p>A VibeSwap Improvement Proposal (VIP) is a design document providing information to the VibeSwap community, describing a new feature, mechanism, process, or improvement. VIPs are the primary mechanism for proposing changes, collecting community input, and documenting design decisions.</p>
+<h2>VIP Numbering</h2>
+<p>VIPs use 24-digit zero-padded numbers: <code>VIP-000000000000000000000001</code></p>
+<p>The zeros are intentional. We expect an insane amount of activity one day.</p>
+<h2>VIP Types</h2>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Mechanism</strong></td>
+<td>Changes to core protocol (auction mechanics, AMM, settlement)</td>
+</tr>
+<tr>
+<td><strong>Governance</strong></td>
+<td>Changes to governance process, voting, or administration</td>
+</tr>
+<tr>
+<td><strong>Incentive</strong></td>
+<td>Changes to rewards, Shapley distribution, bonding curves, JUL</td>
+</tr>
+<tr>
+<td><strong>Infrastructure</strong></td>
+<td>Deployment, cross-chain, oracle, frontend changes</td>
+</tr>
+<tr>
+<td><strong>Community</strong></td>
+<td>Social processes, moderation, communication, onboarding</td>
+</tr>
+</tbody>
+</table>
+<h2>VIP Lifecycle</h2>
+<pre><code>Draft → Review → Accepted → Implemented → Active
+                         ↘ Rejected
+                         ↘ Deferred
+</code></pre>
+<ol>
+<li><strong>Draft</strong>: Author submits via <code>/idea</code> in TG, GitHub Issue, or direct PR</li>
+<li><strong>Review</strong>: Jarvis evaluates against primitives (P-000 fairness, cooperative capitalism). Community discussion on GitHub.</li>
+<li><strong>Accepted</strong>: Will approves for implementation. VIP number assigned.</li>
+<li><strong>Implemented</strong>: Code merged. Commit hash recorded in VIP.</li>
+<li><strong>Active</strong>: Deployed to mainnet or production.</li>
+</ol>
+<h2>How to Submit a VIP</h2>
+<h3>Path 1: Telegram (fastest)</h3>
+<pre><code>/idea [your proposal description]
+</code></pre>
+<p>Jarvis evaluates, scores, and routes high-scoring proposals to Will. Contributor earns Shapley credit.</p>
+<h3>Path 2: GitHub</h3>
+<p>Open an Issue on <a href="https://github.com/WGlynn/VibeSwap">WGlynn/VibeSwap</a> with <code>[VIP]</code> prefix.</p>
+<h3>Path 3: Direct PR</h3>
+<p>Fork the repo, create <code>docs/VIP-[number].md</code> following this template, open PR.</p>
+<h2>Shard Reporting</h2>
+<p>All Jarvis shards (TG conversations, community chats, DMs) automatically detect improvement suggestions and report them to Will's DM pipeline. Credit is attributed to the original contributor via ContributionDAG.</p>
+<p>Flow: <code>User suggestion → Shard detection → VIP formatting → Will DM → GitHub Issue → Deployment pipeline → Mainnet</code></p>
+<h2>VIP Template</h2>
+<pre><code class="language-markdown"># VIP-[NUMBER]: [Title]
+
+**Type**: [Mechanism | Governance | Incentive | Infrastructure | Community]
+**Status**: [Draft | Review | Accepted | Implemented | Active | Rejected | Deferred]
+**Author**: [TG username or GitHub handle]
+**Created**: [Date]
+
+## Abstract
+[2-3 sentence summary]
+
+## Motivation
+[Why this change is needed]
+
+## Specification
+[Technical details]
+
+## Rationale
+[Why this approach over alternatives]
+
+## Implementation
+[Code changes required, estimated scope]
+
+## References
+[Related VIPs, papers, discussions]
+</code></pre>
+<h2>Existing VIPs</h2>
+<table>
+<thead>
+<tr>
+<th>Number</th>
+<th>Title</th>
+<th>Type</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VIP-000...0001</td>
+<td>Human-AI Co-Administration</td>
+<td>Governance</td>
+<td>Active</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>"The greatest idea can't be stolen because part of it is admitting who came up with it."</em></p></body></html>

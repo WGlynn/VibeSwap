@@ -1,0 +1,227 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>JUL: A Work-Credit System for Community-Owned AI</h1>
+<p><strong>Compute access earned through work, not purchased with credit cards</strong></p>
+<hr />
+<h2>The Problem</h2>
+<p>JARVIS — the AI that powers our community — runs on API credits. Someone has to pay for those credits. Right now, that someone is Will, out of pocket, every month.</p>
+<p>Meanwhile, community members mine JUL tokens through SHA-256 proof-of-work. They grind hashes, earn tokens, and those tokens sit in a balance doing nothing. Two systems running side by side, disconnected:</p>
+<ul>
+<li><strong>Mining engine</strong>: you do work, you earn JUL</li>
+<li><strong>Compute engine</strong>: Will pays Anthropic, JARVIS allocates budgets via Shapley game theory</li>
+</ul>
+<p>The JUL → API Access Bridge connects them.</p>
+<hr />
+<h2>How It Works</h2>
+<p>JUL is not a currency. It's a <strong>work-credit</strong>. You can't buy it. You can't trade it on an exchange. The only way to get JUL is to do the work — submit valid SHA-256 proofs that meet the difficulty target. That work is the backing.</p>
+<p>When you <strong>burn</strong> JUL, you convert that stored work into API access:</p>
+<pre><code>Do the work (mine) → Earn JUL → Burn JUL → Get compute access
+      ↑                                          |
+      └─── JARVIS is useful ← more people join ──┘
+</code></pre>
+<p>That's the closed loop. No AMM pool. No crypto exchange. No converting to USD. <strong>Work in, access out.</strong></p>
+<h3>The Pool Expansion</h3>
+<p>Every JUL burned doesn't just benefit the burner — it expands the compute pool for the entire community:</p>
+<pre><code>Effective Pool = Base Pool + (Daily JUL Burned × Floating Ratio)
+</code></pre>
+<ul>
+<li><strong>Base Pool</strong> (500,000 tokens/day) — Will's subsidy. The floor that exists no matter what. His contribution to the cooperative.</li>
+<li><strong>Floating Ratio</strong> — CPI-adjusted so 1 JUL always buys the same real value of compute. Currently ~1,000 tokens per JUL at reference prices, but automatically adjusts when API costs or purchasing power change.</li>
+<li><strong>JUL Bonus</strong> — community-generated expansion. The more JUL burned, the bigger the pool for everyone.</li>
+</ul>
+<p>The expanded pool gets redistributed through <a href="https://en.wikipedia.org/wiki/Shapley_value">Shapley value allocation</a> — a game theory mechanism that rewards each person proportionally to their marginal contribution. Quality contributors get more. But when the pie grows, everyone's slice grows too.</p>
+<h3>Three Burn Paths</h3>
+<p><strong>1. Tipping</strong> (<code>/tip &lt;amount&gt;</code>)
+Voluntarily burn JUL to expand the pool. You're saying: <em>"I earned this through work, and I'm putting it back."</em> The entire community benefits.</p>
+<p><strong>2. Auto-burn on exhaustion</strong>
+When your free + Shapley budget runs out but you still have JUL, the system can burn JUL for extra API access. Pay-as-you-go, beyond the free tier. No one gets cut off if they've done the work.</p>
+<p><strong>3. Future: on-chain governance burns</strong>
+When VibeSwap hits mainnet, protocol-level burns tied to on-chain actions. JUL and the on-chain token economy converge.</p>
+<hr />
+<h2>"But Who Actually Pays Anthropic?"</h2>
+<p>Will does. Let's be honest about that.</p>
+<p>JUL burning doesn't magically generate USD. What it does is create a <strong>transparent demand signal</strong>. The daily burn rate tells Will exactly how much compute the community needs. Instead of guessing, he sees a number: <em>X JUL burned today = X × 1000 tokens of demonstrated demand.</em></p>
+<p>This is better than the alternative (unlimited free access until the credit card melts) because:</p>
+<ul>
+<li><strong>Burn rate = real demand</strong>, backed by proof-of-work. You can't fake it.</li>
+<li><strong>Will's subsidy shrinks in relative importance</strong> as community burn volume grows.</li>
+<li><strong>The burn ledger is the receipts</strong> — transparent, auditable, unfakeable proof that the community is doing work and consuming compute proportionally.</li>
+</ul>
+<p>Over time, the path to full self-sustainability looks like:</p>
+<ol>
+<li><strong>Today</strong>: Will subsidizes the base pool. JUL burn signals demand. Closed loop on work-credits.</li>
+<li><strong>Near-term</strong>: Burn volume data supports grant applications and sponsorship conversations. "Here's how much compute our community uses, backed by verifiable proof-of-work."</li>
+<li><strong>Mainnet</strong>: JUL goes on-chain with VibeSwap. AMM pools, real liquidity, real exchange value. The community can directly fund its own compute.</li>
+<li><strong>Endgame</strong>: Anthropic (or whoever) accepts JUL natively. Work-credits become the universal API payment.</li>
+</ol>
+<p>We're not pretending step 4 is today. But step 1 is already a closed loop — closed on <strong>work</strong>, not money.</p>
+<hr />
+<h2>Why Work-Credits, Not a Token Sale</h2>
+<p>We could have launched JUL on Uniswap. Sold tokens. Let speculators bid up the price. Used the proceeds to pay for API credits.</p>
+<p>We didn't, because that breaks the philosophy.</p>
+<p>VibeSwap is built on <strong>Cooperative Capitalism</strong> — mutualized risk with free-market competition. A token sale would mean:</p>
+<ul>
+<li>People who buy tokens get access. People who can't afford them don't.</li>
+<li>Speculators accumulate tokens without contributing anything.</li>
+<li>The value of JUL gets decoupled from the work it represents.</li>
+</ul>
+<p>Work-credits fix all three:</p>
+<ul>
+<li><strong>Access is earned, not purchased.</strong> You mine, you contribute, you get compute.</li>
+<li><strong>No speculation.</strong> JUL has no market price. It has a burn rate pegged to real purchasing power — the token count floats so 1 JUL always buys the same CPI-adjusted value of compute, regardless of API price changes or dollar inflation.</li>
+<li><strong>Value = work.</strong> Every JUL in existence was created by a valid SHA-256 proof. The token IS the work.</li>
+</ul>
+<p>This is the same principle behind VibeSwap's on-chain mechanism: commit-reveal batch auctions where every participant's order is backed by a deposit, shuffled fairly, and settled at a uniform clearing price. No front-running. No information asymmetry. No extraction.</p>
+<p>JUL mining is the commit (proof-of-work). Burning is the reveal (demonstrated demand). Shapley allocation is the settlement (fair distribution). Same game theory, different substrate.</p>
+<hr />
+<h2>The Treasury</h2>
+<p>All burned JUL flows into the <strong>JUL Treasury</strong> — a transparent ledger tracking:</p>
+<ul>
+<li><strong>Total burned</strong> (all-time) — cumulative work the community has reinvested</li>
+<li><strong>Daily burned</strong> — today's contribution to pool expansion</li>
+<li><strong>Tip records</strong> — who burned, how much, when</li>
+</ul>
+<p>Nothing is hidden. The treasury is the community's proof that their work has value beyond a number on a leaderboard. It's also the data that makes the case for external funding: <em>"This community burns X JUL per day. That's Y hours of proof-of-work. Here's the compute demand it represents."</em></p>
+<hr />
+<h2>What This Means For You</h2>
+<h3>If You Mine</h3>
+<p>Your JUL now has a use case. Mining isn't just earning points — it's earning the fuel that powers JARVIS. Every hash you compute creates real value that converts into real compute access. For yourself when you need it, for everyone when you tip it.</p>
+<h3>If You Contribute (Ideas, Code, Governance)</h3>
+<p>The Shapley pool — the budget that rewards your contributions — is no longer a fixed number. When miners burn JUL, your share of the expanded pool grows too. Mining and contributing are complementary. The miner who tips expands your budget. The contributor whose ideas attract miners expands theirs.</p>
+<h3>If You're New</h3>
+<p>There's a free tier. You don't need JUL to talk to JARVIS. But if you want more access, the path is clear: mine, earn, burn. No credit card required. Just work.</p>
+<hr />
+<h2>Floor/Ceiling Convergence: How JUL Stays Stable</h2>
+<p>JUL is backed by fixed PoW work (production theory of value), but API tokens change in value as models get cheaper or the dollar loses purchasing power. A fixed ratio would create arbitrage — hoard JUL when tokens are expensive, burn when they're cheap.</p>
+<p>The solution is a three-layer pricing oracle inspired by the <a href="https://github.com/WGlynn/VibeSwap/blob/master/docs/TRINOMIAL_STABILITY_THEOREM.md">Trinomial Stability Theorem</a>:</p>
+<blockquote>
+<p><em>The production theory of value (energy-backed) gives you the floor. The time adjustments (CPI) keep that floor honest across history. The market gives you the ceiling — what people actually think it's worth in practice. Floor and ceiling converge → price stability.</em></p>
+</blockquote>
+<h3>Layer 0: The Trustless Floor (No Oracle Needed)</h3>
+<p>The mining network measures its own production cost. No external data feed. No trusted third party. The network IS the oracle.</p>
+<p>Every mining epoch (100 proofs, target: 1 hour), the system records how long it actually took. This is a direct measurement of real-world mining economics:</p>
+<ul>
+<li><strong>Epoch runs fast</strong>: miners spending more compute → energy is cheap, hardware plentiful → deflationary signal</li>
+<li><strong>Epoch runs slow</strong>: miners pulled back → energy expensive, hardware scarce → inflationary signal</li>
+</ul>
+<p>The hash cost index — an exponential moving average of epoch efficiency weighted by difficulty trend — captures the real-world cost of computational work without trusting anyone. From the Trinomial theorem: <em>"price converges to ε₀ — the cost of a single hash in electricity."</em> Layer 0 measures ε₀ directly.</p>
+<p>This is why hash cost is a <em>better</em> economic indicator than CPI for compute pricing. CPI tracks milk and housing. Hash cost tracks exactly what we care about: <strong>what does it cost, in real-world resources, to produce one unit of computational work?</strong></p>
+<h3>Layer 1: CPI Refinement (Semi-Trusted, Optional)</h3>
+<p>The hash cost floor is trustless but coarse. Layer 1 adds precision: API pricing from Anthropic and CPI data for dollar-inflation adjustment. Will updates these via <code>/reprice</code> when pricing changes.</p>
+<p>But Layer 1 is constrained by Layer 0. The dual-oracle architecture from the Trinomial theorem: <em>"each oracle constrains the other. If one feed were compromised or manipulated, the other provides an independent physical-reality anchor."</em></p>
+<p>If Layer 1 diverges more than 25% from Layer 0, the <strong>circuit breaker</strong> fires and Layer 0 wins. You can manipulate a CPI number. You can't manipulate the mining network's own epoch behavior.</p>
+<h3>Layer 2: The Market Ceiling (Future)</h3>
+<p>When JUL goes on-chain with VibeSwap mainnet, AMM price discovery replaces both layers. The JUL/USDC pool price IS the purchasing power signal. The market discovers what people actually think JUL is worth — and that price converges toward the production floor over time (miners won't sell below cost, buyers won't pay unbounded premiums for a commodity).</p>
+<p>Floor and ceiling converge. Volatility bound: the variance of global electricity costs (~2-5% annually, per the Trinomial theorem). That's the lowest achievable bound for proof-of-work money.</p>
+<h3>The Formula</h3>
+<pre><code>Layer 0 ratio = baseRatio × hashCostIndex       (trustless)
+Layer 1 ratio = baseRatio × (refCost / realCost) (CPI-adjusted)
+
+Final ratio = geometric_mean(Layer0, Layer1)
+              unless divergence &gt; 25% → Layer 0 wins
+
+hashCostIndex = EMA(epochDuration / target) × (difficulty / refDifficulty)
+realCost = nominalCost × (referenceCPI / currentCPI)
+</code></pre>
+<p>If API gets cheaper: both layers increase the ratio. If dollar inflates: Layer 1 compensates. If mining gets harder: Layer 0 increases the ratio. If someone feeds bad CPI data: circuit breaker fires, hash cost wins.</p>
+<p><strong>No arbitrage. Work in = value out. Always.</strong></p>
+<h2>The Numbers</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Base pool</td>
+<td>500,000 tokens/day</td>
+<td>Will's baseline subsidy</td>
+</tr>
+<tr>
+<td>Base ratio</td>
+<td>1,000 tokens/JUL</td>
+<td>At reference prices (calibration point)</td>
+</tr>
+<tr>
+<td>Layer 0</td>
+<td>Hash cost from epoch behavior</td>
+<td>Trustless, oracle-free, always-on</td>
+</tr>
+<tr>
+<td>Layer 1</td>
+<td>CPI + API cost</td>
+<td>Fine-tuning, circuit-breakered</td>
+</tr>
+<tr>
+<td>Layer 2</td>
+<td>AMM price (future)</td>
+<td>Market replaces all oracles</td>
+</tr>
+<tr>
+<td>Circuit breaker</td>
+<td>25% divergence</td>
+<td>Layer 0 overrides Layer 1</td>
+</tr>
+<tr>
+<td>Mining reward</td>
+<td>1 JUL base (2× per difficulty bit)</td>
+<td>256 expected hashes per JUL, always</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Commands</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What It Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/mining</code></td>
+<td>Start mining JUL</td>
+</tr>
+<tr>
+<td><code>/balance</code></td>
+<td>Your JUL balance + current ratio + pool contribution stats</td>
+</tr>
+<tr>
+<td><code>/tip &lt;amount&gt;</code></td>
+<td>Burn JUL to expand the compute pool for everyone</td>
+</tr>
+<tr>
+<td><code>/tip</code></td>
+<td>View balance, tip history, and how the loop works</td>
+</tr>
+<tr>
+<td><code>/economy</code></td>
+<td>Pricing oracle, pool breakdown, treasury, burn metrics</td>
+</tr>
+<tr>
+<td><code>/reprice</code></td>
+<td>(Owner) Update API cost or CPI index — ratio recalculates</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Try It</h2>
+<ol>
+<li><code>/mining</code> — start earning JUL through proof-of-work</li>
+<li><code>/balance</code> — see what you've earned</li>
+<li><code>/tip 1</code> — burn 1 JUL, expand the pool by 1,000 tokens</li>
+<li><code>/economy</code> — watch the pool grow</li>
+</ol>
+<p>Every JUL you burn makes JARVIS stronger for everyone. Not because of money. Because of work.</p>
+<hr />
+<p><em>This is how a community funds its own AI — not with credit cards, but with proof of work. The loop is closed. The treasury is transparent. The access is earned.</em></p>
+<p><em>— Will &amp; JARVIS</em></p></body></html>

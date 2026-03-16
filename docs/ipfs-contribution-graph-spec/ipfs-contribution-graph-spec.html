@@ -1,0 +1,111 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>IPFS Contribution Graph — Technical Specification</h1>
+<p><strong>Status</strong>: Design
+<strong>Priority</strong>: HIGH — build sync tool tonight
+<strong>Author</strong>: Will + JARVIS (Session 047-048)</p>
+<hr />
+<h2>Overview</h2>
+<p>Mirror the ContributionDAG and entire GitHub repository to IPFS, making the contribution graph truly unstoppable. If GitHub goes down, if centralized servers fail, the graph persists.</p>
+<h2>Architecture</h2>
+<h3>1. ContributionDAG → IPFS</h3>
+<p>The ContributionDAG smart contract already stores contribution data on-chain. We mirror this to IPFS for:
+- Redundancy (chain + IPFS = two independent persistence layers)
+- Fast queries without RPC calls
+- Human-readable graph exploration</p>
+<p><strong>Flow:</strong></p>
+<pre><code>On-chain ContributionDAG
+    ↓ (event listener)
+IPFS DAG node
+    ↓ (pin)
+Pinata / local Kubo node
+</code></pre>
+<h3>2. GitHub → IPFS Sync</h3>
+<p>Cron job that pushes repository snapshots to IPFS after every meaningful change.</p>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-bash"># Runs every hour or on push webhook
+git archive --format=tar.gz HEAD | ipfs add --pin
+# Store CID on-chain or in a CID registry
+</code></pre>
+<p><strong>What gets synced:</strong>
+- Full repo snapshot (tar.gz)
+- Individual docs/ directory (for direct IPFS gateway access)
+- Session reports (provenance trail)
+- Research papers (knowledge base)</p>
+<h3>3. IPFS Node Setup</h3>
+<p><strong>Option A: Kubo (Go IPFS)</strong>
+- Battle-tested, full DHT participation
+- Runs on Fly.io or VPS alongside JARVIS
+- <code>ipfs daemon --enable-gc --routing=dht</code></p>
+<p><strong>Option B: Helia (JS IPFS)</strong>
+- Runs inside JARVIS Node.js process
+- No separate daemon
+- Better for lightweight pinning
+- <code>import { createHelia } from 'helia'</code></p>
+<p><strong>Recommendation:</strong> Kubo for production (stability), Helia for JARVIS integration (convenience).</p>
+<h3>4. Graph Queries</h3>
+<p><strong>Option A: The Graph Protocol</strong>
+- Subgraph indexing ContributionDAG events
+- GraphQL API for contribution queries
+- Decentralized hosting on The Graph Network</p>
+<p><strong>Option B: Custom Indexer</strong>
+- Node.js service reading from IPFS + chain
+- SQLite or DuckDB for local query engine
+- REST API: <code>/api/contributors</code>, <code>/api/graph/:authorId</code></p>
+<h3>5. Decentralized Identity (DID:IPID)</h3>
+<p>Link IPFS-based identities to VibeCodes.</p>
+<pre><code class="language-json">{
+  &quot;@context&quot;: &quot;https://www.w3.org/ns/did/v1&quot;,
+  &quot;id&quot;: &quot;did:ipid:QmXyz...&quot;,
+  &quot;vibeCode&quot;: &quot;0xabc...&quot;,
+  &quot;publicKey&quot;: [...],
+  &quot;service&quot;: [
+    { &quot;type&quot;: &quot;ContributionGraph&quot;, &quot;endpoint&quot;: &quot;ipfs://QmGraph...&quot; },
+    { &quot;type&quot;: &quot;VibeSwap&quot;, &quot;endpoint&quot;: &quot;https://vibeswap.io&quot; }
+  ]
+}
+</code></pre>
+<h2>Sync Tool Design (MVP — Tonight)</h2>
+<pre><code class="language-javascript">// ipfs-sync.js
+import { create } from 'kubo-rpc-client'
+import { execSync } from 'child_process'
+
+const ipfs = create({ url: '/ip4/127.0.0.1/tcp/5001' })
+
+async function syncRepo() {
+  // 1. Create tar.gz of repo
+  const archive = execSync('git archive --format=tar.gz HEAD')
+
+  // 2. Add to IPFS
+  const result = await ipfs.add(archive, { pin: true })
+  console.log(`Repo CID: ${result.cid}`)
+
+  // 3. Store CID in registry
+  await updateCIDRegistry(result.cid)
+
+  return result.cid
+}
+
+async function syncContributionGraph(graph) {
+  // 1. Serialize graph as DAG-CBOR
+  const cid = await ipfs.dag.put(graph, { storeCodec: 'dag-cbor' })
+  console.log(`Graph CID: ${cid}`)
+
+  // 2. Pin for persistence
+  await ipfs.pin.add(cid)
+
+  return cid
+}
+</code></pre>
+<h2>Security Considerations</h2>
+<ul>
+<li>CIDs are content-addressed — tamper-proof by design</li>
+<li>Pin to multiple providers (Pinata, web3.storage, local node)</li>
+<li>On-chain CID registry prevents DNS-style attacks</li>
+<li>DID documents signed with contributor's private key</li>
+</ul></body></html>

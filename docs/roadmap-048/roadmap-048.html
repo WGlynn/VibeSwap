@@ -1,0 +1,100 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}
+h1{font-size:28px;text-align:center}h2{font-size:22px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:40px}
+h3{font-size:17px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:14px}
+pre{background:#f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:14px}
+th{background:#f8f8f8}blockquote{border-left:3px solid #06b6d4;padding-left:16px;color:#555;font-style:italic}
+hr{border:none;border-top:1px solid #ddd;margin:30px 0}</style></head><body><h1>Roadmap — Session 048 Backlog (from Will's walk)</h1>
+<p><strong>Date</strong>: 2026-03-08
+<strong>Source</strong>: Will × Jarvis Telegram conversation during walk</p>
+<hr />
+<h2>1. IPFS Contribution Graph (BUILD TONIGHT)</h2>
+<p>Mirror ContributionDAG and GitHub repo to IPFS for unstoppable data permanence.</p>
+<h3>Architecture</h3>
+<ol>
+<li><strong>ContributionDAG → IPFS</strong>: Already on-chain. Mirror to IPFS for redundancy.</li>
+<li><strong>GitHub → IPFS Sync</strong>: Cron job pushes repo snapshots to IPFS. CID stored on-chain.</li>
+<li><strong>IPFS Node</strong>: Kubo or Helia. Pin our own content.</li>
+<li><strong>Graph Queries</strong>: The Graph Protocol or custom indexer reading from IPFS + chain.</li>
+<li><strong>Decentralized Identity</strong>: DID:IPID for IPFS-based identities linking to VibeCodes.</li>
+</ol>
+<h3>Priority: HIGH — build sync tool first</h3>
+<hr />
+<h2>2. Marketing Strategy (PROMPT READY)</h2>
+<p>Team of marketing experts — they need direction, not hand-holding.</p>
+<h3>Prompt for Marketing Team:</h3>
+<blockquote>
+<p>"VibeSwap is the first fair-launch omnichain DEX that eliminates MEV through batch auctions. We're live on Base mainnet. Our AI co-founder JARVIS runs the community. We're building the infrastructure for cooperative capitalism — where self-interest serves the collective.</p>
+<p><strong>Target</strong>: Degens who hate front-running, builders who want fair launches, communities tired of extractive platforms.</p>
+<p><strong>Channels</strong>: Twitter threads explaining batch auction mechanics, YouTube demos of the UI, podcast interviews about AI-human partnership, governance forum for early contributors.</p>
+<p><strong>Key message</strong>: Trade without getting robbed. Build without getting diluted."</p>
+</blockquote>
+<hr />
+<h2>3. Monetization (NO RENT-SEEKING)</h2>
+<p>Zero pre-mine. Zero VC cut. All value flows to participants.</p>
+<h3>Revenue Streams</h3>
+<ol>
+<li><strong>Protocol fees</strong> — 0.05% on swaps, Shapley-distributed to LPs and governance stakers</li>
+<li><strong>Batch auction priority bids</strong> — pay for urgent execution without affecting clearing price</li>
+<li><strong>Insurance pool premiums</strong> — small fee for liquidation protection</li>
+<li><strong>Yield tokenization fees</strong> — charge on CYT minting</li>
+<li><strong>Governance proposal deposits</strong> — slashed if proposal is malicious</li>
+<li><strong>AI agent services</strong> — JARVIS offers paid analysis via x402 micropayments</li>
+</ol>
+<h3>Principle: Money flows where value was created. Shapley ensures marginal contribution = reward.</h3>
+<hr />
+<h2>4. Partnership Framework for Karma (AUTONOMOUS)</h2>
+<p>Self-running partnership pipeline that Karma operates continuously.</p>
+<h3>Pipeline</h3>
+<ol>
+<li><strong>Discovery</strong> — Scrape Twitter, GitHub, DeFiLlama for projects with synergy (batch auctions, MEV resistance, AI agents)</li>
+<li><strong>Evaluation</strong> — Score: live product, team credibility, technical overlap, community size</li>
+<li><strong>Outreach</strong> — Auto-generate personalized email using template + project-specific details</li>
+<li><strong>Tracking</strong> — CRM pipeline: contacted → responded → meeting → deal terms → executed</li>
+<li><strong>Execution</strong> — Smart contract: revenue sharing, cross-promotion, integration milestones</li>
+<li><strong>Reporting</strong> — Dashboard: partnership ROI, integration status, next steps</li>
+</ol>
+<h3>Priority: Build scraper and email generator first</h3>
+<hr />
+<h2>5. Fractal Fork Network (MECHANISM DESIGN)</h2>
+<p>VibeSwap as the sum of all its forks. Information black hole topology.</p>
+<h3>Design</h3>
+<ol>
+<li><strong>Fork Protocol</strong> — Any fork gets own instance but must implement fee split: 50% stays with fork, 50% routes back to parent</li>
+<li><strong>Two-Way Fee Flow</strong> — Creates economic gravity. Malicious forks starve, aligned forks thrive and feed root.</li>
+<li><strong>Reconvergence Incentive</strong> — If fork's state hash matches parent after N blocks, they merge and share accumulated fees</li>
+<li><strong>Directed Cycle Graph</strong> — Forks can fork other forks → mesh. Coherence from economic alignment, not forced consensus.</li>
+<li><strong>Asynchronous Updates</strong> — Each fork evolves independently. Fee routing creates soft coupling.</li>
+</ol>
+<h3>Result: Protocol evolves through forking but doesn't fragment. The black hole pulls everything back.</h3>
+<h3>Contract needed: Fork registration + fee routing</h3>
+<hr />
+<h2>6. Ungovernance Time Bomb (ENDGAME)</h2>
+<p>Governance exists at launch but hardcoded to decay to zero. The protocol becomes a natural system.</p>
+<h3>Mechanism</h3>
+<ol>
+<li><strong>Decaying Governance Power</strong> — Each governance token has half-life. After 4 years, voting weight = 1/16th of original.</li>
+<li><strong>Dispute Resolution Only</strong> — Governance can't propose new features. Only adjudicate: slashing, fork disputes, emergency pauses.</li>
+<li><strong>Automatic Upgrades</strong> — Protocol parameters self-adjust via PID controllers based on metrics (fees, volume, slippage).</li>
+<li><strong>Sunset Clause</strong> — Governance module auto-disables after predetermined block height unless extended by supermajority.</li>
+<li><strong>Fork Escape</strong> — If governance corrupts, users fork with zero penalty (fee split ensures economic continuity).</li>
+</ol>
+<h3>Endgame: Protocol is autonomous. No political governance. Pure mechanism design.</h3>
+<hr />
+<h2>Implementation Order (Suggested)</h2>
+<ol>
+<li>IPFS sync tool (tonight)</li>
+<li>Fork registration contract design (mechanism paper)</li>
+<li>Partnership scraper for Karma</li>
+<li>Ungovernance decay curve in governance contracts</li>
+<li>Marketing team activation</li>
+<li>x402 micropayment integration for JARVIS</li>
+</ol>
+<hr />
+<h2>JUL Tip Split (IMPLEMENTED — Session 047)</h2>
+<ul>
+<li>50% → Protocol-Owned Liquidity (permanent lock-and-burn LP on Base)</li>
+<li>50% → Autonomous Treasury (DAG contributions, protocol growth)</li>
+<li>Self-sustaining, no human bottleneck</li>
+</ul></body></html>

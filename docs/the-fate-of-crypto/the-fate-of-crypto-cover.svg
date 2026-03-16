@@ -1,0 +1,12 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'>
+  <rect width='1200' height='630' fill='#000'/>
+  <rect x='0' y='0' width='1200' height='4' fill='#06b6d4' opacity='0.6'/>
+  <rect x='0' y='626' width='1200' height='4' fill='#06b6d4' opacity='0.6'/>
+  <text x='600' y='220' text-anchor='middle' fill='#06b6d4' font-family='monospace' font-size='18' letter-spacing='8' opacity='0.6'>VIBESWAP LABS</text>
+  <text x='600' y='290' text-anchor='middle' fill='white' font-family='Georgia,serif' font-size='42' font-weight='bold'>The Fate of Crypto</text>
+  <text x='600' y='345' text-anchor='middle' fill='white' font-family='Georgia,serif' font-size='42' font-weight='bold'>Is in Our Hands</text>
+  <text x='600' y='410' text-anchor='middle' fill='#888' font-family='monospace' font-size='16'>A Post-Quantum Manifesto for the Next Era of Decentralized Finance</text>
+  <line x1='500' y1='440' x2='700' y2='440' stroke='#06b6d4' stroke-width='1' opacity='0.4'/>
+  <text x='600' y='480' text-anchor='middle' fill='#555' font-family='monospace' font-size='14'>March 2026</text>
+  <text x='600' y='570' text-anchor='middle' fill='#06b6d4' font-family='monospace' font-size='12' opacity='0.5'>"While everyone else patches, we build."</text>
+</svg>

@@ -80,7 +80,7 @@ function HeaderMinimal() {
             <div className="flex items-center space-x-3">
               {/* Batch auction countdown — the heartbeat */}
               <div className="hidden sm:block">
-                <CountdownTimer size={36} showBatch={false} />
+                <CountdownTimer size={40} showBatch={false} />
               </div>
 
               {/* Gas indicator */}

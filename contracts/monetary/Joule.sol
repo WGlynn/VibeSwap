@@ -450,12 +450,19 @@ contract Joule is Ownable, ReentrancyGuard, IJoule {
 
     // ============ Internal: Mining ============
 
+    // H-07 DISSOLVED: Include blockhash and msg.sender in challenge generation.
+    // Previously, challenges were fully predictable from public state, allowing
+    // miners to pre-compute entire epochs offline and submit in one block.
+    // blockhash(block.number - 1) changes every block — can't pre-mine ahead.
+    // msg.sender binds the challenge to the miner — can't share solutions.
     function _generateChallenge() internal view returns (bytes32) {
         return keccak256(abi.encodePacked(
-            address(this),      // Anti-merge-mining: unique to this contract
+            address(this),
             currentEpochNumber,
             epoch.blocksMined,
-            block.chainid
+            block.chainid,
+            blockhash(block.number - 1),
+            msg.sender
         ));
     }
 

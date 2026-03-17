@@ -161,6 +161,116 @@ const CIRCUIT_BREAKER_CONFIG = {
 const circuitBreakers = new Map();     // "user:{provider}" → CircuitState
 const bgCircuitBreakers = new Map();   // "bg:{provider}" → CircuitState
 
+// ============ Request Queue (Per-Provider Concurrency Limiter) ============
+// Prevents thundering herd when a provider recovers from outage.
+// Without this, N simultaneous requests all independently hammer the fallback chain.
+// With this, requests serialize per-provider and back-pressure naturally.
+
+const PROVIDER_CONCURRENCY = {
+  claude: 5,       // Premium — allow more parallel
+  openai: 5,
+  xai: 3,
+  deepseek: 3,
+  gemini: 4,
+  ollama: 2,       // Local — limited by hardware
+  cerebras: 4,     // Free tier — moderate
+  groq: 4,
+  openrouter: 2,   // Free tier — conservative
+  mistral: 3,
+  together: 3,
+  sambanova: 3,
+  fireworks: 3,
+  novita: 2,
+};
+
+class ProviderQueue {
+  constructor(maxConcurrent = 3) {
+    this.maxConcurrent = maxConcurrent;
+    this.active = 0;
+    this.waiting = [];  // FIFO queue of { resolve, enqueueTime }
+    this.totalQueued = 0;
+    this.totalProcessed = 0;
+    this.maxWaitMs = 30000; // Drop requests waiting longer than 30s
+  }
+
+  async acquire() {
+    if (this.active < this.maxConcurrent) {
+      this.active++;
+      return;
+    }
+
+    this.totalQueued++;
+
+    return new Promise((resolve, reject) => {
+      const entry = { resolve, enqueueTime: Date.now() };
+      this.waiting.push(entry);
+
+      // Timeout: don't let requests wait forever in queue
+      const timeout = setTimeout(() => {
+        const idx = this.waiting.indexOf(entry);
+        if (idx !== -1) {
+          this.waiting.splice(idx, 1);
+          reject(new Error(`Queue timeout: waited ${this.maxWaitMs}ms for provider slot`));
+        }
+      }, this.maxWaitMs);
+
+      // Patch resolve to clear timeout
+      const origResolve = entry.resolve;
+      entry.resolve = () => {
+        clearTimeout(timeout);
+        origResolve();
+      };
+    });
+  }
+
+  release() {
+    this.active--;
+    this.totalProcessed++;
+
+    // Drain stale entries (waited too long)
+    while (this.waiting.length > 0) {
+      const next = this.waiting[0];
+      if (Date.now() - next.enqueueTime > this.maxWaitMs) {
+        this.waiting.shift(); // Already timed out, skip
+        continue;
+      }
+      this.waiting.shift();
+      this.active++;
+      next.resolve();
+      return;
+    }
+  }
+
+  getStats() {
+    return {
+      active: this.active,
+      waiting: this.waiting.length,
+      maxConcurrent: this.maxConcurrent,
+      totalQueued: this.totalQueued,
+      totalProcessed: this.totalProcessed,
+    };
+  }
+}
+
+const providerQueues = new Map(); // provider name → ProviderQueue
+
+function getProviderQueue(providerName) {
+  if (!providerQueues.has(providerName)) {
+    const maxConcurrent = PROVIDER_CONCURRENCY[providerName] || 3;
+    providerQueues.set(providerName, new ProviderQueue(maxConcurrent));
+  }
+  return providerQueues.get(providerName);
+}
+
+/** Get queue stats for all providers (monitoring). */
+export function getQueueStats() {
+  const stats = {};
+  for (const [name, q] of providerQueues) {
+    stats[name] = q.getStats();
+  }
+  return stats;
+}
+
 class CircuitState {
   constructor(providerName) {
     this.providerName = providerName;
@@ -211,6 +321,16 @@ class CircuitState {
     this.recentResults.push({ timestamp: Date.now(), success: false });
     this._pruneWindow();
 
+    // 529 Overloaded / 429 Rate Limit → instant trip with extended cooldown
+    const status = error?.status || error?.statusCode || error?.response?.status;
+    const msg = (error?.message || '').toLowerCase();
+    if (status === 529 || msg.includes('overloaded')) {
+      return this.recordOverloaded();
+    }
+    if (status === 429 || msg.includes('rate limit')) {
+      return this.recordRateLimited();
+    }
+
     if (this.state === 'half_open') {
       // Probe failed — reopen with increased backoff
       this.openDuration = Math.min(
@@ -236,6 +356,41 @@ class CircuitState {
         }
       }
     }
+  }
+
+  /**
+   * Instant circuit trip for 529 Overloaded errors.
+   * Overload events are service-wide and last minutes, not seconds.
+   * Don't waste retries probing a provider that told us it's overloaded.
+   */
+  recordOverloaded() {
+    const prevState = this.state;
+    this.state = 'open';
+    this.openedAt = Date.now();
+    // Overloaded = long cooldown. Minimum 60s, escalating on repeat.
+    this.openDuration = Math.max(
+      60000,  // At least 60s (vs default 30s)
+      Math.min(this.openDuration * CIRCUIT_BREAKER_CONFIG.backoffMultiplier, CIRCUIT_BREAKER_CONFIG.maxOpenDurationMs)
+    );
+    this.halfOpenProbes = 0;
+    console.warn(`[circuit-breaker] ${this.providerName}: ${prevState} → OPEN (529 OVERLOADED — instant trip, cooldown ${Math.round(this.openDuration / 1000)}s)`);
+  }
+
+  /**
+   * Instant circuit trip for 429 Rate Limited errors.
+   * Shorter cooldown than overloaded — rate limits clear faster.
+   */
+  recordRateLimited() {
+    const prevState = this.state;
+    this.state = 'open';
+    this.openedAt = Date.now();
+    // Rate limit = moderate cooldown. Minimum 30s, escalating on repeat.
+    this.openDuration = Math.max(
+      30000,
+      Math.min(this.openDuration * CIRCUIT_BREAKER_CONFIG.backoffMultiplier, CIRCUIT_BREAKER_CONFIG.maxOpenDurationMs)
+    );
+    this.halfOpenProbes = 0;
+    console.warn(`[circuit-breaker] ${this.providerName}: ${prevState} → OPEN (429 RATE LIMITED — instant trip, cooldown ${Math.round(this.openDuration / 1000)}s)`);
   }
 
   /**
@@ -340,9 +495,11 @@ export function getProviderHealthString() {
   for (const [name, cb] of circuitBreakers) {
     const stats = cb.getStats();
     const perf = providerPerformance.get(name);
+    const q = providerQueues.get(name);
     const stateIcon = stats.state === 'closed' ? 'OK' : stats.state === 'open' ? 'DOWN' : 'PROBE';
     const latStr = perf ? ` ~${Math.round(perf.emaLatency)}ms` : '';
-    lines.push(`  ${stateIcon} ${name}: ${stats.windowErrorRate} error rate (${stats.windowRequests} req/min)${latStr}, ${stats.totalRequests} total`);
+    const queueStr = q ? ` [${q.active}/${q.maxConcurrent} active, ${q.waiting.length} queued]` : '';
+    lines.push(`  ${stateIcon} ${name}: ${stats.windowErrorRate} error rate (${stats.windowRequests} req/min)${latStr}${queueStr}, ${stats.totalRequests} total`);
     if (stats.state === 'open') {
       lines.push(`     → reopens in ${Math.round(stats.timeUntilProbe / 1000)}s`);
     }
@@ -1915,101 +2072,141 @@ export async function llmChat(request) {
       console.log(`[router] ${complexity} → ${currentProvider.name} [tier ${providerTier}] (${escalationChain.length - 1} escalation tiers available)`);
     }
 
-    // ============ Try Current Provider (with retries) ============
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const attemptStart = Date.now();
-      try {
-        const result = await currentProvider.chat(providerRequest);
+    // ============ Try Current Provider (with retries + queue) ============
+    const queue = getProviderQueue(currentProvider.name);
+    let queueAcquired = false;
 
-        // Hard gate — reject empty/broken
-        validateResponse(result, currentProvider.name);
+    try {
+      await queue.acquire();
+      queueAcquired = true;
+    } catch (queueErr) {
+      // Queue timeout — provider is overwhelmed, skip to next
+      cascadeTrail.push({
+        provider: currentProvider.name,
+        status: 'queue_timeout',
+        tier: providerTier,
+        error: queueErr.message,
+      });
+      console.warn(`[queue] ${currentProvider.name}: queue full, skipping to next provider`);
+      continue;
+    }
 
-        // Record success
-        getCircuitBreaker(currentProvider.name, bg).recordSuccess();
-        recordProviderPerformance(currentProvider.name, Date.now() - attemptStart, true);
+    try {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const attemptStart = Date.now();
+        try {
+          const result = await currentProvider.chat(providerRequest);
 
-        // Soft gate — check adequacy for potential escalation
-        // Only escalate if: (1) there's a higher tier available, (2) response is inadequate
-        // (3) we're not already at the top of the chain
-        if (chainIdx < escalationChain.length - 1 && !isAdequateResponse(result, complexity, queryText)) {
-          const nextProvider = escalationChain[chainIdx + 1];
-          const nextTier = PROVIDER_TIER[nextProvider?.name] ?? 1;
-          // Only escalate to a HIGHER tier, not lateral moves within same tier
-          if (nextTier > providerTier) {
-            console.log(`[escalation] ${currentProvider.name} response inadequate for ${complexity} — escalating to ${nextProvider.name} [tier ${nextTier}]`);
-            cascadeTrail.push({
-              provider: currentProvider.name,
-              model: currentProvider.model,
-              status: 'escalated_quality',
-              tier: providerTier,
-              latencyMs: Date.now() - attemptStart,
-            });
+          // Hard gate — reject empty/broken
+          validateResponse(result, currentProvider.name);
+
+          // Record success
+          getCircuitBreaker(currentProvider.name, bg).recordSuccess();
+          recordProviderPerformance(currentProvider.name, Date.now() - attemptStart, true);
+
+          // Soft gate — check adequacy for potential escalation
+          // Only escalate if: (1) there's a higher tier available, (2) response is inadequate
+          // (3) we're not already at the top of the chain
+          if (chainIdx < escalationChain.length - 1 && !isAdequateResponse(result, complexity, queryText)) {
+            const nextProvider = escalationChain[chainIdx + 1];
+            const nextTier = PROVIDER_TIER[nextProvider?.name] ?? 1;
+            // Only escalate to a HIGHER tier, not lateral moves within same tier
+            if (nextTier > providerTier) {
+              console.log(`[escalation] ${currentProvider.name} response inadequate for ${complexity} — escalating to ${nextProvider.name} [tier ${nextTier}]`);
+              cascadeTrail.push({
+                provider: currentProvider.name,
+                model: currentProvider.model,
+                status: 'escalated_quality',
+                tier: providerTier,
+                latencyMs: Date.now() - attemptStart,
+              });
+              break; // Break retry loop, continue chain loop
+            }
+          }
+
+          // ============ Success — attach metadata and return ============
+          cascadeTrail.push({
+            provider: currentProvider.name,
+            model: currentProvider.model,
+            status: 'success',
+            tier: providerTier,
+            latencyMs: Date.now() - attemptStart,
+            complexity,
+            escalated,
+          });
+
+          recordEscalationMetric(currentProvider.name, escalated);
+          reorderFallbacksByPerformance();
+
+          result._provider = currentProvider.name;
+          result._model = currentProvider.model;
+          result._cascadeTrail = cascadeTrail;
+          result._intelligenceLevel = getIntelligenceLevel();
+          result._complexity = complexity;
+          result._tier = providerTier;
+          result._escalated = escalated;
+          const contentStr = JSON.stringify(result.content);
+          result._responseHash = createHash('sha256')
+            .update(contentStr + currentProvider.name + currentProvider.model + Date.now())
+            .digest('hex');
+          return result;
+
+        } catch (error) {
+          lastError = error;
+          const latencyMs = Date.now() - attemptStart;
+
+          getCircuitBreaker(currentProvider.name, bg).recordFailure(error);
+          recordProviderPerformance(currentProvider.name, latencyMs, false);
+
+          cascadeTrail.push({
+            provider: currentProvider.name,
+            model: currentProvider.model,
+            status: isCreditError(error) ? 'credit_error' : isTransientError(error) ? 'transient_error' : 'error',
+            tier: providerTier,
+            latencyMs,
+            error: error.message?.slice(0, 120),
+          });
+
+          // Credit/permanent error → skip to next provider in chain (escalate)
+          if (isCreditError(error) || (!isTransientError(error) && !isTransientOrGlitch(error))) {
+            console.warn(`[escalation] ${currentProvider.name} failed (${isCreditError(error) ? 'credits' : 'permanent'}): ${error.message?.slice(0, 80)}`);
             break; // Break retry loop, continue chain loop
           }
+
+          // 529/overloaded → DON'T retry same provider, instant escalate
+          // The circuit breaker already tripped via recordOverloaded() — skip remaining retries
+          const errStatus = error?.status || error?.statusCode || error?.response?.status;
+          const errMsg = (error?.message || '').toLowerCase();
+          if (errStatus === 529 || errMsg.includes('overloaded')) {
+            console.warn(`[escalation] ${currentProvider.name} overloaded (529) — instant escalate, no retry`);
+            break; // Skip remaining retries, move to next provider
+          }
+
+          // Transient error — retry with backoff
+          if (attempt < MAX_RETRIES) {
+            // 429 rate limit → longer backoff (10-30s) vs generic transient (1-4s)
+            let baseDelay, jitterRange;
+            if (errStatus === 429 || errMsg.includes('rate limit')) {
+              baseDelay = Math.min(10000 * Math.pow(2, attempt), 30000); // 10s, 20s, 30s
+              jitterRange = 5000;
+            } else {
+              baseDelay = Math.min(1000 * Math.pow(2, attempt), 4000);  // 1s, 2s, 4s
+              jitterRange = 500;
+            }
+            const jitter = Math.random() * jitterRange;
+            console.warn(`[llm] Transient error on ${currentProvider.name} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retry in ${Math.round(baseDelay + jitter)}ms`);
+            await sleep(baseDelay + jitter);
+            continue;
+          }
+
+          // Exhausted retries on this provider → escalate
+          console.warn(`[escalation] ${currentProvider.name} exhausted retries — escalating`);
+          break;
         }
-
-        // ============ Success — attach metadata and return ============
-        cascadeTrail.push({
-          provider: currentProvider.name,
-          model: currentProvider.model,
-          status: 'success',
-          tier: providerTier,
-          latencyMs: Date.now() - attemptStart,
-          complexity,
-          escalated,
-        });
-
-        recordEscalationMetric(currentProvider.name, escalated);
-        reorderFallbacksByPerformance();
-
-        result._provider = currentProvider.name;
-        result._model = currentProvider.model;
-        result._cascadeTrail = cascadeTrail;
-        result._intelligenceLevel = getIntelligenceLevel();
-        result._complexity = complexity;
-        result._tier = providerTier;
-        result._escalated = escalated;
-        const contentStr = JSON.stringify(result.content);
-        result._responseHash = createHash('sha256')
-          .update(contentStr + currentProvider.name + currentProvider.model + Date.now())
-          .digest('hex');
-        return result;
-
-      } catch (error) {
-        lastError = error;
-        const latencyMs = Date.now() - attemptStart;
-
-        getCircuitBreaker(currentProvider.name, bg).recordFailure(error);
-        recordProviderPerformance(currentProvider.name, latencyMs, false);
-
-        cascadeTrail.push({
-          provider: currentProvider.name,
-          model: currentProvider.model,
-          status: isCreditError(error) ? 'credit_error' : isTransientError(error) ? 'transient_error' : 'error',
-          tier: providerTier,
-          latencyMs,
-          error: error.message?.slice(0, 120),
-        });
-
-        // Credit/permanent error → skip to next provider in chain (escalate)
-        if (isCreditError(error) || (!isTransientError(error) && !isTransientOrGlitch(error))) {
-          console.warn(`[escalation] ${currentProvider.name} failed (${isCreditError(error) ? 'credits' : 'permanent'}): ${error.message?.slice(0, 80)}`);
-          break; // Break retry loop, continue chain loop
-        }
-
-        // Transient error — retry with backoff
-        if (attempt < MAX_RETRIES) {
-          const baseDelay = Math.min(1000 * Math.pow(2, attempt), 4000);
-          const jitter = Math.random() * 500;
-          console.warn(`[llm] Transient error on ${currentProvider.name} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retry in ${Math.round(baseDelay + jitter)}ms`);
-          await sleep(baseDelay + jitter);
-          continue;
-        }
-
-        // Exhausted retries on this provider → escalate
-        console.warn(`[escalation] ${currentProvider.name} exhausted retries — escalating`);
-        break;
       }
+    } finally {
+      // ALWAYS release queue slot, even on escalation
+      if (queueAcquired) queue.release();
     }
   }
 

@@ -1,0 +1,175 @@
+# Frank — The Walkthrough
+
+**From**: Will Glynn, VibeSwap
+**For**: Frank Zou, Founding Member @ Sequence Markets (YC W26)
+**Date**: March 17, 2026
+
+---
+
+Frank, I read your launch post. You nailed the problem statement: "If execution is fragmented, value leaks. If execution is controlled, flow compounds."
+
+You're building the execution control point across CEX, DEX, and tokenized rails. I built a venue where the execution quality guarantee is cryptographic, not statistical. This is a walkthrough of how — written for someone who thinks about market microstructure for a living.
+
+Your week was spent trying to mitigate MEV across the venues you route through. I'm going to show you a venue where MEV doesn't exist to mitigate.
+
+---
+
+## Step 1: Why MEV Exists on Every Venue You Currently Route To
+
+You already know this, but let me frame it for what comes next.
+
+Every venue in your routing stack — Binance, Uniswap, dYdX, whatever — uses continuous-time execution. Orders arrive sequentially. Sequential processing creates an information gradient: whoever sees the queue first extracts value from everyone behind them.
+
+Your ~3 microsecond execution engine is fast. But it doesn't matter how fast you route if the venue itself leaks order information to block builders before your trade settles. You're optimizing the pipe while the faucet drips.
+
+Flashbots, MEV-Share, private mempools — these are all mitigation. They accept the leak and negotiate who profits from it.
+
+**The question you should be asking your venues: what if the information never leaked?**
+
+---
+
+## Step 2: The Mechanism (You Know This Pattern from TMX)
+
+Think about the TSX opening auction. Orders accumulate pre-open. Nobody sees the full book. At market open, one clearing price is computed. Everyone gets that price.
+
+VibeSwap does this — every 10 seconds — with cryptographic commitments instead of exchange-operated trust.
+
+**The 10-second batch cycle:**
+
+```
+0s────────────────8s──────10s
+    COMMIT            REVEAL  SETTLE
+```
+
+**Commit (0-8s)**: Trader submits `hash(order + secret)` — a 256-bit commitment that reveals nothing. Not direction. Not size. Not price tolerance. A block builder who sees this has exactly as much information as someone reading a random number. Zero.
+
+**Reveal (8-10s)**: Trader reveals actual order + secret. Contract verifies hash matches commitment. Mismatches → 50% deposit slash. This makes commitment binding.
+
+**Settle (10s)**: One clearing price for the entire batch. Execution order is a Fisher-Yates shuffle seeded by XOR of all participants' secrets. No party — not us, not a validator, not a solver — controls ordering.
+
+---
+
+## Step 3: The Execution Quality Math
+
+You're pitching institutional pilots on execution quality. Here's the model in your terms.
+
+**Your clients today** (continuous venues in your routing stack):
+```
+Effective_cost = spot × (1 + fee + slippage + MEV)
+
+fee       ≈ 5-30 bps (venue-dependent)
+slippage  ≈ f(order_size / venue_depth)  → 10-200 bps institutional
+MEV       ≈ 10-200 bps (empirical, varies by block)
+```
+
+**Your clients through VibeSwap**:
+```
+Effective_cost = clearing_price × (1 + fee)
+
+fee       = 5 bps
+slippage  = 0 (uniform clearing price)
+MEV       = 0 (structurally impossible)
+```
+
+The MEV term isn't small. It's absent. For a 100 ETH block trade (~$280K), the difference between "MEV mitigated to ~20 bps" and "MEV = 0 bps" is $560 per trade. Your OTC desk clients feel that.
+
+**For your investor pitch**: "Our routing includes a venue where MEV is mathematically zero" hits differently than "our routing minimizes MEV."
+
+---
+
+## Step 4: How This Fits Your Architecture
+
+You're building API + SDK/MCP + terminal. VibeSwap exposes:
+
+- **Commit endpoint**: Submit commitment hash + deposit
+- **Reveal endpoint**: Reveal order + secret within batch window
+- **Clearing price feed**: Post-settlement price for each batch
+- **x402 payment layer**: Machine-to-machine micropayments for API access (your agentic trading use case)
+
+Your MCP integration is directly relevant here. You mentioned agents getting crypto wallets on Coinbase — agents that trade through Sequence could route specific flows to VibeSwap when execution quality matters more than latency. The agent decides: "this is a large order, route to batch auction for zero MEV" vs "this is a small scalp, route to Binance for speed."
+
+That's venue-neutral routing with an MEV-aware policy layer. You're already building the router. We're building a venue worth routing to.
+
+---
+
+## Step 5: Your Edge Cases (I Know You're Thinking Them)
+
+**"10 seconds is slow."**
+
+Your microsecond engine is built for speed. But your OTC desk clients already wait minutes for a quote. For block trades, a 10-second batch that guarantees zero MEV is faster AND cheaper than their current workflow. The window is configurable per pool — institutional pairs could run 30-60 second auctions for deeper batches.
+
+**"Thin batches?"**
+
+Below minimum participant threshold, orders roll forward. We add latency rather than settle a manipulable auction. For institutional flow, that's the right tradeoff.
+
+**"How is this different from CoW Protocol?"**
+
+CoW uses off-chain solvers. The solver sees orders in plaintext and computes the batch. You're trusting the solver. That's mitigation with a trust assumption.
+
+We're fully on-chain. No solver, no relayer, no trusted third party. The commitment scheme means nobody — including us — sees orders before reveal. Elimination, not mitigation.
+
+**"Cross-batch MEV?"**
+
+An observer can see batch N's clearing price and position for batch N+1. This is standard inter-auction arbitrage — same as between TSX auctions. We bound it with TWAP circuit breakers (>5% deviation triggers pause).
+
+---
+
+## Step 6: Structural Fairness (What Caught Your Eye About VSOS)
+
+You asked about this specifically. Here's the concrete version.
+
+**The problem**: Most DEX fee models reward capital proportionally. Park a million dollars, extract value. No distinction between capital that enables the market and capital that extracts from it.
+
+**The solution**: Every fee distribution on VibeSwap is a **Shapley value game** — cooperative game theory that computes each participant's marginal contribution. Not "how much did you deposit" but "what uniquely changes when you participate."
+
+Four factors, weighted:
+```
+Direct liquidity     40%  — what you provided
+Enabling time        30%  — how long you enabled others (log scale)
+Scarcity provision   20%  — did you provide the scarce side
+Stability            10%  — did you stay during volatility
+```
+
+**The structural part**: anyone calls `verifyPairwiseFairness(gameId, addr1, addr2)` and gets a mathematical proof that two participants were treated proportionally. Public, permissionless, on-chain. Built-in market surveillance.
+
+The bonding curve enforces a conservation invariant: `V(R,S) = S^κ/R = constant`. Solvency is a mathematical property, not an audit result. The reward distributor is permanently sealed to this invariant — no admin can unseal it.
+
+For your institutional clients: they can verify the protocol's fairness guarantees before depositing. They don't have to trust governance or auditors. They read the contract.
+
+---
+
+## Step 7: The Concrete Next Step
+
+You're pre-revenue, running pilots. I'm not asking for integration today.
+
+**The ask**: Run a slippage comparison test. Same order set — your current routing versus our batch mechanism. Real orders, real data. Low commitment for both of us.
+
+What you get: a concrete data point for your OTC desk pilots. "We integrated a venue where MEV is provably zero, and here's the execution improvement on real orders."
+
+What I get: a technical collaborator who understands market microstructure, and a data point I can take to regulators.
+
+**The longer play**: Sequence becomes the default router that includes MEV-free venues in its routing policy. "Execution certainty" — which is literally your tagline — gets a new meaning when one of your venues has cryptographic execution guarantees instead of statistical ones.
+
+---
+
+## One More Thing
+
+Your post said "be human. Leave AI interactions to AI."
+
+I agree. The mechanism is the pitch — not a deck, not a narrative, not a vision. Just math that works. If it doesn't hold up to your scrutiny, it's not ready. If it does, we have something to build together.
+
+I built this solo. No funding, no team allocation, no VC cap table. The token has zero pre-mine — 21M cap, Bitcoin halving, earned through contribution. That means the conversation about working together is between you and me. No board to convince.
+
+Looking forward to walking through the contracts live.
+
+— Will
+
+---
+
+**Live on Base Mainnet**:
+- CommitRevealAuction: batch auction mechanism
+- ShapleyDistributor: `0x290bc683f242761d513078451154f6bbe1ee18b1`
+- EmissionController: `0xcdb73048a67f0de31777e6966cd92faacdb0fc55`
+- VIBEToken: `0x56c35ba2c026f7a4adbe48d55b44652f959279ae`
+- Source: github.com/WGlynn/VibeSwap
+- Contact: willglynn123@gmail.com

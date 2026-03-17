@@ -1003,6 +1003,54 @@ bot.on('new_chat_members', async (ctx) => {
 
 // ============ Commands ============
 
+// ============ /reboot — Owner-only graceful restart via Telegram ============
+// So Will can restart from his phone without touching a terminal.
+bot.command('reboot', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const target = ctx.message.text.split(' ')[1] || 'self';
+
+  if (target === 'self' || target === 'me') {
+    await ctx.reply('Rebooting in 3 seconds...');
+    // Graceful shutdown: save state, then exit (Fly.io auto-restarts)
+    try {
+      await saveConversations();
+      await flushTracker();
+    } catch {}
+    setTimeout(() => {
+      console.log('[reboot] Owner-initiated reboot via /reboot command');
+      process.exit(0); // Fly.io restart policy: always → auto-restarts
+    }, 3000);
+  } else if (target === 'all') {
+    // Trigger GitHub Actions deploy via API (requires GITHUB_TOKEN)
+    const ghToken = process.env.GITHUB_TOKEN;
+    if (!ghToken) {
+      return ctx.reply('No GITHUB_TOKEN configured — can only reboot self. Use /reboot or /reboot self');
+    }
+    await ctx.reply('Triggering full fleet redeploy via GitHub Actions...');
+    try {
+      const resp = await fetch('https://api.github.com/repos/WGlynn/VibeSwap/actions/workflows/deploy-jarvis.yml/dispatches', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ghToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'master', inputs: { bots: 'all' } }),
+      });
+      if (resp.ok) {
+        await ctx.reply('Deploy triggered. All 3 bots will redeploy in ~2-3 minutes.');
+      } else {
+        await ctx.reply(`GitHub API error: ${resp.status} ${resp.statusText}`);
+      }
+    } catch (err) {
+      await ctx.reply(`Failed: ${err.message}`);
+    }
+  } else {
+    await ctx.reply('Usage: /reboot (self) | /reboot all (full fleet via CI)');
+  }
+});
+
 bot.command('start', async (ctx) => {
   const payload = ctx.message.text.split(' ')[1] || '';
 

@@ -7,7 +7,7 @@ use vibeswap_math::shuffle;
 use vibeswap_math::twap::OracleState;
 use vibeswap_math::{mul_cmp, mul_div, sqrt_product, wide_mul, MathError, PRECISION};
 
-const MINIMUM_LIQUIDITY: u128 = 1000;
+const MINIMUM_LIQUIDITY: u128 = 10000;
 
 // ============ AMM Math ============
 

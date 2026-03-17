@@ -48,7 +48,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 - **SecurityLib** — Signature verification, nonce management
 - **Flash loan protection** — EOA-only commits
 - **TWAP validation** — Max 5% deviation from oracle price
-- **Rate limiting** — 1M tokens/hour/user
+- **Rate limiting** — 100K tokens/hour/user
 - **50% slashing** — For invalid reveals (game-theoretic enforcement)
 
 ### Libraries

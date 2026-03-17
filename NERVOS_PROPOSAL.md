@@ -738,8 +738,8 @@ The VibeSwap Team
 - [CKB Script Programming: Validation Model](https://medium.com/nervosnetwork/intro-to-ckb-script-programming-1-validation-model-9a7d84679266)
 - [Understanding Nervos Network - Messari](https://messari.io/report/understanding-nervos-network)
 - [What is CKB-VM? - Start With Nervos](https://startwithnervos.com/nervos-faq/what-is-the-ckb-vm)
-- [VibeSwap Technical Documentation](./docs/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md)
-- [VibeSwap Security Mechanism Design](./docs/SECURITY_MECHANISM_DESIGN.md)
+- [VibeSwap Technical Documentation](./DOCUMENTATION/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md)
+- [VibeSwap Security Mechanism Design](./DOCUMENTATION/SECURITY_MECHANISM_DESIGN.md)
 
 ---
 

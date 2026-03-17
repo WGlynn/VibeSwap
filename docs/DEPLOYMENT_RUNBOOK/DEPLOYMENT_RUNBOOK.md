@@ -246,7 +246,7 @@ After full deployment, verify:
 - [ ] CircuitBreaker thresholds are configured
 - [ ] Flash loan protection enabled
 - [ ] TWAP validation enabled
-- [ ] Rate limiting configured (1M/hr/user)
+- [ ] Rate limiting configured (100K/hr/user)
 - [ ] Oracle signer authorized on TruePriceOracle + StablecoinFlowRegistry
 - [ ] Pools created with liquidity protection
 - [ ] Token prices set (for liquidity protection USD calculations)

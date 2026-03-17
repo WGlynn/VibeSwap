@@ -123,7 +123,7 @@ This is not a hackathon security stack. This is a mainnet security stack.
 - OpenZeppelin v5.0.1 (UUPS upgradeable proxies)
 - Reentrancy guards on all state-changing functions
 - TWAP oracle validation (max 5% deviation from reference price)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers with configurable volume/price/withdrawal thresholds
 - Flash loan protection (EOA-only commits)
 - 50% collateral slashing for griefing deterrence

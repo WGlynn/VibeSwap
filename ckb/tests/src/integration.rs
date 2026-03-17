@@ -1489,8 +1489,8 @@ fn test_pool_initialization() {
     assert_eq!(pool.total_lp_supply, expected_lp, "LP supply = sqrt(r0*r1) - MINIMUM_LIQUIDITY");
 
     // ---- Verify MINIMUM_LIQUIDITY is locked ----
-    assert_eq!(pool.minimum_liquidity, MINIMUM_LIQUIDITY, "MINIMUM_LIQUIDITY = 1000");
-    assert_eq!(MINIMUM_LIQUIDITY, 1000, "MINIMUM_LIQUIDITY constant must be 1000");
+    assert_eq!(pool.minimum_liquidity, MINIMUM_LIQUIDITY, "MINIMUM_LIQUIDITY = 10000");
+    assert_eq!(MINIMUM_LIQUIDITY, 10000, "MINIMUM_LIQUIDITY constant must be 10000");
 
     // ---- Verify reserves are stored correctly ----
     assert_eq!(pool.reserve0, r0);

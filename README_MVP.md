@@ -166,7 +166,7 @@ auction.withdrawDeposit(commitId);
 
 - **Flash Loan Protection**: Same-block interactions blocked
 - **TWAP Validation**: Price checked against 10-min TWAP
-- **Rate Limiting**: 1M tokens/hour per user
+- **Rate Limiting**: 100K tokens/hour per user
 - **EOA Requirement**: Only EOAs can commit (contracts blocked)
 - **Circuit Breakers**: Auto-pause on anomalies
 

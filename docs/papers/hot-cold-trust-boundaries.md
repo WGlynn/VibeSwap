@@ -536,7 +536,7 @@ Hot/Cold separation is one layer in a defense-in-depth strategy. It complements,
 └───────────────────────────────────────────────────────┘
 ```
 
-VibeSwap implements all five layers. The smart contract layer includes circuit breakers (volume, price, and withdrawal thresholds), rate limiting (1M tokens/hour/user), TWAP validation (max 5% deviation), flash loan protection (EOA-only commits), and 50% slashing for invalid reveals. The Hot/Cold boundary is Layer 2 -- it reduces the surface that Layers 3-5 must protect.
+VibeSwap implements all five layers. The smart contract layer includes circuit breakers (volume, price, and withdrawal thresholds), rate limiting (100K tokens/hour/user), TWAP validation (max 5% deviation), flash loan protection (EOA-only commits), and 50% slashing for invalid reveals. The Hot/Cold boundary is Layer 2 -- it reduces the surface that Layers 3-5 must protect.
 
 ---
 

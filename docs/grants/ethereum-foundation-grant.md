@@ -82,7 +82,7 @@ VibeSwap implements LayerZero V2's OApp protocol for cross-chain batch auction c
 **Security — built in, not bolted on:**
 - Flash loan protection (EOA-only commits)
 - TWAP validation (max 5% deviation)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers (volume, price, withdrawal thresholds)
 - 50% collateral slashing for invalid reveals
 - Full fuzz testing and invariant testing via Foundry

@@ -221,7 +221,7 @@ Invalid reveals lose 50% of collateral. A sybil attacker who doesn't reveal face
 
 **6. Rate Limiting**
 
-Per-user volume limits (1M tokens/hour) apply per address. Sybil addresses each have their own limits, but:
+Per-user volume limits (100K tokens/hour) apply per address. Sybil addresses each have their own limits, but:
 - More addresses = more collateral required
 - Diminishing returns on coordination complexity
 

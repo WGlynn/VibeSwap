@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { getPoolStatus, createResonancePool } from '../utils/vibe-tokenomics'
 
 // ============================================================
 // Safari Jarvis — Interactive Tour Guide
@@ -61,7 +62,7 @@ const TOUR_STOPS = [
     id: 'contributors',
     path: '/contributors',
     title: 'Community Contributors',
-    narration: "Everyone who helped build this is tracked here. See that Resonance Pool? 3 million VIBE tokens sitting there, accumulating. When someone makes a protocol-defining contribution, the pool breaks and distributes to everyone who contributed. It's math, not a contract.",
+    narration: null, // Dynamic — computed at render time from live tokenomics
     tip: 'The VIBE token has a fixed 21M supply with 4-year halvings. Like Bitcoin, with a twist.',
   },
   {
@@ -107,6 +108,15 @@ export default function SafariGuide() {
 
   const currentStop = TOUR_STOPS[step]
   const progress = ((step + 1) / TOUR_STOPS.length) * 100
+
+  // Dynamic narrations — computed from live data
+  const poolStatus = useMemo(() => getPoolStatus(createResonancePool()), [])
+  const dynamicNarration = useMemo(() => {
+    if (currentStop?.id === 'contributors') {
+      return `Everyone who helped build this is tracked here. See that Resonance Pool? ${poolStatus.poolBalanceFormatted} VIBE tokens sitting there, accumulating. When someone makes a protocol-defining contribution, the pool breaks and distributes to everyone who contributed. It's math, not a contract.`
+    }
+    return currentStop?.narration
+  }, [currentStop, poolStatus])
 
   const startTour = useCallback(() => {
     setActive(true)
@@ -222,7 +232,7 @@ export default function SafariGuide() {
               {/* Narration */}
               <div className="px-4 pb-3">
                 <p className="text-sm text-black-200 leading-relaxed">
-                  {currentStop.narration}
+                  {dynamicNarration}
                 </p>
               </div>
 

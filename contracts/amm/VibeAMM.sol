@@ -437,6 +437,11 @@ contract VibeAMM is
 
         uint256 actualFeeRate = feeRate == 0 ? DEFAULT_FEE_RATE : feeRate;
         if (actualFeeRate > 1000) revert FeeTooHigh(); // Max 10%
+        // M-10 DISSOLVED: Minimum fee prevents zero-compensation pools.
+        // Only owner/authorized can create pools, preventing front-run of pool creation
+        // with extreme fee rates on deterministic pool IDs.
+        require(actualFeeRate >= 5, "M-10: Fee too low"); // Min 0.05%
+        require(msg.sender == owner() || authorizedCreators[msg.sender], "M-10: Not authorized to create pool");
 
         pools[poolId] = Pool({
             token0: token0,

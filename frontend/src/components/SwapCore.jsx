@@ -1175,12 +1175,46 @@ function SwapCore() {
   }
 
   return (
-    <div className="h-full flex items-center justify-center px-4 overflow-hidden">
+    <div className={`h-full flex ${isAnyWalletConnected ? 'items-center' : 'items-start pt-8 sm:items-center sm:pt-0'} justify-center px-4 ${isAnyWalletConnected ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Faint radial spotlight behind the swap card */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
         <div className="w-[500px] h-[500px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(0,255,65,0.02) 0%, transparent 70%)' }} />
       </div>
-      <div className="w-full max-w-[420px] relative">
+      <div className={`w-full ${isAnyWalletConnected ? 'max-w-[420px]' : 'max-w-[520px]'} relative`}>
+
+        {/* Hero — only for visitors who haven't connected yet */}
+        {!isAnyWalletConnected && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-6"
+          >
+            <h1 className="text-3xl sm:text-4xl font-bold mb-3">
+              <span className="text-white">Trade without getting </span>
+              <span className="text-matrix-500">robbed.</span>
+            </h1>
+            <p className="text-black-300 text-base sm:text-lg max-w-md mx-auto mb-4">
+              VibeSwap eliminates front-running and sandwich attacks.
+              Every trade settles at a fair price. No exceptions.
+            </p>
+            <div className="flex items-center justify-center gap-4 text-sm text-black-400">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-matrix-500 animate-pulse" />
+                <span>MEV-Protected</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-terminal-500 animate-pulse" />
+                <span>Omnichain</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>AI-Powered</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Main swap card — glass morphism */}
         <GlassCard variant="primary" glowColor="matrix" spotlight hover={false}>
           <motion.div
@@ -1346,6 +1380,43 @@ function SwapCore() {
           setShowToTokens(false)
         }}
       />
+
+      {/* Trust signals — only for visitors, below the swap card */}
+      {!isAnyWalletConnected && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
+          className="mt-6 mb-8"
+        >
+          {/* How it works — 3 steps */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="text-center p-3 rounded-xl bg-black-800/50 border border-black-700/50">
+              <div className="text-matrix-500 text-lg font-mono mb-1">1</div>
+              <div className="text-xs text-black-300 font-medium">Commit</div>
+              <div className="text-[10px] text-black-500 mt-0.5">Orders are hidden</div>
+            </div>
+            <div className="text-center p-3 rounded-xl bg-black-800/50 border border-black-700/50">
+              <div className="text-matrix-500 text-lg font-mono mb-1">2</div>
+              <div className="text-xs text-black-300 font-medium">Reveal</div>
+              <div className="text-[10px] text-black-500 mt-0.5">Verified on-chain</div>
+            </div>
+            <div className="text-center p-3 rounded-xl bg-black-800/50 border border-black-700/50">
+              <div className="text-matrix-500 text-lg font-mono mb-1">3</div>
+              <div className="text-xs text-black-300 font-medium">Settle</div>
+              <div className="text-[10px] text-black-500 mt-0.5">One fair price for all</div>
+            </div>
+          </div>
+
+          {/* Bottom tagline */}
+          <p className="text-center text-xs text-black-500">
+            Commit-reveal batch auctions. Uniform clearing price. Zero MEV.
+          </p>
+          <p className="text-center text-[10px] text-black-600 mt-1">
+            Built on LayerZero V2 — trade across any chain.
+          </p>
+        </motion.div>
+      )}
 
       {/* JARVIS intro — first contact */}
       <JarvisIntro

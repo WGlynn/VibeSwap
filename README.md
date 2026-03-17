@@ -168,7 +168,7 @@ VibeSwap implements six mechanisms that align all participants toward mutual ben
 - Arbitrageurs pay for the privilege of correcting prices
 - The protocol stabilizes itself during downturns
 
-> **Deep Dive:** See the full [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) for mathematical foundations, game theory analysis, and implementation details.
+> **Deep Dive:** See the full [Incentives Whitepaper](DOCUMENTATION/INCENTIVES_WHITEPAPER.md) for mathematical foundations, game theory analysis, and implementation details.
 
 ---
 
@@ -464,7 +464,7 @@ Order F (no bid) ───────┘              6. [E] ← Shuffled
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/vibeswap.git
+git clone https://github.com/WGlynn/VibeSwap.git
 cd vibeswap
 
 # Install dependencies
@@ -538,8 +538,8 @@ script/
 
 Implements the commit-reveal mechanism with priority auction:
 
-- **Commit Phase (800ms)**: Users submit hashed order commitments with deposits
-- **Reveal Phase (200ms)**: Users reveal orders and optionally submit priority bids
+- **Commit Phase (8s)**: Users submit hashed order commitments with deposits
+- **Reveal Phase (2s)**: Users reveal orders and optionally submit priority bids
 - **Settlement**: Orders are shuffled deterministically and executed
 
 ### VibeAMM
@@ -630,13 +630,13 @@ forge coverage
 
 | Document | Description |
 |----------|-------------|
-| [**VibeSwap Whitepaper**](docs/VIBESWAP_WHITEPAPER.md) | **Start here** - Comprehensive whitepaper covering all innovations: batch auctions, Fibonacci scaling, Shapley distribution, Bitcoin halving, and pure economics |
-| [Complete Mechanism Design](docs/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md) | Detailed guide covering all mechanism designs in narrative form |
-| [True Price Oracle](docs/TRUE_PRICE_ORACLE.md) | Kalman filter state-space model, Bayesian estimation, regime detection |
-| [Price Intelligence Oracle](docs/PRICE_INTELLIGENCE_ORACLE.md) | Manipulation detection, liquidation cascade identification, rubber band reversion |
-| [True Price Discovery](docs/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices |
-| [Incentives Whitepaper](docs/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, game theory |
-| [Security Mechanism Design](docs/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, cryptoeconomic defense |
+| [**VibeSwap Whitepaper**](DOCUMENTATION/VIBESWAP_WHITEPAPER.md) | **Start here** - Comprehensive whitepaper covering all innovations: batch auctions, Fibonacci scaling, Shapley distribution, Bitcoin halving, and pure economics |
+| [Complete Mechanism Design](DOCUMENTATION/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md) | Detailed guide covering all mechanism designs in narrative form |
+| [True Price Oracle](DOCUMENTATION/TRUE_PRICE_ORACLE.md) | Kalman filter state-space model, Bayesian estimation, regime detection |
+| [Price Intelligence Oracle](DOCUMENTATION/PRICE_INTELLIGENCE_ORACLE.md) | Manipulation detection, liquidation cascade identification, rubber band reversion |
+| [True Price Discovery](DOCUMENTATION/TRUE_PRICE_DISCOVERY.md) | Cooperative capitalism philosophy, why batch auctions produce true prices |
+| [Incentives Whitepaper](DOCUMENTATION/INCENTIVES_WHITEPAPER.md) | Shapley distribution, IL protection, loyalty rewards, game theory |
+| [Security Mechanism Design](DOCUMENTATION/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security architecture, soulbound identity, cryptoeconomic defense |
 
 ## The Box of Scraps
 

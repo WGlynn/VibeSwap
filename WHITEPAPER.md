@@ -72,7 +72,7 @@ VibeSwap's core innovation is transforming adversarial relationships into cooper
 
 ### 3.1 Dynamic Volatility Fees
 
-Base trading fees (0.3%) increase up to 2x during high volatility periods. The volatility oracle calculates realized volatility from TWAP observations:
+Base trading fees (0.05%) increase up to 2x during high volatility periods. The volatility oracle calculates realized volatility from TWAP observations:
 
 | Volatility (Annualized) | Fee Multiplier |
 |------------------------|----------------|

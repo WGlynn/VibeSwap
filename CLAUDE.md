@@ -62,7 +62,7 @@ This ensures real-time sync between all sessions (desktop, mobile, any device).
 
 These axioms are derived from Will's 2018 paper on wallet security fundamentals. They are **non-negotiable** and must be heavily weighted in ALL design decisions, code implementations, and documentation.
 
-See full paper: `docs/wallet-security-fundamentals-2018.md`
+See full paper: `DOCUMENTATION/wallet-security-fundamentals-2018.md`
 
 ### Core Axioms
 
@@ -178,9 +178,9 @@ python -m oracle.main
 "Cooperative Capitalism" - Mutualized risk (insurance pools, treasury stabilization) + free market competition (priority auctions, arbitrage)
 
 ### Security Features
-- Flash loan protection (EOA-only commits)
+- Flash loan protection (same-block interaction guard)
 - TWAP validation (max 5% deviation)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers (volume, price, withdrawal thresholds)
 - 50% slashing for invalid reveals
 

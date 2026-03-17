@@ -356,7 +356,7 @@ export default function AnalyticsPage() {
                       <th className="pb-3 font-medium">Pair</th>
                       <th className="pb-3 font-medium text-right">24h Volume</th>
                       <th className="pb-3 font-medium text-right">TVL</th>
-                      <th className="pb-3 font-medium text-right">Fee Revenue</th>
+                      <th className="pb-3 font-medium text-right">LP Fee Volume</th>
                       <th className="pb-3 font-medium text-right">24h Change</th>
                     </tr>
                   </thead>
@@ -389,7 +389,7 @@ export default function AnalyticsPage() {
           {/* ============ Fee Revenue Breakdown ============ */}
           <motion.div variants={fadeUp} className="mb-8">
             <GlassCard glowColor="terminal" className="p-6">
-              <SectionHeader title="Fee Revenue Breakdown" subtitle="Protocol fee distribution by pool, chain, and type" />
+              <SectionHeader title="LP Fee Volume Breakdown" subtitle="LP fee distribution by pool, chain, and type" />
               <FeeBreakdownBar items={FEE_BY_POOL} label="By Pool" />
               <FeeBreakdownBar items={FEE_BY_CHAIN} label="By Chain" />
               <FeeBreakdownBar items={FEE_BY_TYPE} label="By Type" />

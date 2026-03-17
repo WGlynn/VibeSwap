@@ -116,7 +116,7 @@ Good behavior is rewarded structurally. Not by social norm. Not by charitable di
 
 **Problem**: DeFi has no fiscal policy. When markets crash, liquidity evaporates precisely when it is most needed. Protocols either hoard treasuries (no benefit) or spend them politically (insider capture).
 
-**Mechanism**: `DAOTreasury` accumulates protocol fees. `TreasuryStabilizer` deploys them counter-cyclically — backstop liquidity during bear markets, withdrawal during bull markets. Autonomous, rule-based, transparent. The DeFi equivalent of central bank open market operations, but without discretion or politics.
+**Mechanism**: `DAOTreasury` accumulates priority bid revenue and auction proceeds. `TreasuryStabilizer` deploys them counter-cyclically — backstop liquidity during bear markets, withdrawal during bull markets. Autonomous, rule-based, transparent. The DeFi equivalent of central bank open market operations, but without discretion or politics.
 
 Temporal discipline enforced:
 - Normal withdrawals: 2-day timelock
@@ -221,7 +221,7 @@ The failure mode is honest. Cooperative Capitalism's weakness is coordination co
 This is the mechanism that makes it work:
 
 1. **Cooperative mechanisms attract non-professional participants** by reducing downside risk (insurance, IL protection, treasury backstop).
-2. **More participants increase trading volume**, generating more protocol fees.
+2. **More participants increase trading volume**, generating more priority bid and auction revenue.
 3. **More fees fund stronger cooperative mechanisms**, attracting more participants.
 4. **Stronger cooperative mechanisms reduce extraction viability**, because the protocol captures MEV cooperatively rather than leaving it for searchers.
 

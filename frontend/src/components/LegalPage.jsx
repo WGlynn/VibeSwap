@@ -203,7 +203,7 @@ const RISK_SECTIONS = [
     severityColor: 'rgb(234,179,8)',
     paragraphs: [
       'Impermanent loss (IL) is a fundamental risk of providing liquidity to automated market makers. It occurs when the price ratio of your deposited tokens changes relative to when you deposited them. The larger the price divergence, the greater the impermanent loss.',
-      'VibeSwap provides IL protection through the ShapleyDistributor mechanism, which compensates liquidity providers based on their marginal contribution to the protocol. However, IL protection is funded by protocol fees and insurance pools, which may not be sufficient to fully compensate all losses in extreme market conditions.',
+      'VibeSwap provides IL protection through the ShapleyDistributor mechanism, which compensates liquidity providers based on their marginal contribution to the protocol. However, IL protection is funded by priority bid revenue and insurance pools, which may not be sufficient to fully compensate all losses in extreme market conditions.',
       'You should thoroughly understand impermanent loss mechanics before providing liquidity. Resources on IL calculation and risk assessment are available in the VibeSwap documentation.',
     ],
   },

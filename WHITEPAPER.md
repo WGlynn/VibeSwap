@@ -103,7 +103,7 @@ The IL Protection Vault tracks LP positions with entry prices and provides tiere
 | Standard | 30 days | 50% |
 | Premium | 90 days | 80% |
 
-Funded by a portion of protocol fees, this vault pays claims when LPs withdraw at a loss relative to holding.
+Funded by priority bid revenue and penalty redistributions, this vault pays claims when LPs withdraw at a loss relative to holding.
 
 *Effect:* LP'ing becomes more predictable. Reduced IL risk attracts more liquidity, which reduces slippage for traders.
 
@@ -124,7 +124,7 @@ Early exit penalties are redistributed: **70% to remaining LPs, 30% to treasury.
 
 ### 3.5 Slippage Guarantee Fund
 
-When executed price falls short of quoted price, the Slippage Guarantee Fund covers the difference (up to 2% of trade value). Funded by 5% of protocol fees.
+When executed price falls short of quoted price, the Slippage Guarantee Fund covers the difference (up to 2% of trade value). Funded by 5% of priority bid revenue.
 
 *Effect:* Traders have execution certainty. Guaranteed fills build trust and volume.
 

@@ -109,7 +109,7 @@ const CONTRACTS = [
     chain: 'Ethereum',
     chainColor: '#627eea',
     verified: true,
-    description: 'Main orchestrator contract. Routes orders between commit-reveal auctions and AMM, manages protocol state and fee collection.',
+    description: 'Main orchestrator contract. Routes orders between commit-reveal auctions and AMM, manages protocol state and LP fee routing.',
     compiler: 'v0.8.20+commit.a1b79de6',
     license: 'MIT',
     proxy: 'UUPS (EIP-1967)',

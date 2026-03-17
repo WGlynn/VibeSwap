@@ -126,7 +126,7 @@ Compare this to VIBE's three sinks:
 
 Both systems split emission into multiple sinks, avoid concentrating into one recipient type, and create feedback loops where emission benefits the entities that make the system work.
 
-CKB's state rent deepens the parallel: state occupants pay implicit rent (locked CKB foregoes NervosDAO returns), funding the commons. VIBE's accumulation pool follows the same logic: protocol fees accumulate in the Shapley pool and distribute to contributors. Traders pay. Contributors earn.
+CKB's state rent deepens the parallel: state occupants pay implicit rent (locked CKB foregoes NervosDAO returns), funding the commons. VIBE's accumulation pool follows the same logic: priority bid revenue accumulates in the Shapley pool and distributes to contributors. Traders pay. Contributors earn.
 
 ### Cell Model for Emission Tracking
 

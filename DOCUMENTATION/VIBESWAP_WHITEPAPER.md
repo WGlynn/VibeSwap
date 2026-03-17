@@ -543,7 +543,7 @@ getEmissionMultiplier(era) = PRECISION >> era  // Bit shift = divide by 2^era
 
 Participants who bootstrap the protocol during Era 0 receive the highest rewards. As the protocol matures:
 - Rewards decrease predictably
-- Fee revenue becomes primary income source
+- LP fees and priority bid revenue become primary income source
 - Token economics stabilize
 - No perpetual inflation tax
 
@@ -631,7 +631,7 @@ Community-funded protection against systemic risks:
 
 | Risk Type | Coverage | Funded By |
 |-----------|----------|-----------|
-| Smart contract bugs | 80% | Protocol fees (10%) |
+| Smart contract bugs | 80% | Priority bid revenue |
 | Oracle failures | 60% | Slashed stakes |
 | Governance attacks | 50% | Violation penalties |
 | Market manipulation | 40% | Dynamic fee excess |

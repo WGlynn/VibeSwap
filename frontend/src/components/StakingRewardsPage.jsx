@@ -182,7 +182,7 @@ export default function StakingRewardsPage() {
   if (!isConnected) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <PageHero title="Staking Rewards" subtitle="Stake JUL to earn protocol revenue, compound your yield, and climb the tier ladder." category="defi" />
+        <PageHero title="Staking Rewards" subtitle="Stake JUL to earn rewards, compound your yield, and climb the tier ladder." category="defi" />
         <GlassCard glowColor="terminal" className="max-w-md mx-auto p-8 text-center mt-8">
           <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 20 }}>
@@ -196,7 +196,7 @@ export default function StakingRewardsPage() {
               Connect to View <span style={{ color: CYAN }}>Rewards</span>
             </h2>
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">
-              Stake JUL tokens to earn protocol fees, unlock tier multipliers, and compound your returns.
+              Stake JUL tokens to earn rewards, unlock tier multipliers, and compound your returns.
             </p>
             <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
               style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>
@@ -211,7 +211,7 @@ export default function StakingRewardsPage() {
   // ============ Connected ============
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
-      <PageHero title="Staking Rewards" subtitle="Stake JUL to earn protocol revenue, compound your yield, and climb the tier ladder."
+      <PageHero title="Staking Rewards" subtitle="Stake JUL to earn rewards, compound your yield, and climb the tier ladder."
         category="defi" badge="Live" badgeColor="#22c55e" />
 
       {/* ============ 01. Stats Row ============ */}

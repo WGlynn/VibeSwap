@@ -66,9 +66,9 @@ const EMISSION_YEARS = [
 ]
 
 const ACCRUAL_CARDS = [
-  { title: 'Fee Capture', value: '0.3%', desc: 'Every swap generates protocol fees — distributed to stakers, treasury, and buyback.', color: MATRIX, icon: '\u2694' },
-  { title: 'Buyback & Burn', value: '15%', desc: 'Of all protocol fees used to buy JUL on open market and send to dead address.', color: '#ef4444', icon: '\uD83D\uDD25' },
-  { title: 'Staking Rewards', value: '8-14%', desc: 'Real yield from protocol fees, not inflationary emissions. Lock longer for higher APR.', color: CYAN, icon: '\u26A1' },
+  { title: 'Zero Protocol Fees', value: '0%', desc: 'Zero protocol fees on swaps — 100% of LP fees go to liquidity providers.', color: MATRIX, icon: '\u2694' },
+  { title: 'Buyback & Burn', value: '15%', desc: 'Of priority bid revenue used to buy JUL on open market and send to dead address.', color: '#ef4444', icon: '\uD83D\uDD25' },
+  { title: 'Staking Rewards', value: '8-14%', desc: 'Real yield from priority bid revenue and emissions. Lock longer for higher APR.', color: CYAN, icon: '\u26A1' },
   { title: 'Governance Power', value: '1:1', desc: 'Staked JUL = voting weight. Quadratic scaling prevents whale domination.', color: '#8b5cf6', icon: '\u2696' },
 ]
 
@@ -93,13 +93,13 @@ const DEFLATIONARY_FORCES = [
 
 const COMPARISON = [
   { f: 'Max Supply', jul: '1B (elastic burn)', uni: '1B (fixed)', cake: 'Uncapped (deflationary)', crv: '3.03B (inflationary)' },
-  { f: 'Fee Sharing', jul: '40% to stakers', uni: 'None (fee switch off)', cake: 'Burn only', crv: '50% to veCRV' },
-  { f: 'Burn Mechanism', jul: '15% of fees burned', uni: 'No burns', cake: 'Weekly manual burns', crv: 'No burns' },
+  { f: 'Fee Sharing', jul: '100% LP fees to LPs', uni: 'None (fee switch off)', cake: 'Burn only', crv: '50% to veCRV' },
+  { f: 'Burn Mechanism', jul: '15% of auction revenue burned', uni: 'No burns', cake: 'Weekly manual burns', crv: 'No burns' },
   { f: 'Governance', jul: 'Quadratic + time-weight', uni: '1 token = 1 vote', cake: 'Snapshot voting', crv: 'veCRV lock 4yr' },
   { f: 'Vesting', jul: '4yr vest, 1yr cliff', uni: '4yr vest (team)', cake: 'No team vesting', crv: 'Continuous emission' },
   { f: 'MEV Protection', jul: 'Commit-reveal batches', uni: 'None', cake: 'None', crv: 'None' },
   { f: 'Cross-chain', jul: 'Native (LayerZero)', uni: 'Bridge dependent', cake: 'BSC + some L2s', crv: 'Bridge dependent' },
-  { f: 'Real Yield', jul: 'Yes (fee revenue)', uni: 'No', cake: 'Partial (staking)', crv: 'Yes (trading fees)' },
+  { f: 'Real Yield', jul: 'Yes (priority bid revenue)', uni: 'No', cake: 'Partial (staking)', crv: 'Yes (trading fees)' },
 ]
 
 // ============ SVG Pie Chart ============

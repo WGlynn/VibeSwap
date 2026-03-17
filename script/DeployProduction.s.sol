@@ -307,9 +307,9 @@ contract DeployProduction is Script {
         VibeAMM(amm).setTreasury(feeAdapter);
         console.log("  VibeAMM treasury -> ProtocolFeeAdapter");
 
-        // Enable protocol fee share (10% of trading fees to protocol)
-        VibeAMM(amm).setProtocolFeeShare(1000);
-        console.log("  VibeAMM protocolFeeShare -> 10% (1000 bps)");
+        // Zero protocol fees — 100% to LPs
+        VibeAMM(amm).setProtocolFeeShare(0);
+        console.log("  VibeAMM protocolFeeShare -> 0% (zero protocol fees)");
     }
 
     function _configureAuthorizations() internal {
@@ -417,7 +417,7 @@ contract DeployProduction is Script {
         require(feeAdapter.code.length > 0, "FeeAdapter has no code");
         require(buybackEngine.code.length > 0, "BuybackEngine has no code");
         require(VibeAMM(amm).treasury() == feeAdapter, "AMM treasury should be FeeAdapter");
-        require(VibeAMM(amm).protocolFeeShare() == 1000, "AMM protocolFeeShare should be 1000");
+        require(VibeAMM(amm).protocolFeeShare() == 0, "AMM protocolFeeShare should be 0");
         require(FeeRouter(feeRouter).isAuthorizedSource(feeAdapter), "FeeAdapter not authorized on FeeRouter");
         require(ProtocolFeeAdapter(payable(feeAdapter)).feeRouter() == feeRouter, "FeeAdapter feeRouter mismatch");
 

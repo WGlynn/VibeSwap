@@ -394,7 +394,7 @@ function SwapHistoryPage() {
               <StatBox label="Total Swaps" value={stats.totalSwaps} sub="all time" />
               <StatBox label="Volume" value={fmtUsd(stats.totalVolume)} sub="total traded" />
               <StatBox label="Avg Saved" value={fmtUsd(stats.avgSaved)} sub="per swap (MEV)" color="#4ade80" />
-              <StatBox label="Fees Paid" value={fmtUsd(stats.totalFees)} sub="protocol fees" />
+              <StatBox label="Fees Paid" value={fmtUsd(stats.totalFees)} sub="trading fees (to LPs)" />
             </div>
           </GlassCard>
         </motion.div>

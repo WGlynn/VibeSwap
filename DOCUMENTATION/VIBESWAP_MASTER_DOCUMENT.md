@@ -2262,7 +2262,7 @@ Community-funded protection against systemic risks:
 
 | Risk Type | Coverage | Funded By |
 |-----------|----------|-----------|
-| Smart contract bugs | 80% | Protocol fees (10%) |
+| Smart contract bugs | 80% | Priority bid revenue |
 | Oracle failures | 60% | Slashed stakes |
 | Governance attacks | 50% | Violation penalties |
 | Market manipulation | 40% | Dynamic fee excess |
@@ -4417,7 +4417,7 @@ struct Appeal {
                     │       MUTUAL INSURANCE POOL         │
                     ├─────────────────────────────────────┤
   Funding Sources:  │                                     │
-  ├─ Protocol fees (10%)                                  │
+  ├─ Priority bid revenue                                 │
   ├─ Slashed stakes ──────►  RESERVE POOL  ◄───── Claims │
   ├─ Violation penalties         │                        │
   └─ Voluntary deposits          │                        │
@@ -5381,7 +5381,7 @@ User receives tokens + reputation
 1. Deploy SoulboundToken (non-transferable ERC-721)
 2. Deploy ReputationOracle (reads from SoulboundToken)
 3. Deploy ViolationRegistry (writes to SoulboundToken)
-4. Deploy InsurancePool (funded by protocol fees)
+4. Deploy InsurancePool (funded by priority bid revenue)
 5. Deploy AccessController (reads ReputationOracle)
 6. Deploy AppealCourt (governance-controlled)
 7. Deploy SecurityCouncil (multisig for emergencies)
@@ -6130,7 +6130,7 @@ function getLeverageParams(address user) public view returns (LeverageParams mem
                     │       MUTUAL INSURANCE POOL         │
                     ├─────────────────────────────────────┤
   Funding Sources:  │                                     │
-  ├─ Protocol fees (10%)                                  │
+  ├─ Priority bid revenue                                 │
   ├─ Slashed stakes ──────►  RESERVE POOL  ◄───── Claims │
   ├─ Violation penalties         │                        │
   └─ Voluntary deposits          │                        │
@@ -6566,7 +6566,7 @@ Verification checklist:
 1. Deploy SoulboundToken (non-transferable ERC-721)
 2. Deploy ReputationOracle (reads from SoulboundToken)
 3. Deploy ViolationRegistry (writes to SoulboundToken)
-4. Deploy InsurancePool (funded by protocol fees)
+4. Deploy InsurancePool (funded by priority bid revenue)
 5. Deploy AccessController (reads ReputationOracle)
 6. Deploy AppealCourt (governance-controlled)
 7. Deploy SecurityCouncil (multisig for emergencies)

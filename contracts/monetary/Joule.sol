@@ -476,8 +476,9 @@ contract Joule is Ownable, ReentrancyGuard, IJoule {
         // New difficulty = old * expected / actual (clamped to 4x)
         uint128 newDifficulty;
         if (elapsed == 0) {
-            // All blocks mined instantly — max increase
-            newDifficulty = oldDifficulty * uint128(MAX_ADJUSTMENT_RATIO);
+            // L-03: Use uint256 intermediate to prevent uint128 overflow at high difficulty
+            uint256 newDiff256 = uint256(oldDifficulty) * MAX_ADJUSTMENT_RATIO;
+            newDifficulty = newDiff256 > type(uint128).max ? type(uint128).max : uint128(newDiff256);
         } else if (elapsed < expectedTime) {
             // Blocks too fast — increase difficulty
             uint256 ratio = (expectedTime * PRECISION) / elapsed;

@@ -79,19 +79,30 @@ export default function VibePlayer() {
         },
         events: {
           onReady: (e) => {
+            console.log('[vibe-player] YouTube player ready')
             // Restore saved position if available
             const saved = loadPlayerState()
-            if (saved && typeof saved.index === 'number') {
-              e.target.playVideoAt(saved.index)
-              // seekTo after a short delay — player needs to load the video first
-              setTimeout(() => {
-                if (saved.time > 0) {
-                  e.target.seekTo(saved.time, true)
-                }
-              }, 500)
-            } else {
-              e.target.playVideo()
+            try {
+              if (saved && typeof saved.index === 'number') {
+                e.target.playVideoAt(saved.index)
+                setTimeout(() => {
+                  if (saved.time > 0) {
+                    e.target.seekTo(saved.time, true)
+                  }
+                }, 500)
+              } else {
+                e.target.playVideo()
+              }
+            } catch (err) {
+              console.warn('[vibe-player] Autoplay blocked or failed:', err.message)
+              setIsLoading(false)
             }
+          },
+          onError: (e) => {
+            console.warn('[vibe-player] YouTube error code:', e.data)
+            // Error codes: 2=invalid param, 5=HTML5 error, 100=not found, 101/150=not embeddable
+            setIsLoading(false)
+            setIsPlaying(false)
           },
           onStateChange: (e) => {
             // Sync UI to actual playback state

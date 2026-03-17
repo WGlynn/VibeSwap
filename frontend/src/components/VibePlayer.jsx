@@ -157,6 +157,21 @@ export default function VibePlayer() {
     if (playerRef.current?.previousVideo) playerRef.current.previousVideo()
   }, [])
 
+  const shuffle = useCallback(() => {
+    if (playerRef.current?.setShuffle) {
+      const p = playerRef.current
+      // Toggle shuffle — YT API stores shuffle state internally
+      p.setShuffle(true)
+      p.nextVideo() // Jump to random track after enabling shuffle
+    }
+  }, [])
+
+  const jumpToTrack = useCallback((index) => {
+    if (playerRef.current?.playVideoAt) {
+      playerRef.current.playVideoAt(index)
+    }
+  }, [])
+
   // Safety timeout — clear loading if player never starts (10s)
   useEffect(() => {
     if (!isLoading) return
@@ -277,6 +292,17 @@ export default function VibePlayer() {
 
           {/* Transport controls */}
           <div className="flex items-center justify-center gap-3 px-4 pb-4">
+            {/* Shuffle */}
+            <button
+              onClick={shuffle}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-black-300 hover:text-matrix-400 hover:bg-white/10 transition-colors"
+              title="Shuffle"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+              </svg>
+            </button>
+
             {/* Previous */}
             <button
               onClick={prevTrack}
@@ -315,6 +341,22 @@ export default function VibePlayer() {
                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
               </svg>
             </button>
+          </div>
+
+          {/* Quick track select — jump to track by index */}
+          <div className="px-4 pb-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => jumpToTrack(i)}
+                  className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-[11px] font-mono text-black-400 hover:text-white hover:bg-matrix-500/20 transition-colors"
+                  title={`Track ${i + 1}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

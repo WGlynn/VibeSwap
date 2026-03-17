@@ -73,6 +73,8 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
 
     // Handshakes (confirmed bidirectional pairs)
     Handshake[] private _handshakes;
+    /// @notice M-09: O(1) handshake lookup (dissolves O(n) linear scan at scale)
+    mapping(bytes32 => bool) private _handshakeMap;
 
     // BFS-computed trust scores
     mapping(address => TrustScore) private _trustScores;
@@ -194,6 +196,7 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
                     user2: to,
                     timestamp: block.timestamp
                 }));
+                _handshakeMap[_handshakeKey(msg.sender, to)] = true;
                 emit HandshakeConfirmed(msg.sender, to);
             }
         }
@@ -238,6 +241,7 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         if (isHandshake_) {
             if (!_handshakeExists(from, to)) {
                 _handshakes.push(Handshake({ user1: from, user2: to, timestamp: block.timestamp }));
+                _handshakeMap[_handshakeKey(from, to)] = true;
                 emit HandshakeConfirmed(from, to);
             }
         }
@@ -651,22 +655,27 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
 
     // ============ Internal Helpers ============
 
+    /// @notice M-09 DISSOLVED: O(1) handshake lookup via mapping.
+    /// Previous O(n) scan cost ~3M gas at 10,000 handshakes. Now constant-time.
+    function _handshakeKey(address a, address b) internal pure returns (bytes32) {
+        (address lo, address hi) = a < b ? (a, b) : (b, a);
+        return keccak256(abi.encodePacked(lo, hi));
+    }
+
     function _handshakeExists(address a, address b) internal view returns (bool) {
-        for (uint256 i = 0; i < _handshakes.length; i++) {
-            Handshake storage h = _handshakes[i];
-            if ((h.user1 == a && h.user2 == b) || (h.user1 == b && h.user2 == a)) {
-                return true;
-            }
-        }
-        return false;
+        return _handshakeMap[_handshakeKey(a, b)];
     }
 
     function _removeHandshake(address a, address b) internal {
+        bytes32 key = _handshakeKey(a, b);
+        if (!_handshakeMap[key]) return;
+        _handshakeMap[key] = false;
+
+        // Also remove from array (for enumeration)
         for (uint256 i = 0; i < _handshakes.length; i++) {
             Handshake storage h = _handshakes[i];
             if ((h.user1 == a && h.user2 == b) || (h.user1 == b && h.user2 == a)) {
                 emit HandshakeRevoked(h.user1, h.user2);
-                // Swap with last and pop
                 _handshakes[i] = _handshakes[_handshakes.length - 1];
                 _handshakes.pop();
                 return;

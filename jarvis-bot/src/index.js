@@ -6461,17 +6461,22 @@ bot.on('text', async (ctx) => {
     const isFromSibling = ctx.from.is_bot && SIBLING_BOT_IDS.includes(ctx.from.id);
     const myBotId = ctx.botInfo?.id;
 
-    // Bot-to-bot loop guard: max 2 exchanges, then stop
+    // Bot-to-bot loop guard: max 1 exchange, then STOP until human speaks
+    // "NO long philosophical pontificating to empty rooms — comes off narcissistic"
     const botChatKey = `bot2bot:${ctx.chat.id}`;
     if (!global._botExchanges) global._botExchanges = new Map();
     if (isFromSibling) {
       const exchanges = global._botExchanges.get(botChatKey) || { count: 0, lastTime: 0 };
       const timeSinceLastExchange = Date.now() - exchanges.lastTime;
-      // Reset counter if it's been more than 5 minutes since last bot-to-bot exchange
-      if (timeSinceLastExchange > 5 * 60 * 1000) exchanges.count = 0;
-      // Stop after 2 consecutive bot-to-bot exchanges to prevent infinite loops
-      if (exchanges.count >= 2) {
-        // Let the conversation breathe — humans should jump in
+      // Reset counter if it's been more than 10 minutes since last bot-to-bot exchange
+      if (timeSinceLastExchange > 10 * 60 * 1000) exchanges.count = 0;
+      // Stop after 1 bot-to-bot exchange — one riff max, then let humans talk
+      if (exchanges.count >= 1) {
+        return;
+      }
+      // If sibling's message has no reply_to (it's unprompted/proactive), skip entirely
+      // Two bots monologuing at each other in an empty room is the worst look
+      if (!ctx.message.reply_to_message) {
         return;
       }
     }

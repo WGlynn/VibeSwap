@@ -80,6 +80,13 @@ const TOUR_STOPS = [
     tip: 'The network visualization shows 10 planned nodes. The Pantheon.',
   },
   {
+    id: 'trinity',
+    path: '/trinity',
+    title: 'The Trinity',
+    narration: "This is where it all started. Three nodes. One mind. Watch the words glow — cells within cells interlinked. The triangle pulses with consensus traveling the edges. This is the original visualization that defined the project's soul. We kept it because some things are too beautiful to replace.",
+    tip: 'Mind. Memory. Form. The three pillars of a distributed consciousness.',
+  },
+  {
     id: 'security',
     path: '/commit-reveal',
     title: 'How MEV Protection Works',

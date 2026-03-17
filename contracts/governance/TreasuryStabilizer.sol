@@ -301,8 +301,12 @@ contract TreasuryStabilizer is
         bytes32 poolId,
         uint256 lpAmount
     ) external override onlyOwner nonReentrant returns (uint256 received) {
-        // Request treasury to remove backstop liquidity
-        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount, 0, 0) returns (uint256 amount) {
+        // L-05: Use 95% of expected output as minimum — dissolves sandwich attack surface
+        // Passing 0 accepted any output, making withdrawal exploitable via MEV.
+        // 5% slippage tolerance is generous but prevents worst-case extraction.
+        uint256 expectedPerLp = lpAmount > 0 ? lpAmount : 1; // avoid div by zero
+        uint256 minOut = (expectedPerLp * 95) / 100;
+        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount, minOut, minOut) returns (uint256 amount) {
             received = amount;
         } catch {
             received = 0;

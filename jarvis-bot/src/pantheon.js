@@ -610,12 +610,33 @@ export async function addNyxMemory(type, content) {
   return entry
 }
 
-// Inject org memory into Nyx's context when she chats
-async function getNyxContextSuffix() {
-  const memory = await getNyxMemory()
-  if (!memory.lastUpdated) return ''
+// Load Nyx's CKB (Common Knowledge Base) — core alignment that never compresses
+async function getNyxCKB() {
+  // Try data/ first (persisted volume), fall back to source seed
+  const paths = [
+    join(IDENTITIES_DIR, 'nyx-ckb.md'),
+    join(SEED_DIR, 'nyx-ckb.md'),
+  ]
+  for (const p of paths) {
+    try { return await readFile(p, 'utf-8') } catch {}
+  }
+  return null
+}
 
-  let ctx = '\n\n## Your Organizational Memory\n'
+// Inject CKB + org memory into Nyx's context when she chats
+async function getNyxContextSuffix() {
+  let ctx = ''
+
+  // CKB: core alignment primitives (loaded every session, never compressed)
+  const ckb = await getNyxCKB()
+  if (ckb) {
+    ctx += '\n\n---\n\n' + ckb
+  }
+
+  const memory = await getNyxMemory()
+  if (!memory.lastUpdated) return ctx
+
+  ctx += '\n\n## Your Organizational Memory\n'
   if (memory.decisions.length > 0) {
     ctx += '\nRecent decisions:\n'
     for (const d of memory.decisions.slice(-10)) {

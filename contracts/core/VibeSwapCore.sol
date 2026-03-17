@@ -964,7 +964,10 @@ contract VibeSwapCore is
     /**
      * @notice Authorize upgrade (UUPS)
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    // L-01: Validate new implementation is a contract
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Security Internal Functions ============
 

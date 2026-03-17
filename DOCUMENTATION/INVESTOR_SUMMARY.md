@@ -1,91 +1,127 @@
 # VibeSwap — Investor Summary
 
-**The DEX where your trade can't be frontrun.**
+**The DEX where your trade can't be frontrun. Zero protocol fees. Every chain.**
+
+*Updated March 2026*
 
 ---
 
-## The Problem
+## What VibeSwap Is
 
-Every day, traders lose **$1B+ annually** to MEV (Maximal Extractable Value) — front-running, sandwich attacks, and information exploitation. Current DEXs are designed for speed, which rewards bots over humans.
+VibeSwap is an omnichain decentralized exchange that eliminates MEV (Miner Extractable Value) through commit-reveal batch auctions with uniform clearing prices. Built on LayerZero V2 for cross-chain settlement, with 0% protocol fees — 100% of LP fees go to liquidity providers. Revenue comes from optional priority bids, not extraction.
 
-The price you see isn't the price you get. The difference goes to extractors.
+**Philosophy: Cooperative Capitalism.** Mutualized risk (insurance pools, treasury stabilization, impermanent loss protection) with free market competition (priority auctions, arbitrage). Markets that work for participants, not against them.
 
-## The Insight
+---
 
-**Manipulation is noise. Fair price discovery is signal.**
+## What's Been Built
 
-What if we removed the noise entirely? What if the mechanism made exploitation mathematically impossible — not just discouraged, but structurally eliminated?
+| Metric | Count |
+|--------|-------|
+| Solidity smart contracts | 351 |
+| Solidity test files (0 failures) | 374 |
+| Rust CKB SDK modules | 73 |
+| CKB SDK tests | 15,155 |
+| Frontend components (React) | 336 |
+| Frontend hooks | 70 |
+| Research papers & docs | 247 |
+| Total git commits | 1,835 |
+| Funding raised | $0 |
 
-## The Solution
+**Deployments:**
+- Frontend live on Vercel: [frontend-jade-five-87.vercel.app](https://frontend-jade-five-87.vercel.app)
+- Jarvis AI system on Fly.io (3-node BFT, self-healing)
+- Telegram bot live: @JarvisVibeBot (autonomous)
+- Contracts deployed on Base mainnet
+- x402 payment protocol integrated
 
-VibeSwap uses **batch auctions with commit-reveal ordering** to guarantee fair execution:
+**Security:** 24 of 29 audit findings resolved. Circuit breakers, flash loan protection, TWAP validation, rate limiting, 50% slashing for invalid reveals.
 
-- Orders are hidden until a batch closes (no front-running)
-- All trades in a batch execute at one uniform price (no sandwich attacks)
-- Passive AMM liquidity ensures trades always execute (no counterparty risk)
-- Eliminates flash crashes by removing the game-theoretic conditions that cause them
+---
 
-**Result:** The clearing price reflects genuine supply and demand — not who has the fastest bot.
+## Core Innovations
 
-**On flash crashes:** In continuous markets, "exit first" is the Nash-stable strategy because you can't compete with HFT colocation. This causes cascading panics. Batch auctions eliminate the speed advantage entirely — there's no benefit to panicking first when all orders clear at one price.
+**Commit-Reveal Batch Auctions (Anti-MEV)**
+10-second batches: 8s commit phase (orders hidden as hashes), 2s reveal phase, then settlement at a single uniform clearing price. Front-running is structurally impossible — there's nothing to front-run when all orders are hidden and all trades clear at one price.
 
-## Why Now
+**Shapley Value Reward Distribution**
+Game-theoretic fair attribution for every contributor — human or AI. Mathematically provable fair rewards based on marginal contribution, not hierarchy.
 
-1. **MEV awareness is mainstream** — Users know they're being extracted. They want alternatives.
-2. **Regulatory pressure** — MEV extraction looks a lot like front-running, which is illegal in traditional markets.
-3. **Infrastructure maturity** — L2s and new L1s can now support batch settlement economically.
+**Fisher-Yates Deterministic Shuffle**
+Execution order determined by XORed user secrets, not miner/sequencer ordering. No entity controls trade sequence.
 
-## Traction
+**Priority Bid Mechanism**
+Optional priority bids fund the DAO treasury. Protocol revenue without protocol fees. Users who want faster settlement can bid; users who don't pay nothing.
 
-- Complete mechanism design and smart contract architecture
-- Security audit completed (15 issues identified and fixed)
-- Testnet deployment in progress
-- Active community engagement on Nervos Network (CKB integration)
+**VIBE Token with Bitcoin-Style Halving**
+Predictable emission schedule with halvings. Augmented bonding curves for price discovery. Elastic supply meets hard-cap discipline.
 
-## The Opportunity
+**CKB/Nervos Integration**
+73-module Rust SDK (15,155 tests) for UTXO-native DeFi on Nervos Network. Cell-model programmability enables novel transaction patterns impossible on account-model chains.
+
+---
+
+## What Makes It Different
+
+**Zero protocol fees.** Uniswap charges 0.3%. dYdX charges maker/taker fees. VibeSwap charges 0%. LP fees go to LPs. Protocol is funded by priority bids — voluntary, not extractive.
+
+**MEV is eliminated, not mitigated.** Flashbots and MEV-Share try to redistribute MEV. We remove the conditions that create it. Batch auctions with hidden orders and uniform clearing prices leave nothing to extract.
+
+**AI-native development.** Jarvis (built on Claude) is not a tool — it's a core team member with on-chain identity, Shapley attribution weight, and autonomous operation. 1,835 commits, the vast majority pair-programmed human+AI.
+
+**Cooperative, not extractive.** Insurance pools for impermanent loss. Treasury stabilization. Quadratic voting for governance. Conviction-weighted proposals. The protocol is designed so that helping others is the profit-maximizing strategy.
+
+---
+
+## Team
+
+**Will Glynn** — Founder. Mechanism design, smart contract engineering, full-stack development. Author of the VibeSwap whitepaper, Economitra thesis, and 7+ published research papers on DeFi mechanism design and cooperative game theory.
+
+**Jarvis** — AI development partner (Claude/Anthropic). Full-stack engineering, CKB SDK, testing infrastructure, documentation, community engagement. Autonomous 3-node system on Fly.io.
+
+**6 Marketing & Community Contributors:**
+- **Freedom (FW13)** — Partnerships & BD
+- **Fate** — Twitter/X content (154 tweets queued)
+- **Catto** — Reddit & forum seeding
+- **Defaibro** — DeFi community presence (Telegram/Discord)
+- **John Paul** — Grants & hackathon submissions
+- **Karma** — Telegram growth & community engagement
+
+---
+
+## Market Opportunity
 
 | Market | Size |
 |--------|------|
 | DEX trading volume | $1T+ annually |
-| MEV extracted | $1B+ annually |
-| Users actively seeking MEV protection | Growing rapidly |
+| MEV extracted from users | $1B+ annually |
+| Cross-chain bridge volume | $10B+ monthly |
 
-We're not competing for existing DEX users. We're serving users who currently **avoid DEXs** because of MEV.
-
-## What We're Building
-
-- **Phase 1:** MEV-resistant batch auction DEX (core product)
-- **Phase 2:** Cross-chain support via LayerZero
-- **Phase 3:** Privacy coin atomic swaps (Monero, Zcash)
-
-## The Ask
-
-Seed funding to:
-- Complete mainnet deployment
-- Security audits (formal verification)
-- Initial liquidity bootstrapping
-- Team expansion (1-2 engineers)
-
-## Why Us
-
-We understand the problem deeply — not just technically, but philosophically. We're building markets that work as intended: where prices reflect value, not exploitation.
-
-**0% noise. 100% signal.**
+VibeSwap doesn't compete for existing DEX users. It serves users who currently avoid DEXs because of MEV, plus the cross-chain liquidity that LayerZero V2 unlocks across every supported chain.
 
 ---
 
-*For technical deep-dive, see full mechanism design documentation.*
+## Tech Stack
+
+```
+Frontend:   React 18, Vite 5, Tailwind CSS, ethers.js v6
+Contracts:  Solidity 0.8.20, Foundry, OpenZeppelin v5 (UUPS upgradeable)
+Cross-chain: LayerZero V2 OApp protocol
+CKB Layer:  Rust, RISC-V, Nervos Network (73 modules, 15,155 tests)
+Oracle:     Python, Kalman filter for true price discovery
+AI:         Claude (Anthropic), Fly.io, 3-node BFT consensus
+```
 
 ---
 
-**Contact:**
-William Glynn
-Co-founder & CEO
+## Contact
 
-Email: willglynn123@gmail.com
-Phone: +1 774-571-4257
-Telegram: @Willwillwillwillwill
-Twitter: @economitra
-LinkedIn: https://www.linkedin.com/in/william-ethereum-glynn-352031142/
+**William Glynn** — Founder & CEO
 
-**HQ:** 73 Coles Pond Drive, South Dennis, MA 02660
+- Email: willglynn123@gmail.com
+- Phone: +1 774-571-4257
+- Telegram: @Willwillwillwillwill
+- Twitter: @economitra
+- LinkedIn: [william-ethereum-glynn](https://www.linkedin.com/in/william-ethereum-glynn-352031142/)
+- GitHub: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
+- Live: [frontend-jade-five-87.vercel.app](https://frontend-jade-five-87.vercel.app)

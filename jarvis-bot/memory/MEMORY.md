@@ -27,13 +27,13 @@
 3. Check this MEMORY.md for recent state
 4. `git pull` both remotes
 
-## Codebase Stats (Feb 21, 2026)
-- **EVM**: 130 .sol files | 55 interfaces | 12 libraries | **1200+ Solidity tests passing**
-- **CKB**: 15 Rust crates (4 libs + 8 scripts + 1 SDK + 1 deploy + 1 test) | **190 Rust tests** | **ALL 7 PHASES + RISC-V + SDK COMPLETE**
+## Codebase Stats (Mar 17, 2026)
+- **EVM**: 351 .sol files | 88 interfaces | 13 libraries | **374 Solidity test files**
+- **CKB**: 73 Rust modules | **15,155 SDK tests** | **ALL 7 PHASES + RISC-V + SDK COMPLETE**
 - **CKB SDK**: 9 tx builders (commit, reveal, pool, add/remove LP, settle batch, oracle, config, compliance)
 - **CKB RISC-V**: 8 ELF binaries (117-192 KB), deploy.json with blake2b code hashes, Makefile build system
-- **Frontend**: 51 components | 14 hooks | 5 deploy scripts
-- **181 Solidity test files** (60 unit, 45 fuzz, 41 invariant, 3 integration, 6 gametheory, 5 security, 2 stress)
+- **Frontend**: 336 components | 70 hooks | 147 pages | deployed on Vercel
+- **Total commits**: 1,835 | **Research papers**: 44 | **Documentation files**: 242
 - Phase 1: Complete | Phase 2 Financial: 10/10 | **Protocol/Framework: 10/10 COMPLETE** | **Mechanism: 10/10 COMPLETE**
 - Identity Layer: ContributionDAG + RewardLedger + CYT + GitHubContributionTracker + ContributionAttestor + **VibeCode** + **AgentRegistry** + **ContextAnchor** + **PairwiseVerifier**
 - **PsiNet Merge**: ERC-8004 AI agent identities + CRPC verification + context graph anchoring (Session 26)

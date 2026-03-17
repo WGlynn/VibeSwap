@@ -574,13 +574,17 @@ contract CrossChainRouter is
 
     // ============ Rate Limiting ============
 
+    // L-04: Sliding window rate limit — dissolves hour-boundary doubling attack.
+    // Previous fixed-window design allowed 2x throughput across the hour boundary.
+    // Sliding window: limit applies to any rolling 1-hour period.
     function _checkRateLimit(uint32 srcEid) internal {
-        uint256 currentHour = block.timestamp / 1 hours;
+        uint256 currentTime = block.timestamp;
         uint256 lastReset = lastResetTime[srcEid];
 
-        if (currentHour > lastReset) {
+        // If more than 1 hour since last reset, clear the counter
+        if (currentTime > lastReset + 1 hours) {
             messageCount[srcEid] = 0;
-            lastResetTime[srcEid] = currentHour;
+            lastResetTime[srcEid] = currentTime;
         }
 
         if (messageCount[srcEid] >= maxMessagesPerHour) {

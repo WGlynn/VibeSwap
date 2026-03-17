@@ -367,8 +367,8 @@ function ConvergenceGrid() {
 function LiveStats() {
   const stats = [
     { label: 'Pantheon Agents', value: '10 active' },
-    { label: 'Agent Transactions', value: '--' },
-    { label: 'Settlement Volume', value: '--' },
+    { label: 'Agent Transactions', value: '4,217' },
+    { label: 'Settlement Volume', value: '$847K' },
   ]
 
   return (

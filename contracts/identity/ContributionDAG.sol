@@ -311,11 +311,9 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
             queueTail++;
         }
 
-        // Track visited (founders already visited)
-        mapping(address => bool) storage visited = _isFounder;
-        // We need a separate visited tracking that doesn't corrupt _isFounder
-        // Use a temporary approach: score existence check
-        // If _trustScores[user].score > 0 || _trustScores[user].isFounder, they're visited
+        // H-06 DISSOLVED: Removed dead storage alias `visited = _isFounder` that could
+        // corrupt founder status if accidentally written to. BFS tracks visited nodes via
+        // _trustScores[user].score > 0 || _trustScores[user].isFounder instead.
 
         while (queueHead < queueTail) {
             address user = queueUsers[queueHead];

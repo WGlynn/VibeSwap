@@ -411,6 +411,15 @@ contract ShapleyDistributor is
         // ABC Conservation Gate: no games created when curve is under stress
         _requireABCHealthy(gameId);
 
+        // H-03 DISSOLVED: Verify contract holds enough tokens to cover the game.
+        // Early claimers can't drain late claimers — the game simply can't be created
+        // if the backing isn't there. Attack surface dissolved at creation, not at claim.
+        if (token == address(0)) {
+            require(address(this).balance >= totalValue, "Insufficient ETH for game");
+        } else {
+            require(IERC20(token).balanceOf(address(this)) >= totalValue, "Insufficient tokens for game");
+        }
+
         // Apply halving ONLY for TOKEN_EMISSION games (not fee distribution)
         // Fee distribution is time-neutral: same work = same reward regardless of era
         // See: docs/TIME_NEUTRAL_TOKENOMICS.md §4.1

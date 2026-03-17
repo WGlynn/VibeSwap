@@ -300,7 +300,8 @@ contract DAOTreasury is
      * @notice Execute a queued withdrawal after timelock
      * @param requestId Withdrawal request ID
      */
-    function executeWithdrawal(uint256 requestId) external nonReentrant {
+    // H-02 DISSOLVED: Only owner or recipient can execute — dissolves front-run timing attack
+    function executeWithdrawal(uint256 requestId) external nonReentrant onlyOwnerOrBackstopOperator {
         WithdrawalRequest storage request = withdrawalRequests[requestId];
 
         require(!request.executed, "Already executed");

@@ -46,6 +46,9 @@ contract LiquidityGauge is ILiquidityGauge, Ownable, ReentrancyGuard {
     uint256 private _epochStartTime;
     uint256 private _totalWeight;
 
+    /// @notice M-03: Track emissions during zero-staker periods for redistribution
+    uint256 public unallocatedEmissions;
+
     // Pool ID → gauge info
     mapping(bytes32 => GaugeInfo) private _gauges;
     bytes32[] private _gaugeIds;
@@ -277,10 +280,16 @@ contract LiquidityGauge is ILiquidityGauge, Ownable, ReentrancyGuard {
     function _updateReward(bytes32 poolId, address account) internal {
         GaugeInfo storage gauge = _gauges[poolId];
 
+        uint256 elapsed = block.timestamp - gauge.lastUpdateTime;
         if (gauge.totalStaked > 0 && _totalWeight > 0) {
-            uint256 elapsed = block.timestamp - gauge.lastUpdateTime;
             uint256 gaugeEmissions = (_emissionRate * elapsed * gauge.weight) / _totalWeight;
-            gauge.rewardPerTokenStored += (gaugeEmissions * PRECISION) / gauge.totalStaked;
+            // M-03 DISSOLVED: Include unallocated emissions from zero-staker periods
+            uint256 totalReward = gaugeEmissions + unallocatedEmissions;
+            unallocatedEmissions = 0;
+            gauge.rewardPerTokenStored += (totalReward * PRECISION) / gauge.totalStaked;
+        } else if (_totalWeight > 0 && gauge.weight > 0) {
+            // M-03: No stakers — accumulate emissions for redistribution instead of losing them
+            unallocatedEmissions += (_emissionRate * elapsed * gauge.weight) / _totalWeight;
         }
 
         gauge.lastUpdateTime = block.timestamp;

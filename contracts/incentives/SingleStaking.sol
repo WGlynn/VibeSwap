@@ -139,6 +139,9 @@ contract SingleStaking is ISingleStaking, Ownable, ReentrancyGuard {
     function notifyRewardAmount(uint256 amount, uint256 duration) external onlyOwner updateReward(address(0)) {
         if (amount == 0) revert ZeroAmount();
         if (duration == 0) revert ZeroAmount();
+        // M-04 DISSOLVED: Minimum 1-day duration prevents reward rate manipulation
+        // via ultra-short durations that cause precision loss in rate calculation
+        require(duration >= 1 days, "M-04: Duration too short");
 
         IERC20(_rewardToken).safeTransferFrom(msg.sender, address(this), amount);
 

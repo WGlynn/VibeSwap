@@ -17,7 +17,7 @@ contract VibeLP is ERC20, Ownable {
     address public immutable token1;
 
     /// @notice Minimum liquidity locked forever
-    uint256 public constant MINIMUM_LIQUIDITY = 1000;
+    uint256 public constant MINIMUM_LIQUIDITY = 10000;
 
     /// @notice Whether minimum liquidity has been locked
     bool public minimumLiquidityLocked;

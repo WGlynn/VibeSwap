@@ -13,16 +13,17 @@ That's it! VibeSwap now appears as an app on your home screen.
 
 ---
 
-A clean, Uniswap-style interface for the VibeSwap MEV-resistant omnichain DEX.
+Full-featured frontend for the VibeSwap MEV-resistant omnichain DEX. 336 React components, 70 custom hooks, 147 pages. Deployed on Vercel.
 
 ## Features
 
-- 🔄 **Token Swapping** - Clean swap interface with real-time quotes
-- 🛡️ **MEV Protection** - Commit-reveal batch auction visualization
-- 💧 **Liquidity Pools** - Add/remove liquidity with pool analytics
-- 🌐 **Multi-chain** - Support for Ethereum, Arbitrum, Optimism, Base, Polygon
-- 👛 **Wallet Connect** - MetaMask and other Web3 wallet support
-- 🎨 **Dark Theme** - Modern, clean UI inspired by Uniswap
+- **336 React components** across Swap, Pool, Bridge, Staking, Governance, Analytics, Treasury, Shapley, Emissions, CRPC, Trinity, x402, and many more pages
+- **70 custom hooks** including useWallet, useDeviceWallet, useBalances, useAuction, useBridge, and more
+- **Dual wallet support** — external wallets (MetaMask, WalletConnect) and device wallets (WebAuthn/passkeys via Secure Element)
+- **MEV protection visualization** — commit-reveal batch auction timer and phase display
+- **Multi-chain** — Ethereum, Arbitrum, Optimism, Base, Polygon via LayerZero V2
+- **Dark theme** with cyan/green accents, responsive design
+- **Deployed** at https://frontend-jade-five-87.vercel.app
 
 ## Quick Start
 
@@ -42,24 +43,14 @@ npm run build
 ```
 frontend/
 ├── src/
-│   ├── components/
-│   │   ├── Header.jsx         # Navigation and wallet connect
-│   │   ├── SwapPage.jsx       # Main swap interface
-│   │   ├── PoolPage.jsx       # Liquidity pools
-│   │   ├── TokenSelector.jsx  # Token selection modal
-│   │   ├── BatchTimer.jsx     # Commit-reveal phase timer
-│   │   └── SettingsModal.jsx  # Slippage settings
-│   ├── hooks/
-│   │   └── useWallet.jsx      # Wallet connection hook
-│   ├── utils/
-│   │   ├── constants.js       # Contract addresses, tokens
-│   │   └── format.js          # Number formatting utilities
-│   ├── abis/                  # Contract ABIs
-│   ├── App.jsx                # Main app component
-│   ├── main.jsx               # Entry point
-│   └── index.css              # Tailwind styles
-├── public/
-│   └── vibe-icon.svg          # Logo
+│   ├── components/        # 336 React components (pages, modals, widgets, layouts)
+│   ├── hooks/             # 70 custom hooks (wallet, balances, auction, bridge, etc.)
+│   ├── utils/             # Constants, formatting, helpers
+│   ├── abis/              # Contract ABIs
+│   ├── App.jsx            # Main app with routing
+│   ├── main.jsx           # Entry point
+│   └── index.css          # Tailwind styles
+├── public/                # Static assets, PWA manifest
 └── package.json
 ```
 
@@ -129,11 +120,10 @@ The `BatchTimer` component shows the current batch phase:
 
 ### Wallet Integration
 
-The `useWallet` hook provides:
-- Connection state management
-- Chain switching
-- Auto-reconnection
-- Event listeners for account/chain changes
+Two wallet systems, unified across all pages:
+- **useWallet** — external wallets (MetaMask, injected providers): connection state, chain switching, auto-reconnection
+- **useDeviceWallet** — device wallets (WebAuthn/passkeys): keys stored in Secure Element, never leave the device
+- Combined state: `isConnected = isExternalConnected || isDeviceConnected`
 
 ## Development
 
@@ -157,11 +147,9 @@ npm run build
 # Output is in dist/
 ```
 
-Deploy the `dist/` folder to any static hosting:
-- Vercel
-- Netlify
-- IPFS
-- GitHub Pages
+Currently deployed on Vercel: https://frontend-jade-five-87.vercel.app
+
+The `dist/` folder can also be deployed to Netlify, IPFS, or GitHub Pages.
 
 ## License
 

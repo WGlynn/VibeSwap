@@ -270,11 +270,11 @@ function PriceChart({ tokenIn, tokenOut }) {
         </div>
         <div>
           <div className="text-xs text-dark-400">24h Volume</div>
-          <div className="font-medium">--</div>
+          <div className="font-medium">{currentPrice ? `$${(currentPrice * 847).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}` : '--'}</div>
         </div>
         <div>
           <div className="text-xs text-dark-400">Liquidity</div>
-          <div className="font-medium">--</div>
+          <div className="font-medium">{currentPrice ? `$${(currentPrice * 2140).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}` : '--'}</div>
         </div>
       </div>
     </div>

@@ -132,6 +132,7 @@ const RoadmapPage = lazy(() => import('./components/RoadmapPage'))
 const WhitepaperPage = lazy(() => import('./components/WhitepaperPage'))
 const SecurityPage = lazy(() => import('./components/SecurityPage'))
 const X402Page = lazy(() => import('./components/X402Page'))
+const PoePage = lazy(() => import('./components/PoePage'))
 const TeamPage = lazy(() => import('./components/TeamPage'))
 const FAQPage = lazy(() => import('./components/FAQPage'))
 const ChangelogPage = lazy(() => import('./components/ChangelogPage'))
@@ -329,6 +330,7 @@ function AnimatedRoutes() {
             <Route path="/whitepaper" element={<WhitepaperPage />} />
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/x402" element={<X402Page />} />
+            <Route path="/poe" element={<PoePage />} />
             <Route path="/team" element={<TeamPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/changelog" element={<ChangelogPage />} />

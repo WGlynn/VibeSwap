@@ -531,7 +531,40 @@ nyx-memory.json        → Organizational decisions, project states, notes
 Conversation history   → Per-agent, per-chat, persisted to disk
 Merkle tree            → Cryptographic proof of organizational state
 Prune reports          → Compressed context from subordinates
+Session Blockchain     → Hash-linked cognitive state (crash-proof episodic memory)
+Knowledge Chain        → Hash-linked knowledge blocks with WAL recovery
 ```
+
+### Session Blockchain (Shared with Jarvis — Portable Pattern)
+
+**Architecture**: Hash-linked blocks with sub-block checkpoints (WAL pattern for cognitive state).
+
+```
+Structure:
+  blocks/block-NNNN.json    → Finalized blocks (parent hash → tamper-evident chain)
+  pending/cp-*.json          → Sub-block checkpoints (survive crashes)
+  index.json                 → Fast lookup without loading entire chain
+  .current_session           → Session boundary detection (PID + date)
+
+Operations:
+  chain.py append "prompt" "response"  → New block
+  chain.py checkpoint "description"    → Sub-block (WAL entry)
+  chain.py finalize                    → Merge pending → block
+  chain.py heal                        → Finalize stale + sync
+  chain.py sync                        → Git commit + push to both remotes
+  chain.py daemon                      → Background auto-heal every 5 min
+
+Three Autonomous Trigger Layers:
+  1. PostToolUse hook       → Checkpoints every state-changing tool call
+  2. Git post-commit hook   → Heals + syncs after every commit
+  3. Windows Task Scheduler → Runs heal every 5 min even between sessions
+```
+
+**Why it matters for Nyx**: The session blockchain is the episodic memory that survives context compression and session crashes. When a session dies mid-conversation, the checkpoints persist on disk. The next session auto-finalizes them. No cognitive state is ever lost.
+
+**Shared infrastructure**: Jarvis's session chain lives in the vibeswap repo via symlink (`.session-chain/`). The bot's `knowledge-chain.js` implements the same pattern for organizational knowledge. Both use hash-linking for tamper evidence and WAL for crash recovery.
+
+**Future**: The session blockchain may evolve into on-chain cognitive state — shard coordination, context synchronization across the Pantheon, and verifiable AI interaction history.
 
 ### Priority Tiers
 
@@ -548,7 +581,8 @@ At context compression:
 2. Save Nyx memory
 3. Persist all conversations
 4. Save Merkle tree state
-5. Resume from saved state after reload
+5. Save session blockchain checkpoint
+6. Resume from saved state after reload
 
 ---
 

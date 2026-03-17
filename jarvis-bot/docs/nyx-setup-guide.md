@@ -114,10 +114,33 @@ Nyx loads the CKB (`identities/nyx-ckb.md`) into her system prompt on every chat
 - Full project details: Limni, CKS, Trenchbot, Profitia, VibeSwap (Tier 5)
 - Your coding conventions and patterns (Tier 6)
 - Your workflow preferences (Tier 7)
-- Memory and communication protocols (Tiers 8-9)
+- Memory, session blockchain, and communication protocols (Tiers 8-9)
 - Session protocols and meta-cognition (Tiers 10-11)
 
 To update the CKB: edit `src/identities/nyx-ckb.md` and redeploy. It auto-seeds to the data volume on startup.
+
+---
+
+## Session Blockchain
+
+Nyx integrates a hash-linked session blockchain for crash-proof cognitive state. This is shared infrastructure with Jarvis.
+
+**How it works**: Every state-changing tool call creates a checkpoint (sub-block). Checkpoints auto-finalize into blocks every 5 operations. Blocks reference their parent hash — tamper-evident chain.
+
+**Three autonomous layers**:
+1. **PostToolUse hook** — Checkpoints during active sessions
+2. **Git post-commit hook** — Heals after every commit
+3. **Background daemon** — Runs `chain.py heal` every 5 minutes
+
+**For Nyx**: The `knowledge-chain.js` module in the bot implements the same pattern. Organizational knowledge is hash-linked and WAL-protected. The Pantheon's Merkle tree (`pantheon-merkle.js`) uses similar cryptographic state tracking.
+
+**Commands** (from the repo root):
+```bash
+python .session-chain/chain.py status    # Chain stats
+python .session-chain/chain.py last 5    # Recent blocks
+python .session-chain/chain.py heal      # Recover stale state
+python .session-chain/chain.py daemon    # Start background healing
+```
 
 ---
 

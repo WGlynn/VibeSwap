@@ -328,6 +328,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
       { path: '/security', label: 'Security', icon: '🛡' },
       { path: '/x402', label: 'x402 Payments', icon: '💳' },
       { path: '/poe', label: 'POE Revaluation', icon: '📜' },
+      { path: '/shapley', label: 'Shapley Rewards', icon: '⚖' },
       { path: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
       { path: '/referral', label: 'Referrals', icon: '🤝' },
       { path: '/roadmap', label: 'Roadmap', icon: '🗺' },

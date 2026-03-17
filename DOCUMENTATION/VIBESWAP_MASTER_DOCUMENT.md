@@ -2425,7 +2425,7 @@ VibeSwap is a **protocol**, not a product. The smart contracts are:
 
 - **Immutable**: Once deployed, core logic cannot be changed
 - **Permissionless**: Anyone can interact directly with contracts
-- **Ownerless**: No admin keys, no special privileges (after initial setup)
+- **Bootstrap Governance**: Admin keys exist during initial deployment for security and upgrades. The Cincinnatus Protocol defines a transition path: (1) multisig transfer, (2) timelock governance, (3) eventual ownership renunciation. The protocol is designed to become ownerless — but honesty requires acknowledging this transition is not yet complete.
 
 ### Uniform Safety, Flexible Access
 

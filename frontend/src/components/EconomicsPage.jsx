@@ -219,7 +219,7 @@ const COOPERATIVE_MECHANISMS = [
         <polyline points="9,12 11,14 15,10" stroke="rgba(34,197,94,0.9)" strokeWidth="2" />
       </svg>
     ),
-    desc: 'Mutual insurance pool funded by a portion of swap fees. LPs who suffer impermanent loss beyond a threshold receive compensation. Risk is shared across all participants, not borne alone.',
+    desc: 'Mutual insurance pool funded by volatility fee surplus and slashing penalties. LPs who suffer impermanent loss beyond a threshold receive compensation. Risk is shared across all participants, not borne alone.',
   },
   {
     title: 'Circuit Breakers',

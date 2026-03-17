@@ -111,7 +111,7 @@ Every single one made by 1 founder + 1 AI + 6 contributors. No team. No contract
 ## Technical Architecture (For Judges Who Want Depth)
 
 ### Key Technical Decisions
-1. **On-chain commit-reveal** (not off-chain order books) — fully decentralized, no trusted solver, no centralized sequencer
+1. **On-chain commit-reveal** (not off-chain order books) — progressively decentralized, no trusted solver, no centralized sequencer, with admin keys transitioning to community governance
 2. **Fisher-Yates shuffle with XORed secrets** — each participant contributes entropy to the execution order; no single party (including the protocol) can manipulate ordering
 3. **Uniform clearing price** — computed by intersecting aggregate supply and demand curves; mathematically guarantees zero ordering advantage
 4. **50% slashing for invalid reveals** — game-theoretic griefing prevention; the expected cost of griefing always exceeds the expected benefit

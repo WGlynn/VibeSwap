@@ -155,7 +155,7 @@ const ARTICLES = [
     wordCount: 850,
     preview: 'How the community treasury accumulates, stabilizes, and deploys protocol revenue.',
     content: [
-      { heading: 'Overview', body: 'The **DAOTreasury** contract receives revenue from priority auction bids and a portion of swap fees. The **TreasuryStabilizer** ensures reserves maintain purchasing power across market cycles through diversified asset management. Disbursements require governance approval via conviction voting, ensuring the community controls how resources are deployed.' },
+      { heading: 'Overview', body: 'The **DAOTreasury** contract receives revenue from priority bid revenue and auction proceeds. The **TreasuryStabilizer** ensures reserves maintain purchasing power across market cycles through diversified asset management. Disbursements require governance approval via conviction voting, ensuring the community controls how resources are deployed.' },
     ],
   },
   {
@@ -179,7 +179,7 @@ const ARTICLES = [
     wordCount: 980,
     preview: 'How the IL Protection vault socializes the risk of providing liquidity.',
     content: [
-      { heading: 'Overview', body: 'The **ILProtection** vault socializes impermanent loss risk across all liquidity providers. A small fee on every swap funds the insurance pool. When a provider withdraws with impermanent loss exceeding a configurable threshold, the vault compensates the difference. This removes the primary barrier to LP participation and deepens protocol liquidity.' },
+      { heading: 'Overview', body: 'The **ILProtection** vault socializes impermanent loss risk across all liquidity providers. The insurance pool is funded by volatility fee surplus during high-volatility periods and slashing penalties from invalid reveals. When a provider withdraws with impermanent loss exceeding a configurable threshold, the vault compensates the difference. This removes the primary barrier to LP participation and deepens protocol liquidity.' },
     ],
   },
   {

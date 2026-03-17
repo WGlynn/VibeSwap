@@ -91,7 +91,7 @@ export const MARKETPLACE_PRIMITIVES = [
     category: 'game-theory',
     tier: 2,
     description:
-      'The unique allocation rule satisfying efficiency, symmetry, dummy player, and additivity axioms. Distributes a coalition\'s surplus based on each player\'s marginal contribution across all possible orderings. Used in VibeSwap\'s ShapleyDistributor for fair reward allocation.',
+      'The unique allocation rule satisfying five axioms: efficiency, symmetry, null player, pairwise proportionality, and time neutrality. Distributes a coalition\'s surplus based on each player\'s marginal contribution across all possible orderings. Used in VibeSwap\'s ShapleyDistributor for fair reward allocation.',
     connections: ['nash-equilibrium', 'cooperative-game-theory', 'shapley-reward-distribution'],
     claimedBy: null,
     reward: 1500,

@@ -264,7 +264,7 @@ Adapt the emphasis based on what the grant program values most:
 |---|---|---|---|
 | MEV protection | None | Partial (solver trust) | Complete (encrypted commits) |
 | Price fairness | Per-trade (no guarantee) | Solver-determined | Uniform clearing price |
-| Decentralization | Fully decentralized | Solver centralization risk | Fully on-chain |
+| Decentralization | Fully decentralized | Solver centralization risk | Progressive decentralization (Cincinnatus Protocol) |
 | Cross-chain | Limited | No | LayerZero V2 OApp |
 | LP rewards | Fee share (whale advantage) | Fee share | Shapley values (marginal contribution) |
 | Funding model | $176M+ VC | $23M+ VC | $0 — fully bootstrapped |

@@ -581,11 +581,11 @@ where:
               <GlassCard className="p-6 sm:p-8" hover={false}>
                 <SectionHeading id="shapley-distribution" number="6" title="Shapley Value Distribution" />
                 <Paragraph>
-                  Protocol fees and rewards are distributed according to <Term>Shapley values</Term> from
-                  cooperative game theory. The Shapley value uniquely satisfies four axioms: efficiency (all
+                  LP fees and token emissions are distributed according to <Term>Shapley values</Term> from
+                  cooperative game theory. The Shapley value uniquely satisfies five axioms: efficiency (all
                   value is distributed), symmetry (equal contributors receive equal rewards), null player
-                  (non-contributors receive nothing), and additivity (contributions across games are
-                  additive).<Citation number={7} />
+                  (non-contributors receive nothing), pairwise proportionality (rewards scale with relative
+                  contribution), and time neutrality (same contribution earns same reward regardless of timing).<Citation number={7} />
                 </Paragraph>
 
                 <Equation label="Shapley Value">{`phi_i = SUM over S in N\\{i} of:
@@ -771,7 +771,7 @@ where:
                   Liquidity providers who stake for a minimum of 30 days qualify for impermanent loss (IL)
                   protection funded by the insurance pool. Protection accrues linearly from 0% at day 0 to
                   100% at day 365, incentivizing long-term liquidity commitment. The insurance pool is
-                  funded by slashing penalties and a portion of trading fees.
+                  funded by slashing penalties and volatility fee surplus.
                 </Paragraph>
               </GlassCard>
             </motion.div>

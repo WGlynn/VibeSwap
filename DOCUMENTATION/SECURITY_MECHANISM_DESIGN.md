@@ -895,7 +895,7 @@ Verification checklist:
 1. Deploy SoulboundToken (non-transferable ERC-721)
 2. Deploy ReputationOracle (reads from SoulboundToken)
 3. Deploy ViolationRegistry (writes to SoulboundToken)
-4. Deploy InsurancePool (funded by protocol fees)
+4. Deploy InsurancePool (funded by priority bid revenue)
 5. Deploy AccessController (reads ReputationOracle)
 6. Deploy AppealCourt (governance-controlled)
 7. Deploy SecurityCouncil (multisig for emergencies)

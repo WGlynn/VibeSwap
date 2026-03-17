@@ -1176,6 +1176,7 @@ function SwapCore() {
   }
 
   return (
+  <>
     <div className={`h-full flex ${isAnyWalletConnected ? 'items-center' : 'items-start pt-8 sm:items-center sm:pt-0'} justify-center px-4 ${isAnyWalletConnected ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Faint radial spotlight behind the swap card */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -1419,55 +1420,61 @@ function SwapCore() {
         </motion.div>
       )}
 
-      {/* JARVIS intro — first contact */}
-      <JarvisIntro
-        isOpen={showJarvisIntro}
-        onContinue={handleJarvisIntroContinue}
-      />
-
-      {/* Welcome modal for first-time visitors */}
-      <WelcomeModal
-        isOpen={showWelcome}
-        onClose={handleWelcomeClose}
-        onGetStarted={handleWelcomeGetStarted}
-        onUseDevice={handleUseDevice}
-        deviceWalletAvailable={deviceWalletAvailable}
-        isCreatingDeviceWallet={deviceWallet.isLoading}
-      />
-
-      {/* Existing wallet detected modal */}
-      <ExistingWalletModal
-        isOpen={showExistingWallet}
-        onSignIn={handleSignInExisting}
-        onCreateNew={handleCreateNewWallet}
-        walletAddress={getStoredWalletAddress()}
-        isSigningIn={isSigningIn}
-      />
-
-      {/* Post-connection modal explaining wallet creation */}
-      <WalletCreatedModal
-        isOpen={showWalletCreated}
-        onClose={handleWalletCreatedClose}
-        onSetupRecovery={handleSetupRecovery}
-        onSetupICloudBackup={handleSetupICloudBackup}
-        walletAddress={activeAddress || ''}
-        isDeviceWallet={isDeviceConnected && !isExternalConnected}
-      />
-
-      {/* iCloud Backup Modal */}
-      <ICloudBackupModal
-        isOpen={showICloudBackup}
-        onClose={handleICloudBackupClose}
-        onComplete={handleICloudBackupComplete}
-        walletData={getDeviceWalletData()}
-      />
-
-      {/* Recovery Setup Modal */}
-      <RecoverySetup
-        isOpen={showRecoverySetup}
-        onClose={handleRecoverySetupClose}
-      />
     </div>
+
+    {/* ============ Modals — rendered OUTSIDE scroll container ============ */}
+    {/* Safari clips fixed-position elements inside overflow containers. */}
+    {/* These must be siblings of the top-level div, not nested inside it. */}
+
+    {/* JARVIS intro — first contact */}
+    <JarvisIntro
+      isOpen={showJarvisIntro}
+      onContinue={handleJarvisIntroContinue}
+    />
+
+    {/* Welcome modal for first-time visitors */}
+    <WelcomeModal
+      isOpen={showWelcome}
+      onClose={handleWelcomeClose}
+      onGetStarted={handleWelcomeGetStarted}
+      onUseDevice={handleUseDevice}
+      deviceWalletAvailable={deviceWalletAvailable}
+      isCreatingDeviceWallet={deviceWallet.isLoading}
+    />
+
+    {/* Existing wallet detected modal */}
+    <ExistingWalletModal
+      isOpen={showExistingWallet}
+      onSignIn={handleSignInExisting}
+      onCreateNew={handleCreateNewWallet}
+      walletAddress={getStoredWalletAddress()}
+      isSigningIn={isSigningIn}
+    />
+
+    {/* Post-connection modal explaining wallet creation */}
+    <WalletCreatedModal
+      isOpen={showWalletCreated}
+      onClose={handleWalletCreatedClose}
+      onSetupRecovery={handleSetupRecovery}
+      onSetupICloudBackup={handleSetupICloudBackup}
+      walletAddress={activeAddress || ''}
+      isDeviceWallet={isDeviceConnected && !isExternalConnected}
+    />
+
+    {/* iCloud Backup Modal */}
+    <ICloudBackupModal
+      isOpen={showICloudBackup}
+      onClose={handleICloudBackupClose}
+      onComplete={handleICloudBackupComplete}
+      walletData={getDeviceWalletData()}
+    />
+
+    {/* Recovery Setup Modal */}
+    <RecoverySetup
+      isOpen={showRecoverySetup}
+      onClose={handleRecoverySetupClose}
+    />
+  </>
   )
 }
 

@@ -513,9 +513,11 @@ contract VibeAMM is
             pool.totalLiquidity
         );
 
-        // FIRST DEPOSITOR ATTACK PROTECTION
-        // Lock minimum liquidity to prevent share inflation attacks
+        // FIRST DEPOSITOR ATTACK PROTECTION (M-02 dissolved)
+        // Lock minimum liquidity + require meaningful initial deposit to prevent
+        // price manipulation via extreme token ratios.
         if (isFirstDeposit) {
+            require(amount0 >= 1e15 && amount1 >= 1e15, "M-02: Minimum initial deposit");
             if (liquidity <= MINIMUM_LIQUIDITY) revert InitialLiquidityTooLow();
             // Burn minimum liquidity to dead address (prevents share manipulation)
             unchecked { liquidity -= MINIMUM_LIQUIDITY; } // Safe: checked above

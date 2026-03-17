@@ -6,6 +6,62 @@ import { recordUsage } from './compute-economics.js';
 import { getTriageModifier, getResponseModifier } from './persona.js';
 import { runLocalCRPC } from './crpc.js';
 
+// ============ Adaptive Triage — Reward Signal Feedback Loop ============
+// Paper: "On Information Self-Locking in RL for Active Reasoning of LLM agents"
+// (Zou et al., 2025) — agents get stuck in low-information loops when action
+// selection and belief tracking reinforce each other's weakness.
+//
+// Fix: inject directional critiques from reward signals into triage decisions.
+// When reward signals degrade → raise confidence threshold (be more selective).
+// When improving → lower threshold (current approach works, engage more).
+// This breaks the self-locking loop: bad engagement → negative signal →
+// higher threshold → fewer but better engagements → better signal → lower threshold.
+
+let rewardScoreCache = { score: 0.5, trend: 'stable', lastUpdate: 0 };
+const REWARD_CACHE_TTL = 60_000; // Refresh every 60s
+
+function getAdaptiveThreshold() {
+  // Lazy-load reward signal module (may not be initialized)
+  try {
+    // Refresh cache if stale
+    if (Date.now() - rewardScoreCache.lastUpdate > REWARD_CACHE_TTL) {
+      // Dynamic import to avoid circular dependency
+      const { getAdaptationRecommendations } = require('./reward-signal.js');
+      const rec = getAdaptationRecommendations?.();
+      if (rec) {
+        rewardScoreCache.score = rec.rollingScore;
+        rewardScoreCache.trend = rec.trend;
+        rewardScoreCache.lastUpdate = Date.now();
+      }
+    }
+  } catch { /* reward-signal not loaded yet — use defaults */ }
+
+  const { score, trend } = rewardScoreCache;
+
+  // Base threshold: 0.03 - 0.07 (original random range)
+  // Adaptive adjustment based on reward signals:
+  //   score < 0.3 (degrading badly) → threshold up to 0.15 (very selective)
+  //   score 0.3-0.5 (below average) → threshold 0.08-0.12
+  //   score 0.5-0.7 (healthy)       → threshold 0.03-0.07 (normal)
+  //   score > 0.7 (thriving)        → threshold 0.01-0.04 (engage more)
+  let baseThreshold;
+  if (score < 0.3) {
+    baseThreshold = 0.10 + Math.random() * 0.05; // 0.10-0.15
+  } else if (score < 0.5) {
+    baseThreshold = 0.08 + Math.random() * 0.04; // 0.08-0.12
+  } else if (score > 0.7) {
+    baseThreshold = 0.01 + Math.random() * 0.03; // 0.01-0.04
+  } else {
+    baseThreshold = 0.03 + Math.random() * 0.04; // 0.03-0.07 (original)
+  }
+
+  // Trend modifier: degrading adds +0.02, improving subtracts -0.01
+  if (trend === 'degrading') baseThreshold += 0.02;
+  else if (trend === 'improving') baseThreshold = Math.max(0.01, baseThreshold - 0.01);
+
+  return baseThreshold;
+}
+
 // ============ Proactive Intelligence ============
 // Jarvis analyzes group messages and decides autonomously when to contribute.
 // Uses Haiku for cheap/fast triage — only escalates to Sonnet/Opus when needed.
@@ -179,9 +235,11 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 
     const result = JSON.parse(jsonMatch[0]);
 
-    // Humanized confidence threshold — slight randomness avoids robotic cutoffs
-    // Sometimes JARVIS talks when he's only kinda sure, sometimes he holds back
-    const engageThreshold = 0.03 + Math.random() * 0.04; // 0.03–0.07 range
+    // Adaptive confidence threshold — driven by reward signal feedback loop
+    // When engagements produce negative signals → threshold rises (be selective)
+    // When engagements produce positive signals → threshold drops (engage more)
+    // This breaks the information self-locking loop (Zou et al., 2025)
+    const engageThreshold = getAdaptiveThreshold();
     if (result.action === 'engage' && result.confidence < engageThreshold) {
       return { action: 'observe', reason: 'low_confidence_engage' };
     }

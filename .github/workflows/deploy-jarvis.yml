@@ -1,16 +1,27 @@
-name: Deploy Jarvis
+name: Deploy Jarvis Fleet
 
-# Disabled — deploying via SSH to Hetzner VPS. Re-enable for Fly.io deployments.
 on:
-  workflow_dispatch:  # Manual trigger only
-  # push:
-  #   branches: [master]
-  #   paths:
-  #     - 'jarvis-bot/**'
+  push:
+    branches: [master]
+    paths:
+      - 'jarvis-bot/src/**'
+      - 'jarvis-bot/Dockerfile'
+      - 'jarvis-bot/package.json'
+      - 'jarvis-bot/package-lock.json'
+      - 'jarvis-bot/entrypoint.sh'
+      - 'jarvis-bot/webapp/**'
+      - 'jarvis-bot/memory/**'
+      - 'jarvis-bot/context-fallback/**'
+  workflow_dispatch:
+    inputs:
+      bots:
+        description: 'Which bots to deploy (all/jarvis/degen/chatterbox)'
+        required: false
+        default: 'all'
 
 jobs:
-  deploy:
-    name: Deploy to Fly.io
+  validate:
+    name: Pre-flight checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -18,16 +29,114 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax check (index.js)
+        run: node --check src/index.js
+
+      - name: Syntax check (chatterbox)
+        run: node --check src/chatterbox/index.js
+
+      - name: Install & audit
+        run: npm ci --omit=dev
+
+  deploy-jarvis:
+    name: Deploy JARVIS Main
+    needs: validate
+    if: ${{ github.event_name == 'push' || github.event.inputs.bots == 'all' || github.event.inputs.bots == 'jarvis' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jarvis-bot
+    steps:
+      - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Deploy
-        run: flyctl deploy --remote-only
+      - name: Deploy jarvis-vibeswap
+        run: flyctl deploy --remote-only -a jarvis-vibeswap
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      - name: Verify health
+      - name: Verify startup
         run: |
-          sleep 20
+          echo "Waiting for JARVIS to boot..."
+          sleep 30
           HEALTH=$(curl -sf https://jarvis-vibeswap.fly.dev/health || echo '{"status":"FAILED"}')
           echo "Health: $HEALTH"
-          echo "$HEALTH" | grep -q '"status":"ok"' || echo "::warning::Health check returned non-ok status"
+          if echo "$HEALTH" | grep -q '"status":"ok"'; then
+            echo "✅ JARVIS Main is online"
+          else
+            echo "❌ JARVIS Main health check failed"
+            flyctl logs -a jarvis-vibeswap --no-tail 2>&1 | tail -20
+            exit 1
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-degen:
+    name: Deploy Diablo JARVIS
+    needs: validate
+    if: ${{ github.event_name == 'push' || github.event.inputs.bots == 'all' || github.event.inputs.bots == 'degen' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jarvis-bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy jarvis-degen
+        run: flyctl deploy --remote-only -a jarvis-degen -c fly-degen.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Verify startup
+        run: |
+          echo "Waiting for Diablo to boot..."
+          sleep 30
+          HEALTH=$(curl -sf https://jarvis-degen.fly.dev/health || echo '{"status":"FAILED"}')
+          echo "Health: $HEALTH"
+          if echo "$HEALTH" | grep -q '"status":"ok"'; then
+            echo "✅ Diablo JARVIS is online"
+          else
+            echo "❌ Diablo JARVIS health check failed"
+            flyctl logs -a jarvis-degen --no-tail 2>&1 | tail -20
+            exit 1
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-chatterbox:
+    name: Deploy Chatterbox
+    needs: validate
+    if: ${{ github.event_name == 'push' || github.event.inputs.bots == 'all' || github.event.inputs.bots == 'chatterbox' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jarvis-bot/src/chatterbox
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy chatterbox-vibeswap
+        run: flyctl deploy --remote-only -a chatterbox-vibeswap
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Verify startup
+        run: |
+          echo "Chatterbox has no HTTP health endpoint — checking machine status..."
+          sleep 15
+          STATUS=$(flyctl status -a chatterbox-vibeswap --json 2>/dev/null | grep -o '"state":"[^"]*"' | head -1)
+          echo "Status: $STATUS"
+          if echo "$STATUS" | grep -q 'started'; then
+            echo "✅ Chatterbox is online"
+          else
+            echo "❌ Chatterbox may not be running"
+            flyctl logs -a chatterbox-vibeswap --no-tail 2>&1 | tail -20
+            exit 1
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -319,7 +319,7 @@ function tipEth(string calldata message) external payable;
 - **Priority Auction**: Users can bid for execution priority
 - **Uniform Clearing Price**: Batch swaps execute at a single clearing price
 - **Cross-Chain**: LayerZero V2 OApp for unified liquidity across chains
-- **DAO Treasury**: Protocol fees and backstop liquidity for store-of-value assets
+- **DAO Treasury**: Auction proceeds, priority bids, and backstop liquidity for store-of-value assets
 
 ## Architecture
 
@@ -549,13 +549,13 @@ Constant product AMM (`x*y=k`) with batch execution:
 - Uniform clearing price calculation
 - Batch swap execution
 - LP token management
-- Protocol fee collection
+- LP fee routing (100% to providers)
 
 ### DAOTreasury
 
 DAO treasury with backstop functionality:
 
-- Receives protocol fees and auction proceeds
+- Receives auction proceeds and priority bid revenue
 - Price smoothing for store-of-value assets
 - Timelock-controlled withdrawals
 - Backstop liquidity provision

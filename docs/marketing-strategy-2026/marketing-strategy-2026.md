@@ -164,7 +164,7 @@ No one can front-run because orders are encrypted during submission. No one can 
 
 > **Infrastructure for Cooperative Capitalism.**
 >
-> VibeSwap proves that self-interest and collective benefit aren't opposed — they're aligned. Protocol fees go to contributors via Shapley distribution. Governance decays to zero. The protocol becomes a natural system, not a political one.
+> VibeSwap proves that self-interest and collective benefit aren't opposed — they're aligned. Priority bid revenue goes to contributors via Shapley distribution. Governance decays to zero. The protocol becomes a natural system, not a political one.
 
 ---
 

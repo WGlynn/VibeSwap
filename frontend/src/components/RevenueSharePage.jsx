@@ -27,10 +27,10 @@ const DISTRIBUTION_SPLITS = [
 
 // ============ Fee Sources ============
 const FEE_SOURCES = [
-  { label: 'Swap Fees', daily: 12_840, pct: 52, color: CYAN },
+  { label: 'Priority Bids', daily: 12_840, pct: 52, color: CYAN },
   { label: 'Bridge Fees', daily: 5_910, pct: 24, color: '#34d399' },
   { label: 'Liquidation Fees', daily: 3_690, pct: 15, color: '#f59e0b' },
-  { label: 'Priority Bids', daily: 2_214, pct: 9, color: '#a78bfa' },
+  { label: 'Auction Proceeds', daily: 2_214, pct: 9, color: '#a78bfa' },
 ]
 
 // ============ Protocol Revenue Stats ============
@@ -137,7 +137,7 @@ export default function RevenueSharePage() {
   if (!isConnected) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <PageHero title="Revenue Share" subtitle="Protocol fees flow back to the community — cooperative capitalism in action" category="defi" />
+        <PageHero title="Revenue Share" subtitle="Priority bid revenue flows back to the community — cooperative capitalism in action" category="defi" />
         <GlassCard glowColor="terminal" className="max-w-md mx-auto p-8 text-center mt-8">
           <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 20 }}>
@@ -151,7 +151,7 @@ export default function RevenueSharePage() {
               Connect to View <span style={{ color: CYAN }}>Revenue</span>
             </h2>
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">
-              Stake JUL or provide liquidity to earn your share of protocol revenue. Every fee collected flows back to the community.
+              Stake JUL or provide liquidity to earn your share of priority bid and auction revenue. Every fee collected flows back to the community.
             </p>
             <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
               style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>
@@ -166,7 +166,7 @@ export default function RevenueSharePage() {
   // ============ Connected ============
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
-      <PageHero title="Revenue Share" subtitle="Protocol fees flow back to the community — cooperative capitalism in action"
+      <PageHero title="Revenue Share" subtitle="Priority bid revenue flows back to the community — cooperative capitalism in action"
         category="defi" badge="Live" badgeColor="#22c55e" />
 
       {/* ============ 01. Revenue Flow Diagram ============ */}
@@ -449,7 +449,7 @@ export default function RevenueSharePage() {
                 <span style={{ color: activeTab === 'staker' ? CYAN : '#34d399' }}>
                   {activeTab === 'staker' ? projections.apr.toFixed(2) : (projections.apr * 0.75).toFixed(2)}%
                 </span>
-                <span className="text-xs text-gray-500 font-normal">from protocol fees alone</span>
+                <span className="text-xs text-gray-500 font-normal">from priority bid and auction revenue</span>
               </div>
               <div className="text-[10px] font-mono text-gray-600 mt-1.5">
                 {activeTab === 'staker' ? '40% of daily revenue distributed to stakers' : '30% of daily revenue distributed to LPs'}
@@ -479,7 +479,7 @@ export default function RevenueSharePage() {
           </div>
           <div className="mt-4 p-3 rounded-xl border" style={{ background: 'rgba(0,0,0,0.15)', borderColor: '#1f2937' }}>
             <div className="text-[10px] font-mono text-gray-500 leading-relaxed text-center">
-              Projections based on current daily protocol revenue of {fmt(REVENUE_STATS.daily)} JUL
+              Projections based on current daily priority bid revenue of {fmt(REVENUE_STATS.daily)} JUL
               and total staked supply of {fmt(8_427_310)} JUL. Actual earnings vary with protocol volume.
             </div>
           </div>

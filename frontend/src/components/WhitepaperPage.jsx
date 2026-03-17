@@ -752,10 +752,10 @@ where:
 
                 <SubHeading>10.1 Fee Structure</SubHeading>
                 <Paragraph>
-                  The protocol charges a 0.3% swap fee on all settled trades, distributed as follows: 70%
-                  to liquidity providers (via Shapley values), 20% to the DAO treasury (for protocol
-                  development and insurance), and 10% to VIBE stakers (as yield). Cross-chain swaps incur
-                  an additional LayerZero messaging fee, passed through at cost with 0% protocol markup.
+                  Each pool charges an LP fee (default 0.05%), 100% of which goes to liquidity providers.
+                  The protocol charges zero protocol fees on swaps. The DAO treasury is funded by priority
+                  bid revenue from batch auctions, not trading fees. Cross-chain swaps incur an additional
+                  LayerZero messaging fee, passed through at cost with 0% protocol markup.
                 </Paragraph>
 
                 <SubHeading>10.2 Treasury Stabilization</SubHeading>

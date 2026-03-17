@@ -134,7 +134,7 @@ const COMMANDS = [
   { id: 'dao-tools', label: 'DAO Tools', description: 'Multi-sig, treasury, payroll, governance', path: '/dao-tools', category: 'Community' },
   { id: 'margin', label: 'Margin Trading', description: 'Isolated margin with up to 10x leverage', path: '/margin', category: 'DeFi' },
   { id: 'automation', label: 'Automation', description: 'Automated strategies and conditional orders', path: '/automation', category: 'Intelligence' },
-  { id: 'revenue', label: 'Revenue Share', description: 'Protocol fee distribution to stakers and LPs', path: '/revenue', category: 'DeFi' },
+  { id: 'revenue', label: 'Revenue Share', description: 'Revenue distribution to stakers and LPs', path: '/revenue', category: 'DeFi' },
   { id: 'vesting', label: 'Token Vesting', description: 'Vesting schedules, cliffs, and unlock timelines', path: '/vesting', category: 'Account' },
   { id: 'liquidations', label: 'Liquidations', description: 'At-risk positions and liquidation auctions', path: '/liquidations', category: 'Protocol' },
   { id: 'delegate', label: 'Delegate', description: 'Delegate voting power to representatives', path: '/delegate', category: 'Community' },

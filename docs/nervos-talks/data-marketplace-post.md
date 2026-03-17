@@ -7,7 +7,7 @@
 
 ## TL;DR
 
-We built a decentralized data marketplace where users tokenize datasets as on-chain assets and sell either direct access or compute-to-data execution -- consumers submit algorithms that run ON the data without ever downloading the raw data. Revenue splits 90% to the data owner, 10% to the protocol's Shapley redistribution pool. The mechanism works on EVM, but when we mapped it to CKB's cell model, something clicked: CKB cells *are* data assets. The mapping isn't analogical -- it's structural.
+We built a decentralized data marketplace where users tokenize datasets as on-chain assets and sell either direct access or compute-to-data execution -- consumers submit algorithms that run ON the data without ever downloading the raw data. Revenue splits 90% to the data owner, 10% to the marketplace's Shapley redistribution pool. (Note: This marketplace fee applies to data marketplace transactions only. VibeSwap DEX swaps have 0% protocol fees -- 100% of trading fees go to LPs.) The mechanism works on EVM, but when we mapped it to CKB's cell model, something clicked: CKB cells *are* data assets. The mapping isn't analogical -- it's structural.
 
 ---
 
@@ -68,7 +68,7 @@ PROTOCOL_SHARE_BPS = 1000   // 10%
 BPS_DENOMINATOR    = 10000
 ```
 
-90% to the data owner. 10% to the protocol's Shapley redistribution pool. The protocol fee isn't extracted -- it's redistributed to contributors based on measured marginal contribution. Data providers whose assets generate downstream value get Shapley rewards on top of their direct revenue.
+90% to the data owner. 10% to the marketplace's Shapley redistribution pool. The marketplace fee isn't extracted -- it's redistributed to contributors based on measured marginal contribution. Data providers whose assets generate downstream value get Shapley rewards on top of their direct revenue.
 
 This is the difference between extractive platforms and cooperative ones. AWS Data Exchange takes a cut and keeps it. We take a cut and give it back to whoever created the most value.
 
@@ -182,7 +182,7 @@ All of this is public, on-chain, and auditable. Reputation aggregators can compu
 
 ## The Cooperative Economics Angle
 
-The 10% protocol fee isn't a rent-seeking mechanism. It funds the Shapley redistribution pool.
+The 10% marketplace fee isn't a rent-seeking mechanism. It funds the Shapley redistribution pool.
 
 Imagine three datasets:
 - Dataset A: Raw sensor data, 100 accesses, $1000 revenue
@@ -191,7 +191,7 @@ Imagine three datasets:
 
 In a traditional marketplace, A gets $1000, B gets $5000, C gets $500. But B's value is partially derived from A. C's value is derived from both. The Shapley value computation asks: what is each dataset's marginal contribution to the total coalition value?
 
-The 10% protocol pool ($650 total) is redistributed based on these marginal contributions. Dataset A gets additional Shapley rewards because it was foundational to B's success. This creates an incentive to publish raw, foundational data -- not just polished end products. The commons rewards infrastructure.
+The 10% marketplace pool ($650 total) is redistributed based on these marginal contributions. Dataset A gets additional Shapley rewards because it was foundational to B's success. This creates an incentive to publish raw, foundational data -- not just polished end products. The commons rewards infrastructure.
 
 ---
 

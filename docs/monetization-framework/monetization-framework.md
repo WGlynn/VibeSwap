@@ -8,10 +8,10 @@
 
 ## Revenue Streams
 
-### 1. Protocol Fees (0.05% on swaps)
+### 1. LP Trading Fees (0.05% default — 100% to liquidity providers)
 
-- Distributed via Shapley value to liquidity providers and governance stakers
-- No protocol treasury cut — 100% goes to contributors
+- 100% of swap fees go directly to liquidity providers
+- No protocol treasury cut — LPs earn every basis point
 - Fee rate adjustable by governance (with decay — see Ungovernance)
 
 ### 2. Batch Auction Priority Bids
@@ -55,9 +55,7 @@
 
 ```
 Swap Fee (0.05%)
-├── Liquidity Providers (Shapley-weighted)     70%
-├── Governance Stakers                         20%
-└── Autonomous Treasury (DAG growth)           10%
+└── Liquidity Providers                        100%
 
 Priority Bid Revenue
 ├── Batch Liquidity Providers                  80%

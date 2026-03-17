@@ -38,27 +38,25 @@ Revenue is legitimate when:
 
 ## 2. Revenue Streams
 
-### 2.1 Protocol Swap Fees
+### 2.1 LP Trading Fees
 
-**Rate**: 0.05% on each swap
+**Rate**: 0.05% on each swap (default)
 
-**Mechanism**: Collected automatically during batch settlement. Fees accumulate in the DAOTreasury contract and are distributed via `ShapleyDistributor.sol`.
+**Mechanism**: Collected automatically during batch settlement. **100% of trading fees go to liquidity providers** — the protocol takes no cut of swap fees. LPs earn proportional to their contribution to pool depth.
 
 **Distribution**:
-- Liquidity providers: Shapley-proportional to marginal contribution to pool depth
-- Governance stakers: Proportional to stake duration and participation
-- Insurance pool: Fixed allocation for protocol safety reserve
+- Liquidity providers: 100% of all swap fees, Shapley-proportional to marginal contribution to pool depth
 
-**Why it's not rent-seeking**: The fee compensates LPs for providing the liquidity that makes the trade possible. Without LPs, there is no pool. The 0.05% rate is among the lowest in DeFi (Uniswap: 0.3%, Curve: 0.04-0.4%).
+**Why it's not rent-seeking**: The fee compensates LPs for providing the liquidity that makes the trade possible. Without LPs, there is no pool. The 0.05% rate is among the lowest in DeFi (Uniswap: 0.3%, Curve: 0.04-0.4%). The protocol collects 0% — all fees go directly to LPs.
 
-**Projected revenue** (at target volumes):
+**Projected LP revenue** (at target volumes):
 
-| Monthly Volume | Fee Revenue | To LPs | To Stakers | To Insurance |
-|---------------|------------|--------|-----------|-------------|
-| $1M | $500 | $350 | $100 | $50 |
-| $10M | $5,000 | $3,500 | $1,000 | $500 |
-| $100M | $50,000 | $35,000 | $10,000 | $5,000 |
-| $1B | $500,000 | $350,000 | $100,000 | $50,000 |
+| Monthly Volume | Fee Revenue | To LPs |
+|---------------|------------|--------|
+| $1M | $500 | $500 |
+| $10M | $5,000 | $5,000 |
+| $100M | $50,000 | $50,000 |
+| $1B | $500,000 | $500,000 |
 
 ### 2.2 Batch Auction Priority Bids
 
@@ -172,20 +170,19 @@ All contributions are on-chain verifiable. Distribution happens automatically at
      └──────┬──────┘  └─────┬─────┘  └───────┬──────┘
             │                │                │
             ▼                ▼                ▼
-     ┌─────────────────────────────────────────────┐
-     │            DAOTreasury.sol                   │
-     └──────────────────┬──────────────────────────┘
-                        │
-                        ▼
-     ┌─────────────────────────────────────────────┐
-     │          ShapleyDistributor.sol              │
-     │                                             │
-     │  LP Rewards ◄── marginal pool contribution  │
-     │  Staker Rewards ◄── security + governance   │
-     │  Builder Rewards ◄── code + integration     │
-     │  JARVIS Rewards ◄── community + analysis    │
-     │  Insurance Reserve ◄── safety buffer        │
-     └─────────────────────────────────────────────┘
+     ┌─────────────┐  ┌─────────────────────────────┐
+     │  100% to    │  │      DAOTreasury.sol        │
+     │  LPs        │  └────────────┬────────────────┘
+     │  directly   │               │
+     └─────────────┘               ▼
+                    ┌─────────────────────────────────┐
+                    │    ShapleyDistributor.sol        │
+                    │                                  │
+                    │  Staker Rewards ◄── governance   │
+                    │  Builder Rewards ◄── code        │
+                    │  JARVIS Rewards ◄── community    │
+                    │  Insurance Reserve ◄── safety    │
+                    └─────────────────────────────────┘
 ```
 
 **Every dollar that enters the protocol exits to a participant who created value. Zero residual for insiders.**

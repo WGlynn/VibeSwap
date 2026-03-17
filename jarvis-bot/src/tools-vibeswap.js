@@ -312,7 +312,7 @@ export async function getShapleyRewards(address) {
       return lines.join('\n');
     }
 
-    return `*Shapley Rewards*\n\n  Address: \`${shortAddr(address)}\`\n  Status: \`Protocol not yet deployed\`\n\n*How Shapley rewards work:*\n  Based on game theory (Shapley values)\n  Fair allocation of protocol fees\n  50% of all VIBE emissions\n  Rewards proportional to contribution\n\n_Rewards will be claimable at mainnet launch._`;
+    return `*Shapley Rewards*\n\n  Address: \`${shortAddr(address)}\`\n  Status: \`Protocol not yet deployed\`\n\n*How Shapley rewards work:*\n  Based on game theory (Shapley values)\n  Fair allocation of priority bid revenue\n  50% of all VIBE emissions\n  Rewards proportional to contribution\n\n_Rewards will be claimable at mainnet launch._`;
   } catch (err) {
     return `Shapley lookup failed: ${err.message}`;
   }
@@ -357,7 +357,7 @@ export async function getStakingInfo(address) {
       }
     }
 
-    return `*Staking Position*\n\n  Address: \`${shortAddr(address)}\`\n  Status: \`Protocol not yet deployed\`\n\n*Staking details:*\n  15% of VIBE emissions go to stakers\n  Lock periods: 1 week to 1 year\n  Longer lock = higher boost (up to 2.5x)\n  Stakers also earn protocol fee share\n\n_Staking will be available at mainnet launch._`;
+    return `*Staking Position*\n\n  Address: \`${shortAddr(address)}\`\n  Status: \`Protocol not yet deployed\`\n\n*Staking details:*\n  15% of VIBE emissions go to stakers\n  Lock periods: 1 week to 1 year\n  Longer lock = higher boost (up to 2.5x)\n  Stakers also earn priority bid revenue share\n\n_Staking will be available at mainnet launch._`;
   } catch (err) {
     return `Staking lookup failed: ${err.message}`;
   }

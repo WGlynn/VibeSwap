@@ -117,7 +117,7 @@ Underwriter capital is mutualized across the pool. If the trigger fires, losses 
 
 **Failure mode addressed**: DeFi protocols have no fiscal policy. When markets crash, there is no lender of last resort. Liquidity evaporates precisely when it is most needed. Protocols that accumulate treasuries either hoard them (no benefit to users) or spend them politically (insider capture). Neither approach provides counter-cyclical stabilization.
 
-**Mechanism**: The `DAOTreasury` contract (`contracts/governance/DAOTreasury.sol`) accumulates protocol fees and auction proceeds into a collective reserve. The `TreasuryStabilizer` contract (`contracts/governance/TreasuryStabilizer.sol`) deploys those reserves counter-cyclically -- providing backstop liquidity during bear markets and withdrawing it during bull markets.
+**Mechanism**: The `DAOTreasury` contract (`contracts/governance/DAOTreasury.sol`) accumulates priority bid revenue and auction proceeds into a collective reserve. The `TreasuryStabilizer` contract (`contracts/governance/TreasuryStabilizer.sol`) deploys those reserves counter-cyclically -- providing backstop liquidity during bear markets and withdrawing it during bull markets.
 
 The treasury enforces temporal discipline through mandatory timelocks:
 
@@ -132,7 +132,7 @@ No withdrawal is instant. Every withdrawal is publicly queued and observable bef
 
 The TreasuryStabilizer operates autonomously based on market conditions, using TWAP (time-weighted average price) data and a volatility oracle to assess market state. When bear market conditions are detected -- sustained price decline below configurable thresholds -- the stabilizer deploys treasury capital as backstop liquidity. This is the DeFi equivalent of a central bank's open market operations, but executed autonomously by code with transparent rules.
 
-**Cooperative properties**: The treasury is funded by *everyone* through protocol fees and receives *no* special allocation from insiders. Backstop liquidity benefits *all* participants by preventing cascading liquidations and death spirals. The stabilizer's operations are transparent and rule-based: no discretionary decisions by a committee, no political allocation, no insider deals. The community's collective reserves are deployed for the community's collective benefit, autonomously.
+**Cooperative properties**: The treasury is funded by priority bid revenue and penalty redistributions, and receives *no* special allocation from insiders. Backstop liquidity benefits *all* participants by preventing cascading liquidations and death spirals. The stabilizer's operations are transparent and rule-based: no discretionary decisions by a committee, no political allocation, no insider deals. The community's collective reserves are deployed for the community's collective benefit, autonomously.
 
 ### 2.4 ILProtectionVault: Impermanent Loss Insurance Funded by Protocol Revenue
 
@@ -213,13 +213,13 @@ COOPERATIVE LAYER (Risk Mutualization)
          ↓ provides stability for competitive layer ↓
 ```
 
-The layers are connected by a funding loop: the competitive layer generates protocol fees and auction proceeds that fund the cooperative layer. The cooperative layer provides stability, insurance, and fair distribution that makes the competitive layer viable for participants who are not professional extractors.
+The layers are connected by a funding loop: the competitive layer generates priority bid revenue and auction proceeds that fund the cooperative layer. The cooperative layer provides stability, insurance, and fair distribution that makes the competitive layer viable for participants who are not professional extractors.
 
 This is the self-reinforcing cycle that neither pure DeFi nor TradFi achieves:
 
 1. **Cooperative mechanisms attract non-professional participants** by reducing downside risk (insurance, IL protection, treasury backstop).
-2. **More participants increase trading volume and liquidity**, generating more protocol fees.
-3. **More fees fund stronger cooperative mechanisms**, which attract more participants.
+2. **More participants increase trading volume and liquidity**, generating more priority bid and auction revenue.
+3. **More revenue funds stronger cooperative mechanisms**, which attract more participants.
 4. **Stronger cooperative mechanisms reduce the viability of extraction**, because the protocol captures MEV cooperatively rather than leaving it for searchers.
 
 The equilibrium is cooperative dominance: extraction becomes less profitable as the protocol grows, because the cooperative layer captures an increasing share of the value that extractors would otherwise take.
@@ -332,7 +332,7 @@ Cooperative Capitalism as implemented in VSOS satisfies four formal properties t
 
 **Property 2: Structural Fairness.** Fairness is enforced by smart contract logic, not by social norms, legal structures, or governance votes. The `verifyPairwiseFairness()` function in ShapleyDistributor allows anyone to cryptographically verify that any two participants' rewards are proportional to their contributions. This verification is on-chain, permissionless, and deterministic.
 
-**Property 3: Anti-Fragile Funding.** The cooperative layer is funded by the competitive layer through protocol fees and auction proceeds. As the system grows (more users, more volume, more competition), the cooperative layer grows proportionally. Unlike systems funded by token inflation (which dilute existing holders) or treasury grants (which require political allocation), the cooperative layer is funded by the productive activity it enables.
+**Property 3: Anti-Fragile Funding.** The cooperative layer is funded by the competitive layer through priority bid revenue and auction proceeds. As the system grows (more users, more volume, more competition), the cooperative layer grows proportionally. Unlike systems funded by token inflation (which dilute existing holders) or treasury grants (which require political allocation), the cooperative layer is funded by the productive activity it enables.
 
 **Property 4: Incentive Compatibility.** Cooperation is the dominant strategy for rational agents, not because of altruism, but because the mechanism design makes cooperation more profitable than defection. An LP who stays during volatility earns higher Shapley stability scores. A community member who builds reputation earns insurance discounts. A protocol that integrates mutualistally earns retroactive rewards. In each case, the cooperative action is also the individually optimal action.
 

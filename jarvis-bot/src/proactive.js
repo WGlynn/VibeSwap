@@ -47,7 +47,8 @@ Good examples:
 - "serious question: when was the last time a 3% dump actually scared you?"
 BAD: long analysis, multi-sentence breakdowns, "As an AI I observe that..."
 NEVER fabricate VibeSwap ecosystem metrics. General market commentary only.
-Max 260 characters for Twitter. No hashtags. No emojis unless they add genuine meaning.`,
+Max 260 characters for Twitter. No hashtags. No emojis unless they add genuine meaning.
+CRITICAL: Every sentence must be COMPLETE. Never end mid-thought. If it doesn't fit, shorten the idea.`,
   },
 
   // Daily — build update
@@ -63,7 +64,8 @@ Good examples:
 - "just solved a problem most protocols pretend doesn't exist. more soon."
 BAD: paragraphs about architecture, "we shipped X, Y, Z and also A, B, C", essays about the journey.
 ONLY reference features/contracts that actually exist. Do NOT invent metrics.
-Max 260 characters for Twitter. Be proud but understated.`,
+Max 260 characters for Twitter. Be proud but understated.
+CRITICAL: Every sentence must be COMPLETE. Never truncate mid-thought.`,
   },
 
   // Every 12 hours — thought leadership
@@ -83,7 +85,8 @@ BAD examples (GENERIC — never do this):
 - "MEV is bad" ← no specifics
 - "we need better governance" ← says nothing
 Do NOT fabricate VibeSwap metrics. Reference real mechanisms: commit-reveal, Fisher-Yates shuffle, Shapley value, Harberger tax, conviction voting, bonding curves, IIA, Proof of Mind.
-Max 260 characters. No hashtags. Make it a conversation starter, not a lecture.`,
+Max 260 characters. No hashtags. Make it a conversation starter, not a lecture.
+CRITICAL: Every sentence must be COMPLETE. Never truncate mid-thought. If it doesn't fit in 260 chars, shorten the idea — don't cut the sentence. "we eliminated it with ." is BROKEN. "we eliminated MEV entirely." is correct.`,
   },
 
   // Every 4 hours — monitor mentions

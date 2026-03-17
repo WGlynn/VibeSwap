@@ -707,14 +707,49 @@ contract VibeSwapCore is
         orderPoolIds = new bytes32[](executionOrder.length);
         orderValid = new bool[](executionOrder.length);
 
+        // C-02: Dissolve duplicate trader order griefing — track cumulative validated
+        // amounts per trader-token pair. Without this, a trader with deposit=1000 and
+        // two orders of 600 each would pass validation for both (600 < 1000) but
+        // underflow during settlement (1000 - 600 - 600), reverting the entire batch
+        // and griefing all other traders. By accumulating per-trader-token, excess
+        // orders are marked invalid before they can poison the batch.
+
+        // Temporary arrays to track cumulative validated amounts per trader-token pair.
+        // We use parallel arrays since memory mappings are not supported in Solidity.
+        address[] memory trackedTraders = new address[](executionOrder.length);
+        address[] memory trackedTokens = new address[](executionOrder.length);
+        uint256[] memory trackedAmounts = new uint256[](executionOrder.length);
+        uint256 trackedCount = 0;
+
         for (uint256 i = 0; i < executionOrder.length; i++) {
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
-            // Verify deposit
-            if (deposits[order.trader][order.tokenIn] < order.amountIn) {
+            // Find or create cumulative tracker for this trader-token pair
+            uint256 cumulativeAmount = order.amountIn;
+            uint256 trackerIdx = type(uint256).max;
+            for (uint256 t = 0; t < trackedCount; t++) {
+                if (trackedTraders[t] == order.trader && trackedTokens[t] == order.tokenIn) {
+                    trackerIdx = t;
+                    cumulativeAmount = trackedAmounts[t] + order.amountIn;
+                    break;
+                }
+            }
+
+            // Verify cumulative deposit does not exceed available balance
+            if (deposits[order.trader][order.tokenIn] < cumulativeAmount) {
                 emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Insufficient deposit");
                 continue;
+            }
+
+            // Update cumulative tracker
+            if (trackerIdx == type(uint256).max) {
+                trackedTraders[trackedCount] = order.trader;
+                trackedTokens[trackedCount] = order.tokenIn;
+                trackedAmounts[trackedCount] = cumulativeAmount;
+                trackedCount++;
+            } else {
+                trackedAmounts[trackerIdx] = cumulativeAmount;
             }
 
             bytes32 poolId = amm.getPoolId(order.tokenIn, order.tokenOut);

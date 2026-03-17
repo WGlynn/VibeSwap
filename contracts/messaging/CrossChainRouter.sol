@@ -688,11 +688,18 @@ contract CrossChainRouter is
             "Not authorized to recover"
         );
 
-        // Clean up state
+        // Clean up state (effects before interactions — CEI pattern)
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
         totalBridgedDeposits -= depositAmount;
         delete pendingCommits[commitId];
+
+        // C-03: Dissolve lost deposit attack surface — actually transfer ETH back
+        // Previously this function only cleaned up accounting state but never sent
+        // the depositor's ETH back, permanently locking funds in the contract.
+        // This makes deposit loss structurally impossible.
+        (bool success, ) = commit.depositor.call{value: depositAmount}("");
+        require(success, "C-03: Recovery transfer failed");
 
         emit BridgedDepositRecovered(commitId, commit.depositor, depositAmount);
     }

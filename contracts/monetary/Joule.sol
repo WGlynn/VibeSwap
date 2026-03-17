@@ -92,6 +92,12 @@ contract Joule is Ownable, ReentrancyGuard, IJoule {
     /// @notice Precision for fixed-point math
     uint256 private constant PRECISION = 1e18;
 
+    /// @notice C-04: Minimum rebase scalar floor — dissolves token bricking attack surface
+    /// @dev Set to 0.01% of PRECISION (1e14). Repeated contractions via oracle manipulation
+    ///      could drive rebaseScalar toward zero, making _toInternal() divide by ~0 and
+    ///      bricking all transfers. This floor makes it structurally impossible.
+    uint256 public constant MIN_REBASE_SCALAR = 1e14;
+
     // ============ Rebase State ============
 
     /// @notice Global rebase scalar — THE core tenet
@@ -376,7 +382,15 @@ contract Joule is Ownable, ReentrancyGuard, IJoule {
         } else if (supplyDelta < 0) {
             // Contraction: decrease scalar
             uint256 scalarDelta = (rebaseState.rebaseScalar * uint256(-supplyDelta)) / currentExternal;
-            rebaseState.rebaseScalar -= scalarDelta;
+            // C-04: Enforce minimum scalar floor — dissolve token bricking attack surface
+            // Without this floor, repeated contractions (e.g., via oracle manipulation)
+            // could drive rebaseScalar to near-zero, making _toInternal() divide by ~0
+            // and bricking all token operations permanently.
+            if (rebaseState.rebaseScalar - scalarDelta < MIN_REBASE_SCALAR) {
+                rebaseState.rebaseScalar = MIN_REBASE_SCALAR;
+            } else {
+                rebaseState.rebaseScalar -= scalarDelta;
+            }
         }
 
         rebaseState.lastRebaseTime = block.timestamp;

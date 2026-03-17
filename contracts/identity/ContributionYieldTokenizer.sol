@@ -364,6 +364,14 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
         uint256 bounty = (remainingFunding * MERGE_BOUNTY_BPS) / BPS;
         uint256 transferAmount = remainingFunding - bounty;
 
+        // M-08 DISSOLVED: Verify contract balance covers this idea's remaining funding.
+        // Prevents merge bounty from draining another idea's funds when multiple ideas
+        // share the same reward token balance.
+        require(
+            rewardToken.balanceOf(address(this)) >= remainingFunding,
+            "M-08: Insufficient balance for merge"
+        );
+
         // Transfer remaining funding to target idea
         if (transferAmount > 0) {
             target.totalFunding += transferAmount;

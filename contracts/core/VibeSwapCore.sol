@@ -354,6 +354,15 @@ contract VibeSwapCore is
         commitOwners[commitId] = msg.sender;
 
         uint64 currentBatchId = auction.getCurrentBatchId();
+
+        // M-06 DISSOLVED: One commit per trader per batch. Prevents batchTraderCommitId
+        // overwrite which would break wBAR routing for earlier commits.
+        // If you need multiple orders, use multiple addresses or wait for next batch.
+        require(
+            batchTraderCommitId[currentBatchId][msg.sender] == bytes32(0),
+            "M-06: One commit per batch per trader"
+        );
+
         emit SwapCommitted(commitId, msg.sender, currentBatchId);
 
         // Mint wBAR receipt if enabled

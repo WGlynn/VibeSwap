@@ -381,6 +381,34 @@ contract AugmentedBondingCurve is Ownable, ReentrancyGuard {
         _isOpen = isOpen;
     }
 
+    // ============ Health Check (Used by ShapleyDistributor) ============
+
+    /// @notice Maximum allowed drift from V₀ before curve is considered unhealthy (5%)
+    uint256 public constant MAX_DRIFT_BPS = 500;
+
+    /**
+     * @notice Check if the bonding curve invariant is within healthy bounds
+     * @dev Returns true if |V(R,S) - V₀| / V₀ ≤ MAX_DRIFT_BPS/10000
+     *      Used by ShapleyDistributor to gate reward distribution.
+     *      A curve under stress (>5% drift) signals real-world instability
+     *      that Shapley math alone cannot account for.
+     * @return healthy Whether the curve invariant is within tolerance
+     * @return driftBps Current drift from V₀ in basis points
+     */
+    function isHealthy() external view returns (bool healthy, uint256 driftBps) {
+        if (!isOpen) return (false, BPS);
+        uint256 supply = communityToken.totalSupply();
+        if (supply == 0 || reserve == 0 || invariantV0 == 0) return (false, BPS);
+
+        uint256 currentV = _pow(supply, kappa) / reserve;
+        uint256 diff = currentV > invariantV0
+            ? currentV - invariantV0
+            : invariantV0 - currentV;
+
+        driftBps = (diff * BPS) / invariantV0;
+        healthy = driftBps <= MAX_DRIFT_BPS;
+    }
+
     // ============ Admin ============
 
     function setAllocator(address allocator, bool status) external onlyOwner {

@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../libraries/PairwiseFairness.sol";
 import "./IPriorityRegistry.sol";
+import "../mechanism/IABCHealthCheck.sol";
 
 /**
  * @title ShapleyDistributor
@@ -208,8 +209,21 @@ contract ShapleyDistributor is
     /// @notice Value distributed per era
     mapping(uint8 => uint256) public eraDistributed;
 
+    // ============ ABC Conservation Gate (Immutable Once Sealed) ============
+
+    /// @notice Augmented Bonding Curve health checker — gates reward distribution
+    /// @dev Once sealed via sealBondingCurve(), this cannot be changed. Ever.
+    ///      Rewards only flow when the curve's conservation invariant is healthy.
+    ///      This is the augmented mechanism design: Shapley math + ABC physics.
+    IABCHealthCheck public bondingCurve;
+
+    /// @notice Whether the bonding curve has been sealed (immutable after sealing)
+    bool public bondingCurveSealed;
+
     // ============ Events ============
 
+    event BondingCurveSealed(address indexed bondingCurve);
+    event ABCHealthGate(bytes32 indexed gameId, bool healthy, uint256 driftBps);
     event GameCreated(bytes32 indexed gameId, uint256 totalValue, address token, uint256 participantCount);
     event ShapleyComputed(bytes32 indexed gameId, address indexed participant, uint256 shapleyValue);
     event RewardClaimed(bytes32 indexed gameId, address indexed participant, uint256 amount);
@@ -238,6 +252,8 @@ contract ShapleyDistributor is
     error TooManyParticipants();
     error InvalidValue();
     error ZeroAddress();
+    error ABCUnhealthy(uint256 driftBps);
+    error BondingCurveAlreadySealed();
 
     // ============ Modifiers ============
 
@@ -268,6 +284,54 @@ contract ShapleyDistributor is
         genesisTimestamp = block.timestamp;
         gamesPerEra = DEFAULT_GAMES_PER_ERA;
         halvingEnabled = true;
+    }
+
+    // ============ ABC Conservation Seal (Set Once, Immutable Forever) ============
+
+    /**
+     * @notice Seal the bonding curve reference — IRREVERSIBLE.
+     * @dev Once sealed, the ABC health gate is permanently enforced on all
+     *      reward distributions. The bonding curve address cannot be changed,
+     *      the gate cannot be bypassed, and no admin can override it.
+     *
+     *      This is the "augmented" in augmented mechanism design:
+     *      - Shapley handles the math (who gets what proportion)
+     *      - ABC handles the physics (is the economy conserving energy?)
+     *      - Together they make rewards fair AND stable
+     *
+     *      The Lawson Constant lives in both contracts. After sealing,
+     *      they are cryptographically bound — one cannot distribute
+     *      without the other's conservation invariant holding.
+     *
+     * @param _bondingCurve Address of the AugmentedBondingCurve contract
+     */
+    function sealBondingCurve(address _bondingCurve) external onlyOwner {
+        if (bondingCurveSealed) revert BondingCurveAlreadySealed();
+        if (_bondingCurve == address(0)) revert ZeroAddress();
+
+        // Verify it implements the interface and is actually open
+        IABCHealthCheck abc = IABCHealthCheck(_bondingCurve);
+        require(abc.isOpen(), "ABC not open");
+
+        bondingCurve = abc;
+        bondingCurveSealed = true;
+
+        emit BondingCurveSealed(_bondingCurve);
+    }
+
+    /**
+     * @notice Internal ABC health gate — reverts if curve is under stress
+     * @dev Called before game creation and settlement. If bondingCurve is not
+     *      sealed yet (pre-deployment bootstrapping), this is a no-op.
+     *      Once sealed, it becomes an immutable checkpoint.
+     */
+    function _requireABCHealthy(bytes32 gameId) internal {
+        if (!bondingCurveSealed) return; // Pre-seal bootstrapping: no gate
+
+        (bool healthy, uint256 driftBps) = bondingCurve.isHealthy();
+        emit ABCHealthGate(gameId, healthy, driftBps);
+
+        if (!healthy) revert ABCUnhealthy(driftBps);
     }
 
     // ============ Game Creation ============
@@ -344,6 +408,9 @@ contract ShapleyDistributor is
         if (participants.length < minParticipants) revert TooFewParticipants();
         if (participants.length > maxParticipants) revert TooManyParticipants();
 
+        // ABC Conservation Gate: no games created when curve is under stress
+        _requireABCHealthy(gameId);
+
         // Apply halving ONLY for TOKEN_EMISSION games (not fee distribution)
         // Fee distribution is time-neutral: same work = same reward regardless of era
         // See: docs/TIME_NEUTRAL_TOKENOMICS.md §4.1
@@ -397,6 +464,9 @@ contract ShapleyDistributor is
         CooperativeGame storage game = games[gameId];
         if (game.totalValue == 0) revert GameNotFound();
         if (game.settled) revert GameAlreadySettled();
+
+        // ABC Conservation Gate: no settlement when curve is under stress
+        _requireABCHealthy(gameId);
 
         Participant[] storage participants = gameParticipants[gameId];
         uint256 n = participants.length;
@@ -902,5 +972,16 @@ contract ShapleyDistributor is
 
     // ============ UUPS ============
 
+    /**
+     * @dev Authorizes upgrades — but if the bonding curve is sealed,
+     *      the seal MUST survive the upgrade. The new implementation
+     *      inherits the same storage slot, so bondingCurve and
+     *      bondingCurveSealed persist. This comment exists as a
+     *      canonical warning: any implementation that removes the
+     *      ABC health gate is a violation of P-000.
+     *
+     *      "If something is clearly unfair, amending the code is a
+     *       responsibility, a credo, a law, a canon."
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

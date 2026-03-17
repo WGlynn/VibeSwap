@@ -310,6 +310,7 @@ try {
 import { initStickers, textToSticker, imageToSticker, imageWithText, addToStickerPack, getStyleList, AVAILABLE_STYLES } from './sticker.js';
 import { loadComms, saveComms, receiveFromClaudeCode, getUnprocessedInbox, markProcessed, sendToClaudeCode, getOutbox, acknowledgeOutbox, getCommsLog, getCommsStats, pruneOldMessages } from './comms.js';
 import { handleWebRequest } from './web-api.js';
+import { initX402 } from './x402.js';
 import { initComputeEconomics, recordUsage as recordComputeUsage, flushComputeEconomics, recordTelegramMessage, getTelegramMessageCount, FREE_TELEGRAM_DMS, getComputeStats, getEffectivePool, getJulToPoolRatio, updatePricing, getPricingInfo, getUserTier, checkTieredBudget } from './compute-economics.js';
 import { initMining, flushMining, getMiningStats, getLeaderboard as getMiningLeaderboard, tipJUL, getTreasuryStats, getDailyBurned, linkMiner, getLinkedMiner, getTotalSupply, getEscapeVelocity, getHashCostIndex } from './mining.js';
 import { initInfoFi, shutdownInfoFi } from './infofi.js';
@@ -7517,6 +7518,7 @@ async function main() {
   const autonomousChatIds = config.authorizedGroups || [];
   initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
   await initComputeEconomics();
+  initX402(); // x402 Payment Required — configures via env vars, disabled if no treasury set
   await initMining();
   await initInfoFi();
   await initDeepStorage();

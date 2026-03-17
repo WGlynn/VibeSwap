@@ -35,6 +35,7 @@ import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStru
 import { createHmac } from 'crypto';
 import { getRosettaView, translate, translateToAll, getLexicon, TEN_COVENANTS, COVENANT_HASH } from './rosetta.js';
 import { createPrimitive, getPrimitive, listPrimitives, citePrimitive, viewPrimitive, getInfoFiStats, getAuthorStats, searchPrimitives } from './infofi.js';
+import { x402Gate, getX402Stats, getPricingSchedule, initX402 } from './x402.js';
 
 // ============ Rate Limiter ============
 
@@ -268,6 +269,23 @@ export async function handleWebRequest(req, res, pathname) {
   }
 
   const ip = getClientIP(req);
+
+  // ============ x402 Payment Gate ============
+  // The singularity is just a well-architected toll booth.
+  const paid = await x402Gate(req, res, pathname);
+  if (!paid) return true; // 402 response already sent
+
+  // ============ GET /web/x402/pricing ============
+  if (pathname === '/web/x402/pricing' && req.method === 'GET') {
+    jsonResponse(res, 200, getPricingSchedule());
+    return true;
+  }
+
+  // ============ GET /web/x402/stats ============
+  if (pathname === '/web/x402/stats' && req.method === 'GET') {
+    jsonResponse(res, 200, getX402Stats());
+    return true;
+  }
 
   // ============ POST /web/chat ============
   if (pathname === '/web/chat' && req.method === 'POST') {

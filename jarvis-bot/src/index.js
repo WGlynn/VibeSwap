@@ -347,6 +347,19 @@ try {
   getCoordinationDelay = sd.getCoordinationDelay;
 } catch (e) { console.warn(`[jarvis] shard-dedup import failed: ${e.message}`); }
 
+// Message collision detection: prevent repeating similar messages
+let initCollisionDetector = async () => {}, checkCollision = () => ({ collision: false }), recordOutgoing = () => {}, buildCollisionContext = () => '', flushCollisionHistory = async () => {}, exportShardHistory = () => ({}), importShardHistory = () => {};
+try {
+  const mc = await import('./message-collision.js');
+  initCollisionDetector = mc.initCollisionDetector;
+  checkCollision = mc.checkCollision;
+  recordOutgoing = mc.recordOutgoing;
+  buildCollisionContext = mc.buildCollisionContext;
+  flushCollisionHistory = mc.flushCollisionHistory;
+  exportShardHistory = mc.exportShardHistory;
+  importShardHistory = mc.importShardHistory;
+} catch (e) { console.warn(`[jarvis] message-collision import failed: ${e.message}`); }
+
 // Cross-context: DM ↔ Group awareness
 let initCrossContext = async () => {}, recordDMTopic = () => {}, getDMContextForGroup = () => '', recordGroupInteraction = () => {};
 try {
@@ -6920,6 +6933,27 @@ bot.on('text', async (ctx) => {
       console.warn('[bot] Response was only tool artifacts — skipped');
       return;
     }
+    // ============ Collision Detection — Don't Repeat Yourself ============
+    const collision = checkCollision(String(chatId), text);
+    if (collision.collision && collision.matchedMessage) {
+      console.log(`[collision] Regenerating response for chat ${chatId} (${(collision.similarity * 100).toFixed(1)}% similar)`);
+      // Inject collision context and regenerate once
+      const collisionPrompt = `${messageForLLM}${buildCollisionContext(collision.matchedMessage, collision.similarity)}`;
+      try {
+        ctx.sendChatAction('typing').catch(() => {});
+        const regenResponse = await chat(collisionPrompt, String(chatId), userName, ctx, { regenAttempt: true });
+        if (regenResponse?.text?.trim()) {
+          let regenText = regenResponse.text.trim();
+          if (isGroup) regenText = stripGroupMarkdown(regenText);
+          regenText = sanitizeOutput(regenText);
+          if (regenText) text = regenText;
+        }
+      } catch (regenErr) {
+        console.warn(`[collision] Regen failed, using original: ${regenErr.message}`);
+        // Fall through with original text
+      }
+    }
+
     if (text.length <= 4096) {
       await ctx.reply(text, { parse_mode: undefined });
     } else {
@@ -6931,6 +6965,9 @@ bot.on('text', async (ctx) => {
         await ctx.reply(chunk, { parse_mode: undefined });
       }
     }
+
+    // Record outgoing message for collision detection
+    recordOutgoing(String(chatId), text);
 
     // Track Jarvis's response in group context window (prevents phantom interactions)
     if (isGroup && text) {
@@ -7366,6 +7403,7 @@ async function main() {
     initRewardSignals().catch(err => console.warn(`[jarvis] Reward signals init failed: ${err.message}`)),
     initSelfImprove().catch(err => console.warn(`[jarvis] Self-improve init failed: ${err.message}`)),
     initCrossContext().catch(err => console.warn(`[jarvis] Cross-context init failed: ${err.message}`)),
+    initCollisionDetector().catch(err => console.warn(`[jarvis] Collision detector init failed: ${err.message}`)),
   ]);
 
   // Group C: MI Host (depends on nothing but may fail — keep isolated)
@@ -8623,6 +8661,7 @@ async function main() {
     await flushAntispam();
     await flushThreads();
     await flushLearning();
+    await flushCollisionHistory();
     try { await readLearnings(); await archiveExpired(); } catch {}
     // Inner dialogue: generate self-reflections (rate-limited to 1x/hour internally)
     try {

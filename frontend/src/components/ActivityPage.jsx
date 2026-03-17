@@ -393,7 +393,7 @@ function ActivityPage() {
     }
   }, [allTransactions])
 
-  // CSV export placeholder
+  // CSV export — generates downloadable file from transaction history
   const handleExportCSV = () => {
     const header = 'Date,Type,From,To,Amount (USD),Status,Chain,Hash'
     const rows = allTransactions.map(tx =>

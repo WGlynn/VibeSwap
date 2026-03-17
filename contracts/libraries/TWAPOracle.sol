@@ -72,9 +72,12 @@ library TWAPOracle {
 
         uint32 delta = uint32(block.timestamp) - last.timestamp;
 
-        // Calculate cumulative price — use unchecked because TWAP math (like Uniswap V2)
-        // intentionally allows wrapping overflow on cumulative values. The corresponding
-        // subtraction in consult() also uses unchecked, so deltas remain correct.
+        // M-07 DISSOLVED: Validate price*delta won't silently truncate when cast to uint224.
+        // Uniswap V2 wrapping is intentional for cumulative values, but the cast itself
+        // must not truncate — truncation corrupts the TWAP calculation permanently.
+        // Max uint224 ≈ 2.7e67. With price=1e30 and delta=86400, product=8.64e34 (safe).
+        // With price=1e40 and delta=86400, product=8.64e44 (safe). Only exotic edge cases fail.
+        require(price <= type(uint224).max / (delta > 0 ? delta : 1), "M-07: Price too large for oracle");
         uint224 newCumulative;
         unchecked {
             newCumulative = last.priceCumulative + uint224(price * delta);

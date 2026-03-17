@@ -690,20 +690,23 @@ contract CommitRevealAuction is
         // Sort priority orders by bid (descending) - simplified bubble sort for small arrays
         uint256[] memory sortedPriority = _sortPriorityOrders(batchId, priorityIndices);
 
-        // Get non-priority indices
+        // M-05 DISSOLVED: O(1) priority lookup via bitmap instead of O(n*p) nested loop.
+        // Previous O(n^2) could exceed block gas limit with 200+ orders.
+        // Bitmap: priorityBitmap[i] = true means index i is a priority order.
+        bool[] memory priorityBitmap = new bool[](totalOrders);
+        for (uint256 j = 0; j < sortedPriority.length; j++) {
+            if (sortedPriority[j] < totalOrders) {
+                priorityBitmap[sortedPriority[j]] = true;
+            }
+        }
+
+        // Get non-priority indices in O(n)
         uint256 regularCount = totalOrders - sortedPriority.length;
         uint256[] memory regularIndices = new uint256[](regularCount);
         uint256 regularIdx = 0;
 
         for (uint256 i = 0; i < totalOrders; i++) {
-            bool isPriority = false;
-            for (uint256 j = 0; j < sortedPriority.length; j++) {
-                if (sortedPriority[j] == i) {
-                    isPriority = true;
-                    break;
-                }
-            }
-            if (!isPriority) {
+            if (!priorityBitmap[i]) {
                 regularIndices[regularIdx++] = i;
             }
         }

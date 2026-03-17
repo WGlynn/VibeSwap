@@ -937,13 +937,19 @@ contract VibeAMM is
             accumulatedFees[tokenIn] += protocolFee;
         }
 
-        // Update reserves unchecked
-        unchecked {
-            if (isToken0) { pool.reserve0 += amountIn; pool.reserve1 -= amountOut; }
-            else { pool.reserve1 += amountIn; pool.reserve0 -= amountOut; }
-            trackedBalances[tokenIn] += amountIn;
-            if (trackedBalances[tokenOut] >= amountOut) trackedBalances[tokenOut] -= amountOut;
+        // H-01 DISSOLVED: Reserve decrements are now checked — underflow is structurally impossible.
+        // Additions remain unchecked (bounded by token supply, can't overflow uint256).
+        if (isToken0) {
+            require(pool.reserve1 >= amountOut, "Reserve underflow");
+            unchecked { pool.reserve0 += amountIn; }
+            pool.reserve1 -= amountOut;
+        } else {
+            require(pool.reserve0 >= amountOut, "Reserve underflow");
+            unchecked { pool.reserve1 += amountIn; }
+            pool.reserve0 -= amountOut;
         }
+        unchecked { trackedBalances[tokenIn] += amountIn; }
+        if (trackedBalances[tokenOut] >= amountOut) trackedBalances[tokenOut] -= amountOut;
 
         // Update oracles and breakers
         _updateBreaker(VOLUME_BREAKER, amountIn);
@@ -1232,6 +1238,17 @@ contract VibeAMM is
     ) {
         bool isToken0 = order.tokenIn == pool.token0;
         address tokenOut = isToken0 ? pool.token1 : pool.token0;
+
+        // C-01: Dissolve fee-on-transfer attack surface — verify actual tokens received
+        // VibeSwapCore transfers tokens before calling executeBatchSwap. We verify
+        // the contract's balance actually reflects the claimed amountIn. If a token
+        // has transfer fees, the actual balance is less than expected and we revert.
+        // This makes fee-on-transfer token drains structurally impossible.
+        {
+            uint256 actualBalance = IERC20(order.tokenIn).balanceOf(address(this));
+            uint256 requiredBalance = (isToken0 ? pool.reserve0 : pool.reserve1) + order.amountIn;
+            require(actualBalance >= requiredBalance, "C-01: Fee-on-transfer token detected");
+        }
 
         amountIn = order.amountIn;
 

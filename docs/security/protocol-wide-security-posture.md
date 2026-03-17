@@ -20,7 +20,7 @@ Layer 2: Protocol Level
 ├─ MAX_SUPPLY hard cap (VIBEToken: 21M, enforced independently)
 ├─ Circuit Breakers (5 types: volume, price, withdrawal, rate, pause)
 ├─ TWAP Validation (max 5% deviation from oracle)
-├─ Rate Limiting (1M tokens/hour/user)
+├─ Rate Limiting (100K tokens/hour/user)
 ├─ EOA-Only Commits (flash loan protection)
 └─ 50% Slashing (invalid reveal punishment)
 

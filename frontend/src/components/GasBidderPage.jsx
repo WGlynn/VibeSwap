@@ -605,9 +605,9 @@ function HowItWorks() {
         'Invalid reveals slashed 50%', 'All secrets XORed to create shuffle seed'],
       priorityNote: 'Priority bidders get execution preference, but ALL orders still receive the same uniform clearing price.' },
     { step: 3, title: 'Settle + Distribute', duration: 'instant', color: '#22c55e', icon: '=',
-      description: 'Orders execute at uniform clearing price. Priority bid revenue is distributed to LPs, stakers, and treasury.',
+      description: 'Orders execute at uniform clearing price. Priority bid revenue is routed to the DAO treasury and distributed according to governance.',
       details: ['Fisher-Yates shuffle determines base order', 'Priority bidders promoted to front of queue',
-        'Single clearing price for all orders', 'Revenue split: 50% LP / 30% stakers / 20% treasury'],
+        'Single clearing price for all orders', 'Revenue routed to DAO treasury via governance'],
       priorityNote: 'MEV value flows to the protocol ecosystem instead of being extracted by validators.' },
   ]
 

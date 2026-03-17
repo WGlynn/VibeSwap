@@ -32,10 +32,11 @@ The result is a market where honest revelation is the dominant strategy, prices 
 6. [Shapley Value Distribution](#6-shapley-value-distribution)
 7. [Bitcoin Halving Schedule for Rewards](#7-bitcoin-halving-schedule-for-rewards)
 8. [Anti-Fragile Security Architecture](#8-anti-fragile-security-architecture)
-9. [Pure Economics: No Rent-Seeking](#9-pure-economics-no-rent-seeking)
-10. [Nash Equilibrium Analysis](#10-nash-equilibrium-analysis)
-11. [Implementation](#11-implementation)
-12. [Conclusion](#12-conclusion)
+9. [The Three-Layer Oracle Stack](#9-the-three-layer-oracle-stack)
+10. [Pure Economics: No Rent-Seeking](#10-pure-economics-no-rent-seeking)
+11. [Nash Equilibrium Analysis](#11-nash-equilibrium-analysis)
+12. [Implementation](#12-implementation)
+13. [Conclusion](#13-conclusion)
 
 ---
 
@@ -620,10 +621,12 @@ Multi-layer protection triggers during anomalies:
 
 | Trigger | Threshold | Action |
 |---------|-----------|--------|
-| Price deviation | >5% from oracle | Pause trading, require verification |
-| Volume spike | >3σ above normal | Reduce rate limits |
-| Withdrawal surge | >50% of TVL in 1 hour | Gradual release queue |
-| Oracle failure | Stale data >5 minutes | Fallback to TWAP |
+| TWAP price deviation | >5% from 10-min TWAP | Individual swap reverts; batch clearing damped |
+| True Price deviation | >50% sustained | `TRUE_PRICE_BREAKER` halts all swaps |
+| Volume spike | >$10M/hour | Reduce rate limits via `VOLUME_BREAKER` |
+| Withdrawal surge | >25% of TVL in 1 hour | Gradual release queue via `WITHDRAWAL_BREAKER` |
+| Oracle staleness | True Price data >5 minutes old | Fallback to on-chain TWAP |
+| Oracle feed deviation | Provider exceeds threshold from median | Per-feed circuit breaker in OracleRouter |
 
 ### 8.6 Mutual Insurance
 
@@ -638,9 +641,256 @@ Community-funded protection against systemic risks:
 
 ---
 
-## 9. Pure Economics: No Rent-Seeking
+## 9. The Three-Layer Oracle Stack
 
-### 9.1 The Problem with Protocol Extraction
+### 9.1 The Price Integrity Problem
+
+Batch auctions produce uniform clearing prices. Shapley distribution rewards honest participation. But none of this matters if the clearing price itself is wrong.
+
+Clearing prices are computed from the AMM's reserve ratios and the orders in each batch. If an attacker can distort the AMM's reserves before a batch settles — through coordinated manipulation on external venues, stablecoin-enabled leverage, or liquidation cascade engineering — the "fair" clearing price becomes the attacker's price.
+
+VibeSwap solves this with a three-layer oracle stack that validates, filters, and defends every price the protocol produces. Each layer operates at a different timescale and catches a different class of attack.
+
+### 9.2 Layer 1: On-Chain TWAP (Time-Weighted Average Price)
+
+The first layer of defense is fully on-chain and trustless. Every swap writes a cumulative price observation to a ring buffer (up to 65,535 entries per pool). TWAP is computed as the integral of price over time divided by the time window:
+
+```
+TWAP = (priceCumulative(now) - priceCumulative(now - T)) / T
+
+Where T is the configurable observation window (default: 10 minutes)
+```
+
+**How it works:**
+
+Each observation stores a 32-bit timestamp and a 224-bit cumulative price sum. When a new swap occurs, the library computes `newCumulative = previousCumulative + (spotPrice * timeSinceLastObservation)` and writes it to the next slot in the ring buffer. The TWAP over any period is then a simple subtraction and division — constant gas cost regardless of window length.
+
+To query a specific historical window, the library performs a binary search through the ring buffer to find the two observations that bracket the target timestamp, then linearly interpolates the cumulative value.
+
+**How it protects the protocol:**
+
+Every individual swap is validated against the 10-minute TWAP with a maximum deviation of 500 basis points (5%). If the post-swap spot price exceeds this bound, the transaction reverts:
+
+```
+|spotPrice - twapPrice| / twapPrice > 5%  →  REVERT
+```
+
+During batch execution, the clearing price is also validated against TWAP. If the clearing price exceeds the 5% bound, golden ratio damping pulls it back toward the TWAP rather than reverting outright — preserving batch settlement while limiting damage:
+
+```
+dampedPrice = twapPrice + (clearingPrice - twapPrice) × φ⁻¹ × (maxDeviation / actualDeviation)
+```
+
+This means single-transaction manipulation must stay within 5% of the time-weighted average, and even batch-level manipulation is damped toward the TWAP anchor.
+
+### 9.3 Layer 2: True Price Oracle (Bayesian State-Space Model)
+
+TWAP resists short-term manipulation, but it cannot distinguish between genuine market moves and sustained, coordinated manipulation across multiple blocks. For that, VibeSwap employs a Kalman filter — a recursive Bayesian estimator that models the "true" equilibrium price as a hidden state.
+
+**The State-Space Model**
+
+The True Price is modeled as a latent variable that evolves slowly, observed through noisy venue prices:
+
+```
+State equation:     x(t) = F · x(t-1) + process_noise
+Observation equation: z(t) = H · x(t) + observation_noise
+
+State vector x = [true_price, drift]
+    - true_price: latent equilibrium price
+    - drift: long-term trend component (mean-reverting)
+
+Transition matrix F:
+    | 1   1 |    true_price(t) = true_price(t-1) + drift(t-1)
+    | 0   ρ |    drift(t) = ρ · drift(t-1),  ρ < 1 (mean-reverting)
+```
+
+**The Kalman Filter Recursion**
+
+At each update cycle (every ~5 minutes), the filter runs a two-step recursion:
+
+*Prediction step* — propagate the state forward:
+```
+x̂(t|t-1) = F · x̂(t-1|t-1)
+P(t|t-1) = F · P(t-1|t-1) · Fᵀ + Q
+```
+
+*Update step* — incorporate new observations:
+```
+Innovation:    y = z(t) - H · x̂(t|t-1)
+Innovation covariance:  S = H · P(t|t-1) · Hᵀ + R
+Kalman gain:   K = P(t|t-1) · Hᵀ · S⁻¹
+State update:  x̂(t|t) = x̂(t|t-1) + K · y
+Covariance:    P(t|t) = (I - K·H) · P(t|t-1) · (I - K·H)ᵀ + K·R·Kᵀ
+```
+
+The **Kalman gain** K is the key insight: it determines how much to trust new observations versus the existing estimate. When observation noise R is high (leverage-driven markets, manipulation detected), K shrinks — the filter trusts the prior estimate and ignores noisy spot prices. When R is low (calm markets, genuine capital inflows), K grows — the filter adapts to new information.
+
+**Time-Varying Noise: The Stablecoin Signal**
+
+Unlike standard Kalman implementations, VibeSwap's filter uses *time-varying* noise covariances that adapt to market conditions based on stablecoin flow dynamics:
+
+| Signal | Effect on Model | Rationale |
+|--------|----------------|-----------|
+| USDT-dominant flows (ratio > 2.0) | Observation noise R increases up to 3x | USDT enables leverage; spot prices are leverage-driven, not equilibrium-driven |
+| USDC-dominant flows (ratio < 0.5) | Process noise Q increases by 20% | USDC represents genuine capital; True Price drift should track it |
+| Active liquidation cascade | Observation noise R increases 10x | Prices during cascades are mechanical, not informational |
+| Low orderbook quality | Observation noise R increases up to 4x | Spoofed liquidity creates false price signals |
+
+This asymmetric treatment of stablecoins — USDT as volatility amplifier, USDC as trend validator — is a key innovation. It means the oracle automatically tightens its estimate when markets are leverage-driven and loosens it when genuine capital is flowing.
+
+**On-Chain Integration**
+
+The off-chain Kalman filter signs its output (True Price estimate, confidence interval, z-score, regime, manipulation probability) using EIP-712 typed data signatures. The on-chain `TruePriceOracle` contract validates these signatures, enforces a maximum staleness of 5 minutes, and limits price jumps to 10% between consecutive updates. Historical data is stored in a 24-entry ring buffer for trend analysis.
+
+During batch settlement, the clearing price is validated against the True Price with regime-adjusted deviation bounds. If both the True Price and the VWAP (volume-weighted average price) agree that the clearing price is skewed in the same direction, the allowed deviation tightens by 20%. When deviation exceeds bounds, golden ratio damping pulls the clearing price toward the True Price anchor.
+
+### 9.4 Layer 3: Price Intelligence (Manipulation Detection and Regime Classification)
+
+The third layer does not produce prices — it classifies market conditions and detects coordinated attacks that the first two layers alone cannot catch.
+
+**Regime Classification**
+
+A priority-based classifier evaluates six distinct market regimes:
+
+```
+Priority 1: CASCADE        Active liquidation cascade (OI collapse + liquidation spike)
+Priority 2: MANIPULATION   USDT-dominant, leverage-driven distortion (P(manip) > threshold)
+Priority 3: TREND          USDC-dominant, genuine price discovery
+Priority 4: HIGH_LEVERAGE   Elevated leverage without cascade
+Priority 5: LOW_VOLATILITY  Stable, low leverage, tight bands
+Priority 6: NORMAL          Default market conditions
+```
+
+Each regime carries specific parameter adjustments. During CASCADE detection, the filter's observation noise multiplier goes to 5x and the expected reversion speed is classified as "fast." During confirmed TREND, process noise increases to allow the True Price to drift, and reversion expectations are "slow." During MANIPULATION, process noise drops to 0.3x (True Price held very stable) while observation noise jumps to 3x (spot prices heavily discounted).
+
+**Liquidation Cascade Detection**
+
+The cascade detector fuses five signals with calibrated weights:
+
+| Signal | Weight | Cascade Threshold |
+|--------|--------|-------------------|
+| Open interest drop rate | 25% | >5% in 5 minutes |
+| Liquidation volume spike | 30% | >5x typical hourly volume |
+| Price-volume divergence | 15% | Price moving faster than volume justifies |
+| Funding-price alignment | 10% | Funding rate and price moving in same direction |
+| USDT flow dominance | 20% | High manipulation probability from stablecoin context |
+
+When the weighted composite exceeds the cascade threshold (default 0.7), the regime is classified as CASCADE and the direction is identified (long squeeze vs. short squeeze).
+
+A pre-cascade risk calculator provides early warning by evaluating proximity to liquidation clusters, funding rate extremity, leverage ratios, orderbook thinness near liquidation levels, and USDT flow risk.
+
+**Stablecoin Flow Registry**
+
+The `StablecoinFlowRegistry` contract tracks the USDT/USDC flow ratio on-chain with a 24-entry historical ring buffer. The manipulation probability is derived from a logistic function:
+
+```
+P(manipulation) = 1 / (1 + exp(-1.5 × (ratio - 2)))
+```
+
+This yields near-zero probability at balanced ratios (1:1), 50% at the USDT-dominant threshold (2:1), and near-certainty above 3.5:1. The volatility multiplier scales linearly from 1.0x at neutral to 3.0x at extreme USDT dominance.
+
+**Statistical Anomaly Detection**
+
+The Price Intelligence layer identifies manipulated prices through deviation z-scores. The True Price estimate and its standard deviation define a confidence interval. Spot prices deviating beyond 3 standard deviations are flagged as statistical anomalies, triggering tighter validation bounds and elevated LP fees for incoming trades.
+
+### 9.5 How the Layers Work Together
+
+The three layers form a defense-in-depth architecture where each catches what the others miss:
+
+```
+                         ┌──────────────────────────────────────┐
+                         │        LAYER 3: PRICE INTELLIGENCE    │
+                         │  Regime classification · Cascade       │
+                         │  detection · Manipulation probability  │
+                         │  Stablecoin flow analysis              │
+                         └──────────────┬───────────────────────┘
+                                        │ Adjusts noise parameters
+                                        ▼
+                         ┌──────────────────────────────────────┐
+                         │      LAYER 2: TRUE PRICE ORACLE       │
+                         │  Kalman filter · Bayesian estimation   │
+                         │  Time-varying covariances · EIP-712    │
+                         │  signed updates · 5-min staleness      │
+                         └──────────────┬───────────────────────┘
+                                        │ Provides ground truth anchor
+                                        ▼
+                         ┌──────────────────────────────────────┐
+                         │         LAYER 1: ON-CHAIN TWAP        │
+                         │  Cumulative price observations ·       │
+                         │  Binary search · 5% max deviation ·    │
+                         │  Golden ratio damping                  │
+                         └──────────────┬───────────────────────┘
+                                        │ Validates every swap
+                                        ▼
+                         ┌──────────────────────────────────────┐
+                         │        VIBEAMM SWAP EXECUTION         │
+                         │  Individual swaps: TWAP-validated      │
+                         │  Batch settlements: True Price +       │
+                         │  TWAP + VWAP cross-validated           │
+                         └──────────────────────────────────────┘
+```
+
+**On every individual swap**: Layer 1 validates the post-swap spot price against the 10-minute TWAP. If deviation exceeds 5%, the swap reverts. This is fully on-chain and trustless.
+
+**On every batch settlement**: Layer 2 provides the True Price as ground truth. The clearing price is validated against both TWAP (Layer 1) and True Price (Layer 2). If both the True Price and VWAP agree the clearing price is skewed, deviation bounds tighten by 20%. Deviations beyond bounds are damped using the golden ratio.
+
+**Continuously**: Layer 3 monitors stablecoin flows, leverage conditions, and liquidation risk. When it detects regime changes (e.g., transition from NORMAL to MANIPULATION), it adjusts the Kalman filter's noise parameters in real time — making the True Price more resistant to noisy observations during adverse conditions.
+
+**At circuit-breaker thresholds**: If the True Price deviation exceeds 50% (the `TRUE_PRICE_BREAKER`), or if volume or withdrawal anomalies are detected, the circuit breaker halts trading entirely until conditions normalize or a guardian manually resets.
+
+### 9.6 Why This Matters for MEV Elimination
+
+Batch auctions eliminate ordering-based MEV (front-running, sandwiching). Uniform clearing prices eliminate execution-advantage MEV. But there is a third vector: **price manipulation MEV**, where an attacker distorts the reference price to shift the clearing price in their favor.
+
+The oracle stack closes this vector:
+
+| Attack Vector | Which Layer Catches It | Mechanism |
+|---------------|------------------------|-----------|
+| Single-swap price manipulation | Layer 1 (TWAP) | 5% deviation cap, immediate revert |
+| Multi-block reserve distortion | Layer 2 (True Price) | Kalman filter anchors to slow-moving equilibrium |
+| Stablecoin-enabled leverage attack | Layer 3 (Regime) | USDT flow detection increases observation noise |
+| Liquidation cascade engineering | Layer 3 (Cascade Detector) | 5-signal fusion identifies artificial cascades |
+| Coordinated cross-venue manipulation | Layer 2 + Layer 3 | Multi-venue observations weighted by reliability |
+| Flash crash / flash loan exploit | Layer 1 + flash loan guard | Same-block interaction blocked + TWAP validation |
+
+**The key principle**: batch auctions define *how* prices are calculated, the oracle stack defines *whether* those prices are trustworthy. Both are required. A batch auction with a corrupt price is just a fair mechanism for executing an unfair trade.
+
+### 9.7 Volatility Oracle and Dynamic LP Fees
+
+A dedicated `VolatilityOracle` calculates realized volatility from a rolling window of 5-minute price observations using the variance of log returns, annualized via the standard square-root-of-time scaling:
+
+```
+σ_annualized = σ_5min × √(105,120)  ≈  σ_5min × 324
+```
+
+Volatility is classified into four tiers with corresponding LP fee multipliers:
+
+| Tier | Annualized Volatility | LP Fee Multiplier |
+|------|----------------------|-------------------|
+| LOW | < 20% | 1.0x (base) |
+| MEDIUM | 20% - 50% | 1.25x |
+| HIGH | 50% - 100% | 1.5x |
+| EXTREME | > 100% | 2.0x |
+
+This dynamic fee mechanism compensates liquidity providers for increased impermanent loss during volatile periods, while keeping fees minimal during calm markets. It is not a "protocol fee" — it flows entirely to LPs as compensation for the risk they bear.
+
+### 9.8 Oracle Router: Multi-Source Aggregation
+
+Sitting beneath the oracle stack is the `VibeOracleRouter`, which aggregates price reports from multiple provider types into a single quality-weighted feed:
+
+- **First-party feeds**: Trinity node direct observations (highest trust)
+- **Aggregator feeds**: Chainlink-style decentralized aggregation
+- **Low-latency feeds**: Pyth-style sub-second price data
+
+Providers are scored on historical accuracy (starting at 50%, adjusted +0.5% per accurate report, -2% per inaccurate report). The router computes a **weighted median** — resistant to up to 49% corrupted weight — and distributes Shapley-attributed rewards to accurate providers from a community-funded reward pool.
+
+If a provider's report deviates beyond the configurable threshold from the weighted median, the router's circuit breaker trips for that feed, halting price updates until a guardian resets. This prevents a compromised oracle from propagating bad data through the stack.
+
+---
+
+## 10. Pure Economics: No Rent-Seeking
+
+### 10.1 The Problem with Protocol Extraction
 
 Most DeFi protocols extract value through:
 
@@ -651,7 +901,7 @@ Most DeFi protocols extract value through:
 
 This creates misaligned incentives: protocol success ≠ user success.
 
-### 9.2 VibeSwap's Approach: Zero Extraction
+### 10.2 VibeSwap's Approach: Zero Extraction
 
 VibeSwap operates on **pure cooperative economics**:
 
@@ -669,7 +919,7 @@ Governance:
 └── 0% founder veto power
 ```
 
-### 9.3 Creator Compensation: The Tip Jar
+### 10.3 Creator Compensation: The Tip Jar
 
 Instead of extracting value through protocol fees, creators receive compensation through **voluntary retroactive gratitude**:
 
@@ -690,7 +940,7 @@ Properties:
 - **Transparent**: All tips visible on-chain
 - **Pure**: No governance, no complexity, just gratitude
 
-### 9.4 Why This Works
+### 10.4 Why This Works
 
 The Bitcoin whitepaper had no ICO, no founder allocation, no protocol fee. Satoshi's "compensation" came from early mining—the same opportunity available to everyone.
 
@@ -700,7 +950,7 @@ VibeSwap follows this model:
 - Protocol purity maintained
 - No conflicts of interest
 
-### 9.5 The Philosophy
+### 10.5 The Philosophy
 
 > "The best systems reward creators through voluntary gratitude, not codified extraction."
 
@@ -710,9 +960,9 @@ A tip jar isn't weaker than a protocol fee—it's stronger, because it represent
 
 ---
 
-## 10. Nash Equilibrium Analysis
+## 11. Nash Equilibrium Analysis
 
-### 10.1 Defining the Game
+### 11.1 Defining the Game
 
 **Players**: Traders, Liquidity Providers, Potential Attackers
 
@@ -720,7 +970,7 @@ A tip jar isn't weaker than a protocol fee—it's stronger, because it represent
 
 **Question**: Under what conditions is honest behavior the dominant strategy?
 
-### 10.2 Honest Revelation Is Dominant
+### 11.2 Honest Revelation Is Dominant
 
 In VibeSwap's batch auction:
 
@@ -739,7 +989,7 @@ In VibeSwap's batch auction:
 - No "before" and "after"
 - Strategy impossible
 
-### 10.3 Attack Expected Value
+### 11.3 Attack Expected Value
 
 For any potential attacker:
 
@@ -769,7 +1019,7 @@ But you only have $1M access level
 → Attack is negative EV
 ```
 
-### 10.4 The Equilibrium
+### 11.4 The Equilibrium
 
 The system reaches Nash equilibrium when:
 
@@ -778,7 +1028,7 @@ The system reaches Nash equilibrium when:
 3. **Attackers** prefer becoming honest participants (attacks are -EV)
 4. **Protocol** remains solvent (insurance reserves adequate)
 
-### 10.5 Comparison
+### 11.5 Comparison
 
 | Mechanism | Honest Dominant? | MEV Possible? | LP Adverse Selection? |
 |-----------|------------------|---------------|----------------------|
@@ -788,13 +1038,13 @@ The system reaches Nash equilibrium when:
 
 ---
 
-## 10.5 Decentralization and Frontend Independence
+## 11.5 Decentralization and Frontend Independence
 
 VibeSwap is a **protocol**, not a product. The smart contracts are:
 
 - **Immutable**: Once deployed, core logic cannot be changed
 - **Permissionless**: Anyone can interact directly with contracts
-- **Ownerless**: No admin keys, no special privileges (after initial setup)
+- **Bootstrap Governance**: Admin keys exist during initial deployment for security and upgrades. The Cincinnatus Protocol defines a transition path: (1) multisig transfer, (2) timelock governance, (3) eventual ownership renunciation. The protocol is designed to become ownerless — but honesty requires acknowledging this transition is not yet complete.
 
 ### Uniform Safety, Flexible Access
 
@@ -870,9 +1120,9 @@ Frontend Layer (Off-Chain, Diverse)
 
 ---
 
-## 11. Implementation
+## 12. Implementation
 
-### 11.1 Core Contracts
+### 12.1 Core Contracts
 
 ```
 VibeSwap Architecture
@@ -895,22 +1145,26 @@ VibeSwap Architecture
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                      SECURITY LAYER                          │
-│  CircuitBreaker ←→ TruePriceOracle ←→ ReputationOracle      │
-│  (Emergency stops)   (Price feeds)    (Trust scores)         │
+│                    ORACLE & SECURITY LAYER                    │
+│  TWAPOracle ←→ TruePriceOracle ←→ VibeOracleRouter          │
+│  (On-chain TWAP)  (Kalman filter)   (Multi-source aggregation)│
+│  VolatilityOracle ←→ StablecoinFlowRegistry ←→ CircuitBreaker│
+│  (Dynamic LP fees)   (Regime detection)    (Emergency stops)  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 11.2 Key Libraries
+### 12.2 Key Libraries
 
 | Library | Purpose |
 |---------|---------|
 | `FibonacciScaling.sol` | Golden ratio math, retracement levels, throughput tiers |
-| `BatchMath.sol` | Clearing price calculation, order matching |
+| `BatchMath.sol` | Clearing price calculation, order matching, golden ratio damping |
 | `DeterministicShuffle.sol` | Fair order randomization using XORed secrets |
-| `TWAPOracle.sol` | Time-weighted average price calculation |
+| `TWAPOracle.sol` | Cumulative price observations, binary search, TWAP computation |
+| `TruePriceLib.sol` | True Price deviation validation and regime-adjusted bounds |
+| `VWAPOracle.sol` | Volume-weighted average price for cross-validation |
 
-### 11.3 Batch Lifecycle (10 seconds)
+### 12.3 Batch Lifecycle (10 seconds)
 
 ```solidity
 // Phase 1: Commit (0-8 seconds)
@@ -955,7 +1209,7 @@ function settle() external {
 }
 ```
 
-### 11.4 Halving Implementation
+### 12.4 Halving Implementation
 
 ```solidity
 function getCurrentHalvingEra() public view returns (uint8) {
@@ -980,32 +1234,35 @@ function createGame(bytes32 gameId, uint256 totalValue, ...) external {
 }
 ```
 
-### 11.5 Deployment
+### 12.5 Deployment
 
 VibeSwap deploys as UUPS upgradeable proxies for security patching while maintaining state:
 
 ```
 Mainnet Deployment:
-├── TruePriceOracle (price feeds)
-├── VibeAMM (liquidity pools)
+├── VibeSwapCore (orchestration)
+├── VibeAMM (liquidity pools + embedded TWAP)
 ├── CommitRevealAuction (batch processing)
 ├── ShapleyDistributor (reward distribution)
+├── TruePriceOracle (Kalman filter state + EIP-712 validation)
+├── VibeOracleRouter (multi-source weighted median aggregation)
+├── StablecoinFlowRegistry (USDT/USDC regime detection)
+├── VolatilityOracle (realized vol + dynamic LP fee multipliers)
 ├── CircuitBreaker (emergency controls)
-├── VibeSwapCore (orchestration)
 └── CreatorTipJar (voluntary compensation)
 ```
 
 ---
 
-## 12. Conclusion
+## 13. Conclusion
 
-### 12.1 The Thesis
+### 13.1 The Thesis
 
 **True price discovery requires cooperation, not competition.**
 
 Current markets are adversarial by accident, not necessity. The same game theory that explains extraction can design cooperation.
 
-### 12.2 The Innovation Stack
+### 13.2 The Innovation Stack
 
 ```
 Commit-Reveal Batching
@@ -1032,6 +1289,10 @@ Anti-Fragile Security
        ↓
 Stronger under attack
        ↓
+Three-Layer Oracle Stack
+       ↓
+Manipulation-resistant price integrity
+       ↓
 Pure Economics (No Extraction)
        ↓
 Aligned incentives
@@ -1039,7 +1300,7 @@ Aligned incentives
 TRUE PRICE DISCOVERY
 ```
 
-### 12.3 The Philosophy
+### 13.3 The Philosophy
 
 VibeSwap doesn't ask users to be altruistic. It designs a mechanism where self-interest produces collective benefit:
 
@@ -1051,7 +1312,7 @@ VibeSwap doesn't ask users to be altruistic. It designs a mechanism where self-i
 
 Markets as **positive-sum games**, not zero-sum extraction.
 
-### 12.4 The Invitation
+### 13.4 The Invitation
 
 We've shown that cooperative price discovery is:
 - **Theoretically sound**: Game-theoretically optimal
@@ -1098,6 +1359,35 @@ Reward(era) = InitialReward / 2^era
 Total(∞) = InitialReward × 2 (geometric series sum)
 ```
 
+### TWAP (Time-Weighted Average Price)
+```
+TWAP(T) = [priceCumulative(t) - priceCumulative(t - T)] / T
+Where priceCumulative(t) = Σ price(τ) × Δτ  (integral of spot price over time)
+```
+
+### Kalman Filter (True Price Estimation)
+```
+Prediction:
+  x̂(t|t-1) = F · x̂(t-1)           State prediction
+  P(t|t-1) = F · P(t-1) · Fᵀ + Q   Covariance prediction
+
+Update:
+  K = P(t|t-1) · Hᵀ · (H · P(t|t-1) · Hᵀ + R)⁻¹   Kalman gain
+  x̂(t) = x̂(t|t-1) + K · (z(t) - H · x̂(t|t-1))     State update
+
+Where:
+  x = [true_price, drift]   State vector
+  z = observed venue prices  Observation vector
+  Q = process noise (trend dynamics, stablecoin-adjusted)
+  R = observation noise (leverage stress, orderbook quality, USDT flows)
+  K = Kalman gain (how much to trust new observations vs. prior)
+```
+
+### Manipulation Probability (Stablecoin Signal)
+```
+P(manipulation) = 1 / (1 + exp(-1.5 × (USDT_USDC_ratio - 2)))
+```
+
 ### Nash Equilibrium Condition
 ```
 ∀i: uᵢ(sᵢ*, s₋ᵢ*) ≥ uᵢ(sᵢ, s₋ᵢ*) for all sᵢ
@@ -1116,6 +1406,9 @@ Total(∞) = InitialReward × 2 (geometric series sum)
 | CommitRevealAuction | - | - |
 | ShapleyDistributor | - | - |
 | TruePriceOracle | - | - |
+| VibeOracleRouter | - | - |
+| StablecoinFlowRegistry | - | - |
+| VolatilityOracle | - | - |
 | CircuitBreaker | - | - |
 | CreatorTipJar | - | - |
 
@@ -1128,6 +1421,9 @@ Total(∞) = InitialReward × 2 (geometric series sum)
 3. Budish, Cramton, Shim. "The High-Frequency Trading Arms Race" (2015)
 4. Daian et al. "Flash Boys 2.0: Frontrunning, Transaction Reordering, and Consensus Instability" (2019)
 5. Fibonacci, Leonardo. "Liber Abaci" (1202)
+6. Kalman, Rudolf E. "A New Approach to Linear Filtering and Prediction Problems" (1960)
+7. Adams et al. "Uniswap v2 Core" — TWAP oracle design (2020)
+8. Hamilton, James D. "A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle" — Hidden Markov regime switching (1989)
 
 ---
 

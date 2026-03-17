@@ -212,14 +212,20 @@ This mechanism ensures that the protocol can correct historical injustices witho
 
 ## 9. Governance Architecture
 
-### 9.1 No Admin Keys
+### 9.1 Admin Keys & Progressive Decentralization
 
-VibeSwap's critical parameters are either:
-- **Immutable** (VIBE supply cap, Shapley axioms, bonding curve seal)
-- **Timelocked** (treasury withdrawals: 2-day default, 6-hour emergency)
-- **Community-governed** (conviction voting with quadratic weighting)
+Admin keys currently exist with the deployer address. This is necessary during the bootstrap phase for:
+- **Security operations**: Pausing contracts, triggering circuit breakers, blacklisting malicious addresses
+- **Upgrades**: UUPS proxy upgrades to fix vulnerabilities or add functionality
+- **Parameter tuning**: Adjusting rate limits, cooldowns, and security thresholds
 
-There is no admin key that can unilaterally change protocol behavior. The founder's stated goal is the **Cincinnatus Protocol** — designing the system so it functions autonomously without any individual's continued involvement.
+The planned transition to full decentralization follows the **Cincinnatus Protocol**:
+1. **Multisig transfer** — Move ownership from single deployer to a multisig controlled by core contributors
+2. **Timelock governance** — Introduce time-delayed execution so the community can review and veto changes
+3. **DAO governance** — Transfer control to community-governed conviction voting with quadratic weighting
+4. **Ownership renunciation** — Once parameters are battle-tested, renounce ownership entirely; critical parameters become immutable
+
+Certain parameters are already immutable (VIBE supply cap, Shapley axioms, bonding curve seal) and others are already timelocked (treasury withdrawals: 2-day default, 6-hour emergency). The goal is the Cincinnatus Protocol — designing the system so it functions autonomously without any individual's continued involvement. We are transparent that this transition is not yet complete.
 
 ### 9.2 Attribution as Structural Dependency
 

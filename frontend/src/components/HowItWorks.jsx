@@ -224,7 +224,7 @@ function HowItWorks() {
     { q: 'What happens if I don\'t reveal?', a: 'Your deposit is slashed 50%. This ensures honest participation -- the game theory makes revealing always the dominant strategy. The slashed tokens go to the insurance pool.' },
     { q: 'How is the clearing price determined?', a: 'All orders in a batch execute at a single uniform clearing price computed by the constant product AMM (x*y=k). This means every trader in the batch gets the exact same price, regardless of order size.' },
     { q: 'Can anyone front-run my trade?', a: 'No. During the commit phase, your order is a cryptographic hash -- nobody can see the actual trade details. By the time orders are revealed, the batch is sealed and execution order is determined by a Fisher-Yates shuffle seeded by all participants\' XORed secrets.' },
-    { q: 'What are priority bids?', a: 'Optional fees traders can attach during reveal to influence execution order within the batch. Unlike MEV extraction, these fees are transparent, voluntary, and go to the protocol treasury rather than hidden actors.' },
+    { q: 'What are priority bids?', a: 'Optional fees traders can attach during reveal to influence execution order within the batch. Unlike MEV extraction, these bids are transparent, voluntary, and go to the DAO treasury, distributed according to governance, rather than hidden actors.' },
   ]
 
   return (

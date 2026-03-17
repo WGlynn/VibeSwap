@@ -136,7 +136,7 @@ contract DeployVibeSwap is Script {
     function _configureSecuritySettings() internal {
         // Configure VibeSwapCore security
         VibeSwapCore(payable(core)).setRequireEOA(true); // Flash loan protection
-        VibeSwapCore(payable(core)).setMaxSwapPerHour(1_000_000 * 1e18); // 1M token limit per hour
+        VibeSwapCore(payable(core)).setMaxSwapPerHour(100_000 * 1e18); // 100K tokens/hour/user — matches contract default
         VibeSwapCore(payable(core)).setCommitCooldown(1); // 1 second between commits
 
         // Configure Core security (guardian can pause)

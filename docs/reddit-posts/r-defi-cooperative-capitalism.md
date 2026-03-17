@@ -44,7 +44,7 @@ There is also a floor: any honest participant receives a minimum 1% reward share
 
 **3. Mutualize risk instead of externalizing it**
 
-- **Impermanent loss protection:** A dedicated vault compensates LPs for IL, funded by protocol fees. The cost of IL is shared across the system rather than borne entirely by the LP who got unlucky.
+- **Impermanent loss protection:** A dedicated vault compensates LPs for IL, funded by volatility fee surplus and slashing penalties. The cost of IL is shared across the system rather than borne entirely by the LP who got unlucky.
 - **Slippage guarantee fund:** Configurable per-trade slippage insurance with daily limits.
 - **Treasury stabilization:** Automated rebalancing that maintains protocol solvency during market stress.
 

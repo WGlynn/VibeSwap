@@ -176,7 +176,7 @@ The governance roadmap for these contracts follows a credible neutrality progres
 2. **DAO Governance** — transfer ownership to community-controlled treasury with time-locked execution
 3. **Renounce entirely** — parameters become immutable, protocol runs autonomously
 
-Once ownership is renounced, the rules are the rules. No admin keys. No multisig overrides. The math executes itself.
+The math is designed to execute itself. Admin keys exist during bootstrap, with a defined transition to community governance and eventual ownership renunciation via the Cincinnatus Protocol.
 
 This is what "trustless" actually means — not "trust us, we're decentralized," but "here are the proofs, verify them yourself, and nobody can change them."
 

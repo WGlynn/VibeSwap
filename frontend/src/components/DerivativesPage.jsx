@@ -849,12 +849,12 @@ export default function DerivativesPage() {
             {
               title: 'Circuit Breakers',
               desc: 'Automated circuit breakers halt trading during extreme volatility to protect positions and prevent cascading liquidations.',
-              items: ['Price deviation > 15%', 'Volume spike > 500%', 'Liquidation cascade > 10 accounts'],
+              items: ['Price deviation > 50%', 'Volume spike > $10M/hour', 'Withdrawal surge > 25% TVL'],
               color: '#ef4444',
             },
             {
               title: 'Insurance Fund',
-              desc: 'Protocol insurance fund covers socialized losses from under-collateralized liquidations. Funded by trading fees.',
+              desc: 'Protocol insurance fund covers socialized losses from under-collateralized liquidations. Funded by volatility fee surplus and slashing penalties.',
               items: ['Fund size: $4.2M', 'Coverage ratio: 142%', 'Auto-deleverage as last resort'],
               color: '#10b981',
             },

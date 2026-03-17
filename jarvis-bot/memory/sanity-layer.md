@@ -45,7 +45,7 @@ Removing these creates exploitable vulnerabilities.
 | ID | System | What It Prevents | Files |
 |----|--------|-----------------|-------|
 | S1 | **TWAP Validation (max 5% deviation)** | Price manipulation via flash loans | `VibeSwapCore.sol`, `TWAPOracle.sol` |
-| S2 | **Rate Limiting (1M tokens/hour/user)** | Wash trading, market manipulation | `SecurityLib.sol` |
+| S2 | **Rate Limiting (100K tokens/hour/user)** | Wash trading, market manipulation | `SecurityLib.sol` |
 | S3 | **Circuit Breakers (5 types)** | Uncontrolled operation during attacks/crashes | `CircuitBreaker.sol` |
 | S4 | **ReentrancyGuard (nonReentrant)** | Classic reentrancy drain attacks | Every token-handling contract |
 | S5 | **CEI Pattern (Checks-Effects-Interactions)** | State inconsistency during external calls | Every contract |

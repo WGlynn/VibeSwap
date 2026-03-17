@@ -336,14 +336,14 @@ try {
   initSelfImprove = si.initSelfImprove;
 } catch (e) { console.warn(`[jarvis] self-improve import failed: ${e.message}`); }
 // Shard dedup: coordinate responses when multiple Jarvis bots in same group
-let registerSiblings = () => {}, trackSiblingMessage = () => {}, checkSiblingResponse = () => ({ siblingResponded: false }), buildSiblingContext = () => '', shouldSuppress = () => false, getCoordinationDelay = () => 0;
+let registerSiblings = () => {}, trackSiblingMessage = () => {}, checkSiblingResponse = () => ({ siblingResponded: false }), buildSiblingContext = () => '', shouldSuppressShard = () => false, getCoordinationDelay = () => 0;
 try {
   const sd = await import('./shard-dedup.js');
   registerSiblings = sd.registerSiblings;
   trackSiblingMessage = sd.trackMessage;
   checkSiblingResponse = sd.checkSiblingResponse;
   buildSiblingContext = sd.buildSiblingContext;
-  shouldSuppress = sd.shouldSuppress;
+  shouldSuppressShard = sd.shouldSuppress;
   getCoordinationDelay = sd.getCoordinationDelay;
 } catch (e) { console.warn(`[jarvis] shard-dedup import failed: ${e.message}`); }
 
@@ -6833,7 +6833,7 @@ bot.on('text', async (ctx) => {
     clearInterval(typingInterval);
 
     // Shard dedup: if response is "." (nothing to add), suppress it silently
-    if (isGroupMsg && shouldSuppress(response.text)) {
+    if (isGroupMsg && shouldSuppressShard(response.text)) {
       console.log(`[shard-dedup] Suppressed response in ${chatId} — sibling already covered it`);
       return;
     }

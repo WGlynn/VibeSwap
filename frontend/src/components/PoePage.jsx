@@ -1,6 +1,13 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
+import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
+
+const PHI = 1.618033988749895
+const CYAN = '#06b6d4'
+const GREEN = '#00FF41'
+const AMBER = '#FBBF24'
 
 const EXAMPLE_PROPOSALS = [
   {
@@ -36,26 +43,27 @@ const STATES = {
 }
 
 export default function PoePage() {
+  const { isConnected: isExternalConnected } = useWallet()
+  const { isConnected: isDeviceConnected } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
   const [tab, setTab] = useState('active')
+  const [stakeModal, setStakeModal] = useState(null)
+  const [stakeAmount, setStakeAmount] = useState('')
 
   return (
-    <div className="min-h-full px-4 py-8 max-w-4xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">POE Revaluation</h1>
-          <p className="text-sm text-black-400 italic mb-3">
-            Posthumous/Overlooked Evidence — named after Edgar Allan Poe,
-            who died penniless while his work became priceless.
-          </p>
-          <p className="text-black-300 text-sm leading-relaxed max-w-2xl">
-            Contributions whose value was only recognized after their original
-            Shapley game settled can be retroactively revalued. The protocol remembers.
-          </p>
-        </div>
+    <div className="max-w-3xl mx-auto px-4 py-6">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+        <h1 className="text-3xl sm:text-4xl font-bold text-white font-display">
+          POE <span style={{ color: CYAN }}>REVALUATION</span>
+        </h1>
+        <p className="text-gray-400 text-sm mt-2 font-mono italic">
+          Posthumous/Overlooked Evidence — named after Edgar Allan Poe
+        </p>
+        <p className="text-gray-500 text-xs mt-1 font-mono">
+          Retroactive recognition for contributions whose value was only understood later.
+        </p>
+        <div className="mx-auto mt-3 h-px w-32" style={{ background: `linear-gradient(to right, transparent, ${CYAN}, transparent)` }} />
+      </motion.div>
 
         {/* Mechanism */}
         <div className="mb-8 p-4 rounded-xl bg-black-800/50 border border-black-700/50">
@@ -139,22 +147,101 @@ export default function PoePage() {
                       Conviction met. {p.daysUntilExecutable} days until executable.
                     </div>
                   )}
+                  {/* Action buttons */}
+                  <div className="flex gap-2 mt-3">
+                    {p.state === 'PROPOSED' && (
+                      <button onClick={() => setStakeModal(p.id)}
+                        className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold border transition-all hover:brightness-125"
+                        style={{ color: CYAN, borderColor: `${CYAN}40`, backgroundColor: `${CYAN}10` }}>
+                        {isConnected ? 'Stake VIBE' : 'Connect to Stake'}
+                      </button>
+                    )}
+                    {p.state === 'EXECUTABLE' && (
+                      <button className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold border transition-all hover:brightness-125"
+                        style={{ color: GREEN, borderColor: `${GREEN}40`, backgroundColor: `${GREEN}10` }}>
+                        Execute Proposal
+                      </button>
+                    )}
+                    <button className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-500 border border-gray-700 hover:text-white transition-all">
+                      View Evidence
+                    </button>
+                  </div>
                 </div>
               </GlassCard>
             )
           })}
           {tab !== 'active' && (
-            <div className="text-center py-12 text-black-500 text-sm">
+            <div className="text-center py-12 text-black-500 text-sm font-mono">
               No {tab} proposals yet.
             </div>
           )}
         </div>
 
+        {/* Your Governance Position */}
+        <div className="mt-8 mb-8">
+          <h2 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+            <span style={{ color: CYAN }}>_</span>Your Governance
+          </h2>
+          {!isConnected ? (
+            <GlassCard glowColor="terminal" hover={false}>
+              <div className="p-6 text-center">
+                <div className="text-gray-400 text-sm font-mono">Connect wallet to participate in governance</div>
+              </div>
+            </GlassCard>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Staked VIBE', value: '2,400', color: CYAN },
+                { label: 'Active Proposals', value: '2', color: GREEN },
+                { label: 'Conviction Power', value: '1.4x', color: AMBER },
+              ].map((s, i) => (
+                <GlassCard key={s.label} glowColor="terminal" hover>
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08 * PHI }} className="p-3 text-center">
+                    <div className="text-lg font-mono font-bold" style={{ color: s.color }}>{s.value}</div>
+                    <div className="text-[10px] text-gray-500 font-mono mt-1">{s.label}</div>
+                  </motion.div>
+                </GlassCard>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Stake Modal */}
+        <AnimatePresence>
+          {stakeModal !== null && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setStakeModal(null)}>
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white font-bold font-mono text-sm">Stake on Proposal #{stakeModal}</h3>
+                  <button onClick={() => setStakeModal(null)} className="text-gray-500 hover:text-white text-lg">&times;</button>
+                </div>
+                <div className="bg-gray-800/50 rounded-xl p-4 mb-4">
+                  <div className="text-xs text-gray-400 font-mono mb-2">Amount (VIBE)</div>
+                  <input type="number" placeholder="0" value={stakeAmount} onChange={e => setStakeAmount(e.target.value)}
+                    className="w-full bg-transparent text-white text-xl font-mono font-bold outline-none placeholder-gray-700" />
+                </div>
+                <div className="text-[10px] text-gray-500 font-mono mb-4">
+                  Staked tokens are locked until the proposal resolves. Conviction power increases with time staked.
+                </div>
+                <button className="w-full py-3 rounded-xl font-bold font-mono text-sm text-gray-900 transition-all"
+                  style={{ backgroundColor: CYAN }}>
+                  Stake VIBE
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Quote */}
-        <div className="mt-8 text-center">
-          <p className="text-[11px] text-black-600 italic">
+        <div className="text-center pb-4">
+          <div className="text-gray-600 text-[10px] font-mono italic">
             "To be seen. To be valued. Even if it takes the world decades to catch up."
-          </p>
+          </div>
         </div>
       </motion.div>
     </div>

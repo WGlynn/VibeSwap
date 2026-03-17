@@ -104,7 +104,10 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Distribution ============
 
+    // H-05 DISSOLVED: Only authorized sources or owner can trigger distribution.
+    // Dissolves MEV timing attack where anyone front-runs collectFee with distribute.
     function distribute(address token) public nonReentrant {
+        require(_authorizedSources[msg.sender] || msg.sender == owner(), "Not authorized to distribute");
         uint256 pending = _accounting[token].pending;
         if (pending == 0) revert NothingToDistribute();
 

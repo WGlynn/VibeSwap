@@ -6524,7 +6524,15 @@ bot.on('text', async (ctx) => {
     if (msgText.length >= 3 && !shouldSkipProactive && !shouldSuppress(ctx.chat.id, 'proactive')) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
-        const recentCtx = getRecentContext(ctx.chat.id, 10);
+        let recentCtx = getRecentContext(ctx.chat.id, 10);
+
+        // Inject reply-to-message context for triage — if someone replies to a message,
+        // the triage engine needs to see what was quoted to make a good engagement decision
+        const proactiveReplyTo = ctx.message.reply_to_message;
+        if (proactiveReplyTo?.text) {
+          const quotedAuthor = proactiveReplyTo.from?.username || proactiveReplyTo.from?.first_name || 'someone';
+          recentCtx = `${recentCtx || ''}\n\n[${userName} is replying to @${quotedAuthor}'s message: "${proactiveReplyTo.text.slice(0, 500)}"]`;
+        }
 
         // If message is from sibling bot, run triage but with sibling context hint
         let analysis;
@@ -6754,6 +6762,26 @@ bot.on('text', async (ctx) => {
           messageForLLM = `${ctx.message.text}\n\n[SYSTEM: ${userName} just called your name. Here's what was just discussed in the group — respond to the conversation flow, not with a generic "Yes?":\n${recentCtx}]`;
         }
       }
+    }
+
+    // ============ Reply Context Injection ============
+    // When a user replies to ANY message (not just Jarvis's), inject the original
+    // message so Jarvis knows what they're referring to. Without this, Jarvis
+    // just sees the user's text with no idea what they tagged/quoted.
+    const replyToMsg = ctx.message.reply_to_message;
+    if (replyToMsg && replyToMsg.text) {
+      const replyAuthor = replyToMsg.from?.username || replyToMsg.from?.first_name || 'someone';
+      const isReplyToSelf = replyToMsg.from?.id === ctx.botInfo?.id;
+      // Always inject — even for replies to Jarvis (gives full context, not just correction detection)
+      const replyContent = replyToMsg.text.slice(0, 1000);
+      const label = isReplyToSelf ? 'your previous message' : `a message from @${replyAuthor}`;
+      messageForLLM = `${messageForLLM}\n\n[CONTEXT: ${userName} is replying to ${label}:\n"${replyContent}"\n\nAddress this message directly in your response. The user wants you to engage with the content above, not just acknowledge being tagged.]`;
+    } else if (replyToMsg && (replyToMsg.photo || replyToMsg.document || replyToMsg.video || replyToMsg.sticker)) {
+      // Non-text reply — at least tell the LLM something was tagged
+      const replyAuthor = replyToMsg.from?.username || replyToMsg.from?.first_name || 'someone';
+      const mediaType = replyToMsg.photo ? 'photo' : replyToMsg.document ? 'document' : replyToMsg.video ? 'video' : 'sticker';
+      const caption = replyToMsg.caption?.slice(0, 500) || '';
+      messageForLLM = `${messageForLLM}\n\n[CONTEXT: ${userName} is replying to a ${mediaType} from @${replyAuthor}${caption ? ` with caption: "${caption}"` : ''}. Address what they're asking about this ${mediaType}.]`;
     }
 
     // YouTube Intelligence — detect links and fetch transcript/metadata for context

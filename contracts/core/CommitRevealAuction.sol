@@ -156,6 +156,9 @@ contract CommitRevealAuction is
     /// @notice Authorized settlers (VibeSwapCore, CrossChainRouter)
     mapping(address => bool) public authorizedSettlers;
 
+    /// @notice H-04 DISSOLVED: Pull pattern for ETH refunds — no reentrancy possible
+    mapping(address => uint256) public pendingRefunds;
+
     /// @notice DAO treasury address for slashed funds
     address public treasury;
 
@@ -458,14 +461,11 @@ contract CommitRevealAuction is
         // Store secret for shuffle seed
         batchSecrets[currentBatchId].push(secret);
 
-        // FIX #7: Refund excess ETH beyond priority bid
+        // H-04 DISSOLVED: Pull pattern replaces inline ETH refund.
+        // No external call during reveal = no reentrancy surface to attack.
         uint256 excess = msg.value - priorityBid;
         if (excess > 0) {
-            (bool refundSuccess, ) = msg.sender.call{value: excess}("");
-            // If refund fails, excess stays in contract (user's problem if they use a non-receivable contract)
-            if (!refundSuccess) {
-                emit ExcessETHRefundFailed(msg.sender, excess);
-            }
+            pendingRefunds[msg.sender] += excess;
         }
 
         emit OrderRevealed(
@@ -823,6 +823,18 @@ contract CommitRevealAuction is
             amountIn,
             priorityBid
         );
+    }
+
+    // ============ ETH Refund Claims (Pull Pattern — H-04) ============
+
+    /// @notice Claim accumulated ETH refunds from reveal overpayments
+    /// @dev Pull pattern: user calls this to withdraw, no reentrancy surface during reveal
+    function claimRefund() external nonReentrant {
+        uint256 amount = pendingRefunds[msg.sender];
+        require(amount > 0, "No refund pending");
+        pendingRefunds[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Refund transfer failed");
     }
 
     // ============ View Functions ============

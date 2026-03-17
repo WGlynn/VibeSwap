@@ -138,7 +138,8 @@ vibeswap/
 ├── script/             # Deploy.s.sol, ConfigurePeers.s.sol
 ├── frontend/src/       # React components, hooks, utils
 ├── oracle/             # Python Kalman filter price oracle
-└── docs/               # Whitepapers and mechanism design docs
+├── docs/               # Whitepapers and mechanism design docs
+└── DOCUMENTATION/      # Design philosophy, master docs, Nervos talks
 ```
 
 ### Core Mechanism (10-second batches)
@@ -179,7 +180,7 @@ python -m oracle.main
 
 ### Security Features
 - Flash loan protection (same-block interaction guard)
-- TWAP validation (max 5% deviation)
+- TWAP validation (max 5% deviation, in VibeAMM)
 - Rate limiting (100K tokens/hour/user)
 - Circuit breakers (volume, price, withdrawal thresholds)
 - 50% slashing for invalid reveals

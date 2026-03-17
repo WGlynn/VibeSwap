@@ -352,7 +352,7 @@ The identity layer feeds into governance (reputation-weighted voting), incentive
 
 - Configurable security (DVN selection per route)
 - Replay protection
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Gas estimation and refund
 
 ---

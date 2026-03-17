@@ -73,7 +73,7 @@ This isn't theoretical. The contracts are deployed. The frontend handles the com
 ### Security (Built-In, Not Bolted On)
 - Flash loan protection (EOA-only commits)
 - TWAP validation (max 5% deviation threshold)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers (volume, price, and withdrawal thresholds)
 - 50% collateral slashing for invalid reveals
 - No custodial key storage — ever

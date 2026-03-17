@@ -136,7 +136,7 @@ The patterns we develop for managing constraints today become the foundations of
 
 ## Call to Action (1 min)
 
-1. **Read the proofs**: `docs/VIBESWAP_FORMAL_PROOFS.md`
+1. **Read the proofs**: `DOCUMENTATION/VIBESWAP_FORMAL_PROOFS.md`
 2. **Verify yourself**: All math is open source
 3. **Build with us**: Fairness as a composable primitive
 

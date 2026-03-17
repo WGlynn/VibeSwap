@@ -46,7 +46,7 @@ This isn't theoretical. It's deployed. It works. The mechanism design has been v
 Even at $0, we didn't compromise on security:
 - Flash loan protection (EOA-only commits)
 - TWAP validation (max 5% deviation from oracle)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers (volume, price, and withdrawal thresholds)
 - 50% slashing for invalid reveals
 - Full fuzz and invariant test suites

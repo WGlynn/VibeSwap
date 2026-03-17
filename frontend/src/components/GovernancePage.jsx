@@ -37,7 +37,7 @@ const QUORUM_THRESHOLD = 0.30 // 30% of total supply
 const PROPOSALS = [
   {
     id: 'VIP-017',
-    title: 'Increase LP base fee to 0.35%',
+    title: 'Increase LP base fee to 0.10%',
     status: 'ACTIVE',
     category: 'Protocol',
     forVotes: 842000,
@@ -46,7 +46,7 @@ const PROPOSALS = [
     endTime: '2d 14h',
     proposer: '0x7a3F...c91E',
     createdAt: 'Mar 6, 2026',
-    description: 'Raise the base swap fee from 0.30% to 0.35% to increase LP yield. The additional 0.05% is split 60/40 between LPs and the DAO treasury. Modeling shows this remains competitive with Uniswap V3.',
+    description: 'Raise the base swap fee from 0.05% to 0.10% to increase LP yield. The additional 0.05% is split 60/40 between LPs and the DAO treasury. Modeling shows this remains competitive with Uniswap V3.',
     discussion: [
       { author: '0xaB92...1fD7', text: 'Supports LP retention. Modeling looks solid.' },
       { author: '0x3bE1...d4F2', text: 'What about impact on volume? Higher fees could deter arb bots.' },

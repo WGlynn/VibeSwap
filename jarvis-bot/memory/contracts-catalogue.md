@@ -845,7 +845,7 @@ import "../monetary/interfaces/IJoule.sol";
 - **Purpose**: Cell data structures with little-endian binary serialization (no molecule dependency)
 - **Phase constants**: `PHASE_COMMIT=0`, `PHASE_REVEAL=1`, `PHASE_SETTLING=2`, `PHASE_SETTLED=3`
 - **Order types**: `ORDER_BUY=0`, `ORDER_SELL=1`
-- **Config defaults**: `DEFAULT_COMMIT_WINDOW_BLOCKS=40`, `DEFAULT_REVEAL_WINDOW_BLOCKS=10`, `DEFAULT_SLASH_RATE_BPS=5000`, `DEFAULT_FEE_RATE_BPS=5`, `DEFAULT_MIN_POW_DIFFICULTY=16`, `MINIMUM_LIQUIDITY=1000`
+- **Config defaults**: `DEFAULT_COMMIT_WINDOW_BLOCKS=40`, `DEFAULT_REVEAL_WINDOW_BLOCKS=10`, `DEFAULT_SLASH_RATE_BPS=5000`, `DEFAULT_FEE_RATE_BPS=5`, `DEFAULT_MIN_POW_DIFFICULTY=16`, `MINIMUM_LIQUIDITY=10000`
 
 **Cell Data Structs** (all have `serialize() -> [u8; N]` and `deserialize(&[u8]) -> Option<Self>`):
 

@@ -312,7 +312,7 @@ The three methodologies compose to cover different dimensions of the correctness
 function test_swap_appliesCorrectFee() public {
     vm.prank(alice);
     uint256 amountOut = amm.swap(poolId, address(token0), 10 ether);
-    // Fee is 0.3%, so output should be slightly less than
+    // Fee is 0.05%, so output should be slightly less than
     // the constant-product formula without fees
     uint256 expectedWithoutFee = (reserves1 * 10 ether) /
                                   (reserves0 + 10 ether);

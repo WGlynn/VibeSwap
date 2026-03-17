@@ -21,7 +21,7 @@ const DEFAULT_FEE_RATE_BPS: u64 = 30;
 const DEFAULT_PROTOCOL_FEE_BPS: u64 = 1667;
 
 /// Minimum liquidity permanently locked on first deposit
-const MINIMUM_LIQUIDITY: u64 = 1000;
+const MINIMUM_LIQUIDITY: u64 = 10000;
 
 /// Price scaling factor (1e8) for fixed-point price representation
 const PRICE_SCALE: u128 = 100_000_000;

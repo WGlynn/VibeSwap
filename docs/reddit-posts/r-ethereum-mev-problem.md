@@ -40,7 +40,7 @@ The result is that the entire category of MEV extraction disappears. Not mitigat
 
 - Flash loan prevention: only EOAs (externally owned accounts) can submit commits. Smart contracts cannot participate in the commit phase, which blocks flash-loan-powered MEV strategies.
 - TWAP oracle validation: trades are validated against a time-weighted average price with a maximum 5% deviation threshold, preventing oracle manipulation.
-- Rate limiting: 1M tokens per hour per user, preventing single-actor market manipulation.
+- Rate limiting: 100K tokens per hour per user, preventing single-actor market manipulation.
 - Circuit breakers: automatic trading halts if volume, price movement, or withdrawal patterns exceed configured thresholds.
 
 VibeSwap is live on Base mainnet. Fair launch — no VC funding, no pre-mine, no team token allocation. Over 200 smart contracts, all open source.

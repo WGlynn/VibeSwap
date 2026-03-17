@@ -48,7 +48,7 @@ pub const DEFAULT_MAX_PRICE_DEVIATION: u16 = 500; // 5%
 pub const DEFAULT_MAX_TRADE_SIZE_BPS: u16 = 1000; // 10% of reserves
 pub const DEFAULT_FEE_RATE_BPS: u16 = 5; // 0.05%
 pub const DEFAULT_MIN_POW_DIFFICULTY: u8 = 16;
-pub const MINIMUM_LIQUIDITY: u128 = 1000;
+pub const MINIMUM_LIQUIDITY: u128 = 10000;
 
 // ============ Cell Data Structures ============
 

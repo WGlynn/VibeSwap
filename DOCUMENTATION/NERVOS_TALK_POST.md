@@ -140,10 +140,10 @@ Full architecture, formal proofs, and mechanism design docs in the repo.
 **GitHub**: https://github.com/WGlynn/VibeSwap
 
 **Documentation includes:**
-- [VibeSwap Whitepaper](https://github.com/WGlynn/VibeSwap/blob/master/docs/VIBESWAP_WHITEPAPER.md)
-- [Incentives Whitepaper](https://github.com/WGlynn/VibeSwap/blob/master/docs/INCENTIVES_WHITEPAPER.md)
-- [Formal Proofs (Academic Format)](https://github.com/WGlynn/VibeSwap/blob/master/docs/VIBESWAP_FORMAL_PROOFS_ACADEMIC.md)
-- [Security Mechanism Design](https://github.com/WGlynn/VibeSwap/blob/master/docs/SECURITY_MECHANISM_DESIGN.md)
+- [VibeSwap Whitepaper](https://github.com/WGlynn/VibeSwap/blob/master/DOCUMENTATION/VIBESWAP_WHITEPAPER.md)
+- [Incentives Whitepaper](https://github.com/WGlynn/VibeSwap/blob/master/DOCUMENTATION/INCENTIVES_WHITEPAPER.md)
+- [Formal Proofs (Academic Format)](https://github.com/WGlynn/VibeSwap/blob/master/DOCUMENTATION/VIBESWAP_FORMAL_PROOFS_ACADEMIC.md)
+- [Security Mechanism Design](https://github.com/WGlynn/VibeSwap/blob/master/DOCUMENTATION/SECURITY_MECHANISM_DESIGN.md)
 
 ---
 

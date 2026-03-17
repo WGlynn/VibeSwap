@@ -60,7 +60,7 @@ This isn't a whitepaper. This isn't a pitch deck with "coming soon" milestones. 
 ### The Security Stack
 - Flash loan protection (EOA-only commits)
 - TWAP validation (max 5% deviation from oracle)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers (multi-dimensional thresholds)
 - 50% collateral slashing for invalid reveals
 - All contracts built on OpenZeppelin v5.0.1 with UUPS upgradeable proxies

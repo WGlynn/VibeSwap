@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ethers } from 'ethers';
 import { logger } from '../utils/logger.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 
 /**
  * GitHub webhook routes for contribution tracking.
@@ -64,7 +65,7 @@ export function createGitHubRoutes(relayer) {
 
   // ============ Register Contributor ============
 
-  router.post('/register', (req, res) => {
+  router.post('/register', strictLimiter, (req, res) => {
     const { githubUsername, address } = req.body;
 
     if (!githubUsername || !address) {
@@ -86,7 +87,7 @@ export function createGitHubRoutes(relayer) {
 
   // ============ Force Flush ============
 
-  router.post('/flush', async (_req, res) => {
+  router.post('/flush', strictLimiter, async (_req, res) => {
     try {
       await relayer._flushBatch();
       res.json({ success: true, remaining: relayer.pendingBatch.length });

@@ -1604,7 +1604,7 @@ P(manipulation) = 1 / (1 + exp(-1.5 × (USDT_USDC_ratio - 2)))
 5. Fibonacci, Leonardo. "Liber Abaci" (1202)
 6. Kalman, Rudolf E. "A New Approach to Linear Filtering and Prediction Problems" (1960)
 7. Adams et al. "Uniswap v2 Core" — TWAP oracle design (2020)
-8. Hamilton, James D. "A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle" — Hidden Markov regime switching (1989)
+8. Hamilton, James D. "A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle" — regime switching models (1989). Note: VibeSwap uses a priority-based regime classifier with threshold triggers, not a hidden Markov model.
 
 ---
 

@@ -12,7 +12,7 @@ import { PriceFeedService } from './services/priceFeed.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { createHealthRoutes } from './routes/health.js';
-import priceRoutes from './routes/prices.js';
+import { createPriceRoutes } from './routes/prices.js';
 import tokenRoutes from './routes/tokens.js';
 import chainRoutes from './routes/chains.js';
 import { createGitHubRoutes } from './routes/github.js';
@@ -22,6 +22,9 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// ============ Trust Proxy (must be before middleware) ============
+app.set('trust proxy', 1);
 
 // ============ Shared Services ============
 const priceFeed = new PriceFeedService();
@@ -71,12 +74,9 @@ app.use(httpLogger);
 // ============ Rate Limiting ============
 app.use('/api/', apiLimiter);
 
-// ============ Trust Proxy (for reverse proxy setups) ============
-app.set('trust proxy', 1);
-
 // ============ API Routes ============
 app.use('/api/health', createHealthRoutes(priceFeed));
-app.use('/api/prices', priceRoutes);
+app.use('/api/prices', createPriceRoutes(priceFeed));
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/chains', chainRoutes);
 app.use('/api/github', createGitHubRoutes(githubRelayer));

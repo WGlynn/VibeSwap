@@ -10,9 +10,17 @@ import "../contracts/messaging/CrossChainRouter.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
- * @title DeployVibeSwap
- * @notice Deployment script for VibeSwap omnichain DEX
- * @dev Run with: forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
+ * @title Deploy (DEPRECATED — use DeployProduction.s.sol)
+ * @notice This script deploys VibeAMMLite for basic testing only.
+ *         For any real deployment (testnet or mainnet), use DeployProduction.s.sol which deploys:
+ *         - VibeAMM (full implementation with protocol fee controls)
+ *         - Fee pipeline (ProtocolFeeAdapter → FeeRouter → Treasury/Insurance/RevShare/Buyback)
+ *         - Oracle stack (TruePriceOracle, StablecoinFlowRegistry)
+ *         - All security configurations
+ *
+ * @dev This script is retained for backward compatibility and quick local testing only.
+ *      WARNING: Deployments from this script are INCOMPATIBLE with SetupMVP.s.sol,
+ *      VerifyDeployment.s.sol, and all other downstream scripts.
  */
 contract DeployVibeSwap is Script {
     // Deployment addresses
@@ -27,6 +35,8 @@ contract DeployVibeSwap is Script {
     address public lzEndpoint;
 
     function run() external {
+        console.log("WARNING: Deploy.s.sol is DEPRECATED. Use DeployProduction.s.sol for real deployments.");
+
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         owner = vm.addr(deployerPrivateKey);
 

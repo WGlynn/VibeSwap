@@ -135,7 +135,7 @@ pub fn adjust_difficulty(
 /// difficulty_bits = number of leading zero bits required
 /// Returns a 32-byte target where hash must be <= target
 pub fn difficulty_to_target(difficulty_bits: u8) -> [u8; 32] {
-    if difficulty_bits >= 255 {
+    if difficulty_bits == 255 {
         return [0u8; 32]; // Impossible difficulty
     }
 

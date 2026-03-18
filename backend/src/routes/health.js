@@ -29,5 +29,3 @@ export function createHealthRoutes(priceFeed, wss) {
   return router;
 }
 
-// Keep default export for backwards compat if needed
-export default createHealthRoutes();

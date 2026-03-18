@@ -57,11 +57,11 @@ const PRIORITY_TIERS = [
 
 // ============ Cross-Chain Bridge Fees ============
 const BRIDGE_FEES = [
-  { chain: 'Ethereum', bridgeFee: 0.05, gasFee: '$3.20', time: '~12 min', color: '#627eea' },
-  { chain: 'Base', bridgeFee: 0.01, gasFee: '$0.01', time: '~2 min', color: '#3b82f6' },
-  { chain: 'Arbitrum', bridgeFee: 0.02, gasFee: '$0.06', time: '~3 min', color: '#28a0f0' },
-  { chain: 'Optimism', bridgeFee: 0.01, gasFee: '$0.01', time: '~3 min', color: '#ff0420' },
-  { chain: 'Polygon', bridgeFee: 0.02, gasFee: '$0.02', time: '~5 min', color: '#8247e5' },
+  { chain: 'Ethereum', bridgeFee: 0.00, gasFee: '$3.20', time: '~12 min', color: '#627eea' },
+  { chain: 'Base', bridgeFee: 0.00, gasFee: '$0.01', time: '~2 min', color: '#3b82f6' },
+  { chain: 'Arbitrum', bridgeFee: 0.00, gasFee: '$0.06', time: '~3 min', color: '#28a0f0' },
+  { chain: 'Optimism', bridgeFee: 0.00, gasFee: '$0.01', time: '~3 min', color: '#ff0420' },
+  { chain: 'Polygon', bridgeFee: 0.00, gasFee: '$0.02', time: '~5 min', color: '#8247e5' },
   { chain: 'CKB', bridgeFee: 0.00, gasFee: '$0.001', time: '~8 min', color: '#3cc68a' },
 ]
 
@@ -273,7 +273,7 @@ function CrossChainFees() {
         </motion.div>
       ))}
       <div className="text-[9px] font-mono text-black-600 text-center mt-2 px-3">
-        Bridge fees cover LayerZero relayer costs. Zero protocol markup on cross-chain transfers.
+        Bridge transfers: 0% protocol fee. Only LayerZero gas costs are passed through.
       </div>
     </div>
   )

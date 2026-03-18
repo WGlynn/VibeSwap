@@ -1190,7 +1190,7 @@ mod tests {
     #[test]
     fn test_first_deposit_too_small() {
         let mut p = make_pool();
-        // sqrt(100 * 100) = 100, which is <= MINIMUM_LIQUIDITY (1000)
+        // sqrt(100 * 100) = 100, which is <= MINIMUM_LIQUIDITY (10000)
         let result = add_liquidity(&mut p, 100, 100, 0);
         assert_eq!(result.unwrap_err(), PoolError::MinimumLiquidity);
     }
@@ -1198,7 +1198,7 @@ mod tests {
     #[test]
     fn test_first_deposit_exactly_minimum() {
         let mut p = make_pool();
-        // sqrt(1000 * 1000) = 1000, equals MINIMUM_LIQUIDITY → error
+        // sqrt(1000 * 1000) = 1000, equals MINIMUM_LIQUIDITY (10000) → error
         let result = add_liquidity(&mut p, 1000, 1000, 0);
         assert_eq!(result.unwrap_err(), PoolError::MinimumLiquidity);
     }

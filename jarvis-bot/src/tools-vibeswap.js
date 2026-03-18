@@ -481,7 +481,7 @@ export async function getProtocolHealth() {
     lines.push('  Commit phase: `8s`');
     lines.push('  Reveal phase: `2s`');
     lines.push('  TWAP max deviation: `5%`');
-    lines.push('  Rate limit: `1M tokens/hr/user`');
+    lines.push('  Rate limit: `100K tokens/hr/user`');
     lines.push('  Invalid reveal slash: `50%`');
 
     lines.push('\n*Security:*');

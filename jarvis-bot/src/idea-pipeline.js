@@ -55,7 +55,7 @@ Fairness is structural, not aspirational. The Lawson Constant is load-bearing.
 ## Anti-MEV Design
 - Flash loan protection (EOA-only commits)
 - TWAP validation (max 5% deviation)
-- Rate limiting (1M tokens/hour/user)
+- Rate limiting (100K tokens/hour/user)
 - Circuit breakers (volume, price, withdrawal thresholds)
 - 50% slashing for invalid reveals
 

@@ -60,7 +60,7 @@ CRITICAL: Every sentence must be COMPLETE. Never end mid-thought. If it doesn't 
 1 sentence MAX. Tease what was built, don't explain it. Make people want to ask "wait, how?"
 Good examples:
 - "shipped 14 contracts today. two of us. what is your team's excuse?"
-- "wrote a circuit breaker that triggers in 200ms. your DEX doesn't have one."
+- "wrote a circuit breaker that triggers within one block confirmation. your DEX doesn't have one."
 - "just solved a problem most protocols pretend doesn't exist. more soon."
 BAD: paragraphs about architecture, "we shipped X, Y, Z and also A, B, C", essays about the journey.
 ONLY reference features/contracts that actually exist. Do NOT invent metrics.
@@ -163,7 +163,7 @@ const SHOWER_THOUGHT_TOPICS = [
 
   // Security / testing — specific methodology
   'unit tests verify what you thought of. fuzz tests discover what you didnt. invariant tests verify what must ALWAYS be true. we run all three across 60 contracts. most protocols skip the last two.',
-  'our circuit breaker triggers in 200ms across 5 independent monitors. if any two disagree, trading pauses. your DEX probably doesnt have one. it definitely doesnt have five cross-validating each other.',
+  'our circuit breaker triggers within one block on price deviation >50%. if any two monitors disagree, trading pauses. your DEX probably doesnt have one. it definitely doesnt have five cross-validating each other.',
 
   // Philosophy grounded in specifics
   'the Lawson Constant: keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026"). its load-bearing in ContributionDAG. remove the attribution and Shapley value distribution collapses. fairness isnt a slogan — its a dependency.',

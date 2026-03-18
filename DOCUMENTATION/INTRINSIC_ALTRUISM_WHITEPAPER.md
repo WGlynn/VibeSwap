@@ -276,11 +276,12 @@ Cooperative game theory provides the mathematical foundation for fair value dist
 
 $$\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!(|N|-|S|-1)!}{|N|!} [v(S \cup \{i\}) - v(S)]$$
 
-This satisfies four axioms:
+This satisfies five axioms:
 1. **Efficiency**: All value is distributed
 2. **Symmetry**: Equal contributions → equal rewards
 3. **Null player**: Zero contribution → zero reward
-4. **Additivity**: Combined games distribute additively
+4. **Pairwise Proportionality**: Reward ratio = contribution ratio for any pair
+5. **Time Neutrality**: Identical contributions yield identical rewards regardless of when
 
 ### 5.2 Why Fair Distribution Matters for IIA
 

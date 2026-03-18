@@ -1466,7 +1466,7 @@ fn test_partial_reveal_batch() {
 
 /// Creates a new pool with initial liquidity and verifies:
 /// 1. LP supply = sqrt(reserve0 * reserve1) - MINIMUM_LIQUIDITY
-/// 2. MINIMUM_LIQUIDITY (1000) is locked permanently
+/// 2. MINIMUM_LIQUIDITY (10000) is locked permanently
 /// 3. Pool creation passes type script validation
 /// 4. All invariants hold (reserves > 0, fee rate valid, pair_id non-zero)
 #[test]

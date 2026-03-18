@@ -74,7 +74,8 @@ contract VibeCrossChainSwap is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         feeRecipient = _feeRecipient;
-        feeBps = 10; // 0.1%
+        // Zero protocol fee — only LayerZero gas costs passed through
+        feeBps = 0;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

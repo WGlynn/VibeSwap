@@ -12,7 +12,7 @@ export const TOKENS = {
   USDT: { symbol: 'USDT', name: 'Tether', color: '#26a17b', decimals: 6, chain: 'Ethereum' },
   DAI: { symbol: 'DAI', name: 'Dai', color: '#f5ac37', decimals: 18, chain: 'Ethereum' },
   VIBE: { symbol: 'VIBE', name: 'VibeSwap', color: '#06b6d4', decimals: 18, chain: 'Base' },
-  JUL: { symbol: 'JUL', name: 'JUL Token', color: '#8b5cf6', decimals: 18, chain: 'Base' },
+  JUL: { symbol: 'JUL', name: 'Joule', color: '#8b5cf6', decimals: 18, chain: 'Base' },
   MATIC: { symbol: 'MATIC', name: 'Polygon', color: '#8247e5', decimals: 18, chain: 'Polygon' },
   ARB: { symbol: 'ARB', name: 'Arbitrum', color: '#28a0f0', decimals: 18, chain: 'Arbitrum' },
   OP: { symbol: 'OP', name: 'Optimism', color: '#ff0420', decimals: 18, chain: 'Optimism' },

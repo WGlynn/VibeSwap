@@ -15,7 +15,6 @@ import "./interfaces/IFeeRouter.sol";
  *      All protocol revenue flows through FeeRouter:
  *        - AMM swap fees (VibeAMM)
  *        - Priority bid revenue (CommitRevealAuction → MEVRedistributor → FeeRouter)
- *        - Bridge fees (CrossChainRouter)
  *        - Strategy vault performance fees (StrategyVault)
  *        - Liquidation fees (DutchAuctionLiquidator)
  *

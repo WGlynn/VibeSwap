@@ -28,7 +28,7 @@ const TOKENS = [
   { symbol: 'USDC', name: 'USD Coin',        icon: '\uD83D\uDFE2', price: 1.00 },
   { symbol: 'USDT', name: 'Tether',          icon: '\uD83D\uDFE2', price: 1.00 },
   { symbol: 'BTC',  name: 'Bitcoin',         icon: '\u20BF', price: 67500.00 },
-  { symbol: 'JUL',  name: 'Julius',          icon: '\u2726', price: 0.42 },
+  { symbol: 'JUL',  name: 'Joule',           icon: '\u2726', price: 0.42 },
   { symbol: 'DAI',  name: 'Dai Stablecoin',  icon: '\u25C7', price: 1.00 },
 ]
 

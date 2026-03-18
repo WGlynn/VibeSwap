@@ -33,7 +33,7 @@
 - **Escrow**: All transactions go through smart contract escrow (release on delivery confirmation)
 - **Reviews**: Weighted by reviewer's reputation tier (Sybil-resistant via PoM)
 - **Seller ratings**: Shapley-scored based on transaction history, dispute rate, review quality
-- **Fees**: Protocol fee only (no platform commission). Fee goes to DAO treasury.
+- **Fees**: Marketplace service fee only (no platform commission). Fee goes to DAO treasury.
 - **Discovery**: Conviction-weighted listings (community signals what's worth seeing)
 
 ---
@@ -63,7 +63,7 @@
 - **Milestone escrow**: Funds locked per milestone, released on completion proof
 - **Skill verification**: VibeLearn skill NFTs as verifiable credentials
 - **Fair dispute**: Community arbitration, not platform diktat
-- **Revenue**: Minimal protocol fee (1-2%), rest goes to freelancer
+- **Revenue**: Minimal marketplace fee (1-2%), rest goes to freelancer
 - **Reputation portable**: Your VibeGig reputation works across all VibeApps
 
 ---

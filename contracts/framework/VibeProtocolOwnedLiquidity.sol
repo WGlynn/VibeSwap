@@ -18,7 +18,7 @@ import "../financial/interfaces/IVibeRevShare.sol";
  *         when rewards dry up), the treasury owns its liquidity permanently.
  *         Fees earned go back to RevShare for JUL staker distribution.
  *
- *         Self-sustaining flywheel: protocol fees → treasury → more LP → more fees.
+ *         Self-sustaining flywheel: protocol revenue → treasury → more LP → more fees.
  *
  *         Cooperative capitalism:
  *           - Mutualized risk: can't be mercenary-withdrawn during stress

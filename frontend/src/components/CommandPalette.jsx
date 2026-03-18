@@ -68,7 +68,7 @@ const COMMANDS = [
   { id: 'whitepaper', label: 'Whitepaper', description: 'Technical whitepaper', path: '/whitepaper', category: 'Knowledge' },
   { id: 'philosophy', label: 'Philosophy', description: 'Protocol philosophy', path: '/philosophy', category: 'Knowledge' },
   { id: 'economics', label: 'Economics', description: 'Cooperative capitalism model', path: '/economics', category: 'Knowledge', shortcut: 'Ctrl+E' },
-  { id: 'tokenomics', label: 'Tokenomics', description: 'JUL token economics', path: '/tokenomics', category: 'Knowledge' },
+  { id: 'tokenomics', label: 'Tokenomics', description: 'VIBE token economics', path: '/tokenomics', category: 'Knowledge' },
 
   // Account
   { id: 'portfolio', label: 'Portfolio', description: 'Your holdings & PnL', path: '/portfolio', category: 'Account', shortcut: 'Ctrl+P' },
@@ -106,7 +106,7 @@ const COMMANDS = [
   // Tools
   { id: 'multisend', label: 'Multi-Send', description: 'Batch transfers to multiple recipients', path: '/multisend', category: 'DeFi' },
   { id: 'limit', label: 'Limit Orders', description: 'Price-triggered orders', path: '/limit', category: 'DeFi' },
-  { id: 'airdrop', label: 'Airdrop', description: 'Check VIBE allocation & eligibility', path: '/airdrop', category: 'Account' },
+  { id: 'airdrop', label: 'Airdrop', description: 'Check VIBE contribution claims', path: '/airdrop', category: 'Account' },
   { id: 'badges', label: 'Badges', description: 'Soulbound achievement badges', path: '/badges', category: 'Account' },
   { id: 'alerts', label: 'Price Alerts', description: 'Set price & volume alerts', path: '/alerts', category: 'Account' },
   { id: 'export', label: 'Export Data', description: 'CSV, JSON, PDF exports & tax', path: '/export', category: 'Account' },

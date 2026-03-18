@@ -15,7 +15,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
  * - Royalty enforcement (EIP-2981 compatible)
  * - Collection offers (bid on any NFT in collection)
  * - Creator-controlled primary sales
- * - Protocol fee: 1% (lowest in market)
+ * - Marketplace fee: 1% (lowest in market)
  */
 contract VibeNFTMarketplace is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 

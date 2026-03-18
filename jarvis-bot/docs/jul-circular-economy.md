@@ -120,7 +120,7 @@ The subsidy provider absorbs the cost. JUL burns are a **demand signal** — the
 Cost to provider: $Pool_{effective} \times c_{api}$
 
 **Phase 2 — Revenue-Backed (Near-term):**
-Protocol revenue (VibeSwap trading fees, bridge fees, etc.) flows into a treasury that purchases API credits. JUL burns draw from this treasury.
+Protocol revenue (priority bid revenue, bridge revenue, etc.) flows into a treasury that purchases API credits. JUL burns draw from this treasury.
 
 $$Treasury_{daily} = \sum fees_i - \sum costs_j$$
 
@@ -476,7 +476,7 @@ As the economy matures:
 | Phase | Subsidy Ratio | Provider Cost | Community Cost |
 |-------|--------------|---------------|----------------|
 | Bootstrap | ~120,000:1 | $1.50/day | ~$0 (electricity) |
-| Revenue | ~1,000:1 | Protocol fees | Electricity |
+| Revenue | ~1,000:1 | Protocol revenue | Electricity |
 | Market | ~1:1 | $0 (treasury) | Market price |
 
 The subsidy ratio compresses from 120,000:1 to 1:1 as the economy reaches equilibrium. At 1:1, mining JUL costs approximately as much in electricity as the compute it purchases — no subsidy needed.
@@ -519,7 +519,7 @@ Allow users to burn JUL now for guaranteed compute access in the future. A simpl
 
 ### 11.4 Revenue Integration
 
-Connect VibeSwap protocol fees to the JUL treasury. As the DEX generates trading fees, those fees purchase API credits, reducing and eventually eliminating the subsidy provider's cost.
+Connect VibeSwap priority bid revenue to the JUL treasury. As the DEX generates revenue, that revenue purchases API credits, reducing and eventually eliminating the subsidy provider's cost.
 
 ---
 

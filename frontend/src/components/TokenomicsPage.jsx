@@ -50,7 +50,7 @@ const sectionV = {
 // ============ Data ============
 
 const DISTRIBUTION = [
-  { label: 'Community', pct: 40, color: MATRIX, desc: 'Airdrops, incentives, ecosystem growth' },
+  { label: 'Community', pct: 40, color: MATRIX, desc: 'Community incentives, ecosystem growth' },
   { label: 'Treasury', pct: 20, color: '#8b5cf6', desc: 'DAO-governed reserve for protocol development' },
   { label: 'Team', pct: 15, color: '#f97316', desc: '4-year vest, 1-year cliff, linear unlock' },
   { label: 'Liquidity Mining', pct: 15, color: CYAN, desc: 'LP rewards across all supported chains' },
@@ -67,9 +67,9 @@ const EMISSION_YEARS = [
 
 const ACCRUAL_CARDS = [
   { title: 'Zero Protocol Fees', value: '0%', desc: 'Zero protocol fees on swaps — 100% of LP fees go to liquidity providers.', color: MATRIX, icon: '\u2694' },
-  { title: 'Buyback & Burn', value: '15%', desc: 'Of priority bid revenue used to buy JUL on open market and send to dead address.', color: '#ef4444', icon: '\uD83D\uDD25' },
+  { title: 'Buyback & Burn', value: '15%', desc: 'Of priority bid revenue used to buy VIBE on open market and send to dead address.', color: '#ef4444', icon: '\uD83D\uDD25' },
   { title: 'Staking Rewards', value: '8-14%', desc: 'Real yield from priority bid revenue and emissions. Lock longer for higher APR.', color: CYAN, icon: '\u26A1' },
-  { title: 'Governance Power', value: '1:1', desc: 'Staked JUL = voting weight. Quadratic scaling prevents whale domination.', color: '#8b5cf6', icon: '\u2696' },
+  { title: 'Governance Power', value: '1:1', desc: 'Staked VIBE = voting weight. Quadratic scaling prevents whale domination.', color: '#8b5cf6', icon: '\u2696' },
 ]
 
 const VESTING_SCHEDULE = [
@@ -81,7 +81,7 @@ const VESTING_SCHEDULE = [
 
 const INFLATIONARY_FORCES = [
   { name: 'Liquidity Mining', rate: '+18.75M', desc: 'LP rewards distributed per epoch to active pools' },
-  { name: 'Staking Emissions', rate: '+6.25M', desc: 'Additional JUL minted for long-term stakers' },
+  { name: 'Staking Emissions', rate: '+6.25M', desc: 'Additional VIBE minted for long-term stakers' },
   { name: 'Ecosystem Grants', rate: '+3.12M', desc: 'Developer and partnership grants from ecosystem fund' },
 ]
 
@@ -92,14 +92,14 @@ const DEFLATIONARY_FORCES = [
 ]
 
 const COMPARISON = [
-  { f: 'Max Supply', jul: '21M (Bitcoin-aligned hard cap)', uni: '1B (fixed)', cake: 'Uncapped (deflationary)', crv: '3.03B (inflationary)' },
-  { f: 'Fee Sharing', jul: '100% LP fees to LPs', uni: 'None (fee switch off)', cake: 'Burn only', crv: '50% to veCRV' },
-  { f: 'Burn Mechanism', jul: '15% of auction revenue burned', uni: 'No burns', cake: 'Weekly manual burns', crv: 'No burns' },
-  { f: 'Governance', jul: 'Quadratic + time-weight', uni: '1 token = 1 vote', cake: 'Snapshot voting', crv: 'veCRV lock 4yr' },
-  { f: 'Vesting', jul: '4yr vest, 1yr cliff', uni: '4yr vest (team)', cake: 'No team vesting', crv: 'Continuous emission' },
-  { f: 'MEV Protection', jul: 'Commit-reveal batches', uni: 'None', cake: 'None', crv: 'None' },
-  { f: 'Cross-chain', jul: 'Native (LayerZero)', uni: 'Bridge dependent', cake: 'BSC + some L2s', crv: 'Bridge dependent' },
-  { f: 'Real Yield', jul: 'Yes (priority bid revenue)', uni: 'No', cake: 'Partial (staking)', crv: 'Yes (trading fees)' },
+  { f: 'Max Supply', vibe: '21M (Bitcoin-aligned hard cap)', uni: '1B (fixed)', cake: 'Uncapped (deflationary)', crv: '3.03B (inflationary)' },
+  { f: 'Fee Sharing', vibe: '100% LP fees to LPs', uni: 'None (fee switch off)', cake: 'Burn only', crv: '50% to veCRV' },
+  { f: 'Burn Mechanism', vibe: '15% of auction revenue burned', uni: 'No burns', cake: 'Weekly manual burns', crv: 'No burns' },
+  { f: 'Governance', vibe: 'Quadratic + time-weight', uni: '1 token = 1 vote', cake: 'Snapshot voting', crv: 'veCRV lock 4yr' },
+  { f: 'Vesting', vibe: '4yr vest, 1yr cliff', uni: '4yr vest (team)', cake: 'No team vesting', crv: 'Continuous emission' },
+  { f: 'MEV Protection', vibe: 'Commit-reveal batches', uni: 'None', cake: 'None', crv: 'None' },
+  { f: 'Cross-chain', vibe: 'Native (LayerZero)', uni: 'Bridge dependent', cake: 'BSC + some L2s', crv: 'Bridge dependent' },
+  { f: 'Real Yield', vibe: 'Yes (priority bid revenue)', uni: 'No', cake: 'Partial (staking)', crv: 'Yes (trading fees)' },
 ]
 
 // ============ SVG Pie Chart ============
@@ -159,14 +159,14 @@ function PieChart({ data, size = 220 }) {
           </g>
         ))}
         <circle cx={cx} cy={cy} r={r * 0.32} fill="#0a0a0a" />
-        <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize={size * 0.065} fontFamily="monospace" fontWeight="bold" className="select-none">JUL</text>
+        <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize={size * 0.065} fontFamily="monospace" fontWeight="bold" className="select-none">VIBE</text>
         <text x={cx} y={cy + 12} textAnchor="middle" fill="#6b7280" fontSize={size * 0.035} fontFamily="monospace" className="select-none">21M Supply</text>
       </svg>
       {hovered !== null && (
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 bg-black-900/95 border border-black-700 rounded-lg px-3 py-2 text-center pointer-events-none z-20">
           <p className="text-xs font-mono font-bold" style={{ color: slices[hovered].color }}>{slices[hovered].label}</p>
           <p className="text-[10px] font-mono text-black-400">{slices[hovered].desc}</p>
-          <p className="text-sm font-mono font-bold text-white">{(TOTAL_SUPPLY * slices[hovered].pct / 100).toLocaleString()} JUL</p>
+          <p className="text-sm font-mono font-bold text-white">{(TOTAL_SUPPLY * slices[hovered].pct / 100).toLocaleString()} VIBE</p>
         </div>
       )}
     </div>
@@ -296,9 +296,9 @@ export default function TokenomicsPage() {
   const [supplyMode, setSupplyMode] = useState('both')
   const [highlightCol, setHighlightCol] = useState(null)
 
-  const cols = ['jul', 'uni', 'cake', 'crv']
-  const colLabels = { jul: 'JUL', uni: 'UNI', cake: 'CAKE', crv: 'CRV' }
-  const colColors = { jul: MATRIX, uni: '#ff007a', cake: '#d4a017', crv: '#f97316' }
+  const cols = ['vibe', 'uni', 'cake', 'crv']
+  const colLabels = { vibe: 'VIBE', uni: 'UNI', cake: 'CAKE', crv: 'CRV' }
+  const colColors = { vibe: MATRIX, uni: '#ff007a', cake: '#d4a017', crv: '#f97316' }
 
   const netSupplyChange = useMemo(() => {
     const inflate = 18.75 + 6.25 + 3.12
@@ -310,7 +310,7 @@ export default function TokenomicsPage() {
     <div className="min-h-screen pb-20">
       <PageHero
         category="knowledge"
-        title="JUL Tokenomics"
+        title="VIBE Tokenomics"
         subtitle="Supply, distribution, and value accrual mechanics"
       />
 
@@ -347,7 +347,7 @@ export default function TokenomicsPage() {
                         <span className="text-sm font-mono font-bold" style={{ color: d.color }}>{d.pct}%</span>
                       </div>
                       <p className="text-[10px] font-mono text-black-500 leading-relaxed">{d.desc}</p>
-                      <p className="text-[10px] font-mono text-black-600">{(TOTAL_SUPPLY * d.pct / 100).toLocaleString()} JUL</p>
+                      <p className="text-[10px] font-mono text-black-600">{(TOTAL_SUPPLY * d.pct / 100).toLocaleString()} VIBE</p>
                     </div>
                   </div>
                 ))}
@@ -377,7 +377,7 @@ export default function TokenomicsPage() {
         {/* ============ Section 4: Value Accrual Mechanics ============ */}
         <motion.div variants={sectionV} custom={3} initial="hidden" animate="visible">
           <h2 className="text-lg font-bold font-mono text-white mb-1">Value Accrual Mechanics</h2>
-          <p className="text-xs font-mono text-black-500 mb-4">Four engines driving JUL value — real yield, not inflationary rewards</p>
+          <p className="text-xs font-mono text-black-500 mb-4">Four engines driving VIBE value — real yield, not inflationary rewards</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {ACCRUAL_CARDS.map((card, i) => (
               <motion.div key={card.title} variants={sectionV} custom={3 + i * 0.3} initial="hidden" animate="visible">
@@ -511,7 +511,7 @@ export default function TokenomicsPage() {
                 <div>
                   <p className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Net Supply Change Per Epoch</p>
                   <p className="text-xl font-mono font-bold" style={{ color: AMBER }}>
-                    +{netSupplyChange.net.toFixed(2)}M JUL
+                    +{netSupplyChange.net.toFixed(2)}M VIBE
                   </p>
                 </div>
                 <div className="text-right space-y-1">
@@ -540,7 +540,7 @@ export default function TokenomicsPage() {
         <motion.div variants={sectionV} custom={7} initial="hidden" animate="visible">
           <GlassCard glowColor="matrix" spotlight className="p-5 md:p-6">
             <h2 className="text-lg font-bold font-mono text-white mb-1">Tokenomics Comparison</h2>
-            <p className="text-xs font-mono text-black-500 mb-4">JUL vs UNI vs CAKE vs CRV — what sets us apart</p>
+            <p className="text-xs font-mono text-black-500 mb-4">VIBE vs UNI vs CAKE vs CRV — what sets us apart</p>
             <div className="overflow-x-auto -mx-2 px-2">
               <table className="w-full text-left">
                 <thead>
@@ -573,7 +573,7 @@ export default function TokenomicsPage() {
                           key={c}
                           className="text-[10px] font-mono p-2 text-center transition-all"
                           style={{
-                            color: highlightCol === c ? colColors[c] : (c === 'jul' ? MATRIX : '#9ca3af'),
+                            color: highlightCol === c ? colColors[c] : (c === 'vibe' ? MATRIX : '#9ca3af'),
                             opacity: highlightCol === null || highlightCol === c ? 1 : 0.3,
                           }}
                         >
@@ -587,7 +587,7 @@ export default function TokenomicsPage() {
             </div>
             <div className="mt-4 bg-green-500/5 rounded-lg p-3 border border-green-500/20">
               <p className="text-[11px] font-mono text-black-400 text-center leading-relaxed">
-                JUL combines <span style={{ color: MATRIX }} className="font-bold">real fee-sharing</span> (like CRV),{' '}
+                VIBE combines <span style={{ color: MATRIX }} className="font-bold">real fee-sharing</span> (like CRV),{' '}
                 <span style={{ color: AMBER }} className="font-bold">active burns</span> (like CAKE),
                 and <span style={{ color: CYAN }} className="font-bold">governance</span> (like UNI) — plus commit-reveal MEV protection and native cross-chain via LayerZero.
               </p>
@@ -612,7 +612,7 @@ export default function TokenomicsPage() {
           <div className="flex flex-wrap justify-center gap-3 mt-6">
             {[
               { href: '/jul', label: 'JUL Token', color: 'green' },
-              { href: '/staking', label: 'Stake JUL', color: 'amber' },
+              { href: '/staking', label: 'Stake VIBE', color: 'amber' },
               { href: '/governance', label: 'Governance', color: 'purple' },
               { href: '/economics', label: 'Economics', color: 'cyan' },
             ].map((l) => (

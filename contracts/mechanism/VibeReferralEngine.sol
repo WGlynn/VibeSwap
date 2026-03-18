@@ -17,7 +17,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
  * - Anti-sybil: self-referral detection and prevention
  *
  * Reward tiers:
- *   Direct referral: 30% of protocol fees from referred user
+ *   Direct referral: 30% of referral revenue from referred user
  *   2nd degree: 10% of fees (if direct referrer also referred)
  *   Volume bonus: Extra 5% if referred user trades >10 ETH/month
  */

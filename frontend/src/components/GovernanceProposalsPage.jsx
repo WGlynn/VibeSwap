@@ -67,7 +67,7 @@ function generateProposals() {
   const cats = ['Protocol','Protocol','Treasury','Protocol','Protocol','Community','Protocol','Treasury','Protocol','Protocol','Protocol','Emergency']
   const times = ['2d 14h','5d 8h','3d 2h','7d 0h','Ended','Ended','Ended','Ended','Ended','1d 6h','6d 18h','Ended']
   const descs = [
-    'Raise the base swap fee from 0.05% to 0.10% to increase LP yield. The additional 0.05% is split 60/40 between LPs and the DAO treasury.',
+    'Raise the base swap fee from 0.05% to 0.10% to increase LP yield. The additional 0.05% is distributed 100% to liquidity providers in the affected pools.',
     'Deploy a new SOL/USDC liquidity pool via LayerZero cross-chain messaging. Initial emission gauge weight of 10%.',
     'Allocate 50,000 JUL from the DAO treasury to fund the Memehunter analytics module with a 90-day delivery window.',
     'Lower the commit-reveal auction commitment window from 8 seconds to 6 seconds based on reveal latency analysis.',

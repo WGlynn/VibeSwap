@@ -74,7 +74,7 @@ const PAYMENT_METHODS = [
 const TOKENS = [
   { symbol: 'ETH', name: 'Ethereum', icon: '\u27E0', price: 2800 },
   { symbol: 'USDC', name: 'USD Coin', icon: '\uD83D\uDFE2', price: 1 },
-  { symbol: 'JUL', name: 'Julius', icon: '\u2726', price: 0.42 },
+  { symbol: 'JUL', name: 'Joule', icon: '\u2726', price: 0.42 },
 ]
 
 // ============ Mock Recent Purchases ============

@@ -193,7 +193,7 @@ CKB is designed as a "Universal Verification Layer"—computation happens off-ch
 │  ✓ Deterministic shuffle computed correctly (XOR secrets → seed)    │
 │  ✓ Output balances are mathematically correct                       │
 │  ✓ Pool invariant maintained (x × y = k)                            │
-│  ✓ Protocol fees calculated correctly                               │
+│  ✓ Fee routing calculated correctly                               │
 │  ✓ No tokens created or destroyed (conservation)                    │
 │                                                                      │
 │  Security Guarantee:                                                │
@@ -407,7 +407,7 @@ On CKB, we could offer **user-selectable cryptography**—traders choose their p
 │    reserve_b: u128              # Token B reserves                  │
 │    total_lp_shares: u128        # Outstanding LP tokens             │
 │    last_batch_id: u64           # Replay protection                 │
-│    fee_accumulator: u128        # Unclaimed protocol fees           │
+│    fee_accumulator: u128        # Unclaimed LP fees           │
 │    twap_accumulator: u256       # Time-weighted price data          │
 │    last_update_block: u64       # TWAP timing                       │
 │                                                                      │

@@ -262,7 +262,7 @@ export default function StakingPage() {
               Connect to <span style={{ color: CYAN }}>Stake</span>
             </h2>
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">
-              Lock JUL to earn rewards, select validators, and gain governance power through veJUL.
+              Stake JUL to earn VIBE rewards, select validators, and gain governance power through VIBE.
             </p>
             <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
               style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>
@@ -521,13 +521,13 @@ export default function StakingPage() {
       </Section>
 
       {/* ============ 8. veJUL Power ============ */}
-      <Section num="08" title="veJUL Power" delay={0.38}>
+      <Section num="08" title="Governance Power" delay={0.38}>
         <GlassCard glowColor="terminal" className="p-5">
           {veJUL.locked === 0 ? (
             <div className="text-center py-4">
-              <div className="font-mono text-sm text-gray-500 mb-2">No JUL locked yet</div>
+              <div className="font-mono text-sm text-gray-500 mb-2">No JUL staked yet</div>
               <p className="font-mono text-[10px] text-gray-600 leading-relaxed max-w-sm mx-auto">
-                Lock JUL to earn veJUL governance power. Longer locks give more weight.
+                Stake JUL to earn VIBE governance tokens. Longer locks give more VIBE rewards and voting weight.
               </p>
               <div className="grid grid-cols-3 gap-1 mt-4 max-w-xs mx-auto">
                 {[
@@ -537,7 +537,7 @@ export default function StakingPage() {
                 ].map(v => (
                   <div key={v.lock} className="p-1.5 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
                     <div className="font-mono text-[10px] text-gray-500">{v.lock}</div>
-                    <div className="font-mono text-xs font-bold" style={{ color: CYAN }}>{v.mult} VP</div>
+                    <div className="font-mono text-xs font-bold" style={{ color: CYAN }}>{v.mult} VIBE</div>
                   </div>
                 ))}
               </div>
@@ -558,7 +558,7 @@ export default function StakingPage() {
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <div className="text-sm font-mono font-bold text-white">{fmt(veJUL.power)}</div>
-                      <div className="text-[8px] font-mono text-gray-500">veJUL</div>
+                      <div className="text-[8px] font-mono text-gray-500">VIBE power</div>
                     </div>
                   </div>
                   <div>
@@ -579,11 +579,11 @@ export default function StakingPage() {
                 </div>
               </div>
               <div>
-                <div className="font-mono text-xs text-gray-400 mb-2">veJUL Decay Curve</div>
+                <div className="font-mono text-xs text-gray-400 mb-2">VIBE Governance Power Curve</div>
                 <DecayCurve lockDays={veJUL.lockDays} currentDay={veJUL.elapsed} />
                 <p className="font-mono text-[10px] text-gray-500 mt-3 leading-relaxed">
-                  veJUL decays linearly from lock amount to zero over the lock period.
-                  Longer locks give more governance weight. Re-lock to restore full power.
+                  Governance power decays linearly over the lock period.
+                  Longer locks earn more VIBE and give more voting weight. Re-lock to restore full power.
                 </p>
                 <div className="grid grid-cols-3 gap-1 mt-3">
                   {[
@@ -593,7 +593,7 @@ export default function StakingPage() {
                   ].map(v => (
                     <div key={v.lock} className="p-1.5 rounded-lg border text-center" style={{ background: 'rgba(0,0,0,0.2)', borderColor: '#1f2937' }}>
                       <div className="font-mono text-[10px] text-gray-500">{v.lock}</div>
-                      <div className="font-mono text-xs font-bold" style={{ color: CYAN }}>{v.mult} VP</div>
+                      <div className="font-mono text-xs font-bold" style={{ color: CYAN }}>{v.mult} VIBE</div>
                     </div>
                   ))}
                 </div>

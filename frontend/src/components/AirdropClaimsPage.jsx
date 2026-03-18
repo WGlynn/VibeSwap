@@ -23,7 +23,7 @@ function seededRandom(seed) {
 // ============ Mock Data ============
 
 const CLAIMABLE_AIRDROPS = [
-  { id: 1, protocol: 'VibeSwap',   token: 'VIBE',  amount: 4250,   usdValue: 8925,   expiry: new Date(Date.now() + 14 * 864e5), reason: 'Early adopter allocation',       logo: 'V', color: '#22c55e' },
+  { id: 1, protocol: 'VibeSwap',   token: 'VIBE',  amount: 4250,   usdValue: 8925,   expiry: new Date(Date.now() + 14 * 864e5), reason: 'Contribution claim (VIBE is earned, not airdropped)', logo: 'V', color: '#22c55e' },
   { id: 2, protocol: 'LayerZero',  token: 'ZRO',   amount: 312.5,  usdValue: 1562.5, expiry: new Date(Date.now() + 30 * 864e5), reason: 'Cross-chain messaging usage',    logo: 'L', color: '#6366f1' },
   { id: 3, protocol: 'Arbitrum',   token: 'ARB',   amount: 1875,   usdValue: 2250,   expiry: new Date(Date.now() +  7 * 864e5), reason: 'STIP retroactive distribution',  logo: 'A', color: '#3b82f6' },
   { id: 4, protocol: 'Optimism',   token: 'OP',    amount: 640,    usdValue: 1408,   expiry: new Date(Date.now() + 60 * 864e5), reason: 'RetroPGF round 5 allocation',    logo: 'O', color: '#ef4444' },

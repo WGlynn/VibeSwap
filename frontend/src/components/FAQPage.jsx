@@ -99,7 +99,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: 'How do staking rewards work?',
-        a: 'Stake your JUL tokens to earn a share of protocol revenue and governance power. Staking rewards come from priority bid fees, cross-chain messaging fees, and treasury yield. Longer lock periods earn higher multipliers through our loyalty rewards system.',
+        a: 'Stake your JUL tokens to earn VIBE rewards. Staking rewards come from priority bid fees, cross-chain messaging fees, and treasury yield. VIBE grants governance voting power. Longer lock periods earn higher multipliers through our loyalty rewards system.',
         link: { text: 'Learn more', to: '/staking' },
       },
     ],
@@ -137,23 +137,23 @@ const FAQ_CATEGORIES = [
     icon: '\u2606',
     questions: [
       {
-        q: 'What is JUL?',
-        a: "JUL is VibeSwap's native governance and utility token. It represents ownership in the protocol and grants voting rights on treasury allocation, fee parameters, and protocol upgrades. JUL is also used for staking, liquidity mining rewards, and priority bid payments.",
+        q: 'What are JUL and VIBE?',
+        a: "JUL (Joule) is VibeSwap's stable liquidity asset, PoW-mined with elastic rebase. VIBE is the governance and reward token with a 21M hard cap. Stake JUL to earn VIBE rewards. VIBE holders vote on governance proposals.",
         link: { text: 'Learn more', to: '/jul' },
       },
       {
-        q: 'How do I earn JUL?',
-        a: "You can earn JUL by providing liquidity to pools, participating in governance, referring new users, and contributing to the protocol's growth. Rewards are distributed through the Shapley distribution system, which ensures fair compensation based on your actual contribution.",
+        q: 'How do I earn VIBE?',
+        a: "You can earn VIBE by providing liquidity to pools, participating in governance, referring new users, and contributing to the protocol's growth. Rewards are distributed through the Shapley distribution system, which ensures fair compensation based on your actual contribution. JUL is earned through proof-of-work mining.",
         link: { text: 'Learn more', to: '/rewards' },
       },
       {
-        q: 'What can I do with JUL?',
-        a: 'JUL can be staked for protocol revenue sharing, used to vote on governance proposals, spent on priority bids for faster settlement, and provided as liquidity in trading pairs. Holding JUL also increases your loyalty tier, unlocking higher IL protection coverage and fee discounts.',
+        q: 'What can I do with JUL and VIBE?',
+        a: 'Stake JUL to earn VIBE rewards. VIBE holders vote on governance proposals, share in protocol revenue, and unlock higher loyalty tiers for IL protection coverage and fee discounts. JUL serves as the stable liquidity asset across all trading pairs.',
         link: { text: 'Learn more', to: '/tokenomics' },
       },
       {
-        q: 'What is the total supply of JUL?',
-        a: "JUL follows a halving emission schedule inspired by Bitcoin's proven scarcity model. The emission rate halves at regular intervals, creating predictable supply dynamics. Treasury stabilization mechanisms ensure price stability while maintaining long-term scarcity.",
+        q: 'What is the total supply of VIBE?',
+        a: "VIBE follows a 1-year halving emission schedule with a 21M hard cap, inspired by Bitcoin's proven scarcity model. JUL supply adjusts via elastic rebase with no hard cap. Treasury stabilization mechanisms ensure price stability while maintaining long-term scarcity.",
         link: { text: 'Learn more', to: '/tokenomics' },
       },
     ],

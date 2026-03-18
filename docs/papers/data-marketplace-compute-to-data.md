@@ -307,7 +307,7 @@ The 10% protocol share flows into VibeSwap's Shapley redistribution pool. The Sh
 - A knowledge graph that is queried by multiple downstream applications has high Shapley value
 - An API endpoint that serves as infrastructure for other marketplace assets has high Shapley value
 
-The 10% protocol fee is not a tax. It is a contribution to the cooperative commons that is redistributed based on measured contribution. This is the distinction between extractive and cooperative economics: extractive protocols take a cut and keep it; cooperative protocols take a cut and redistribute it to those who created the most value.
+The 10% marketplace fee is not a tax. It is a contribution to the cooperative commons that is redistributed based on measured contribution. This is the distinction between extractive and cooperative economics: extractive protocols take a cut and keep it; cooperative protocols take a cut and redistribute it to those who created the most value.
 
 ---
 
@@ -583,7 +583,7 @@ The marketplace exhibits positive network effects on both sides:
 - Higher revenue attracts more Shapley pool contributions (better redistribution)
 - Better redistribution attracts more contributors (cooperative flywheel)
 
-The 10% protocol fee funds this flywheel. It is the minimum viable tax for cooperative economics: low enough to not deter participation, high enough to fund meaningful redistribution.
+The 10% marketplace fee funds this flywheel. It is the minimum viable tax for cooperative economics: low enough to not deter participation, high enough to fund meaningful redistribution.
 
 ---
 
@@ -602,7 +602,7 @@ The 10% protocol fee funds this flywheel. It is the minimum viable tax for coope
 | Governance | Ocean DAO | VibeSwap governance | AWS |
 | Upgrade mechanism | Proxy | UUPS | Centralized |
 
-The key differentiators are: (1) Shapley redistribution of protocol fees, which creates a cooperative economic loop absent from other marketplaces; (2) automatic refund on compute failure, which aligns provider incentives with service quality; and (3) explicit CKB cell model mapping, which provides a path to privacy-native implementation.
+The key differentiators are: (1) Shapley redistribution of marketplace fees, which creates a cooperative economic loop absent from other marketplaces; (2) automatic refund on compute failure, which aligns provider incentives with service quality; and (3) explicit CKB cell model mapping, which provides a path to privacy-native implementation.
 
 ---
 

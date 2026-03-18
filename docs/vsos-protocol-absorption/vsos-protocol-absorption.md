@@ -411,7 +411,7 @@ Every layer interoperates via standardized interfaces:
 
 Every absorbed protocol gets the same economic fix:
 
-1. **No rent-seeking tokens** — protocol fees distributed via Shapley, not held hostage by token holders
+1. **No rent-seeking tokens** — revenue distributed via Shapley, not held hostage by token holders
 2. **No governance capture** — Ungovernance Time Bomb decays all voting power
 3. **No VC extraction** — fair launch, no insider allocation
 4. **PID auto-tuning** — parameters self-adjust, no governance votes needed

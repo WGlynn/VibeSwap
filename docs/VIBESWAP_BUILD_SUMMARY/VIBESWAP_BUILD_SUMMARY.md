@@ -36,7 +36,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 
 ### Trading Engine
 - **CommitRevealAuction** — Batch auction mechanism with commit/reveal/settle lifecycle
-- **VibeAMM** — Constant product AMM (x*y=k) with TWAP oracle, protocol fees, emergency pause
+- **VibeAMM** — Constant product AMM (x*y=k) with TWAP oracle, LP fee routing (0% protocol extraction), emergency pause
 - **VibeSwapCore** — Main orchestrator connecting auction, AMM, and cross-chain
 - **VibeLP** — ERC-20 LP token for liquidity positions
 
@@ -95,7 +95,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 ## Layer 4: Governance & Compliance
 
 ### Governance
-- **DAOTreasury** — Protocol fee collection, backstop liquidity (95% slippage protection), timelock proposals
+- **DAOTreasury** — Priority bid revenue collection, backstop liquidity (95% slippage protection), timelock proposals
 - **TreasuryStabilizer** — Automated rebalancing of treasury assets
 - **VibeTimelock** — Time-delayed execution for governance proposals
 - **DecentralizedTribunal** — On-chain dispute resolution with juror staking (pull-pattern settlement, Sybil-resistant via SoulboundIdentity)

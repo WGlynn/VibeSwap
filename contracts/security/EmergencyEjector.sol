@@ -64,7 +64,9 @@ contract EmergencyEjector is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         emergencyThreshold = _emergencyThreshold > 0 ? _emergencyThreshold : 2;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Safe House Management ============
 

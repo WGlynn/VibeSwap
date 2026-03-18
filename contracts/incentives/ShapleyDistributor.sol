@@ -992,5 +992,7 @@ contract ShapleyDistributor is
      *      "If something is clearly unfair, amending the code is a
      *       responsibility, a credo, a law, a canon."
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 }

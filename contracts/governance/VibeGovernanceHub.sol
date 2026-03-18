@@ -969,7 +969,9 @@ contract VibeGovernanceHub is
     /**
      * @dev Authorize upgrades — only owner (governance timelock).
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Receive ETH ============
 

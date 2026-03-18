@@ -255,5 +255,7 @@ contract VibeWrappedAssets is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
         return keccak256(abi.encodePacked(chainId, token));
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 }

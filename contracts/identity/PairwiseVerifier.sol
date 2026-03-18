@@ -498,5 +498,7 @@ contract PairwiseVerifier is IPairwiseVerifier, OwnableUpgradeable, ReentrancyGu
         }
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 }

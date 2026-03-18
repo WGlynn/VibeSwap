@@ -193,6 +193,15 @@ contract VibeSwapCore is
     event ExecutionTrackingFailed(bytes32 indexed poolId, address indexed trader, bytes reason);
     event ComplianceCheckFailed(bytes32 indexed poolId, address indexed trader, bytes reason);
 
+    // SEC-1: Event for refunded orders in partial batch failures
+    event OrderRefunded(
+        uint64 indexed batchId,
+        address indexed trader,
+        address tokenIn,
+        uint256 amountIn,
+        string reason
+    );
+
     // ============ Errors ============
 
     error ContractPaused();
@@ -418,6 +427,15 @@ contract VibeSwapCore is
     /**
      * @notice Process and settle a batch
      * @param batchId Batch ID to settle (must match current batch)
+     * @dev SEC-2: settleBatch is INTENTIONALLY permissionless (no access control).
+     *      In VibeSwap's commit-reveal batch auction, settlement is a public good:
+     *      - Timing is deterministic (8s commit + 2s reveal per batch)
+     *      - The batch can only be settled after the reveal phase ends (enforced by auction.settleBatch())
+     *      - Anyone can trigger settlement — this enables bots, keepers, and users to settle
+     *      - No MEV advantage: execution order is determined by the deterministic shuffle,
+     *        and the clearing price is uniform. The settler gains no information advantage.
+     *      - Restricting to a single settler would create a liveness dependency and censorship risk.
+     *      Adding access control here would harm the protocol's censorship resistance.
      */
     function settleBatch(uint64 batchId) external whenNotPaused nonReentrant {
         // Verify we're settling the correct batch
@@ -877,6 +895,13 @@ contract VibeSwapCore is
 
     /**
      * @notice Settle individual orders after successful batch execution
+     * @dev SEC-1: Detects partial batch failures. When executeBatchSwap returns aggregate
+     *      results, some individual orders may have failed (slippage/liquidity). The AMM
+     *      returns those orders' tokens to VibeSwapCore and contributes (0,0,0) to totals.
+     *      We detect this by comparing totalTokenInSwapped against the sum of all orders'
+     *      amountIn. Failed orders are identified by replicating the AMM's output check
+     *      (clearing price + pool fee rate vs minAmountOut). Their deposits are NOT
+     *      decremented — the user can reclaim via withdrawDeposit().
      */
     function _settleExecutedOrders(
         uint64 batchId,
@@ -886,14 +911,57 @@ contract VibeSwapCore is
         bytes32 poolId,
         IVibeAMM.BatchSwapResult memory result
     ) internal {
+        // SEC-1: Compute total input sent to AMM and detect partial failures
+        uint256 totalInputSent = 0;
+        for (uint256 k = 0; k < count; k++) {
+            totalInputSent += orders[originalIndices[k]].amountIn;
+        }
+        bool hasFailures = result.totalTokenInSwapped < totalInputSent;
+
+        // Get pool info for per-order failure detection (only when needed)
+        IVibeAMM.Pool memory pool;
+        if (hasFailures) {
+            pool = amm.getPool(poolId);
+        }
+
         for (uint256 k = 0; k < count; k++) {
             uint256 idx = originalIndices[k];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
-            // Clear deposit
+            // SEC-1: Skip failed orders within a partial batch — don't decrement their deposits.
+            // The AMM already returned their tokens to VibeSwapCore. The user can reclaim
+            // via withdrawDeposit(). We identify failures by replicating the AMM's output
+            // calculation: clearing price -> gross output -> fee deduction -> check minAmountOut.
+            if (hasFailures) {
+                bool isToken0 = order.tokenIn == pool.token0;
+                uint256 grossOut;
+                if (isToken0) {
+                    grossOut = (order.amountIn * result.clearingPrice) / 1e18;
+                } else {
+                    grossOut = result.clearingPrice > 0
+                        ? (order.amountIn * 1e18) / result.clearingPrice
+                        : 0;
+                }
+                // Use pool base fee rate as conservative lower bound. If actual fee is higher
+                // (True Price surcharge), netOut is even lower — so this check is conservative:
+                // it correctly identifies all slippage failures, and may also catch surcharge failures.
+                uint256 netOut = grossOut - (grossOut * pool.feeRate) / 10000;
+
+                if (netOut < order.minAmountOut) {
+                    // This order failed in the AMM — tokens already returned to VibeSwapCore
+                    emit OrderRefunded(
+                        batchId, order.trader, order.tokenIn, order.amountIn,
+                        "Partial batch: slippage or liquidity failure"
+                    );
+                    continue;
+                }
+            }
+
+            // Clear deposit (only for successfully executed orders)
             deposits[order.trader][order.tokenIn] -= order.amountIn;
 
             // Pro-rata share of total output based on input contribution
+            // NOTE: totalTokenInSwapped only includes successful orders, so pro-rata is accurate
             uint256 estimatedOut = 0;
             if (result.clearingPrice > 0 && result.totalTokenInSwapped > 0) {
                 estimatedOut = (order.amountIn * result.totalTokenOutSwapped) / result.totalTokenInSwapped;

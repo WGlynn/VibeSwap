@@ -170,7 +170,9 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         verifier = _verifier;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Layer 7: Commitment Scheme ============
 

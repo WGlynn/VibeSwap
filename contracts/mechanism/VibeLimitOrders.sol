@@ -79,7 +79,9 @@ contract VibeLimitOrders is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         minKeeperBounty = _minKeeperBounty;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Order Placement ============
 

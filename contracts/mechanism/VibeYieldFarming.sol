@@ -96,7 +96,9 @@ contract VibeYieldFarming is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         bonusEndBlock = _startBlock + 100000; // ~2 weeks of bonus
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Pool Management ============
 

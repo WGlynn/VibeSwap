@@ -495,7 +495,9 @@ contract DisputeResolver is
         arbitrationDuration = _arbitrationDuration;
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     receive() external payable {}
 }

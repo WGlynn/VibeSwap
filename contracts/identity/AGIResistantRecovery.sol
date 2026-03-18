@@ -127,7 +127,9 @@ contract AGIResistantRecovery is UUPSUpgradeable, OwnableUpgradeable {
         minProofsRequired[uint8(ProofType.SOCIAL_VOUCHING)] = 3; // 3 humans must vouch
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Behavioral Fingerprinting ============
 

@@ -86,7 +86,9 @@ contract VibeCDN is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
         minNodeStake = 0.05 ether;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Node Management ============
 

@@ -115,7 +115,9 @@ contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
         premiumRateBps[RiskCategory.DEPEGGING] = 500;        // 5%
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Underwriting ============
 

@@ -100,7 +100,9 @@ contract VibeEnergyMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Producer Management ============
 

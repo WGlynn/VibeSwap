@@ -17,7 +17,9 @@ contract VibeDAVerifier is OwnableUpgradeable, UUPSUpgradeable {
     event DAVerified(uint256 indexed id);
 
     function initialize(uint256 _quorum) external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); quorum = _quorum > 0 ? _quorum : 2; }
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     function commitDA(uint256 blockNumber, bytes32 dataRoot, uint256 blobCount, uint256 totalSize) external {
         require(validators[msg.sender] || msg.sender == owner(), "Not validator");

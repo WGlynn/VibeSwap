@@ -98,7 +98,9 @@ contract VibeLiquidityGauge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         epochStartTime = block.timestamp;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Gauge Management ============
 

@@ -66,7 +66,9 @@ contract VibeAutomation is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
         __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Deposits ============
 

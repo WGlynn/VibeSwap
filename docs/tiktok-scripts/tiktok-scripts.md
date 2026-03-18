@@ -67,7 +67,7 @@
 ## Script 6: "21 Million Tokens. No VCs."
 **Hook (2s):** "21 million tokens. No VCs. No pre-mine. No team allocation."
 
-**Body (20s):** "VIBE has a fixed supply like Bitcoin. 4-year halvings. But here's the twist — tokens accumulate in a pool, like a lottery. They build up until someone makes a contribution that changes the protocol. Then the pool breaks and distributes to everyone who helped build it. Your weight is based on what you actually did."
+**Body (20s):** "VIBE has a fixed supply like Bitcoin. Annual halvings. But here's the twist — tokens accumulate in a pool, like a lottery. They build up until someone makes a contribution that changes the protocol. Then the pool breaks and distributes to everyone who helped build it. Your weight is based on what you actually did."
 
 **Punch (8s):** "It's math, not a contract. Contracts live on one chain. Math lives everywhere."
 

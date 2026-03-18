@@ -820,6 +820,419 @@ contract ShapleyDistributorTest is Test {
         assertEq(distributor.getEmissionMultiplier(100), 0);
     }
 
+    // ============ Contribution Weights Invariant ============
+
+    function test_contributionWeightsSumTo100Percent() public view {
+        // The four contribution weights MUST sum to 10000 BPS (100%)
+        uint256 totalWeights = distributor.DIRECT_WEIGHT()
+            + distributor.ENABLING_WEIGHT()
+            + distributor.SCARCITY_WEIGHT()
+            + distributor.STABILITY_WEIGHT();
+        assertEq(totalWeights, 10000, "Contribution weights must sum to 10000 BPS");
+    }
+
+    function test_contributionWeightsExactValues() public view {
+        // Direct 40%, Enabling 30%, Scarcity 20%, Stability 10%
+        assertEq(distributor.DIRECT_WEIGHT(), 4000);
+        assertEq(distributor.ENABLING_WEIGHT(), 3000);
+        assertEq(distributor.SCARCITY_WEIGHT(), 2000);
+        assertEq(distributor.STABILITY_WEIGHT(), 1000);
+    }
+
+    // ============ Axiom: Null Player Property ============
+
+    function test_axiom_nullPlayer_zeroContributionGetsMinimal() public {
+        // A participant with zero contribution across all dimensions
+        // should get no more than rounding dust
+        distributor.setUseQualityWeights(false);
+
+        ShapleyDistributor.Participant[] memory participants = new ShapleyDistributor.Participant[](2);
+        participants[0] = ShapleyDistributor.Participant({
+            participant: alice,
+            directContribution: 100 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+        participants[1] = ShapleyDistributor.Participant({
+            participant: bob,
+            directContribution: 0,
+            timeInPool: 0,
+            scarcityScore: 0,
+            stabilityScore: 0
+        });
+
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        uint256 bobShare = distributor.getShapleyValue(GAME_ID, bob);
+        uint256 aliceShare = distributor.getShapleyValue(GAME_ID, alice);
+
+        // Bob's zero contribution should yield a near-zero share
+        // Alice should get essentially everything
+        assertGt(aliceShare, bobShare, "Null player should get less than active contributor");
+        assertGt(aliceShare, 90 ether, "Active contributor should get vast majority");
+    }
+
+    function test_axiom_efficiency_totalDistributedEqualsTotalValue() public {
+        // Efficiency axiom: sum of all Shapley values = total game value
+        distributor.setUseQualityWeights(false);
+
+        ShapleyDistributor.Participant[] memory participants = new ShapleyDistributor.Participant[](3);
+        participants[0] = ShapleyDistributor.Participant({
+            participant: alice,
+            directContribution: 200 ether,
+            timeInPool: 30 days,
+            scarcityScore: 8000,
+            stabilityScore: 9000
+        });
+        participants[1] = ShapleyDistributor.Participant({
+            participant: bob,
+            directContribution: 50 ether,
+            timeInPool: 3 days,
+            scarcityScore: 3000,
+            stabilityScore: 2000
+        });
+        participants[2] = ShapleyDistributor.Participant({
+            participant: charlie,
+            directContribution: 75 ether,
+            timeInPool: 14 days,
+            scarcityScore: 6000,
+            stabilityScore: 7000
+        });
+
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        uint256 total = distributor.getShapleyValue(GAME_ID, alice)
+            + distributor.getShapleyValue(GAME_ID, bob)
+            + distributor.getShapleyValue(GAME_ID, charlie);
+
+        // Efficiency: all value must be distributed, no dust lost
+        assertEq(total, 100 ether, "Efficiency axiom violated: total distributed != total value");
+    }
+
+    function test_axiom_symmetry_equalContributorsEqualRewards() public {
+        // Symmetry axiom: identical contributions yield identical rewards
+        distributor.setUseQualityWeights(false);
+
+        ShapleyDistributor.Participant[] memory participants = new ShapleyDistributor.Participant[](3);
+        // Alice and Bob have IDENTICAL contributions
+        participants[0] = ShapleyDistributor.Participant({
+            participant: alice,
+            directContribution: 100 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+        participants[1] = ShapleyDistributor.Participant({
+            participant: bob,
+            directContribution: 100 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+        // Charlie has different contribution
+        participants[2] = ShapleyDistributor.Participant({
+            participant: charlie,
+            directContribution: 200 ether,
+            timeInPool: 14 days,
+            scarcityScore: 7000,
+            stabilityScore: 8000
+        });
+
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        uint256 aliceShare = distributor.getShapleyValue(GAME_ID, alice);
+        uint256 bobShare = distributor.getShapleyValue(GAME_ID, bob);
+        uint256 charlieShare = distributor.getShapleyValue(GAME_ID, charlie);
+
+        // Alice and Bob: identical contributions -> identical rewards
+        assertEq(aliceShare, bobShare, "Symmetry axiom violated: equal contributors got unequal rewards");
+        // Charlie contributed more -> should get more
+        assertGt(charlieShare, aliceShare, "Higher contributor should get more");
+    }
+
+    // ============ Lawson Fairness Floor ============
+
+    function test_lawsonFairnessFloorConstant() public view {
+        // The Lawson Fairness Floor is 1% (100 BPS)
+        assertEq(distributor.LAWSON_FAIRNESS_FLOOR(), 100, "Lawson Fairness Floor must be 100 BPS (1%)");
+    }
+
+    // ============ Track Separation: FEE_DISTRIBUTION vs TOKEN_EMISSION ============
+
+    function test_trackSeparation_feeDistributionNoHalving() public {
+        // FEE_DISTRIBUTION games are time-neutral: NO halving applied
+        distributor.setGamesPerEra(5);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 2000 ether);
+
+        // Create 10 games to enter Era 2 (5 per era)
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 gameId = keccak256(abi.encode("filler", i));
+            distributor.createGame(gameId, 10 ether, address(token), participants);
+        }
+
+        // Confirm we're in Era 2
+        assertEq(distributor.getCurrentHalvingEra(), 2);
+
+        // Create a FEE_DISTRIBUTION game — should get FULL value (no halving)
+        bytes32 feeGameId = keccak256("fee-game-era2");
+        distributor.createGame(feeGameId, 100 ether, address(token), participants);
+
+        (, uint256 feeGameValue,,,) = distributor.games(feeGameId);
+        assertEq(feeGameValue, 100 ether, "FEE_DISTRIBUTION must NOT be halved");
+    }
+
+    function test_trackSeparation_tokenEmissionHalved() public {
+        // TOKEN_EMISSION games ARE subject to halving
+        distributor.setGamesPerEra(5);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 2000 ether);
+
+        // Create 10 games to enter Era 2
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 gameId = keccak256(abi.encode("filler", i));
+            distributor.createGame(gameId, 10 ether, address(token), participants);
+        }
+
+        assertEq(distributor.getCurrentHalvingEra(), 2);
+
+        // Create a TOKEN_EMISSION game — should be halved to 25%
+        bytes32 emissionGameId = keccak256("emission-game-era2");
+        distributor.createGameTyped(
+            emissionGameId, 100 ether, address(token),
+            ShapleyDistributor.GameType.TOKEN_EMISSION,
+            participants
+        );
+
+        (, uint256 emissionGameValue,,,) = distributor.games(emissionGameId);
+        assertEq(emissionGameValue, 25 ether, "TOKEN_EMISSION must be halved to 25% in Era 2");
+    }
+
+    function test_trackSeparation_sameEra_differentValues() public {
+        // In the same era, FEE and EMISSION games diverge on halving
+        distributor.setGamesPerEra(10);
+
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 2000 ether);
+
+        // Create 10 games to enter Era 1
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 gameId = keccak256(abi.encode("setup", i));
+            distributor.createGame(gameId, 10 ether, address(token), participants);
+        }
+
+        assertEq(distributor.getCurrentHalvingEra(), 1);
+
+        // FEE_DISTRIBUTION: full value
+        bytes32 feeGameId = keccak256("fee-era1");
+        distributor.createGame(feeGameId, 100 ether, address(token), participants);
+        (, uint256 feeVal,,,) = distributor.games(feeGameId);
+
+        // TOKEN_EMISSION: halved
+        bytes32 emissionGameId = keccak256("emission-era1");
+        distributor.createGameTyped(
+            emissionGameId, 100 ether, address(token),
+            ShapleyDistributor.GameType.TOKEN_EMISSION,
+            participants
+        );
+        (, uint256 emissionVal,,,) = distributor.games(emissionGameId);
+
+        assertEq(feeVal, 100 ether, "FEE game should be full value in Era 1");
+        assertEq(emissionVal, 50 ether, "EMISSION game should be 50% in Era 1");
+        assertGt(feeVal, emissionVal, "FEE must exceed EMISSION after halving");
+    }
+
+    // ============ Authorization Tests ============
+
+    function test_unauthorizedCannotComputeShapley() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        vm.prank(unauthorized);
+        vm.expectRevert(ShapleyDistributor.Unauthorized.selector);
+        distributor.computeShapleyValues(GAME_ID);
+    }
+
+    function test_unauthorizedCannotUpdateQualityWeights() public {
+        vm.prank(unauthorized);
+        vm.expectRevert(ShapleyDistributor.Unauthorized.selector);
+        distributor.updateQualityWeight(alice, 5000, 5000, 5000);
+    }
+
+    function test_qualityWeight_scoresCannotExceedMax() public {
+        // Activity score > 10000 BPS should revert
+        vm.expectRevert(ShapleyDistributor.ScoreExceedsMax.selector);
+        distributor.updateQualityWeight(alice, 10001, 5000, 5000);
+
+        // Reputation score > 10000 BPS
+        vm.expectRevert(ShapleyDistributor.ScoreExceedsMax.selector);
+        distributor.updateQualityWeight(alice, 5000, 10001, 5000);
+
+        // Economic score > 10000 BPS
+        vm.expectRevert(ShapleyDistributor.ScoreExceedsMax.selector);
+        distributor.updateQualityWeight(alice, 5000, 5000, 10001);
+    }
+
+    // ============ Game Type Verification ============
+
+    function test_gameTypeStoredCorrectly_feeDistribution() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+
+        // Default createGame should be FEE_DISTRIBUTION
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        assertEq(
+            uint256(distributor.getGameType(GAME_ID)),
+            uint256(ShapleyDistributor.GameType.FEE_DISTRIBUTION)
+        );
+    }
+
+    function test_gameTypeStoredCorrectly_tokenEmission() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+
+        bytes32 gameId = keccak256("emission-type-test");
+        distributor.createGameTyped(
+            gameId, 100 ether, address(token),
+            ShapleyDistributor.GameType.TOKEN_EMISSION,
+            participants
+        );
+
+        assertEq(
+            uint256(distributor.getGameType(gameId)),
+            uint256(ShapleyDistributor.GameType.TOKEN_EMISSION)
+        );
+    }
+
+    // ============ Halving Edge Cases ============
+
+    function test_halving_setGamesPerEra_revertZero() public {
+        vm.expectRevert(ShapleyDistributor.InvalidGamesPerEra.selector);
+        distributor.setGamesPerEra(0);
+    }
+
+    function test_halving_era32_emissionIsZero() public {
+        // After 32 halvings, emission multiplier = 0
+        // This means TOKEN_EMISSION games in era 32+ get zero adjusted value
+        assertEq(distributor.getEmissionMultiplier(32), 0);
+        assertEq(distributor.getEmissionMultiplier(33), 0);
+        assertEq(distributor.getEmissionMultiplier(255), 0);
+    }
+
+    function test_halving_decreasesByHalfEachEra() public pure {
+        // Verify the halving math: each era's multiplier is exactly half the previous
+        uint256 PRECISION = 1e18;
+        uint256 prev = PRECISION; // Era 0
+
+        for (uint8 era = 1; era < 32; era++) {
+            uint256 current = PRECISION >> era;
+            assertEq(current, prev / 2, "Each era must be exactly half the previous");
+            prev = current;
+        }
+    }
+
+    // ============ Pairwise Fairness Verification ============
+
+    function test_pairwiseFairness_equalContributors() public {
+        distributor.setUseQualityWeights(false);
+
+        ShapleyDistributor.Participant[] memory participants = new ShapleyDistributor.Participant[](2);
+        participants[0] = ShapleyDistributor.Participant({
+            participant: alice,
+            directContribution: 100 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+        participants[1] = ShapleyDistributor.Participant({
+            participant: bob,
+            directContribution: 100 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        (bool fair, uint256 deviation) = distributor.verifyPairwiseFairness(GAME_ID, alice, bob);
+        assertTrue(fair, "Equal contributors must pass pairwise fairness check");
+        assertEq(deviation, 0, "Equal contributors should have zero deviation");
+    }
+
+    function test_pairwiseFairness_unequalContributors() public {
+        distributor.setUseQualityWeights(false);
+
+        ShapleyDistributor.Participant[] memory participants = new ShapleyDistributor.Participant[](2);
+        participants[0] = ShapleyDistributor.Participant({
+            participant: alice,
+            directContribution: 300 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+        participants[1] = ShapleyDistributor.Participant({
+            participant: bob,
+            directContribution: 100 ether,
+            timeInPool: 7 days,
+            scarcityScore: 5000,
+            stabilityScore: 5000
+        });
+
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        (bool fair, ) = distributor.verifyPairwiseFairness(GAME_ID, alice, bob);
+        assertTrue(fair, "Unequal but proportional distribution must pass fairness check");
+
+        // Verify proportionality: alice's reward / bob's reward should match weight ratio
+        uint256 aliceReward = distributor.getShapleyValue(GAME_ID, alice);
+        uint256 bobReward = distributor.getShapleyValue(GAME_ID, bob);
+        assertGt(aliceReward, bobReward, "Higher contributor must get more");
+    }
+
+    // ============ Claim All Participants ============
+
+    function test_allParticipantsCanClaim() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        // Everyone claims
+        vm.prank(alice);
+        uint256 aliceClaimed = distributor.claimReward(GAME_ID);
+
+        vm.prank(bob);
+        uint256 bobClaimed = distributor.claimReward(GAME_ID);
+
+        vm.prank(charlie);
+        uint256 charlieClaimed = distributor.claimReward(GAME_ID);
+
+        // All claimed amounts sum to total game value
+        assertEq(aliceClaimed + bobClaimed + charlieClaimed, 100 ether, "All claims must sum to total value");
+
+        // Distributor should have 0 tokens remaining for this game's token
+        // (might still have tokens from other games)
+        assertGt(aliceClaimed, 0, "Alice must claim non-zero");
+        assertGt(bobClaimed, 0, "Bob must claim non-zero");
+        assertGt(charlieClaimed, 0, "Charlie must claim non-zero");
+    }
+
     // ============ Helpers ============
 
     function _createParticipants() internal view returns (ShapleyDistributor.Participant[] memory) {

@@ -16,6 +16,9 @@ contract VIBETokenTest is Test {
     address public bob = makeAddr("bob");
     address public carol = makeAddr("carol");
 
+    event MinterUpdated(address indexed minter, bool authorized);
+    event TokensBurned(address indexed burner, uint256 amount);
+
     function setUp() public {
         vibeImpl = new VIBEToken();
         ERC1967Proxy proxy = new ERC1967Proxy(
@@ -372,5 +375,198 @@ contract VIBETokenTest is Test {
         vm.stopPrank();
 
         assertEq(vibe.totalSupply(), 175e18);
+    }
+
+    // ============ Hard Cap Security Tests ============
+
+    function test_maxSupplyIs21Million() public view {
+        // Bitcoin-aligned hard cap — fundamental invariant
+        assertEq(vibe.MAX_SUPPLY(), 21_000_000e18);
+        // MAX_SUPPLY is a constant — cannot be changed by any mechanism
+    }
+
+    function test_maxSupplyCannotBeExceededByOneWei() public {
+        // Mint to 1 wei below cap
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 21_000_000e18 - 1);
+
+        // Exactly 1 wei remaining
+        assertEq(vibe.mintableSupply(), 1);
+
+        // Can mint that last wei
+        vm.prank(shapleyDistributor);
+        vibe.mint(bob, 1);
+
+        assertEq(vibe.totalSupply(), 21_000_000e18);
+        assertEq(vibe.mintableSupply(), 0);
+
+        // Now even 1 wei is rejected
+        vm.prank(shapleyDistributor);
+        vm.expectRevert(VIBEToken.ExceedsMaxSupply.selector);
+        vibe.mint(carol, 1);
+    }
+
+    function test_multipleMintsBuildTowardsCap() public {
+        // Multiple minters approaching the cap in small increments
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 10_000_000e18);
+
+        vm.prank(liquidityGauge);
+        vibe.mint(bob, 10_000_000e18);
+
+        vm.prank(owner);
+        vibe.mint(carol, 999_999e18);
+
+        assertEq(vibe.totalSupply(), 20_999_999e18);
+        assertEq(vibe.mintableSupply(), 1e18);
+
+        // Overshoot the remaining supply
+        vm.prank(shapleyDistributor);
+        vm.expectRevert(VIBEToken.ExceedsMaxSupply.selector);
+        vibe.mint(alice, 2e18);
+    }
+
+    function test_revokedMinterCannotMint() public {
+        // Mint once to prove authority
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 100e18);
+        assertEq(vibe.balanceOf(alice), 100e18);
+
+        // Revoke
+        vm.prank(owner);
+        vibe.setMinter(shapleyDistributor, false);
+
+        // Now fails
+        vm.prank(shapleyDistributor);
+        vm.expectRevert(VIBEToken.Unauthorized.selector);
+        vibe.mint(alice, 100e18);
+    }
+
+    // ============ ERC20Votes Delegation Edge Cases ============
+
+    function test_votesZeroWithoutDelegation() public {
+        // Tokens held but not delegated -> 0 voting power
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 1000e18);
+
+        // Balance exists but votes are 0 (must delegate first)
+        assertEq(vibe.balanceOf(alice), 1000e18);
+        assertEq(vibe.getVotes(alice), 0);
+    }
+
+    function test_delegateToThirdParty() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 500e18);
+
+        vm.prank(shapleyDistributor);
+        vibe.mint(bob, 300e18);
+
+        // Both delegate to carol (who holds 0 tokens)
+        vm.prank(alice);
+        vibe.delegate(carol);
+
+        vm.prank(bob);
+        vibe.delegate(carol);
+
+        // Carol has combined voting power
+        assertEq(vibe.getVotes(carol), 800e18);
+        assertEq(vibe.balanceOf(carol), 0);
+    }
+
+    // ============ Burn Edge Cases ============
+
+    function test_burnInsufficientBalance() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 100e18);
+
+        vm.prank(alice);
+        vm.expectRevert(); // ERC20: burn amount exceeds balance
+        vibe.burn(200e18);
+    }
+
+    function test_burnUpdatesCirculatingSupply() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 1000e18);
+
+        assertEq(vibe.circulatingSupply(), 1000e18);
+
+        vm.prank(alice);
+        vibe.burn(300e18);
+
+        assertEq(vibe.circulatingSupply(), 700e18);
+        assertEq(vibe.totalMinted(), 1000e18);
+        assertEq(vibe.totalBurned(), 300e18);
+    }
+
+    // ============ Transfer Edge Cases ============
+
+    function test_transferToSelf() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 100e18);
+
+        vm.prank(alice);
+        vibe.transfer(alice, 50e18);
+
+        // Balance unchanged
+        assertEq(vibe.balanceOf(alice), 100e18);
+    }
+
+    function test_transferZeroAmount() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 100e18);
+
+        vm.prank(alice);
+        vibe.transfer(bob, 0);
+
+        assertEq(vibe.balanceOf(alice), 100e18);
+        assertEq(vibe.balanceOf(bob), 0);
+    }
+
+    function test_approveAndTransferFromFullAllowance() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 1000e18);
+
+        vm.prank(alice);
+        vibe.approve(bob, 1000e18);
+
+        vm.prank(bob);
+        vibe.transferFrom(alice, carol, 1000e18);
+
+        assertEq(vibe.balanceOf(alice), 0);
+        assertEq(vibe.balanceOf(carol), 1000e18);
+        assertEq(vibe.allowance(alice, bob), 0);
+    }
+
+    function test_transferFromExceedsAllowance() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 1000e18);
+
+        vm.prank(alice);
+        vibe.approve(bob, 500e18);
+
+        vm.prank(bob);
+        vm.expectRevert(); // ERC20: insufficient allowance
+        vibe.transferFrom(alice, carol, 600e18);
+    }
+
+    // ============ Minter Events ============
+
+    function test_setMinterEmitsEvent() public {
+        address newMinter = makeAddr("eventMinter");
+
+        vm.prank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit MinterUpdated(newMinter, true);
+        vibe.setMinter(newMinter, true);
+    }
+
+    function test_burnEmitsEvent() public {
+        vm.prank(shapleyDistributor);
+        vibe.mint(alice, 100e18);
+
+        vm.prank(alice);
+        vm.expectEmit(true, false, false, true);
+        emit TokensBurned(alice, 50e18);
+        vibe.burn(50e18);
     }
 }

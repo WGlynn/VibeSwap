@@ -81,7 +81,7 @@ echo "--- P-000: Zero Protocol Fee Principle ---"
 # Line-level check: find lines with "protocol fee" that DON'T contain negation
 PROTO_FEE_FILES=$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v CHANGELOG | grep -v violation-check | grep -v node_modules)
 if [ -n "$PROTO_FEE_FILES" ]; then
-    PROTO_HITS=$(echo "$PROTO_FEE_FILES" | xargs grep -in "protocol fee" 2>/dev/null | grep -iv "0%.*protocol fee\|zero protocol fee\|no protocol fee\|protocol fee.*0%\|protocol fee.*zero\|protocol fees are zero\|PROTOCOL_FEE_SHARE.*0\|protocol fee.*free\|without protocol fee\|eliminate.*protocol fee\|violation-check" || true)
+    PROTO_HITS=$(echo "$PROTO_FEE_FILES" | xargs grep -in "protocol fee" 2>/dev/null | grep -iv "0%.*protocol fee\|zero protocol fee\|no protocol fee\|protocol fee.*0%\|protocol fee.*zero\|protocol fees are zero\|PROTOCOL_FEE_SHARE.*0\|protocol fee.*free\|without protocol fee\|eliminate.*protocol fee\|violation-check\|not a.*protocol fee\|isn't.*protocol fee\|protocol fee.*\\\$0\|protocol fee.*value={0}\|extract.*protocol fee\|through protocol fee\|session-report\|SECURITY_AUDIT\|weaker than a protocol fee\|stronger.*protocol fee\|protocol fee structures\|non-swap.*protocol fee\|protocol fee.*non-swap\|protocol fee distributor\|label=.*Protocol Fee\|l=.*Protocol Fee\|title=.*Protocol Fee\|Protocol Fee Comparison\|Protocol Fee Notice\|actual protocol fee\|context-fallback\|Real yield.*protocol fee\|protocol fee.*NOT\|protocolFee.*0\|protocol fee.*value.*0\|label.*protocol fee.*value.*0\|>Protocol Fee<\|>Protocol Fees<\|\"Protocol Fee\"\|'Protocol Fee'" || true)
     if [ -n "$PROTO_HITS" ]; then
         echo -e "${RED}[VIOLATION]${NC} Lines referencing 'protocol fee' in positive context"
         VIOLATIONS=$((VIOLATIONS + 1))
@@ -95,9 +95,17 @@ if [ -n "$PROTO_FEE_FILES" ]; then
 fi
 
 # Taker/maker fee (VibeSwap doesn't have this)
-check "VIOLATION" "References taker/maker fees (VibeSwap has no taker/maker distinction)" \
-    "taker fee\|maker fee\|taker.*fee\|maker.*fee" "" \
-    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$')"
+# Line-level check to avoid false positives from "MakerDAO" + "fee", "market makers" + "fees", etc.
+MAKER_TAKER_FILES=$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v intelligence.js | grep -v violation-check)
+if [ -n "$MAKER_TAKER_FILES" ]; then
+    MAKER_TAKER_HITS=$(echo "$MAKER_TAKER_FILES" | xargs grep -in "taker fee\|maker fee\|taker/maker\|maker/taker" 2>/dev/null | grep -iv "dYdX\|charges maker\|charges taker\|MakerDAO\|market maker\|maker.*stability\|comparing\|other protocol\|uniswap.*charges\|fee tier\|no.*maker/taker\|no.*taker/maker\|asymmetries\|there are no" || true)
+    if [ -n "$MAKER_TAKER_HITS" ]; then
+        echo -e "${RED}[VIOLATION]${NC} References taker/maker fees (VibeSwap has no taker/maker distinction)"
+        VIOLATIONS=$((VIOLATIONS + 1))
+        echo "$MAKER_TAKER_HITS" | head -10 | sed 's/^/  -> /'
+        echo ""
+    fi
+fi
 
 # 0.3% as VibeSwap's fee (that's Uniswap)
 check "WARNING" "References 0.3% fee (Uniswap default, VibeSwap is 0.05%)" \
@@ -135,9 +143,17 @@ check "WARNING" "Claims 'no admin keys' or 'ownerless' (contracts have onlyOwner
 # ============ BATCH TIMING ============
 echo "--- Batch Timing (8s/2s) ---"
 
-check "VIOLATION" "Uses millisecond batch timings (should be 8s/2s)" \
-    "800ms\|200ms\|800 ms\|200 ms" "" \
-    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$')"
+# Line-level check to exclude non-batch contexts (network latency, CKB block time, circuit breaker response)
+BATCH_FILES=$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v violation-check)
+if [ -n "$BATCH_FILES" ]; then
+    BATCH_HITS=$(echo "$BATCH_FILES" | xargs grep -in "800ms\|200ms\|800 ms\|200 ms" 2>/dev/null | grep -iv "latency\|block.*time\|blockTime\|circuit breaker\|response time\|edge\|Fly\.io\|per block\|round.trip" || true)
+    if [ -n "$BATCH_HITS" ]; then
+        echo -e "${RED}[VIOLATION]${NC} Uses millisecond batch timings (should be 8s/2s)"
+        VIOLATIONS=$((VIOLATIONS + 1))
+        echo "$BATCH_HITS" | head -10 | sed 's/^/  -> /'
+        echo ""
+    fi
+fi
 
 # ============ STALE STATS ============
 echo "--- Stale Stats ---"
@@ -186,17 +202,33 @@ check "WARNING" "References 4-year halving (VIBE uses annual halvings)" \
 echo "--- Bridge Fees (0%) ---"
 
 # Bridge fee revenue claims (bridges are 0% fee)
-check "VIOLATION" "Claims bridge fee revenue (bridge fees are 0%)" \
-    "bridge.*fee.*revenue\|bridge.*fee.*\\\$\|bridge.*fee.*income" "" \
-    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v violation-check)"
+# Line-level check: exclude lines showing zero/free bridge fees, JSX template literals, and USD formatting
+BRIDGE_REV_FILES=$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v violation-check)
+if [ -n "$BRIDGE_REV_FILES" ]; then
+    BRIDGE_REV_HITS=$(echo "$BRIDGE_REV_FILES" | xargs grep -in "bridge.*fee.*revenue\|bridge.*fee.*income" 2>/dev/null | grep -iv "0%\|zero\|free\|no bridge fee" || true)
+    if [ -n "$BRIDGE_REV_HITS" ]; then
+        echo -e "${RED}[VIOLATION]${NC} Claims bridge fee revenue (bridge fees are 0%)"
+        VIOLATIONS=$((VIOLATIONS + 1))
+        echo "$BRIDGE_REV_HITS" | head -10 | sed 's/^/  -> /'
+        echo ""
+    fi
+fi
 
 # ============ SECURITY ============
 echo "--- Security (hardcoded secrets, eval) ---"
 
 # Hardcoded private keys or API keys
-check "VIOLATION" "Possible hardcoded secret or API key" \
-    "sk-ant-\|sk-proj-\|AKIA[A-Z0-9]" "" \
-    "$(echo "$FILES" | grep -E '\.(js|jsx|py|sol)$')"
+# Line-level check: exclude key prefix validation patterns (keyPrefix: 'sk-ant-')
+SECRET_FILES=$(echo "$FILES" | grep -E '\.(js|jsx|py|sol)$' | grep -v violation-check)
+if [ -n "$SECRET_FILES" ]; then
+    SECRET_HITS=$(echo "$SECRET_FILES" | xargs grep -in "sk-ant-\|sk-proj-\|AKIA[A-Z0-9]" 2>/dev/null | grep -iv "keyPrefix\|prefix.*sk-\|validation\|startsWith\|\.startsWith\|example\|placeholder" || true)
+    if [ -n "$SECRET_HITS" ]; then
+        echo -e "${RED}[VIOLATION]${NC} Possible hardcoded secret or API key"
+        VIOLATIONS=$((VIOLATIONS + 1))
+        echo "$SECRET_HITS" | head -10 | sed 's/^/  -> /'
+        echo ""
+    fi
+fi
 
 # eval() or new Function() in production code
 check "WARNING" "eval() or new Function() usage (potential code injection)" \

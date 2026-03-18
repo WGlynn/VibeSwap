@@ -3614,7 +3614,7 @@ bot.command('vibe', (ctx) => {
   }
 
   lines.push('');
-  lines.push('VIBE is not on-chain yet — balances are tracked for future airdrop.');
+  lines.push('VIBE is not on-chain yet — balances are tracked for future contribution claims (VIBE is earned, never airdropped).');
 
   ctx.reply(lines.join('\n'));
 });

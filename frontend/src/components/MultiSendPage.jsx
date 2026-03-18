@@ -13,7 +13,7 @@ const TOKENS = [
   { symbol: 'ETH',  name: 'Ethereum',   logo: '\u27E0', decimals: 18 },
   { symbol: 'USDC', name: 'USD Coin',    logo: '$',      decimals: 6  },
   { symbol: 'VIBE', name: 'VibeSwap',    logo: '\u2261', decimals: 18 },
-  { symbol: 'JUL',  name: 'Julius',      logo: '\u2726', decimals: 18 },
+  { symbol: 'JUL',  name: 'Joule',        logo: '\u2726', decimals: 18 },
 ]
 
 // ============ Mock History ============

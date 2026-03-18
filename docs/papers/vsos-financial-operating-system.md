@@ -206,7 +206,7 @@ These are the "apps that ship with the OS" — financial instruments that compos
 | **VibeCredit** | Undercollateralized lending | Reputation + collateral |
 | **VibeSynth** | Synthetic assets | Oracle prices + collateral |
 | **VibeInsurance** | Pool insurance against exploits | Risk mutualization |
-| **VibeRevShare** | Revenue sharing tokens | Protocol fee distribution |
+| **VibeRevShare** | Revenue sharing tokens | Priority bid revenue distribution |
 | **PredictionMarket** | Binary outcome markets | Oracle resolution |
 | **BondingCurveLauncher** | Token launch curves | Initial price discovery |
 

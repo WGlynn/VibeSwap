@@ -577,7 +577,7 @@ export default function ContributorsPage() {
           <GlassCard glowColor="terminal" className="p-5 md:p-6 text-center" hover={false}>
             <h3 className="text-lg font-bold font-mono mb-2" style={{ color: AMBER }}>VIBE TOKEN</h3>
             <p className="text-sm text-black-200 max-w-2xl mx-auto leading-relaxed mb-3">
-              21,000,000 fixed supply. 4-year halvings. Emissions accumulate in the <span style={{ color: AMBER }}>Resonance Pool</span> until
+              21,000,000 fixed supply. Annual halvings. Emissions accumulate in the <span style={{ color: AMBER }}>Resonance Pool</span> until
               a protocol-defining contribution is recognized — then the pool breaks and distributes to all contributors via Shapley values.
             </p>
             <p className="text-xs font-mono italic" style={{ color: CYAN }}>

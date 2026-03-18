@@ -1201,7 +1201,7 @@ function settleReputation(uint256 comparisonId) external {
     }
     
     // Reward correct voters with Shapley distribution
-    uint256 rewardPool = address(this).balance / 100;  // 1% of protocol fees
+    uint256 rewardPool = address(this).balance / 100;  // 1% of priority bid revenue
     
     for (uint i = 0; i < comp.totalVotes; i++) {
         address voter = committedVoters[comparisonId][i];

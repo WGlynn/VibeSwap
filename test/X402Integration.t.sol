@@ -14,8 +14,8 @@ import "../contracts/mechanism/IABCHealthCheck.sol";
 contract X402IntegrationTest is Test {
     AugmentedBondingCurve public abc;
 
-    address treasury = address(0xTREASURY);
-    address agent = address(0xAGENT);
+    address treasury = makeAddr("treasury");
+    address agent = makeAddr("agent");
 
     function setUp() public {
         // Deploy a mock ABC for testing x402 health checks

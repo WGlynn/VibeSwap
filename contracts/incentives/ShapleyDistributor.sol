@@ -206,6 +206,10 @@ contract ShapleyDistributor is
     /// @notice Total value distributed across all eras (for tracking)
     uint256 public totalValueDistributed;
 
+    /// @notice Total value committed but not yet claimed across all active games
+    /// @dev Used to prevent concurrent game creation from overdrawing shared balance
+    uint256 public totalCommittedBalance;
+
     /// @notice Value distributed per era
     mapping(uint8 => uint256) public eraDistributed;
 
@@ -408,17 +412,30 @@ contract ShapleyDistributor is
         if (participants.length < minParticipants) revert TooFewParticipants();
         if (participants.length > maxParticipants) revert TooManyParticipants();
 
+        // Validate participant inputs: no duplicates, bounded scores
+        for (uint256 i = 0; i < participants.length; i++) {
+            require(participants[i].participant != address(0), "Zero address participant");
+            require(participants[i].scarcityScore <= BPS_PRECISION, "Scarcity score exceeds 10000");
+            require(participants[i].stabilityScore <= BPS_PRECISION, "Stability score exceeds 10000");
+
+            // Check for duplicate participants (O(n^2) but n <= maxParticipants which is bounded)
+            for (uint256 j = 0; j < i; j++) {
+                require(participants[i].participant != participants[j].participant, "Duplicate participant");
+            }
+        }
+
         // ABC Conservation Gate: no games created when curve is under stress
         _requireABCHealthy(gameId);
 
-        // H-03 DISSOLVED: Verify contract holds enough tokens to cover the game.
-        // Early claimers can't drain late claimers — the game simply can't be created
-        // if the backing isn't there. Attack surface dissolved at creation, not at claim.
+        // H-03 DISSOLVED: Verify contract holds enough tokens to cover the game
+        // INCLUDING already-committed funds from other unsettled games.
+        // Prevents concurrent game creation from overdrawing shared balance.
         if (token == address(0)) {
-            require(address(this).balance >= totalValue, "Insufficient ETH for game");
+            require(address(this).balance >= totalCommittedBalance + totalValue, "Insufficient ETH for game");
         } else {
-            require(IERC20(token).balanceOf(address(this)) >= totalValue, "Insufficient tokens for game");
+            require(IERC20(token).balanceOf(address(this)) >= totalCommittedBalance + totalValue, "Insufficient tokens for game");
         }
+        totalCommittedBalance += totalValue;
 
         // Apply halving ONLY for TOKEN_EMISSION games (not fee distribution)
         // Fee distribution is time-neutral: same work = same reward regardless of era
@@ -501,14 +518,52 @@ contract ShapleyDistributor is
         // Step 2: Distribute value proportional to weighted contribution
         // This satisfies Efficiency, Pairwise Proportionality, and Time Neutrality
         // See: docs/TIME_NEUTRAL_TOKENOMICS.md §3.1-3.3
+        uint256[] memory shares = new uint256[](n);
         uint256 distributed = 0;
+
+        for (uint256 i = 0; i < n; i++) {
+            shares[i] = (game.totalValue * weights[i]) / totalWeight;
+            distributed += shares[i];
+        }
+
+        // Step 3: Enforce Lawson Fairness Floor (1% minimum for non-zero contributors)
+        // Named after Jayme Lawson — nobody who showed up and acted honestly walks away empty.
+        // Only applies to participants with non-zero weight (null players still get zero).
+        uint256 floorAmount = (game.totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
+        uint256 floorDeficit = 0;
+        uint256 nonFloorWeight = 0;
+
+        for (uint256 i = 0; i < n; i++) {
+            if (weights[i] > 0 && shares[i] < floorAmount) {
+                floorDeficit += floorAmount - shares[i];
+                shares[i] = floorAmount;
+            } else if (shares[i] > floorAmount) {
+                nonFloorWeight += weights[i];
+            }
+        }
+
+        // Redistribute deficit from above-floor participants proportionally
+        if (floorDeficit > 0 && nonFloorWeight > 0) {
+            for (uint256 i = 0; i < n; i++) {
+                if (shares[i] > floorAmount && weights[i] > 0) {
+                    uint256 deduction = (floorDeficit * weights[i]) / nonFloorWeight;
+                    if (deduction < shares[i] - floorAmount) {
+                        shares[i] -= deduction;
+                    } else {
+                        shares[i] = floorAmount;
+                    }
+                }
+            }
+        }
+
+        // Step 4: Final assignment with dust collection on last participant
+        distributed = 0;
         for (uint256 i = 0; i < n; i++) {
             uint256 share;
             if (i == n - 1) {
-                // Last participant gets remainder (prevents dust)
                 share = game.totalValue - distributed;
             } else {
-                share = (game.totalValue * weights[i]) / totalWeight;
+                share = shares[i];
             }
 
             shapleyValues[gameId][participants[i].participant] = share;
@@ -534,6 +589,11 @@ contract ShapleyDistributor is
         if (amount == 0) revert NoReward();
 
         claimed[gameId][msg.sender] = true;
+
+        // Release committed balance tracking
+        if (totalCommittedBalance >= amount) {
+            totalCommittedBalance -= amount;
+        }
 
         // Transfer reward
         if (game.token == address(0)) {

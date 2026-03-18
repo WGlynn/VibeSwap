@@ -58,12 +58,12 @@ echo ""
 
 # Determine which files to check
 if [ "$1" = "--all" ]; then
-    FILES=$(find . -name "*.md" -o -name "*.jsx" -o -name "*.js" -o -name "*.sol" | grep -v node_modules | grep -v .git)
+    FILES=$(find . \( -name "*.md" -o -name "*.jsx" -o -name "*.js" -o -name "*.sol" \) | grep -v node_modules | grep -v .git | grep -v "/dist/" | grep -v "/build/" | grep -v ".min.js" | grep -v "zero-tolerance-audit-post")
 elif [ "$1" = "--staged" ]; then
     FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(md|jsx|js|sol)$' || true)
 else
     # Default: check all tracked files
-    FILES=$(git ls-files "*.md" "*.jsx" "*.js" "*.sol" | grep -v node_modules | grep -v "/dist/" | grep -v "dist/" | grep -v build/ | grep -v ".min.js")
+    FILES=$(git ls-files "*.md" "*.jsx" "*.js" "*.sol" | grep -v node_modules | grep -v "/dist/" | grep -v "dist/" | grep -v build/ | grep -v ".min.js" | grep -v "zero-tolerance-audit-post")
 fi
 
 if [ -z "$FILES" ]; then

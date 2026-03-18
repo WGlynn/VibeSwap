@@ -111,7 +111,9 @@ function getTokenUsdPrice(symbol) {
     // Dynamic import would create circular dep — use global cache from usePriceFeed
     const cached = window.__vibePriceCache?.[symbol?.toUpperCase()]
     if (cached && cached > 0) return cached
-  } catch {}
+  } catch (e) {
+    console.warn('Pool data fetch failed:', e.message)
+  }
   return USD_PRICES_FALLBACK[symbol] || 1
 }
 

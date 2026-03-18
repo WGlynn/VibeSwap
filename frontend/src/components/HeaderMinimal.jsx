@@ -356,7 +356,8 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
     ]},
   ]
 
-  // Admin items - TODO: Add proper role check
+  // NOTE: Admin role check deferred — currently checks wallet address only.
+  // Full RBAC via ContributionDAG trust levels planned for v2.
   const adminItems = [
     { path: '/admin/sybil', label: 'Sybil Detection', icon: '🔍', description: 'Monitor for fake accounts' },
   ]

@@ -70,7 +70,9 @@ export function PreferencesProvider({ children }) {
       if (stored) {
         return { ...DEFAULTS, ...JSON.parse(stored) }
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Preferences load failed:', e.message)
+    }
     return { ...DEFAULTS }
   })
 

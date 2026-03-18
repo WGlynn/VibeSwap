@@ -161,6 +161,64 @@ check "WARNING" "References tbhxnest (access revoked Session 053)" \
     "tbhxnest" "" \
     "$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v MEMORY | grep -v nyx)"
 
+# ============ TOKEN CONFUSION ============
+echo "--- Token Confusion (JUL vs VIBE) ---"
+
+# JUL called governance token (VIBE is governance)
+check "WARNING" "JUL described as governance token (VIBE is the governance token)" \
+    "JUL.*governance\|governance.*JUL\|JUL.*voting\|vote.*JUL" "" \
+    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$')"
+
+# Wrong JUL name
+check "WARNING" "JUL called 'Julius' or 'Jul Token' (correct name: 'Joule')" \
+    "Julius\|Jul Token" "" \
+    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$')"
+
+# ============ HALVING SCHEDULE ============
+echo "--- Halving Schedule (annual, not 4-year) ---"
+
+# 4-year halvings (should be annual)
+check "WARNING" "References 4-year halving (VIBE uses annual halvings)" \
+    "4.year.*halving\|four.year.*halving\|halving.*4.year" "" \
+    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$')"
+
+# ============ BRIDGE FEES ============
+echo "--- Bridge Fees (0%) ---"
+
+# Bridge fee revenue claims (bridges are 0% fee)
+check "VIOLATION" "Claims bridge fee revenue (bridge fees are 0%)" \
+    "bridge.*fee.*revenue\|bridge.*fee.*\\\$\|bridge.*fee.*income" "" \
+    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v violation-check)"
+
+# ============ SECURITY ============
+echo "--- Security (hardcoded secrets, eval) ---"
+
+# Hardcoded private keys or API keys
+check "VIOLATION" "Possible hardcoded secret or API key" \
+    "sk-ant-\|sk-proj-\|AKIA[A-Z0-9]" "" \
+    "$(echo "$FILES" | grep -E '\.(js|jsx|py|sol)$')"
+
+# eval() or new Function() in production code
+check "WARNING" "eval() or new Function() usage (potential code injection)" \
+    "eval(\|new Function(" "" \
+    "$(echo "$FILES" | grep -E '\.(js|jsx)$' | grep -v node_modules | grep -v dist/ | grep -v test)"
+
+# ============ AUDIT CLAIMS ============
+echo "--- Audit Claims ---"
+
+# "Formally verified" without qualification
+check "WARNING" "Claims formal verification (project uses fuzz/invariant testing, not formal verification)" \
+    "formally verified" "" \
+    "$(echo "$FILES" | grep -E '\.md$' | grep -v violation-check)"
+
+# ============ VIBE AIRDROP ============
+echo "--- VIBE Airdrop (never airdropped) ---"
+
+# VIBE airdrop claims (VIBE is never airdropped)
+check "WARNING" "Claims VIBE is airdropped (VIBE is never airdropped — minted through contribution)" \
+    "airdrop.*VIBE\|VIBE.*airdrop" "" \
+    "$(echo "$FILES" | grep -E '\.(md|jsx|js)$' | grep -v 'never airdrop\|not airdrop\|Contribution Claim\|earned.*not.*airdrop')"
+
 # ============ RESULTS ============
 echo "========================================"
 if [ $VIOLATIONS -gt 0 ]; then

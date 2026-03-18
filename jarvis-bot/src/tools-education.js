@@ -713,7 +713,7 @@ export function getProtocolTimeline() {
       lines.push(`    - ${item}`);
     }
   }
-  lines.push('\n  1200+ Solidity tests | 190 Rust tests | 130 contracts');
+  lines.push('\n  5,800+ Solidity tests | 15,155 CKB tests | 351 contracts | 336 frontend components');
   return lines.join('\n');
 }
 

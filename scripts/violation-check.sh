@@ -63,7 +63,7 @@ elif [ "$1" = "--staged" ]; then
     FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(md|jsx|js|sol)$' || true)
 else
     # Default: check all tracked files
-    FILES=$(git ls-files "*.md" "*.jsx" "*.js" "*.sol" | grep -v node_modules | grep -v dist/ | grep -v build/)
+    FILES=$(git ls-files "*.md" "*.jsx" "*.js" "*.sol" | grep -v node_modules | grep -v "/dist/" | grep -v "dist/" | grep -v build/ | grep -v ".min.js")
 fi
 
 if [ -z "$FILES" ]; then

@@ -1010,7 +1010,7 @@ pub fn would_exceed_impact(
     price_impact(pool, amt_in, is_a_to_b) > max_impact_bps
 }
 
-/// The minimum liquidity constant (1000) locked on first deposit.
+/// The minimum liquidity constant (10000) locked on first deposit.
 pub fn minimum_liquidity() -> u64 {
     MINIMUM_LIQUIDITY
 }
@@ -1174,7 +1174,7 @@ mod tests {
     fn test_first_deposit_asymmetric() {
         let mut p = make_pool();
         let pos = add_liquidity(&mut p, 4_000_000, 1_000_000, 0).unwrap();
-        // sqrt(4e6 * 1e6) = sqrt(4e12) = 2e6, minus 1000 = 1_999_000
+        // sqrt(4e6 * 1e6) = sqrt(4e12) = 2e6, minus 10000 = 1_990_000
         assert_eq!(pos.shares, 2_000_000 - MINIMUM_LIQUIDITY);
     }
 
@@ -1182,8 +1182,8 @@ mod tests {
     fn test_first_deposit_minimum_liquidity_locked() {
         let mut p = make_pool();
         let pos = add_liquidity(&mut p, 100_000, 100_000, 0).unwrap();
-        // sqrt(1e10) = 100_000, minus 1000 = 99_000
-        assert_eq!(pos.shares, 99_000);
+        // sqrt(1e10) = 100_000, minus 10000 = 90_000
+        assert_eq!(pos.shares, 90_000);
         assert_eq!(p.total_lp_shares, 100_000); // includes MINIMUM_LIQUIDITY
     }
 
@@ -1198,16 +1198,16 @@ mod tests {
     #[test]
     fn test_first_deposit_exactly_minimum() {
         let mut p = make_pool();
-        // sqrt(1000 * 1000) = 1000, equals MINIMUM_LIQUIDITY (10000) → error
-        let result = add_liquidity(&mut p, 1000, 1000, 0);
+        // sqrt(10000 * 10000) = 10000, equals MINIMUM_LIQUIDITY (10000) → error
+        let result = add_liquidity(&mut p, 10000, 10000, 0);
         assert_eq!(result.unwrap_err(), PoolError::MinimumLiquidity);
     }
 
     #[test]
     fn test_first_deposit_just_above_minimum() {
         let mut p = make_pool();
-        // sqrt(1001 * 1001) = 1001, minus 1000 = 1 share
-        let pos = add_liquidity(&mut p, 1001, 1001, 0).unwrap();
+        // sqrt(10001 * 10001) = 10001, minus 10000 = 1 share
+        let pos = add_liquidity(&mut p, 10001, 10001, 0).unwrap();
         assert_eq!(pos.shares, 1);
     }
 
@@ -1313,9 +1313,9 @@ mod tests {
         let pos = add_liquidity(&mut p, 1_000_000, 1_000_000, 0).unwrap();
         let (a, b) = remove_liquidity(&mut p, pos.shares).unwrap();
         // User gets back proportional share minus MINIMUM_LIQUIDITY portion
-        // shares = 999_000 out of 1_000_000 total → 999_000/1_000_000 * 1M = 999_000
-        assert_eq!(a, 999_000);
-        assert_eq!(b, 999_000);
+        // shares = 990_000 out of 1_000_000 total → 990_000/1_000_000 * 1M = 990_000
+        assert_eq!(a, 990_000);
+        assert_eq!(b, 990_000);
     }
 
     #[test]
@@ -2152,8 +2152,8 @@ mod tests {
         let p = seeded_pool(1_000_000, 1_000_000);
         let shares = p.total_lp_shares - MINIMUM_LIQUIDITY; // user's shares
         let val = lp_value(&p, shares, PRICE_SCALE as u64);
-        // User owns 999000/1000000 of pool = 99.9% of 2M TVL
-        assert!(val > 1_990_000);
+        // User owns 990000/1000000 of pool = 99% of 2M TVL
+        assert!(val > 1_970_000);
         assert!(val <= 2_000_000);
     }
 
@@ -2290,7 +2290,7 @@ mod tests {
 
     #[test]
     fn test_minimum_liquidity_constant() {
-        assert_eq!(minimum_liquidity(), 1000);
+        assert_eq!(minimum_liquidity(), 10000);
     }
 
     // ============ Overflow Safety Tests ============
@@ -2373,8 +2373,8 @@ mod tests {
 
         // First depositor's position should be unaffected in value
         let (a1, b1) = amounts_for_shares(&p, pos1.shares);
-        assert!(a1 >= 999_000);
-        assert!(b1 >= 999_000);
+        assert!(a1 >= 989_000);
+        assert!(b1 >= 989_000);
     }
 
     #[test]
@@ -2395,8 +2395,8 @@ mod tests {
     #[test]
     fn test_pool_health_shallow_pool() {
         let mut p = make_pool();
-        add_liquidity(&mut p, 10_000, 10_000, 0).unwrap();
-        let health = pool_health(&p, 1_000, PRICE_SCALE as u64);
+        add_liquidity(&mut p, 100_000, 100_000, 0).unwrap();
+        let health = pool_health(&p, 10_000, PRICE_SCALE as u64);
         assert!(health.depth_score < BPS);
     }
 
@@ -2421,7 +2421,7 @@ mod tests {
 
     #[test]
     fn test_spot_price_large_asymmetry() {
-        let p = seeded_pool(1, 10_000_000);
+        let p = seeded_pool(1_000, 100_000_000);
         let price = spot_price(&p, true);
         assert!(price > 0);
     }

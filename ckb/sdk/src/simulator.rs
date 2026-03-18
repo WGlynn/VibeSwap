@@ -28,7 +28,7 @@ pub const MAX_SIMULATION_STEPS: u32 = 100;
 pub const MAX_CASCADE_DEPTH: u32 = 10;
 
 /// Minimum liquidity to consider a pool valid.
-pub const MIN_LIQUIDITY: u128 = 1000;
+pub const MIN_LIQUIDITY: u128 = 10000;
 
 // ============ Error Types ============
 

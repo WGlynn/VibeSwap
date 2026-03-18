@@ -101,7 +101,10 @@ export class GitHubRelayerService {
   // ============ Webhook Verification ============
 
   verifyWebhookSignature(payload, signature) {
-    if (!this.webhookSecret) return true; // Skip if no secret configured
+    if (!this.webhookSecret) {
+      logger.warn('GITHUB_WEBHOOK_SECRET not configured — rejecting all webhooks');
+      return false;
+    }
 
     const expected = 'sha256=' + crypto
       .createHmac('sha256', this.webhookSecret)

@@ -112,7 +112,7 @@ impl MMR {
     /// Merge peaks that are at the same height
     /// Two peaks of height h merge into one peak of height h+1
     fn merge_peaks(&mut self) {
-        while self.peaks.len() >= 2 {
+        if self.peaks.len() >= 2 {
             // Check if the last two peaks should merge
             // They merge when the number of leaves under them is equal
             let n = self.leaf_count;
@@ -121,14 +121,13 @@ impl MMR {
             // Two peaks merge when the (height-1)th bit of leaf_count is 0
             // i.e., the binary representation tells us the peak structure
             if n & (1 << (height - 1)) != 0 {
-                break; // No merge needed
+                // No merge needed
             }
 
             // Actually, MMR merging works differently:
             // After adding a leaf, we check if the number of leaves
             // makes the last two peaks at the same height.
             // The structure follows the binary representation of leaf_count.
-            break;
         }
 
         // Correct approach: rebuild peaks from leaf_count binary representation
@@ -324,19 +323,8 @@ fn leaf_to_node_index(leaf_index: u64) -> u64 {
     // Simple approach: leaves are interleaved with internal nodes
     // Leaf i is at position (2*i) in a perfect binary tree
     // But MMR is a forest of perfect trees, so we compute directly
-    let _pos = 0u64;
     let remaining = leaf_index;
-    let _height = 0u32;
-
-    // Walk through the binary representation of leaf_index
-    // Each bit tells us whether to go into a subtree or skip it
-    while remaining > 0 || _height > 0 {
-        if _height > 0 {
-            break;
-        }
-        let _pos = remaining; // Simplified: direct mapping for flat storage
-        break;
-    }
+    let _pos = remaining; // Simplified: direct mapping for flat storage
 
     // For our flat node storage, leaf at index i is simply stored at
     // position that accounts for internal nodes inserted before it

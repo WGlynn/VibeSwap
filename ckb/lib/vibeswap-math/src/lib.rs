@@ -264,10 +264,10 @@ pub mod batch_math {
     ) -> Result<u128, MathError> {
         if total_supply == 0 {
             let liquidity = super::sqrt_product(amount0, amount1);
-            if liquidity <= 1000 {
+            if liquidity <= 10000 {
                 return Err(MathError::InsufficientInitialLiquidity);
             }
-            Ok(liquidity - 1000) // Lock minimum liquidity
+            Ok(liquidity - 10000) // Lock minimum liquidity
         } else {
             let liquidity0 = super::mul_div(amount0, total_supply, reserve0);
             let liquidity1 = super::mul_div(amount1, total_supply, reserve1);
@@ -776,8 +776,8 @@ mod tests {
             0,
         )
         .unwrap();
-        // sqrt(1e6 * 1e6) * 1e18 - 1000
-        assert_eq!(lp, 1_000_000 * PRECISION - 1000);
+        // sqrt(1e6 * 1e6) * 1e18 - 10000
+        assert_eq!(lp, 1_000_000 * PRECISION - 10000);
     }
 
     #[test]

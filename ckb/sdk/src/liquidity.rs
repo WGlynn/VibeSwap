@@ -1151,10 +1151,10 @@ mod tests {
         let pool = make_pool(
             1_000_000 * PRECISION,
             1_000_000 * PRECISION,
-            10_000,
+            20_000,
             30,
         );
-        let burn_amount = 10_000 - MINIMUM_LIQUIDITY;
+        let burn_amount = 20_000 - MINIMUM_LIQUIDITY;
         let est = estimate_withdrawal(burn_amount, &pool).unwrap();
         // After burning, remaining = MINIMUM_LIQUIDITY exactly
         assert!(!est.below_minimum, "Remaining at exactly minimum should not be below_minimum");
@@ -1844,9 +1844,9 @@ mod tests {
     #[test]
     fn test_estimate_withdrawal_at_minimum() {
         // Remaining LP exactly equals minimum_liquidity → not below minimum
-        let pool = make_pool(10_000, 10_000, 2000, 30);
+        let pool = make_pool(10_000, 10_000, 11000, 30);
         let est = estimate_withdrawal(1000, &pool).unwrap();
-        // remaining = 2000 - 1000 = 1000 = MINIMUM_LIQUIDITY
+        // remaining = 11000 - 1000 = 10000 = MINIMUM_LIQUIDITY
         assert!(!est.below_minimum, "Exactly at minimum should not be below");
     }
 

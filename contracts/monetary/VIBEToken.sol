@@ -116,7 +116,7 @@ contract VIBEToken is
         if (!minters[msg.sender] && msg.sender != owner()) revert Unauthorized();
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
-        if (totalSupply() + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
+        if (totalMinted + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
 
         totalMinted += amount;
         _mint(to, amount);
@@ -127,7 +127,8 @@ contract VIBEToken is
     /**
      * @notice Burn VIBE from caller's balance
      * @dev Anyone can burn their own tokens (deflationary mechanism).
-     *      Burns reduce circulating supply but not MAX_SUPPLY cap.
+     *      Burns are PERMANENT — they reduce circulating supply and can
+     *      never be re-minted. 21M lifetime cap is absolute.
      * @param amount Amount of VIBE to burn
      */
     function burn(uint256 amount) external {
@@ -154,10 +155,10 @@ contract VIBEToken is
 
     // ============ View Functions ============
 
-    /// @notice Remaining VIBE that can ever be minted
+    /// @notice Remaining VIBE that can ever be minted (lifetime cap)
+    /// @dev Burns do NOT create room for re-minting. 21M means 21M ever.
     function mintableSupply() external view returns (uint256) {
-        uint256 current = totalSupply();
-        return current >= MAX_SUPPLY ? 0 : MAX_SUPPLY - current;
+        return totalMinted >= MAX_SUPPLY ? 0 : MAX_SUPPLY - totalMinted;
     }
 
     /// @notice Circulating supply (total minted minus burned)

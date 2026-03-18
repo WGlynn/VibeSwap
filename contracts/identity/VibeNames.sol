@@ -301,5 +301,7 @@ contract VibeNames is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     // ============ UUPS ============
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 }

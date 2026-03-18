@@ -65,7 +65,9 @@ contract GaslessRescue is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
         relayerFeeBps = _feeBps > MAX_FEE_BPS ? MAX_FEE_BPS : _feeBps;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Safe Address Registration ============
 

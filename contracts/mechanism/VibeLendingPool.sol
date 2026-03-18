@@ -97,7 +97,9 @@ contract VibeLendingPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         reserveFactorBps = 1000; // 10% of interest to reserves
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Asset Management ============
 

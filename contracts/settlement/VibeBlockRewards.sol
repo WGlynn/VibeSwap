@@ -40,7 +40,9 @@ contract VibeBlockRewards is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         epochs[1] = RewardEpoch(1, INITIAL_BLOCK_REWARD, INITIAL_BLOCK_REWARD / 6, INITIAL_BLOCK_REWARD / 2, 0, 0);
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     function distributeBlockReward(address validator, uint256 blockNumber) external onlyOwner {
         RewardEpoch storage ep = epochs[currentEpoch];

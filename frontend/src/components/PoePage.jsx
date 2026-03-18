@@ -243,7 +243,6 @@ export default function PoePage() {
             "To be seen. To be valued. Even if it takes the world decades to catch up."
           </div>
         </div>
-      </motion.div>
     </div>
   )
 }

@@ -78,7 +78,9 @@ contract VibeCrossChainSwap is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         feeBps = 0;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Swap Lifecycle ============
 

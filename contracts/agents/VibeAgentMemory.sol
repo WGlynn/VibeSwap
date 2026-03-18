@@ -121,7 +121,9 @@ contract VibeAgentMemory is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         emit ValidatorSet(_validator, _status);
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Store Memory ============
 

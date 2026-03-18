@@ -361,5 +361,7 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
 
     // ============ UUPS ============
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 }

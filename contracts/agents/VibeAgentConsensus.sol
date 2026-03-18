@@ -123,7 +123,9 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         slashBps = 1000; // 10% slash for non-reveal
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Round Management ============
 

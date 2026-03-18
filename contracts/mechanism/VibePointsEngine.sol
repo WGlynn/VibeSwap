@@ -88,7 +88,9 @@ contract VibePointsEngine is OwnableUpgradeable, UUPSUpgradeable {
         _createAchievement("Bug Hunter", "Report a valid bug", 0, 10000);
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Point Awards ============
 

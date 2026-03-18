@@ -72,7 +72,9 @@ contract VibeLiquidityLocker is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
         lockFee = _lockFee;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Locking ============
 

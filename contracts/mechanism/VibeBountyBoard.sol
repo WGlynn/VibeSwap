@@ -76,7 +76,9 @@ contract VibeBountyBoard is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Bounty Management ============
 

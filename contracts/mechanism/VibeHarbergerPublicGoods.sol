@@ -105,7 +105,9 @@ contract VibeHarbergerPublicGoods is OwnableUpgradeable, UUPSUpgradeable, Reentr
         categoryTaxRateBps[AssetCategory.PREMIUM_FEATURE] = 600;     // 6%
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Asset Creation ============
 

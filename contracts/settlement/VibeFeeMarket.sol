@@ -18,7 +18,9 @@ contract VibeFeeMarket is OwnableUpgradeable, UUPSUpgradeable {
     event BaseFeeUpdated(uint256 indexed blockNumber, uint256 newBaseFee, uint256 gasUsed);
 
     function initialize() external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); baseFee = 100 gwei; }
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     function recordBlock(uint256 blockNumber, uint256 gasUsed) external onlyOwner {
         blockGasUsed[blockNumber] = gasUsed;

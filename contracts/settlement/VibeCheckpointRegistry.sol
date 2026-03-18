@@ -13,7 +13,9 @@ contract VibeCheckpointRegistry is OwnableUpgradeable, UUPSUpgradeable {
     event CheckpointSubmitted(uint256 indexed id, uint256 blockNumber, bytes32 stateRoot);
 
     function initialize() external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); }
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     function submit(uint256 blockNumber, bytes32 stateRoot, bytes32 receiptsRoot) external {
         require(submitters[msg.sender] || msg.sender == owner(), "Not submitter");

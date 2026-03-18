@@ -81,7 +81,9 @@ contract VibeEmergencyDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         }
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     modifier onlyGuardian() {
         require(_isGuardian(msg.sender), "Not guardian");

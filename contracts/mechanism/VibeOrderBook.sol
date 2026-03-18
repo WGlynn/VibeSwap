@@ -97,7 +97,9 @@ contract VibeOrderBook is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
         bestAsk = type(uint256).max;
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Place Orders ============
 

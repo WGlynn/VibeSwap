@@ -496,7 +496,9 @@ contract VibeGovernanceSunset is
      * @notice Authorize contract upgrades (owner only)
      * @dev Required by UUPSUpgradeable. Only owner can upgrade.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Storage Gap ============
 

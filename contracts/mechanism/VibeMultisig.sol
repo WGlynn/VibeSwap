@@ -68,7 +68,9 @@ contract VibeMultisig is Initializable, UUPSUpgradeable {
         required = _required;
     }
 
-    function _authorizeUpgrade(address) internal override onlyWallet {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyWallet {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Transaction Lifecycle ============
 

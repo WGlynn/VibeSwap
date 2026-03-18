@@ -194,7 +194,9 @@ contract VibePointsSeason is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         actionConfigs[Action.BUG_REPORT]    = ActionConfig({ basePoints: 1000, volumeScale: 0,        active: true });
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation.code.length > 0, "Not a contract");
+    }
 
     // ============ Season Management ============
 

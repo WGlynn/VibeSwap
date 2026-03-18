@@ -35,7 +35,7 @@ import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStru
 import { createHmac } from 'crypto';
 import { getRosettaView, translate, translateToAll, getLexicon, TEN_COVENANTS, COVENANT_HASH } from './rosetta.js';
 import { createPrimitive, getPrimitive, listPrimitives, citePrimitive, viewPrimitive, getInfoFiStats, getAuthorStats, searchPrimitives } from './infofi.js';
-import { x402Gate, getX402Stats, getPricingSchedule, initX402 } from './x402.js';
+import { x402Gate, getX402Stats, getPricingSchedule, initX402, handleSIWXNonce, handleSIWXVerify } from './x402.js';
 
 // ============ Rate Limiter ============
 
@@ -269,6 +269,23 @@ export async function handleWebRequest(req, res, pathname) {
   }
 
   const ip = getClientIP(req);
+
+  // ============ SIWX Session Endpoints (free — before payment gate) ============
+  if (pathname === '/web/x402/siwx/nonce' && req.method === 'GET') {
+    handleSIWXNonce(req, res);
+    return true;
+  }
+  if (pathname === '/web/x402/siwx/verify' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      req.body = body;
+    } catch {
+      jsonResponse(res, 400, { error: 'Invalid JSON body' });
+      return true;
+    }
+    handleSIWXVerify(req, res);
+    return true;
+  }
 
   // ============ x402 Payment Gate ============
   // The singularity is just a well-architected toll booth.

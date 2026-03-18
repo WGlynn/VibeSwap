@@ -31,6 +31,19 @@ import { config } from './config.js';
 import { ethers } from 'ethers';
 import { createHash, createHmac, randomBytes } from 'crypto';
 
+// ============ SIWX (Sign-In-With-X) — CAIP-122 Session Auth ============
+// Pay once, authenticate via wallet signature on subsequent requests.
+// Eliminates per-request blockchain latency for session-based access.
+
+const SIWX_SESSION_TTL = 4 * 60 * 60 * 1000;  // 4 hours default
+const SIWX_NONCE_TTL = 5 * 60 * 1000;          // 5 min nonce validity
+const SIWX_MAX_SESSIONS = 10000;
+
+// Active sessions: walletAddress → { tier, expires, nonce, chainId }
+const siwxSessions = new Map();
+// Nonce tracking for replay prevention
+const siwxNonces = new Map();
+
 // ============ Pricing Configuration ============
 
 /**
@@ -205,6 +218,226 @@ function validateSignedReceipt(receiptStr) {
   }
 }
 
+// ============ SIWX — CAIP-122 Message Builder ============
+
+/**
+ * Build a CAIP-122 compatible sign-in message.
+ * @param {string} address - Wallet address
+ * @param {number} chainId - Chain ID
+ * @param {string} nonce - Server-generated nonce
+ * @param {string} domain - Server domain
+ * @param {number} expiresAt - Expiration timestamp
+ */
+function buildSIWXMessage({ address, chainId, nonce, domain, expiresAt }) {
+  const issuedAt = new Date().toISOString();
+  const expiration = new Date(expiresAt).toISOString();
+
+  return [
+    `${domain} wants you to sign in with your wallet.`,
+    ``,
+    `Address: ${address}`,
+    `Chain ID: ${chainId}`,
+    `Nonce: ${nonce}`,
+    `Issued At: ${issuedAt}`,
+    `Expiration Time: ${expiration}`,
+    ``,
+    `By signing this message, you prove ownership of this wallet`,
+    `for x402 session authentication. No transaction will be sent.`
+  ].join('\n');
+}
+
+// ============ SIWX — Nonce Generation & Validation ============
+
+function generateNonce() {
+  const nonce = ethers.hexlify(ethers.randomBytes(16));
+  siwxNonces.set(nonce, Date.now() + SIWX_NONCE_TTL);
+  return nonce;
+}
+
+function consumeNonce(nonce) {
+  const expires = siwxNonces.get(nonce);
+  if (!expires) return false;
+  if (Date.now() > expires) {
+    siwxNonces.delete(nonce);
+    return false;
+  }
+  siwxNonces.delete(nonce);
+  return true;
+}
+
+// ============ SIWX — Signature Verification ============
+
+/**
+ * Verify a SIWX signature and create/validate a session.
+ * Supports EIP-191 personal_sign signatures.
+ *
+ * @param {string} message - The CAIP-122 message that was signed
+ * @param {string} signature - The wallet's signature
+ * @returns {{ valid: boolean, address?: string, chainId?: number, nonce?: string, expiration?: number, error?: string }}
+ */
+function verifySIWXSignature(message, signature) {
+  try {
+    const recoveredAddress = ethers.verifyMessage(message, signature);
+
+    // Parse message to extract fields
+    const addressMatch = message.match(/Address:\s*(0x[a-fA-F0-9]{40})/);
+    const chainIdMatch = message.match(/Chain ID:\s*(\d+)/);
+    const nonceMatch = message.match(/Nonce:\s*(0x[a-fA-F0-9]+)/);
+    const expirationMatch = message.match(/Expiration Time:\s*(.+)/);
+
+    if (!addressMatch || !chainIdMatch || !nonceMatch || !expirationMatch) {
+      return { valid: false, error: 'Invalid SIWX message format' };
+    }
+
+    const claimedAddress = addressMatch[1];
+    const nonce = nonceMatch[1];
+    const expiration = new Date(expirationMatch[1]).getTime();
+
+    // Verify recovered address matches claimed address
+    if (recoveredAddress.toLowerCase() !== claimedAddress.toLowerCase()) {
+      return { valid: false, error: 'Signature does not match claimed address' };
+    }
+
+    // Check expiration
+    if (Date.now() > expiration) {
+      return { valid: false, error: 'SIWX session expired' };
+    }
+
+    return {
+      valid: true,
+      address: recoveredAddress.toLowerCase(),
+      chainId: parseInt(chainIdMatch[1]),
+      nonce,
+      expiration
+    };
+  } catch (err) {
+    return { valid: false, error: `Signature verification failed: ${err.message}` };
+  }
+}
+
+// ============ SIWX — Session Management ============
+
+/**
+ * Create a SIWX session after payment verification.
+ */
+function createSIWXSession(address, tier, chainId) {
+  const session = {
+    tier,
+    chainId,
+    expires: Date.now() + SIWX_SESSION_TTL,
+    created: Date.now(),
+    requestCount: 0
+  };
+  siwxSessions.set(address.toLowerCase(), session);
+
+  // Evict oldest sessions if over limit
+  if (siwxSessions.size > SIWX_MAX_SESSIONS) {
+    let oldest = null, oldestKey = null;
+    for (const [key, s] of siwxSessions) {
+      if (!oldest || s.created < oldest.created) {
+        oldest = s;
+        oldestKey = key;
+      }
+    }
+    if (oldestKey) siwxSessions.delete(oldestKey);
+  }
+
+  return session;
+}
+
+/**
+ * Check if a wallet has an active session at the required tier.
+ */
+function checkSIWXSession(address, requiredTier) {
+  const session = siwxSessions.get(address.toLowerCase());
+  if (!session) return null;
+  if (Date.now() > session.expires) {
+    siwxSessions.delete(address.toLowerCase());
+    return null;
+  }
+  if (session.tier < requiredTier) return null;
+  session.requestCount++;
+  return session;
+}
+
+// ============ SIWX — Endpoint Handlers ============
+
+/**
+ * GET /x402/siwx/nonce — Request a nonce for SIWX sign-in
+ */
+export function handleSIWXNonce(req, res) {
+  const nonce = generateNonce();
+  const domain = req.headers.host || 'vibeswap.xyz';
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    nonce,
+    domain,
+    expiresIn: SIWX_NONCE_TTL / 1000,
+    message: 'Sign this nonce with your wallet to authenticate'
+  }));
+}
+
+/**
+ * POST /x402/siwx/verify — Verify a signed SIWX message and create session
+ * Body: { message, signature }
+ */
+export function handleSIWXVerify(req, res) {
+  const { message, signature } = req.body || {};
+  if (!message || !signature) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Missing message or signature' }));
+    return;
+  }
+
+  const result = verifySIWXSignature(message, signature);
+  if (!result.valid) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: result.error }));
+    return;
+  }
+
+  // Check if this wallet already has an active session
+  const address = result.address;
+  const existingSession = siwxSessions.get(address);
+
+  if (!existingSession) {
+    // No existing session — check if they've paid via tx hash
+    // Look in paymentProofs for this address
+    let maxTier = TIER.FREE;
+    for (const [, proof] of paymentProofs) {
+      if (proof.payer && proof.payer.toLowerCase() === address && proof.verified) {
+        // They've paid before — grant session based on amount
+        if (proof.amount >= TIER.HIGH) maxTier = Math.max(maxTier, TIER.HIGH);
+        else if (proof.amount >= TIER.MEDIUM) maxTier = Math.max(maxTier, TIER.MEDIUM);
+        else if (proof.amount >= TIER.LOW) maxTier = Math.max(maxTier, TIER.LOW);
+      }
+    }
+
+    if (maxTier === TIER.FREE) {
+      res.writeHead(402, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: 'No payment found for this wallet',
+        paymentRequired: true,
+        treasury: treasuryAddress,
+        tiers: TIER
+      }));
+      return;
+    }
+
+    createSIWXSession(address, maxTier, result.chainId);
+  }
+
+  const activeSession = siwxSessions.get(address);
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    authenticated: true,
+    address,
+    tier: activeSession.tier,
+    expires: activeSession.expires,
+    sessionTTL: SIWX_SESSION_TTL / 1000
+  }));
+}
+
 // ============ Configuration ============
 
 // Payment receiver address (VibeSwap treasury)
@@ -293,6 +526,25 @@ export async function x402Gate(req, res, pathname) {
   const price = getRoutePrice(pathname);
   if (price === 0) return true; // Free endpoint
 
+  // SIWX Fast Path — check wallet signature session first (microseconds)
+  const siwxAuth = req.headers['x-siwx-auth'];
+  if (siwxAuth) {
+    try {
+      const [message, signature] = Buffer.from(siwxAuth, 'base64').toString().split('::SIG::');
+      const result = verifySIWXSignature(message, signature);
+      if (result.valid) {
+        const session = checkSIWXSession(result.address, price);
+        if (session) {
+          // Session valid — skip all payment verification
+          res.setHeader('X-SIWX-Session', 'active');
+          res.setHeader('X-SIWX-Expires', session.expires.toString());
+          res.setHeader('X-SIWX-Requests', session.requestCount.toString());
+          return true;
+        }
+      }
+    } catch { /* fall through to payment verification */ }
+  }
+
   // Check for payment proof (3 verification paths, fastest first)
   const proofHeader = req.headers['x-payment-proof'];
   const receiptHeader = req.headers['x-payment-receipt'];
@@ -344,6 +596,12 @@ export async function x402Gate(req, res, pathname) {
       if (validation.remaining > 0) {
         res.setHeader('X-Payment-Balance', String(validation.remaining));
       }
+
+      // Auto-create SIWX session for the payer
+      if (validation.payer) {
+        createSIWXSession(validation.payer, price, 8453); // Default Base chain
+      }
+
       return true;
     }
   }
@@ -395,6 +653,9 @@ function send402(res, pathname, price) {
     'X-Payment-Address': treasuryAddress,
     'X-Payment-Amount': String(price),
     'X-Payment-Currency': 'VIBE',
+    'X-SIWX-Supported': 'true',
+    'X-SIWX-Nonce-Endpoint': '/web/x402/siwx/nonce',
+    'X-SIWX-Verify-Endpoint': '/web/x402/siwx/verify',
   });
   res.end(JSON.stringify(paymentInfo));
 }
@@ -533,6 +794,13 @@ setInterval(() => {
   for (const [key, session] of sessionBalances) {
     if (now > session.expires) sessionBalances.delete(key);
   }
+  // Clean expired SIWX sessions and nonces
+  for (const [key, session] of siwxSessions) {
+    if (now > session.expires) siwxSessions.delete(key);
+  }
+  for (const [nonce, expires] of siwxNonces) {
+    if (now > expires) siwxNonces.delete(nonce);
+  }
 }, 5 * 60_000);
 
 // ============ Stats ============
@@ -546,6 +814,10 @@ export function getX402Stats() {
     activeSessions: sessionBalances.size,
     cachedProofs: paymentProofs.size,
     routeCount: Object.keys(ROUTE_PRICING).length,
+    siwx: {
+      activeSessions: siwxSessions.size,
+      pendingNonces: siwxNonces.size
+    }
   };
 }
 

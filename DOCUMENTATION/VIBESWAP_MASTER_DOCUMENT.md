@@ -130,8 +130,8 @@ We're not competing for existing DEX users. We're serving users who currently **
 
 ## What We're Building
 
-- **Phase 1:** MEV-resistant batch auction DEX (core product)
-- **Phase 2:** Cross-chain support via LayerZero
+- **Phase 1:** MEV-resistant batch auction DEX (core product) — **Live**
+- **Phase 2:** Cross-chain support via LayerZero — **Implemented** (CrossChainRouter deployed as LayerZero V2 OApp)
 - **Phase 3:** Privacy coin atomic swaps (Monero, Zcash)
 
 ## The Ask
@@ -3950,7 +3950,7 @@ The VolatilityOracle monitors realized volatility using a rolling window of pric
 ```
 Total Dynamic Fee
       ↓
-  ├── Base portion (0.05%) → Standard LP/Treasury split
+  ├── Base portion (0.05%) → 100% to LP pool reserves
   └── Excess portion → Volatility Insurance Pool
 ```
 
@@ -7302,7 +7302,7 @@ The VolatilityOracle monitors realized volatility using a rolling window of pric
 ```
 Total Dynamic Fee
       ↓
-  ├── Base portion (0.05%) → Standard LP/Treasury split
+  ├── Base portion (0.05%) → 100% to LP pool reserves
   └── Excess portion → Volatility Insurance Pool
 ```
 

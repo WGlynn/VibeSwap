@@ -575,7 +575,7 @@ VSOS employs five independent security layers:
     Automatic trip — no governance delay required.
 
   Layer 4: Rate Limiting
-    1M tokens per hour per user.
+    100K tokens per hour per user.
     Prevents single-actor drain scenarios.
 
   Layer 5: Extension Sandboxing

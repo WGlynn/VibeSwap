@@ -50,4 +50,4 @@
 - **Research papers**: https://github.com/WGlynn/VibeSwap/tree/master/docs/papers
 
 ## The One-Liner (use everywhere)
-"One human + Claude Code built a complete DeFi operating system — 130 contracts, 3000 tests, autonomous AI agent, $0 funding. Machines of Loving Grace isn't an essay. It's our build log."
+"One human + Claude Code built a complete DeFi operating system — 351 contracts, 5,800+ tests, autonomous AI agent, $0 funding. Machines of Loving Grace isn't an essay. It's our build log."

@@ -189,7 +189,7 @@ VibeAMM.growOracleCardinality(poolId, 100); // More history
 **Files:** `SecurityLib.sol`, `VibeSwapCore.sol`
 
 **Measures:**
-- Per-user hourly swap limits (default 1M tokens)
+- Per-user hourly swap limits (default 100K tokens)
 - Commit cooldown (1 second minimum)
 - Blacklist for known exploit contracts
 

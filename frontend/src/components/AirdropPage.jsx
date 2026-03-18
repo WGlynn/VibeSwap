@@ -150,8 +150,8 @@ function AirdropPage() {
   return (
     <div className="min-h-screen">
       <PageHero
-        title="Airdrop"
-        subtitle="Claim your VIBE tokens for contributing to the VibeSwap ecosystem."
+        title="Contribution Claims"
+        subtitle="Claim VIBE tokens earned through demonstrated contribution to the VibeSwap ecosystem. VIBE is never airdropped — it is minted exclusively through verified on-chain participation."
         category="community"
         badge={SEASON.name}
         badgeColor={CYAN}
@@ -248,7 +248,7 @@ function AirdropPage() {
               </div>
               <h2 className="text-xl font-bold text-white mb-2">Connect Your Wallet</h2>
               <p className="text-sm text-black-400 mb-6 max-w-md mx-auto">
-                Connect your wallet to check if you are eligible for the Season 1 VIBE airdrop.
+                Connect your wallet to check if you are eligible for the Season 1 VIBE contribution claim.
               </p>
               <motion.button
                 onClick={connect}
@@ -659,8 +659,9 @@ function AirdropPage() {
           className="text-center"
         >
           <p className="text-[10px] text-black-500 font-mono max-w-md mx-auto">
-            Airdrop allocations are determined by on-chain activity snapshots. Unclaimed tokens after the
-            deadline are returned to the DAO treasury. No purchase necessary.
+            Contribution claim allocations are determined by on-chain activity snapshots. VIBE is minted exclusively
+            through demonstrated contribution — never airdropped. Unclaimed tokens after the deadline are returned
+            to the DAO treasury. No purchase necessary.
           </p>
         </motion.div>
 

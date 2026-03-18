@@ -6,4 +6,4 @@ Financial: Options, Bonds, Credit, Synths, Insurance, Streams
 Governance: QuadraticVoting, ConvictionVoting, DAOTreasury
 Identity: SoulboundIdentity, ContributionDAG, ReputationOracle
 
-121 contracts. Not a fork of anything. Written from scratch.
+351 contracts. Not a fork of anything. Written from scratch.

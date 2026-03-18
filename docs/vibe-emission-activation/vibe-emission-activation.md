@@ -131,7 +131,6 @@ If both CRPC and handshake fail:
 | Contributor | Platform | Identity Anchor | Status |
 |-------------|----------|----------------|--------|
 | Freedom (freedomwarrior13) | GitHub/TG | github:freedomwarrior13 | Placeholder |
-| tbhxnest | GitHub/TG | github:tbhxnest | Placeholder |
 | Matt | GitHub/TG | TBD | Placeholder |
 | Community contributors | Various | Per-platform ID | Placeholder |
 
@@ -170,7 +169,7 @@ Retroactive amounts computed via Shapley game (FEE_DISTRIBUTION type, time-neutr
 - [ ] Set Will's wallet as founder in ContributionDAG
 - [ ] Register JARVIS in AgentRegistry
 - [ ] Start recording contributions to RewardLedger
-- [ ] Create placeholder accounts for Freedom, tbhxnest, Matt
+- [ ] Create placeholder accounts for Freedom, Matt
 - [ ] First `drip()` call — emissions begin
 
 ### This Week

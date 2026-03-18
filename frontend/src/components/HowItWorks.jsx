@@ -216,7 +216,7 @@ function HowItWorks() {
     { icon: 'S', title: 'Anti-MEV', description: 'Commit-reveal eliminates front-running, back-running, and sandwich attacks by hiding order details until all commits are in.', color: GREEN },
     { icon: 'F', title: 'Flash Loan Shield', description: 'EOA-only commits prevent flash loan exploits. Smart contracts cannot participate in the commit phase.', color: CYAN },
     { icon: 'P', title: 'TWAP Validation', description: 'Oracle validates prices within 5% of time-weighted average. Manipulation attempts trigger circuit breakers.', color: AMBER },
-    { icon: 'R', title: 'Rate Limiting', description: '1M tokens per hour per user. Prevents whale manipulation while keeping the system accessible to all traders.', color: PURPLE },
+    { icon: 'R', title: 'Rate Limiting', description: '100K tokens per hour per user. Prevents whale manipulation while keeping the system accessible to all traders.', color: PURPLE },
   ]
 
   const faqs = [
@@ -390,7 +390,7 @@ function HowItWorks() {
 
       {/* Footer */}
       <div className="mt-8 text-center text-[10px] text-gray-600 font-mono">
-        Mechanism design by Will Glynn -- Contracts audited and formally verified
+        Mechanism design by Will Glynn -- Contracts tested with 15,155+ automated tests and comprehensive exploit analysis (24/29 findings dissolved)
       </div>
     </div>
   )

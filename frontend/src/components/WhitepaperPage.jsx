@@ -718,7 +718,7 @@ where:
 
                 <SubHeading>9.3 Rate Limiting</SubHeading>
                 <Paragraph>
-                  Individual accounts are rate-limited to 1M tokens per hour per trading pair. This prevents
+                  Individual accounts are rate-limited to 100K tokens per hour per trading pair. This prevents
                   whale manipulation and ensures that no single actor can dominate a batch. Rate limits
                   apply to both commits and withdrawals, with separate counters for each.
                 </Paragraph>

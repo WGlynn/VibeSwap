@@ -1,4 +1,4 @@
-Every protocol fee on VibeSwap flows through VibeRevShare.
+Every priority bid on VibeSwap flows through VibeRevShare.
 
 LPs get their cut. Token holders get their cut. Contributors get their cut.
 

@@ -74,7 +74,7 @@ const RELEASES = [
       { type: 'fixed', text: 'TWAP oracle deviation calculation edge case when price feeds lag >30 seconds' },
       { type: 'fixed', text: 'Rate limiter not resetting correctly at hour boundaries for cross-chain transfers' },
       { type: 'security', text: 'Added 5% maximum TWAP deviation validation for all oracle-dependent operations' },
-      { type: 'security', text: 'Rate limiting enforced at 1M tokens/hour/user across all supported chains' },
+      { type: 'security', text: 'Rate limiting enforced at 100K tokens/hour/user across all supported chains' },
     ],
   },
   {

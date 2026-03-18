@@ -5,14 +5,14 @@
 VibeSwap
 
 ## What does your company do?
-VibeSwap is an omnichain DEX and AI coordination protocol built entirely with Claude Code. We eliminate MEV through commit-reveal batch auctions, distribute rewards via Shapley game theory, and run JARVIS — an autonomous AI agent powered by Claude with its own on-chain identity, compute budget, and 3-node BFT network on Fly.io. 130 Solidity contracts, 3000+ tests, 51 frontend components, 23 research papers. Zero funding. One human + Claude.
+VibeSwap is an omnichain DEX and AI coordination protocol built entirely with Claude Code. We eliminate MEV through commit-reveal batch auctions, distribute rewards via Shapley game theory, and run JARVIS — an autonomous AI agent powered by Claude with its own on-chain identity, compute budget, and 3-node BFT network on Fly.io. 351 Solidity contracts, 5,800+ tests, 336 frontend components, 44 research papers. Zero funding. One human + Claude.
 
 ## How do you use Claude today?
 Claude is the entire development stack:
 - Claude Code CLI built every smart contract, test, frontend component, and research paper across 45+ pair-programming sessions
 - JARVIS (our autonomous AI agent) runs on Claude's API — inference, knowledge chain, inner dialogue, Telegram bot, web chat
 - Claude powers the 3-node BFT consensus network for AI coordination (CRPC protocol)
-- All 23 research papers on mechanism design, game theory, and AI coordination were co-authored with Claude
+- All 44 research papers on mechanism design, game theory, and AI coordination were co-authored with Claude
 - The CKB/Nervos Layer 1 integration (15 Rust crates, 190 tests) was built with Claude
 
 ## How would you like to work with Anthropic?

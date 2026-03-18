@@ -42,7 +42,7 @@ contract VibeLPTest is Test {
         assertEq(lp.token0(), token0);
         assertEq(lp.token1(), token1);
         assertEq(lp.owner(), ammOwner);
-        assertEq(lp.MINIMUM_LIQUIDITY(), 1000);
+        assertEq(lp.MINIMUM_LIQUIDITY(), 10000);
         assertFalse(lp.minimumLiquidityLocked());
     }
 
@@ -73,28 +73,28 @@ contract VibeLPTest is Test {
     // ============ First Mint (Minimum Liquidity Lock) ============
 
     function test_firstMint_locksMinimumLiquidity() public {
-        uint256 amount = 10_000;
+        uint256 amount = 20_000;
 
         lp.mint(user1, amount);
 
         assertTrue(lp.minimumLiquidityLocked());
-        // Dead address gets MINIMUM_LIQUIDITY
-        assertEq(lp.balanceOf(address(0xdead)), 1000);
+        // Dead address gets MINIMUM_LIQUIDITY (10000)
+        assertEq(lp.balanceOf(address(0xdead)), 10000);
         // User gets amount - MINIMUM_LIQUIDITY
-        assertEq(lp.balanceOf(user1), amount - 1000);
+        assertEq(lp.balanceOf(user1), amount - 10000);
         // Total supply = amount
         assertEq(lp.totalSupply(), amount);
     }
 
     function test_firstMint_insufficientInitialLiquidity() public {
         vm.expectRevert("Insufficient initial liquidity");
-        lp.mint(user1, 1000); // Exactly MINIMUM_LIQUIDITY, not enough
+        lp.mint(user1, 10000); // Exactly MINIMUM_LIQUIDITY, not enough
     }
 
     function test_firstMint_barelyAboveMinimum() public {
-        lp.mint(user1, 1001);
+        lp.mint(user1, 10001);
         assertEq(lp.balanceOf(user1), 1);
-        assertEq(lp.balanceOf(address(0xdead)), 1000);
+        assertEq(lp.balanceOf(address(0xdead)), 10000);
     }
 
     // ============ Subsequent Mints ============
@@ -124,10 +124,10 @@ contract VibeLPTest is Test {
     }
 
     function test_burn_partial() public {
-        lp.mint(user1, 10_000);
+        lp.mint(user1, 20_000);
 
         lp.burn(user1, 1000);
-        assertEq(lp.balanceOf(user1), 10_000 - 1000 - 1000); // Minus MINIMUM_LIQUIDITY and burned
+        assertEq(lp.balanceOf(user1), 20_000 - 10000 - 1000); // Minus MINIMUM_LIQUIDITY (10000) and burned (1000)
     }
 
     function test_burn_onlyOwner() public {

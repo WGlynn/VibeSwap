@@ -13,7 +13,7 @@ VibeSwap: MEV-Eliminating Omnichain DEX via Commit-Reveal Batch Auctions
 
 ## The Pitch: $0 to $100K
 
-We built an entire MEV-eliminating omnichain DEX — 342 smart contracts, 371 test files, 401 frontend components, 55 research papers, and a live deployment on Base mainnet — with literally zero dollars. No VC funding. No pre-mine. No team allocation. No grants. Just a mechanism designer, an AI engineering partner, and the conviction that MEV is a solvable problem.
+We built an entire MEV-eliminating omnichain DEX — 351 smart contracts, 374 test files, 336 frontend components, 44 research papers, and a live deployment on Base mainnet — with literally zero dollars. No VC funding. No pre-mine. No team allocation. No grants. Just a mechanism designer, an AI engineering partner, and the conviction that MEV is a solvable problem.
 
 **Here's what we built with $0. Now imagine what we'd build with $100K.**
 
@@ -27,12 +27,12 @@ This is not a pitch deck for something we plan to build. This is what already ex
 
 | Metric | Count |
 |---|---|
-| Smart contracts (Solidity 0.8.20) | 342 |
-| Test files (unit, fuzz, invariant) | 371 |
-| Frontend components (React 18) | 401 |
+| Smart contracts (Solidity 0.8.20) | 351 |
+| Test files (unit, fuzz, invariant) | 374 |
+| Frontend components (React 18) | 336 |
 | Lines of contract code | ~99,000 |
 | Lines of test code | ~124,000 |
-| Research papers | 55 |
+| Research papers | 44 |
 | Deployment scripts | 12 |
 | Oracle modules (Python) | 53 |
 | Funding received | $0 |
@@ -142,7 +142,7 @@ The mechanism works. Now we prove it formally and put it in front of the researc
 
 ### Milestone 2: Professional Security Audit (Months 3-6) — $40,000
 
-342 contracts with 124,000 lines of tests deserve a professional audit to prove what we already believe: this system is sound.
+351 contracts with 124,000 lines of tests deserve a professional audit to prove what we already believe: this system is sound.
 
 - Professional security audit of core contracts by a top-tier firm
 - Gas optimization of batch settlement (reduce per-trade costs)
@@ -177,7 +177,7 @@ VibeSwap is designed omnichain from day one. LayerZero V2 integration is already
 | Category | Amount | What It Accelerates |
 |---|---|---|
 | Research & Publication | $15,000 | Formal proofs of MEV elimination properties we've already demonstrated in code |
-| Security Audit | $40,000 | Professional validation of 342 contracts and 124K lines of tests already written |
+| Security Audit | $40,000 | Professional validation of 351 contracts and 124K lines of tests already written |
 | SDK & Open Source Tooling | $20,000 | Extracting our working implementation into a public good any DEX can use |
 | Infrastructure & Deployment | $15,000 | Multi-chain deployment of an architecture already built for omnichain operation |
 | Operational | $10,000 | Legal, accounting, travel for presenting research at Ethereum conferences |
@@ -190,7 +190,7 @@ This is not a budget for building something. It is a budget for validating, hard
 ## 5. Team
 
 ### Faraday1 — Founder & Mechanism Designer
-- Solo architect of VibeSwap's 342 contract system, 401 frontend components, and 55 research papers
+- Solo architect of VibeSwap's 351 contract system, 336 frontend components, and 44 research papers
 - Author of original mechanism design papers on cooperative capitalism, Shapley reward systems, and trinomial stability
 - Designed the commit-reveal batch auction system from first principles — no forks, no templates
 - Published wallet security research (2018) predating VibeSwap

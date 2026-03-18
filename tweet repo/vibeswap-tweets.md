@@ -34,9 +34,9 @@ Fair price? Guaranteed.
 ## Tweet 3 — The Cave
 VibeSwap stats:
 
-- 121 smart contracts
-- 1,700+ tests
-- 51 frontend components
+- 351 smart contracts
+- 5,800+ tests
+- 336 frontend components
 - 0 VC dollars
 
 Built by one founder and an AI co-developer.
@@ -234,7 +234,7 @@ One protocol. Every chain. Zero extraction.
 ## Tweet 20 — CTA / Manifesto
 We didn't raise a round. We didn't hire a team of 50. We didn't ask permission.
 
-We wrote 121 contracts. 1,700 tests. A stability theorem. A fairness floor named after an actress who embodies what we believe in.
+We wrote 351 contracts. 5,800 tests. A stability theorem. A fairness floor named after an actress who embodies what we believe in.
 
 VibeSwap is open source. Go-live 2026.
 

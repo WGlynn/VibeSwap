@@ -130,7 +130,7 @@ const FEATURES = [
 const FEE_CATEGORIES = [
   {
     name: 'Swap Fee',
-    vibeswap: '0.20%',
+    vibeswap: '0.05%',
     uniswap: '0.30%',
     curve: '0.04%',
     '1inch': '0%*',

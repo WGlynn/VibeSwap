@@ -1,7 +1,7 @@
 // ============ VIBE Token Economics ============
 //
 // 21,000,000 VIBE — fixed supply, never changes.
-// 4-year halvings like Bitcoin, with a twist:
+// annual halvings (52,560 games per era ~ 1 year), with a twist:
 //
 // THE TWIST: Emissions accumulate in a POOL (the "Resonance Pool")
 // like a lottery pot. VIBE doesn't drip — it BUILDS UP until someone
@@ -37,14 +37,14 @@
 
 // ============ Constants ============
 export const TOTAL_SUPPLY = 21_000_000
-export const HALVING_INTERVAL_DAYS = 365.25 * 4 // 4 years in days
-export const INITIAL_DAILY_EMISSION = 14.38356164 // ~21M / (4 * 365.25 * sum_of_halving_series)
-// Sum of geometric series: 1 + 0.5 + 0.25 + ... ≈ 2, so ~21M / (2 * 4 * 365.25) ≈ 7.19
-// But we want 50% emitted in first 4 years = 10.5M / (4*365.25) ≈ 7191.78/day...
+export const HALVING_INTERVAL_DAYS = 365.25 // annual halvings (1 year in days)
+export const INITIAL_DAILY_EMISSION = 14.38356164 // ~21M / (365.25 * sum_of_halving_series)
+// Sum of geometric series: 1 + 0.5 + 0.25 + ... ≈ 2, so ~21M / (2 * 365.25) ≈ 28.75
+// But we want 50% emitted in first year = 10.5M / 365.25 ≈ 28,747.43/day...
 // Let's be precise:
 
-// First era: 50% = 10,500,000 over 1461 days = 7,187.54 VIBE/day
-// Second era: 25% = 5,250,000 over 1461 days = 3,593.77 VIBE/day
+// First era: 50% = 10,500,000 over 365.25 days = 28,747.43 VIBE/day
+// Second era: 25% = 5,250,000 over 365.25 days = 14,373.72 VIBE/day
 // Third era: 12.5%, etc.
 export const ERAS = []
 let remaining = TOTAL_SUPPLY

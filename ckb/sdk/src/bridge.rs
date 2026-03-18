@@ -31,8 +31,8 @@ pub const MAX_CHAINS: usize = 32;
 /// Minimum finality blocks required for a chain config to be valid
 pub const MIN_FINALITY_BLOCKS: u64 = 10;
 
-/// Default bridge fee rate in basis points (0.3%)
-pub const DEFAULT_FEE_RATE_BPS: u16 = 30;
+/// Zero bridge fees — VibeSwap never extracts from cross-chain transfers
+pub const DEFAULT_FEE_RATE_BPS: u16 = 0;
 
 /// Message expiry in blocks (~5.5 hours at CKB speed)
 pub const MESSAGE_EXPIRY_BLOCKS: u64 = 100_000;

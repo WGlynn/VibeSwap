@@ -1442,7 +1442,7 @@ mod tests {
     fn test_optimal_deposit_initial_tiny_amounts_insufficient() {
         // Initial deposit where sqrt(a0 * a1) <= MINIMUM_LIQUIDITY → InsufficientLiquidity
         let empty = make_pool(0, 0, 0, 30);
-        // sqrt(100 * 1) = 10 which is < MINIMUM_LIQUIDITY (1000), so lp saturates to 0
+        // sqrt(100 * 1) = 10 which is < MINIMUM_LIQUIDITY (10000), so lp saturates to 0
         let err = optimal_deposit(100, 1, &empty).unwrap_err();
         assert_eq!(err, LiquidityError::InsufficientLiquidity);
     }
@@ -1837,7 +1837,7 @@ mod tests {
         // Burning enough to go below minimum_liquidity should flag below_minimum
         let pool = make_pool(10_000, 10_000, 2000, 30);
         let est = estimate_withdrawal(1500, &pool).unwrap();
-        // remaining = 2000 - 1500 = 500 < MINIMUM_LIQUIDITY (1000)
+        // remaining = 2000 - 1500 = 500 < MINIMUM_LIQUIDITY (10000)
         assert!(est.below_minimum, "500 remaining LP < MINIMUM_LIQUIDITY should flag below_minimum");
     }
 

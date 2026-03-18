@@ -43,6 +43,7 @@ contract VibeBridge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
         uint256 lastResetTime;
         uint256 minAmount;
         uint256 maxAmount;
+        // Zero protocol fee on bridges — VibeSwap never extracts
         uint256 feeBps;
         bool active;
     }
@@ -120,6 +121,7 @@ contract VibeBridge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
     ) external onlyOwner returns (bytes32) {
         bytes32 routeId = keccak256(abi.encodePacked(srcChainId, dstChainId, srcToken, dstToken));
 
+        // Zero protocol fee on bridges — VibeSwap never extracts
         routes[routeId] = BridgeRoute({
             srcChainId: srcChainId,
             dstChainId: dstChainId,
@@ -130,7 +132,7 @@ contract VibeBridge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
             lastResetTime: block.timestamp,
             minAmount: minAmount,
             maxAmount: maxAmount,
-            feeBps: feeBps,
+            feeBps: 0,
             active: true
         });
 

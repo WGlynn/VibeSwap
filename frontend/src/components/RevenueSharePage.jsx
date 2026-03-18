@@ -28,7 +28,7 @@ const DISTRIBUTION_SPLITS = [
 // ============ Fee Sources ============
 const FEE_SOURCES = [
   { label: 'Priority Bids', daily: 12_840, pct: 52, color: CYAN },
-  { label: 'Bridge Fees', daily: 5_910, pct: 24, color: '#34d399' },
+  { label: 'Penalty Redistributions', daily: 5_910, pct: 24, color: '#34d399' },
   { label: 'Liquidation Fees', daily: 3_690, pct: 15, color: '#f59e0b' },
   { label: 'Auction Proceeds', daily: 2_214, pct: 9, color: '#a78bfa' },
 ]
@@ -384,7 +384,7 @@ export default function RevenueSharePage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'From Swaps', amount: YOUR_EARNINGS.pendingClaim * 0.52, pct: 52, color: CYAN },
-              { label: 'From Bridges', amount: YOUR_EARNINGS.pendingClaim * 0.24, pct: 24, color: '#34d399' },
+              { label: 'From Penalties', amount: YOUR_EARNINGS.pendingClaim * 0.24, pct: 24, color: '#34d399' },
               { label: 'From Liquidations', amount: YOUR_EARNINGS.pendingClaim * 0.15, pct: 15, color: '#f59e0b' },
               { label: 'From Priority', amount: YOUR_EARNINGS.pendingClaim * 0.09, pct: 9, color: '#a78bfa' },
             ].map((source, i) => (

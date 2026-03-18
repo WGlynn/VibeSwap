@@ -120,7 +120,7 @@ The subsidy provider absorbs the cost. JUL burns are a **demand signal** — the
 Cost to provider: $Pool_{effective} \times c_{api}$
 
 **Phase 2 — Revenue-Backed (Near-term):**
-Protocol revenue (priority bid revenue, bridge revenue, etc.) flows into a treasury that purchases API credits. JUL burns draw from this treasury.
+Protocol revenue (priority bid revenue, penalty redistributions, etc.) flows into a treasury that purchases API credits. JUL burns draw from this treasury.
 
 $$Treasury_{daily} = \sum fees_i - \sum costs_j$$
 

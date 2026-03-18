@@ -48,7 +48,7 @@ For the complete philosophical framework and welfare proofs, see `COOPERATIVE_MA
 
 ## 2. Shapley Value Axioms
 
-The Shapley value φ is the unique allocation satisfying four axioms:
+The Shapley value φ is the unique allocation satisfying five axioms:
 
 ### 2.1 Efficiency Axiom
 
@@ -73,13 +73,19 @@ $$\forall S \subseteq N \setminus \{i,j\}: v(S \cup \{i\}) = v(S \cup \{j\}) \Ri
 
 $$\forall S \subseteq N \setminus \{i\}: v(S \cup \{i\}) = v(S) \Rightarrow \phi_i(v) = 0$$
 
-### 2.4 Additivity Axiom
+### 2.4 Pairwise Proportionality Axiom
 
-**Definition**: The Shapley value of a combined game equals the sum of individual Shapley values.
+**Definition**: The reward ratio between any two players equals their contribution ratio.
 
-$$\phi_i(v + w) = \phi_i(v) + \phi_i(w)$$
+$$\frac{\phi_i(v)}{\phi_j(v)} = \frac{c_i}{c_j} \quad \forall i,j \in N \text{ where } c_j > 0$$
 
-### 2.5 True Shapley Value Formula
+### 2.5 Time Neutrality Axiom
+
+**Definition**: Identical contributions yield identical rewards regardless of when they occur.
+
+$$c_i^{(t_1)} = c_i^{(t_2)} \Rightarrow \phi_i^{(t_1)}(v) = \phi_i^{(t_2)}(v) \quad \forall t_1, t_2$$
+
+### 2.6 True Shapley Value Formula
 
 $$\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!(|N|-|S|-1)!}{|N|!} [v(S \cup \{i\}) - v(S)]$$
 

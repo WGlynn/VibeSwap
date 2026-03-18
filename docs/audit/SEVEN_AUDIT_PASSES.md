@@ -168,7 +168,7 @@ Equally important — what held up under scrutiny:
 - **AMM core math** — constant product invariant, fee accounting, LP share calculations all verified through fuzz testing and formal invariant checks.
 - **Commit-reveal mechanism** — hash hiding, slash accounting, priority bid ordering all battle-tested with adversarial tests.
 - **TWAP oracle** — deviation checks, flash loan protection, same-block interaction blocks all functioning correctly.
-- **Shapley distribution** — game theory axioms (efficiency, symmetry, null player, additivity) all formally verified.
+- **Shapley distribution** — game theory axioms (efficiency, symmetry, null player, pairwise proportionality, time neutrality) all tested with fuzz and invariant testing.
 - **DeterministicShuffle** — production code correctly uses `generateSeedSecure()` with block entropy, not the simplified `generateSeed()`.
 
 ---

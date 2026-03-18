@@ -39,7 +39,7 @@ const ASSETS = [
 
 const REVENUE = [
   { name: 'Priority Bid Revenue', monthly: 187_500, pct: 60.0, color: CYAN, trend: '+12%' },
-  { name: 'Bridge Fees', monthly: 78_125, pct: 25.0, color: '#a78bfa', trend: '+31%' },
+  { name: 'Penalty Redistributions', monthly: 78_125, pct: 25.0, color: '#a78bfa', trend: '+31%' },
   { name: 'Premium Features', monthly: 46_875, pct: 15.0, color: '#34d399', trend: '+8%' },
 ]
 
@@ -52,7 +52,7 @@ const EXPENSES = [
 
 const TRANSACTIONS = (() => {
   const r = seededRandom(1616)
-  const inflowDescs = ['Priority bid revenue — weekly', 'Bridge fee collection — LayerZero', 'Premium subscription batch', 'LP yield harvest — ETH/USDC', 'Auction proceeds — batch settlement']
+  const inflowDescs = ['Priority bid revenue — weekly', 'Penalty redistribution — slashing', 'Premium subscription batch', 'LP yield harvest — ETH/USDC', 'Auction proceeds — batch settlement']
   const outflowDescs = ['Developer salaries — monthly', 'Audit payment — Trail of Bits', 'Community grant — Memehunter', 'Marketing campaign — Q1', 'Infrastructure — RPC nodes', 'Bug bounty payout']
   const txs = []
   for (let i = 0; i < 10; i++) {

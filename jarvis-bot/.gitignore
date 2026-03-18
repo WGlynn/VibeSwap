@@ -4,3 +4,8 @@ data/
 data/.master-key
 .vercel
 dist/
+
+# SSH keys — never commit
+*.pem
+key.pem
+cert.pem

@@ -218,7 +218,7 @@ Zero violations found across all invariant runs. Clean session.
 3. **22 contracts have ZERO tests** — most are Phase 1 infra (identity, compliance, quantum)
 4. **Protocol/Framework: 8/10 done** — missing Intent Routing + POL
 5. **Mechanism Design + DeFi/DeFAI: 0/20** — all pending
-6. **Frontend: 51 components** — GE redesign partially started
+6. **Frontend: 336 components, 70 hooks, 147 pages** — GE redesign partially started
 
 ### Patterns confirmed
 1. **Pluggable curve architecture** — stateless math contracts + factory state storage. IPoolCurve → ConstantProductCurve / StableSwapCurve. Extensible to concentrated, weighted, etc.

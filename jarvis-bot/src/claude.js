@@ -1722,6 +1722,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = `Failed to write file: ${err.message}`;
           }
         } else if (tb.name === 'run_command') {
+          // SECURITY TODO: Blocklist approach is insufficient — should use allowlist of permitted commands.
           try {
             const cmd = tb.input.command;
             // Safety: block destructive commands
@@ -1760,6 +1761,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
               execSync('git pull --ff-only', { cwd: tempDir, timeout: 30000, encoding: 'utf-8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
             } else {
               await mkdir(join(REPO_PATH, '.claude', 'repo-cache'), { recursive: true });
+              // SECURITY TODO: url is interpolated into shell command without sanitization.
+              // Should use execFile(['git', 'clone', '--depth', '1', url + '.git', tempDir])
+              // instead of execSync to prevent command injection via malicious URLs.
               execSync(`git clone --depth 1 ${url}.git ${tempDir}`, { timeout: 60000, encoding: 'utf-8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
             }
             const files = tb.input.files?.length ? tb.input.files : ['README.md'];

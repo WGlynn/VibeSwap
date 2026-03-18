@@ -1,4 +1,4 @@
-# x402 Just Got Sessions. We Already Shipped It.
+#  x402 Just Got Sessions. We Already Shipped It.
 
 *Nervos Talks Post — Faraday1*
 *March 2026*
@@ -17,12 +17,12 @@ x402 V1 was elegant: slap a 402 on any HTTP endpoint, client pays, server respon
 
 But that model has a ceiling:
 
-| Use Case | Calls Per Session | V1 Payment Overhead | Real-World Viable? |
-|---|---|---|---|
-| Single API call | 1 | 1-2s | Yes |
-| LLM inference session | 50+ tool calls | 50-100s accumulated | No |
-| Paywalled webpage | 30 sub-requests | 30-60s | No |
-| AI agent workflow | 100+ hops | 100-200s | No |
+| Use Case              | Calls Per Session | V1 Payment Overhead | Real-World Viable? |
+| --------------------- | ----------------- | ------------------- | ------------------ |
+| Single API call       | 1                 | 1-2s                | Yes                |
+| LLM inference session | 50+ tool calls    | 50-100s accumulated | No                 |
+| Paywalled webpage     | 30 sub-requests   | 30-60s              | No                 |
+| AI agent workflow     | 100+ hops         | 100-200s            | No                 |
 
 An AI agent making 50 tool calls shouldn't spend more time paying than thinking. A webpage loading 30 assets shouldn't require 30 separate payments. The protocol understood "pay for this request" but couldn't express "pay for access."
 
@@ -115,11 +115,13 @@ Step 5: All subsequent requests:
 This is where it gets interesting. We run a multi-shard AI system called Pantheon — multiple Jarvis instances that operate autonomously across Telegram, web, and internal workflows.
 
 Before SIWX:
+
 ```
 Shard boots → needs API access → pays per call → 50 tool calls × 1-2s payment = 50-100s overhead
 ```
 
 After SIWX:
+
 ```
 Shard boots → pays once → SIWX session → 50 tool calls × ~0ms payment = ~0s overhead
 ```
@@ -167,6 +169,7 @@ SessionCell {
 ```
 
 The type script validates:
+
 - Signature matches the wallet in the cell data
 - Session hasn't expired
 - Tier is sufficient for the requested resource
@@ -230,3 +233,5 @@ That's not x402 anymore. That's a new economic primitive. And it's only possible
 ---
 
 *VibeSwap — 1,845+ commits, 351 contracts, 15,155 CKB tests, $0 funding. Built in a cave. Shipped same day.*
+
+

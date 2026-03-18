@@ -9,7 +9,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 
 **Philosophy:** Cooperative Capitalism — mutualized risk (insurance, treasury stabilization) + free market competition (priority auctions, arbitrage).
 
-**Codebase:** 122 Solidity contracts | 136 test files | 1200+ tests passing | 51 frontend components | 14 hooks | 5 deploy scripts
+**Codebase:** 351 Solidity contracts | 374 test files | 5,800+ tests passing | 336 frontend components | 70 hooks | 5 deploy scripts
 
 ---
 
@@ -158,7 +158,7 @@ subtitle: "Feb 2026 | Go-Live Sprint"
 
 ---
 
-## Frontend (51 Components)
+## Frontend (336 Components)
 
 ### Core Pages
 - **SwapPage / SwapCore** — Token swap interface

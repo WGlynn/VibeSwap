@@ -1,8 +1,8 @@
 VibeSwap stats:
 
-- 121 smart contracts
-- 1,700+ tests
-- 51 frontend components
+- 351 smart contracts
+- 5,800+ tests
+- 336 frontend components
 - 0 VC dollars
 
 Built by one founder and an AI co-developer.

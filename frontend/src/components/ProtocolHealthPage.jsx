@@ -52,7 +52,7 @@ const SAFETY_SYSTEMS = [
     description: 'Per-address and global throughput limits',
     metrics: [
       { label: 'Global Usage', value: '23.4%', status: 'ok' },
-      { label: 'Per-User Limit', value: '1M tokens/hr', status: 'ok' },
+      { label: 'Per-User Limit', value: '100K tokens/hr', status: 'ok' },
       { label: 'Pool Rate Cap', value: '10% TVL/hr', status: 'ok' },
       { label: 'Cooldown Active', value: '0 users', status: 'ok' },
     ] },

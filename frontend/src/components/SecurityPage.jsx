@@ -50,9 +50,9 @@ const SECURITY_LAYERS = [
   },
   {
     id: 'rate-limit', name: 'Rate Limiting', color: '#a855f7', status: 'active',
-    summary: '1M tokens per hour per user prevents whale manipulation.',
+    summary: '100K tokens per hour per user prevents whale manipulation.',
     details: [
-      'Per-address rate limits: 1,000,000 tokens/hour across all pairs',
+      'Per-address rate limits: 100,000 tokens/hour across all pairs',
       'Global pool rate limits: 10% of TVL per hour max throughput',
       'Graduated limits — new addresses start at 10% of max, scaling over 30 days',
       'Rate limit resets are time-weighted, not hard boundaries',

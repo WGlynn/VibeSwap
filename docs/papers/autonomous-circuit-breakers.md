@@ -336,7 +336,7 @@ The commit phase of the batch auction enforces `tx.origin == msg.sender`, restri
 
 ### 4.3 Rate Limiting
 
-Per-user rate limits of 1,000,000 tokens per hour prevent gradual drainage attacks that stay under the volume breaker threshold. An attacker attempting to extract value through many small trades hits the rate limit before accumulating meaningful profit.
+Per-user rate limits of 100,000 tokens per hour prevent gradual drainage attacks that stay under the volume breaker threshold. An attacker attempting to extract value through many small trades hits the rate limit before accumulating meaningful profit.
 
 ### 4.4 Invalid Reveal Slashing
 

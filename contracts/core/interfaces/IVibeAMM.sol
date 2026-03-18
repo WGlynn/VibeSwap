@@ -14,7 +14,7 @@ interface IVibeAMM {
         uint256 reserve0;
         uint256 reserve1;
         uint256 totalLiquidity;
-        uint256 feeRate; // In basis points (e.g., 30 = 0.3%)
+        uint256 feeRate; // In basis points (e.g., 5 = 0.05% (default))
         bool initialized;
     }
 

@@ -6,7 +6,7 @@
 Mechanism Design, Game Theory, and AI Coordination in Decentralized Financial Systems
 
 ## Project Description
-VibeSwap is both a deployed protocol and an active research project producing novel contributions at the intersection of game theory, cryptography, and AI coordination. We've published 23 research papers covering:
+VibeSwap is both a deployed protocol and an active research project producing novel contributions at the intersection of game theory, cryptography, and AI coordination. We've published 44 research papers covering:
 
 - **Shapley Value Distribution in DeFi** — Fair attribution using cooperative game theory for both human and AI contributors
 - **Commit-Reveal Batch Auctions** — MEV elimination through cryptographic commitment schemes with uniform clearing prices
@@ -26,7 +26,7 @@ VibeSwap is both a deployed protocol and an active research project producing no
   - Multi-agent experiments (multiple Claude-powered agents in adversarial/cooperative scenarios)
 
 ## Impact
-23 papers already published. 71 knowledge primitives extracted. All open source. API credits directly translate to more research output — every inference JARVIS makes is a data point in the study of bounded AI autonomy under real economic constraints.
+44 papers already published. 71 knowledge primitives extracted. All open source. API credits directly translate to more research output — every inference JARVIS makes is a data point in the study of bounded AI autonomy under real economic constraints.
 
 ## Publications
 All papers: https://github.com/WGlynn/VibeSwap/tree/master/docs/papers

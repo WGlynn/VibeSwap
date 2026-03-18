@@ -1042,7 +1042,7 @@ export default function SmartContractPage() {
               <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <p className="text-[10px] font-mono text-black-400 leading-relaxed">
                   <span className="text-white font-bold">Security philosophy:</span> VibeSwap follows defense-in-depth with circuit breakers,
-                  flash loan protection (EOA-only commits), TWAP validation (max 5% deviation), rate limiting (1M tokens/hour/user),
+                  flash loan protection (EOA-only commits), TWAP validation (max 5% deviation), rate limiting (100K tokens/hour/user),
                   and 50% slashing for invalid reveals. All contracts use <span style={{ color: CYAN }}>OpenZeppelin v5.0.1</span> patterns
                   with <span style={{ color: CYAN }}>nonReentrant</span> guards on every state-changing function.
                 </p>

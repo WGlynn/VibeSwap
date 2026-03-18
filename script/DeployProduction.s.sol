@@ -356,7 +356,8 @@ contract DeployProduction is Script {
 
         // Core security
         VibeSwapCore(payable(core)).setRequireEOA(true);
-        VibeSwapCore(payable(core)).setMaxSwapPerHour(1_000_000 * 1e18);
+        // 100K tokens/hour/user — matches contract default and documentation
+        VibeSwapCore(payable(core)).setMaxSwapPerHour(100_000 * 1e18);
         VibeSwapCore(payable(core)).setCommitCooldown(1);
         console.log("  Core: EOA required, rate limiting configured");
     }

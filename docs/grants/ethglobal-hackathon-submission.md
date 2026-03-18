@@ -6,11 +6,11 @@ Here's what we built with literally zero dollars:
 
 | What | How Much |
 |---|---|
-| Solidity contracts | **342** |
-| Test files (unit, fuzz, invariant) | **371** |
-| Frontend components | **401** |
-| Research papers | **55** |
-| Git commits | **1,684+** |
+| Solidity contracts | **351** |
+| Test files (unit, fuzz, invariant) | **374** |
+| Frontend components | **336** |
+| Research papers | **44** |
+| Git commits | **1,837+** |
 | Funding raised | **$0** |
 | Pre-mine | **0** |
 | Team token allocation | **0%** |
@@ -19,7 +19,7 @@ Here's what we built with literally zero dollars:
 
 This is not a hackathon project. This is a production protocol entering your competition.
 
-While most submissions are weekend prototypes stitched together in the final hour, VibeSwap is a fully deployed omnichain DEX with 342 auditable contracts, a complete test suite, a live frontend, cross-chain infrastructure, and a novel mechanism design backed by 55 research papers. You're not looking at a demo. You're looking at a protocol.
+While most submissions are weekend prototypes stitched together in the final hour, VibeSwap is a fully deployed omnichain DEX with 351 auditable contracts, a complete test suite, a live frontend, cross-chain infrastructure, and a novel mechanism design backed by 44 research papers. You're not looking at a demo. You're looking at a protocol.
 
 ---
 
@@ -71,8 +71,8 @@ VibeSwap runs 10-second batch auction cycles that make extraction structurally i
 
 We want to be explicit about what the judges are evaluating here, because this isn't typical.
 
-### The Contract Layer — 342 Solidity Contracts
-Not 342 files of boilerplate. 342 contracts spanning a complete DEX architecture: batch auction engine, constant product AMM, cross-chain router, circuit breakers, Shapley value reward distribution, DAO treasury, treasury stabilization, impermanent loss protection, loyalty rewards, TWAP oracle, and deterministic shuffle library. Every contract has corresponding tests. Every contract compiles. Every contract is deployable.
+### The Contract Layer — 351 Solidity Contracts
+Not 351 files of boilerplate. 351 contracts spanning a complete DEX architecture: batch auction engine, constant product AMM, cross-chain router, circuit breakers, Shapley value reward distribution, DAO treasury, treasury stabilization, impermanent loss protection, loyalty rewards, TWAP oracle, and deterministic shuffle library. Every contract has corresponding tests. Every contract compiles. Every contract is deployable.
 
 ```
 CommitRevealAuction.sol  — Core batch auction engine
@@ -91,19 +91,19 @@ ILProtection.sol          — Impermanent loss insurance for LPs
 LoyaltyRewards.sol        — Time-weighted loyalty incentives
 ```
 
-### The Test Suite — 371 Test Files
+### The Test Suite — 374 Test Files
 Unit tests, fuzz tests, invariant tests. Built on Foundry. This is not "we wrote a few happy path tests." This is production-grade coverage across the entire contract surface.
 
-### The Frontend — 401 Components
-React 18, Vite 5, Tailwind CSS, ethers.js v6. Swap, bridge, pools, governance, analytics, portfolio — 401 components of fully functional UI. Dual wallet support: MetaMask/Coinbase Wallet AND WebAuthn passkeys (your phone's Secure Element, no browser extension needed). Mobile-responsive.
+### The Frontend — 336 Components
+React 18, Vite 5, Tailwind CSS, ethers.js v6. Swap, bridge, pools, governance, analytics, portfolio — 336 components of fully functional UI. Dual wallet support: MetaMask/Coinbase Wallet AND WebAuthn passkeys (your phone's Secure Element, no browser extension needed). Mobile-responsive.
 
 ### The Oracle — Kalman Filter Price Discovery
 Python-based oracle using Kalman filtering for true price discovery, independent of on-chain manipulation. TWAP validation prevents stale or manipulated prices from affecting settlement.
 
-### The Research — 55 Papers
+### The Research — 44 Papers
 Mechanism design papers, whitepapers, game theory analysis, wallet security fundamentals, architecture docs, deployment guides. This protocol is documented like it's going to production — because it is.
 
-### The Commit History — 1,684+ Commits
+### The Commit History — 1,837+ Commits
 Every single one made by 1 founder + 1 AI + 6 contributors. No team. No contractors. No outsourced audits. Just conviction and execution.
 
 ---
@@ -177,7 +177,7 @@ XORed secrets from every participant create a deterministic but unmanipulable ex
 First DEX to use cooperative game theory (Shapley values) for provably fair reward distribution among liquidity providers. Your reward is mathematically proportional to your marginal contribution to the pool — not your share of TVL, not an arbitrary emission schedule.
 
 ### 4. AI Co-Founder Development Model
-JARVIS (Claude-powered) is credited as a co-founder, not a tool. 1,684+ commits of AI-augmented development at production scale. This is what the future of building looks like.
+JARVIS (Claude-powered) is credited as a co-founder, not a tool. 1,837+ commits of AI-augmented development at production scale. This is what the future of building looks like.
 
 ### What Makes This Different from CowSwap / Existing Batch Auction DEXs
 | | CowSwap | VibeSwap |
@@ -193,7 +193,7 @@ JARVIS (Claude-powered) is credited as a co-founder, not a tool. 1,684+ commits 
 ## Team
 
 **Faraday1** — Founder & Mechanism Designer
-Built the entire protocol solo. 342 contracts. 371 test files. 401 frontend components. 55 research papers. 1,684+ commits. $0 raised. Zero external funding, zero pre-mine, zero team token allocation. This is what conviction looks like when you can't raise a round — you ship anyway.
+Built the entire protocol solo. 351 contracts. 374 test files. 336 frontend components. 44 research papers. 1,837+ commits. $0 raised. Zero external funding, zero pre-mine, zero team token allocation. This is what conviction looks like when you can't raise a round — you ship anyway.
 
 **JARVIS** — AI Co-Founder (Claude-powered)
 Full-stack engineering partner across Solidity, React, Python, and Rust. Autonomous community management via Telegram. Not a chatbot, not a copilot — a co-founder with commit access and a credited contribution to every layer of the stack.
@@ -223,7 +223,7 @@ Full-stack engineering partner across Solidity, React, Python, and Rust. Autonom
 ## Prize Categories — Why VibeSwap Wins Each One
 
 ### Best DeFi Project
-You're looking at a complete, deployed, production-grade DEX with 342 contracts that solves DeFi's largest unsolved problem. Not a proof of concept. Not a "we plan to build this." A live protocol with a test suite larger than most hackathon teams' entire codebases. Built on $0.
+You're looking at a complete, deployed, production-grade DEX with 351 contracts that solves DeFi's largest unsolved problem. Not a proof of concept. Not a "we plan to build this." A live protocol with a test suite larger than most hackathon teams' entire codebases. Built on $0.
 
 ### MEV / Transaction Ordering
 This is literally what VibeSwap was built to destroy. Commit-reveal encryption makes orders invisible. Uniform clearing prices make ordering irrelevant. Participant-seeded shuffle makes manipulation impossible. MEV isn't mitigated — it's eliminated by construction. Show us another submission that can say that.
@@ -235,14 +235,14 @@ Cross-chain batch auction coordination is a novel OApp pattern that goes beyond 
 VibeSwap is live on Base mainnet. MEV-free trading as a native capability of the Base ecosystem. The first DEX on Base where users are mathematically guaranteed to never be frontrun.
 
 ### Public Goods
-Fully open source (MIT license). Zero extraction model — no VC funding to repay, no pre-mine to dump, no team allocation to vest. The protocol exists to serve traders, not to extract from them. The entire 1,684+ commit history is public. The mechanism design papers are public. The test suite is public. This is a public good by every definition.
+Fully open source (MIT license). Zero extraction model — no VC funding to repay, no pre-mine to dump, no team allocation to vest. The protocol exists to serve traders, not to extract from them. The entire 1,837+ commit history is public. The mechanism design papers are public. The test suite is public. This is a public good by every definition.
 
 ### Best Smart Contract Project
-342 contracts. 371 test files. OpenZeppelin v5.0.1 with UUPS upgradeable proxies. Reentrancy guards, circuit breakers, rate limiting, TWAP validation, flash loan protection. A security stack built for mainnet, not for a demo. Judge it against any submission's contract quality — we welcome the comparison.
+351 contracts. 374 test files. OpenZeppelin v5.0.1 with UUPS upgradeable proxies. Reentrancy guards, circuit breakers, rate limiting, TWAP validation, flash loan protection. A security stack built for mainnet, not for a demo. Judge it against any submission's contract quality — we welcome the comparison.
 
 ### Most Innovative
 Three genuine innovations in one protocol: (1) practical on-chain commit-reveal batch auctions with 10-second cycles, (2) participant-seeded deterministic shuffle for verifiable execution ordering, (3) Shapley value cooperative game theory for LP reward distribution. Plus a fourth: proving that an AI co-founder model can produce production-grade infrastructure, not just toy demos.
 
 ---
 
-*$0 raised. 1,684+ commits. 342 contracts. Live on mainnet. We didn't wait for permission or funding. We built it.*
+*$0 raised. 1,837+ commits. 351 contracts. Live on mainnet. We didn't wait for permission or funding. We built it.*

@@ -1,8 +1,8 @@
 "You can't build a DEX alone."
-We did. 121 contracts.
+We did. 351 contracts.
 
 "AI can't write production Solidity."
-It did. 1,700 tests prove it.
+It did. 5,800 tests prove it.
 
 "You need VC money to compete."
 We don't. Zero dollars raised.

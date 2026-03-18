@@ -10,7 +10,7 @@ const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
 const MATRIX = '#00ff41'
 const AMBER = '#f59e0b'
-const TOTAL_SUPPLY = 1_000_000_000
+const TOTAL_SUPPLY = 21_000_000
 
 // ============ Seeded PRNG ============
 
@@ -58,11 +58,11 @@ const DISTRIBUTION = [
 ]
 
 const EMISSION_YEARS = [
-  { year: 1, tokens: 400_000_000, cumulative: 400_000_000 },
-  { year: 2, tokens: 200_000_000, cumulative: 600_000_000 },
-  { year: 3, tokens: 100_000_000, cumulative: 700_000_000 },
-  { year: 4, tokens: 50_000_000, cumulative: 750_000_000 },
-  { year: 5, tokens: 25_000_000, cumulative: 775_000_000 },
+  { year: 1, tokens: 10_500_000, cumulative: 10_500_000 },
+  { year: 2, tokens: 5_250_000, cumulative: 15_750_000 },
+  { year: 3, tokens: 2_625_000, cumulative: 18_375_000 },
+  { year: 4, tokens: 1_312_500, cumulative: 19_687_500 },
+  { year: 5, tokens: 656_250, cumulative: 20_343_750 },
 ]
 
 const ACCRUAL_CARDS = [
@@ -92,7 +92,7 @@ const DEFLATIONARY_FORCES = [
 ]
 
 const COMPARISON = [
-  { f: 'Max Supply', jul: '1B (elastic burn)', uni: '1B (fixed)', cake: 'Uncapped (deflationary)', crv: '3.03B (inflationary)' },
+  { f: 'Max Supply', jul: '21M (Bitcoin-aligned hard cap)', uni: '1B (fixed)', cake: 'Uncapped (deflationary)', crv: '3.03B (inflationary)' },
   { f: 'Fee Sharing', jul: '100% LP fees to LPs', uni: 'None (fee switch off)', cake: 'Burn only', crv: '50% to veCRV' },
   { f: 'Burn Mechanism', jul: '15% of auction revenue burned', uni: 'No burns', cake: 'Weekly manual burns', crv: 'No burns' },
   { f: 'Governance', jul: 'Quadratic + time-weight', uni: '1 token = 1 vote', cake: 'Snapshot voting', crv: 'veCRV lock 4yr' },
@@ -160,7 +160,7 @@ function PieChart({ data, size = 220 }) {
         ))}
         <circle cx={cx} cy={cy} r={r * 0.32} fill="#0a0a0a" />
         <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize={size * 0.065} fontFamily="monospace" fontWeight="bold" className="select-none">JUL</text>
-        <text x={cx} y={cy + 12} textAnchor="middle" fill="#6b7280" fontSize={size * 0.035} fontFamily="monospace" className="select-none">1B Supply</text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fill="#6b7280" fontSize={size * 0.035} fontFamily="monospace" className="select-none">21M Supply</text>
       </svg>
       {hovered !== null && (
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 bg-black-900/95 border border-black-700 rounded-lg px-3 py-2 text-center pointer-events-none z-20">
@@ -334,7 +334,7 @@ export default function TokenomicsPage() {
         <motion.div variants={sectionV} custom={1} initial="hidden" animate="visible">
           <GlassCard glowColor="matrix" spotlight className="p-5 md:p-6">
             <h2 className="text-lg font-bold font-mono text-white mb-1">Token Distribution</h2>
-            <p className="text-xs font-mono text-black-500 mb-5">1,000,000,000 JUL — allocated for long-term sustainability</p>
+            <p className="text-xs font-mono text-black-500 mb-5">21,000,000 VIBE — Bitcoin-aligned hard cap with halving emission schedule</p>
             <div className="flex flex-col md:flex-row items-center gap-6">
               <PieChart data={DISTRIBUTION} />
               <div className="flex-1 space-y-3 w-full">

@@ -1,6 +1,6 @@
 VibeSwap test suite:
 
-- 1,700+ tests passing
+- 5,800+ tests passing
 - 56 unit test files
 - 41 fuzz test files
 - 37 invariant test files

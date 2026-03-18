@@ -459,7 +459,7 @@ function getLeverageParams(address user) public view returns (LeverageParams mem
                     │       MUTUAL INSURANCE POOL         │
                     ├─────────────────────────────────────┤
   Funding Sources:  │                                     │
-  ├─ Protocol fees (10%)                                  │
+  ├─ Priority bid revenue                                  │
   ├─ Slashed stakes ──────►  RESERVE POOL  ◄───── Claims │
   ├─ Violation penalties         │                        │
   └─ Voluntary deposits          │                        │

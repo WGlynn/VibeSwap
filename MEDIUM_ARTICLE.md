@@ -66,9 +66,9 @@ We're not competing for existing DEX users. We're serving the users who left —
 
 ## What We're Building
 
-**Phase 1:** MEV-resistant batch auction DEX — the core product.
+**Phase 1:** MEV-resistant batch auction DEX — the core product. **Live.**
 
-**Phase 2:** Cross-chain support via LayerZero — trade across chains with the same guarantees.
+**Phase 2:** Cross-chain support via LayerZero — trade across chains with the same guarantees. **Implemented** (CrossChainRouter deployed as LayerZero V2 OApp).
 
 **Phase 3:** Privacy coin atomic swaps — Monero, Zcash, and more. Trustless, MEV-resistant, cross-chain.
 

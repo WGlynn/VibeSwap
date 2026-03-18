@@ -584,7 +584,7 @@ The VolatilityOracle monitors realized volatility using a rolling window of pric
 ```
 Total Dynamic Fee
       ↓
-  ├── Base portion (0.05%) → Standard LP/Treasury split
+  ├── Base portion (0.05%) → 100% to LP pool reserves
   └── Excess portion → Volatility Insurance Pool
 ```
 

@@ -40,7 +40,7 @@ Team of marketing experts — they need direction, not hand-holding.
 Zero pre-mine. Zero VC cut. All value flows to participants.
 
 ### Revenue Streams
-1. **Protocol fees** — 0.05% on swaps, Shapley-distributed to LPs and governance stakers
+1. **LP Trading Fees** — 0.05% default, 100% to liquidity providers
 2. **Batch auction priority bids** — pay for urgent execution without affecting clearing price
 3. **Insurance pool premiums** — small fee for liquidation protection
 4. **Yield tokenization fees** — charge on CYT minting

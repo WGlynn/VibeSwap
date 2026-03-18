@@ -48,7 +48,7 @@ Replace all [AMOUNT] markers with the specific funding request.
 
 ## 1. We Built This With $0
 
-**342 smart contracts. 401 frontend components. 1,684+ commits. Full unit, fuzz, and invariant test suite. Live on Base mainnet. Cross-chain via LayerZero V2. Open source, MIT licensed.**
+**351 smart contracts. 336 frontend components. 1,837+ commits. Full unit, fuzz, and invariant test suite. Live on Base mainnet. Cross-chain via LayerZero V2. Open source, MIT licensed.**
 
 **Total external funding received: $0.**
 
@@ -75,9 +75,9 @@ For community audiences, emphasize the fair-launch ethos.
 
 | Metric | Value |
 |---|---|
-| Smart contracts (Solidity 0.8.20) | 342 |
-| Frontend components (React 18, Vite 5) | 401 |
-| Git commits | 1,684+ |
+| Smart contracts (Solidity 0.8.20) | 351 |
+| Frontend components (React 18, Vite 5) | 336 |
+| Git commits | 1,837+ |
 | Test coverage | Unit + fuzz + invariant |
 | Mainnet deployment | Base (live) |
 | Cross-chain protocol | LayerZero V2 OApp |
@@ -112,7 +112,7 @@ Phase 3 — SETTLEMENT:
 
 ### The Full Stack (All Built, All Working)
 
-**Smart Contracts (342 contracts, Foundry + OpenZeppelin v5.0.1)**
+**Smart Contracts (351 contracts, Foundry + OpenZeppelin v5.0.1)**
 - `CommitRevealAuction.sol` — Core batch auction engine
 - `VibeAMM.sol` — Constant product AMM (x*y=k)
 - `VibeSwapCore.sol` — Main orchestrator
@@ -134,7 +134,7 @@ Phase 3 — SETTLEMENT:
 - Reentrancy guards (OpenZeppelin)
 - 50% slashing for invalid reveals
 
-**Frontend (401 components, React 18 + Vite 5 + Tailwind CSS)**
+**Frontend (336 components, React 18 + Vite 5 + Tailwind CSS)**
 - Swap, bridge, pools, governance, analytics
 - Dual wallet support: MetaMask/Coinbase + WebAuthn passkeys (device wallet)
 - Live at https://frontend-jade-five-87.vercel.app
@@ -167,7 +167,7 @@ AMOUNT CALIBRATION:
 - $100K+: Full roadmap. Audit + multi-chain + research + ecosystem growth.
 
 The key insight: every dollar goes further here because the foundation is already built.
-A $50K audit on a $0-funded protocol with 342 contracts is an extraordinary ROI.
+A $50K audit on a $0-funded protocol with 351 contracts is an extraordinary ROI.
 A $50K audit on a VC-funded protocol that raised $10M is a line item.
 -->
 
@@ -219,7 +219,7 @@ Adjust line items and amounts to match the grant program's typical range.
 | [CUSTOMIZE] | $[AMOUNT] | [CUSTOMIZE] |
 | [CUSTOMIZE] | $[AMOUNT] | [CUSTOMIZE] |
 | Infrastructure | $[AMOUNT] | RPC nodes, hosting, monitoring — production-grade reliability for what's already live |
-| Security Audit | $[AMOUNT] | Professional audit of 342 contracts — the highest-leverage spend for a bootstrapped protocol |
+| Security Audit | $[AMOUNT] | Professional audit of 351 contracts — the highest-leverage spend for a bootstrapped protocol |
 | **Total** | **$[TOTAL]** | |
 
 **Context by grant size:**
@@ -244,7 +244,7 @@ Adapt the emphasis based on what the grant program values most:
 
 ### Why This Is the Highest-ROI Grant You'll Make
 
-**The protocol is built.** This is not a whitepaper, not a pitch deck, not a roadmap. 342 contracts, 401 frontend components, 1,684+ commits, live on mainnet. Grant funding doesn't build VibeSwap — it accelerates a protocol that already works.
+**The protocol is built.** This is not a whitepaper, not a pitch deck, not a roadmap. 351 contracts, 336 frontend components, 1,837+ commits, live on mainnet. Grant funding doesn't build VibeSwap — it accelerates a protocol that already works.
 
 **Every dollar goes to development.** No VC to pay back. No team tokens to vest. No investors expecting a return. Zero extraction means 100% of funding goes to infrastructure, security, and ecosystem growth.
 
@@ -282,9 +282,9 @@ the trajectory.
 ## 7. Team
 
 ### Faraday1 — Founder & Mechanism Designer
-- Solo architect of 342-contract system and 401-component frontend
+- Solo architect of 351-contract system and 336-component frontend
 - Author of mechanism design papers: cooperative capitalism, Shapley rewards, trinomial stability, wallet security fundamentals
-- 1,684+ commits of bootstrapped building
+- 1,837+ commits of bootstrapped building
 - GitHub: https://github.com/wglynn
 
 ### JARVIS — AI Co-Founder (Claude-powered)
@@ -301,7 +301,7 @@ the trajectory.
 
 ## 8. Technical Architecture
 
-### Smart Contracts (342 contracts, Solidity 0.8.20, Foundry)
+### Smart Contracts (351 contracts, Solidity 0.8.20, Foundry)
 - **Core:** `CommitRevealAuction.sol`, `VibeSwapCore.sol`, `CircuitBreaker.sol`
 - **AMM:** `VibeAMM.sol` (constant product x*y=k), `VibeLP.sol`
 - **Governance:** `DAOTreasury.sol`, `TreasuryStabilizer.sol`
@@ -318,7 +318,7 @@ the trajectory.
 - Reentrancy guards (OpenZeppelin)
 - UUPS upgradeable proxies with timelock governance
 
-### Frontend (401 components, React 18 + Vite 5 + Tailwind CSS + ethers.js v6)
+### Frontend (336 components, React 18 + Vite 5 + Tailwind CSS + ethers.js v6)
 - Swap, bridge, pools, governance, analytics dashboards
 - Dual wallet architecture: external (MetaMask, Coinbase Wallet) + device (WebAuthn/passkeys via Secure Element)
 - Live deployment: https://frontend-jade-five-87.vercel.app

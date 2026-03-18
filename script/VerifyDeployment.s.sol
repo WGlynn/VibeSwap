@@ -260,10 +260,15 @@ contract VerifyDeployment is Script {
         console.log("--- Contract Interconnections ---");
 
         // Check AMM treasury address
+        // NOTE: In production (DeployProduction.s.sol), AMM treasury is set to
+        // ProtocolFeeAdapter, NOT DAOTreasury directly. The fee pipeline is:
+        // VibeAMM -> ProtocolFeeAdapter -> FeeRouter -> {Treasury, Insurance, RevShare, Buyback}
+        // This check validates against DAOTreasury for basic Deploy.s.sol deployments.
+        // For production deployments, verify ammTreasury == feeAdapter instead.
         address ammTreasury = VibeAMM(amm).treasury();
         console.log("AMM treasury:", ammTreasury);
         if (ammTreasury != treasury) {
-            console.log("ERROR: AMM treasury does not match deployed treasury");
+            console.log("WARNING: AMM treasury does not match DAOTreasury (expected if using ProtocolFeeAdapter pipeline)");
         }
 
         // Check Treasury AMM reference

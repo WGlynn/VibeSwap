@@ -39,7 +39,7 @@ const DIRECTIONS = [
       { name: 'Circuit Breakers', desc: 'Automatic halt on anomalous volume, price, or withdrawal spikes. Three independent thresholds guard the protocol.', contract: 'CircuitBreaker.sol' },
       { name: 'TWAP Validation', desc: 'All trades validated against time-weighted average price with max 5% deviation tolerance, preventing oracle manipulation.', contract: 'TWAPOracle.sol' },
       { name: 'Flash Loan Protection', desc: 'EOA-only commits ensure atomic flash-loan exploits cannot game the batch auction mechanism.', contract: 'CommitRevealAuction.sol' },
-      { name: 'Rate Limiting', desc: '1M tokens per hour per user. Prevents whale-driven liquidity drain attacks on any single pool.', contract: 'VibeSwapCore.sol' },
+      { name: 'Rate Limiting', desc: '100K tokens per hour per user. Prevents whale-driven liquidity drain attacks on any single pool.', contract: 'VibeSwapCore.sol' },
       { name: 'Slashing for Invalid Reveals', desc: '50% deposit slashing for orders that fail reveal verification, making griefing economically irrational.', contract: 'CommitRevealAuction.sol' },
     ],
   },

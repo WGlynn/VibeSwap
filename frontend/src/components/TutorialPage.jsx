@@ -135,7 +135,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Is VibeSwap safe to use?',
-    answer: 'VibeSwap employs multiple security layers: flash loan protection (EOA-only commits), TWAP oracle validation (max 5% deviation), rate limiting (1M tokens/hour/user), circuit breakers for volume/price/withdrawal anomalies, and 50% slashing for invalid reveals. All contracts are UUPS upgradeable with timelocked governance.',
+    answer: 'VibeSwap employs multiple security layers: flash loan protection (EOA-only commits), TWAP oracle validation (max 5% deviation), rate limiting (100K tokens/hour/user), circuit breakers for volume/price/withdrawal anomalies, and 50% slashing for invalid reveals. All contracts are UUPS upgradeable with timelocked governance.',
   },
   {
     question: 'What chains does VibeSwap support?',

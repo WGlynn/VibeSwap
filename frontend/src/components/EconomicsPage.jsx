@@ -128,10 +128,13 @@ function TwoForcesSection() {
 function FeeFlowSection() {
   const [hoveredPath, setHoveredPath] = useState(null)
 
+  // LP base fees: 100% to LPs (protocolFeeShare = 0)
+  // Non-swap revenue (priority bids) handled by FeeRouter:
+  //   40% treasury, 20% insurance, 30% revshare, 10% buyback
   const paths = [
-    { id: 'lp', label: 'LP Rewards', pct: 70, color: '#22c55e', y: 25 },
-    { id: 'treasury', label: 'Treasury', pct: 20, color: '#f59e0b', y: 55 },
-    { id: 'burn', label: 'Buyback & Burn', pct: 10, color: '#ef4444', y: 82 },
+    { id: 'lp', label: 'LP Rewards', pct: 100, color: '#22c55e', y: 25 },
+    { id: 'treasury', label: 'Treasury (priority bids)', pct: 40, color: '#f59e0b', y: 55 },
+    { id: 'burn', label: 'Buyback & Burn (priority bids)', pct: 10, color: '#ef4444', y: 82 },
   ]
 
   return (
@@ -146,8 +149,8 @@ function FeeFlowSection() {
           <svg width="360" height="110" viewBox="0 0 360 110" className="w-full max-w-[360px]">
             {/* Source node */}
             <rect x="5" y="20" width="70" height="70" rx="8" fill="rgba(245,158,11,0.12)" stroke="rgba(245,158,11,0.35)" strokeWidth="1" />
-            <text x="40" y="50" textAnchor="middle" fill="rgba(245,158,11,0.9)" fontSize="9" fontFamily="monospace">0.3%</text>
-            <text x="40" y="62" textAnchor="middle" fill="rgba(245,158,11,0.6)" fontSize="7" fontFamily="monospace">SWAP FEE</text>
+            <text x="40" y="50" textAnchor="middle" fill="rgba(245,158,11,0.9)" fontSize="9" fontFamily="monospace">0.05%</text>
+            <text x="40" y="62" textAnchor="middle" fill="rgba(245,158,11,0.6)" fontSize="7" fontFamily="monospace">LP FEE</text>
 
             {/* Flow paths */}
             {paths.map((p) => {

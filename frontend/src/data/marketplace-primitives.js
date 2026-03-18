@@ -291,7 +291,7 @@ export const MARKETPLACE_PRIMITIVES = [
     category: 'defi-mechanics',
     tier: 2,
     description:
-      'Automated safety mechanisms that pause or throttle protocol operations when anomalous conditions are detected. VibeSwap implements volume circuit breakers, price deviation limits, and per-user rate limiting (1M tokens/hour) to prevent exploitation during market stress.',
+      'Automated safety mechanisms that pause or throttle protocol operations when anomalous conditions are detected. VibeSwap implements volume circuit breakers, price deviation limits, and per-user rate limiting (100K tokens/hour) to prevent exploitation during market stress.',
     connections: ['oracle-manipulation', 'flash-loan-mechanics', 'twap-oracle'],
     claimedBy: null,
     reward: 800,

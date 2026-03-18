@@ -86,12 +86,12 @@ const BATCH_STATS = {
 }
 
 const TOKEN_DISTRIBUTION = [
-  { holder: 'Community Treasury', pct: 35, tokens: 350_000_000, color: CYAN },
-  { holder: 'LP Incentives', pct: 25, tokens: 250_000_000, color: '#8b5cf6' },
-  { holder: 'Team (4yr vest)', pct: 15, tokens: 150_000_000, color: '#f97316' },
-  { holder: 'Insurance Pool', pct: 10, tokens: 100_000_000, color: '#22c55e' },
-  { holder: 'Early Contributors', pct: 8, tokens: 80_000_000, color: '#eab308' },
-  { holder: 'Circulating', pct: 7, tokens: 70_000_000, color: '#ec4899' },
+  { holder: 'Community Treasury', pct: 35, tokens: 7_350_000, color: CYAN },
+  { holder: 'LP Incentives', pct: 25, tokens: 5_250_000, color: '#8b5cf6' },
+  { holder: 'Team (4yr vest)', pct: 15, tokens: 3_150_000, color: '#f97316' },
+  { holder: 'Insurance Pool', pct: 10, tokens: 2_100_000, color: '#22c55e' },
+  { holder: 'Early Contributors', pct: 8, tokens: 1_680_000, color: '#eab308' },
+  { holder: 'Circulating', pct: 7, tokens: 1_470_000, color: '#ec4899' },
 ]
 
 const WATERFALL_STEPS = [
@@ -489,9 +489,9 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="space-y-4">
                   {[
-                    { label: 'Total Supply', value: '1,000,000,000 VIBE' },
-                    { label: 'Circulating Supply', value: '70,000,000 VIBE', sub: '7.0% of total supply' },
-                    { label: 'Treasury Holdings', value: '350,000,000 VIBE', sub: 'Governed by DAO vote' },
+                    { label: 'Total Supply', value: '21,000,000 VIBE' },
+                    { label: 'Circulating Supply', value: '1,470,000 VIBE', sub: '7.0% of total supply' },
+                    { label: 'Treasury Holdings', value: '7,350,000 VIBE', sub: 'Governed by DAO vote' },
                   ].map((item) => (
                     <div key={item.label} className="bg-black-800/40 rounded-xl p-4 border border-black-800">
                       <div className="text-xs text-black-500 font-mono mb-1">{item.label}</div>

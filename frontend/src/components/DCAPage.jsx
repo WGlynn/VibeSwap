@@ -11,7 +11,7 @@ const BUY_TOKENS = [
   { symbol: 'ETH', name: 'Ethereum', color: '#627eea' },
   { symbol: 'BTC', name: 'Bitcoin', color: '#f7931a' },
   { symbol: 'SOL', name: 'Solana', color: '#9945ff' },
-  { symbol: 'JUL', name: 'Jul Token', color: CYAN },
+  { symbol: 'JUL', name: 'Joule', color: CYAN },
   { symbol: 'ARB', name: 'Arbitrum', color: '#28a0f0' },
   { symbol: 'OP', name: 'Optimism', color: '#ff0420' },
 ]

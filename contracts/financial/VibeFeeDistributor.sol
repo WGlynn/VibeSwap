@@ -180,7 +180,7 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     // ============ Staking ============
 
     /**
-     * @notice Stake VIBE to earn protocol fees
+     * @notice Stake VIBE to earn protocol revenue
      */
     function stake() external payable {
         require(msg.value > 0, "Zero stake");

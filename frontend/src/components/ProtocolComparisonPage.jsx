@@ -312,17 +312,17 @@ const UNIQUE_FEATURES = [
     link: '/economics',
   },
   {
-    name: 'JUL Governance Token',
-    icon: 'J',
+    name: 'VIBE Governance Token',
+    icon: 'V',
     color: '#f59e0b',
-    description: 'JUL is the governance and utility token powering VibeSwap. Think RuneScape GP of the metaverse — deep capital formation with voting integrity.',
+    description: 'VIBE is the governance and reward token powering VibeSwap (21M hard cap, Shapley-distributed). Stake JUL to earn VIBE. Deep capital formation with voting integrity.',
     details: [
-      'Governance votes weighted by stake duration',
-      'Protocol fee sharing for stakers',
+      'Governance votes weighted by VIBE holdings',
+      'Priority bid revenue sharing for stakers',
       'Strategic reserve for ecosystem development',
       'Deflationary burns from protocol revenue',
     ],
-    link: '/jul',
+    link: '/tokenomics',
   },
   {
     name: 'Omnichain via LayerZero V2',

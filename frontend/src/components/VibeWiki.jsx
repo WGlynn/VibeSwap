@@ -56,8 +56,8 @@ const ARTICLES = [
     pinned: true,
     preview: 'Why fair reward distribution matters and how cooperative game theory powers VibeSwap incentives.',
     content: [
-      { heading: 'From Game Theory to DeFi', body: 'The Shapley value (1953) answers a fundamental question: when a group cooperates to create value, how should rewards be divided? The answer satisfies four axioms \u2014 efficiency, symmetry, additivity, and the null player property.\n\nVibeSwap\'s **ShapleyDistributor** applies this to DeFi. It measures each participant\'s marginal contribution: LPs supplying thin markets earn more than those in deep pools, traders improving price discovery earn more than redundant orders.' },
-      { heading: 'Why Not Split Evenly?', body: 'Equal splitting ignores contribution. An LP supplying 90% of depth but receiving 50% of rewards will leave. Shapley values are the **unique** allocation satisfying all four fairness axioms simultaneously.\n\nThis is Cooperative Capitalism in action \u2014 the protocol recognizes and rewards the actual value each participant creates.' },
+      { heading: 'From Game Theory to DeFi', body: 'The Shapley value (1953) answers a fundamental question: when a group cooperates to create value, how should rewards be divided? The answer satisfies five axioms \u2014 efficiency, symmetry, additivity, the null player property, and marginality.\n\nVibeSwap\'s **ShapleyDistributor** applies this to DeFi. It measures each participant\'s marginal contribution: LPs supplying thin markets earn more than those in deep pools, traders improving price discovery earn more than redundant orders.' },
+      { heading: 'Why Not Split Evenly?', body: 'Equal splitting ignores contribution. An LP supplying 90% of depth but receiving 50% of rewards will leave. Shapley values are the **unique** allocation satisfying all five fairness axioms simultaneously.\n\nThis is Cooperative Capitalism in action \u2014 the protocol recognizes and rewards the actual value each participant creates.' },
     ],
   },
   {
@@ -165,9 +165,9 @@ const ARTICLES = [
     lastEdited: '2026-03-09',
     contributors: 15,
     wordCount: 1200,
-    preview: 'The native governance and utility token powering the VibeSwap ecosystem.',
+    preview: 'VIBE is the governance and reward token. JUL (Joule) is the stable liquidity asset powering VibeSwap.',
     content: [
-      { heading: 'Overview', body: 'Joule (JUL) is the native governance and utility token. It powers conviction voting, funds retroactive public goods, and serves as the staking asset for protocol security. The emission schedule follows a **halving model** inspired by Bitcoin\'s scarcity design, with initial distribution prioritizing early contributors, liquidity providers, and the DAO treasury.' },
+      { heading: 'Overview', body: 'VIBE is the native governance and reward token (21M hard cap, Shapley-distributed). Joule (JUL) is the stable liquidity asset (PoW-mined, elastic rebase). Stake JUL to earn VIBE. VIBE powers conviction voting, funds retroactive public goods, and governs the protocol. The VIBE emission schedule follows a **1-year halving model** inspired by Bitcoin\'s scarcity design, with initial distribution prioritizing early contributors, liquidity providers, and the DAO treasury.' },
     ],
   },
   {

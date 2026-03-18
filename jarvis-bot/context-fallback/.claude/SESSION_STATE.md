@@ -722,7 +722,7 @@ This file maintains continuity between Claude Code sessions across devices.
 ## Previously Completed (Feb 16, 2026)
 42. **VibeProtocolOwnedLiquidity — Protocol-Owned LP Positions**
     - Protocol/Framework #10: Treasury-owned LP positions earning fees perpetually
-    - Self-sustaining flywheel: protocol fees → treasury → more LP → more fees
+    - Self-sustaining flywheel: priority bid revenue → treasury → more LP → more fees
     - deployLiquidity, withdrawLiquidity, collectFees, rebalance, emergencyWithdrawAll
     - 37 unit tests, 7 fuzz tests (256 runs), 6 invariant tests (128K calls) — ALL PASSING
 41. **VibeIntentRouter — Intent-Based Order Routing**

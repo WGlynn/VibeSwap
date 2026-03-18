@@ -182,7 +182,7 @@ export default function StakingRewardsPage() {
   if (!isConnected) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <PageHero title="Staking Rewards" subtitle="Stake JUL to earn rewards, compound your yield, and climb the tier ladder." category="defi" />
+        <PageHero title="Staking Rewards" subtitle="Stake JUL to earn VIBE rewards, compound your yield, and climb the tier ladder." category="defi" />
         <GlassCard glowColor="terminal" className="max-w-md mx-auto p-8 text-center mt-8">
           <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 20 }}>
@@ -196,7 +196,7 @@ export default function StakingRewardsPage() {
               Connect to View <span style={{ color: CYAN }}>Rewards</span>
             </h2>
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">
-              Stake JUL tokens to earn rewards, unlock tier multipliers, and compound your returns.
+              Stake JUL tokens to earn VIBE rewards, unlock tier multipliers, and compound your returns.
             </p>
             <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
               style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>
@@ -211,7 +211,7 @@ export default function StakingRewardsPage() {
   // ============ Connected ============
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
-      <PageHero title="Staking Rewards" subtitle="Stake JUL to earn rewards, compound your yield, and climb the tier ladder."
+      <PageHero title="Staking Rewards" subtitle="Stake JUL to earn VIBE rewards, compound your yield, and climb the tier ladder."
         category="defi" badge="Live" badgeColor="#22c55e" />
 
       {/* ============ 01. Stats Row ============ */}
@@ -221,7 +221,7 @@ export default function StakingRewardsPage() {
             { label: 'Total Staked', value: `${fmt(PROTOCOL_STATS.totalStaked)} JUL`, sub: 'protocol-wide' },
             { label: 'Current APY', value: `${PROTOCOL_STATS.currentApy}%`, color: CYAN, sub: 'weighted average' },
             { label: 'Your Stake', value: `${fmt(PROTOCOL_STATS.yourStake)} JUL`, sub: 'across all tiers' },
-            { label: 'Pending Rewards', value: `${fmt(PROTOCOL_STATS.pendingRewards)} JUL`, color: '#34d399', sub: 'claimable now' },
+            { label: 'Pending Rewards', value: `${fmt(PROTOCOL_STATS.pendingRewards)} VIBE`, color: '#34d399', sub: 'claimable now' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.08 + i * (0.06 / PHI) }}>
@@ -279,7 +279,7 @@ export default function StakingRewardsPage() {
                 <div className="text-base sm:text-lg font-mono font-bold" style={{ color: CYAN }}>
                   +{p.value >= 1000 ? fmt(p.value) : p.value.toFixed(2)}
                 </div>
-                <div className="text-[10px] font-mono text-gray-500 mt-0.5">JUL</div>
+                <div className="text-[10px] font-mono text-gray-500 mt-0.5">VIBE</div>
                 <div className="text-[10px] font-mono text-gray-600">{p.label}</div>
               </div>
             ))}
@@ -353,7 +353,7 @@ export default function StakingRewardsPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-mono text-sm font-bold" style={{ color: '#34d399' }}>
-                        +{stake.earnedEstimate.toFixed(2)} JUL
+                        +{stake.earnedEstimate.toFixed(2)} VIBE
                       </div>
                       <div className="text-[10px] font-mono text-gray-500">earned so far</div>
                     </div>
@@ -380,7 +380,7 @@ export default function StakingRewardsPage() {
                 <span className="text-3xl font-mono font-bold" style={{ color: '#34d399' }}>
                   {fmt(PROTOCOL_STATS.pendingRewards)}
                 </span>
-                <span className="text-sm font-mono text-gray-500">JUL</span>
+                <span className="text-sm font-mono text-gray-500">VIBE</span>
               </div>
               <div className="text-[10px] font-mono text-gray-600 mt-1">
                 ~${(PROTOCOL_STATS.pendingRewards * 0.87).toFixed(2)} USD at current price
@@ -415,7 +415,7 @@ export default function StakingRewardsPage() {
                 exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                 <div className="p-3 rounded-xl border mb-4" style={{ background: 'rgba(167,139,250,0.06)', borderColor: 'rgba(167,139,250,0.2)' }}>
                   <div className="font-mono text-xs text-gray-300 leading-relaxed">
-                    Compounding restakes your {fmt(PROTOCOL_STATS.pendingRewards)} JUL rewards into your
+                    Compounding restakes your {fmt(PROTOCOL_STATS.pendingRewards)} VIBE rewards into your
                     highest-tier active stake, increasing principal and accelerating yield through compound interest.
                   </div>
                 </div>
@@ -450,7 +450,7 @@ export default function StakingRewardsPage() {
         <GlassCard glowColor="terminal" className="overflow-hidden">
           <div className="hidden sm:grid grid-cols-6 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
             <div>Tier</div><div>Lock Period</div><div>Base APY</div>
-            <div>Multiplier</div><div>Effective APY</div><div className="text-right">10K JUL / Year</div>
+            <div>Multiplier</div><div>Effective APY</div><div className="text-right">10K Staked / Year</div>
           </div>
           {TIERS.map((tier, i) => (
             <motion.div key={tier.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
@@ -465,7 +465,7 @@ export default function StakingRewardsPage() {
               <div className="font-mono text-sm font-bold" style={{ color: tier.color }}>{tier.mult}x</div>
               <div className="font-mono text-sm font-bold" style={{ color: CYAN }}>{(tier.baseApy * tier.mult).toFixed(1)}%</div>
               <div className="font-mono text-sm text-right" style={{ color: '#34d399' }}>
-                +{fmt(10000 * tier.baseApy * tier.mult / 100)} JUL
+                +{fmt(10000 * tier.baseApy * tier.mult / 100)} VIBE
               </div>
             </motion.div>
           ))}
@@ -487,7 +487,7 @@ export default function StakingRewardsPage() {
                 <span className="font-mono text-sm font-bold" style={{ color: actionColor(ev.action) }}>{ev.action}</span>
               </div>
               <div className="font-mono text-sm text-white">
-                {ev.action === 'Unstake' ? '-' : '+'}{fmt(ev.amount)} JUL
+                {ev.action === 'Unstake' ? '-' : '+'}{fmt(ev.amount)} {ev.action === 'Claim' || ev.action === 'Compound' ? 'VIBE' : 'JUL'}
               </div>
               <div className="font-mono text-sm text-gray-400">
                 {ev.tier ? (

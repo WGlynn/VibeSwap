@@ -300,7 +300,7 @@ const researchPapers = [
     year: '',
     desc: 'Revenue-backed vs inflationary models — sustainable DeFi economics.',
     abstract: 'The "real yield" movement advocates for DeFi protocols to distribute actual revenue (trading fees, interest) rather than inflationary token emissions. Sustainable tokenomics requires that token value be backed by protocol revenue, not circular incentive structures.',
-    vibeswapRelevance: 'VibeSwap is real yield by design. Trading fees are distributed via ShapleyDistributor to LPs and stakers. No inflationary emission schedule. The priority auction generates additional revenue that flows to the DAO treasury. Every token of yield is earned, not printed.',
+    vibeswapRelevance: 'VibeSwap is real yield by design. LP fees go 100% to liquidity providers. Priority bid revenue is distributed via ShapleyDistributor to stakers and contributors. No inflationary emission schedule. The priority auction generates additional revenue that flows to the DAO treasury. Every token of yield is earned, not printed.',
   },
 
   // PHILOSOPHY

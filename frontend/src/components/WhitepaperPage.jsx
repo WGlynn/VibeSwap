@@ -746,7 +746,7 @@ where:
                 <SectionHeading id="token-economics" number="10" title="Token Economics" />
                 <Paragraph>
                   The VIBE token serves three functions: governance voting, priority bid denomination, and
-                  staking for fee sharing. The token follows a deflationary model with a halving schedule
+                  staking for revenue sharing. The token follows a deflationary model with a halving schedule
                   inspired by Bitcoin's emission curve.
                 </Paragraph>
 

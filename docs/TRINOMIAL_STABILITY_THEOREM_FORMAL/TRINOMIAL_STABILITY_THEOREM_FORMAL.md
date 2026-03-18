@@ -312,7 +312,7 @@ With stable collateral backing loans:
 
 - Stable base collateral removes the incentive for hidden leverage (leverage on a stable asset produces negligible return)
 - Overcollateralization requirements can be reduced from 150%+ to 100-110% (the buffer need only cover operational risk, not price volatility)
-- Protocol fees from lending are predictable, enabling fair Shapley distribution of surplus
+- Lending service revenue is predictable, enabling fair Shapley distribution of surplus
 
 ---
 

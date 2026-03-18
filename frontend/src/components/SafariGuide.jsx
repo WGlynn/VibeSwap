@@ -63,7 +63,7 @@ const TOUR_STOPS = [
     path: '/contributors',
     title: 'Community Contributors',
     narration: null, // Dynamic — computed at render time from live tokenomics
-    tip: 'The VIBE token has a fixed 21M supply with 4-year halvings. Like Bitcoin, with a twist.',
+    tip: 'The VIBE token has a fixed 21M supply with annual halvings (every 365.25 days). Like Bitcoin, with a twist.',
   },
   {
     id: 'jarvis',

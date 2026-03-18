@@ -35,8 +35,9 @@ The result is a market where honest revelation is the dominant strategy, prices 
 9. [The Three-Layer Oracle Stack](#9-the-three-layer-oracle-stack)
 10. [Pure Economics: No Rent-Seeking](#10-pure-economics-no-rent-seeking)
 11. [Nash Equilibrium Analysis](#11-nash-equilibrium-analysis)
-12. [Implementation](#12-implementation)
-13. [Conclusion](#13-conclusion)
+12. [Augmented Governance: Constitutional Invariants Enforced by Cooperative Game Theory](#12-augmented-governance-constitutional-invariants-enforced-by-cooperative-game-theory)
+13. [Implementation](#13-implementation)
+14. [Conclusion](#14-conclusion)
 
 ---
 
@@ -1120,9 +1121,185 @@ Frontend Layer (Off-Chain, Diverse)
 
 ---
 
-## 12. Implementation
+## 12. Augmented Governance: Constitutional Invariants Enforced by Cooperative Game Theory
 
-### 12.1 Core Contracts
+### 12.1 The Problem: Governance Capture
+
+Governance capture is the single most consequential failure mode in decentralized finance. Not smart contract exploits, not oracle manipulation, not flash loan attacks — governance capture. Because governance capture is the one failure mode that is indistinguishable from legitimate operation.
+
+The record speaks for itself:
+
+- **Compound (2022)**: A coordinated whale faction voted to redirect $25 million in COMP rewards to a pool they dominated, extracting value from the protocol under the cover of a valid governance proposal.
+- **Curve Wars (2021-present)**: Convex, Yearn, and other protocols turned Curve's vote-escrowed governance into a secondary market for bribery. Governance capture became a *business model* — protocols competed to acquire veCRV for the explicit purpose of directing emissions to their own pools.
+- **Beanstalk (2022)**: An attacker used a flash loan to acquire enough governance tokens to pass a proposal draining the entire treasury in a single transaction. The governance mechanism worked exactly as designed — it was the design itself that failed.
+
+Every DAO faces the same fundamental question: **what if the voters are the ones extracting?** Traditional governance has no answer. Token-weighted voting assumes that token holders' interests align with the protocol's health. This assumption is violated every time a whale can profit more from extraction than from long-term participation.
+
+The core issue is that governance mechanisms check *votes*, not *intent*. A proposal to redirect LP fees to a treasury controlled by a majority coalition looks identical to a proposal to fund a legitimate initiative. Both pass the same quorum threshold. Both follow the same voting procedure. The difference is visible only in the mathematical structure of who benefits and who pays.
+
+### 12.2 The Solution: Augmented Governance
+
+VibeSwap's answer is not to remove governance — that would merely replace one form of capture with another (developer capture). The answer is to *augment* governance with mathematical constraints that no vote can override.
+
+This follows the same pattern as augmented mechanism design in auction theory: the mechanism designer does not dictate outcomes, but defines the space of *permissible* outcomes. Within that space, participants act freely. Outside it, the mechanism itself prevents deviation.
+
+In VibeSwap, the governance hierarchy has three layers, ordered by decreasing authority:
+
+**Layer 1: Physics (Shapley Invariants and Self-Correction)**
+
+The five Shapley axioms and the extraction detection system operate at the protocol's mathematical foundation. They are not parameters that governance can adjust — they are structural properties of the reward computation itself. Just as a physical system conserves energy regardless of what its components "want," VibeSwap's Shapley computation conserves fairness regardless of what governance proposes.
+
+This layer cannot be overridden. It is enforced by the same computation that distributes rewards.
+
+**Layer 2: Constitution (Fairness Axioms P-000 and P-001)**
+
+The constitutional layer encodes the protocol's foundational commitments:
+
+- **P-000 (Fairness Above All)**: If something is clearly unfair, amending the mechanism is a responsibility, not an option. This is not a suggestion — it is a cryptographic commitment embedded in the ContributionDAG via the Lawson Constant.
+- **P-001 (Extraction Detection)**: The protocol autonomously detects and corrects extraction patterns. Verified through simulation with 9 deterministic tests and 2 fuzz campaigns, all passing.
+
+Constitutional axioms are amendable, but only when the Shapley mathematics agree that the amendment preserves fairness. A governance vote alone is insufficient — the proposed change must satisfy the same axioms it seeks to modify.
+
+**Layer 3: Governance (DAO Votes and Proposals)**
+
+The DAO operates freely within the bounds established by Layers 1 and 2. Token holders vote on proposals, elect delegates, allocate discretionary funds, and adjust operational parameters. This is standard DAO governance — with the critical difference that it operates within a mathematically enforced constitution rather than an honor system.
+
+### 12.3 How It Works: The Constitutional Court
+
+The Shapley value computation that distributes rewards after every batch settlement doubles as a constitutional enforcement mechanism. Every actor's marginal contribution is measured continuously. When a governance proposal is submitted, it is evaluated against five axioms before execution:
+
+**1. Efficiency Axiom**
+
+> Does the proposal conserve total value?
+
+The sum of all allocations must equal the total value generated. A proposal that creates value from nothing (minting rewards without corresponding contribution) or destroys value (burning LP deposits to benefit a subset) violates efficiency. Formally:
+
+```
+Σᵢ φᵢ(v) = v(N)
+
+The total distributed must equal the total generated.
+No proposal may create allocation without corresponding value creation.
+```
+
+**2. Symmetry Axiom**
+
+> Does the proposal treat equal contributors equally?
+
+If two participants contribute identically to every coalition they could join, they must receive identical allocations. A proposal that privileges one class of participants over another, absent a difference in marginal contribution, violates symmetry. Formally:
+
+```
+If v(S ∪ {i}) = v(S ∪ {j}) for all S ⊆ N \ {i,j}
+Then φᵢ(v) = φⱼ(v)
+
+Equal contribution → equal reward. No exceptions for identity, wallet age, or token holdings.
+```
+
+**3. Null Player Axiom**
+
+> Does the proposal give rewards to non-contributors?
+
+If a participant adds zero marginal value to every coalition, their allocation must be zero. A proposal that directs LP fees or priority bid revenue to parties who did not contribute to price discovery or liquidity provision violates the null player axiom. Formally:
+
+```
+If v(S ∪ {i}) = v(S) for all S ⊆ N \ {i}
+Then φᵢ(v) = 0
+
+Zero contribution → zero reward. No rent-seeking, no passive extraction.
+```
+
+**4. Pairwise Proportionality Axiom**
+
+> Are allocations proportional to contributions?
+
+Between any two participants, the ratio of their rewards must reflect the ratio of their marginal contributions. A proposal that disproportionately benefits high-token-holders relative to their actual contribution to protocol value violates proportionality. Formally:
+
+```
+φᵢ(v) / φⱼ(v) ∝ MC(i) / MC(j)
+
+Where MC(i) = average marginal contribution of participant i across all coalitions.
+Rewards track contribution, not political power.
+```
+
+**5. Time Neutrality Axiom**
+
+> Does timing create unfair advantage?
+
+The protocol must not reward or penalize participants based on when they entered governance, only on what they contributed. A proposal that grandfathers early token holders into perpetual fee streams, or that creates time-locked advantages unrelated to ongoing contribution, violates time neutrality.
+
+```
+For participants i, j with MC(i) = MC(j):
+φᵢ(v) = φⱼ(v)  regardless of when i and j entered the system.
+
+Contribution is measured in the present, not inherited from the past.
+```
+
+If a governance proposal violates any of these five axioms, it is **autonomously vetoed** — the execution transaction reverts. No human intervention is required. No guardian must act. The mathematics enforce themselves.
+
+### 12.4 Regular vs. Augmented Governance
+
+The distinction is best illustrated through scenarios:
+
+| Scenario | Regular Governance | Augmented Governance |
+|----------|-------------------|---------------------|
+| 51% coalition votes to redirect LP fees to a treasury they control | LP fees are redirected. Liquidity providers lose income. The protocol enters a death spiral as LPs exit. | Shapley computation detects null-player extraction — the treasury coalition contributes zero marginal value to price discovery. The null player axiom vetoes the proposal. LP fees continue flowing to contributors. |
+| Whale accumulates governance tokens and submits proposals benefiting their own pools | Proposals pass. Other pools are starved. Liquidity concentrates where the whale directs it, not where the market needs it. | Every proposal is checked against the symmetry axiom. If the whale's pools receive disproportionate allocation relative to their marginal contribution, the proposal reverts. The whale's tokens buy votes but not outcomes. |
+| Governance proposes draining 80% of the insurance treasury for a "strategic initiative" | If votes pass quorum, the treasury is drained. Insurance coverage collapses. The next exploit has no safety net. | The efficiency axiom detects that the withdrawal destroys more value (insurance coverage) than the initiative creates. The proportionality axiom flags the disproportionate benefit to initiative recipients. The proposal reverts. |
+| Governance votes to add a new fee tier that implicitly extracts from small LPs | Fee tier passes. Small LPs pay more, large LPs pay less. Concentration increases. | Shapley values reveal that the fee structure violates symmetry — equal contributors face unequal costs. The proposal is vetoed until the fee structure treats equal contributors equally. |
+
+### 12.5 What Governance CAN and CANNOT Do
+
+Augmented governance is not governance removal. The DAO retains substantial authority over operational decisions that do not violate constitutional invariants.
+
+**Governance CAN:**
+
+- **Adjust pool fee tiers** — provided the fee structure does not violate the symmetry axiom (equal contributors must face equal fees)
+- **Fund initiatives from priority bid revenue** — priority bids are voluntary payments for execution ordering within a batch; directing this revenue to grants, development, or community initiatives is a legitimate allocation of voluntarily contributed value
+- **Modify circuit breaker thresholds** — the specific trigger levels for volume, price, and withdrawal circuit breakers are operational parameters, not constitutional invariants
+- **Approve grants and ecosystem funding** — discretionary spending from designated treasury allocations, subject to efficiency constraints
+- **Add new trading pairs and pool types** — market structure decisions within the protocol's safety parameters
+- **Adjust oracle parameters** — staleness thresholds, deviation bounds, and regime classification weights, within safety margins
+
+**Governance CANNOT:**
+
+- **Extract LP fees** — LP fees flow to liquidity providers via Shapley distribution. Redirecting them violates the null player axiom (the treasury is not a liquidity provider)
+- **Redirect swap fees to treasury** — same principle; swap fee revenue belongs to the participants who created the trades
+- **Break Shapley axioms** — the five axioms are mathematical properties of the reward computation, not governance parameters
+- **Give rewards to non-contributors** — the null player axiom is absolute; no vote can direct rewards to parties with zero marginal contribution
+- **Create time-based privileges unrelated to contribution** — the time neutrality axiom prevents grandfathering, vesting cliffs that reward presence over participation, or other temporal extraction patterns
+
+The boundary is clear: governance controls the **operational parameters** of the protocol. The constitution controls the **fairness invariants**. The physics (Shapley computation) controls the **mathematical foundation**. Each layer can modify what is below it, but not what is above.
+
+### 12.6 Mathematical Foundation
+
+The theoretical basis for augmented governance is not novel — it is the direct application of Shapley's 1953 axiomatization to protocol governance. What is novel is the implementation: the same computation that distributes rewards after every batch settlement also serves as the constitutional enforcement layer.
+
+This is a symmetric proof. The Shapley value computation that fairly distributes rewards is mathematically identical to the computation that detects extraction. If a participant's Shapley value is zero (null player), they should receive zero rewards — and any proposal directing rewards to them is extraction by definition. If two participants' Shapley values are equal (symmetry), they should receive equal rewards — and any proposal giving one more than the other is discrimination by definition.
+
+The ExtractionDetection simulation (P-001) validates this in practice: 9 deterministic test scenarios and 2 fuzz campaigns, all passing. The simulation demonstrates that:
+
+1. **Coalition extraction is detected**: When a subset of participants attempts to redirect value to themselves, the Shapley computation identifies the discrepancy between contribution and allocation.
+2. **Autonomous correction restores fairness**: Once extraction is detected, the protocol's self-correction mechanism restores the Shapley-fair allocation without human intervention.
+3. **The system is robust under fuzzing**: Randomized extraction attempts across diverse parameter spaces fail to find a strategy that evades detection.
+
+The same mathematics that answers "how much did you contribute?" also answers "are you taking more than you contributed?" These are not two separate systems — they are two readings of the same computation.
+
+### 12.7 The Analogy
+
+Consider a constitutional court. In conventional governance, the court is staffed by humans — appointed through political processes, subject to ideological drift, vulnerable to institutional capture over time. The court's authority depends on the willingness of other branches to respect its rulings.
+
+VibeSwap's constitutional court is staffed by mathematics. The Shapley axioms do not have political opinions. They do not accept bribes. They do not suffer from regulatory capture. They do not retire, die, or change their minds. They evaluate every proposal against the same five criteria, every time, with zero variance.
+
+Gravity does not ask permission. Conservation of energy does not take a vote. These are not constraints imposed on physical systems by an external authority — they are properties that emerge from the structure of reality itself. Fairness, when encoded as Shapley axioms in a cooperative game, has the same character. It is not a rule that the protocol follows — it is a property that the protocol *is*.
+
+The distinction matters. Rules can be changed. Properties cannot — at least, not without changing the system into something fundamentally different. A governance proposal that violates the Shapley axioms does not merely break a rule; it attempts to make the protocol into something that is no longer VibeSwap. The autonomous veto is not censorship — it is identity preservation.
+
+This is augmented governance: a system where human judgment operates freely within mathematical bounds, producing outcomes that are both democratic and provably fair. Not because voters chose to be fair, but because the mechanism makes unfairness structurally impossible.
+
+---
+
+## 13. Implementation
+
+### 13.1 Core Contracts
 
 ```
 VibeSwap Architecture
@@ -1153,7 +1330,7 @@ VibeSwap Architecture
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 12.2 Key Libraries
+### 13.2 Key Libraries
 
 | Library | Purpose |
 |---------|---------|
@@ -1164,7 +1341,7 @@ VibeSwap Architecture
 | `TruePriceLib.sol` | True Price deviation validation and regime-adjusted bounds |
 | `VWAPOracle.sol` | Volume-weighted average price for cross-validation |
 
-### 12.3 Batch Lifecycle (10 seconds)
+### 13.3 Batch Lifecycle (10 seconds)
 
 ```solidity
 // Phase 1: Commit (0-8 seconds)
@@ -1209,7 +1386,7 @@ function settle() external {
 }
 ```
 
-### 12.4 Halving Implementation
+### 13.4 Halving Implementation
 
 ```solidity
 function getCurrentHalvingEra() public view returns (uint8) {
@@ -1234,7 +1411,7 @@ function createGame(bytes32 gameId, uint256 totalValue, ...) external {
 }
 ```
 
-### 12.5 Deployment
+### 13.5 Deployment
 
 VibeSwap deploys as UUPS upgradeable proxies for security patching while maintaining state:
 
@@ -1254,15 +1431,15 @@ Mainnet Deployment:
 
 ---
 
-## 13. Conclusion
+## 14. Conclusion
 
-### 13.1 The Thesis
+### 14.1 The Thesis
 
 **True price discovery requires cooperation, not competition.**
 
 Current markets are adversarial by accident, not necessity. The same game theory that explains extraction can design cooperation.
 
-### 13.2 The Innovation Stack
+### 14.2 The Innovation Stack
 
 ```
 Commit-Reveal Batching
@@ -1297,10 +1474,14 @@ Pure Economics (No Extraction)
        ↓
 Aligned incentives
        ↓
+Augmented Governance
+       ↓
+Constitutional invariants enforced by math
+       ↓
 TRUE PRICE DISCOVERY
 ```
 
-### 13.3 The Philosophy
+### 14.3 The Philosophy
 
 VibeSwap doesn't ask users to be altruistic. It designs a mechanism where self-interest produces collective benefit:
 
@@ -1312,7 +1493,7 @@ VibeSwap doesn't ask users to be altruistic. It designs a mechanism where self-i
 
 Markets as **positive-sum games**, not zero-sum extraction.
 
-### 13.4 The Invitation
+### 14.4 The Invitation
 
 We've shown that cooperative price discovery is:
 - **Theoretically sound**: Game-theoretically optimal

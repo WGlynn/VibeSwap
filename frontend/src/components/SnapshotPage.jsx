@@ -686,7 +686,7 @@ export default function SnapshotPage() {
                     Connect your wallet to create proposals
                   </p>
                   <p className="text-[10px] font-mono text-black-500">
-                    Minimum 10,000 JUL required to submit a governance proposal
+                    Minimum 10,000 VIBE required to submit a governance proposal
                   </p>
                 </GlassCard>
               ) : showCreateForm ? (
@@ -924,7 +924,7 @@ export default function SnapshotPage() {
                       Connect wallet to view voting power
                     </p>
                     <p className="text-[10px] font-mono text-black-500">
-                      Hold JUL tokens to participate in governance
+                      Hold VIBE tokens to participate in governance
                     </p>
                   </div>
                 )}
@@ -1050,7 +1050,7 @@ export default function SnapshotPage() {
                     {
                       step: '01',
                       title: 'Snapshot Block',
-                      desc: 'Your JUL balance at the snapshot block determines voting weight',
+                      desc: 'Your VIBE balance at the snapshot block determines voting weight',
                     },
                     {
                       step: '02',

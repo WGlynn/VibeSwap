@@ -7568,8 +7568,11 @@ async function main() {
     console.log('[directives] TAG_ONLY_CHAT_IDS: empty (no env var or no valid IDs)');
   }
   await loadChatActivity(); // Restore activity state before init
-  const autonomousChatIds = config.authorizedGroups || [];
-  initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
+  // DISABLED: Autonomous messaging off until API credits allow better experience.
+  // Will must re-enable by uncommenting and redeploying.
+  // const autonomousChatIds = config.authorizedGroups || [];
+  // initAutonomous((chatId, text) => bot.telegram.sendMessage(chatId, text), autonomousChatIds);
+  console.log('[autonomous] DISABLED — proactive messaging turned off to reduce community spam');
   await initComputeEconomics();
   initX402(); // x402 Payment Required — configures via env vars, disabled if no treasury set
   await initMining();

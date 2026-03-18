@@ -405,6 +405,11 @@ export function initProactive(deps = {}) {
     } catch { /* fresh */ }
   }
 
+  // OVERRIDE: Force proactive OFF on startup until manually re-enabled.
+  // Prevents spam in community chat when bots restart on Fly.io.
+  // Will must explicitly /proactive_on to re-enable.
+  state.enabled = false
+
   // Wire dependencies
   chatFn = deps.chat || null
   llmFn = deps.llm || null

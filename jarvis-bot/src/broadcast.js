@@ -674,7 +674,10 @@ async function loadBroadcastState() {
     const raw = await readFile(STATE_FILE, 'utf-8');
     const data = JSON.parse(raw);
 
-    state.enabled = data.enabled || false;
+    // OVERRIDE: Force broadcast OFF on startup until manually re-enabled.
+    // Prevents spam in community chat when bots restart.
+    // Will must explicitly /broadcast on to re-enable.
+    state.enabled = false;
     state.queue = data.queue || [];
     state.history = data.history || [];
     state.dailyCounts = data.dailyCounts || {};

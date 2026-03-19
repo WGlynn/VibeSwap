@@ -170,8 +170,9 @@ import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, for
 import { runPrimitiveGate, formatGateResult, getPrimitives, getPrimitiveManifest, getGateHistory } from './primitive-gate.js';
 import { initConstellation, handleConstellationRequest } from './constellation.js';
 import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, getLexicon, getCovenant, TEN_COVENANTS, COVENANT_HASH, issueChallenge, getChallenges, persistRosetta } from './rosetta.js';
-import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue } from './social.js';
+import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
+import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
 // Nervos Talks — autonomous forum presence (silent guardian)
 let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
 try {
@@ -6299,6 +6300,39 @@ bot.on('text', async (ctx) => {
   // Passive attribution — scan group messages for attribution signals
   try { detectTextAttribution(ctx.message?.text || ''); } catch {}
 
+  // Dialogue-to-code: detect protocol-relevant insights in conversations
+  // "Everybody is a dev in VibeSwap" — dialogue becomes code autonomously
+  try {
+    const msgText = ctx.message?.text || '';
+    // Inline quality/category since tracker functions are not exported
+    const ideaWords = ['what if', 'proposal', 'suggest', 'concept', 'we could', 'idea', 'should'];
+    const hasIdea = ideaWords.some(w => msgText.toLowerCase().includes(w));
+    const trackerCategory = hasIdea ? 'IDEA' : (msgText.length > 100 ? 'COMMUNITY' : 'COMMUNITY');
+    const trackerQuality = Math.min(5, Math.floor(msgText.length / 50) + (hasIdea ? 2 : 0));
+    const detection = quickDetect(msgText, {
+      category: trackerCategory,
+      quality: trackerQuality,
+      userId: String(ctx.from?.id || 0),
+      username: ctx.from?.username || ctx.from?.first_name || 'anonymous',
+      chatId: String(ctx.chat?.id || 0),
+    });
+    if (detection?.isCodeworthy) {
+      // Run pipeline in background — don't block message handling
+      const recentMsgs = getRecentContext(ctx.chat.id, 10)
+        .split('\n')
+        .filter(l => l.trim())
+        .map(l => {
+          const match = l.match(/^\[(.+?)\]: (.+)$/);
+          if (match) return { username: match[1], text: match[2], isJarvis: match[1] === 'JARVIS' };
+          return { username: 'unknown', text: l, isJarvis: false };
+        });
+      runDialoguePipeline(detection, ctx, recentMsgs, {
+        createGitHubIssue,
+        recordSource: attributeSource,
+      }).catch(err => console.warn(`[dialogue-to-code] Pipeline error: ${err.message}`));
+    }
+  } catch {}
+
   // Passive XP + catchup activity tracking for every message
   const msgUserName = ctx.from.username || ctx.from.first_name || 'Unknown';
   recordActivity(ctx.from.id);
@@ -7447,6 +7481,10 @@ async function main() {
   // Step 2.9: Initialize continuous context memory (rolling summaries)
   console.log('[jarvis] Step 2.9: Initializing continuous context memory...');
   await initContextMemory();
+
+  // Step 2.92: Initialize dialogue-to-code pipeline
+  console.log('[jarvis] Step 2.92: Initializing dialogue-to-code pipeline...');
+  await initDialogueToCode();
 
   // Step 2.95: Load runtime-authorized users
   await loadRuntimeAuthorized();
@@ -8765,6 +8803,7 @@ async function main() {
     await flushHell();
     await flushLimni();
     await flushContextMemory();
+    await flushDialogueInsights();
     await flushPreferences();
     await flushScheduler();
     await flushTaskQueue();

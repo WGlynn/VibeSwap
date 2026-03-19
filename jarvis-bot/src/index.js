@@ -172,7 +172,7 @@ import { initConstellation, handleConstellationRequest } from './constellation.j
 import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, getLexicon, getCovenant, TEN_COVENANTS, COVENANT_HASH, issueChallenge, getChallenges, persistRosetta } from './rosetta.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
-import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
+import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // Nervos Talks — autonomous forum presence (silent guardian)
 let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
@@ -3519,7 +3519,7 @@ bot.command('mystatus', async (ctx) => {
 
 // /contributions — Show recent dialogue-to-code insights
 bot.command('contributions', async (ctx) => {
-  const stats = getDialogueStats();
+  const stats = getCodeStats();
   if (stats.totalDetected === 0) {
     return ctx.reply('No dialogue insights detected yet. Keep chatting — your insights become contributions!');
   }

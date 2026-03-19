@@ -605,19 +605,17 @@ contract VibeSwapCore is
     // ============ Admin Functions ============
 
     /**
-     * @notice Create a new liquidity pool
+     * @notice Create a new liquidity pool — PERMISSIONLESS
      *
-     * DISINTERMEDIATION: Grade C → Target Grade A. Pool creation is permissionless in VibeAMM
-     * (with fee bounds). The onlyOwner gate here in Core is redundant with VibeAMM's own
-     * M-10 check (owner or authorizedExecutor). Once VibeAMM pool creation is fully
-     * permissionless (with fee bounds enforced), this can be dissolved.
-     * Path: remove onlyOwner, rely on VibeAMM's fee bounds (5-1000 bps) as the constraint.
+     * DISINTERMEDIATION: Grade A (DISSOLVED). Anyone can create pools.
+     * Safety: VibeAMM enforces fee bounds (5-1000 bps). Pool creation
+     * is permissionless in VibeAMM — this gate was redundant.
      */
     function createPool(
         address token0,
         address token1,
         uint256 feeRate
-    ) external onlyOwner returns (bytes32 poolId) {
+    ) external returns (bytes32 poolId) {
         poolId = amm.createPool(token0, token1, feeRate);
 
         // Auto-support tokens
@@ -646,11 +644,11 @@ contract VibeSwapCore is
     /**
      * @notice Pause the contract
      *
-     * DISINTERMEDIATION: KEEP — emergency pause is a bootstrap safety mechanism.
-     * Also accessible via emergencyPause() (guardian or owner). Target Grade B:
-     * governance + guardian multisig. Unpause should require governance timelock.
+     * DISINTERMEDIATION: Grade B (DISSOLVED from owner-only). Guardian OR owner
+     * can pause — removes single-owner dependency for emergency functions.
+     * Also accessible via emergencyPause(). Target: governance + guardian multisig.
      */
-    function pause() external onlyOwner {
+    function pause() external onlyGuardianOrOwner {
         paused = true;
         emit Paused(msg.sender);
     }
@@ -658,9 +656,10 @@ contract VibeSwapCore is
     /**
      * @notice Unpause the contract
      *
-     * DISINTERMEDIATION: KEEP — must be paired with pause(). Target Grade B via governance.
+     * DISINTERMEDIATION: Grade B (DISSOLVED from owner-only). Guardian OR owner
+     * can unpause — mirrors pause() access. Target: governance timelock for unpause.
      */
-    function unpause() external onlyOwner {
+    function unpause() external onlyGuardianOrOwner {
         paused = false;
         emit Unpaused(msg.sender);
     }

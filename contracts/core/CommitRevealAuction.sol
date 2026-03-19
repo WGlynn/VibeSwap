@@ -630,17 +630,15 @@ contract CommitRevealAuction is
     }
 
     /**
-     * @notice Settle the current batch
+     * @notice Settle the current batch — PERMISSIONLESS
      *
-     * DISINTERMEDIATION: Grade C → Target Grade A. Currently onlyAuthorizedSettler.
-     * Settlement is deterministic (Fisher-Yates shuffle from XORed secrets + block entropy,
-     * uniform clearing price from batch math). No discretion in settlement logic.
-     * Path to permissionless: remove onlyAuthorizedSettler, add time-based guard
-     * (e.g., can only settle after SETTLING phase begins). Requires audit to confirm
-     * no griefing vectors from permissionless settlement (e.g., gas exhaustion attacks
-     * on large batches, front-running settlement block for entropy manipulation).
+     * DISINTERMEDIATION: Grade A (DISSOLVED). Anyone can settle.
+     * Settlement is deterministic: Fisher-Yates shuffle from XORed secrets + block entropy,
+     * uniform clearing price from batch math. No discretion — pure math.
+     * Phase guard (SETTLING/SETTLED) prevents premature settlement.
+     * isSettled guard prevents double-settlement.
      */
-    function settleBatch() external onlyAuthorizedSettler nonReentrant {
+    function settleBatch() external nonReentrant {
         Batch storage batch = batches[currentBatchId];
 
         BatchPhase phase = getCurrentPhase();
@@ -932,9 +930,8 @@ contract CommitRevealAuction is
      * @param settler Address to authorize
      * @param authorized Whether to authorize or revoke
      *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Key dependency for settleBatch disintermediation — once settlement is permissionless,
-     * this function becomes unnecessary.
+     * Now only needed for cross-chain reveal authorization (revealOrderCrossChain).
+     * settleBatch is permissionless as of Grade A dissolution — no settler needed for settlement.
      */
     function setAuthorizedSettler(
         address settler,

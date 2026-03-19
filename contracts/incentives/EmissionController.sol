@@ -200,6 +200,10 @@ contract EmissionController is
      * @notice Advance emission clock, mint accrued VIBE, split to sinks
      * @dev Anyone can call. Mints VIBE proportional to wall-clock time elapsed,
      *      with rate halving every eraDuration. Cross-era accrual handled correctly.
+     *
+     *      DISINTERMEDIATION: Grade A — fully permissionless. No owner gate, no access control.
+     *      Any EOA or contract can trigger emission. Protocol runs without founder.
+     *
      * @return minted Total VIBE minted in this drip
      */
     function drip() external nonReentrant returns (uint256 minted) {
@@ -249,6 +253,12 @@ contract EmissionController is
      * @dev Transfers VIBE to ShapleyDistributor and creates a FEE_DISTRIBUTION game
      *      (not TOKEN_EMISSION — EmissionController already applies wall-clock halving).
      *      Also settles the game immediately so rewards are claimable.
+     *
+     *      DISINTERMEDIATION: Grade C → Target Grade B. Currently onlyDrainer (owner-authorized).
+     *      Cannot go fully permissionless because arbitrary callers could drain the pool to
+     *      fake participant lists. Requires governance to replace owner as drainer authorizer.
+     *      Path: owner.setAuthorizedDrainer() → governance.setAuthorizedDrainer() via TimelockController.
+     *
      * @param gameId Unique game identifier
      * @param participants Participant array for the Shapley game
      * @param drainBps Percentage of pool to drain (in basis points, capped at maxDrainBps)
@@ -296,6 +306,9 @@ contract EmissionController is
      * @dev Approves SingleStaking and calls notifyRewardAmount.
      *      Requires EmissionController to be the owner of SingleStaking.
      *      Anyone can call — permissionless protocol operation.
+     *
+     *      DISINTERMEDIATION: Grade A — fully permissionless. No owner gate.
+     *
      */
     function fundStaking() external nonReentrant {
         uint256 amount = stakingPending;
@@ -385,6 +398,8 @@ contract EmissionController is
 
     // ============ Admin Functions ============
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    // Budget allocation is a policy decision — governance-appropriate, not permissionless.
     function setBudget(uint256 _shapleyBps, uint256 _gaugeBps, uint256 _stakingBps) external onlyOwner {
         if (_shapleyBps + _gaugeBps + _stakingBps != BPS) revert InvalidBudget();
         shapleyBps = _shapleyBps;
@@ -393,12 +408,14 @@ contract EmissionController is
         emit BudgetUpdated(_shapleyBps, _gaugeBps, _stakingBps);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setMaxDrainBps(uint256 _maxDrainBps) external onlyOwner {
         if (_maxDrainBps > BPS) revert InvalidBps();
         maxDrainBps = _maxDrainBps;
         emit MaxDrainUpdated(_maxDrainBps);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setMinDrain(uint256 _minDrainBps, uint256 _minDrainAmount) external onlyOwner {
         if (_minDrainBps > BPS) revert InvalidBps();
         minDrainBps = _minDrainBps;
@@ -406,29 +423,36 @@ contract EmissionController is
         emit MinDrainUpdated(_minDrainBps, _minDrainAmount);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setStakingRewardDuration(uint256 _duration) external onlyOwner {
         if (_duration == 0) revert InvalidDuration();
         stakingRewardDuration = _duration;
         emit StakingDurationUpdated(_duration);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    // Key dependency for createContributionGame disintermediation.
     function setAuthorizedDrainer(address drainer, bool authorized) external onlyOwner {
         if (drainer == address(0)) revert ZeroAddress();
         authorizedDrainers[drainer] = authorized;
         emit DrainerUpdated(drainer, authorized);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    // Infrastructure wiring — should be governance-controlled post-bootstrap.
     function setLiquidityGauge(address _gauge) external onlyOwner {
         liquidityGauge = _gauge;
         emit SinkUpdated("gauge", _gauge);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setSingleStaking(address _staking) external onlyOwner {
         if (_staking == address(0)) revert ZeroAddress();
         singleStaking = ISingleStakingNotify(_staking);
         emit SinkUpdated("staking", _staking);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setShapleyDistributor(address _shapley) external onlyOwner {
         if (_shapley == address(0)) revert ZeroAddress();
         shapleyDistributor = _shapley;
@@ -437,6 +461,8 @@ contract EmissionController is
 
     // ============ UUPS ============
 
+    // DISINTERMEDIATION: KEEP during bootstrap. Target Grade B via governance TimelockController.
+    // Upgrades are the highest-trust operation — must be last to dissolve.
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         require(newImplementation.code.length > 0, "Not a contract");
     }

@@ -152,9 +152,16 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Configuration ============
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-    // Fee split ratios are protocol policy — governance-appropriate.
-    // Owner can redirect ALL protocol revenue by changing splits. Grade 0 risk without governance.
+    /**
+     * @notice Update fee distribution split ratios
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: Owner can redirect ALL protocol revenue by setting 100% to any single bucket
+     * (e.g., 100% buyback to a compromised BuybackEngine, or 100% treasury to a personal
+     * address if setTreasury was also compromised). Structural safety: splits must sum to
+     * 10000 BPS, but distribution between buckets is unconstrained.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
+     */
     function updateConfig(FeeConfig calldata newConfig) external onlyOwner {
         uint256 total = uint256(newConfig.treasuryBps) +
             uint256(newConfig.insuranceBps) +
@@ -173,53 +180,110 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
         );
     }
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-    // Source authorization controls who can inject fees — security-critical.
+    /**
+     * @notice Authorize a fee source contract
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: Owner can authorize a malicious contract that calls collectFee with inflated
+     * amounts (requires the source to also hold and approve tokens, limiting direct theft).
+     * More realistically, unauthorized sources could inject fee accounting to dilute
+     * legitimate revenue distribution. Security-critical gate.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
+     */
     function authorizeSource(address source) external onlyOwner {
         if (source == address(0)) revert ZeroAddress();
         _authorizedSources[source] = true;
         emit SourceAuthorized(source);
     }
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    /**
+     * @notice Revoke a fee source contract's authorization
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: Owner can revoke legitimate fee sources, halting protocol revenue collection.
+     * No direct fund theft — only denial of service for fee pipeline. Recoverable by
+     * re-authorizing the source. Censorship risk if owner selectively blocks revenue streams.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
+     */
     function revokeSource(address source) external onlyOwner {
         _authorizedSources[source] = false;
         emit SourceRevoked(source);
     }
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-    // Changing fee destinations is the highest-risk admin operation in FeeRouter.
-    // Owner can steal ALL protocol revenue by redirecting to personal address.
+    /**
+     * @notice Set treasury destination address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: CRITICAL — Owner can redirect ALL treasury-allocated revenue (default 40% of
+     * all protocol fees) to a personal address. Combined with updateConfig (set treasury
+     * to 100%), owner can steal ALL protocol revenue. This is the highest-risk admin
+     * operation alongside other setXxx destination functions.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required. Consider immutable
+     * destination addresses post-bootstrap (Grade A where safe).
+     */
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
         _treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
     }
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    /**
+     * @notice Set insurance pool destination address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: CRITICAL — Owner can redirect ALL insurance-allocated revenue (default 20% of
+     * all protocol fees) to a personal address. Additionally, undermines the mutualized
+     * insurance pool that protects LPs from impermanent loss, breaking cooperative capitalism
+     * guarantees. Users relying on IL protection would be unprotected.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
+     */
     function setInsurance(address newInsurance) external onlyOwner {
         if (newInsurance == address(0)) revert ZeroAddress();
         _insurance = newInsurance;
         emit InsuranceUpdated(newInsurance);
     }
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    /**
+     * @notice Set revenue share destination address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: CRITICAL — Owner can redirect ALL revshare-allocated revenue (default 30% of
+     * all protocol fees) to a personal address. JUL stakers expecting revenue share would
+     * receive nothing, breaking the core value proposition for token holders.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
+     */
     function setRevShare(address newRevShare) external onlyOwner {
         if (newRevShare == address(0)) revert ZeroAddress();
         _revShare = newRevShare;
         emit RevShareUpdated(newRevShare);
     }
 
-    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    /**
+     * @notice Set buyback engine destination address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Risk: CRITICAL — Owner can redirect ALL buyback-allocated revenue (default 10% of
+     * all protocol fees) to a personal address instead of BuybackEngine. Tokens that should
+     * be bought back and burned would be stolen, undermining deflationary tokenomics.
+     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
+     */
     function setBuybackTarget(address newTarget) external onlyOwner {
         if (newTarget == address(0)) revert ZeroAddress();
         _buybackTarget = newTarget;
         emit BuybackTargetUpdated(newTarget);
     }
 
-    // DISINTERMEDIATION: KEEP — emergency recovery is a bootstrap necessity.
-    // Target Grade B via governance TimelockController with timelock delay.
-    // This is the most dangerous function: owner can drain ALL accumulated fees.
+    /**
+     * @notice Emergency recovery for stuck tokens
+     *
+     * DISINTERMEDIATION: KEEP → Target Grade B. Requires governance (TimelockController).
+     * Risk: CRITICAL — Owner can drain ALL accumulated and pending fees for any token.
+     * This is the single most dangerous function in FeeRouter: unrestricted transfer of
+     * any amount of any token to any address. No structural safety bounds exist.
+     * Bootstrap necessity only — must be first function dissolved to governance.
+     * Dissolve: TimelockController with 48h+ delay, governance supermajority, and
+     * consider adding a cap or requiring pending=0 as structural safety.
+     */
     function emergencyRecover(address token, uint256 amount, address to) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
         IERC20(token).safeTransfer(to, amount);

@@ -173,6 +173,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
+import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // Nervos Talks — autonomous forum presence (silent guardian)
 let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
 try {
@@ -3502,6 +3503,86 @@ bot.command('linkwallet', async (ctx) => {
   } else {
     ctx.reply('Send a message first so I can track you, then link your wallet.');
   }
+});
+
+// ============ Contribution & Reward Commands ============
+
+// /mystatus — Show user's contribution status and reward eligibility
+bot.command('mystatus', async (ctx) => {
+  const status = formatUserRewardStatus(
+    String(ctx.from.id),
+    getUserStats,
+    getUserWallet
+  );
+  await ctx.reply(status);
+});
+
+// /contributions — Show recent dialogue-to-code insights
+bot.command('contributions', async (ctx) => {
+  const stats = getDialogueStats();
+  if (stats.totalDetected === 0) {
+    return ctx.reply('No dialogue insights detected yet. Keep chatting — your insights become contributions!');
+  }
+  const lines = ['Recent Dialogue Insights:\n'];
+  for (const insight of stats.recentInsights) {
+    const issue = insight.githubIssue ? ` (GH #${insight.githubIssue})` : '';
+    lines.push(`• "${insight.title}" by @${insight.contributor}${issue}`);
+  }
+  lines.push(`\nTotal: ${stats.totalDetected} detected, ${stats.totalPublished} published`);
+  if (stats.topContributors.length > 0) {
+    lines.push('\nTop Contributors:');
+    for (const tc of stats.topContributors.slice(0, 5)) {
+      lines.push(`  ${tc.name}: ${tc.count} insights`);
+    }
+  }
+  await ctx.reply(lines.join('\n'));
+});
+
+// /leaderboard — Top contributors by quality-weighted contributions
+bot.command('leaderboard', async (ctx) => {
+  const allUsers = getAllUsers();
+  const ranked = Object.entries(allUsers)
+    .map(([id, user]) => {
+      const stats = getUserStats(id);
+      if (!stats || stats.contributions === 0) return null;
+      return {
+        username: user.username || user.firstName || id,
+        contributions: stats.contributions,
+        quality: stats.avgQuality || 0,
+        score: (stats.avgQuality || 0) * stats.contributions,
+        wallet: getUserWallet(id) ? 'linked' : 'no wallet',
+        days: stats.daysSinceFirst || 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 15);
+
+  if (ranked.length === 0) {
+    return ctx.reply('No contributors yet. Start chatting to earn your spot!');
+  }
+
+  const lines = ['VibeSwap Contributor Leaderboard\n'];
+  for (let i = 0; i < ranked.length; i++) {
+    const r = ranked[i];
+    const medal = i === 0 ? '1.' : i === 1 ? '2.' : i === 2 ? '3.' : `${i + 1}.`;
+    lines.push(`${medal} @${r.username} — ${r.contributions} contributions (q:${r.quality.toFixed(1)}, ${r.days}d) [${r.wallet}]`);
+  }
+  lines.push('\nScore = quality x contributions. Link wallet with /linkwallet 0xAddr');
+  await ctx.reply(lines.join('\n'));
+});
+
+// /batch_rewards — Owner-only: compute and display reward batch
+bot.command('batch_rewards', async (ctx) => {
+  if (String(ctx.from.id) !== config.ownerId) {
+    return ctx.reply('Owner only.');
+  }
+  const batch = computeBatch(getAllUsers, getUserStats, getUserWallet);
+  if (batch.totalParticipants === 0) {
+    return ctx.reply('No eligible participants (need linked wallets + contributions).');
+  }
+  const announcement = formatBatchAnnouncement(batch);
+  await ctx.reply(announcement);
 });
 
 // ============ /connect — Wallet connect via TG ============
@@ -7486,6 +7567,10 @@ async function main() {
   console.log('[jarvis] Step 2.92: Initializing dialogue-to-code pipeline...');
   await initDialogueToCode();
 
+  // Step 2.93: Initialize reward batcher
+  console.log('[jarvis] Step 2.93: Initializing reward batcher...');
+  await initRewardBatcher();
+
   // Step 2.95: Load runtime-authorized users
   await loadRuntimeAuthorized();
 
@@ -8804,6 +8889,7 @@ async function main() {
     await flushLimni();
     await flushContextMemory();
     await flushDialogueInsights();
+    // Reward batcher saves on its own timer — no explicit flush needed
     await flushPreferences();
     await flushScheduler();
     await flushTaskQueue();

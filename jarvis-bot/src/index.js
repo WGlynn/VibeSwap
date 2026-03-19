@@ -1219,8 +1219,8 @@ bot.command('supply', async (ctx) => {
   );
 });
 
-// /leaderboard — Top JUL miners
-bot.command('leaderboard', async (ctx) => {
+// /mineleaderboard — Top JUL miners
+bot.command('mineleaderboard', async (ctx) => {
   const lb = getMiningLeaderboard(10);
   if (lb.leaderboard.length === 0) {
     return ctx.reply('No miners yet. Start mining with /mine or at vibeswap.io');

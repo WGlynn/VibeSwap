@@ -203,8 +203,10 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     }
 
     /// @notice Add a vouch on behalf of a verified human (bridge pattern)
-    /// @dev Only authorized bridges (e.g., AgentRegistry) can call this.
-    ///      The bridge is responsible for verifying that `from` has a SoulboundIdentity.
+    /// @dev DEPRECATED — trust should be peer-to-peer (Grade 2 → Grade 4).
+    ///      Retained for backward compatibility with AgentRegistry.
+    ///      Target: remove in next major version. Vouching on behalf of someone
+    ///      is intermediation — real trust requires the person to vouch themselves.
     function addVouchOnBehalf(
         address from,
         address to,
@@ -272,8 +274,17 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         _removeHandshake(msg.sender, to);
     }
 
+    /// @notice Cooldown between trust recalculations (permissionless, rate-limited)
+    uint256 public constant RECALC_COOLDOWN = 1 hours;
+    uint256 public lastRecalcTimestamp;
+
     /// @inheritdoc IContributionDAG
-    function recalculateTrustScores() external onlyOwner {
+    /// @dev DISINTERMEDIATION: Permissionless. Anyone can trigger recalculation.
+    /// BFS is deterministic — same graph always produces same scores.
+    /// Rate-limited to prevent gas griefing. Grade 1 → Grade 3.
+    function recalculateTrustScores() external {
+        require(block.timestamp >= lastRecalcTimestamp + RECALC_COOLDOWN, "Recalc cooldown active");
+        lastRecalcTimestamp = block.timestamp;
         // Lawson Constant integrity check — attribution is load-bearing
         require(LAWSON_CONSTANT == keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026"), "Attribution tampered");
 

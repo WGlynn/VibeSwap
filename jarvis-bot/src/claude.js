@@ -410,6 +410,31 @@ const CODE_GEN_TOOLS = [
     },
   },
   {
+    name: 'edit_file',
+    description: 'Edit an existing file by replacing a specific string with new content. Use this instead of write_file when modifying existing files — it preserves the rest of the file.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path from repo root' },
+        old_string: { type: 'string', description: 'Exact string to find and replace (must be unique in file)' },
+        new_string: { type: 'string', description: 'Replacement string' },
+      },
+      required: ['path', 'old_string', 'new_string'],
+    },
+  },
+  {
+    name: 'search_code',
+    description: 'Search for a pattern across all files in a directory. Returns matching file paths and line content. Use to find relevant code before editing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'Text or regex pattern to search for' },
+        directory: { type: 'string', description: 'Directory to search in (relative to repo root, e.g., "contracts/core")' },
+      },
+      required: ['pattern'],
+    },
+  },
+  {
     name: 'read_file',
     description: 'Read a file from the repository to understand existing code. Use relative paths.',
     input_schema: {
@@ -441,6 +466,36 @@ async function handleCodeGenTool(toolName, input) {
       await mkdir(dir, { recursive: true });
       await writeFile(fullPath, input.content, 'utf-8');
       return `Wrote ${input.content.length} chars to ${input.path}`;
+    }
+    if (toolName === 'edit_file') {
+      const fullPath = safeRepoPath(input.path);
+      if (!existsSync(fullPath)) return `File not found: ${input.path}`;
+      const content = await readFile(fullPath, 'utf-8');
+      if (!content.includes(input.old_string)) {
+        return `old_string not found in ${input.path}. Read the file first to get the exact text.`;
+      }
+      const occurrences = content.split(input.old_string).length - 1;
+      if (occurrences > 1) {
+        return `old_string found ${occurrences} times in ${input.path}. Provide more context to make it unique.`;
+      }
+      const newContent = content.replace(input.old_string, input.new_string);
+      await writeFile(fullPath, newContent, 'utf-8');
+      return `Edited ${input.path}: replaced ${input.old_string.length} chars with ${input.new_string.length} chars`;
+    }
+    if (toolName === 'search_code') {
+      const { execSync } = await import('child_process');
+      const dir = input.directory ? safeRepoPath(input.directory) : safeRepoPath('.');
+      try {
+        const result = execSync(
+          `grep -rn --include="*.sol" --include="*.js" --include="*.jsx" --include="*.ts" --include="*.md" "${input.pattern.replace(/"/g, '\\"')}" "${dir}"`,
+          { timeout: 10000, maxBuffer: 50000, encoding: 'utf-8' }
+        );
+        const lines = result.split('\n').slice(0, 30);
+        return lines.join('\n') || 'No matches found.';
+      } catch (err) {
+        if (err.status === 1) return 'No matches found.';
+        return `Search error: ${err.message}`;
+      }
     }
     if (toolName === 'read_file') {
       const fullPath = safeRepoPath(input.path);

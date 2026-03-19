@@ -202,51 +202,15 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         }
     }
 
-    /// @notice Add a vouch on behalf of a verified human (bridge pattern)
-    /// @dev DEPRECATED — trust should be peer-to-peer (Grade 2 → Grade 4).
-    ///      Retained for backward compatibility with AgentRegistry.
-    ///      Target: remove in next major version. Vouching on behalf of someone
-    ///      is intermediation — real trust requires the person to vouch themselves.
+    /// @notice REMOVED — vouching on behalf is intermediation (Grade 4 dissolution)
+    /// @dev Previously allowed authorized bridges to vouch for users.
+    ///      Trust is peer-to-peer or it's not trust. Use addVouch() directly.
     function addVouchOnBehalf(
-        address from,
-        address to,
-        bytes32 messageHash
-    ) external returns (bool isHandshake_) {
-        require(authorizedBridges[msg.sender], "Not authorized bridge");
-
-        if (from == to) revert CannotVouchSelf();
-        if (_vouchesFrom[from].length >= MAX_VOUCH_PER_USER) revert MaxVouchesReached();
-
-        Vouch storage existing = _vouches[from][to];
-        if (existing.timestamp != 0) {
-            uint256 elapsed = block.timestamp - existing.timestamp;
-            if (elapsed < HANDSHAKE_COOLDOWN) revert VouchCooldown(HANDSHAKE_COOLDOWN - elapsed);
-            existing.timestamp = block.timestamp;
-            existing.messageHash = messageHash;
-            emit VouchAdded(from, to, messageHash);
-            isHandshake_ = _vouches[to][from].timestamp != 0;
-            return isHandshake_;
-        }
-
-        _vouches[from][to] = Vouch({ timestamp: block.timestamp, messageHash: messageHash });
-        _vouchesFrom[from].push(to);
-        _vouchedBy[to].push(from);
-
-        if (_vouchTreeInitialized) {
-            bytes32 vouchLeaf = keccak256(abi.encodePacked(from, to, block.timestamp, messageHash));
-            _vouchTree.insert(vouchLeaf);
-        }
-
-        emit VouchAdded(from, to, messageHash);
-
-        isHandshake_ = _vouches[to][from].timestamp != 0;
-        if (isHandshake_) {
-            if (!_handshakeExists(from, to)) {
-                _handshakes.push(Handshake({ user1: from, user2: to, timestamp: block.timestamp }));
-                _handshakeMap[_handshakeKey(from, to)] = true;
-                emit HandshakeConfirmed(from, to);
-            }
-        }
+        address,
+        address,
+        bytes32
+    ) external pure returns (bool) {
+        revert("DISSOLVED: use addVouch() directly - trust is peer-to-peer");
     }
 
     /// @notice Set authorized bridge contract (e.g., AgentRegistry)

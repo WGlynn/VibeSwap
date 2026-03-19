@@ -331,12 +331,8 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
 
         _humanVouchers[agentId].push(msg.sender);
 
-        // Bridge to ContributionDAG: create a vouch from human → agent operator
-        if (address(contributionDAG) != address(0)) {
-            // The human vouches for the agent's operator address in the trust graph
-            // Uses addVouchOnBehalf since AgentRegistry (msg.sender) can't have a SoulboundIdentity
-            try contributionDAG.addVouchOnBehalf(msg.sender, _agents[agentId].operator, messageHash) {} catch {}
-        }
+        // DISSOLVED: addVouchOnBehalf removed (Grade 4 — trust is peer-to-peer)
+        // Human must call contributionDAG.addVouch() directly to vouch for agent operator
 
         emit AgentVouchedByHuman(agentId, msg.sender, messageHash);
     }

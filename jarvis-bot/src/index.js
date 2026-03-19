@@ -5694,6 +5694,100 @@ bot.command('idea', async (ctx) => {
   }
 });
 
+// ============ Shard-as-Coder: /code Command ============
+// The first step toward shards coding alongside Will.
+// Takes a task description, reads relevant code, generates targeted edits,
+// creates a branch, pushes, and returns the diff for review.
+// "The shards should eventually be coding with me" — Will
+
+bot.command('code', async (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+
+  const taskText = ctx.message.text.replace(/^\/code(@\w+)?/, '').trim();
+  if (!taskText || taskText.length < 10) {
+    return ctx.reply(
+      'Usage: /code <task description>\n\n' +
+      'Describe what you want changed. The shard will:\n' +
+      '1. Read relevant existing code\n' +
+      '2. Make targeted edits (not just new files)\n' +
+      '3. Create a branch and push\n' +
+      '4. Show you the diff\n\n' +
+      'Example: /code Make settleBatch permissionless by removing the onlyAuthorizedSettler modifier'
+    );
+  }
+
+  const author = ctx.from.username || ctx.from.first_name || 'Unknown';
+  const slug = taskText.slice(0, 40).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+  const branch = `shard/${slug}`;
+
+  await ctx.reply(`Shard coding task from @${author}...\n\nBranch: ${branch}\nTask: ${taskText.slice(0, 200)}`);
+  await ctx.sendChatAction('typing');
+
+  try {
+    // 1. Pull latest
+    await gitPull();
+
+    // 2. Create branch
+    const branchResult = await gitCreateBranch(branch);
+    if (!branchResult.ok) {
+      await gitReturnToMaster();
+      return ctx.reply(`Failed to create branch: ${branchResult.error}`);
+    }
+
+    // 3. Generate code with enhanced tools (edit_file, search_code)
+    const { text, filesWritten } = await codeGenChat(
+      `TASK: ${taskText}\n\nIMPORTANT: This is a targeted code modification task, not a new idea. Read existing files first, then use edit_file to make precise changes. Do NOT rewrite entire files. Search for relevant code with search_code. Keep changes minimal and focused.`,
+      author
+    );
+
+    // 4. Get diff for review
+    let diff = '';
+    try {
+      const { execSync } = await import('child_process');
+      diff = execSync('git diff HEAD', {
+        cwd: config.repo.path,
+        encoding: 'utf-8',
+        maxBuffer: 50000,
+        timeout: 10000,
+      }).slice(0, 3000);
+    } catch {}
+
+    if (filesWritten.length === 0 && !diff) {
+      await gitReturnToMaster();
+      return ctx.reply(`Shard analyzed the task but made no changes:\n\n${text.slice(0, 1500)}`);
+    }
+
+    // 5. Commit and push
+    const commitMsg = `shard: ${taskText.slice(0, 72)}\n\nAuthor: @${author} (via /code)\nShard: ${config.shard?.id || 'primary'}`;
+    const pushResult = await gitCommitAndPushBranch(commitMsg, branch);
+
+    // 6. Return to master
+    await gitReturnToMaster();
+
+    // 7. Report back with diff
+    const fileList = filesWritten.map(f => `  - ${f}`).join('\n');
+    const summary = text.length > 600 ? text.slice(0, 600) + '...' : text;
+    const diffPreview = diff ? `\nDiff preview:\n\`\`\`\n${diff.slice(0, 1500)}\n\`\`\`` : '';
+
+    await ctx.reply(
+      `Shard completed coding task.\n\n` +
+      `Branch: ${branch}\n` +
+      (filesWritten.length > 0 ? `Files touched:\n${fileList}\n\n` : '') +
+      `${pushResult}\n\n` +
+      `Summary:\n${summary}` +
+      `${diffPreview}\n\n` +
+      `Review & merge: https://github.com/wglynn/vibeswap/compare/${branch}?expand=1`
+    );
+
+    // Track contribution
+    await trackMessage(ctx);
+
+  } catch (error) {
+    await gitReturnToMaster();
+    ctx.reply(`Shard coding failed: ${error.message}`);
+  }
+});
+
 // ============ Sticker Generator ============
 
 bot.command('sticker', async (ctx) => {

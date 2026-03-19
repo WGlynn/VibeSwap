@@ -113,7 +113,10 @@ contract VIBEToken is
      * @param amount Amount of VIBE to mint
      */
     function mint(address to, uint256 amount) external {
-        if (!minters[msg.sender] && msg.sender != owner()) revert Unauthorized();
+        // DISINTERMEDIATION: Owner cannot mint directly. Only authorized minters
+        // (EmissionController, LiquidityGauge) can create new VIBE.
+        // The founder has no backdoor to the money supply. Grade 1 → Grade 3.
+        if (!minters[msg.sender]) revert Unauthorized();
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         if (totalMinted + amount > MAX_SUPPLY) revert ExceedsMaxSupply();

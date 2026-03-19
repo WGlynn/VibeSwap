@@ -37,6 +37,19 @@ contract VibeSwapCore is
 {
     using SafeERC20 for IERC20;
 
+    // ============ DISINTERMEDIATION ROADMAP ============
+    // Phase 1 (NOW): Owner controls all admin functions
+    // Phase 2 (NEXT): Transfer ownership to TimelockController (48h delay)
+    // Phase 3 (GOVERNANCE): DAO proposals via GovernanceGuard with Shapley veto
+    // Phase 4 (GHOST): Renounce ownership. Immutable where safe. Governance where needed.
+    // Every onlyOwner function in this contract has a documented target grade.
+    //
+    // Disintermediation Grades:
+    //   Grade A (DISSOLVED): No access control. Permissionless. Structurally safe.
+    //   Grade B (GOVERNANCE): TimelockController + DAO vote. No single human can act.
+    //   Grade C (OWNER): Current state. Single owner key. Bootstrap-only.
+    //   KEEP: Genuinely security-critical. Remains gated even in Phase 4.
+
     // ============ The Lawson Constant ============
     // "Fairness above all. If something is clearly unfair, amending the code
     //  is not just a right — it is a responsibility, a credo, a law, a canon."

@@ -1045,6 +1045,10 @@ contract VibeAMM is
 
     /**
      * @notice Set authorized executor
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Executor authorization controls which contracts can batch-execute swaps.
+     * Key dependency for pool creation (M-10) and batch swap execution.
      */
     function setAuthorizedExecutor(
         address executor,
@@ -1056,6 +1060,9 @@ contract VibeAMM is
 
     /**
      * @notice Update treasury address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Treasury controls where dynamic volatility fees go.
      */
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert InvalidTreasury();
@@ -1065,6 +1072,10 @@ contract VibeAMM is
 
     /// @notice Set protocol fee share (portion of trading fees routed to treasury)
     /// @param share Fee share in BPS (0-2500). 0 = all fees to LPs, 2500 = 25% to protocol.
+    ///
+    /// DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    /// Economic parameter that directly affects LP revenue. Governance-critical.
+    /// Hard cap of 25% ensures LPs always get majority — that's structural protection.
     function setProtocolFeeShare(uint256 share) external onlyOwner {
         if (share > 2500) revert("Fee share too high"); // Max 25%
         protocolFeeShare = share;
@@ -1076,6 +1087,9 @@ contract VibeAMM is
     /**
      * @notice Enable/disable global liquidity protection
      * @dev Gas-optimized: uses packed uint8 flags
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Security toggle — disabling protection exposes pools to manipulation.
      */
     function setLiquidityProtection(bool enabled) external onlyOwner {
         if (enabled) {
@@ -1090,6 +1104,9 @@ contract VibeAMM is
      * @notice Configure liquidity protection for a specific pool
      * @param poolId Pool identifier
      * @param config Protection configuration
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Per-pool security configuration — governance-appropriate.
      */
     function setPoolProtectionConfig(
         bytes32 poolId,
@@ -1105,6 +1122,8 @@ contract VibeAMM is
      * @notice Set default protection config for a pool
      * @param poolId Pool identifier
      * @param isStablePair Whether this is a stablecoin pair
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      */
     function setDefaultProtectionConfig(bytes32 poolId, bool isStablePair) external onlyOwner poolExists(poolId) {
         if (isStablePair) {
@@ -1133,6 +1152,9 @@ contract VibeAMM is
 
     /**
      * @notice Set price oracle address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Oracle wiring — governance-appropriate post-bootstrap.
      */
     function setPriceOracle(address oracle) external onlyOwner {
         require(oracle != address(0), "Invalid oracle");
@@ -1142,6 +1164,8 @@ contract VibeAMM is
 
     /**
      * @notice Set priority registry for recording pool creation pioneers
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      */
     function setPriorityRegistry(address _registry) external onlyOwner {
         priorityRegistry = IPriorityRegistry(_registry);
@@ -1151,6 +1175,8 @@ contract VibeAMM is
     /**
      * @notice Set the IncentiveController for LP lifecycle hooks and fee routing
      * @param _controller IncentiveController proxy address (or address(0) to disable)
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      */
     function setIncentiveController(address _controller) external onlyOwner {
         incentiveController = IIncentiveController(_controller);
@@ -1160,6 +1186,8 @@ contract VibeAMM is
     /**
      * @notice Set VolatilityOracle for cross-validation with True Price regime
      * @param _oracle VolatilityOracle contract address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      */
     function setVolatilityOracle(address _oracle) external onlyOwner {
         volatilityOracle = IVolatilityOracle(_oracle);
@@ -1168,8 +1196,12 @@ contract VibeAMM is
 
     /**
      * @notice Grow VWAP oracle cardinality for longer windows
+     *
+     * DISINTERMEDIATION: DISSOLVE NOW → Grade A. Growing oracle cardinality is a
+     * monotonic improvement (more data = better). No security risk from permissionless calls.
+     * Only costs gas to the caller. Cannot degrade oracle quality.
      */
-    function growVWAPCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
+    function growVWAPCardinality(bytes32 poolId, uint16 newCardinality) external {
         poolVWAP[poolId].grow(newCardinality);
         emit VWAPCardinalityGrown(poolId, newCardinality);
     }
@@ -1612,6 +1644,10 @@ contract VibeAMM is
     /**
      * @notice Enable/disable flash loan protection
      * @dev Gas-optimized: uses packed uint8 flags
+     *
+     * DISINTERMEDIATION: KEEP — security toggle. Disabling flash loan protection
+     * exposes the protocol to flash loan attacks. Must remain admin-gated.
+     * Target Grade B: governance + guardian multisig.
      */
     function setFlashLoanProtection(bool enabled) external onlyOwner {
         if (enabled) {
@@ -1625,6 +1661,9 @@ contract VibeAMM is
     /**
      * @notice Enable/disable TWAP validation
      * @dev Gas-optimized: uses packed uint8 flags
+     *
+     * DISINTERMEDIATION: KEEP — security toggle. Same reasoning as flash loan protection.
+     * Target Grade B: governance + guardian multisig.
      */
     function setTWAPValidation(bool enabled) external onlyOwner {
         if (enabled) {
@@ -1662,6 +1701,9 @@ contract VibeAMM is
 
     /**
      * @notice Set custom max trade size for a pool
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Per-pool risk parameter — governance-appropriate.
      */
     function setPoolMaxTradeSize(bytes32 poolId, uint256 maxSize) external onlyOwner {
         poolMaxTradeSize[poolId] = maxSize;
@@ -1670,14 +1712,21 @@ contract VibeAMM is
 
     /**
      * @notice Grow oracle cardinality for longer TWAP windows
+     *
+     * DISINTERMEDIATION: DISSOLVE NOW → Grade A. Same as growVWAPCardinality —
+     * monotonic improvement, no security risk, caller pays gas.
      */
-    function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
+    function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external {
         poolOracles[poolId].grow(newCardinality);
         emit OracleCardinalityGrown(poolId, newCardinality);
     }
 
     /**
      * @notice Sync tracked balance with actual balance (admin recovery)
+     *
+     * DISINTERMEDIATION: KEEP — syncing tracked balances affects donation attack detection.
+     * If permissionless, an attacker could donate tokens then sync to bypass detection.
+     * Target Grade B: governance or guardian only.
      */
     function syncTrackedBalance(address token) external onlyOwner {
         trackedBalances[token] = IERC20(token).balanceOf(address(this));
@@ -1801,6 +1850,9 @@ contract VibeAMM is
     /**
      * @notice Set the True Price Oracle address
      * @param _oracle TruePriceOracle contract address
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Oracle wiring — governance-appropriate post-bootstrap.
      */
     function setTruePriceOracle(address _oracle) external onlyOwner {
         truePriceOracle = ITruePriceOracle(_oracle);
@@ -1812,6 +1864,9 @@ contract VibeAMM is
      * @dev When enabled, batch clearing prices are validated against the Kalman filter True Price.
      *      Deviation beyond bounds triggers golden ratio damping (soft enforcement).
      *      Extreme deviation triggers the TRUE_PRICE_BREAKER circuit breaker (hard enforcement).
+     *
+     * DISINTERMEDIATION: KEEP — security toggle. Disabling True Price validation removes
+     * a critical anti-manipulation layer. Target Grade B: governance + guardian.
      */
     function setTruePriceValidation(bool enabled) external onlyOwner {
         if (enabled) {
@@ -1825,6 +1880,9 @@ contract VibeAMM is
     /**
      * @notice Set max staleness for True Price data
      * @param maxStaleness Maximum age in seconds (default 5 minutes)
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Bounded parameter (30s - 30min) — safe defaults, governance-appropriate.
      */
     function setTruePriceMaxStaleness(uint256 maxStaleness) external onlyOwner {
         require(maxStaleness >= 30 && maxStaleness <= 30 minutes, "Staleness out of range");
@@ -2084,6 +2142,9 @@ contract VibeAMM is
     /**
      * @notice Enable/disable Fibonacci scaling
      * @dev Gas-optimized: uses packed uint8 flags
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Feature toggle — governance-appropriate.
      */
     function setFibonacciScaling(bool enabled) external onlyOwner {
         if (enabled) {
@@ -2098,6 +2159,9 @@ contract VibeAMM is
      * @notice Set Fibonacci base unit for a pool
      * @param poolId Pool identifier
      * @param baseUnit Base unit for tier calculation
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Per-pool economic parameter — governance-appropriate.
      */
     function setFibonacciBaseUnit(bytes32 poolId, uint256 baseUnit) external onlyOwner {
         if (baseUnit == 0) revert InvalidBaseUnit();
@@ -2108,6 +2172,9 @@ contract VibeAMM is
     /**
      * @notice Set Fibonacci volume window duration
      * @param duration Window duration in seconds
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Bounded parameter (1min - 24h) — safe defaults, governance-appropriate.
      */
     function setFibonacciWindowDuration(uint256 duration) external onlyOwner {
         if (duration < 1 minutes || duration > 24 hours) revert InvalidDuration();
@@ -2118,6 +2185,9 @@ contract VibeAMM is
     /**
      * @notice Reset high/low prices for Fibonacci retracement
      * @param poolId Pool identifier
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Resetting price levels affects Fibonacci fee calculations — governance-appropriate.
      */
     function resetFibonacciPriceLevels(bytes32 poolId) external onlyOwner {
         Pool storage pool = pools[poolId];
@@ -2134,6 +2204,9 @@ contract VibeAMM is
     /**
      * @notice Set maximum fee discount from PoW
      * @param _maxDiscount Maximum discount in basis points (e.g., 5000 = 50%)
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Economic parameter affecting fee structure — governance-appropriate.
      */
     function setMaxPoWFeeDiscount(uint256 _maxDiscount) external onlyOwner {
         if (_maxDiscount > 10000) revert InvalidDiscount();

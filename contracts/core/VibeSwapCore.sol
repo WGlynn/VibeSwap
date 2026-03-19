@@ -593,6 +593,12 @@ contract VibeSwapCore is
 
     /**
      * @notice Create a new liquidity pool
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade A. Pool creation is permissionless in VibeAMM
+     * (with fee bounds). The onlyOwner gate here in Core is redundant with VibeAMM's own
+     * M-10 check (owner or authorizedExecutor). Once VibeAMM pool creation is fully
+     * permissionless (with fee bounds enforced), this can be dissolved.
+     * Path: remove onlyOwner, rely on VibeAMM's fee bounds (5-1000 bps) as the constraint.
      */
     function createPool(
         address token0,
@@ -611,6 +617,10 @@ contract VibeSwapCore is
 
     /**
      * @notice Set token support status
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Token whitelisting is a policy/security decision — prevents scam tokens from
+     * being routed through the protocol. Governance-appropriate.
      */
     function setSupportedToken(
         address token,
@@ -622,6 +632,10 @@ contract VibeSwapCore is
 
     /**
      * @notice Pause the contract
+     *
+     * DISINTERMEDIATION: KEEP — emergency pause is a bootstrap safety mechanism.
+     * Also accessible via emergencyPause() (guardian or owner). Target Grade B:
+     * governance + guardian multisig. Unpause should require governance timelock.
      */
     function pause() external onlyOwner {
         paused = true;
@@ -630,6 +644,8 @@ contract VibeSwapCore is
 
     /**
      * @notice Unpause the contract
+     *
+     * DISINTERMEDIATION: KEEP — must be paired with pause(). Target Grade B via governance.
      */
     function unpause() external onlyOwner {
         paused = false;
@@ -638,6 +654,10 @@ contract VibeSwapCore is
 
     /**
      * @notice Update subsystem contracts
+     *
+     * DISINTERMEDIATION: KEEP — infrastructure wiring is the highest-trust operation.
+     * Changing auction/AMM/treasury/router addresses can redirect ALL protocol operations.
+     * Target Grade B via governance TimelockController with significant delay (48h+).
      */
     function updateContracts(
         address _auction,
@@ -657,6 +677,9 @@ contract VibeSwapCore is
     /**
      * @notice Set wBAR contract address
      * @param _wbar wBAR contract address (address(0) to disable)
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Infrastructure wiring — governance-appropriate post-bootstrap.
      */
     function setWBAR(address _wbar) external onlyOwner {
         wbar = IwBAR(_wbar);
@@ -666,6 +689,8 @@ contract VibeSwapCore is
     /**
      * @notice Set the IncentiveController for auction proceeds and execution tracking
      * @param _controller IncentiveController proxy address (or address(0) to disable)
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      */
     function setIncentiveController(address _controller) external onlyOwner {
         incentiveController = IIncentiveController(_controller);
@@ -1040,6 +1065,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Authorize upgrade (UUPS)
+     *
+     * DISINTERMEDIATION: KEEP during bootstrap. Target Grade B via governance TimelockController.
+     * Upgrades are the highest-trust operation — must be last to dissolve.
      */
     // L-01: Validate new implementation is a contract
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
@@ -1092,6 +1120,10 @@ contract VibeSwapCore is
 
     /**
      * @notice Set blacklist status for an address
+     *
+     * DISINTERMEDIATION: KEEP — security enforcement requires rapid response.
+     * Target Grade B: guardian multisig + governance can blacklist.
+     * Cannot be permissionless (griefing: anyone blacklists competitors).
      */
     function setBlacklist(address user, bool status) external onlyOwner {
         blacklisted[user] = status;
@@ -1100,6 +1132,8 @@ contract VibeSwapCore is
 
     /**
      * @notice Batch blacklist addresses (for known exploit contracts)
+     *
+     * DISINTERMEDIATION: KEEP — same as setBlacklist. Security enforcement.
      */
     function batchBlacklist(address[] calldata users, bool status) external onlyOwner {
         for (uint256 i = 0; i < users.length; i++) {
@@ -1110,6 +1144,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Set whitelist status for a contract
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Contract whitelisting determines which integrations can interact with the protocol.
      */
     function setContractWhitelist(address contractAddr, bool status) external onlyOwner {
         whitelistedContracts[contractAddr] = status;
@@ -1118,6 +1155,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Set maximum swap amount per hour
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Rate limiting parameter — governance-appropriate. Safe default exists (100K).
      */
     function setMaxSwapPerHour(uint256 amount) external onlyOwner {
         maxSwapPerHour = amount;
@@ -1126,6 +1166,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Set EOA requirement (flash loan protection)
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Security toggle — should not be flipped without deliberation.
      */
     function setRequireEOA(bool required) external onlyOwner {
         requireEOA = required;
@@ -1134,6 +1177,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Set commit cooldown
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Anti-spam parameter — governance-appropriate.
      */
     function setCommitCooldown(uint256 cooldown) external onlyOwner {
         commitCooldown = cooldown;
@@ -1142,6 +1188,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Set guardian address
+     *
+     * DISINTERMEDIATION: KEEP — guardian is part of the security architecture.
+     * Target Grade B: governance sets guardian via TimelockController.
      */
     function setGuardian(address newGuardian) external onlyOwner {
         require(newGuardian != address(0), "Invalid guardian");
@@ -1151,6 +1200,9 @@ contract VibeSwapCore is
 
     /**
      * @notice Set clawback registry for taint checking
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Compliance infrastructure wiring — governance-appropriate.
      */
     function setClawbackRegistry(address _registry) external onlyOwner {
         clawbackRegistry = ClawbackRegistry(_registry);

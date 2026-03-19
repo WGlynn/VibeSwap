@@ -82,6 +82,9 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Fee Collection ============
 
+    // DISINTERMEDIATION: Grade B — authorized sources + owner can collect.
+    // Source authorization is a security gate (prevents arbitrary fee injection).
+    // Grade B is correct: sources are protocol contracts, not arbitrary users.
     function collectFee(address token, uint256 amount) external nonReentrant {
         if (!_authorizedSources[msg.sender] && msg.sender != owner()) revert UnauthorizedSource();
         if (token == address(0)) revert ZeroAddress();
@@ -105,6 +108,10 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // H-05 DISSOLVED: Only authorized sources or owner can trigger distribution.
     // Dissolves MEV timing attack where anyone front-runs collectFee with distribute.
+    //
+    // DISINTERMEDIATION: Grade B — authorized sources + owner. The H-05 security fix is correct:
+    // permissionless distribute() was a MEV vector. Grade B is the right ceiling here.
+    // Path to Grade A: batched collect+distribute in same tx (atomic, no front-run window).
     function distribute(address token) public nonReentrant {
         require(_authorizedSources[msg.sender] || msg.sender == owner(), "Not authorized to distribute");
         uint256 pending = _accounting[token].pending;
@@ -145,6 +152,9 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Configuration ============
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    // Fee split ratios are protocol policy — governance-appropriate.
+    // Owner can redirect ALL protocol revenue by changing splits. Grade 0 risk without governance.
     function updateConfig(FeeConfig calldata newConfig) external onlyOwner {
         uint256 total = uint256(newConfig.treasuryBps) +
             uint256(newConfig.insuranceBps) +
@@ -163,41 +173,53 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
         );
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    // Source authorization controls who can inject fees — security-critical.
     function authorizeSource(address source) external onlyOwner {
         if (source == address(0)) revert ZeroAddress();
         _authorizedSources[source] = true;
         emit SourceAuthorized(source);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function revokeSource(address source) external onlyOwner {
         _authorizedSources[source] = false;
         emit SourceRevoked(source);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+    // Changing fee destinations is the highest-risk admin operation in FeeRouter.
+    // Owner can steal ALL protocol revenue by redirecting to personal address.
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
         _treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setInsurance(address newInsurance) external onlyOwner {
         if (newInsurance == address(0)) revert ZeroAddress();
         _insurance = newInsurance;
         emit InsuranceUpdated(newInsurance);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setRevShare(address newRevShare) external onlyOwner {
         if (newRevShare == address(0)) revert ZeroAddress();
         _revShare = newRevShare;
         emit RevShareUpdated(newRevShare);
     }
 
+    // DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
     function setBuybackTarget(address newTarget) external onlyOwner {
         if (newTarget == address(0)) revert ZeroAddress();
         _buybackTarget = newTarget;
         emit BuybackTargetUpdated(newTarget);
     }
 
+    // DISINTERMEDIATION: KEEP — emergency recovery is a bootstrap necessity.
+    // Target Grade B via governance TimelockController with timelock delay.
+    // This is the most dangerous function: owner can drain ALL accumulated fees.
     function emergencyRecover(address token, uint256 amount, address to) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
         IERC20(token).safeTransfer(to, amount);

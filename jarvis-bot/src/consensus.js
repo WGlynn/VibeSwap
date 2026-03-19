@@ -234,6 +234,19 @@ export function initConsensus() {
   }
 }
 
+/**
+ * Dynamic activation: called when a new shard registers with the router.
+ * Switches from single-shard to BFT mode when enough shards are online.
+ */
+export function recheckConsensusMode(liveShardCount) {
+  if (consensusEnabled) return; // Already active
+  if (liveShardCount > 1) {
+    consensusEnabled = true;
+    console.log(`[consensus] BFT ACTIVATED — ${liveShardCount} shards now online. Proposals require consensus.`);
+    setInterval(checkProposalTimeouts, PHASE_TIMEOUT_MS);
+  }
+}
+
 // ============ Propose ============
 
 export async function propose(type, data) {

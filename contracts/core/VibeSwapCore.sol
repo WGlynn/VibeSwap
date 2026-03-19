@@ -1168,10 +1168,12 @@ contract VibeSwapCore is
     /**
      * @notice Set maximum swap amount per hour
      *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Rate limiting parameter — governance-appropriate. Safe default exists (100K).
+     * DISINTERMEDIATION: Grade B (DISSOLVED from Grade C). Guardian OR owner can adjust.
+     * Rate limiting parameter — safe default exists (100K). No fund risk from misconfiguration;
+     * worst case is overly permissive or restrictive rate limits, both recoverable.
+     * Target Grade B via governance TimelockController.
      */
-    function setMaxSwapPerHour(uint256 amount) external onlyOwner {
+    function setMaxSwapPerHour(uint256 amount) external onlyGuardianOrOwner {
         maxSwapPerHour = amount;
         emit MaxSwapPerHourUpdated(amount);
     }
@@ -1179,10 +1181,13 @@ contract VibeSwapCore is
     /**
      * @notice Set EOA requirement (flash loan protection)
      *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Security toggle — should not be flipped without deliberation.
+     * DISINTERMEDIATION: Grade B (DISSOLVED from Grade C). Guardian OR owner can toggle.
+     * Configuration toggle that doesn't affect funds — controls whether contracts can
+     * interact directly. Disabling allows more integrations; enabling blocks flash loans.
+     * Both states are safe; whitelistedContracts provides granular override.
+     * Target Grade B via governance TimelockController.
      */
-    function setRequireEOA(bool required) external onlyOwner {
+    function setRequireEOA(bool required) external onlyGuardianOrOwner {
         requireEOA = required;
         emit RequireEOAUpdated(required);
     }
@@ -1190,10 +1195,12 @@ contract VibeSwapCore is
     /**
      * @notice Set commit cooldown
      *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Anti-spam parameter — governance-appropriate.
+     * DISINTERMEDIATION: Grade B (DISSOLVED from Grade C). Guardian OR owner can adjust.
+     * Anti-spam rate limiting parameter. No fund risk — worst case is zero cooldown
+     * (more spam, handled by other rate limits) or excessive cooldown (poor UX, recoverable).
+     * Target Grade B via governance TimelockController.
      */
-    function setCommitCooldown(uint256 cooldown) external onlyOwner {
+    function setCommitCooldown(uint256 cooldown) external onlyGuardianOrOwner {
         commitCooldown = cooldown;
         emit CommitCooldownUpdated(cooldown);
     }
@@ -1213,10 +1220,13 @@ contract VibeSwapCore is
     /**
      * @notice Set clawback registry for taint checking
      *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Compliance infrastructure wiring — governance-appropriate.
+     * DISINTERMEDIATION: Grade B (DISSOLVED from Grade C). Guardian OR owner can set.
+     * Infrastructure wiring for compliance. Setting address(0) disables taint checking
+     * (permissive, not dangerous). Setting a malicious registry could block legitimate
+     * users but cannot steal funds — notTainted modifier only reverts, never transfers.
+     * Target Grade B via governance TimelockController.
      */
-    function setClawbackRegistry(address _registry) external onlyOwner {
+    function setClawbackRegistry(address _registry) external onlyGuardianOrOwner {
         clawbackRegistry = ClawbackRegistry(_registry);
         emit ClawbackRegistryUpdated(_registry);
     }

@@ -206,34 +206,84 @@ contract BuybackEngine is IBuybackEngine, Ownable, ReentrancyGuard {
 
     // ============ Configuration ============
 
+    /**
+     * @notice Set minimum buyback threshold for a token
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Configuration parameter — no fund risk. Setting too high prevents buybacks (poor value
+     * accrual, recoverable). Setting to 0 allows dust buybacks (wastes gas, not dangerous).
+     * BuybackEngine lacks guardian pattern — dissolve when ownership transfers to TimelockController.
+     */
     function setMinBuybackAmount(address token, uint256 amount) external onlyOwner {
         _minBuybackAmount[token] = amount;
         emit MinBuybackUpdated(token, amount);
     }
 
+    /**
+     * @notice Set slippage tolerance for buyback swaps
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Structurally capped at MAX_SLIPPAGE_BPS (2000 = 20%) — misconfiguration bounded.
+     * Worst case: owner sets 20% slippage, buybacks execute at unfavorable prices.
+     * Cannot steal funds; can only degrade buyback efficiency.
+     * BuybackEngine lacks guardian pattern — dissolve when ownership transfers to TimelockController.
+     */
     function setSlippageTolerance(uint256 bps) external onlyOwner {
         if (bps > MAX_SLIPPAGE_BPS) revert SlippageTooHigh(bps);
         _slippageToleranceBps = bps;
         emit SlippageToleranceUpdated(bps);
     }
 
+    /**
+     * @notice Set cooldown period between buybacks for the same token
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
+     * Configuration parameter — no fund risk. Setting to 0 allows rapid buybacks (more gas,
+     * potential sandwich risk but bounded by slippage tolerance). Setting too high delays
+     * buybacks (poor value accrual, recoverable). No structural cap needed.
+     * BuybackEngine lacks guardian pattern — dissolve when ownership transfers to TimelockController.
+     */
     function setCooldown(uint256 period) external onlyOwner {
         _cooldownPeriod = period;
         emit CooldownUpdated(period);
     }
 
+    /**
+     * @notice Set the protocol token to buy back and burn
+     *
+     * DISINTERMEDIATION: KEEP → Target Grade B. Requires governance (TimelockController).
+     * Risk: Owner can redirect buybacks to buy a worthless token, wasting accumulated revenue.
+     * Not direct theft (tokens go to burn address), but economic damage to protocol token holders.
+     * Must remain gated. Dissolve via TimelockController with 48h+ delay.
+     */
     function setProtocolToken(address token) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
         _protocolToken = token;
         emit ProtocolTokenUpdated(token);
     }
 
+    /**
+     * @notice Set the burn destination address
+     *
+     * DISINTERMEDIATION: KEEP → Target Grade B. Requires governance (TimelockController).
+     * Risk: Owner can redirect "burned" tokens to a personal address, stealing ALL buyback
+     * output. This is the highest-risk function in BuybackEngine — equivalent to theft of
+     * accumulated revenue. Must remain gated. Dissolve via TimelockController with 48h+ delay.
+     */
     function setBurnAddress(address addr) external onlyOwner {
         if (addr == address(0)) revert ZeroAddress();
         _burnAddress = addr;
         emit BurnAddressUpdated(addr);
     }
 
+    /**
+     * @notice Emergency recovery for stuck tokens
+     *
+     * DISINTERMEDIATION: KEEP → Target Grade B. Requires governance (TimelockController).
+     * Risk: Owner can drain ALL tokens accumulated for buyback. This is the most dangerous
+     * function — unrestricted transfer of any token to any address. Bootstrap necessity only.
+     * Dissolve via TimelockController with 48h+ delay and governance approval.
+     */
     function emergencyRecover(address token, uint256 amount, address to) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
         IERC20(token).safeTransfer(to, amount);

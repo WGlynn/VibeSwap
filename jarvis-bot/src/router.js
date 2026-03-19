@@ -33,6 +33,18 @@
 
 import { config } from './config.js';
 
+// Dynamic BFT/CRPC activation — graceful imports
+let recheckConsensusMode = () => {};
+let recheckCRPCMode = () => {};
+try {
+  const consensus = await import('./consensus.js');
+  recheckConsensusMode = consensus.recheckConsensusMode || (() => {});
+} catch {}
+try {
+  const crpc = await import('./crpc.js');
+  recheckCRPCMode = crpc.recheckCRPCMode || (() => {});
+} catch {}
+
 // ============ Constants ============
 
 const HEARTBEAT_TIMEOUT_MS = 90000; // 90s — 3 missed heartbeats = DOWN
@@ -79,7 +91,12 @@ export function registerShard(data) {
   const entry = createShardEntry(data);
   shardRegistry.set(entry.shardId, entry);
 
-  console.log(`[router] Registered shard: ${entry.shardId} (${entry.nodeType}) at ${entry.url}`);
+  const liveCount = shardRegistry.size;
+  console.log(`[router] Registered shard: ${entry.shardId} (${entry.nodeType}) at ${entry.url} [${liveCount} total]`);
+
+  // Dynamic BFT/CRPC activation — check if we've crossed the threshold
+  recheckConsensusMode(liveCount);
+  recheckCRPCMode(liveCount);
 
   return {
     success: true,

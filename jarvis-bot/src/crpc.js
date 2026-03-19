@@ -153,6 +153,19 @@ export async function initCRPC() {
   }
 }
 
+/**
+ * Dynamic activation: called when a new shard registers with the router.
+ * Switches from single-response to CRPC mode when enough shards are online.
+ */
+export function recheckCRPCMode(liveShardCount) {
+  if (crpcEnabled) return; // Already active
+  if (liveShardCount >= MIN_PARTICIPANTS) {
+    crpcEnabled = true;
+    console.log(`[crpc] CRPC ACTIVATED — ${liveShardCount} shards online. Pairwise comparison enabled.`);
+    staleTaskInterval = setInterval(autoSettleStaleTasks, 30000);
+  }
+}
+
 // ============ Persistence ============
 
 export async function flushCRPC() {

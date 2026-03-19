@@ -303,14 +303,20 @@ contract VibeAMMLite is
 
     // ============ Admin ============
 
+    /// DISINTERMEDIATION: Grade C -> Target Grade B. Governance (TimelockController).
     function setAuthorizedExecutor(address e, bool a) external onlyOwner { authorizedExecutors[e] = a; }
+    /// DISINTERMEDIATION: Grade C -> Target Grade B. Governance (TimelockController).
     function setTreasury(address t) external onlyOwner { if (t == address(0)) revert InvalidTreasury(); treasury = t; }
+    /// DISINTERMEDIATION: KEEP — emergency pause. Target Grade B: governance + guardian.
     function setGlobalPause(bool p) external onlyOwner { globalPaused = p; }
+    /// DISINTERMEDIATION: KEEP — security toggle. Target Grade B: governance + guardian.
     function setFlashLoanProtection(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_FLASH_LOAN; else protectionFlags &= ~FLAG_FLASH_LOAN; }
+    /// DISINTERMEDIATION: KEEP — security toggle. Target Grade B: governance + guardian.
     function setTWAPValidation(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_TWAP; else protectionFlags &= ~FLAG_TWAP; }
 
+    /// DISINTERMEDIATION: DISSOLVED (Phase 2). Fee collection sends to treasury
+    /// (hardcoded destination). Permissionless — caller pays gas, protocol benefits.
     function collectFees(address token) external nonReentrant {
-        if (msg.sender != treasury && msg.sender != owner()) revert NotAuthorized();
         uint256 a = accumulatedFees[token];
         if (a == 0) revert InsufficientOutput();
         accumulatedFees[token] = 0;
@@ -318,7 +324,10 @@ contract VibeAMMLite is
         emit FeesCollected(token, a);
     }
 
-    function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external onlyOwner {
+    /// DISINTERMEDIATION: DISSOLVED (Phase 2). Monotonic improvement — more oracle data
+    /// is always better. No security risk. Caller pays gas. Cannot degrade oracle quality.
+    /// Aligned with VibeAMM.growOracleCardinality() which was already permissionless.
+    function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external {
         poolOracles[poolId].grow(newCardinality);
     }
 }

@@ -42,6 +42,19 @@ contract VibeAMM is
     using TWAPOracle for TWAPOracle.OracleState;
     using VWAPOracle for VWAPOracle.VWAPState;
 
+    // ============ DISINTERMEDIATION ROADMAP ============
+    // Phase 1 (NOW): Owner controls all admin functions
+    // Phase 2 (NEXT): Transfer ownership to TimelockController (48h delay)
+    // Phase 3 (GOVERNANCE): DAO proposals via GovernanceGuard with Shapley veto
+    // Phase 4 (GHOST): Renounce ownership. Immutable where safe. Governance where needed.
+    // Every onlyOwner function in this contract has a documented target grade.
+    //
+    // Disintermediation Grades:
+    //   Grade A (DISSOLVED): No access control. Permissionless. Structurally safe.
+    //   Grade B (GOVERNANCE): TimelockController + DAO vote. No single human can act.
+    //   Grade C (OWNER): Current state. Single owner key. Bootstrap-only.
+    //   KEEP: Genuinely security-critical. Remains gated even in Phase 4.
+
     // ============ Constants ============
 
     /// @notice Default fee rate (0.05% - 5 basis points)
@@ -972,9 +985,12 @@ contract VibeAMM is
      * @dev When protocolFeeShare > 0, a portion of trading fees accumulate here.
      *      Treasury (ProtocolFeeAdapter) forwards to FeeRouter for cooperative distribution.
      * @param token Token address to collect fees for
+     *
+     * DISINTERMEDIATION: DISSOLVED (Phase 2). Fee collection sends funds to treasury
+     * (hardcoded destination) — the caller cannot redirect them. Permissionless collection
+     * means anyone can trigger cooperative fee distribution. Caller pays gas, protocol benefits.
      */
     function collectFees(address token) external nonReentrant {
-        if (msg.sender != treasury && msg.sender != owner()) revert NotAuthorized();
         uint256 amount = accumulatedFees[token];
         if (amount == 0) revert NoFeesToCollect();
 
@@ -1197,7 +1213,7 @@ contract VibeAMM is
     /**
      * @notice Grow VWAP oracle cardinality for longer windows
      *
-     * DISINTERMEDIATION: DISSOLVE NOW → Grade A. Growing oracle cardinality is a
+     * DISINTERMEDIATION: DISSOLVED (Phase 1) → Grade A. Growing oracle cardinality is a
      * monotonic improvement (more data = better). No security risk from permissionless calls.
      * Only costs gas to the caller. Cannot degrade oracle quality.
      */
@@ -1713,8 +1729,8 @@ contract VibeAMM is
     /**
      * @notice Grow oracle cardinality for longer TWAP windows
      *
-     * DISINTERMEDIATION: DISSOLVE NOW → Grade A. Same as growVWAPCardinality —
-     * monotonic improvement, no security risk, caller pays gas.
+     * DISINTERMEDIATION: DISSOLVED (Phase 1) → Grade A. Monotonic improvement —
+     * more oracle data is always better. No security risk, caller pays gas.
      */
     function growOracleCardinality(bytes32 poolId, uint16 newCardinality) external {
         poolOracles[poolId].grow(newCardinality);

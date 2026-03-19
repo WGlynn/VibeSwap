@@ -52,6 +52,19 @@ contract ShapleyDistributor is
 {
     using SafeERC20 for IERC20;
 
+    // ============ DISINTERMEDIATION ROADMAP ============
+    // Phase 1 (NOW): Owner controls all admin functions
+    // Phase 2 (NEXT): Transfer ownership to TimelockController (48h delay)
+    // Phase 3 (GOVERNANCE): DAO proposals via GovernanceGuard with Shapley veto
+    // Phase 4 (GHOST): Renounce ownership. Immutable where safe. Governance where needed.
+    // Every onlyOwner function in this contract has a documented target grade.
+    //
+    // Disintermediation Grades:
+    //   Grade A (DISSOLVED): No access control. Permissionless. Structurally safe.
+    //   Grade B (GOVERNANCE): TimelockController + DAO vote. No single human can act.
+    //   Grade C (OWNER): Current state. Single owner key. Bootstrap-only.
+    //   KEEP: Genuinely security-critical. Remains gated even in Phase 4.
+
     // ============ Custom Errors (Gas Optimized) ============
 
     error ETHTransferFailed();
@@ -309,6 +322,9 @@ contract ShapleyDistributor is
      *
      * @param _bondingCurve Address of the AugmentedBondingCurve contract
      */
+    /// DISINTERMEDIATION: KEEP — sealing is a one-way operation that permanently
+    /// binds the ABC health gate. Must be owner-gated to prevent griefing (sealing
+    /// with a malicious contract). After sealing, this function is dead code anyway.
     function sealBondingCurve(address _bondingCurve) external onlyOwner {
         if (bondingCurveSealed) revert BondingCurveAlreadySealed();
         if (_bondingCurve == address(0)) revert ZeroAddress();
@@ -346,6 +362,13 @@ contract ShapleyDistributor is
      * @param totalValue Total value to distribute
      * @param token Token to distribute (address(0) for ETH)
      * @param participants Array of participants with contribution data
+     *
+     * DISINTERMEDIATION: KEEP (Phase 2) — the caller defines participants and weights,
+     * which is a trust-critical operation. If permissionless, anyone could create games
+     * with fabricated contributions to drain funds.
+     * Target: on-chain contribution tracking (ContributionDAG + IncentiveController)
+     * auto-creates games from verified on-chain state. No human picks participants.
+     * Path: createGame becomes internal, called only by verified on-chain event hooks.
      */
     function createGame(
         bytes32 gameId,
@@ -366,6 +389,9 @@ contract ShapleyDistributor is
      * @param token Token to distribute (address(0) for ETH)
      * @param gameType FEE_DISTRIBUTION or TOKEN_EMISSION
      * @param participants Array of participants with contribution data
+     *
+     * DISINTERMEDIATION: KEEP — same as createGame(). Caller defines participants.
+     * Target: auto-creation from on-chain contribution tracking.
      */
     function createGameTyped(
         bytes32 gameId,
@@ -387,6 +413,9 @@ contract ShapleyDistributor is
      * @param gameType FEE_DISTRIBUTION or TOKEN_EMISSION
      * @param scopeId Scope identifier (typically poolId) for pioneer lookup
      * @param participants Array of participants with contribution data
+     *
+     * DISINTERMEDIATION: KEEP — same as createGame(). Caller defines participants.
+     * Target: auto-creation from on-chain contribution tracking.
      */
     function createGameFull(
         bytes32 gameId,
@@ -484,9 +513,17 @@ contract ShapleyDistributor is
      * @notice Compute Shapley values for all participants in a game
      * @dev Uses weighted contribution model for practical computation
      *      Full Shapley is O(2^n), this approximation is O(n)
+     *
+     *      DISINTERMEDIATION: DISSOLVED (Phase 2). This is pure math — deterministic
+     *      given the participants and weights stored on-chain. There is no reason only
+     *      authorized creators should compute it. Anyone can settle a game that's been
+     *      created. The inputs are immutable (stored in gameParticipants), the output
+     *      is deterministic, and the ABC health gate provides the safety check.
+     *      Permissionless settlement means games can never be held hostage.
+     *
      * @param gameId Game identifier
      */
-    function computeShapleyValues(bytes32 gameId) external onlyAuthorized {
+    function computeShapleyValues(bytes32 gameId) external {
         CooperativeGame storage game = games[gameId];
         if (game.totalValue == 0) revert GameNotFound();
         if (game.settled) revert GameAlreadySettled();
@@ -752,6 +789,11 @@ contract ShapleyDistributor is
      * @param activityScore Recent activity (0-10000 bps)
      * @param reputationScore Long-term reputation (0-10000 bps)
      * @param economicScore Economic contribution (0-10000 bps)
+     *
+     * DISINTERMEDIATION: KEEP — quality weights affect reward distribution.
+     * If permissionless, anyone could inflate their own quality scores.
+     * Target: compute quality weights from on-chain data (trade history,
+     * LP duration, governance participation) instead of off-chain input.
      */
     function updateQualityWeight(
         address participant,
@@ -976,17 +1018,24 @@ contract ShapleyDistributor is
 
     // ============ Admin Functions ============
 
+    /// @notice DISINTERMEDIATION: KEEP — controls which contracts can create games with
+    /// fabricated participant data. Security-critical until on-chain auto-creation exists.
+    /// Target Grade B: governance (TimelockController).
     function setAuthorizedCreator(address creator, bool authorized) external onlyOwner {
         authorizedCreators[creator] = authorized;
         emit AuthorizedCreatorUpdated(creator, authorized);
     }
 
+    /// @notice DISINTERMEDIATION: Grade C -> Target Grade B. Governance-appropriate.
+    /// Participant limits are safety bounds — too low breaks games, too high causes OOG.
     function setParticipantLimits(uint256 _min, uint256 _max) external onlyOwner {
         minParticipants = _min;
         maxParticipants = _max;
         emit ParticipantLimitsUpdated(_min, _max);
     }
 
+    /// @notice DISINTERMEDIATION: Grade C -> Target Grade B. Governance-appropriate.
+    /// Feature toggle that affects reward calculation.
     function setUseQualityWeights(bool _use) external onlyOwner {
         useQualityWeights = _use;
         emit QualityWeightsToggled(_use);
@@ -998,6 +1047,9 @@ contract ShapleyDistributor is
      * @notice Set the PriorityRegistry for pioneer bonus lookup
      * @dev address(0) disables pioneer bonus (default)
      * @param _registry PriorityRegistry address
+     *
+     * DISINTERMEDIATION: Grade C -> Target Grade B. Governance-appropriate.
+     * Infrastructure wiring — changes which registry provides pioneer scores.
      */
     function setPriorityRegistry(address _registry) external onlyOwner {
         priorityRegistry = IPriorityRegistry(_registry);
@@ -1009,6 +1061,10 @@ contract ShapleyDistributor is
     /**
      * @notice Enable or disable halving schedule
      * @param _enabled Whether halving should be applied
+     *
+     * DISINTERMEDIATION: KEEP — halving toggle fundamentally changes tokenomics.
+     * Disabling halving during an era would inflate token supply unexpectedly.
+     * Target Grade B: governance (TimelockController) with significant delay.
      */
     function setHalvingEnabled(bool _enabled) external onlyOwner {
         halvingEnabled = _enabled;
@@ -1019,6 +1075,9 @@ contract ShapleyDistributor is
      * @notice Set games per halving era
      * @dev Only affects future era calculations, not past games
      * @param _gamesPerEra New games per era value
+     *
+     * DISINTERMEDIATION: KEEP — changes halving schedule timing.
+     * Target Grade B: governance (TimelockController).
      */
     function setGamesPerEra(uint256 _gamesPerEra) external onlyOwner {
         if (_gamesPerEra == 0) revert InvalidGamesPerEra();
@@ -1029,6 +1088,9 @@ contract ShapleyDistributor is
     /**
      * @notice Emergency reset of genesis timestamp (use with caution)
      * @dev Only for correcting deployment issues, not regular use
+     *
+     * DISINTERMEDIATION: KEEP — emergency-only. Resetting genesis manipulates
+     * the entire halving schedule. Target Grade B: governance with delay.
      */
     function resetGenesisTimestamp() external onlyOwner {
         genesisTimestamp = block.timestamp;
@@ -1048,6 +1110,10 @@ contract ShapleyDistributor is
      *      bondingCurveSealed persist. This comment exists as a
      *      canonical warning: any implementation that removes the
      *      ABC health gate is a violation of P-000.
+     *
+     *      DISINTERMEDIATION: KEEP during bootstrap. Target Grade B via
+     *      governance TimelockController. Upgrades are the highest-trust
+     *      operation — must be last to dissolve.
      *
      *      "If something is clearly unfair, amending the code is a
      *       responsibility, a credo, a law, a canon."

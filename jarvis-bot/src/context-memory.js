@@ -1,51 +1,55 @@
-// ============ CONTINUOUS CONTEXT — Rolling Conversation Memory ============
+// ============ CONTINUOUS CONTEXT — Verkle Context Tree ============
 //
-// The breakthrough: with Wardenclyffe providing free compute, we can afford
-// LLM summarization calls to compress old messages instead of losing them.
+// V2: Upgraded from flat rolling summaries to the Verkle Context Tree.
 //
-// Problem:  maxConversationHistory = 50. Messages beyond 50 get shift()'d off.
-//           conversations.json only persists last 30. Everything else is LOST.
-//           Every restart, every trim = partial amnesia.
+// The original problem remains the same: messages beyond the history limit
+// get lost. The original solution (flat rolling summary) worked but was
+// lossy in the wrong way — older context got overwritten, not compressed.
 //
-// Solution: Before trimming, summarize the chunk being removed into a rolling
-//           context summary. The summary accumulates — new summaries incorporate
-//           the old summary. The LLM always sees:
+// The Verkle Context Tree fixes this:
 //
-//             [system prompt] + [rolling summary of ALL past context] + [recent messages]
+//   OLD: [system prompt] + [one flat summary blob] + [recent messages]
+//   NEW: [system prompt] + [structured witness] + [recent messages]
 //
-//           This gives Jarvis continuous memory across:
-//           - Long conversations (beyond 50 messages)
-//           - Bot restarts
-//           - Context window limits
+// The witness is a compact proof of the entire conversation:
+//   - Root: who, what, major decisions (always present)
+//   - Recent era: compressed last ~75 messages
+//   - Current epochs: structured last ~15-45 messages
+//   - Live messages: verbatim recent history
 //
-// Design:   One summary per chatId, persisted to disk.
-//           Summary grows via accumulation, not replacement.
-//           Compression ratio: ~20 messages → ~200 words of summary.
-//           With Wardenclyffe, summarization calls cost nothing.
+// Decisions NEVER get dropped. Relationships survive if load-bearing.
+// Open questions get promoted until resolved. Filler dies at epoch level.
+//
+// Backwards compatible: migrates flat summaries to tree on first use.
+// Same exports, same interface — context-memory.js is still the API.
 //
 // "No more session resets. Jarvis becomes truly persistent."
+// Now with structure, not just persistence.
 // ============
 
 import { writeFile, readFile, mkdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { config } from './config.js';
-import { llmChat } from './llm-provider.js';
+import { VerkleContextTree, EPOCH_SIZE } from './verkle-context.js';
 
 const DATA_DIR = config.dataDir;
 const CONTEXT_DIR = join(DATA_DIR, 'context-memory');
-const SUMMARIES_FILE = join(CONTEXT_DIR, 'summaries.json');
+const SUMMARIES_FILE = join(CONTEXT_DIR, 'summaries.json');       // Legacy flat summaries
+const VERKLE_FILE = join(CONTEXT_DIR, 'verkle-trees.json');       // New tree storage
 
 // ============ State ============
 
-// chatId -> { summary, messageCount, lastUpdated, version }
-const summaries = new Map();
+// chatId -> VerkleContextTree
+const trees = new Map();
+
+// chatId -> { summary, messageCount, lastUpdated, version }  (legacy, kept for migration)
+const legacySummaries = new Map();
 
 // How many messages to keep in live history before summarizing
 const SUMMARIZE_THRESHOLD = 40;     // Start summarizing when history hits this
 const KEEP_RECENT = 25;             // Keep this many recent messages verbatim
-const SUMMARIZE_BATCH = 15;         // Summarize this many oldest messages at a time
-const MAX_SUMMARY_LENGTH = 6000;    // Max chars — richer context for technical discussions
+const MAX_SUMMARY_LENGTH = 6000;    // Max chars — safety bound for legacy
 
 let dirty = false;
 
@@ -55,22 +59,62 @@ export async function initContextMemory() {
   try {
     await mkdir(CONTEXT_DIR, { recursive: true });
 
-    if (existsSync(SUMMARIES_FILE)) {
-      const raw = await readFile(SUMMARIES_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      let count = 0;
-      for (const [chatId, data] of Object.entries(parsed)) {
-        // Validate loaded summary bounds — truncate oversized summaries
-        if (data.summary && data.summary.length > MAX_SUMMARY_LENGTH * 2) {
-          console.warn(`[context-memory] Chat ${chatId}: summary oversized (${data.summary.length} chars), truncating`);
-          data.summary = data.summary.slice(0, MAX_SUMMARY_LENGTH) + '\n[truncated on load]';
+    // Load Verkle trees (new format)
+    if (existsSync(VERKLE_FILE)) {
+      try {
+        const raw = await readFile(VERKLE_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        let count = 0;
+        for (const [chatId, treeData] of Object.entries(parsed)) {
+          trees.set(Number(chatId), VerkleContextTree.fromJSON(treeData));
+          count++;
         }
-        summaries.set(Number(chatId), data);
-        count++;
+        console.log(`[context-memory] Loaded ${count} Verkle context trees`);
+      } catch (err) {
+        console.warn(`[context-memory] Verkle tree load failed: ${err.message}`);
       }
-      console.log(`[context-memory] Loaded ${count} conversation summaries (continuous context active)`);
-    } else {
-      console.log('[context-memory] No saved summaries — starting fresh (continuous context active)');
+    }
+
+    // Load legacy flat summaries (for migration)
+    if (existsSync(SUMMARIES_FILE)) {
+      try {
+        const raw = await readFile(SUMMARIES_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        let count = 0;
+        let migrated = 0;
+        for (const [chatId, data] of Object.entries(parsed)) {
+          const numId = Number(chatId);
+
+          // If we already have a tree for this chat, skip
+          if (trees.has(numId)) {
+            count++;
+            continue;
+          }
+
+          // Migrate flat summary to Verkle tree
+          if (data.summary && data.summary.length > 0) {
+            const tree = new VerkleContextTree(numId);
+            tree.importFlatSummary(data.summary, data.messageCount || 0);
+            trees.set(numId, tree);
+            migrated++;
+          }
+
+          // Keep legacy data for backup
+          legacySummaries.set(numId, data);
+          count++;
+        }
+        if (migrated > 0) {
+          console.log(`[context-memory] Migrated ${migrated} flat summaries to Verkle trees`);
+          dirty = true;  // Save the new trees
+        }
+        console.log(`[context-memory] Loaded ${count} legacy summaries (${trees.size} total trees active)`);
+      } catch (err) {
+        console.warn(`[context-memory] Legacy summary load failed: ${err.message}`);
+      }
+    }
+
+    if (trees.size === 0 && legacySummaries.size === 0) {
+      console.log('[context-memory] No saved context — starting fresh (Verkle context active)');
     }
   } catch (err) {
     console.warn(`[context-memory] Init warning: ${err.message}`);
@@ -82,31 +126,51 @@ export async function initContextMemory() {
 export async function flushContextMemory() {
   if (!dirty) return;
   try {
-    const obj = {};
-    for (const [chatId, data] of summaries) {
-      obj[chatId] = data;
+    // Save Verkle trees
+    const treeObj = {};
+    for (const [chatId, tree] of trees) {
+      treeObj[chatId] = tree.toJSON();
     }
-    const tmpFile = SUMMARIES_FILE + '.tmp';
-    await writeFile(tmpFile, JSON.stringify(obj, null, 2));
-    await rename(tmpFile, SUMMARIES_FILE);
+    const tmpFile = VERKLE_FILE + '.tmp';
+    await writeFile(tmpFile, JSON.stringify(treeObj, null, 2));
+    await rename(tmpFile, VERKLE_FILE);
+
+    // Also keep legacy summaries updated (backup + tools that read them)
+    const legacyObj = {};
+    for (const [chatId, data] of legacySummaries) {
+      legacyObj[chatId] = data;
+    }
+    // Also write tree witnesses as legacy-compatible summaries
+    for (const [chatId, tree] of trees) {
+      if (!legacyObj[chatId]) {
+        const witness = tree.buildWitness();
+        legacyObj[chatId] = {
+          summary: witness || '',
+          messageCount: tree.totalMessages,
+          lastUpdated: tree.lastUpdated,
+          version: tree.version,
+        };
+      }
+    }
+    const legacyTmp = SUMMARIES_FILE + '.tmp';
+    await writeFile(legacyTmp, JSON.stringify(legacyObj, null, 2));
+    await rename(legacyTmp, SUMMARIES_FILE);
+
     dirty = false;
   } catch (err) {
     console.warn(`[context-memory] Flush error: ${err.message}`);
   }
 }
 
-// ============ Core: Summarize & Trim ============
+// ============ Core: Summarize & Trim (Verkle Tree) ============
 
 /**
  * Check if a conversation history needs summarization, and if so,
- * summarize the oldest messages into the rolling summary.
+ * compress the oldest messages into the Verkle context tree.
  *
- * Call this BEFORE trimming history. It will:
- * 1. Check if history.length >= SUMMARIZE_THRESHOLD
- * 2. Extract the oldest SUMMARIZE_BATCH messages
- * 3. Summarize them (incorporating existing rolling summary)
- * 4. Remove summarized messages from history
- * 5. Store the updated rolling summary
+ * Same interface as before — call this BEFORE trimming history.
+ * Internally, instead of creating a flat summary, it creates
+ * structured epoch(s) in the Verkle tree.
  *
  * @param {number} chatId - Chat identifier
  * @param {Array} history - The conversation history array (MUTATED in place)
@@ -118,96 +182,52 @@ export async function summarizeIfNeeded(chatId, history) {
   const messagesToSummarize = history.length - KEEP_RECENT;
   if (messagesToSummarize < 5) return false;
 
+  // Get or create tree for this chat
+  if (!trees.has(chatId)) {
+    trees.set(chatId, new VerkleContextTree(chatId));
+  }
+  const tree = trees.get(chatId);
+
   // Extract the oldest messages that will be summarized
   const batch = history.slice(0, messagesToSummarize);
 
-  // Get existing summary for this chat
-  const existing = summaries.get(chatId);
-  const existingSummary = existing?.summary || '';
-
   try {
-    // Build the summarization prompt
-    const textMessages = batch
-      .filter(m => typeof m.content === 'string')
-      .map(m => {
-        const text = m.content.length > 300 ? m.content.slice(0, 300) + '...' : m.content;
-        return `${m.role}: ${text}`;
-      });
+    // Create epoch(s) from the batch
+    // If batch is larger than EPOCH_SIZE, create multiple epochs
+    let created = 0;
+    let offset = 0;
 
-    // Also include tool interactions as context (summarized)
-    const toolMessages = batch
-      .filter(m => Array.isArray(m.content))
-      .map(m => {
-        if (m.role === 'assistant') {
-          const tools = m.content.filter(b => b.type === 'tool_use').map(b => b.name);
-          const text = m.content.filter(b => b.type === 'text').map(b => b.text.slice(0, 100)).join(' ');
-          return tools.length > 0
-            ? `assistant: [used tools: ${tools.join(', ')}] ${text}`
-            : `assistant: ${text}`;
-        }
-        return null;
-      })
-      .filter(Boolean);
+    while (offset < batch.length) {
+      const epochBatch = batch.slice(offset, offset + EPOCH_SIZE);
+      if (epochBatch.length < 5) break;  // Don't create tiny epochs
 
-    const allMessages = [...textMessages, ...toolMessages];
-    if (allMessages.length < 3) return false;
+      const epoch = await tree.createEpoch(epochBatch);
+      if (epoch) {
+        created++;
+      } else {
+        // If epoch creation failed, don't lose messages — break and let them stay in history
+        console.warn(`[context-memory] Chat ${chatId}: epoch creation failed at offset ${offset}, keeping messages`);
+        break;
+      }
 
-    const prompt = existingSummary
-      ? `EXISTING CONTEXT SUMMARY:\n${existingSummary}\n\nNEW CONVERSATION MESSAGES TO INCORPORATE:\n${allMessages.join('\n')}`
-      : allMessages.join('\n');
-
-    const systemMsg = `You are a context memory system. Your job is to maintain a rolling summary of a conversation.
-
-${existingSummary ? 'Update the existing summary by incorporating the new messages below.' : 'Create a summary of the conversation below.'}
-
-Rules:
-- Focus on: decisions made, facts learned, preferences expressed, ongoing tasks, action items, relationships between people mentioned
-- PRESERVE with exact detail: names (people, tokens, contracts), numbers, dates, code references, file paths, technical decisions, architectural choices, error messages, URLs
-- Preserve WHO said WHAT — attribute opinions and decisions to specific people
-- Remove chit-chat and greetings — keep only substantive content
-- Write in present tense as ongoing context ("User prefers X", "Currently working on Y")
-- Keep under 1000 words — be dense and information-rich, but never lose technical specifics
-- Do NOT use JSON — write natural flowing prose with bullet points for key facts
-- This summary will be prepended to future conversations so the AI has continuous memory
-- When in doubt about whether to keep a detail, KEEP IT — information loss is worse than verbosity`;
-
-    const response = await llmChat({
-      _background: true,
-      max_tokens: 800,
-      system: systemMsg,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const summaryText = response.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('')
-      .trim();
-
-    if (!summaryText || summaryText.length < 20) {
-      console.warn('[context-memory] Summarization returned empty result — skipping');
-      return false;
+      offset += EPOCH_SIZE;
     }
 
-    // Truncate if too long (should rarely happen with good prompting)
-    const finalSummary = summaryText.length > MAX_SUMMARY_LENGTH
-      ? summaryText.slice(0, MAX_SUMMARY_LENGTH) + '\n[summary truncated]'
-      : summaryText;
+    if (created === 0) return false;
 
-    // Store the summary
-    const messageCount = (existing?.messageCount || 0) + messagesToSummarize;
-    summaries.set(chatId, {
-      summary: finalSummary,
-      messageCount,
-      lastUpdated: Date.now(),
-      version: (existing?.version || 0) + 1,
-    });
+    // Remove summarized messages from history
+    const messagesConsumed = Math.min(created * EPOCH_SIZE, messagesToSummarize);
+    history.splice(0, messagesConsumed);
+
     dirty = true;
 
-    // Remove summarized messages from history (keep only recent ones)
-    history.splice(0, messagesToSummarize);
+    const stats = tree.getStats();
+    console.log(
+      `[context-memory] Chat ${chatId}: created ${created} epoch(s)`
+      + ` (${messagesConsumed} msgs consumed, ${stats.epochs} total epochs`
+      + `, ${stats.eras} eras, ${stats.totalDecisions} decisions tracked)`
+    );
 
-    console.log(`[context-memory] Chat ${chatId}: summarized ${messagesToSummarize} messages (total: ${messageCount}, summary: ${finalSummary.length} chars, v${(existing?.version || 0) + 1})`);
     return true;
   } catch (err) {
     console.warn(`[context-memory] Summarization failed for chat ${chatId}: ${err.message}`);
@@ -218,27 +238,65 @@ Rules:
 // ============ Get Summary for Prompt Injection ============
 
 /**
- * Get the rolling context summary for a chat.
- * Returns a formatted string to prepend to the system prompt,
- * or empty string if no summary exists.
+ * Get the context witness for a chat.
+ * Returns a structured Verkle witness — compact proof of the entire
+ * conversation with decisions, relationships, and open questions.
+ *
+ * Falls back to legacy flat summary if no tree exists.
  */
 export function getContextSummary(chatId) {
-  const data = summaries.get(chatId);
-  if (!data?.summary || data.summary.length === 0) return '';
+  // Try Verkle tree first
+  const tree = trees.get(chatId);
+  if (tree) {
+    const witness = tree.buildWitness();
+    if (witness) return witness;
+  }
 
-  // Safety bound — truncate if somehow oversized
-  const summary = data.summary.length > MAX_SUMMARY_LENGTH
-    ? data.summary.slice(0, MAX_SUMMARY_LENGTH) + '\n[context truncated]'
-    : data.summary;
+  // Fallback to legacy flat summary
+  const legacy = legacySummaries.get(chatId);
+  if (!legacy?.summary || legacy.summary.length === 0) return '';
 
-  const age = Date.now() - data.lastUpdated;
+  const summary = legacy.summary.length > MAX_SUMMARY_LENGTH
+    ? legacy.summary.slice(0, MAX_SUMMARY_LENGTH) + '\n[context truncated]'
+    : legacy.summary;
+
+  const age = Date.now() - legacy.lastUpdated;
   const ageStr = age < 3600000
     ? `${Math.round(age / 60000)}m ago`
     : age < 86400000
       ? `${Math.round(age / 3600000)}h ago`
       : `${Math.round(age / 86400000)}d ago`;
 
-  return `\n\n// ============ CONTINUOUS CONTEXT (${data.messageCount} messages summarized, updated ${ageStr}) ============\n${summary}\n// ============ END CONTINUOUS CONTEXT ============`;
+  return `\n\n// ============ CONTINUOUS CONTEXT (${legacy.messageCount} messages summarized, updated ${ageStr}) ============\n${summary}\n// ============ END CONTINUOUS CONTEXT ============`;
+}
+
+// ============ Verkle-Specific Operations ============
+
+/**
+ * Get the Verkle tree for a chat (for cross-shard operations).
+ */
+export function getTree(chatId) {
+  return trees.get(chatId) || null;
+}
+
+/**
+ * Export a witness for cross-shard sharing.
+ */
+export function exportWitness(chatId) {
+  const tree = trees.get(chatId);
+  return tree ? tree.exportWitness() : null;
+}
+
+/**
+ * Import a witness from another shard.
+ */
+export function importWitness(chatId, witness) {
+  if (!trees.has(chatId)) {
+    trees.set(chatId, new VerkleContextTree(chatId));
+  }
+  const result = trees.get(chatId).importWitness(witness);
+  if (result) dirty = true;
+  return result;
 }
 
 // ============ Manual Operations ============
@@ -249,13 +307,15 @@ export function getContextSummary(chatId) {
 export async function forceSummarize(chatId, history) {
   if (!history || history.length < 5) return { error: 'Not enough messages to summarize' };
 
-  const originalThreshold = SUMMARIZE_THRESHOLD;
-  // Temporarily lower threshold to force summarization
+  // Temporarily use a lower threshold
+  const oldThreshold = SUMMARIZE_THRESHOLD;
   const result = await summarizeIfNeeded(chatId, history);
+
+  const tree = trees.get(chatId);
   return {
     summarized: result,
-    summary: summaries.get(chatId)?.summary || null,
-    messageCount: summaries.get(chatId)?.messageCount || 0,
+    verkle: tree ? tree.getStats() : null,
+    witness: tree ? tree.buildWitness() : null,
   };
 }
 
@@ -264,40 +324,53 @@ export async function forceSummarize(chatId, history) {
  */
 export function getContextMemoryStats() {
   const stats = {
-    totalChats: summaries.size,
-    summaries: [],
+    totalChats: trees.size,
+    trees: [],
     totalMessages: 0,
-    totalSummaryChars: 0,
+    totalDecisions: 0,
+    totalEpochs: 0,
+    totalEras: 0,
+    legacySummaries: legacySummaries.size,
   };
 
-  for (const [chatId, data] of summaries) {
-    stats.summaries.push({
-      chatId,
-      messageCount: data.messageCount,
-      summaryLength: data.summary.length,
-      version: data.version,
-      lastUpdated: new Date(data.lastUpdated).toISOString(),
-    });
-    stats.totalMessages += data.messageCount;
-    stats.totalSummaryChars += data.summary.length;
+  for (const [chatId, tree] of trees) {
+    const treeStats = tree.getStats();
+    stats.trees.push(treeStats);
+    stats.totalMessages += treeStats.totalMessages;
+    stats.totalDecisions += treeStats.totalDecisions;
+    stats.totalEpochs += treeStats.epochs;
+    stats.totalEras += treeStats.eras;
   }
 
   return stats;
 }
 
 /**
- * Clear the summary for a specific chat.
+ * Clear the context for a specific chat.
  */
 export function clearContextSummary(chatId) {
-  const existed = summaries.has(chatId);
-  summaries.delete(chatId);
-  if (existed) dirty = true;
-  return existed;
+  const hadTree = trees.has(chatId);
+  const hadLegacy = legacySummaries.has(chatId);
+  trees.delete(chatId);
+  legacySummaries.delete(chatId);
+  if (hadTree || hadLegacy) dirty = true;
+  return hadTree || hadLegacy;
 }
 
 /**
  * Get raw summary data for a chat.
+ * Returns Verkle tree stats if available, legacy summary otherwise.
  */
 export function getRawSummary(chatId) {
-  return summaries.get(chatId) || null;
+  const tree = trees.get(chatId);
+  if (tree) {
+    return {
+      type: 'verkle',
+      stats: tree.getStats(),
+      witness: tree.buildWitness(),
+      root: tree.root,
+    };
+  }
+
+  return legacySummaries.get(chatId) || null;
 }

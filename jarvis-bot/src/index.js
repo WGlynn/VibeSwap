@@ -5764,19 +5764,14 @@ bot.command('code', async (ctx) => {
     // 6. Return to master
     await gitReturnToMaster();
 
-    // 7. Report back with diff
-    const fileList = filesWritten.map(f => `  - ${f}`).join('\n');
-    const summary = text.length > 600 ? text.slice(0, 600) + '...' : text;
-    const diffPreview = diff ? `\nDiff preview:\n\`\`\`\n${diff.slice(0, 1500)}\n\`\`\`` : '';
+    // 7. Report back — clean and simple
+    const fileCount = filesWritten.length;
+    const oneLiner = text.split('\n').find(l => l.trim().length > 20)?.trim().slice(0, 120) || taskText.slice(0, 120);
 
     await ctx.reply(
-      `Shard completed coding task.\n\n` +
-      `Branch: ${branch}\n` +
-      (filesWritten.length > 0 ? `Files touched:\n${fileList}\n\n` : '') +
-      `${pushResult}\n\n` +
-      `Summary:\n${summary}` +
-      `${diffPreview}\n\n` +
-      `Review & merge: https://github.com/wglynn/vibeswap/compare/${branch}?expand=1`
+      `Done. ${fileCount} file${fileCount !== 1 ? 's' : ''} changed.\n` +
+      `${oneLiner}\n` +
+      `github.com/wglynn/vibeswap/compare/${branch}?expand=1`
     );
 
     // Track contribution

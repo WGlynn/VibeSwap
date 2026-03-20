@@ -517,13 +517,13 @@ export default function OnboardingTour() {
   }
 
   return (
-    <AnimatePresence mode="wait">
-      {visible && (
-        <>
-          {/* Spotlight overlay with cutout */}
-          <SpotlightOverlay targetRect={targetRect} onClick={completeTour} />
+    <>
+      {/* Spotlight overlay — OUTSIDE AnimatePresence so it doesn't unmount between steps */}
+      {visible && <SpotlightOverlay targetRect={targetRect} onClick={completeTour} />}
 
-          {/* Tooltip card */}
+      <AnimatePresence mode="wait">
+        {visible && (
+          /* Tooltip card */
           <motion.div
             ref={tooltipRef}
             key={`tour-tooltip-${step}`}
@@ -656,8 +656,8 @@ export default function OnboardingTour() {
               </div>
             </div>
           </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

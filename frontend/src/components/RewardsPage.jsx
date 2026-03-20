@@ -4,6 +4,7 @@ import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { useRewardsAPI } from '../hooks/useRewardsAPI'
 
 // ============ Constants ============
 const PHI = 1.618033988749895
@@ -89,16 +90,44 @@ export default function RewardsPage() {
   const isConnected = isExternalConnected || isDeviceConnected
   const [isClaiming, setIsClaiming] = useState(false)
 
-  const userStats = useMemo(() => isConnected
-    ? { contributions: 0, quality: 0, daysActive: 0, pendingVibe: 0 }
-    : { contributions: 87, quality: 0.91, daysActive: 34, pendingVibe: 1240.5 },
-  [isConnected])
+  // Real data from Jarvis API + on-chain contracts (falls back to mock)
+  const { userStats: apiStats, leaderboard: apiLeaderboard, insights: apiInsights, vibeBalance, isLoading: apiLoading } = useRewardsAPI(account)
+
+  const userStats = useMemo(() => {
+    if (apiStats?.contributions > 0) {
+      return {
+        contributions: apiStats.contributions,
+        quality: apiStats.avgQuality || 0,
+        daysActive: apiStats.daysSinceFirst || 0,
+        pendingVibe: parseFloat(vibeBalance || '0'),
+      }
+    }
+    // Mock data when API unavailable or no contributions
+    return isConnected
+      ? { contributions: 0, quality: 0, daysActive: 0, pendingVibe: parseFloat(vibeBalance || '0') }
+      : { contributions: 87, quality: 0.91, daysActive: 34, pendingVibe: 1240.5 }
+  }, [apiStats, vibeBalance, isConnected])
 
   const tier = getTier(userStats.contributions)
-  const leaderboard = useMemo(() => generateLeaderboard(), [])
+
+  // Real leaderboard from API, mock fallback
+  const leaderboard = useMemo(() => {
+    if (apiLeaderboard.length > 0) {
+      return apiLeaderboard.map((u, i) => ({
+        rank: i + 1,
+        name: u.username,
+        contributions: u.contributions,
+        quality: u.quality,
+        devPct: Math.round((u.categories?.CODE || 0) / Math.max(1, u.contributions) * 100),
+        mechPct: Math.round((u.categories?.IDEA || 0) / Math.max(1, u.contributions) * 100),
+        commPct: Math.round((u.categories?.COMMUNITY || 0) / Math.max(1, u.contributions) * 100),
+      }))
+    }
+    return generateLeaderboard()
+  }, [apiLeaderboard])
 
   const handleClaim = () => {
-    // TODO: Call ShapleyDistributor.claimReward() via signer
+    // TODO: Call ShapleyDistributor.claimReward() via ethers signer
     setIsClaiming(true)
     setTimeout(() => setIsClaiming(false), 2000)
   }

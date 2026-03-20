@@ -1,4 +1,28 @@
+# Default profile: lightweight local dev (no optimizer, no via_ir, no tests)
+# Full compilation + testing happens in CI (GitHub Actions, 7GB RAM)
+# Use `FOUNDRY_PROFILE=ci forge build` for full build locally if needed
 [profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+solc = "0.8.20"
+optimizer = false
+via_ir = false
+ffi = false
+verbosity = 3
+
+[profile.default.fuzz]
+runs = 256
+max_test_rejects = 65536
+
+[profile.default.invariant]
+runs = 256
+depth = 500
+
+# CI profile: full optimization + via_ir (runs on GitHub Actions with 7GB RAM)
+# This is the source of truth for deployment artifacts
+[profile.ci]
 src = "contracts"
 out = "out"
 libs = ["lib"]
@@ -9,11 +33,11 @@ via_ir = true
 ffi = false
 verbosity = 3
 
-[profile.default.fuzz]
+[profile.ci.fuzz]
 runs = 256
 max_test_rejects = 65536
 
-[profile.default.invariant]
+[profile.ci.invariant]
 runs = 256
 depth = 500
 

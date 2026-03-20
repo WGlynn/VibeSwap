@@ -144,11 +144,11 @@ jobs:
         with:
           version: nightly
 
-      - name: Build contracts
-        run: forge build
+      - name: Build contracts (full optimization)
+        run: FOUNDRY_PROFILE=ci forge build
 
       - name: Run tests
-        run: forge test -vvv
+        run: FOUNDRY_PROFILE=ci forge test -vvv
 
   # ============ Oracle ============
   oracle:

@@ -298,9 +298,11 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         { path: '/proposals', label: 'Proposals', icon: '📋' },
         { path: '/treasury', label: 'Treasury', icon: '🏛' },
         { path: '/contributors', label: 'Contributors', icon: '⭐' },
+        { path: '/ideas', label: 'Ideas', icon: '💡' },
       ],
       all: [
         { path: '/feed', label: 'VibeFeed', icon: '📡' },
+        { path: '/ideas', label: 'Ideas', icon: '💡' },
         { path: '/social', label: 'Social Trading', icon: '👥' },
         { path: '/wiki', label: 'VibeWiki', icon: '📚' },
         { path: '/board', label: 'Discussions', icon: '💬' },

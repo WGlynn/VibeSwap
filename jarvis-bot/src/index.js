@@ -5704,16 +5704,29 @@ bot.command('idea', async (ctx) => {
 bot.command('code', async (ctx) => {
   if (!isOwner(ctx)) return ownerOnly(ctx);
 
-  const taskText = ctx.message.text.replace(/^\/code(@\w+)?/, '').trim();
+  let taskText = ctx.message.text.replace(/^\/code(@\w+)?/, '').trim();
+
+  // If replying to someone's message, use their message as context
+  // This lets Will reply to "the swap page is confusing" with just /code
+  const repliedMsg = ctx.message.reply_to_message;
+  let creditUser = null;
+  if (repliedMsg?.text) {
+    const repliedAuthor = repliedMsg.from?.username || repliedMsg.from?.first_name || 'someone';
+    if (!taskText) {
+      // No explicit task — use the replied-to message AS the task
+      taskText = `Address this feedback from @${repliedAuthor}: "${repliedMsg.text}"`;
+    } else {
+      // Explicit task + reply context — combine them
+      taskText = `${taskText}\n\nContext from @${repliedAuthor}: "${repliedMsg.text}"`;
+    }
+    // Credit the original author via dialogue-to-code attribution
+    creditUser = { id: repliedMsg.from?.id, username: repliedAuthor };
+  }
+
   if (!taskText || taskText.length < 10) {
     return ctx.reply(
-      'Usage: /code <task description>\n\n' +
-      'Describe what you want changed. The shard will:\n' +
-      '1. Read relevant existing code\n' +
-      '2. Make targeted edits (not just new files)\n' +
-      '3. Create a branch and push\n' +
-      '4. Show you the diff\n\n' +
-      'Example: /code Make settleBatch permissionless by removing the onlyAuthorizedSettler modifier'
+      'Usage: /code <task> or reply to a message with /code\n\n' +
+      'Reply to someone\'s feedback with /code and the shard turns their insight into a code change. They get credited.'
     );
   }
 
@@ -5786,13 +5799,26 @@ bot.command('code', async (ctx) => {
     }
 
     // 8. Report back — clean and simple + review verdict
+    const creditLine = creditUser ? `\nInsight by @${creditUser.username} — credited.` : '';
     await ctx.reply(
-      `Done. ${fileCount} file${fileCount !== 1 ? 's' : ''} changed.${crpcVerdict}\n` +
+      `Done. ${fileCount} file${fileCount !== 1 ? 's' : ''} changed.${crpcVerdict}${creditLine}\n` +
       `github.com/wglynn/vibeswap/compare/${branch}?expand=1`
     );
 
-    // Track contribution
+    // Track contribution + credit original author if replying to their message
     await trackMessage(ctx);
+    if (creditUser?.id) {
+      try {
+        attributeSource({
+          author: creditUser.username,
+          authorId: String(creditUser.id),
+          url: `https://github.com/wglynn/vibeswap/compare/${branch}`,
+          type: 'SOCIAL',
+          title: `Code change from insight (${taskText.slice(0, 60)})`,
+          metadata: { telegramId: creditUser.id, pipeline: 'code-from-reply', branch },
+        });
+      } catch {}
+    }
 
   } catch (error) {
     await gitReturnToMaster();

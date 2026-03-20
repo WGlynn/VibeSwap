@@ -529,6 +529,82 @@ export async function handleWebRequest(req, res, pathname) {
     return true;
   }
 
+  // ============ GET /web/rewards/stats ============
+  // Contribution stats for a wallet address (for RewardsPage)
+  if (pathname === '/web/rewards/stats' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const wallet = url.searchParams.get('wallet');
+      const { getAllUsers, getUserStats, getUserWallet } = await import('./tracker.js');
+      const { getCodeStats } = await import('./dialogue-to-code.js');
+
+      if (wallet) {
+        // Find user by wallet address
+        const allUsers = getAllUsers();
+        let found = null;
+        for (const [telegramId, userData] of Object.entries(allUsers)) {
+          if (getUserWallet(telegramId)?.toLowerCase() === wallet.toLowerCase()) {
+            found = { telegramId, ...getUserStats(telegramId), wallet };
+            break;
+          }
+        }
+        jsonResponse(res, 200, found || { contributions: 0, quality: 0, daysActive: 0 });
+      } else {
+        // Global stats
+        const dialogueStats = getCodeStats();
+        jsonResponse(res, 200, { dialogueInsights: dialogueStats });
+      }
+    } catch (err) {
+      jsonResponse(res, 200, { contributions: 0, error: err.message });
+    }
+    return true;
+  }
+
+  // ============ GET /web/rewards/leaderboard ============
+  if (pathname === '/web/rewards/leaderboard' && req.method === 'GET') {
+    try {
+      const { getAllUsers, getUserStats, getUserWallet } = await import('./tracker.js');
+      const allUsers = getAllUsers();
+      const ranked = Object.entries(allUsers)
+        .map(([id, user]) => {
+          const stats = getUserStats(id);
+          if (!stats || stats.contributions === 0) return null;
+          return {
+            username: user.username || user.firstName || 'anon',
+            contributions: stats.contributions,
+            quality: stats.avgQuality || 0,
+            score: (stats.avgQuality || 0) * stats.contributions,
+            wallet: getUserWallet(id) ? 'linked' : 'none',
+            days: stats.daysSinceFirst || 0,
+            categories: stats.categoryCounts || {},
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20);
+      jsonResponse(res, 200, { leaderboard: ranked });
+    } catch (err) {
+      jsonResponse(res, 200, { leaderboard: [], error: err.message });
+    }
+    return true;
+  }
+
+  // ============ GET /web/rewards/insights ============
+  if (pathname === '/web/rewards/insights' && req.method === 'GET') {
+    try {
+      const { getCodeStats } = await import('./dialogue-to-code.js');
+      const stats = getCodeStats();
+      jsonResponse(res, 200, {
+        insights: stats.recentInsights || [],
+        total: stats.totalDetected || 0,
+        published: stats.totalPublished || 0,
+      });
+    } catch (err) {
+      jsonResponse(res, 200, { insights: [], error: err.message });
+    }
+    return true;
+  }
+
   // ============ GET /web/wardenclyffe ============
   // LLM provider cascade performance stats
   if (pathname === '/web/wardenclyffe' && req.method === 'GET') {

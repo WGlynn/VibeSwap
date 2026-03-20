@@ -22,6 +22,7 @@ import { FavoritesProvider } from './contexts/FavoritesContext'
 import { InfinityStonesProvider } from './hooks/useInfinityStones'
 import { GasProvider } from './contexts/GasContext'
 import MobileNav from './components/ui/MobileNav'
+import DemoBanner from './components/ui/DemoBanner'
 import { remember } from './utils/sankofa'
 
 // Error boundary to catch React errors
@@ -461,6 +462,7 @@ function App() {
       {isVoicePage ? (
         // Voice page: full screen, no header, no nav
         <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>
+          <DemoBanner />
           <main className="flex-1 overflow-hidden">
             <AnimatedRoutes />
           </main>
@@ -468,6 +470,7 @@ function App() {
       ) : isHomePage ? (
         // Home page: completely fixed layout, no scroll possible
         <div className="fixed inset-0 flex flex-col" style={{ zIndex: 1 }}>
+          <DemoBanner />
           <HeaderMinimal />
           <main className="flex-1 overflow-hidden">
             <AnimatedRoutes />
@@ -476,6 +479,7 @@ function App() {
       ) : (
         // Other pages: allow scrolling with .allow-scroll class
         <div className="fixed inset-0 flex flex-col allow-scroll" style={{ zIndex: 1 }}>
+          <DemoBanner />
           <HeaderMinimal />
           <main className="flex-1 overflow-y-auto allow-scroll">
             <AnimatedRoutes />

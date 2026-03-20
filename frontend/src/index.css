@@ -119,6 +119,13 @@ body.no-scroll #root {
   outline-offset: 2px;
 }
 
+/* Prevent iOS Safari auto-zoom on input focus (requires >= 16px font) */
+@media screen and (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Number inputs */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -1029,4 +1036,14 @@ details[open] > div {
 
 .flash-success {
   animation: success-flash 1s ease-out;
+}
+
+/* ============================================
+   MOBILE NAV BOTTOM PADDING
+   ============================================ */
+/* Pages need bottom padding so content isn't hidden behind fixed MobileNav */
+@media screen and (max-width: 639px) {
+  main.overflow-y-auto {
+    padding-bottom: 5rem; /* ~80px, clears MobileNav + safe area */
+  }
 }

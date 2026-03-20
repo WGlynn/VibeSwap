@@ -104,13 +104,13 @@ export default function MobileNav({ onOpenMenu }) {
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div className="flex items-center justify-around px-2 py-1.5">
+      <div className="flex items-center justify-around px-2 py-2">
         {navItems.map((item) => {
           const isActive = item.path !== null && location.pathname === item.path
           const isMore = item.path === null
 
           const content = (
-            <div className="flex flex-col items-center gap-0.5 py-1 relative">
+            <div className="flex flex-col items-center gap-0.5 py-1.5 relative">
               <div
                 className="transition-colors duration-150"
                 style={{ color: isActive ? CYAN : 'rgba(255, 255, 255, 0.45)' }}

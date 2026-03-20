@@ -45,7 +45,7 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
           initial={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(4px)' }}
           animate={{ scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }}
           exit={{ scale: 0.95, opacity: 0, y: 20, filter: 'blur(2px)' }}
-          className="relative w-full max-w-md glass-card rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto"
+          className="relative w-full max-w-md glass-card rounded-2xl p-4 sm:p-6 shadow-2xl max-h-[85vh] overflow-y-auto"
         >
           {/* Content */}
           <div className="text-center mb-6">

@@ -84,6 +84,7 @@ export default function Dropdown({
             style={{
               background: 'rgba(8,8,12,0.95)',
               borderColor: `${CYAN}20`,
+              WebkitBackdropFilter: 'blur(16px)',
               backdropFilter: 'blur(16px)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
             }}

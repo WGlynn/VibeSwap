@@ -82,6 +82,7 @@ function CountdownTimer({ size = 64, showBatch = true, className = '' }) {
         style={{
           width: size, height: size,
           background: 'rgba(15, 15, 15, 0.6)',
+          WebkitBackdropFilter: 'blur(12px)',
           backdropFilter: 'blur(12px)',
           border: '1px solid rgba(255, 255, 255, 0.06)',
         }}

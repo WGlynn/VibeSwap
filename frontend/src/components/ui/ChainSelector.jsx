@@ -73,6 +73,7 @@ export default function ChainSelector({
             style={{
               background: 'rgba(10,10,10,0.95)',
               borderColor: `${CYAN}20`,
+              WebkitBackdropFilter: 'blur(20px)',
               backdropFilter: 'blur(20px)',
             }}
           >

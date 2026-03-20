@@ -38,7 +38,7 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-start justify-center px-4"
-        style={{ top: 0, left: 0, right: 0, bottom: 0, height: '100vh', height: '100dvh', paddingTop: '18vh' }}
+        style={{ top: 0, left: 0, right: 0, bottom: 0, height: '100vh', height: '100dvh', paddingTop: '28vh' }}
       >
         <div className="absolute inset-0 bg-black/80 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.85))' }} />
         <motion.div

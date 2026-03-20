@@ -5,6 +5,7 @@ import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { useIdentity } from '../hooks/useIdentity'
 import { useMindMesh } from '../hooks/useMindMesh'
+import { useUserLevel } from '../hooks/useUserLevel'
 import SoulboundAvatar from './SoulboundAvatar'
 import RecoverySetup from './RecoverySetup'
 import PulseIndicator from './ui/PulseIndicator'
@@ -14,9 +15,11 @@ import { useTheme } from '../hooks/useTheme'
 import { useUbuntu } from '../hooks/useUbuntu'
 
 /**
- * Minimal header - Logo, wallet, and hidden drawer for power users
- * The scalpel approach: hide complexity until needed
- * @version 2.1.0 - Fixed wallet connection display for both external and device wallets
+ * Minimal header — Progressive Disclosure Navigation
+ * Layer 0: Logo + wallet + search. No hamburger. Just breathe.
+ * Layer 1+: Drawer appears with engagement-appropriate depth.
+ * "Apple doesn't show you Settings on the home screen."
+ * @version 3.0.0 - Progressive disclosure restructure
  */
 function HeaderMinimal() {
   const location = useLocation()
@@ -25,6 +28,7 @@ function HeaderMinimal() {
   const { identity, hasIdentity } = useIdentity()
   const { mesh } = useMindMesh()
   const { here } = useUbuntu()
+  const { level, unlockExplore, toggleDeveloperMode, developerMode } = useUserLevel()
   const [showDrawer, setShowDrawer] = useState(false)
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
   const [gasGwei, setGasGwei] = useState(18)
@@ -66,7 +70,7 @@ function HeaderMinimal() {
       >
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-14">
-            {/* Logo — subtle constant glow */}
+            {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 group">
               <div className="w-8 h-8 rounded-lg bg-matrix-600 flex items-center justify-center animate-glow-breathe">
                 <svg className="w-4 h-4 text-black-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -83,17 +87,19 @@ function HeaderMinimal() {
                 <CountdownTimer size={40} showBatch={false} />
               </div>
 
-              {/* Gas indicator */}
-              <Link
-                to="/gas"
-                className="hidden sm:flex items-center space-x-1 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-black-500 transition-colors"
-                title="Gas Tracker"
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: gasGwei > 40 ? '#ef4444' : gasGwei > 25 ? '#f59e0b' : '#22c55e' }} />
-                <span className="text-[10px] font-mono text-black-400">{Math.round(gasGwei)}</span>
-              </Link>
+              {/* Gas indicator — only show at Level 1+ */}
+              {level >= 1 && (
+                <Link
+                  to="/gas"
+                  className="hidden sm:flex items-center space-x-1 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-black-500 transition-colors"
+                  title="Gas Tracker"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: gasGwei > 40 ? '#ef4444' : gasGwei > 25 ? '#f59e0b' : '#22c55e' }} />
+                  <span className="text-[10px] font-mono text-black-400">{Math.round(gasGwei)}</span>
+                </Link>
+              )}
 
-              {/* Search button — opens CommandPalette */}
+              {/* Search button — opens CommandPalette (always visible) */}
               <button
                 onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, shiftKey: true }))}
                 className="p-1.5 rounded-lg hover:bg-black-800/60 transition-colors"
@@ -105,38 +111,41 @@ function HeaderMinimal() {
                 </svg>
               </button>
 
-              {/* Notification bell */}
-              <Link
-                to="/notifications"
-                className="relative p-1.5 rounded-lg hover:bg-black-800/60 transition-colors"
-                title="Notifications"
-              >
-                <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {/* Notification badge — only show when there are real notifications */}
-              </Link>
+              {/* Notification bell — only Level 1+ */}
+              {level >= 1 && (
+                <Link
+                  to="/notifications"
+                  className="relative p-1.5 rounded-lg hover:bg-black-800/60 transition-colors"
+                  title="Notifications"
+                >
+                  <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </Link>
+              )}
 
-              {/* Mesh indicator — cells within cells interlinked */}
-              <Link
-                to="/mesh"
-                className="hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-matrix-700 transition-colors"
-                title="Mind Network Mesh"
-              >
-                {mesh?.status === 'fully-interlinked' ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-matrix-500 animate-pulse" />
-                ) : mesh?.status === 'partial' ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-black-500" />
-                )}
-                <span className="text-[10px] font-mono text-black-400">
-                  {mesh ? `${mesh.cells?.filter(c => c.status === 'interlinked').length || 0}/3` : '...'}
-                </span>
-              </Link>
+              {/* Mesh indicator — Level 2+ */}
+              {level >= 2 && (
+                <Link
+                  to="/mesh"
+                  className="hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-matrix-700 transition-colors"
+                  title="Mind Network Mesh"
+                >
+                  {mesh?.status === 'fully-interlinked' ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-matrix-500 animate-pulse" />
+                  ) : mesh?.status === 'partial' ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-black-500" />
+                  )}
+                  <span className="text-[10px] font-mono text-black-400">
+                    {mesh ? `${mesh.cells?.filter(c => c.status === 'interlinked').length || 0}/3` : '...'}
+                  </span>
+                </Link>
+              )}
 
-              {/* Ubuntu — souls present */}
-              {here > 1 && (
+              {/* Ubuntu — souls present (Level 2+) */}
+              {level >= 2 && here > 1 && (
                 <span className="hidden sm:inline text-[10px] font-mono text-black-500">
                   {here}
                 </span>
@@ -167,22 +176,24 @@ function HeaderMinimal() {
                 </InteractiveButton>
               )}
 
-              {/* Menu button */}
-              <button
-                onClick={() => setShowDrawer(true)}
-                className="p-2 rounded-lg hover:bg-black-800/60 transition-colors"
-                aria-label="Open menu"
-              >
-                <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+              {/* Menu button — hidden at Level 0 (no hamburger for first-timers) */}
+              {level >= 1 && (
+                <button
+                  onClick={() => setShowDrawer(true)}
+                  className="p-2 rounded-lg hover:bg-black-800/60 transition-colors"
+                  aria-label="Open menu"
+                >
+                  <svg className="w-5 h-5 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Drawer - all secondary features hidden here */}
+      {/* Drawer — progressive disclosure */}
       <AnimatePresence>
         {showDrawer && (
           <Drawer
@@ -192,6 +203,10 @@ function HeaderMinimal() {
             hasIdentity={hasIdentity}
             isConnected={isConnected}
             disconnect={disconnect}
+            level={level}
+            unlockExplore={unlockExplore}
+            toggleDeveloperMode={toggleDeveloperMode}
+            developerMode={developerMode}
             onOpenRecoverySetup={() => {
               setShowDrawer(false)
               setShowRecoverySetup(true)
@@ -209,157 +224,223 @@ function HeaderMinimal() {
   )
 }
 
-function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect, onOpenRecoverySetup, showAdminSection }) {
+// ============ Drawer Component — Layered Navigation ============
+
+function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnect, level, unlockExplore, toggleDeveloperMode, developerMode, onOpenRecoverySetup, showAdminSection }) {
   const location = useLocation()
   const { theme, cycleTheme, themes } = useTheme()
 
-  const navItems = [
-    { path: '/', label: 'Exchange', icon: '⚡', description: 'Trade one currency for another' },
-    { path: '/trade', label: 'Pro Trading', icon: '📈', description: 'Charts, order book & positions' },
-    { path: '/buy', label: 'Add Money', icon: '💳', description: 'Use Venmo, PayPal, or bank' },
-    { path: '/lend', label: 'Lend & Borrow', icon: '🏦', description: 'Supply or borrow assets' },
-    { path: '/stake', label: 'Stake & Earn', icon: '🔒', description: 'Lock tokens for rewards' },
-    { path: '/vault', label: 'Savings Vault', icon: '💰', description: 'Long-term secure storage' },
-    { path: '/send', label: 'Send Money', icon: '→', description: 'Transfer to anyone' },
+  // ============ Level 1 — Engaged User Nav ============
+  const level1Items = [
     { path: '/portfolio', label: 'Portfolio', icon: '📊', description: 'Your holdings at a glance' },
-    { path: '/apps', label: 'App Store', icon: '🏪', description: 'Apps for VSOS' },
+    { path: '/rewards', label: 'Rewards', icon: '🎁', description: 'Earn VIBE tokens' },
+    { path: '/markets', label: 'Markets', icon: '📈', description: 'See all prices' },
+    { path: '/buy', label: 'Buy / Sell', icon: '💳', description: 'Use Venmo, PayPal, or bank' },
+    { path: '/history', label: 'History', icon: '📜', description: 'Your transactions' },
+    { path: '/notifications', label: 'Notifications', icon: '🔔', description: 'Alerts & updates' },
   ]
 
-  // Categorized secondary navigation — collapsible groups for flow
-  const categories = [
-    { label: 'DeFi', items: [
-      { path: '/perps', label: 'Perpetuals', icon: '📈' },
-      { path: '/options', label: 'Options', icon: '⚖' },
-      { path: '/yield', label: 'Yield', icon: '🌱' },
-      { path: '/aggregator', label: 'Aggregator', icon: '⚡' },
-      { path: '/bonds', label: 'Bonds', icon: '🔗' },
-      { path: '/dca', label: 'Auto-Buy (DCA)', icon: '🔄' },
-      { path: '/insurance', label: 'Insurance', icon: '🛡' },
-      { path: '/predict', label: 'Predictions', icon: '🔮' },
-      { path: '/gameswap', label: 'Game Swap', icon: '🎮' },
-      { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
-      { path: '/launchpad', label: 'Launchpad', icon: '🚀' },
-      { path: '/rewards', label: 'Rewards', icon: '🎁' },
-      { path: '/mine', label: 'Mine JUL', icon: '⛏' },
-      { path: '/multisend', label: 'Multi-Send', icon: '📨' },
-      { path: '/limit', label: 'Limit Orders', icon: '📋' },
-      { path: '/staking-rewards', label: 'Staking Rewards', icon: '💎' },
-      { path: '/onramp', label: 'Buy with Fiat', icon: '💵' },
-      { path: '/farming', label: 'Liquidity Mining', icon: '🌾' },
-      { path: '/otc', label: 'OTC Desk', icon: '🏢' },
-      { path: '/lp-positions', label: 'LP Positions', icon: '📐' },
-      { path: '/markets', label: 'Markets', icon: '📊' },
-      { path: '/derivatives', label: 'Derivatives', icon: '📉' },
-      { path: '/create-token', label: 'Token Creator', icon: '🪄' },
-      { path: '/margin', label: 'Margin Trading', icon: '📊' },
-      { path: '/revenue', label: 'Revenue Share', icon: '💸' },
-      { path: '/vesting', label: 'Vesting', icon: '🔐' },
-      { path: '/liquidations', label: 'Liquidations', icon: '⚠' },
-      { path: '/offramp', label: 'Sell to Fiat', icon: '💶' },
-      { path: '/rebalance', label: 'Rebalancer', icon: '⚖' },
-      { path: '/lp-optimizer', label: 'LP Optimizer', icon: '📈' },
-      { path: '/price-impact', label: 'Price Impact', icon: '📐' },
-    ]},
-    { label: 'Ecosystem', items: [
-      { path: '/nft', label: 'NFT Market', icon: '🖼' },
-      { path: '/agents', label: 'AI Agents', icon: '🤖' },
-      { path: '/depin', label: 'DePIN Network', icon: '📡' },
-      { path: '/rwa', label: 'Real World Assets', icon: '🏠' },
-      { path: '/infofi', label: 'InfoFi', icon: '💡' },
-      { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
-      { path: '/names', label: '.vibe Names', icon: '🏷' },
-      { path: '/govern', label: 'Governance', icon: '🗳️' },
-    ]},
-    { label: 'Community', items: [
-      { path: '/feed', label: 'VibeFeed', icon: '📡' },
-      { path: '/social', label: 'Social Trading', icon: '👥' },
-      { path: '/wiki', label: 'VibeWiki', icon: '📚' },
-      { path: '/board', label: 'Discussions', icon: '💬' },
-      { path: '/forum', label: 'Community', icon: '🗨️' },
-      { path: '/prompts', label: 'Prompt Feed', icon: '>' },
-      { path: '/live', label: 'Live', icon: '🔴' },
-      { path: '/proposals', label: 'Proposals', icon: '📋' },
-      { path: '/treasury', label: 'Treasury', icon: '🏛' },
-      { path: '/grants', label: 'Grants', icon: '💰' },
-      { path: '/dao-tools', label: 'DAO Tools', icon: '🛠' },
-      { path: '/delegate', label: 'Delegate', icon: '🗳' },
-      { path: '/competitions', label: 'Competitions', icon: '🏆' },
-      { path: '/contributors', label: 'Contributors', icon: '⭐' },
-      { path: '/snapshot', label: 'Snapshots', icon: '📸' },
-      { path: '/airdrop', label: 'Airdrop', icon: '🪂' },
-      { path: '/claims', label: 'Claim Rewards', icon: '🎁' },
-    ]},
-    { label: 'Intelligence', items: [
-      { path: '/trinity', label: 'The Trinity', icon: '🔺' },
-      { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
-      { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
-      { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
-      { path: '/automation', label: 'Automation', icon: '🤖' },
-      { path: '/arbitrage', label: 'Arbitrage Scanner', icon: '🔀' },
-      { path: '/whales', label: 'Whale Watcher', icon: '🐋' },
-      { path: '/sentiment', label: 'Sentiment', icon: '🌡' },
-      { path: '/backtest', label: 'Backtester', icon: '⏪' },
-      { path: '/screener', label: 'DEX Screener', icon: '🔍' },
-    ]},
-    { label: 'Knowledge', items: [
-      { path: '/docs', label: 'Learn', icon: '📖' },
-      { path: '/economics', label: 'Economics', icon: '$' },
-      { path: '/jul', label: 'JUL Token', icon: 'J' },
-      { path: '/philosophy', label: 'Philosophy', icon: '∞' },
-      { path: '/covenants', label: 'Ten Covenants', icon: 'X' },
-      { path: '/rosetta', label: 'Rosetta Protocol', icon: '⟷' },
-      { path: '/trust', label: 'Trust Network', icon: '⊗' },
-      { path: '/gametheory', label: 'Game Theory', icon: '∑' },
-      { path: '/commit-reveal', label: 'Commit-Reveal', icon: '#' },
-      { path: '/inversion', label: 'Graceful Inversion', icon: '∿' },
-      { path: '/research', label: 'Research', icon: '~' },
-      { path: '/whitepaper', label: 'Whitepaper', icon: '📜' },
-      { path: '/tokenomics', label: 'Tokenomics', icon: '🪙' },
-    ]},
-    { label: 'System', items: [
-      { path: '/status', label: 'System Status', icon: '|' },
-      { path: '/analytics', label: 'Analytics', icon: '📊' },
-      { path: '/gas', label: 'Gas Tracker', icon: '⛽' },
-      { path: '/oracle', label: 'Oracle', icon: '👁' },
-      { path: '/circuit-breaker', label: 'Circuit Breaker', icon: '⚡' },
-      { path: '/crosschain', label: 'Cross-Chain', icon: '🔗' },
-      { path: '/networks', label: 'Networks', icon: '🌐' },
-      { path: '/fees', label: 'Fee Tiers', icon: '💲' },
-      { path: '/security', label: 'Security', icon: '🛡' },
-      { path: '/x402', label: 'x402 Payments', icon: '💳' },
-      { path: '/poe', label: 'POE Revaluation', icon: '📜' },
-      { path: '/shapley', label: 'Shapley Rewards', icon: '⚖' },
-      { path: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
-      { path: '/referral', label: 'Referrals', icon: '🤝' },
-      { path: '/roadmap', label: 'Roadmap', icon: '🗺' },
-      { path: '/team', label: 'Team', icon: '👥' },
-      { path: '/faq', label: 'FAQ', icon: '?' },
-      { path: '/changelog', label: 'Changelog', icon: '📝' },
-      { path: '/migrate', label: 'Migration', icon: '🔄' },
-      { path: '/health', label: 'Protocol Health', icon: '💚' },
-      { path: '/fee-calculator', label: 'Fee Calculator', icon: '🧮' },
-      { path: '/mev', label: 'MEV Dashboard', icon: '🛡' },
-      { path: '/contracts', label: 'Smart Contracts', icon: '📝' },
-      { path: '/unlocks', label: 'Token Unlocks', icon: '🔓' },
-      { path: '/about', label: 'About', icon: 'i' },
-      { path: '/partners', label: 'Partners', icon: '🤝' },
-      { path: '/brand', label: 'Brand', icon: '🎨' },
-      { path: '/careers', label: 'Careers', icon: '💼' },
-      { path: '/legal', label: 'Legal', icon: '📄' },
-      { path: '/contact', label: 'Contact', icon: '✉️' },
-      { path: '/approvals', label: 'Approvals', icon: '✅' },
-      { path: '/multichain', label: 'Multi-Chain', icon: '🔗' },
-      { path: '/education', label: 'Education', icon: '🎓' },
-      { path: '/compare', label: 'Compare DEXs', icon: '⚖' },
-      { path: '/api', label: 'API Docs', icon: '🔌' },
-      { path: '/privacy', label: 'Privacy', icon: '🔏' },
-    ]},
+  // ============ Level 2 — Curated Categories ============
+  // Top items per category, with full list behind "See all"
+  const level2Categories = [
+    {
+      label: 'DeFi',
+      top: [
+        { path: '/perps', label: 'Perpetuals', icon: '📈' },
+        { path: '/options', label: 'Options', icon: '⚖' },
+        { path: '/yield', label: 'Yield', icon: '🌱' },
+        { path: '/lend', label: 'Lending', icon: '🏦' },
+        { path: '/dca', label: 'Auto-Buy (DCA)', icon: '🔄' },
+        { path: '/insurance', label: 'Insurance', icon: '🛡' },
+        { path: '/limit', label: 'Limit Orders', icon: '📋' },
+        { path: '/lp-positions', label: 'LP Positions', icon: '📐' },
+      ],
+      all: [
+        { path: '/perps', label: 'Perpetuals', icon: '📈' },
+        { path: '/options', label: 'Options', icon: '⚖' },
+        { path: '/yield', label: 'Yield', icon: '🌱' },
+        { path: '/aggregator', label: 'Aggregator', icon: '⚡' },
+        { path: '/bonds', label: 'Bonds', icon: '🔗' },
+        { path: '/dca', label: 'Auto-Buy (DCA)', icon: '🔄' },
+        { path: '/insurance', label: 'Insurance', icon: '🛡' },
+        { path: '/predict', label: 'Predictions', icon: '🔮' },
+        { path: '/gameswap', label: 'Game Swap', icon: '🎮' },
+        { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
+        { path: '/launchpad', label: 'Launchpad', icon: '🚀' },
+        { path: '/mine', label: 'Mine JUL', icon: '⛏' },
+        { path: '/multisend', label: 'Multi-Send', icon: '📨' },
+        { path: '/limit', label: 'Limit Orders', icon: '📋' },
+        { path: '/staking-rewards', label: 'Staking Rewards', icon: '💎' },
+        { path: '/onramp', label: 'Buy with Fiat', icon: '💵' },
+        { path: '/farming', label: 'Liquidity Mining', icon: '🌾' },
+        { path: '/otc', label: 'OTC Desk', icon: '🏢' },
+        { path: '/lp-positions', label: 'LP Positions', icon: '📐' },
+        { path: '/lend', label: 'Lending', icon: '🏦' },
+        { path: '/stake', label: 'Staking', icon: '🔒' },
+        { path: '/derivatives', label: 'Derivatives', icon: '📉' },
+        { path: '/create-token', label: 'Token Creator', icon: '🪄' },
+        { path: '/margin', label: 'Margin Trading', icon: '📊' },
+        { path: '/revenue', label: 'Revenue Share', icon: '💸' },
+        { path: '/vesting', label: 'Vesting', icon: '🔐' },
+        { path: '/liquidations', label: 'Liquidations', icon: '⚠' },
+        { path: '/offramp', label: 'Sell to Fiat', icon: '💶' },
+        { path: '/rebalance', label: 'Rebalancer', icon: '⚖' },
+        { path: '/lp-optimizer', label: 'LP Optimizer', icon: '📈' },
+        { path: '/price-impact', label: 'Price Impact', icon: '📐' },
+      ],
+    },
+    {
+      label: 'Community',
+      top: [
+        { path: '/feed', label: 'VibeFeed', icon: '📡' },
+        { path: '/forum', label: 'Community', icon: '🗨️' },
+        { path: '/govern', label: 'Governance', icon: '🗳️' },
+        { path: '/proposals', label: 'Proposals', icon: '📋' },
+        { path: '/treasury', label: 'Treasury', icon: '🏛' },
+        { path: '/contributors', label: 'Contributors', icon: '⭐' },
+      ],
+      all: [
+        { path: '/feed', label: 'VibeFeed', icon: '📡' },
+        { path: '/social', label: 'Social Trading', icon: '👥' },
+        { path: '/wiki', label: 'VibeWiki', icon: '📚' },
+        { path: '/board', label: 'Discussions', icon: '💬' },
+        { path: '/forum', label: 'Community', icon: '🗨️' },
+        { path: '/prompts', label: 'Prompt Feed', icon: '>' },
+        { path: '/live', label: 'Live', icon: '🔴' },
+        { path: '/proposals', label: 'Proposals', icon: '📋' },
+        { path: '/treasury', label: 'Treasury', icon: '🏛' },
+        { path: '/grants', label: 'Grants', icon: '💰' },
+        { path: '/dao-tools', label: 'DAO Tools', icon: '🛠' },
+        { path: '/delegate', label: 'Delegate', icon: '🗳' },
+        { path: '/competitions', label: 'Competitions', icon: '🏆' },
+        { path: '/contributors', label: 'Contributors', icon: '⭐' },
+        { path: '/snapshot', label: 'Snapshots', icon: '📸' },
+        { path: '/airdrop', label: 'Airdrop', icon: '🪂' },
+        { path: '/claims', label: 'Claim Rewards', icon: '🎁' },
+        { path: '/govern', label: 'Governance', icon: '🗳️' },
+      ],
+    },
+    {
+      label: 'Intelligence',
+      top: [
+        { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
+        { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
+        { path: '/whales', label: 'Whale Watcher', icon: '🐋' },
+        { path: '/sentiment', label: 'Sentiment', icon: '🌡' },
+        { path: '/screener', label: 'DEX Screener', icon: '🔍' },
+      ],
+      all: [
+        { path: '/trinity', label: 'The Trinity', icon: '🔺' },
+        { path: '/mesh', label: 'Mind Mesh', icon: '🌐' },
+        { path: '/jarvis', label: 'JARVIS', icon: '🧠' },
+        { path: '/agentic', label: 'Agentic Economy', icon: '⚡' },
+        { path: '/automation', label: 'Automation', icon: '🤖' },
+        { path: '/arbitrage', label: 'Arbitrage Scanner', icon: '🔀' },
+        { path: '/whales', label: 'Whale Watcher', icon: '🐋' },
+        { path: '/sentiment', label: 'Sentiment', icon: '🌡' },
+        { path: '/backtest', label: 'Backtester', icon: '⏪' },
+        { path: '/screener', label: 'DEX Screener', icon: '🔍' },
+      ],
+    },
+  ]
+
+  // ============ Level 3 — Developer Categories ============
+  const level3Categories = [
+    {
+      label: 'Ecosystem',
+      items: [
+        { path: '/nft', label: 'NFT Market', icon: '🖼' },
+        { path: '/agents', label: 'AI Agents', icon: '🤖' },
+        { path: '/depin', label: 'DePIN Network', icon: '📡' },
+        { path: '/rwa', label: 'Real World Assets', icon: '🏠' },
+        { path: '/infofi', label: 'InfoFi', icon: '💡' },
+        { path: '/memehunter', label: 'Memehunter', icon: '🎯' },
+        { path: '/names', label: '.vibe Names', icon: '🏷' },
+        { path: '/apps', label: 'App Store', icon: '🏪' },
+      ],
+    },
+    {
+      label: 'Knowledge',
+      items: [
+        { path: '/docs', label: 'Learn', icon: '📖' },
+        { path: '/economics', label: 'Economics', icon: '$' },
+        { path: '/jul', label: 'JUL Token', icon: 'J' },
+        { path: '/philosophy', label: 'Philosophy', icon: '∞' },
+        { path: '/covenants', label: 'Ten Covenants', icon: 'X' },
+        { path: '/rosetta', label: 'Rosetta Protocol', icon: '⟷' },
+        { path: '/trust', label: 'Trust Network', icon: '⊗' },
+        { path: '/gametheory', label: 'Game Theory', icon: '∑' },
+        { path: '/commit-reveal', label: 'Commit-Reveal', icon: '#' },
+        { path: '/inversion', label: 'Graceful Inversion', icon: '∿' },
+        { path: '/research', label: 'Research', icon: '~' },
+        { path: '/whitepaper', label: 'Whitepaper', icon: '📜' },
+        { path: '/tokenomics', label: 'Tokenomics', icon: '🪙' },
+      ],
+    },
+    {
+      label: 'System',
+      items: [
+        { path: '/status', label: 'System Status', icon: '|' },
+        { path: '/analytics', label: 'Analytics', icon: '📊' },
+        { path: '/gas', label: 'Gas Tracker', icon: '⛽' },
+        { path: '/oracle', label: 'Oracle', icon: '👁' },
+        { path: '/circuit-breaker', label: 'Circuit Breaker', icon: '⚡' },
+        { path: '/crosschain', label: 'Cross-Chain', icon: '🔗' },
+        { path: '/networks', label: 'Networks', icon: '🌐' },
+        { path: '/fees', label: 'Fee Tiers', icon: '💲' },
+        { path: '/security', label: 'Security', icon: '🛡' },
+        { path: '/x402', label: 'x402 Payments', icon: '💳' },
+        { path: '/poe', label: 'POE Revaluation', icon: '📜' },
+        { path: '/shapley', label: 'Shapley Rewards', icon: '⚖' },
+        { path: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
+        { path: '/referral', label: 'Referrals', icon: '🤝' },
+        { path: '/roadmap', label: 'Roadmap', icon: '🗺' },
+        { path: '/team', label: 'Team', icon: '👥' },
+        { path: '/faq', label: 'FAQ', icon: '?' },
+        { path: '/changelog', label: 'Changelog', icon: '📝' },
+        { path: '/migrate', label: 'Migration', icon: '🔄' },
+        { path: '/health', label: 'Protocol Health', icon: '💚' },
+        { path: '/fee-calculator', label: 'Fee Calculator', icon: '🧮' },
+        { path: '/mev', label: 'MEV Dashboard', icon: '🛡' },
+        { path: '/contracts', label: 'Smart Contracts', icon: '📝' },
+        { path: '/unlocks', label: 'Token Unlocks', icon: '🔓' },
+        { path: '/about', label: 'About', icon: 'i' },
+        { path: '/partners', label: 'Partners', icon: '🤝' },
+        { path: '/brand', label: 'Brand', icon: '🎨' },
+        { path: '/careers', label: 'Careers', icon: '💼' },
+        { path: '/legal', label: 'Legal', icon: '📄' },
+        { path: '/contact', label: 'Contact', icon: '✉️' },
+        { path: '/approvals', label: 'Approvals', icon: '✅' },
+        { path: '/multichain', label: 'Multi-Chain', icon: '🔗' },
+        { path: '/education', label: 'Education', icon: '🎓' },
+        { path: '/compare', label: 'Compare DEXs', icon: '⚖' },
+        { path: '/api', label: 'API Docs', icon: '🔌' },
+        { path: '/privacy', label: 'Privacy', icon: '🔏' },
+      ],
+    },
   ]
 
   // NOTE: Admin role check deferred — currently checks wallet address only.
   // Full RBAC via ContributionDAG trust levels planned for v2.
   const adminItems = [
     { path: '/admin/sybil', label: 'Sybil Detection', icon: '🔍', description: 'Monitor for fake accounts' },
+  ]
+
+  // Account items — shown at Level 1+
+  const accountItems = [
+    { path: '/wallet', label: 'Wallet', icon: '👛' },
+    { path: '/profile', label: 'Profile', icon: '👤' },
+    { path: '/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/badges', label: 'Badges', icon: '🏅' },
+    { path: '/alerts', label: 'Price Alerts', icon: '🔔' },
+    { path: '/watchlist', label: 'Watchlist', icon: '👁' },
+    { path: '/achievements', label: 'Achievements', icon: '🏆' },
+    { path: '/swap-history', label: 'Swap History', icon: '📜' },
+    { path: '/portfolio-analytics', label: 'Analytics', icon: '📈' },
+    { path: '/bridge-history', label: 'Bridge History', icon: '🌉' },
+    { path: '/export', label: 'Export Data', icon: '📤' },
+    { path: '/streaks', label: 'Streaks', icon: '🔥' },
+    { path: '/tutorial', label: 'Getting Started', icon: '📖' },
   ]
 
   return (
@@ -373,7 +454,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         onClick={onClose}
       />
 
-      {/* Drawer — glass morphism */}
+      {/* Drawer */}
       <motion.div
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
@@ -419,9 +500,9 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
           </div>
         )}
 
-        {/* Main navigation */}
+        {/* ============ Level 1 — Quick Actions ============ */}
         <div className="p-2">
-          {navItems.map((item) => (
+          {level1Items.map((item) => (
             <Link
               key={item.path}
               to={item.path}
@@ -443,88 +524,116 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
           ))}
         </div>
 
-        {/* Divider */}
-        <div className="mx-4 h-px bg-black-700" />
+        {/* ============ Level 1 → Level 2 Upgrade Prompt ============ */}
+        {level < 2 && (
+          <>
+            <div className="mx-4 h-px bg-black-700" />
+            <div className="p-2">
+              <button
+                onClick={unlockExplore}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-black-400 hover:text-matrix-400 hover:bg-black-700/50 transition-colors"
+              >
+                <span className="text-sm">Explore more features</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
 
-        {/* Categorized navigation — collapsible groups */}
+        {/* ============ Level 2 — Curated Categories ============ */}
+        {level >= 2 && (
+          <>
+            <div className="mx-4 h-px bg-black-700" />
+            <div className="p-2">
+              {level2Categories.map((cat) => (
+                <CategorySection
+                  key={cat.label}
+                  label={cat.label}
+                  topItems={cat.top}
+                  allItems={cat.all}
+                  location={location}
+                  onClose={onClose}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ============ Level 3 — Developer Mode Categories ============ */}
+        {level >= 3 && (
+          <>
+            <div className="mx-4 h-px bg-matrix-700/30" />
+            <div className="p-2">
+              <div className="px-4 py-2 text-[10px] font-mono text-matrix-600 uppercase tracking-wider">Developer</div>
+              {level3Categories.map((cat) => {
+                const isActive = cat.items.some(item => item.path === location.pathname)
+                return (
+                  <details key={cat.label} open={isActive} className="group mb-1">
+                    <summary className="flex items-center justify-between px-4 py-2 cursor-pointer text-xs text-black-500 uppercase hover:text-black-300 transition-colors list-none select-none">
+                      <span>{cat.label}</span>
+                      <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </summary>
+                    <div className="pb-1">
+                      {cat.items.map((item) => (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={onClose}
+                          className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+                            location.pathname === item.path
+                              ? 'bg-black-700 text-white'
+                              : 'hover:bg-black-700/50 text-black-400'
+                          }`}
+                        >
+                          <span className="text-sm">{item.icon}</span>
+                          <span className="text-sm">{item.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ============ Account Section ============ */}
+        <div className="mx-4 h-px bg-black-700" />
         <div className="p-2">
-          {categories.map((cat) => {
-            // Auto-open category if current page is in it
-            const isActive = cat.items.some(item => item.path === location.pathname)
-            return (
-              <details key={cat.label} open={isActive} className="group mb-1">
-                <summary className="flex items-center justify-between px-4 py-2 cursor-pointer text-xs text-black-500 uppercase hover:text-black-300 transition-colors list-none select-none">
-                  <span>{cat.label}</span>
-                  <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </summary>
-                <div className="pb-1">
-                  {cat.items.map((item) => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={onClose}
-                      className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
-                        location.pathname === item.path
-                          ? 'bg-black-700 text-white'
-                          : 'hover:bg-black-700/50 text-black-400'
-                      }`}
-                    >
-                      <span className="text-sm">{item.icon}</span>
-                      <span className="text-sm">{item.label}</span>
-                    </Link>
-                  ))}
-                </div>
-              </details>
-            )
-          })}
+          <details className="group mb-1">
+            <summary className="flex items-center justify-between px-4 py-2 cursor-pointer text-xs text-black-500 uppercase hover:text-black-300 transition-colors list-none select-none">
+              <span>Account</span>
+              <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </summary>
+            <div className="pb-1">
+              {accountItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+                    location.pathname === item.path
+                      ? 'bg-black-700 text-white'
+                      : 'hover:bg-black-700/50 text-black-400'
+                  }`}
+                >
+                  <span className="text-sm">{item.icon}</span>
+                  <span className="text-sm">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </details>
         </div>
 
-        {/* Account links */}
+        {/* ============ Safety & Settings ============ */}
         <div className="mx-4 h-px bg-black-700" />
         <div className="p-2">
-          <div className="px-4 py-2 text-xs text-black-500 uppercase">Account</div>
-          {[
-            { path: '/wallet', label: 'Wallet', icon: '👛' },
-            { path: '/notifications', label: 'Notifications', icon: '🔔' },
-            { path: '/profile', label: 'Profile', icon: '👤' },
-            { path: '/settings', label: 'Settings', icon: '⚙️' },
-            { path: '/tutorial', label: 'Getting Started', icon: '📖' },
-            { path: '/badges', label: 'Badges', icon: '🏅' },
-            { path: '/alerts', label: 'Price Alerts', icon: '🔔' },
-            { path: '/export', label: 'Export Data', icon: '📤' },
-            { path: '/airdrop', label: 'Airdrop', icon: '🪂' },
-            { path: '/watchlist', label: 'Watchlist', icon: '👁' },
-            { path: '/achievements', label: 'Achievements', icon: '🏆' },
-            { path: '/swap-history', label: 'Swap History', icon: '📜' },
-            { path: '/portfolio-analytics', label: 'Analytics', icon: '📈' },
-            { path: '/bridge-history', label: 'Bridge History', icon: '🌉' },
-            { path: '/approvals', label: 'Approvals', icon: '✅' },
-            { path: '/streaks', label: 'Streaks', icon: '🔥' },
-            { path: '/vesting', label: 'Vesting', icon: '🔐' },
-            { path: '/multichain', label: 'Multi-Chain', icon: '🌐' },
-          ].map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={onClose}
-              className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
-                location.pathname === item.path
-                  ? 'bg-black-700 text-white'
-                  : 'hover:bg-black-700/50 text-black-400'
-              }`}
-            >
-              <span className="text-sm">{item.icon}</span>
-              <span className="text-sm">{item.label}</span>
-            </Link>
-          ))}
-        </div>
-
-        {/* Security Section - Account Protection */}
-        <div className="mx-4 h-px bg-black-700" />
-        <div className="p-2">
-          <div className="px-4 py-2 text-xs text-black-500 uppercase">Safety</div>
           <button
             onClick={onOpenRecoverySetup}
             className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors hover:bg-black-700/50 text-black-400 hover:text-matrix-400"
@@ -532,7 +641,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
             <span>🛡️</span>
             <div className="text-left">
               <div>Protect My Account</div>
-              <div className="text-xs text-black-500">Set up backup options in case you lose access</div>
+              <div className="text-xs text-black-500">Set up backup options</div>
             </div>
           </button>
           <button
@@ -545,10 +654,33 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
               <div className="text-xs text-black-500">Tap to cycle themes</div>
             </div>
           </button>
+
+          {/* Developer Mode Toggle — always visible at Level 2+ */}
+          {level >= 2 && (
+            <button
+              onClick={toggleDeveloperMode}
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-colors ${
+                developerMode
+                  ? 'bg-matrix-500/10 text-matrix-400'
+                  : 'hover:bg-black-700/50 text-black-400 hover:text-matrix-400'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <span>🔧</span>
+                <div className="text-left">
+                  <div>Developer Mode</div>
+                  <div className="text-xs text-black-500">Knowledge, System & Admin tools</div>
+                </div>
+              </div>
+              <div className={`w-8 h-4 rounded-full transition-colors ${developerMode ? 'bg-matrix-500' : 'bg-black-600'}`}>
+                <div className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${developerMode ? 'translate-x-4' : 'translate-x-0.5'} translate-y-[1px]`} />
+              </div>
+            </button>
+          )}
         </div>
 
-        {/* Admin Section - Development/Admin only */}
-        {showAdminSection && (
+        {/* Admin Section — Development/Admin only */}
+        {showAdminSection && level >= 3 && (
           <>
             <div className="mx-4 h-px bg-black-700" />
             <div className="p-2">
@@ -580,7 +712,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
           </>
         )}
 
-        {/* Settings & Disconnect */}
+        {/* Disconnect */}
         {isConnected && (
           <div className="p-4 mt-auto border-t border-black-700">
             <button
@@ -595,7 +727,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
           </div>
         )}
 
-        {/* Quantum status - only show if enabled */}
+        {/* Quantum status */}
         {identity?.quantumEnabled && (
           <div className="mx-4 mb-4 p-3 rounded-lg bg-terminal-500/10 border border-terminal-500/20">
             <div className="flex items-center space-x-2 text-sm">
@@ -608,6 +740,56 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         )}
       </motion.div>
     </>
+  )
+}
+
+// ============ CategorySection — "See all" Pattern ============
+// Shows top N items by default, expands to full list on click.
+
+function CategorySection({ label, topItems, allItems, location, onClose }) {
+  const [expanded, setExpanded] = useState(false)
+  const isActive = allItems.some(item => item.path === location.pathname)
+  const items = expanded ? allItems : topItems
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between px-4 py-2">
+        <span className="text-xs text-black-500 uppercase">{label}</span>
+        {!expanded && allItems.length > topItems.length && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="text-[10px] text-matrix-600 hover:text-matrix-400 transition-colors font-mono"
+          >
+            See all {allItems.length} →
+          </button>
+        )}
+        {expanded && (
+          <button
+            onClick={() => setExpanded(false)}
+            className="text-[10px] text-black-500 hover:text-black-300 transition-colors font-mono"
+          >
+            Show less
+          </button>
+        )}
+      </div>
+      <div className="pb-1">
+        {items.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            onClick={onClose}
+            className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+              location.pathname === item.path
+                ? 'bg-black-700 text-white'
+                : 'hover:bg-black-700/50 text-black-400'
+            }`}
+          >
+            <span className="text-sm">{item.icon}</span>
+            <span className="text-sm">{item.label}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   )
 }
 

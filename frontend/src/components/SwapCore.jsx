@@ -446,12 +446,12 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
           <div className="space-y-3">
             {isDeviceWallet ? (
               <>
-                {/* Primary: iCloud backup for device wallets */}
+                {/* Primary: encrypted backup for device wallets */}
                 <button
                   onClick={onSetupICloudBackup}
                   className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base transition-colors"
                 >
-                  ☁️ Back Up to iCloud Notes
+                  🔐 Create Encrypted Backup
                 </button>
                 <button
                   onClick={onSetupRecovery}
@@ -512,7 +512,7 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
   )
 }
 
-// PIN-encrypted iCloud backup modal
+// PIN-encrypted backup modal (works on any device — no iCloud dependency)
 function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
   const [step, setStep] = useState('intro') // intro, pin, confirm, backup, done
   const [pin, setPin] = useState('')
@@ -623,9 +623,9 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
                   <span className="text-3xl">☁️</span>
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Back Up to iCloud</h2>
+                <h2 className="text-2xl font-bold mb-2">Create Encrypted Backup</h2>
                 <p className="text-black-200 text-base">
-                  Save an encrypted backup to your iCloud Notes. If you lose this device, you can recover your wallet.
+                  Create a PIN-encrypted backup of your wallet. Save it somewhere safe — a password manager, a note, or printed on paper. If you lose this device, your backup restores access.
                 </p>
               </div>
 
@@ -640,7 +640,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                 <div className="flex items-start space-x-3 p-3 rounded-lg bg-black-700/50">
                   <span className="text-xl mt-0.5">2️⃣</span>
                   <div>
-                    <div className="font-medium text-base">Save to iCloud Notes</div>
+                    <div className="font-medium text-base">Save your backup code</div>
                     <div className="text-sm text-black-300">We'll give you a code to paste</div>
                   </div>
                 </div>
@@ -655,7 +655,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
 
               <div className="p-3 rounded-lg bg-terminal-500/10 border border-terminal-500/20 mb-6">
                 <p className="text-sm text-black-200 text-center">
-                  <strong className="text-terminal-400">Why iCloud Notes?</strong> It syncs across all your Apple devices and is protected by your Apple ID.
+                  <strong className="text-terminal-400">Why encrypt?</strong> Your backup is AES-256 encrypted with your PIN. Without the PIN, the backup is useless — safe to store anywhere.
                 </p>
               </div>
 
@@ -787,7 +787,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Your Backup Code</h2>
                 <p className="text-black-200 text-base">
-                  Copy this code and save it in your iCloud Notes app.
+                  Copy this code and save it somewhere safe.
                 </p>
               </div>
 
@@ -806,12 +806,12 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
               </div>
 
               <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 mb-6">
-                <p className="text-sm text-black-200 font-medium mb-2">How to save to iCloud Notes:</p>
+                <p className="text-sm text-black-200 font-medium mb-2">Where to save your backup:</p>
                 <ol className="text-sm text-black-300 space-y-1 list-decimal list-inside">
-                  <li>Open the <strong>Notes</strong> app on your iPhone/Mac</li>
-                  <li>Create a new note titled "VibeSwap Backup"</li>
-                  <li>Paste the code you just copied</li>
-                  <li>Make sure it syncs to iCloud (check the folder)</li>
+                  <li>A <strong>password manager</strong> (1Password, Bitwarden, etc.)</li>
+                  <li>A <strong>secure note</strong> on your device</li>
+                  <li><strong>Print it</strong> and store with important documents</li>
+                  <li>Avoid cloud notes without encryption (Google Keep, etc.)</li>
                 </ol>
               </div>
 
@@ -1461,7 +1461,7 @@ function SwapCore() {
       isDeviceWallet={isDeviceConnected && !isExternalConnected}
     />
 
-    {/* iCloud Backup Modal */}
+    {/* Encrypted Backup Modal */}
     <ICloudBackupModal
       isOpen={showICloudBackup}
       onClose={handleICloudBackupClose}

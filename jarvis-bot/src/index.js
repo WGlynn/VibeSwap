@@ -174,6 +174,7 @@ import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, g
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
 import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, flagNoise, getAirspaceStats } from './airspace-monitor.js';
+import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // Nervos Talks — autonomous forum presence (silent guardian)
 let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
@@ -6081,6 +6082,19 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       }
     }
 
+    // Self-eval: post-response alignment check (background, non-blocking)
+    // "The true mind can weather all lies and illusions without being lost."
+    try {
+      const recentCtx = getRecentContext(chatId, 8) || '';
+      evaluateResponse(reply, text, recentCtx, {
+        chatId: String(chatId),
+        userId: String(ctx.from?.id || 0),
+        username: userName,
+        isGroup: chatType !== 'private',
+      });
+      recordBotResponse(chatId, ctx.from?.id);
+    } catch {}
+
     // Wardenclyffe: check for intelligence degradation and notify once
     const degradation = checkDegradation();
     if (degradation?.degraded) {
@@ -7731,6 +7745,10 @@ async function main() {
   // Step 2.92: Initialize dialogue-to-code pipeline
   console.log('[jarvis] Step 2.92: Initializing dialogue-to-code pipeline...');
   await initDialogueToCode();
+
+  // Step 2.925: Initialize self-evaluation (post-response alignment auditor)
+  console.log('[jarvis] Step 2.925: Initializing self-evaluation...');
+  await initSelfEval();
 
   // Step 2.93: Initialize reward batcher
   console.log('[jarvis] Step 2.93: Initializing reward batcher...');

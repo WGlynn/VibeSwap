@@ -41,7 +41,7 @@ export default function BackToTop() {
           exit={{ opacity: 0, y: 20, scale: 0.8 }}
           transition={{ duration: 1 / (PHI * PHI * PHI), ease: [0.25, 0.1, 1 / PHI, 1] }}
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full border border-black-600 backdrop-blur-xl flex items-center justify-center group transition-colors hover:border-cyan-500/50"
+          className="fixed bottom-20 sm:bottom-6 right-6 z-30 w-10 h-10 rounded-full border border-black-600 backdrop-blur-xl flex items-center justify-center group transition-colors hover:border-cyan-500/50"
           style={{
             background: 'rgba(8,8,12,0.8)',
             boxShadow: `0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(6,182,212,0.08)`,

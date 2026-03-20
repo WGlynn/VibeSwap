@@ -6,6 +6,18 @@ import { getPersonaOverlay, getActivePersonaId } from './persona.js';
 import { syncFileChange } from './knowledge-chain.js';
 import { getTheAIContext } from './pantheon.js';
 
+// Self-improvement: prompt overlay from RL + self-eval correction prompt
+let getPromptOverlay = () => '';
+let getSelfCorrectionPrompt = () => '';
+try {
+  const si = await import('./self-improve.js');
+  getPromptOverlay = si.getPromptOverlay || (() => '');
+} catch {}
+try {
+  const se = await import('./self-eval.js');
+  getSelfCorrectionPrompt = se.getSelfCorrectionPrompt || (() => '');
+} catch {}
+
 const MEMORY_FILES = [
   'MEMORY.md',
   'it-token-vision.md',
@@ -753,6 +765,12 @@ export async function loadSystemPrompt() {
     const theaiContext = await getTheAIContext();
     if (theaiContext) dynamicParts.push(theaiContext);
   } catch {}
+
+  // Self-improvement overlays — auto-generated from RL signals + self-eval violations
+  const rlOverlay = getPromptOverlay();
+  const selfEvalOverlay = getSelfCorrectionPrompt();
+  if (rlOverlay) dynamicParts.push(rlOverlay);
+  if (selfEvalOverlay) dynamicParts.push(selfEvalOverlay);
 
   const dynamicPrompt = dynamicParts.join('\n');
   const fullPrompt = staticPrompt + '\n' + dynamicPrompt + '\n' + RECENCY_RULES;

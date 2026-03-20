@@ -173,6 +173,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
+import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, flagNoise, getAirspaceStats } from './airspace-monitor.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // Nervos Talks — autonomous forum presence (silent guardian)
 let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
@@ -6467,6 +6468,21 @@ bot.on('text', async (ctx) => {
   // Track ALL messages silently (before auth check for chat responses)
   await trackMessage(ctx);
 
+  // Airspace monitor — record every message for dominance tracking
+  if (ctx.chat?.type !== 'private') {
+    recordAirspace(ctx.chat.id, ctx.from.id);
+
+    // Owner noise signal — when Will says "slop", "noise", or dismisses a thread
+    if (isOwner(ctx)) {
+      const ownerText = (ctx.message?.text || '').toLowerCase();
+      const noiseSignals = ['slop', 'this is noise', 'lost iq', 'stop engaging', 'move on', 'enough'];
+      if (noiseSignals.some(s => ownerText.includes(s))) {
+        flagNoise(ctx.chat.id);
+        console.log(`[airspace] Owner flagged noise in chat ${ctx.chat.id} — suppressing for 30min`);
+      }
+    }
+  }
+
   // Passive attribution — scan group messages for attribution signals
   try { detectTextAttribution(ctx.message?.text || ''); } catch {}
 
@@ -6639,6 +6655,24 @@ bot.on('text', async (ctx) => {
   // Jarvis follows behavioral directives from team members.
   // Detection runs BEFORE enforcement so users can always change the mode.
   const isAddressed = isMentioned || isReplyToBot || isCalledByName;
+
+  // ============ Airspace Monitor — Anti-Dominance Throttling ============
+  // Rebalances bot attention: dominant users get less, quiet users get more.
+  // The troll doesn't get banned — they get boring.
+  if (isGroup && isAddressed) {
+    // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
+    if (String(ctx.from?.id) !== config.ownerId) {
+      const airspace = checkAirspace(ctx.chat.id, ctx.from.id);
+      if (!airspace.shouldRespond) {
+        // Silently skip — don't even acknowledge. The troll gets nothing.
+        const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+        bufferMessage(ctx.chat.id, userName, ctx.message.text);
+        pushGroupMessage(ctx.chat.id, userName, ctx.message.text, ctx.message.message_id, false);
+        console.log(`[airspace] Throttled response to ${userName} in ${ctx.chat.id}: ${airspace.reason}`);
+        return;
+      }
+    }
+  }
 
   // Directive detection — check if this is a behavioral instruction
   if (isGroup && isAddressed) {

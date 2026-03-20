@@ -63,7 +63,7 @@ function HeaderMinimal() {
       <header
         className="sticky top-0 z-40 backdrop-blur-xl border-b border-black-700/50"
         style={{
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
           background: 'rgba(0,0,0,0.6)',
           boxShadow: '0 1px 0 0 rgba(0,255,65,0.08), 0 4px 20px rgba(0,0,0,0.3), inset 0 -1px 0 rgba(0,255,65,0.03)',
         }}

@@ -69,6 +69,7 @@ export default function Modal({
               className={`w-full ${sizes[size] || sizes.md} rounded-2xl border border-black-600 overflow-hidden pointer-events-auto ${className}`}
               style={{
                 background: 'rgba(8,8,12,0.95)',
+                WebkitBackdropFilter: 'blur(24px)',
                 backdropFilter: 'blur(24px)',
                 boxShadow: '0 0 60px rgba(0,0,0,0.5), 0 0 20px rgba(6,182,212,0.06)',
               }}

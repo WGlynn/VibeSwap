@@ -111,6 +111,7 @@ function JarvisIntro({ isOpen, onContinue }) {
           className="absolute inset-0"
           style={{
             background: 'rgba(0, 0, 0, 0.9)',
+            WebkitBackdropFilter: 'blur(12px)',
             backdropFilter: 'blur(12px)',
           }}
         />

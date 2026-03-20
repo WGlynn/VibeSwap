@@ -414,6 +414,7 @@ export default function VibePlayer() {
               ? 'linear-gradient(135deg, rgba(16,185,129,0.3), rgba(5,150,105,0.2))'
               : 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
             border: '1px solid rgba(255,255,255,0.15)',
+            WebkitBackdropFilter: 'blur(12px)',
             backdropFilter: 'blur(12px)',
           }}
         >

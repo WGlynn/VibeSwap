@@ -227,7 +227,7 @@ function SpotlightOverlay({ targetRect, onClick }) {
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
         className="fixed inset-0 z-[60]"
-        style={{ background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)' }}
+        style={{ background: 'rgba(0, 0, 0, 0.85)', WebkitBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)' }}
         onClick={onClick}
       />
     )
@@ -276,7 +276,7 @@ function SpotlightOverlay({ targetRect, onClick }) {
           height="100%"
           fill="rgba(0, 0, 0, 0.70)"
           mask="url(#tour-spotlight)"
-          style={{ backdropFilter: 'blur(4px)' }}
+          style={{ WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}
         />
         {/* Spotlight ring glow */}
         <motion.rect

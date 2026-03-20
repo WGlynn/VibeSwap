@@ -83,6 +83,7 @@ export default function TokenSelect({
             style={{
               background: 'rgba(10,10,10,0.95)',
               borderColor: `${CYAN}20`,
+              WebkitBackdropFilter: 'blur(20px)',
               backdropFilter: 'blur(20px)',
               boxShadow: `0 8px 32px rgba(0,0,0,0.5)`,
             }}

@@ -239,6 +239,7 @@ input[type="number"] {
    ============================================ */
 .modal-backdrop {
   background: rgba(0, 0, 0, 0.9);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
@@ -442,12 +443,14 @@ input[type="number"] {
 /* Glass effect - minimal version */
 .glass {
   background: rgba(13, 13, 13, 0.8);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border);
 }
 
 .glass-strong {
   background: rgba(13, 13, 13, 0.95);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
 }

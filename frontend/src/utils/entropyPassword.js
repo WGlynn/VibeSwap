@@ -88,7 +88,7 @@ export function collectEntropyAndGeneratePassword() {
     const overlay = document.createElement('div')
     overlay.style.cssText = `
       position: fixed; inset: 0; z-index: 9999;
-      background: rgba(0,0,0,0.95); backdrop-filter: blur(12px);
+      background: rgba(0,0,0,0.95); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-family: 'JetBrains Mono', monospace; color: #e0e0e0;
     `

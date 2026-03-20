@@ -35,7 +35,7 @@ function MessageBoard() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden" style={{ height: 'calc(100dvh - 3.5rem)' }}>
       {/* Channel Sidebar - desktop always, mobile when no chat open */}
       <div className={`${mobileView ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-72 lg:w-80 flex-shrink-0 border-r border-black-700 bg-black-900`}>
         <ChannelList

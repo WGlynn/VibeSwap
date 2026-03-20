@@ -60,6 +60,7 @@ export default function InfoTooltip({
               style={{
                 background: 'rgba(10,10,10,0.95)',
                 border: `1px solid ${CYAN}20`,
+                WebkitBackdropFilter: 'blur(12px)',
                 backdropFilter: 'blur(12px)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
               }}

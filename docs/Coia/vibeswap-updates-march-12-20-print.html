@@ -1,0 +1,154 @@
+<html><head><meta charset="utf-8"><style>
+body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; }
+h1 { border-bottom: 2px solid #00cc33; padding-bottom: 8px; }
+h2 { color: #00884d; margin-top: 32px; }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+th { background: #f5f5f5; }
+code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+hr { border: none; border-top: 1px solid #e0e0e0; margin: 24px 0; }
+</style></head><body><h1>VibeSwap Updates — March 12-20, 2026</h1>
+<p><strong>42 commits in 8 days. Here's what happened.</strong></p>
+<hr />
+<h2>Contracts &amp; Protocol</h2>
+<ul>
+<li>
+<p><strong>Disintermediation Phases 1-4</strong> — Systematically dissolving all owner/admin control. 10 of 14 protocol interactions now at Grade 3+ (peer-to-peer). <code>settleBatch()</code>, <code>createPool()</code>, Shapley computation, trust scoring all permissionless now. No single key can rug the protocol.</p>
+</li>
+<li>
+<p><strong>GovernanceGuard.sol</strong> — TimelockController with Shapley veto. 48-hour delay on proposals, governance can be vetoed by fairness math. The constitutional court.</p>
+</li>
+<li>
+<p><strong>Atomized Shapley</strong> — Two new contracts (UtilizationAccumulator + MicroGameFactory) that create Shapley games for every trade batch. LPs who actually get utilized earn more than LPs who just park capital. Follower count, TVL, volume — all replaced by counterfactual marginal contribution.</p>
+</li>
+<li>
+<p><strong>100+ contracts</strong> in the codebase now.</p>
+</li>
+</ul>
+<hr />
+<h2>Jarvis AI Network</h2>
+<ul>
+<li>
+<p><strong>Verkle Context Tree</strong> — New hierarchical memory system for all Jarvis shards. Conversations compressed into epochs/eras/root with structured categories (decisions, people, open questions, facts). Inspired by Ethereum's Verkle trees.</p>
+</li>
+<li>
+<p><strong>BFT Consensus LIVE</strong> — The shard mesh is real. Dynamic activation when 2+ shards register. CRPC pairwise comparison activates at 3+. Confirmed in production logs.</p>
+</li>
+<li>
+<p><strong>Dialogue-to-Code Pipeline</strong> — TG conversations automatically become GitHub contributions. Community members earn credit without writing code. "Everybody is a dev in VibeSwap."</p>
+</li>
+<li>
+<p><strong><code>/code</code> Command</strong> — Shards can write code. Say <code>/code fix the oracle timeout</code> or reply to someone's feedback with <code>/code</code> and the shard reads the codebase, makes targeted edits, creates a branch, runs CRPC review, and credits the original speaker.</p>
+</li>
+<li>
+<p><strong>Anti-Sycophancy Protocol</strong> — After the "Nebuchadnezzar Incident" (documented as IR-002), Jarvis now has five layers of defense against social pressure attacks. Won't give unearned concessions, won't become anyone's hype man, holds position under repetition.</p>
+</li>
+<li>
+<p><strong>Airspace Monitor</strong> — Probabilistic response throttling. Dominant users get less bot attention, quiet users get more. Trolls don't get banned — they get boring.</p>
+</li>
+<li>
+<p><strong>Self-Evaluation</strong> — Jarvis audits 10% of its own responses for alignment violations and auto-corrects its behavior. The prompt IS the weights. Every conversation is training data.</p>
+</li>
+<li>
+<p><strong>6 shards deployed</strong> on Fly.io (US East, London) + 2 VPS shards.</p>
+</li>
+</ul>
+<hr />
+<h2>Frontend</h2>
+<ul>
+<li>
+<p><strong>New URL</strong>: vibeswap-app.vercel.app (auto-aliased on every deploy)</p>
+</li>
+<li>
+<p><strong>RewardsPage</strong> — Contribution dashboard with leaderboard, stats, VIBE claim button at /rewards</p>
+</li>
+<li>
+<p><strong>Device Wallet</strong> — Now works on ANY device. WebAuthn (biometrics) → security key → password fallback. Mouse entropy generator creates memorable 6-word passphrases by moving your mouse over a grid.</p>
+</li>
+<li>
+<p><strong>Onboarding Tour</strong> fixed — no longer disappears on "Next" click, more visible against dark background, prominent skip button</p>
+</li>
+<li>
+<p><strong>Jarvis Intro Chat</strong> — Now has its own solid card body instead of floating transparently over the swap page</p>
+</li>
+</ul>
+<hr />
+<h2>TG Bot Commands (New)</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What It Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/mystatus</code></td>
+<td>Check your contribution stats and reward eligibility</td>
+</tr>
+<tr>
+<td><code>/contributions</code></td>
+<td>See dialogue-to-code insights</td>
+</tr>
+<tr>
+<td><code>/leaderboard</code></td>
+<td>Top contributors by quality-weighted score</td>
+</tr>
+<tr>
+<td><code>/batch_rewards</code></td>
+<td>Compute weekly Shapley reward batch</td>
+</tr>
+<tr>
+<td><code>/code &lt;task&gt;</code></td>
+<td>Shards write code from task descriptions</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Papers Published</h2>
+<ol>
+<li>
+<p><strong>"Dissolving the Owner"</strong> — Every admin gate documented with before/after code, grading system, philosophical foundations</p>
+</li>
+<li>
+<p><strong>"Atomized Shapley"</strong> — Universal fair measurement replacing all gameable metrics (TVL, volume, follower count)</p>
+</li>
+<li>
+<p><strong>"Everybody Is a Dev"</strong> — Community walkthrough for earning VIBE through TG conversations</p>
+</li>
+<li>
+<p><strong>ethresear.ch reply draft</strong> — Response to MEV auction format research, positioning commit-reveal batch auctions as the missing format</p>
+</li>
+</ol>
+<hr />
+<h2>Build Pipeline</h2>
+<ul>
+<li>Local builds: <strong>28 seconds</strong> (was 2.4 hours — optimizer was the bottleneck, not file count)</li>
+<li>CI: Full optimized builds on GitHub Actions (7GB RAM)</li>
+<li>Chunked build script for low-RAM machines</li>
+</ul>
+<hr />
+<h2>What's Next</h2>
+<ul>
+<li><strong>March 26</strong>: Fund Base deployer with ETH → call <code>drip()</code> → ~233K VIBE flows to community Shapley pool</li>
+<li><strong>Identity Layer Deploy</strong>: SoulboundIdentity + ContributionDAG on Base mainnet</li>
+<li><strong>Tokens flowing</strong>: Weekly Shapley games, community members claim VIBE for their contributions</li>
+<li><strong>ethresear.ch post</strong>: Positioning VibeSwap in front of Ethereum researchers</li>
+</ul>
+<hr />
+<h2>The Numbers</h2>
+<ul>
+<li><strong>42 commits</strong> in 8 days</li>
+<li><strong>100+ smart contracts</strong></li>
+<li><strong>128 frontend components</strong></li>
+<li><strong>6 Jarvis shards</strong> (BFT consensus active)</li>
+<li><strong>10/14 interactions</strong> at Grade 3+ peer-to-peer</li>
+<li><strong>3 papers</strong> published</li>
+<li><strong>5 new TG commands</strong></li>
+<li><strong>~233K VIBE</strong> waiting to flow to community</li>
+</ul>
+<hr />
+<p><em>"The real VibeSwap is not a DEX. It's not even a blockchain. We created a movement. An idea. VibeSwap is wherever the Minds converge."</em></p>
+<p><strong>GitHub</strong>: github.com/WGlynn/VibeSwap
+<strong>App</strong>: vibeswap-app.vercel.app
+<strong>Telegram</strong>: t.me/+3uHbNxyZH-tiOGY8</p></body></html>

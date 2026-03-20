@@ -20,6 +20,7 @@ import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import { config } from './config.js';
+import { executeRewardBatch, isConfigured as isContractConfigured } from './contract-bridge.js';
 
 // ============ Constants ============
 
@@ -184,20 +185,20 @@ export function computeBatch(getAllUsers, getUserStats, getUserWallet) {
  * @param {Object} contracts - { emissionController, signer } ethers.js instances
  * @returns {Object} Transaction result
  */
-export async function executeBatch(batch, contracts) {
-  if (!contracts?.emissionController) {
-    console.log('[reward-batcher] No contracts available - dry run only');
+export async function executeBatch(batch) {
+  if (!isContractConfigured()) {
+    console.log('[reward-batcher] No contracts configured - dry run only');
     batch.status = 'dry_run';
     batches.push(batch);
     await save();
-    return { success: false, reason: 'no contracts', batch };
+    return { success: false, reason: 'no contracts configured', batch };
   }
 
   try {
     // Prepare on-chain participant data
     const onChainParticipants = batch.participants.map(p => ({
       participant: p.wallet,
-      directContribution: BigInt(p.directContribution) * BigInt(1e14), // Scale to wei
+      directContribution: BigInt(p.directContribution) * BigInt(1e14),
       timeInPool: BigInt(p.timeInPool),
       scarcityScore: BigInt(p.scarcityScore),
       stabilityScore: BigInt(p.stabilityScore),
@@ -208,30 +209,32 @@ export async function executeBatch(batch, contracts) {
       .update(`vibeswap_week_${batch.weekNumber}_${batch.batchId}`)
       .digest('hex');
 
-    // Execute on-chain
-    const tx = await contracts.emissionController.createContributionGame(
-      gameId,
-      onChainParticipants,
-      batch.drainBps,
-    );
+    // Execute via contract-bridge (uses wallet.js spending limits + ledger)
+    const result = await executeRewardBatch(gameId, onChainParticipants, batch.drainBps);
 
-    const receipt = await tx.wait();
+    if (result.error) {
+      batch.status = 'failed';
+      batch.error = result.error;
+      batches.push(batch);
+      await save();
+      return { success: false, reason: result.error, batch };
+    }
 
     batch.status = 'executed';
-    batch.txHash = receipt.hash;
+    batch.txHash = result.hash;
     batch.gameId = gameId;
-    batch.blockNumber = receipt.blockNumber;
+    batch.blockNumber = result.blockNumber;
 
     batches.push(batch);
     lastBatchTime = Date.now();
     await save();
 
     console.log(
-      `[reward-batcher] Batch executed on-chain: ${receipt.hash}`
+      `[reward-batcher] Batch executed on-chain: ${result.hash}`
       + ` (${batch.totalParticipants} participants, game: ${gameId.slice(0, 10)}...)`
     );
 
-    return { success: true, txHash: receipt.hash, gameId, batch };
+    return { success: true, txHash: result.hash, gameId, batch };
   } catch (err) {
     console.error(`[reward-batcher] On-chain execution failed: ${err.message}`);
     batch.status = 'failed';

@@ -1047,3 +1047,37 @@ details[open] > div {
     padding-bottom: 5rem; /* ~80px, clears MobileNav + safe area */
   }
 }
+
+/* ============================================
+   REOWN APPKIT (WALLET CONNECT) MOBILE FIX
+   ============================================ */
+/* The Reown modal renders as a web component portal outside React.
+   On mobile it gets cut off at the bottom. Force it to fit the viewport. */
+w3m-modal {
+  --w3m-z-index: 9999;
+}
+
+@media screen and (max-width: 767px) {
+  w3m-modal::part(content) {
+    max-height: 90vh;
+    max-height: 90dvh;
+    overflow-y: auto;
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Fallback: target the modal's inner container via global styles */
+  .w3m-modal,
+  [class*="w3m-modal"],
+  wui-flex[data-type="dialogs"] {
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Ensure the card inside the modal scrolls rather than overflowing */
+  wui-card {
+    max-height: 85vh !important;
+    max-height: 85dvh !important;
+    overflow-y: auto !important;
+  }
+}

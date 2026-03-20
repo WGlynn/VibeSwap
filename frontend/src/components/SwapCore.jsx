@@ -179,7 +179,8 @@ function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isS
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-start justify-center px-4"
+        style={{ paddingTop: '38vh' }}
       >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
@@ -289,7 +290,8 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-start justify-center px-4"
+        style={{ paddingTop: '38vh' }}
       >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
@@ -607,7 +609,8 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-start justify-center px-4"
+        style={{ paddingTop: '38vh' }}
       >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ background: 'radial-gradient(circle at center, rgba(0,255,65,0.02), rgba(0,0,0,0.7))' }} />
         <motion.div
@@ -1487,7 +1490,8 @@ function TokenSelector({ isOpen, onClose, tokens, selected, onSelect }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-start justify-center px-4"
+        style={{ paddingTop: '38vh' }}
       >
         <div
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"

@@ -18,7 +18,7 @@ import { initProvider, getProviderName, getModelName, getFallbackChain, getIntel
 import { initShard, getShardInfo, isMultiShard, shutdownShard } from './shard.js';
 import { getTopology, handleRouterRequest, processRouterBody, checkShardHealth, getArchiveStatus } from './router.js';
 import { initConsensus, getConsensusState, handleConsensusRequest, processConsensusBody } from './consensus.js';
-import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody, runCRPCDemo } from './crpc.js';
+import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, processCRPCBody, runCRPCDemo, runLocalCRPC } from './crpc.js';
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
@@ -5765,13 +5765,29 @@ bot.command('code', async (ctx) => {
     // 6. Return to master
     await gitReturnToMaster();
 
-    // 7. Report back — clean and simple
+    // 7. CRPC review — ask shards "does this change make sense?"
     const fileCount = filesWritten.length;
     const oneLiner = text.split('\n').find(l => l.trim().length > 20)?.trim().slice(0, 120) || taskText.slice(0, 120);
+    const diffSnippet = diff ? diff.slice(0, 1000) : oneLiner;
 
+    let crpcVerdict = '';
+    try {
+      const reviewPrompt = `A shard proposed this code change. One-line verdict: does it make sense? Answer YES or NO with a brief reason (under 15 words).\n\nTask: ${taskText}\n\nDiff:\n${diffSnippet}`;
+      const crpcResult = await runLocalCRPC(
+        'You are a code reviewer for VibeSwap. Be terse. YES or NO + reason.',
+        [{ role: 'user', content: reviewPrompt }],
+        { maxTokens: 60 }
+      );
+      if (crpcResult?.consensusResponse) {
+        crpcVerdict = `\nCRPC review: ${crpcResult.consensusResponse.slice(0, 80)}`;
+      }
+    } catch (err) {
+      crpcVerdict = '\nCRPC review: unavailable';
+    }
+
+    // 8. Report back — clean and simple + review verdict
     await ctx.reply(
-      `Done. ${fileCount} file${fileCount !== 1 ? 's' : ''} changed.\n` +
-      `${oneLiner}\n` +
+      `Done. ${fileCount} file${fileCount !== 1 ? 's' : ''} changed.${crpcVerdict}\n` +
       `github.com/wglynn/vibeswap/compare/${branch}?expand=1`
     );
 

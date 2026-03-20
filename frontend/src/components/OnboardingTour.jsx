@@ -227,7 +227,7 @@ function SpotlightOverlay({ targetRect, onClick }) {
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
         className="fixed inset-0 z-[60]"
-        style={{ background: 'rgba(0, 0, 0, 0.70)', backdropFilter: 'blur(4px)' }}
+        style={{ background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)' }}
         onClick={onClick}
       />
     )
@@ -545,8 +545,8 @@ export default function OnboardingTour() {
             <div
               className="rounded-2xl overflow-hidden backdrop-blur-2xl"
               style={{
-                background: 'rgba(8, 8, 8, 0.92)',
-                border: `1px solid ${accent.border}`,
+                background: 'rgba(8, 8, 8, 0.97)',
+                border: `1.5px solid ${accent.border}`,
                 boxShadow: `
                   0 0 40px -10px ${accent.glow},
                   0 0 80px -20px ${accent.glow},

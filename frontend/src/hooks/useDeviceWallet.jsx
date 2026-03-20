@@ -52,6 +52,20 @@ const derivePrivateKey = (credentialId, userHandle) => {
   return privateKeyBytes
 }
 
+// Password-based key derivation fallback for devices without ANY authenticator
+// Uses PBKDF2 with high iterations for brute-force resistance
+const deriveKeyFromPassword = async (password, salt) => {
+  const encoder = new TextEncoder()
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: encoder.encode(salt), iterations: 600000, hash: 'SHA-256' },
+    keyMaterial, 256
+  )
+  return ethers.hexlify(new Uint8Array(bits))
+}
+
 // Generate registration options (normally from server, but we do it client-side for simplicity)
 const generateRegistrationOptions = (userId, preferPlatform = true) => {
   const challenge = crypto.getRandomValues(new Uint8Array(32))
@@ -183,33 +197,55 @@ export function DeviceWalletProvider({ children }) {
 
       let credential = null
 
-      // Try platform authenticator first (biometrics), fall back to any authenticator
+      // Try platform authenticator first (biometrics), fall back to any authenticator,
+      // then fall back to password-based derivation for devices with NO authenticator
+      let wallet = null
+      let credentialId = null
+      let walletMethod = 'webauthn'
+
       try {
-        const options = generateRegistrationOptions(userId, true)
-        credential = await navigator.credentials.create({ publicKey: options })
-      } catch (platformErr) {
-        console.warn('Platform authenticator failed, trying without restriction:', platformErr.message)
-        // Retry without forcing platform attachment
-        const fallbackOptions = generateRegistrationOptions(userId, false)
-        credential = await navigator.credentials.create({ publicKey: fallbackOptions })
+        try {
+          const options = generateRegistrationOptions(userId, true)
+          credential = await navigator.credentials.create({ publicKey: options })
+        } catch (platformErr) {
+          console.warn('Platform authenticator failed, trying without restriction:', platformErr.message)
+          const fallbackOptions = generateRegistrationOptions(userId, false)
+          credential = await navigator.credentials.create({ publicKey: fallbackOptions })
+        }
+
+        if (!credential) throw new Error('No credential')
+
+        credentialId = arrayBufferToBase64(credential.rawId)
+        const privateKey = derivePrivateKey(credentialId, userId)
+        wallet = new ethers.Wallet(privateKey)
+      } catch (webauthnErr) {
+        // WebAuthn completely unavailable — password fallback
+        console.warn('WebAuthn unavailable, using password fallback:', webauthnErr.message)
+        walletMethod = 'password'
+
+        const password = window.prompt(
+          'Your device doesn\'t support biometric authentication.\n\n' +
+          'Create a strong password to secure your wallet.\n' +
+          'This password + your device = your private key.\n' +
+          'If you forget it, your wallet is unrecoverable.'
+        )
+
+        if (!password || password.length < 8) {
+          throw new Error('Password must be at least 8 characters')
+        }
+
+        const salt = `vibeswap:${userId}:${window.location.hostname}`
+        const privateKey = await deriveKeyFromPassword(password, salt)
+        wallet = new ethers.Wallet(privateKey)
+        credentialId = 'password-derived'
       }
 
-      if (!credential) {
-        throw new Error('Failed to create credential')
-      }
-
-      // Extract credential ID
-      const credentialId = arrayBufferToBase64(credential.rawId)
-
-      // Derive Ethereum private key from credential
-      const privateKey = derivePrivateKey(credentialId, userId)
-      const wallet = new ethers.Wallet(privateKey)
-
-      // Store wallet info (NOT the private key - it's derived from credential)
+      // Store wallet info (NOT the private key - it's derived from credential or password)
       const walletData = {
         credentialId,
         userId,
         address: wallet.address,
+        method: walletMethod,
         createdAt: Date.now(),
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(walletData))
@@ -243,22 +279,23 @@ export function DeviceWalletProvider({ children }) {
     setError(null)
 
     try {
-      const { credentialId, userId } = JSON.parse(stored)
+      const { credentialId, userId, method } = JSON.parse(stored)
+      let privateKey
 
-      // Create authentication options
-      const options = generateAuthenticationOptions(credentialId)
+      if (method === 'password') {
+        // Password-derived wallet — prompt for password
+        const password = window.prompt('Enter your wallet password to sign in:')
+        if (!password) throw new Error('Password required')
 
-      // Start WebAuthn authentication (triggers biometric prompt)
-      const assertion = await navigator.credentials.get({
-        publicKey: options
-      })
-
-      if (!assertion) {
-        throw new Error('Authentication failed')
+        const salt = `vibeswap:${userId}:${window.location.hostname}`
+        privateKey = await deriveKeyFromPassword(password, salt)
+      } else {
+        // WebAuthn authentication (triggers biometric prompt)
+        const options = generateAuthenticationOptions(credentialId)
+        const assertion = await navigator.credentials.get({ publicKey: options })
+        if (!assertion) throw new Error('Authentication failed')
+        privateKey = derivePrivateKey(credentialId, userId)
       }
-
-      // Derive the same private key
-      const privateKey = derivePrivateKey(credentialId, userId)
       const wallet = new ethers.Wallet(privateKey)
 
       setIsLoading(false)

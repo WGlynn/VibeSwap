@@ -565,12 +565,12 @@ export default function OnboardingTour() {
 
               {/* Content */}
               <div className="relative p-5">
-                {/* Skip link — top right */}
+                {/* Skip button — top right, prominent */}
                 <button
                   onClick={completeTour}
-                  className="absolute top-3 right-3 text-[10px] font-mono text-black-500 hover:text-black-300 transition-colors"
+                  className="absolute top-3 right-3 px-3 py-1 text-[11px] font-mono text-black-300 hover:text-white bg-white/5 hover:bg-white/10 border border-black-500 hover:border-black-400 rounded-md transition-all"
                 >
-                  skip tour
+                  skip
                 </button>
 
                 {/* Icon circle */}

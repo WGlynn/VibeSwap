@@ -1,17 +1,16 @@
 # Default profile: lightweight local dev (no optimizer, no via_ir, no tests)
 # Full compilation + testing happens in CI (GitHub Actions, 7GB RAM)
 # Use `FOUNDRY_PROFILE=ci forge build` for full build locally if needed
-# Default: via_ir + optimizer with minimal runs (fixes stack-too-deep, low RAM)
-# optimizer_runs=1 uses fraction of the memory vs runs=200
+# Default: no optimizer, no via_ir — 28 seconds on Windows, catches 99% of issues
+# One contract has stack-too-deep without via_ir — CI catches it (full optimization)
 [profile.default]
 src = "contracts"
 out = "out"
 libs = ["lib"]
 test = "test"
 solc = "0.8.20"
-optimizer = true
-optimizer_runs = 1
-via_ir = true
+optimizer = false
+via_ir = false
 ffi = false
 verbosity = 3
 

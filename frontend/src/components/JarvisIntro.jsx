@@ -106,19 +106,27 @@ function JarvisIntro({ isOpen, onContinue }) {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex flex-col"
       >
-        {/* Backdrop */}
+        {/* Backdrop — solid dark overlay so swap page doesn't bleed through */}
         <div
           className="absolute inset-0"
           style={{
-            background: 'radial-gradient(ellipse at 50% 30%, rgba(0,255,65,0.03) 0%, #000 70%)',
+            background: 'rgba(0, 0, 0, 0.9)',
+            backdropFilter: 'blur(12px)',
           }}
         />
 
-        {/* Main content — centered vertically when few messages */}
+        {/* Main content — centered card with distinct body */}
         <div className="relative z-10 flex-1 flex flex-col max-w-2xl w-full mx-auto px-4 py-8">
 
-          {/* Messages area */}
-          <div className="flex-1 flex flex-col justify-end overflow-y-auto allow-scroll pb-4">
+          {/* Chat card body */}
+          <div
+            className="flex-1 flex flex-col justify-end overflow-y-auto allow-scroll pb-4 px-6 pt-6 rounded-2xl"
+            style={{
+              background: 'rgba(12, 12, 12, 0.95)',
+              border: '1px solid rgba(0, 255, 65, 0.08)',
+              boxShadow: '0 0 60px -20px rgba(0, 255, 65, 0.06), 0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            }}
+          >
             <div className="space-y-6">
               {messages.map((msg, i) => (
                 <motion.div
@@ -171,7 +179,6 @@ function JarvisIntro({ isOpen, onContinue }) {
 
               <div ref={messagesEndRef} />
             </div>
-          </div>
 
           {/* Input area */}
           {greeted && (
@@ -239,6 +246,7 @@ function JarvisIntro({ isOpen, onContinue }) {
               )}
             </motion.div>
           )}
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>

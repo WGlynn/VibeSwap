@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { ethers } from 'ethers'
+import { collectEntropyAndGeneratePassword } from '../utils/entropyPassword'
 
 /**
  * Device Wallet Hook with React Context
@@ -223,15 +224,10 @@ export function DeviceWalletProvider({ children }) {
         console.warn('WebAuthn unavailable, using password fallback:', webauthnErr.message)
         walletMethod = 'password'
 
-        const password = window.prompt(
-          'Your device doesn\'t support biometric authentication.\n\n' +
-          'Create a strong password to secure your wallet.\n' +
-          'This password + your device = your private key.\n' +
-          'If you forget it, your wallet is unrecoverable.'
-        )
+        const password = await collectEntropyAndGeneratePassword()
 
         if (!password || password.length < 8) {
-          throw new Error('Password must be at least 8 characters')
+          throw new Error('Password creation cancelled or too short')
         }
 
         const salt = `vibeswap:${userId}:${window.location.hostname}`

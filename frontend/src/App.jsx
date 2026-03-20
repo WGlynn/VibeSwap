@@ -222,6 +222,7 @@ const VibeNamesPage = lazy(() => import('./components/VibeNamesPage'))
 const PsiNetPage = lazy(() => import('./components/PsiNetPage'))
 const VisionPage = lazy(() => import('./components/VisionPage'))
 const GauntletPage = lazy(() => import('./components/GauntletPage'))
+const IdeaPage = lazy(() => import('./components/IdeaPage'))
 
 // Sacred Geometry page transitions
 // Phi (golden ratio) = 1.618... — appears in nautilus shells, galaxies, and markets
@@ -422,6 +423,7 @@ function AnimatedRoutes() {
             <Route path="/psinet" element={<PsiNetPage />} />
             <Route path="/vision" element={<VisionPage />} />
             <Route path="/gauntlet" element={<GauntletPage />} />
+            <Route path="/ideas" element={<IdeaPage />} />
             {/* Admin routes */}
             <Route path="/admin/sybil" element={<AdminSybilDetection />} />
             {/* 404 catch-all */}

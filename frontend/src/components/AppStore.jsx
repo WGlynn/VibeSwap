@@ -40,9 +40,10 @@ const APPS = [
   { id: 'vibeforum',  icon: '🗨️', name: 'VibeForum',            tagline: 'Community discussions and governance debates',     category: 'Social',     route: '/forum',      status: 'installed', rating: 4.5, installs: '62K',  featured: false },
   { id: 'mindmesh',   icon: '🌐', name: 'Mind Mesh',             tagline: 'Network topology visualizer',                      category: 'Tools',      route: '/mesh',       status: 'installed', rating: 4.2, installs: '22K',  featured: false },
   { id: 'vibeplayer', icon: '🎵', name: 'VibePlayer',            tagline: 'Community playlist — vibe while you trade',        category: 'Tools',      route: null,          status: 'builtin',   rating: 4.7, installs: '89K',  featured: false },
+  { id: 'ideas',      icon: '💡', name: 'Ideas',                 tagline: 'Submit and vote on what VibeSwap builds next',     category: 'Community',  route: '/ideas',      status: 'new',       rating: 4.8, installs: '0',    featured: false },
 ]
 
-const CATEGORIES = ['All', 'DeFi', 'Social', 'Tools', 'Games', 'AI', 'Governance']
+const CATEGORIES = ['All', 'DeFi', 'Social', 'Community', 'Tools', 'Games', 'AI', 'Governance']
 const STATUS_CONFIG = {
   installed:   { label: 'Installed',   color: 'text-matrix-400', bg: 'bg-matrix-600/15', border: 'border-matrix-600/30' },
   new:         { label: 'New',         color: 'text-cyan-400',   bg: 'bg-cyan-600/15',   border: 'border-cyan-600/30' },

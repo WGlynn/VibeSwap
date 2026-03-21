@@ -1,0 +1,9 @@
+node_modules
+../contracts
+../test
+../script
+../oracle
+../jarvis-bot
+../.claude
+../.git
+*.sol

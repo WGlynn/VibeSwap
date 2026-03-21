@@ -1000,11 +1000,114 @@ import "../monetary/interfaces/IJoule.sol";
 
 ---
 
+## Settlement Layer (`contracts/settlement/`)
+
+> *The math persists longer than the chain itself.*
+
+### VerifiedCompute.sol (Abstract Base)
+```solidity
+import "./VerifiedCompute.sol";
+// Bond + dispute window pattern for off-chain compute verification
+// Subclass: override _getExpectedRoot() and _validateDispute()
+// ResultStatus: None → Pending → Finalized/Disputed
+// 50% slash rate on invalid results. Permissionless disputes.
+```
+- `bond()` / `unbond(amount)` — submitter bonding
+- `submitResult(computeId, resultHash, merkleProof)` — generic submission
+- `finalizeResult(computeId)` / `disputeResult(computeId, evidence)` — lifecycle
+- `getResult(computeId)` → `ComputeResult` / `isFinalized(computeId)` → `bool`
+
+### ShapleyVerifier.sol (extends VerifiedCompute)
+```solidity
+import "./ShapleyVerifier.sol";
+// Axiom checks: efficiency, sanity, Lawson floor (1%), Merkle
+```
+- `submitShapleyResult(gameId, participants, values, totalPool, merkleProof)` — submit off-chain Shapley
+- `finalizeShapleyResult(gameId)` — finalize after dispute window
+- `getVerifiedValues(gameId)` → `(address[], uint256[])` — consumer interface
+- `getVerifiedTotalPool(gameId)` → `uint256`
+- `verifyShapleyAxioms(participantCount, values, totalPool)` → `bool` — **PURE** (CKB-portable)
+
+### IShapleyVerifier.sol (Interface)
+```solidity
+import "./IShapleyVerifier.sol";
+// Used by ShapleyDistributor.settleFromVerifier()
+```
+- `getVerifiedValues(gameId)` → `(address[], uint256[])`
+- `getVerifiedTotalPool(gameId)` → `uint256`
+- `isFinalized(gameId)` → `bool`
+
+### TrustScoreVerifier.sol (extends VerifiedCompute)
+```solidity
+import "./TrustScoreVerifier.sol";
+// Invariants: bounded [0, MAX_SCORE=10000], normalized, non-zero, Merkle
+```
+- `submitTrustResult(epochId, participants, scores, totalScore, epoch, merkleProof)`
+- `finalizeTrustResult(epochId)`
+- `getVerifiedScores(epochId)` → `(address[], uint256[])` — consumer for SoulboundIdentity
+- `verifyTrustInvariants(participantCount, scores, totalScore)` → `bool` — **PURE**
+
+### VoteVerifier.sol (extends VerifiedCompute)
+```solidity
+import "./VoteVerifier.sol";
+// Invariants: conservation, no inflation, quorum, correct winner, Merkle
+```
+- `submitVoteResult(VoteSubmission, merkleProof)` — struct input to avoid stack depth
+- `finalizeVoteResult(proposalId)`
+- `getVerifiedTally(proposalId)` → `(uint256[], uint8, bool)` — consumer for governance
+- `getVerifiedWinner(proposalId)` → `uint8`
+- `isQuorumMet(proposalId)` → `bool`
+- `getVoterTurnout(proposalId)` → `uint256` (BPS)
+- `verifyVoteInvariants(optionVotes, totalVotesCast, registeredVoters, winningOption)` → `bool` — **PURE**
+
+### BatchPriceVerifier.sol (standalone, not VerifiedCompute)
+```solidity
+import "./BatchPriceVerifier.sol";
+// O(1) clearing price verification instead of O(n log n) binary search
+```
+- `submitBatchPrice(batchId, clearingPrice, orderRoot, totalBuyVolume, totalSellVolume)`
+- `finalizeBatch(batchId)` / `disputeBatch(batchId, actualBuyVolume, actualSellVolume)`
+- `getBatchPrice(batchId)` → `(uint256 price, bool finalized)`
+- `verifyClearing(price, buyVolume, sellVolume)` → `bool` — internal pure
+
+### VerifierCheckpointBridge.sol (UUPS)
+```solidity
+import "./VerifierCheckpointBridge.sol";
+// Bridges finalized verifier results → VibeStateChain consensus checkpoints
+// PERMISSIONLESS (Grade A DISSOLVED) — anyone can push finalized results
+```
+- `registerVerifier(verifier, source)` — owner registers verifier contracts
+- `checkpointResult(verifier, computeId)` — permissionless, reads from verifier
+- `checkpointBatch(verifiers[], computeIds[])` — batch checkpoint
+- Source constants: `SOURCE_SHAPLEY`, `SOURCE_TRUST`, `SOURCE_VOTE`, `SOURCE_BATCH_PRICE`
+
+### VibeStateChain.sol (UUPS)
+```solidity
+import "./VibeStateChain.sol";
+// CKB-inspired state settlement chain with Ergo subblocks
+```
+- `registerValidator()` / `addStake()` — validator management
+- `proposeSubblock(stateRoot, txRoot, createdCellIds, consumedCellIds)` — fast finality
+- `confirmSubblock(subblockId)` — validator confirms
+- `proposeBlock(stateRoot, consensusRoot)` / `finalizeBlock(blockNumber)` — full finality
+- `checkpoint(source, decisionHash, roundId)` — consensus recording
+- `createCell(typeHash, lockHash, dataHash, capacity)` — state cells (UTXO-like)
+
+### Deploy Script: `script/DeploySettlement.s.sol`
+Deploys all 6 as UUPS proxies + wires verifiers into checkpoint bridge.
+```bash
+forge script script/DeploySettlement.s.sol --rpc-url $RPC --broadcast
+# Env: PRIVATE_KEY, DISPUTE_WINDOW (default 1h), BOND_AMOUNT (default 0.01 ETH)
+# Optional: SHAPLEY_DISTRIBUTOR (auto-wires verifier)
+```
+
+---
+
 ## Stats
 
 - **~130 .sol files** total (contracts + interfaces)
 - **~90 implementation contracts**
 - **~55 interfaces**
 - **~12 libraries**
-- Core: 5 | AMM: 6 (+ 2 curves) | Financial: 7 | Governance: 8 | Incentives: 7 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2 | Mechanism: 90+
+- Core: 5 | AMM: 6 (+ 2 curves) | **Settlement: 14** | Financial: 7 | Governance: 8 | Incentives: 7 | Compliance: 4 | Identity: 11 (+ 7 interfaces) | Community: 1 | Messaging: 1 | Oracle: 4 | Quantum: 3 | Account: 2 | MetaTx: 1 | Proxy: 1 | Hooks: 1 | Monetary: 1 | Framework: 2 | Mechanism: 90+
 - **14 Rust crates** (CKB): 4 libraries + 8 scripts + 1 SDK + 1 test crate | **167 Rust tests**

@@ -1,28 +1,43 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-20 (Marathon session — 22 ships)
+**Last Updated**: 2026-03-21 (Settlement layer completion)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
-## 2026-03-20: The Marathon (22 ships)
+## 2026-03-21: Settlement Layer Completion
+
+### COMPLETED THIS SESSION
+1. ✅ Posted ethresear.ch reply (Will posted manually)
+2. ✅ Wire ShapleyVerifier into ShapleyDistributor — `settleFromVerifier()`, IShapleyVerifier interface
+3. ✅ TrustScoreVerifier — bounded scores, normalized sums, non-zero active, merkle proof
+4. ✅ VoteVerifier — conservation, no inflation, quorum, correct winner, merkle proof
+5. ✅ VerifierCheckpointBridge — permissionless bridge from verifiers → VibeStateChain
+6. ✅ DeploySettlement.s.sol — deploys all 6 settlement contracts as UUPS proxies
+7. ✅ Fixed build-chunks.sh — 29/29 directories pass (was 0/14 with broken --match-path)
 
 ### NEXT SESSION — DO THESE FIRST
-1. Post ethresear.ch reply (cooldown should be lifted)
-2. Fund deployer 0x095C...e8cc with 0.01 ETH on Base (March 26 EBT)
-3. Call drip() → 233K VIBE to Shapley pool
-4. Deploy identity layer (DeployIdentity.s.sol)
-5. Redeploy shard-2 + ollama with latest code
+1. Fund deployer 0x095C...e8cc with 0.01 ETH on Base (March 26 EBT)
+2. Call drip() → 233K VIBE to Shapley pool
+3. Deploy identity layer (DeployIdentity.s.sol)
+4. Deploy settlement layer (DeploySettlement.s.sol)
+5. Redeploy shard-2 + ollama with latest code (Will needs to run `flyctl auth token`)
 6. Test /code command with a real task
-7. Wire ShapleyVerifier into ShapleyDistributor (accept verified off-chain results)
-8. TrustScoreVerifier + VoteVerifier (next settlement layer contracts)
+7. Write tests for settlement layer verifiers
+8. Wire ShapleyVerifier expected roots from off-chain Shapley computation
 
-### Settlement Layer Separation (NEW ARCHITECTURE)
+### Key Commits
+- 3543350 settlement layer: wire ShapleyVerifier into Distributor + TrustScoreVerifier + VoteVerifier
+- 6214256 settlement layer: VerifierCheckpointBridge + DeploySettlement + fix build script
+
+### Settlement Layer (NOW COMPLETE)
 - **Plan**: `C:\Users\Will\.claude\plans\crispy-dazzling-grove.md`
 - Layer 1 (Settlement): ~40 contracts on-chain — token custody, pool reserves, finality
 - Layer 2 (Verified Compute): heavy math off-chain with merkle proofs — 90% gas savings
 - Layer 3 (Off-Chain): Jarvis shards, AI agents, community scoring
-- **Built**: VerifiedCompute.sol (base), ShapleyVerifier.sol, BatchPriceVerifier.sol
-- **Key**: `verifyShapleyAxioms()` and `verifyClearing()` are PURE — account model agnostic, ports to CKB
-- Remaining: TrustScoreVerifier, VoteVerifier, VibeStateChain integration
+- **Built**: VerifiedCompute.sol, ShapleyVerifier, BatchPriceVerifier, TrustScoreVerifier, VoteVerifier
+- **Bridge**: VerifierCheckpointBridge → VibeStateChain (finalized results become permanent checkpoints)
+- **Deploy**: DeploySettlement.s.sol (6 UUPS proxies + wiring)
+- **Key**: All verifiers have `pure` verification functions — portable to CKB RISC-V
+- **Philosophy**: "The math persists longer than the chain itself"
 
 ### Self-Improvement Stack
 - self-eval.js: Jarvis audits 10% of own responses for alignment violations

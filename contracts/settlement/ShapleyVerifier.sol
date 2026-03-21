@@ -44,22 +44,15 @@ contract ShapleyVerifier is VerifiedCompute {
     event ShapleyResultSubmitted(bytes32 indexed gameId, uint256 participantCount, uint256 totalPool, address indexed submitter);
     event ShapleyResultFinalized(bytes32 indexed gameId, uint256 participantCount);
 
-    // ============ Constants ============
-
-    /// @notice Lawson floor: 1% of average (100 basis points)
-    uint256 public constant LAWSON_FLOOR_BPS = 100;
-
     // ============ State ============
 
+    uint256 public constant LAWSON_FLOOR_BPS = 100; // 1% of average
     mapping(bytes32 => ShapleyResult) internal shapleyResults;
     mapping(bytes32 => bytes32) public expectedRoots;
 
     // ============ Init ============
 
-    function initialize(
-        uint256 _disputeWindow,
-        uint256 _bondAmount
-    ) external initializer {
+    function initialize(uint256 _disputeWindow, uint256 _bondAmount) external initializer {
         __VerifiedCompute_init(_disputeWindow, _bondAmount);
     }
 
@@ -69,14 +62,9 @@ contract ShapleyVerifier is VerifiedCompute {
         expectedRoots[gameId] = root;
     }
 
-    function setExpectedRoots(
-        bytes32[] calldata gameIds,
-        bytes32[] calldata roots
-    ) external onlyOwner {
+    function setExpectedRoots(bytes32[] calldata gameIds, bytes32[] calldata roots) external onlyOwner {
         if (gameIds.length != roots.length) revert ArrayLengthMismatch();
-        for (uint256 i = 0; i < gameIds.length; i++) {
-            expectedRoots[gameIds[i]] = roots[i];
-        }
+        for (uint256 i = 0; i < gameIds.length; i++) expectedRoots[gameIds[i]] = roots[i];
     }
 
     // ============ Shapley Submission ============
@@ -121,53 +109,35 @@ contract ShapleyVerifier is VerifiedCompute {
         }
 
         // --- Store result ---
-        shapleyResults[gameId] = ShapleyResult({
-            participants: participants,
-            values: values,
-            totalPool: totalPool
-        });
-
+        shapleyResults[gameId] = ShapleyResult(participants, values, totalPool);
         results[gameId] = ComputeResult({
-            resultHash: resultHash,
-            submitter: msg.sender,
-            timestamp: block.timestamp,
-            status: ResultStatus.Pending
+            resultHash: resultHash, submitter: msg.sender,
+            timestamp: block.timestamp, status: ResultStatus.Pending
         });
-
         emit ShapleyResultSubmitted(gameId, participants.length, totalPool, msg.sender);
         emit ResultSubmitted(gameId, resultHash, msg.sender);
     }
 
     // ============ Finalization ============
 
-    /// @notice Finalize a Shapley result after dispute window
     function finalizeShapleyResult(bytes32 gameId) external {
         ComputeResult storage r = results[gameId];
         if (r.status != ResultStatus.Pending) revert ResultNotPending();
         if (block.timestamp < r.timestamp + disputeWindow) revert DisputeWindowActive();
-
         r.status = ResultStatus.Finalized;
-
         emit ShapleyResultFinalized(gameId, shapleyResults[gameId].participants.length);
         emit ResultFinalized(gameId, r.resultHash);
     }
 
     // ============ Consumer Interface ============
 
-    /// @notice Get verified Shapley values — only returns finalized results
     /// @dev Integration point: ShapleyDistributor calls this instead of computing on-chain
-    function getVerifiedValues(bytes32 gameId)
-        external
-        view
-        returns (address[] memory participants, uint256[] memory values)
-    {
+    function getVerifiedValues(bytes32 gameId) external view returns (address[] memory, uint256[] memory) {
         if (results[gameId].status != ResultStatus.Finalized) revert GameNotFinalized();
-
         ShapleyResult storage s = shapleyResults[gameId];
         return (s.participants, s.values);
     }
 
-    /// @notice Get the total pool for a finalized game
     function getVerifiedTotalPool(bytes32 gameId) external view returns (uint256) {
         if (results[gameId].status != ResultStatus.Finalized) revert GameNotFinalized();
         return shapleyResults[gameId].totalPool;
@@ -175,24 +145,15 @@ contract ShapleyVerifier is VerifiedCompute {
 
     // ============ Internal Overrides ============
 
-    /// @inheritdoc VerifiedCompute
     function _getExpectedRoot(bytes32 computeId) internal view override returns (bytes32) {
         return expectedRoots[computeId];
     }
 
-    /// @inheritdoc VerifiedCompute
-    function _validateDispute(
-        bytes32 computeId,
-        bytes calldata evidence
-    ) internal override returns (bool) {
+    function _validateDispute(bytes32 computeId, bytes calldata evidence) internal override returns (bool) {
         (address[] memory correctParticipants, uint256[] memory correctValues, uint256 correctTotal)
             = abi.decode(evidence, (address[], uint256[], uint256));
         ShapleyResult storage submitted = shapleyResults[computeId];
-
-        // Dispute valid if participant count differs
         if (correctParticipants.length != submitted.participants.length) return true;
-
-        // Dispute valid if values differ and corrected values pass efficiency
         for (uint256 i = 0; i < correctValues.length; i++) {
             if (correctValues[i] != submitted.values[i]) {
                 uint256 sum = 0;
@@ -205,28 +166,18 @@ contract ShapleyVerifier is VerifiedCompute {
 
     // ============ View ============
 
-    function getShapleyResult(bytes32 gameId)
-        external
-        view
-        returns (
-            address[] memory participants,
-            uint256[] memory values,
-            uint256 totalPool,
-            ResultStatus status
-        )
+    function getShapleyResult(bytes32 gameId) external view
+        returns (address[] memory, uint256[] memory, uint256, ResultStatus)
     {
         ShapleyResult storage s = shapleyResults[gameId];
         return (s.participants, s.values, s.totalPool, results[gameId].status);
     }
 
     // ============ Pure Verification (Account Model Agnostic) ============
-    // Pure functions — no state, no storage. Portable to CKB RISC-V cell scripts.
 
-    /// @notice Verify Shapley axioms. Pure math — works on any chain.
+    /// @notice Verify Shapley axioms — pure math, portable to CKB RISC-V cell scripts
     function verifyShapleyAxioms(
-        uint256 participantCount,
-        uint256[] calldata values,
-        uint256 totalPool
+        uint256 participantCount, uint256[] calldata values, uint256 totalPool
     ) public pure returns (bool) {
         uint256 sum = 0;
         for (uint256 i = 0; i < values.length; i++) {

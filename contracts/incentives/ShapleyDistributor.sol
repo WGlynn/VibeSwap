@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../libraries/PairwiseFairness.sol";
 import "./IPriorityRegistry.sol";
 import "../mechanism/IABCHealthCheck.sol";
+import "../settlement/IShapleyVerifier.sol";
 
 /**
  * @title ShapleyDistributor
@@ -237,6 +238,13 @@ contract ShapleyDistributor is
     /// @notice Whether the bonding curve has been sealed (immutable after sealing)
     bool public bondingCurveSealed;
 
+    // ============ ShapleyVerifier Integration (Settlement Layer) ============
+
+    /// @notice Off-chain Shapley verifier — accepts pre-verified results
+    /// @dev When set, settleFromVerifier() can pull finalized Shapley values
+    ///      instead of computing on-chain. Execution/settlement separation.
+    IShapleyVerifier public shapleyVerifier;
+
     // ============ Events ============
 
     event BondingCurveSealed(address indexed bondingCurve);
@@ -248,6 +256,8 @@ contract ShapleyDistributor is
     event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
     event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
     event FairnessVerified(bytes32 indexed gameId, address indexed participant1, address indexed participant2, bool fair, uint256 deviation);
+    event SettledFromVerifier(bytes32 indexed gameId, uint256 participantCount, uint256 totalPool);
+    event ShapleyVerifierUpdated(address indexed verifier);
     event AuthorizedCreatorUpdated(address indexed creator, bool authorized);
     event ParticipantLimitsUpdated(uint256 minParticipants, uint256 maxParticipants);
     event QualityWeightsToggled(bool enabled);
@@ -271,6 +281,9 @@ contract ShapleyDistributor is
     error ZeroAddress();
     error ABCUnhealthy(uint256 driftBps);
     error BondingCurveAlreadySealed();
+    error VerifierNotSet();
+    error VerifierResultNotFinalized();
+    error VerifierParticipantMismatch();
 
     // ============ Modifiers ============
 
@@ -610,6 +623,53 @@ contract ShapleyDistributor is
         }
 
         game.settled = true;
+    }
+
+    // ============ Settlement Layer Integration ============
+
+    /**
+     * @notice Settle a game using pre-verified Shapley values from ShapleyVerifier
+     * @dev Instead of computing on-chain, pulls finalized results from the verifier.
+     *      The verifier has already checked all Shapley axioms (efficiency, sanity,
+     *      Lawson floor, merkle proof). This function just assigns the verified
+     *      values to the game's participants.
+     *
+     *      DISINTERMEDIATION: DISSOLVED (Phase 2). Like computeShapleyValues(),
+     *      this is deterministic given verified inputs. Anyone can trigger it.
+     *      The ShapleyVerifier's dispute window provides the trust guarantee.
+     *
+     * @param gameId Game identifier (must match a game created via createGame)
+     */
+    function settleFromVerifier(bytes32 gameId) external {
+        if (address(shapleyVerifier) == address(0)) revert VerifierNotSet();
+
+        CooperativeGame storage game = games[gameId];
+        if (game.totalValue == 0) revert GameNotFound();
+        if (game.settled) revert GameAlreadySettled();
+
+        // ABC Conservation Gate
+        _requireABCHealthy(gameId);
+
+        // Pull verified values — reverts inside verifier if not finalized
+        (address[] memory participants, uint256[] memory values) =
+            shapleyVerifier.getVerifiedValues(gameId);
+
+        // Verify participant count matches the game
+        Participant[] storage gamePs = gameParticipants[gameId];
+        if (participants.length != gamePs.length) revert VerifierParticipantMismatch();
+
+        // Assign verified Shapley values directly
+        // The verifier already enforced efficiency (sum == totalPool),
+        // sanity (no value > totalPool), and Lawson floor (>= 1% average)
+        for (uint256 i = 0; i < participants.length; i++) {
+            shapleyValues[gameId][participants[i]] = values[i];
+            emit ShapleyComputed(gameId, participants[i], values[i]);
+        }
+
+        game.settled = true;
+
+        emit SettledFromVerifier(gameId, participants.length,
+            shapleyVerifier.getVerifiedTotalPool(gameId));
     }
 
     /**
@@ -1039,6 +1099,21 @@ contract ShapleyDistributor is
     function setUseQualityWeights(bool _use) external onlyOwner {
         useQualityWeights = _use;
         emit QualityWeightsToggled(_use);
+    }
+
+    // ============ Settlement Layer Admin ============
+
+    /**
+     * @notice Set the ShapleyVerifier for off-chain settlement
+     * @dev address(0) disables verifier path (only on-chain compute available)
+     * @param _verifier ShapleyVerifier address
+     *
+     * DISINTERMEDIATION: Grade C -> Target Grade B. Governance-appropriate.
+     * Infrastructure wiring — changes which verifier provides Shapley values.
+     */
+    function setShapleyVerifier(address _verifier) external onlyOwner {
+        shapleyVerifier = IShapleyVerifier(_verifier);
+        emit ShapleyVerifierUpdated(_verifier);
     }
 
     // ============ Pioneer Admin Functions ============

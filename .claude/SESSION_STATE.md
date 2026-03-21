@@ -1,32 +1,61 @@
 # Session State (Diff-Based)
 
-**Last Updated**: 2026-03-21 (Settlement layer completion)
+**Last Updated**: 2026-03-21 (Settlement + Cincinnatus dissolution — 8 commits)
 **Format**: Deltas from previous state. Read bottom-up for chronological order.
 
-## 2026-03-21: Settlement Layer Completion
+## 2026-03-21: Settlement Layer + Cincinnatus Dissolution (8 commits)
 
 ### COMPLETED THIS SESSION
-1. ✅ Posted ethresear.ch reply (Will posted manually)
+1. ✅ Posted ethresear.ch reply ("Open vs. Sealed Auction Format Choice for MEV")
 2. ✅ Wire ShapleyVerifier into ShapleyDistributor — `settleFromVerifier()`, IShapleyVerifier interface
 3. ✅ TrustScoreVerifier — bounded scores, normalized sums, non-zero active, merkle proof
 4. ✅ VoteVerifier — conservation, no inflation, quorum, correct winner, merkle proof
 5. ✅ VerifierCheckpointBridge — permissionless bridge from verifiers → VibeStateChain
 6. ✅ DeploySettlement.s.sol — deploys all 6 settlement contracts as UUPS proxies
 7. ✅ Fixed build-chunks.sh — 29/29 directories pass (was 0/14 with broken --match-path)
+8. ✅ Settlement test suite — ShapleyVerifier.t.sol, TrustScoreVerifier.t.sol, VoteVerifier.t.sol
+9. ✅ Contracts catalogue updated with full settlement section
+10. ✅ Paper: "Execution-Settlement Separation" + Nervos Talks post
+11. ✅ .vercelignore added, Vercel redeployed (vibeswap-app.vercel.app live)
+12. ✅ Dissolution audit — 48 functions across 13 contracts (8 dissolved, 34 governance, 6 keep)
+13. ✅ DissolveCincinnatus.s.sol — one-shot deploy to transfer all ownership to GovernanceGuard
 
 ### NEXT SESSION — DO THESE FIRST
 1. Fund deployer 0x095C...e8cc with 0.01 ETH on Base (March 26 EBT)
 2. Call drip() → 233K VIBE to Shapley pool
 3. Deploy identity layer (DeployIdentity.s.sol)
 4. Deploy settlement layer (DeploySettlement.s.sol)
-5. Redeploy shard-2 + ollama with latest code (Will needs to run `flyctl auth token`)
+5. Redeploy shard-2 + ollama (Will needs `flyctl auth token`)
 6. Test /code command with a real task
-7. Write tests for settlement layer verifiers
+7. FeeRouter reconciliation — 3 competing implementations, choose canonical one
 8. Wire ShapleyVerifier expected roots from off-chain Shapley computation
+9. When ready: run DissolveCincinnatus.s.sol (needs VETO_GUARDIAN + EMERGENCY_GUARDIAN addresses)
+
+### Dissolution Status (Cincinnatus Roadmap)
+- **Audit**: `docs/dissolution-audit-2026-03-21.md`
+- **Script**: `script/DissolveCincinnatus.s.sol`
+- 48 protected functions: 8 Grade A (dissolved), 34 Grade B (governance), 6 KEEP (emergency)
+- GovernanceGuard already exists: 48h timelock + Shapley veto + emergency 6h fast-track
+- VibeTimelock already exists: reputation-gated delays + JUL keeper tips
+- Missing: VETO_GUARDIAN and EMERGENCY_GUARDIAN multisig addresses (Will to set up)
+- After dissolution: Will can PROPOSE only. 48h delay. Shapley veto. P-001 at execution layer.
+
+### FeeRouter Reconciliation (NEEDS WILL'S DECISION)
+- `contracts/core/FeeRouter.sol` — DEPLOYED, 4-way split (40/20/30/10)
+- `contracts/mechanism/VibeFeeRouter.sol` — NOT DEPLOYED, 5-way with Mind Contributors
+- `contracts/financial/VibeFeeDistributor.sol` — NOT DEPLOYED, epoch-based staker claims
+- Only FeeRouter is wired in production. Other two are competing designs.
+- Decision needed: keep core FeeRouter? Merge features? Deprecate unused?
 
 ### Key Commits
-- 3543350 settlement layer: wire ShapleyVerifier into Distributor + TrustScoreVerifier + VoteVerifier
-- 6214256 settlement layer: VerifierCheckpointBridge + DeploySettlement + fix build script
+- 3543350 settlement: wire ShapleyVerifier into Distributor + TrustScoreVerifier + VoteVerifier
+- 6214256 settlement: VerifierCheckpointBridge + DeploySettlement + fix build script
+- afe03cf session state update
+- 3667b98 test: settlement layer test suite
+- 0137f62 docs: settlement section in contracts catalogue
+- b230170 paper: Execution-Settlement Separation + Nervos Talks post
+- f92f57a chore: .vercelignore
+- 4cb60df Cincinnatus: dissolution audit + DissolveCincinnatus.s.sol
 
 ### Settlement Layer (NOW COMPLETE)
 - **Plan**: `C:\Users\Will\.claude\plans\crispy-dazzling-grove.md`

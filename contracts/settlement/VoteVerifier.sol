@@ -238,14 +238,17 @@ contract VoteVerifier is VerifiedCompute {
     // ============ View ============
 
     function getVoteResult(bytes32 proposalId) external view
-        returns (uint256[] memory, uint256, uint256, uint256, uint8, bool, ResultStatus)
+        returns (uint256[] memory optionVotes, uint256 totalVotesCast, uint8 winningOption, bool quorumMet)
     {
         VoteResult storage v = voteResults[proposalId];
-        return (
-            v.optionVotes, v.totalVotesCast, v.registeredVoters,
-            v.quorumRequired, v.winningOption, v.quorumMet,
-            results[proposalId].status
-        );
+        return (v.optionVotes, v.totalVotesCast, v.winningOption, v.quorumMet);
+    }
+
+    function getVoteMetadata(bytes32 proposalId) external view
+        returns (uint256 registeredVoters, uint256 quorumRequired, ResultStatus status)
+    {
+        VoteResult storage v = voteResults[proposalId];
+        return (v.registeredVoters, v.quorumRequired, results[proposalId].status);
     }
 
     // ============ Pure Verification (Account Model Agnostic) ============

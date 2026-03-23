@@ -1,9 +1,0 @@
-{
-  "id": 0,
-  "parent": null,
-  "timestamp": "2026-03-13T18:54:28.734317+00:00",
-  "prompt": "Session continuation: identity fix + PsiNet + Vision + Infinity Stones + Gauntlet + Chatterbox bot",
-  "response": "Built chatterbox bot (separate TG bot, same Jarvis mind, separate throttle). Rebuilt session chain v2 with file-based persistence.",
-  "checkpoints": [],
-  "hash": "d2efc4347efa6e33"
-}

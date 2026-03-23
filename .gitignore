@@ -50,3 +50,12 @@ __pycache__/
 # TLS certificates (NEVER commit)
 *.pem
 .cold-wallet
+
+# Working context files (session memory, not for public repo)
+.claude/
+.session-chain/
+
+# Video files (too large for git)
+*.mp4
+*.mepj
+Video content*/

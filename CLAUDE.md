@@ -9,12 +9,40 @@
 ```
 1. Read .claude/JarvisxWill_CKB.md     → Core alignment primitives
 2. Read CLAUDE.md (this file)          → Project context
-3. Read .claude/SESSION_STATE.md       → Recent work state
+3. Read .claude/SESSION_STATE.md       → Block header (recent work state)
 4. git pull origin master              → Latest code
 5. Resume work
 ```
 
 **Common Knowledge Base**: `.claude/JarvisxWill_CKB.md` (GitHub synced)
+
+## SESSION END PROTOCOL (MANDATORY)
+
+**Before ending ANY session, write block header to `.claude/SESSION_STATE.md`:**
+
+```markdown
+# Session Tip — YYYY-MM-DD
+
+## Block Header
+- **Session**: [topic]
+- **Parent**: [previous session's HEAD hash]
+- **Branch**: `master` @ `[current HEAD hash]`
+- **Status**: [one-line summary]
+
+## What Exists Now
+[Artifacts created/modified — relative paths]
+
+## Manual Queue (Will does these)
+[Human-in-the-loop tasks only Will can do]
+
+## Key Changes This Session
+[Non-obvious: config, .gitignore, build, architecture decisions]
+
+## Next Session
+[What to pick up, blockers, pending verifications]
+```
+
+Then commit and push to both remotes. This is the chain tip — like a block header, it enables full state reconstruction without storing the full state.
 
 ---
 

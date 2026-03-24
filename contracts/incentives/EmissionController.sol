@@ -85,6 +85,11 @@ contract EmissionController is
     /// @notice Default era duration: 1 year (365.25 days = 31,557,600 seconds)
     uint256 public constant DEFAULT_ERA_DURATION = 31_557_600;
 
+    /// @notice Max accrual per drip — prevents timestamp manipulation from compressing schedule
+    /// @dev If sequencer jumps forward, each drip() only accrues 1 day. Caller must drip
+    ///      more frequently to claim full emissions. Manipulation becomes griefing, not acceleration.
+    uint256 public constant MAX_DRIP_DELTA = 1 days;
+
     // ============ External Contracts ============
 
     IVIBEMintable public vibeToken;
@@ -162,7 +167,8 @@ contract EmissionController is
         address _vibeToken,
         address _shapleyDistributor,
         address _liquidityGauge,
-        address _singleStaking
+        address _singleStaking,
+        uint256 _genesisTime
     ) external initializer {
         if (_owner == address(0)) revert ZeroAddress();
         if (_vibeToken == address(0)) revert ZeroAddress();
@@ -176,7 +182,9 @@ contract EmissionController is
         liquidityGauge = _liquidityGauge;
         singleStaking = ISingleStakingNotify(_singleStaking);
 
-        genesisTime = block.timestamp;
+        // Chain-portable: genesis travels with the protocol across networks
+        // Pass 0 to use current block.timestamp (first deployment)
+        genesisTime = _genesisTime == 0 ? block.timestamp : _genesisTime;
         lastDripTime = block.timestamp;
         eraDuration = DEFAULT_ERA_DURATION;
 
@@ -207,7 +215,14 @@ contract EmissionController is
      * @return minted Total VIBE minted in this drip
      */
     function drip() external nonReentrant returns (uint256 minted) {
-        uint256 pending = pendingEmissions();
+        // Drift guard: cap accrual window to prevent timestamp manipulation
+        // If >1 day has passed, only accrue MAX_DRIP_DELTA. Caller must drip again for the rest.
+        uint256 effectiveTime = block.timestamp;
+        if (effectiveTime - lastDripTime > MAX_DRIP_DELTA) {
+            effectiveTime = lastDripTime + MAX_DRIP_DELTA;
+        }
+
+        uint256 pending = _pendingEmissionsUntil(effectiveTime);
         if (pending == 0) revert NothingToDrip();
 
         // Cap at mintable supply
@@ -218,7 +233,8 @@ contract EmissionController is
         if (pending == 0) revert NothingToDrip();
 
         // Update state before external calls
-        lastDripTime = block.timestamp;
+        // Use effectiveTime (not block.timestamp) so remaining emissions are preserved for next drip
+        lastDripTime = effectiveTime;
         totalEmitted += pending;
 
         // Mint to self
@@ -346,14 +362,21 @@ contract EmissionController is
     }
 
     /**
-     * @notice Calculate unminted emissions since last drip
-     * @dev Loops through eras, calculating time overlap with [lastDripTime, now].
+     * @notice Calculate unminted emissions since last drip (full, no drift cap)
+     * @dev View function returns total pending. drip() applies MAX_DRIP_DELTA cap internally.
+     */
+    function pendingEmissions() public view returns (uint256) {
+        return _pendingEmissionsUntil(block.timestamp);
+    }
+
+    /**
+     * @notice Calculate emissions accrued from lastDripTime to a target timestamp
+     * @dev Loops through eras, calculating time overlap with [lastDripTime, targetTime].
      *      Bounded at MAX_ERAS iterations (32), so gas is predictable.
      */
-    function pendingEmissions() public view returns (uint256 total) {
+    function _pendingEmissionsUntil(uint256 targetTime) internal view returns (uint256 total) {
         uint256 lastTime = lastDripTime;
-        uint256 currentTime = block.timestamp;
-        if (currentTime <= lastTime) return 0;
+        if (targetTime <= lastTime) return 0;
 
         uint256 genesis = genesisTime;
         uint256 dur = eraDuration;
@@ -367,11 +390,11 @@ contract EmissionController is
 
             // Skip eras fully before lastTime
             if (eraEnd <= lastTime) continue;
-            // Stop if era starts after currentTime
-            if (eraStart >= currentTime) break;
+            // Stop if era starts after targetTime
+            if (eraStart >= targetTime) break;
 
             uint256 start = lastTime > eraStart ? lastTime : eraStart;
-            uint256 end = currentTime < eraEnd ? currentTime : eraEnd;
+            uint256 end = targetTime < eraEnd ? targetTime : eraEnd;
 
             total += rate * (end - start);
         }

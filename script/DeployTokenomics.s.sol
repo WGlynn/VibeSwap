@@ -155,14 +155,23 @@ contract DeployTokenomics is Script {
         console.log("  SingleStaking:", singleStaking);
 
         // Step 8: Deploy EmissionController proxy
+        // Pass 0 for genesisTime on first deploy (uses block.timestamp).
+        // For chain migration, pass the original genesis to continue the emission curve.
+        uint256 genesisTime = vm.envOr("GENESIS_TIME", uint256(0));
         console.log("Step 8: Deploying EmissionController proxy...");
+        if (genesisTime != 0) {
+            console.log("  Using existing genesis:", genesisTime);
+        } else {
+            console.log("  Fresh genesis (block.timestamp)");
+        }
         bytes memory emissionInit = abi.encodeWithSelector(
             EmissionController.initialize.selector,
             owner,
             vibeToken,
             shapley,
             liquidityGauge,
-            singleStaking
+            singleStaking,
+            genesisTime
         );
         emissionController = address(new ERC1967Proxy(emissionControllerImpl, emissionInit));
         console.log("  EmissionController proxy:", emissionController);

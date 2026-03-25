@@ -13,9 +13,7 @@ Your pending transaction sits in the mempool like a poker hand played face-up. S
 
 Over $1 billion per year flows from regular users to MEV extractors this way.
 
-This isn't a bug in any particular DEX. It's a structural consequence of sequential order execution. And it can be eliminated entirely.
-
-I built VibeSwap to prove it. Here's how:
+This isn't a bug. It's a structural consequence of sequential execution. And it can be eliminated entirely. Here's how:
 
 Commit-reveal batch auctions process trades in 10-second batches with three phases:
 
@@ -31,11 +29,9 @@ The execution order is cryptographically random — seeded by combined secrets f
 
 Are there trade-offs? Yes. You wait up to 10 seconds. You submit two transactions instead of one. Failed reveals get 50% slashed.
 
-These are deliberate design choices, not oversights. The slashing makes commitment credible. The latency aggregates meaningful order flow. The two-tx cost is the price of information hiding on a transparent chain.
+These are deliberate design choices. The slashing makes commitment credible. The latency aggregates meaningful order flow. The two-tx cost is the price of privacy on a transparent chain.
 
-MEV is not inevitable. It's a consequence of specific mechanism choices that most DEXs inherited from centralized exchange models without questioning whether they fit a transparent blockchain.
-
-Link in comments.
+MEV is not inevitable. It's a design choice most DEXs inherited without questioning.
 
 What would you trade — instant execution for guaranteed fair pricing?
 
@@ -54,9 +50,7 @@ You own 10% of the pool, you get 10% of the fees. Simple. And deeply unfair.
 
 Pro-rata treats a dollar deposited five minutes ago the same as a dollar that survived three liquidation cascades. It treats the abundant side of a lopsided market the same as the scarce side that actually enabled trades to clear.
 
-There's a better way. It's been around since 1953. Lloyd Shapley just never had to put it on a blockchain.
-
-The Glove Game makes it obvious:
+There's a better way. It's been around since 1953. Lloyd Shapley won a Nobel Prize for it. He just never had to put it on a blockchain.
 
 Alice has a left glove. Bob has a left glove. Carol has a right glove. A matched pair sells for $1.
 
@@ -81,9 +75,7 @@ Traditional DeFi is a Prisoner's Dilemma — defection is individually rational 
 
 Shapley values transform it into an Assurance Game — cooperation is rational when others cooperate.
 
-Rewards cannot exceed revenue. Compounding is limited to realized events. Cooperation is rational, not moral.
-
-Link in comments.
+Rewards cannot exceed revenue. Cooperation is rational, not moral.
 
 If your protocol rewards showing up over contributing — who are you really incentivizing?
 
@@ -100,11 +92,9 @@ Every DeFi protocol ships with a reentrancy guard and calls itself secure.
 
 Meanwhile, $3.8 billion was drained from DeFi in 2022 alone — and the vast majority sailed past reentrancy protection without triggering it.
 
-The problem isn't that protocols lack security. It's that they treat it as a checklist instead of an architecture.
+The problem isn't missing security. It's treating security as a checklist instead of an architecture.
 
-A reentrancy guard is layer one. The sophisticated attacks target layers three through six, where most protocols have nothing at all.
-
-Here are six layers of defense-in-depth:
+A reentrancy guard is layer one. The real attacks target layers three through six — where most protocols have nothing at all.
 
 Layer 1: Reentrancy Guards — table stakes. If you're not using OpenZeppelin's ReentrancyGuard on every state-mutating function, stop reading and go fix that.
 
@@ -118,17 +108,13 @@ Layer 5: Rate Limiting — cap per-user throughput. 100K tokens per hour per use
 
 Layer 6: Economic Security — align incentives so attacking is negative-expected-value before it begins. 50% slashing on failed reveals. Shapley values exclude zero-contribution actors from rewards. The game theory doesn't merely discourage attacks — it makes honest participation the dominant strategy.
 
-Most audits verify layers one and two. Some check three. Almost none evaluate four through six, because they require understanding mechanism design and game theory — not just Solidity.
+Most audits verify layers one and two. Some check three. Almost none touch four through six — those require game theory, not just Solidity.
 
-But look at where the money actually gets stolen. Oracle manipulation. Gradual drains. Governance attacks where the strategy is economically rational given the incentive structure. Those are layers three through six.
+But look at where money actually gets stolen. Oracle manipulation. Gradual drains. Governance attacks that are economically rational. All layers three through six.
 
-If your protocol has reentrancy guards and calls itself secure, you're defending against 2016's attacks.
+Reentrancy guards and calling yourself secure is defending against 2016.
 
-Build the other layers.
-
-Link in comments.
-
-How many layers does your protocol actually have? Honestly.
+How many layers does your protocol actually have?
 
 #SmartContracts #Security #DeFi #MechanismDesign #Blockchain
 
@@ -223,9 +209,9 @@ We asked a different one: "How do we make sure this is fair?"
 
 That distinction changes everything. When you optimize for extraction, you build systems that are sophisticated but predatory. When you optimize for fairness, you build systems that are sustainable and trust doesn't have to be earned — it's enforced by math.
 
-This isn't idealism. It's better engineering. Fairness isn't a constraint on profitability — it's the foundation of it. Markets that don't extract from participants attract more participants. Protocols that can't be gamed don't need to be defended. Systems built on cooperation outperform systems built on exploitation, given enough time.
+This isn't idealism. It's better engineering. Markets that don't extract attract more participants. Protocols that can't be gamed don't need to be defended. Cooperation outperforms exploitation, given enough time.
 
-And we're not just talking about it. We're not writing manifestos or holding signs. We're shipping code. 360+ smart contracts that make extraction structurally unprofitable. Shapley values that distribute rewards based on marginal contribution, not political power. Circuit breakers that protect users without asking permission.
+And we're not writing manifestos. We're shipping code. 360+ contracts that make extraction structurally unprofitable. Shapley values that reward contribution, not political power. Circuit breakers that protect users without asking permission.
 
 Building something out of love for what it could be — not just what it could earn — backed by 360+ contracts and 98 tests that prove it actually works. Most people can't even conceive of it. That's the real edge.
 

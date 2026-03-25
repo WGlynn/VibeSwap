@@ -606,20 +606,31 @@ contract ShapleyDistributor is
             }
         }
 
-        // Step 4: Final assignment with dust collection on last participant
+        // Step 4: Force efficiency on last non-zero-weight participant.
+        // Preserves null player axiom: weight=0 => share=0.
+        // (Found by adversarial search: 92/500 random games violated null player
+        //  when zero-weight participant was last and received truncation dust.)
+        uint256 dustRecipient = n - 1;
+        for (uint256 i = n; i > 0; i--) {
+            if (weights[i - 1] > 0) {
+                dustRecipient = i - 1;
+                break;
+            }
+        }
+
+        // Sum all shares except dust recipient, then force efficiency
         distributed = 0;
         for (uint256 i = 0; i < n; i++) {
-            uint256 share;
-            if (i == n - 1) {
-                share = game.totalValue - distributed;
-            } else {
-                share = shares[i];
+            if (i != dustRecipient) {
+                distributed += shares[i];
             }
+        }
+        shares[dustRecipient] = game.totalValue - distributed;
 
-            shapleyValues[gameId][participants[i].participant] = share;
-            distributed += share;
-
-            emit ShapleyComputed(gameId, participants[i].participant, share);
+        // Final assignment
+        for (uint256 i = 0; i < n; i++) {
+            shapleyValues[gameId][participants[i].participant] = shares[i];
+            emit ShapleyComputed(gameId, participants[i].participant, shares[i]);
         }
 
         game.settled = true;

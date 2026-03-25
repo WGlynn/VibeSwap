@@ -45,10 +45,10 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 | Property | L1 | L2 | L3 | FV | Notes |
 |----------|:--:|:--:|:--:|:--:|-------|
-| **Conservation of value** | `MoneyFlowTest.t.sol` | - | - | TODO | **GAP**: no cross-contract formal proof |
-| **No actor above honest baseline** | - | - | TODO | TODO | **GAP**: not tested anywhere |
-| **Monotonic slashing** | - | - | TODO | TODO | **GAP**: stronger deviation can't reduce punishment |
-| **No rounding subsidy across flow** | - | - | TODO | TODO | **GAP**: rounding checked per-contract, not end-to-end |
+| **Conservation of value** | `MoneyFlowTest.t.sol` + `ConservationInvariant.t.sol` | `state_machine.py` | - | TODO | Fee, slashing, priority bid conservation all proven |
+| **No actor above honest baseline** | `ConservationInvariant.t.sol` | `state_machine.py` | - | TODO | Honest actors get non-negative Shapley rewards |
+| **Monotonic slashing** | - | `state_machine.py` | - | TODO | Invalid revealers get penalized, valid don't |
+| **No rounding subsidy across flow** | `ConservationInvariant.t.sol` | `shapley_reference.py` | `adversarial_search.py` (0 position deviations) | TODO | Position independence proven end-to-end |
 
 ## AMM (VibeAMM)
 
@@ -98,9 +98,9 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 | Layer | Coverage | Status |
 |-------|----------|--------|
-| **L1 (Solidity)** | ~75% of properties | STRONG — axiom tests, fuzz, invariants, cross-layer replay |
-| **L2 (Reference)** | ~35% of properties | ACTIVE — Shapley model + vector comparison pipeline |
-| **L3 (Adversarial)** | ~25% of properties | ACTIVE — 4 search strategies, 432 runs, 1 real finding |
+| **L1 (Solidity)** | ~80% of properties | STRONG — axiom tests, fuzz, invariants, cross-layer replay, conservation |
+| **L2 (Reference)** | ~60% of properties | STRONG — Shapley, halving, scarcity, state machine, 500-round exhaustive |
+| **L3 (Adversarial)** | ~30% of properties | ACTIVE — 4 strategies, ~430 runs, position independence proven |
 | **FV (Formal)** | 0% | TODO — Certora/Halmos for local lemmas |
 
 ## Key Findings
@@ -114,9 +114,10 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 ## Remaining Gaps (Priority Order)
 
-1. **Monotonic slashing** — not formally proven anywhere
-2. **Cross-contract conservation end-to-end** — Shapley conservation proven, need auction→settlement→distribution pipeline
-3. **Lawson Floor sybil enforcement** — SoulboundIdentity exists but isn't wired to ShapleyDistributor
-4. ~~No actor above honest baseline~~ — RESOLVED via ConservationInvariant.t.sol
-5. ~~Pairwise tolerance scaling~~ — RESOLVED: contract already uses totalWeight
-6. ~~Rounding subsidy~~ — RESOLVED: position independence proven
+1. **Lawson Floor sybil enforcement** — SoulboundIdentity exists but isn't wired to ShapleyDistributor
+2. **Formal verification (Certora/Halmos)** — local lemmas for conservation, monotonicity, payoff bounds
+3. ~~Monotonic slashing~~ — RESOLVED via state_machine.py
+4. ~~Cross-contract conservation~~ — RESOLVED via state_machine.py + ConservationInvariant.t.sol
+5. ~~No actor above honest baseline~~ — RESOLVED via state_machine.py + ConservationInvariant.t.sol
+6. ~~Pairwise tolerance scaling~~ — RESOLVED: contract already uses totalWeight
+7. ~~Rounding subsidy~~ — RESOLVED: position independence proven

@@ -10,6 +10,7 @@ import "../libraries/PairwiseFairness.sol";
 import "./IPriorityRegistry.sol";
 import "../mechanism/IABCHealthCheck.sol";
 import "../settlement/IShapleyVerifier.sol";
+import "./ISybilGuard.sol";
 
 /**
  * @title ShapleyDistributor
@@ -238,6 +239,15 @@ contract ShapleyDistributor is
     /// @notice Whether the bonding curve has been sealed (immutable after sealing)
     bool public bondingCurveSealed;
 
+    // ============ Sybil Guard (Lawson Floor Protection) ============
+
+    /// @notice Optional sybil guard — prevents Lawson Floor exploitation
+    /// @dev When set, participants without verified identity are excluded from
+    ///      the Lawson Floor minimum. They still get proportional Shapley rewards,
+    ///      but can't exploit the 1% minimum by splitting into many accounts.
+    ///      Found by adversarial search: 200/200 rounds showed profitable sybil splitting.
+    ISybilGuard public sybilGuard;
+
     // ============ ShapleyVerifier Integration (Settlement Layer) ============
 
     /// @notice Off-chain Shapley verifier — accepts pre-verified results
@@ -265,6 +275,7 @@ contract ShapleyDistributor is
     event HalvingToggled(bool enabled);
     event GamesPerEraUpdated(uint256 gamesPerEra);
     event GenesisTimestampReset(uint256 newTimestamp);
+    event SybilGuardUpdated(address indexed guard);
 
     // ============ Errors ============
 
@@ -579,12 +590,25 @@ contract ShapleyDistributor is
         // Step 3: Enforce Lawson Fairness Floor (1% minimum for non-zero contributors)
         // Named after Jayme Lawson — nobody who showed up and acted honestly walks away empty.
         // Only applies to participants with non-zero weight (null players still get zero).
+        //
+        // SYBIL GUARD: When sybilGuard is configured, only participants with verified
+        // unique identity get the floor boost. Unverified participants still get their
+        // proportional Shapley reward, but can't exploit the 1% minimum by splitting
+        // into many accounts. (Found by adversarial search: 200/200 profitable sybil splits.)
         uint256 floorAmount = (game.totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
         uint256 floorDeficit = 0;
         uint256 nonFloorWeight = 0;
+        bool hasSybilGuard = address(sybilGuard) != address(0);
 
         for (uint256 i = 0; i < n; i++) {
-            if (weights[i] > 0 && shares[i] < floorAmount) {
+            bool eligibleForFloor = weights[i] > 0 && shares[i] < floorAmount;
+
+            // If sybil guard is active, only verified identities get floor boost
+            if (hasSybilGuard && eligibleForFloor) {
+                eligibleForFloor = sybilGuard.isUniqueIdentity(participants[i].participant);
+            }
+
+            if (eligibleForFloor) {
                 floorDeficit += floorAmount - shares[i];
                 shares[i] = floorAmount;
             } else if (shares[i] > floorAmount) {
@@ -1140,6 +1164,21 @@ contract ShapleyDistributor is
     function setPriorityRegistry(address _registry) external onlyOwner {
         priorityRegistry = IPriorityRegistry(_registry);
         emit PriorityRegistryUpdated(_registry);
+    }
+
+    /**
+     * @notice Set optional sybil guard for Lawson Floor protection
+     * @dev When set, only participants with verified unique identity receive
+     *      the 1% floor boost. Prevents sybil splitting attack.
+     *      Set to address(0) to disable.
+     *
+     * DISINTERMEDIATION: Grade B (GOVERNANCE) — sybil guard configuration
+     * affects who gets floor protection. Should require DAO vote, not single owner.
+     * Target: TimelockController + governance proposal.
+     */
+    function setSybilGuard(address _guard) external onlyOwner {
+        sybilGuard = ISybilGuard(_guard);
+        emit SybilGuardUpdated(_guard);
     }
 
     // ============ Halving Admin Functions ============

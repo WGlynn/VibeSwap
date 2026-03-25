@@ -1,64 +1,68 @@
 # Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: MARATHON — TRP + testing + convergence + job assessment + content pipeline + library
+- **Session**: MARATHON — full TRP execution, all protocols engaged
 - **Parent**: `aa0edab`
-- **Branch**: `master` @ `adf649a`
-- **Status**: 49 commits. 98 tests. Most productive session ever.
+- **Branch**: `master` @ `ef631ed`
+- **Status**: 54 commits. 105 tests. Most productive session in project history.
 
-## Session Deliverables
+## TOMORROW: VIBE Emission Launch on Base
+- Deploy script: `script/DeployTokenomics.s.sol` (verified, 6-param initialize ready)
+- Command: `forge script script/DeployTokenomics.s.sol --rpc-url $BASE_RPC --broadcast --verify`
+- Post-deploy: wire VIBEToken.setMinter, ShapleyDistributor.setAuthorizedCreator, setPriorityRegistry
+- GenesisTime = block.timestamp at deploy
 
-### Code (98 tests, all green)
-- Three-layer testing framework: reference model + adversarial search + Foundry replay
-- Null player dust fix (contract + model)
-- Sybil guard (ISybilGuard + SoulboundSybilGuard + ShapleyDistributor integration)
-- AttributionBridge.sol (Jarvis → Shapley rewards)
-- Formal verification specs (6 Halmos/Foundry fuzz lemmas)
-- Sub-block WAL system (Ergo-style crash recovery)
-- Admin override for user level (creator sees everything)
-- PairwiseFairness standalone library published (github.com/WGlynn/pairwise-fairness)
+## Artifacts Created This Session (54 commits)
 
-### Jarvis × VibeSwap Convergence
-- attribution-bridge.js (merkle epoch builder)
-- claude-code-bridge.js (session state ↔ knowledge chain)
-- shard-shapley.js (AI agents as economic actors)
+### Testing (105 tests)
+- Python: 81 (reference model, adversarial, halving, exhaustive, state machine, pipeline, collusion)
+- Solidity: 24 (replay, conservation, sybil guard, formal fuzz, attribution bridge)
+
+### Contract Changes
+- ShapleyDistributor: null player dust fix + sybil guard + ISybilGuard interface
+- WalletRecovery: 48h guardian activation delay (from collusion analysis)
+- AttributionBridge.sol: Jarvis → Shapley rewards
+- SoulboundSybilGuard.sol: identity adapter
+- PairwiseFairness NatSpec fix
+- EmissionController test param fix
+
+### Convergence (Jarvis × VibeSwap)
+- attribution-bridge.js, claude-code-bridge.js, shard-shapley.js
 - reward_feedback.py (frustration-directed adversarial search)
+- guardian_collusion.py (collusion economics model)
+
+### Content
+- 39 LinkedIn posts (through Aug 5)
+- 8 ethresear.ch posts (pure research)
+- 3 old ethresear.ch posts cleaned
+- LinkedIn post audit (5 rounds of R1 improvement)
 
 ### Documentation
-- Trinity Recursion Protocol v1.1 (3+1 recursions, verified, audited)
-- Weight augmentation without weight modification
+- Trinity Recursion Protocol v1.1 + verification report
+- Weight augmentation primitive
 - Jarvis × VibeSwap convergence spec
-- Mechanism coverage matrix (all gaps resolved)
-- Open source strategy (extractable libraries)
+- Coverage matrix (all critical gaps resolved)
+- Open source strategy
 - Anthropic feedback letter
 
-### Content Pipeline
-- 39 LinkedIn posts (Tue/Thu through Aug 5)
-- 8 ethresear.ch posts (pure research, zero self-promotion)
-- 3 old ethresear.ch posts cleaned (stripped project pitching)
-
-### Job Assessment
-- Mellus: 2 fixes + bonus observations → github.com/WGlynn/mellus-assessment
-- Reply sent. Waiting on interview scheduling.
-
 ### Other
-- Knowledge test written (40 questions, Will scored 35/40)
-- Knowledge gaps tracked (specifics > concepts, AMM formula priority)
-- Resume updated on Desktop
-- Vercel deployed with admin override
+- Mellus job assessment shipped (github.com/WGlynn/mellus-assessment)
+- PairwiseFairness library published (github.com/WGlynn/pairwise-fairness)
+- Knowledge test + gap tracking
+- Sub-block WAL system
+- Admin override deployed to Vercel
 
-## Manual Queue
-1. TOMORROW: Green light VIBE rewards on Base
-2. Post ethresear.ch articles (start with Shapley fairness — Post 1)
-3. Start LinkedIn cadence (Post #3: Security, Tue Apr 1)
-4. Apply to ETH Boston FIRST when applications open
-5. Mellus interview when scheduled
-6. Contribute to open source (pairwise-fairness library → awesome-solidity lists)
-7. Open source contribution PRs to high-visibility repos
+## Key Findings
+1. Position independence: PROVEN (0/100 across 5 adversarial cycles)
+2. Lawson Floor sybil: found → fixed (ISybilGuard, 100→0 exploits)
+3. Null player dust: found → fixed (0/500 post-fix)
+4. Guardian collusion: modeled (safe ≤24h, 48h activation delay added)
+5. Scarcity boundary: documented (not harmful)
+6. Weight augmentation without weight modification: the ASI trajectory insight
 
 ## Next Session
-- Run second full R1 adversarial cycle post-all-fixes
-- VIBE emission activation on Base
-- Start posting ethresear.ch (1 per week)
-- Start LinkedIn cadence (Tue/Thu)
-- More knowledge tests targeting Will's weak areas (specifics, AMM math)
+- LAUNCH VIBE emissions on Base
+- Start LinkedIn posting cadence (Tue/Thu)
+- Post first ethresear.ch article
+- Mellus interview when scheduled
+- ETH Boston application when open

@@ -61,7 +61,7 @@ contract ShapleyFormalSpecs is Test {
     // For any valid game, sum(shapleyValues) == totalValue.
     // This is the most important invariant — no value created or destroyed.
 
-    function check_conservation_twoPlayers(
+    function testFuzz_conservation_twoPlayers(
         uint256 totalValue,
         uint256 direct1,
         uint256 direct2,
@@ -109,7 +109,7 @@ contract ShapleyFormalSpecs is Test {
     // No participant ever receives a negative share.
     // (Solidity uint256 makes this trivially true, but the SPEC documents the intent.)
 
-    function check_nonNegativity_twoPlayers(
+    function testFuzz_nonNegativity_twoPlayers(
         uint256 totalValue,
         uint256 direct1,
         uint256 direct2
@@ -143,7 +143,7 @@ contract ShapleyFormalSpecs is Test {
     // ============ SPEC 3: Upper Bound ============
     // No single participant can receive more than totalValue.
 
-    function check_upperBound_twoPlayers(
+    function testFuzz_upperBound_twoPlayers(
         uint256 totalValue,
         uint256 direct1,
         uint256 direct2
@@ -175,7 +175,7 @@ contract ShapleyFormalSpecs is Test {
     // ============ SPEC 4: Lawson Floor Lower Bound ============
     // Any participant with non-zero weight gets at least 1% of totalValue.
 
-    function check_lawsonFloor(
+    function testFuzz_lawsonFloor(
         uint256 totalValue,
         uint256 direct1,
         uint256 direct2
@@ -209,7 +209,7 @@ contract ShapleyFormalSpecs is Test {
     // ============ SPEC 5: Monotonicity ============
     // Strictly more contribution (same other inputs) => weakly more reward.
 
-    function check_monotonicity(
+    function testFuzz_monotonicity(
         uint256 totalValue,
         uint256 directLow,
         uint256 directBonus
@@ -256,7 +256,7 @@ contract ShapleyFormalSpecs is Test {
     // verifyPairwiseFairness(a, a) should always be fair (a participant
     // is always proportional to themselves).
 
-    function check_pairwiseSelfFair(uint256 totalValue, uint256 direct1) public {
+    function testFuzz_pairwiseSelfFair(uint256 totalValue, uint256 direct1) public {
         totalValue = bound(totalValue, 1 * PRECISION, 1000 * PRECISION);
         direct1 = bound(direct1, 1 * PRECISION, 1000 * PRECISION);
 

@@ -1,51 +1,61 @@
 # Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: Three-layer testing architecture — Shapley reference model, adversarial search, coverage matrix
+- **Session**: Three-layer testing framework + recursive self-improvement loop
 - **Parent**: `aa0edab` (Martin call session)
-- **Branch**: `master` @ `d590bb8`
-- **Status**: Three-layer testing framework built. 52 Python tests passing. Forge compiling (446 files, slow machine). 6 commits today.
+- **Branch**: `master` @ `51d8ac0`
+- **Status**: Three-layer framework built AND running. First recursive self-improvement cycle completed: adversarial search found bug → contract fixed → tests confirmed. 82 new tests, 11 commits.
 
 ## What Exists Now
-- `oracle/backtest/shapley_reference.py` — Exact arithmetic mirror of ShapleyDistributor.sol (dual mode: Fraction + Solidity-emulated integer)
-- `oracle/backtest/adversarial_search.py` — Layer 3 adversarial search with 4 strategies
-- `oracle/backtest/generate_vectors.py` — Generates JSON test vectors for Foundry replay
-- `oracle/tests/test_shapley_reference.py` — 25 tests: axiom verification, rounding analysis, edge cases
-- `oracle/tests/test_adversarial_search.py` — 6 tests: position independence, sybil, input integrity
-- `oracle/tests/test_halving_schedule.py` — 21 tests: era calc, multiplier, supply cap convergence
-- `test/crosslayer/ShapleyReplay.t.sol` — Foundry replay of Python vectors (awaiting compilation)
-- `test/crosslayer/ConservationInvariant.t.sol` — Cross-contract value conservation proofs
-- `test/vectors/*.json` — 10 test vectors + adversarial report + manifest
-- `docs/MECHANISM_COVERAGE_MATRIX.md` — Per-property verification matrix across all layers
-- `scripts/test_all_layers.sh` — Single command for all three layers
 
-## Key Findings
-1. **Position independence PROVEN**: 0 deviations across 50 rounds — mechanism is order-independent
-2. **Lawson Floor sybil vulnerability**: splitting accounts doubles floor subsidy. Mitigated by SoulboundIdentity.
-3. **Input integrity is load-bearing**: onlyAuthorized access control prevents 232 trivial exploits
-4. **PairwiseFairness NatSpec was misleading**: contract uses totalWeight tolerance (correct), docs said numParticipants
-5. **Halving schedule matches exact arithmetic**: all 32 eras produce identical results
+### Layer 2: Python Reference Model
+- `oracle/backtest/shapley_reference.py` — Exact arithmetic mirror of ShapleyDistributor.sol + HalvingSchedule
+- `oracle/backtest/generate_vectors.py` — 11 JSON vectors for Foundry replay
+- `oracle/tests/test_shapley_reference.py` — 25 tests: axioms, rounding, edge cases
+- `oracle/tests/test_halving_schedule.py` — 21 tests: era, multiplier, supply cap
+- `oracle/tests/test_property_exhaustive.py` — 15 tests: 500-round exhaustive checks + scarcity model
 
-## Context: GitHub Discussion
-- Someone gave expert feedback on three-layer testing for mechanism-heavy Solidity
-- Their framework: L1 (Solidity invariants) + L2 (off-chain reference) + L3 (adversarial search)
-- Will crafted reply showing existing coverage + gaps + open question about approximation vs exact
-- This session implements their entire framework
+### Layer 3: Adversarial Search
+- `oracle/backtest/adversarial_search.py` — 4 strategies: mutation, coalition, position, sybil
+- `oracle/tests/test_adversarial_search.py` — 6 tests: reproducibility, key findings
 
-## Fixes Applied
-- EmissionController tests updated for 6-param initialize (_genesisTime)
-- PairwiseFairness.sol NatSpec corrected
+### Layer 1: Solidity Cross-Layer
+- `test/crosslayer/ShapleyReplay.t.sol` — 10 replay tests from Python vectors
+- `test/crosslayer/ConservationInvariant.t.sol` — 5 conservation/position/baseline tests
+
+### Infrastructure
+- `test/vectors/*.json` — 11 test vectors + adversarial report
+- `docs/MECHANISM_COVERAGE_MATRIX.md` — per-property verification matrix
+- `scripts/test_all_layers.sh` — single command for all layers
+
+## Key Findings & Fixes
+
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | PairwiseFairness NatSpec misleading (tolerance) | Low | FIXED (docs corrected, contract was already right) |
+| 2 | Lawson Floor sybil (2 accounts = 2x floor) | Medium | KNOWN (mitigated by SoulboundIdentity) |
+| 3 | Null player + dust collection conflict | Medium | **FIXED** (contract + reference model updated) |
+| 4 | Balanced market scarcity = 5500 not 5000 | Low | KNOWN (strict > at buyRatio boundary) |
+| 5 | Position independence PROVEN | N/A (positive) | 0/50 deviations — mechanism is order-independent |
+| 6 | Input integrity is load-bearing | N/A (validation) | onlyAuthorized prevents 232 trivial exploits |
+
+## Recursive Self-Improvement
+First full cycle completed:
+1. Adversarial search found null player dust bug (92/500 games)
+2. Root cause identified: dust goes to last participant regardless of weight
+3. Fix: dust recipient = last non-zero-weight participant
+4. Both contract and reference model updated in lockstep
+5. Re-tested: 0/500 violations. 82/82 tests green.
 
 ## Manual Queue (Will does these)
-1. Post GitHub discussion reply (drafted, ready to paste)
-2. Follow up with Martin in ~2 weeks
-3. Publish blog post #3 (Security, Tue Apr 1)
-4. Create accounts: Code4rena, Sherlock, Cantina
+1. Post GitHub discussion reply (drafted, ready)
+2. Follow up with Martin (~2 weeks)
+3. Blog post #3 (Security, Tue Apr 1)
+4. Create Code4rena/Sherlock/Cantina accounts
 5. Deploy VIBE emission on Base
 
 ## Next Session
-- Verify Foundry cross-layer tests pass (forge compilation pending)
-- Wire SoulboundIdentity check into ShapleyDistributor for Lawson floor sybil defense
-- Add Certora/Halmos specs for conservation + monotonicity (FV column in matrix)
-- Respond to GitHub discussion if they reply to Will's post
-- Canonical FeeRouter decision still outstanding
+- Run second adversarial search cycle (search for new deviations post-fix)
+- Certora/Halmos formal verification specs
+- Canonical FeeRouter decision
+- Wire SoulboundIdentity to ShapleyDistributor for Lawson floor sybil defense

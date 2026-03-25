@@ -157,17 +157,15 @@ What's stopping you from running this on your own codebase?
 ## Post #5: Hardened Then Decentralized
 **Schedule: Tue Apr 8**
 
-The hardest part of building a decentralized protocol isn't the decentralization. It's what comes before it.
+Most protocols decentralize on day one and hope for the best.
 
-VibeSwap was developed centrally first — deliberately. Every mechanism, every invariant, every safety check was designed so that the protocol can't be broken by bad actors, bad code, or bad governance.
+We did the opposite. VibeSwap was developed centrally first — deliberately. Every mechanism, every invariant, every safety check was designed so that the protocol can't be broken by bad actors, bad code, or bad governance.
 
 The commit-reveal auction can't be front-run. The Shapley distribution can't over-allocate. The circuit breakers can't be bypassed. The bonding curve, once sealed, can't be unsealed. These aren't policies. They're physics.
 
 Only after the mechanism is structurally sound do you open the door. Permissionless contribution — anyone can submit code, anyone can propose changes — but consensus decides what gets merged. The math has veto power over governance.
 
-Most protocols decentralize first and pray. We hardened first and decentralized with confidence.
-
-The goal was never to build something I control. It was to build something nobody needs to control. 360+ contracts, each verified against mathematical invariants before we opened a single line to outside contribution.
+The goal was never to build something I control. It was to build something nobody needs to control. 360+ contracts, each verified against mathematical invariants before a single line was opened to outside contribution.
 
 What would you trust more — a protocol that depends on good people, or one that doesn't need them?
 
@@ -234,13 +232,13 @@ Every senior engineer uses one now. Most won't admit it. I'd rather be honest an
 
 In a single session this week, my AI-augmented workflow produced: 98 tests across three verification layers, an adversarial search harness that found a real bug in my own contract, the fix for that bug, a cross-layer reference model with exact arithmetic, and formal verification specs. One session.
 
-The question isn't whether engineers use AI tools. The question is whether they're good enough to use them well.
+The question isn't whether engineers use AI. It's whether they're good enough to use it well.
 
-Anyone can paste code into ChatGPT. Building a recursive testing framework where the system attacks itself, finds its own bugs, and generates its own regression tests — that requires deep understanding of what you're building. The AI doesn't replace the thinking. It amplifies it.
+Anyone can paste code into ChatGPT. Building a recursive testing framework where the system attacks itself, finds its own bugs, and generates its own regression tests — that takes deep understanding of what you're building. The AI doesn't replace the thinking. It amplifies it.
 
-When I interview, I say this upfront. If a company penalizes me for using the best tools available, that tells me everything I need to know about their engineering culture.
+When I interview, I say this upfront. If a company penalizes me for using the best tools available, that tells me everything about their engineering culture.
 
-The engineers who pretend they don't use AI are optimizing for optics. The engineers who use it openly and effectively are optimizing for output. I know which one I'd hire.
+Engineers who hide their AI usage are optimizing for optics. Engineers who use it openly are optimizing for output. I know which one I'd hire.
 
 #AI #Engineering #BuildInPublic #Honesty #DeFi
 
@@ -251,21 +249,19 @@ The engineers who pretend they don't use AI are optimizing for optics. The engin
 ## Post #9: Continuity of Purpose
 **Schedule: Tue Apr 22**
 
-Apple without Steve Jobs is still Apple. The United States without its founders is still the United States. The vision persists after the visionary leaves. That's what makes institutions outlive individuals.
+The founder leaves. The token dumps. The community scatters.
 
-Most crypto protocols can't say this. The founder leaves, the token dumps, the community scatters. The protocol was never the product — the founder's attention was.
+Most crypto protocols die this way because the protocol was never the product — the founder's attention was.
 
-I designed VibeSwap to be the opposite.
+VibeSwap was designed to be the opposite.
 
 The fairness guarantees aren't policies that a governance vote can override. They're mathematical invariants enforced by code. The Shapley distribution can't over-allocate regardless of who's running the protocol. The commit-reveal auction can't be front-run regardless of who controls the validators. The circuit breakers fire automatically — no human in the loop.
 
-We even built governance to sunset itself. Voting weight decays exponentially. After a few years, the protocol runs on pure mechanism design. No human governance needed.
+We even built governance to sunset itself. Voting weight decays exponentially. After a few years, the protocol runs on pure mechanism design. No humans needed.
 
-I call this the Cincinnatus Protocol — named after the Roman dictator who voluntarily gave up power and went back to farming. Build it. Prove it works. Walk away.
+I call this the Cincinnatus Protocol — named after the Roman dictator who gave up absolute power and went back to farming. Build it. Prove it works. Walk away.
 
-The goal isn't to be important. The goal is to build something so well-designed that your importance becomes zero.
-
-Continuity of purpose matters more than continuity of identity. The math doesn't need to know who wrote it.
+The math doesn't need to know who wrote it.
 
 If you disappeared tomorrow, would your project still work?
 

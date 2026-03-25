@@ -1,0 +1,143 @@
+{
+  "metadata": {
+    "generator": "shapley_reference.py",
+    "precision": 1000000000000000000,
+    "bps_precision": 10000,
+    "weights": {
+      "direct": 4000,
+      "enabling": 3000,
+      "scarcity": 2000,
+      "stability": 1000
+    },
+    "lawson_floor_bps": 100
+  },
+  "input": {
+    "total_value": "1000000000000000000000",
+    "participants": [
+      {
+        "addr": "alice",
+        "direct_contribution": "100000000000000000000",
+        "time_in_pool": 31536000,
+        "scarcity_score": 9000,
+        "stability_score": 9000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "bob",
+        "direct_contribution": "1000000000000000000",
+        "time_in_pool": 86400,
+        "scarcity_score": 1000,
+        "stability_score": 1000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "charlie",
+        "direct_contribution": "50000000000000000000",
+        "time_in_pool": 7776000,
+        "scarcity_score": 5000,
+        "stability_score": 5000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      }
+    ]
+  },
+  "expected_solidity": {
+    "total_weight": "61300000000000000000",
+    "weights": [
+      {
+        "addr": "alice",
+        "weight": "40510000000000000000"
+      },
+      {
+        "addr": "bob",
+        "weight": "460000000000000000"
+      },
+      {
+        "addr": "charlie",
+        "weight": "20330000000000000000"
+      }
+    ],
+    "shares": [
+      {
+        "addr": "alice",
+        "share": "659186390532544378698"
+      },
+      {
+        "addr": "bob",
+        "share": "10000000000000000000"
+      },
+      {
+        "addr": "charlie",
+        "share": "330813609467455621302"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": false,
+      "pairwise_worst_deviation": "101874260355029585798920000000000000000"
+    }
+  },
+  "expected_exact": {
+    "total_weight": "61300000000000000000",
+    "shares": [
+      {
+        "addr": "alice",
+        "share": "659186390532544378698"
+      },
+      {
+        "addr": "bob",
+        "share": "10000000000000000000"
+      },
+      {
+        "addr": "charlie",
+        "share": "330813609467455621302"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": false,
+      "pairwise_worst_deviation": "101874260355029585798920000000000000000"
+    }
+  },
+  "rounding_analysis": {
+    "max_share_delta": "0",
+    "max_share_delta_addr": "",
+    "total_rounding_gain": "0",
+    "total_rounding_loss": "0",
+    "rounding_subsidy_exists": false,
+    "per_participant": [
+      {
+        "addr": "alice",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "bob",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "charlie",
+        "weight_delta": "0",
+        "share_delta": "0"
+      }
+    ]
+  }
+}

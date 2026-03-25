@@ -19,7 +19,7 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 | **Efficiency** (sum = total) | `ShapleyFuzz.t.sol` | `shapley_reference.py` | - | TODO | Dust collection on last participant |
 | **Symmetry** (equal in = equal out) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | Pre-dust only |
 | **Null Player** (zero in = zero out) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | |
-| **Pairwise Proportionality** | `PairwiseFairness.sol` (on-chain) | `shapley_reference.py` | - | TODO | **FINDING**: tolerance = n is too tight when weights are 1e18-scale. Cross-mult amplifies 1 wei to ~1e18 deviation. |
+| **Pairwise Proportionality** | `PairwiseFairness.sol` (on-chain) | `shapley_reference.py` | - | TODO | Contract uses totalWeight as tolerance (correct). NatSpec was misleading — fixed. |
 | **Time Neutrality** | `PairwiseFairness.sol` | - | - | TODO | Only for FEE_DISTRIBUTION type |
 | **Lawson Floor** (1% minimum) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | Floor + efficiency interaction |
 | **Rounding subsidy** (no micro-arb) | - | `shapley_reference.py` | TODO | TODO | **GAP**: no Solidity test for this |
@@ -59,6 +59,21 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 | **Rate limiting** | `StressTest.t.sol` | - | - | - | 100K tokens/hour/user |
 | **LP share fairness** | `VibeAMM.t.sol` | - | - | TODO | |
 
+## Guardian Recovery (WalletRecovery.sol)
+
+| Property | L1 | L2 | L3 | FV | Notes |
+|----------|:--:|:--:|:--:|:--:|-------|
+| **3-of-5 threshold enforcement** | `WalletRecovery.t.sol` | - | - | TODO | |
+| **24h notification delay** | `WalletRecovery.t.sol` | - | - | TODO | |
+| **Owner cancel + bond slash** | `WalletRecovery.t.sol` | - | - | TODO | |
+| **Guardian collusion (3 collude)** | TODO | - | TODO | TODO | **CRITICAL GAP**: not tested anywhere |
+| **Guardian add/remove gaming** | - | - | TODO | TODO | **GAP**: rapid add/remove to game threshold |
+| **Bond sufficiency for deterrence** | - | - | TODO | - | **GAP**: is bond > reward for collusion? |
+| **Sleeping owner attack window** | - | - | TODO | TODO | **GAP**: 24h may not be enough if owner is offline |
+| **AGI-resistant behavioral checks** | `WalletRecovery.t.sol` | - | - | - | MockAGIGuard only |
+| **Rate limiting (3 attempts, 7d cool)** | `WalletRecovery.t.sol` | - | - | - | |
+| **Dead man's switch timing** | `WalletRecovery.t.sol` | - | - | - | |
+
 ## Circuit Breakers
 
 | Property | L1 | L2 | L3 | FV | Notes |
@@ -93,4 +108,4 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 2. **Monotonic slashing** — not proven anywhere
 3. **Cross-contract conservation** — tested per-contract but not end-to-end
 4. **Rounding subsidy across full flow** — Python catches per-contract, not pipeline
-5. **Pairwise tolerance scaling** — current tolerance too tight for 1e18-scale values
+5. ~~Pairwise tolerance scaling~~ — RESOLVED: contract already uses totalWeight, NatSpec was misleading

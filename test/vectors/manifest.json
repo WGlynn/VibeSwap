@@ -1,0 +1,62 @@
+[
+  {
+    "name": "two_equal",
+    "file": "two_equal.json",
+    "num_participants": 2,
+    "total_value": "100000000000000000000"
+  },
+  {
+    "name": "three_unequal",
+    "file": "three_unequal.json",
+    "num_participants": 3,
+    "total_value": "1000000000000000000000"
+  },
+  {
+    "name": "lawson_floor",
+    "file": "lawson_floor.json",
+    "num_participants": 2,
+    "total_value": "100000000000000000000"
+  },
+  {
+    "name": "five_dust_stress",
+    "file": "five_dust_stress.json",
+    "num_participants": 5,
+    "total_value": "999999999999999997"
+  },
+  {
+    "name": "pioneer_bonus",
+    "file": "pioneer_bonus.json",
+    "num_participants": 2,
+    "total_value": "100000000000000000000"
+  },
+  {
+    "name": "quality_weights",
+    "file": "quality_weights.json",
+    "num_participants": 2,
+    "total_value": "100000000000000000000"
+  },
+  {
+    "name": "twenty_rounding_drift",
+    "file": "twenty_rounding_drift.json",
+    "num_participants": 20,
+    "total_value": "10000000000000000000000"
+  },
+  {
+    "name": "extreme_ratio",
+    "file": "extreme_ratio.json",
+    "num_participants": 2,
+    "total_value": "1000000000000000000000000"
+  },
+  {
+    "name": "zero_scores",
+    "file": "zero_scores.json",
+    "num_participants": 2,
+    "total_value": "100000000000000000000"
+  },
+  {
+    "name": "null_player",
+    "file": "null_player.json",
+    "num_participants": 3,
+    "total_value": "100000000000000000000"
+  }
+]

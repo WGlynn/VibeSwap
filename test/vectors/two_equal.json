@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "generator": "shapley_reference.py",
+    "precision": 1000000000000000000,
+    "bps_precision": 10000,
+    "weights": {
+      "direct": 4000,
+      "enabling": 3000,
+      "scarcity": 2000,
+      "stability": 1000
+    },
+    "lawson_floor_bps": 100
+  },
+  "input": {
+    "total_value": "100000000000000000000",
+    "participants": [
+      {
+        "addr": "alice",
+        "direct_contribution": "10000000000000000000",
+        "time_in_pool": 2592000,
+        "scarcity_score": 5000,
+        "stability_score": 5000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "bob",
+        "direct_contribution": "10000000000000000000",
+        "time_in_pool": 2592000,
+        "scarcity_score": 5000,
+        "stability_score": 5000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      }
+    ]
+  },
+  "expected_solidity": {
+    "total_weight": "8540000000000000000",
+    "weights": [
+      {
+        "addr": "alice",
+        "weight": "4270000000000000000"
+      },
+      {
+        "addr": "bob",
+        "weight": "4270000000000000000"
+      }
+    ],
+    "shares": [
+      {
+        "addr": "alice",
+        "share": "50000000000000000000"
+      },
+      {
+        "addr": "bob",
+        "share": "50000000000000000000"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": true,
+      "pairwise_worst_deviation": "0"
+    }
+  },
+  "expected_exact": {
+    "total_weight": "8540000000000000000",
+    "shares": [
+      {
+        "addr": "alice",
+        "share": "50000000000000000000"
+      },
+      {
+        "addr": "bob",
+        "share": "50000000000000000000"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": true,
+      "pairwise_worst_deviation": "0"
+    }
+  },
+  "rounding_analysis": {
+    "max_share_delta": "0",
+    "max_share_delta_addr": "",
+    "total_rounding_gain": "0",
+    "total_rounding_loss": "0",
+    "rounding_subsidy_exists": false,
+    "per_participant": [
+      {
+        "addr": "alice",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "bob",
+        "weight_delta": "0",
+        "share_delta": "0"
+      }
+    ]
+  }
+}

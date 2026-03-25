@@ -1,0 +1,636 @@
+{
+  "metadata": {
+    "generator": "shapley_reference.py",
+    "precision": 1000000000000000000,
+    "bps_precision": 10000,
+    "weights": {
+      "direct": 4000,
+      "enabling": 3000,
+      "scarcity": 2000,
+      "stability": 1000
+    },
+    "lawson_floor_bps": 100
+  },
+  "input": {
+    "total_value": "10000000000000000000000",
+    "participants": [
+      {
+        "addr": "p0",
+        "direct_contribution": "1000000000000000000",
+        "time_in_pool": 86400,
+        "scarcity_score": 0,
+        "stability_score": 0,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p1",
+        "direct_contribution": "2000000000000000000",
+        "time_in_pool": 172800,
+        "scarcity_score": 500,
+        "stability_score": 700,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p2",
+        "direct_contribution": "3000000000000000000",
+        "time_in_pool": 259200,
+        "scarcity_score": 1000,
+        "stability_score": 1400,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p3",
+        "direct_contribution": "4000000000000000000",
+        "time_in_pool": 345600,
+        "scarcity_score": 1500,
+        "stability_score": 2100,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p4",
+        "direct_contribution": "5000000000000000000",
+        "time_in_pool": 432000,
+        "scarcity_score": 2000,
+        "stability_score": 2800,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p5",
+        "direct_contribution": "6000000000000000000",
+        "time_in_pool": 518400,
+        "scarcity_score": 2500,
+        "stability_score": 3500,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p6",
+        "direct_contribution": "7000000000000000000",
+        "time_in_pool": 604800,
+        "scarcity_score": 3000,
+        "stability_score": 4200,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p7",
+        "direct_contribution": "8000000000000000000",
+        "time_in_pool": 691200,
+        "scarcity_score": 3500,
+        "stability_score": 4900,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p8",
+        "direct_contribution": "9000000000000000000",
+        "time_in_pool": 777600,
+        "scarcity_score": 4000,
+        "stability_score": 5600,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p9",
+        "direct_contribution": "10000000000000000000",
+        "time_in_pool": 864000,
+        "scarcity_score": 4500,
+        "stability_score": 6300,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p10",
+        "direct_contribution": "11000000000000000000",
+        "time_in_pool": 950400,
+        "scarcity_score": 5000,
+        "stability_score": 7000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p11",
+        "direct_contribution": "12000000000000000000",
+        "time_in_pool": 1036800,
+        "scarcity_score": 5500,
+        "stability_score": 7700,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p12",
+        "direct_contribution": "13000000000000000000",
+        "time_in_pool": 1123200,
+        "scarcity_score": 6000,
+        "stability_score": 8400,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p13",
+        "direct_contribution": "14000000000000000000",
+        "time_in_pool": 1209600,
+        "scarcity_score": 6500,
+        "stability_score": 9100,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p14",
+        "direct_contribution": "15000000000000000000",
+        "time_in_pool": 1296000,
+        "scarcity_score": 7000,
+        "stability_score": 9800,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p15",
+        "direct_contribution": "16000000000000000000",
+        "time_in_pool": 1382400,
+        "scarcity_score": 7500,
+        "stability_score": 499,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p16",
+        "direct_contribution": "17000000000000000000",
+        "time_in_pool": 1468800,
+        "scarcity_score": 8000,
+        "stability_score": 1199,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p17",
+        "direct_contribution": "18000000000000000000",
+        "time_in_pool": 1555200,
+        "scarcity_score": 8500,
+        "stability_score": 1899,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p18",
+        "direct_contribution": "19000000000000000000",
+        "time_in_pool": 1641600,
+        "scarcity_score": 9000,
+        "stability_score": 2599,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "p19",
+        "direct_contribution": "20000000000000000000",
+        "time_in_pool": 1728000,
+        "scarcity_score": 9500,
+        "stability_score": 3299,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      }
+    ]
+  },
+  "expected_solidity": {
+    "total_weight": "88469950000000000000",
+    "weights": [
+      {
+        "addr": "p0",
+        "weight": "430000000000000000"
+      },
+      {
+        "addr": "p1",
+        "weight": "847000000000000000"
+      },
+      {
+        "addr": "p2",
+        "weight": "1294000000000000000"
+      },
+      {
+        "addr": "p3",
+        "weight": "1711000000000000000"
+      },
+      {
+        "addr": "p4",
+        "weight": "2128000000000000000"
+      },
+      {
+        "addr": "p5",
+        "weight": "2545000000000000000"
+      },
+      {
+        "addr": "p6",
+        "weight": "2992000000000000000"
+      },
+      {
+        "addr": "p7",
+        "weight": "3409000000000000000"
+      },
+      {
+        "addr": "p8",
+        "weight": "3826000000000000000"
+      },
+      {
+        "addr": "p9",
+        "weight": "4243000000000000000"
+      },
+      {
+        "addr": "p10",
+        "weight": "4660000000000000000"
+      },
+      {
+        "addr": "p11",
+        "weight": "5077000000000000000"
+      },
+      {
+        "addr": "p12",
+        "weight": "5494000000000000000"
+      },
+      {
+        "addr": "p13",
+        "weight": "5911000000000000000"
+      },
+      {
+        "addr": "p14",
+        "weight": "6358000000000000000"
+      },
+      {
+        "addr": "p15",
+        "weight": "6674990000000000000"
+      },
+      {
+        "addr": "p16",
+        "weight": "7091990000000000000"
+      },
+      {
+        "addr": "p17",
+        "weight": "7508990000000000000"
+      },
+      {
+        "addr": "p18",
+        "weight": "7925990000000000000"
+      },
+      {
+        "addr": "p19",
+        "weight": "8342990000000000000"
+      }
+    ],
+    "shares": [
+      {
+        "addr": "p0",
+        "share": "100000000000000000000"
+      },
+      {
+        "addr": "p1",
+        "share": "100000000000000000000"
+      },
+      {
+        "addr": "p2",
+        "share": "145438363996171708837"
+      },
+      {
+        "addr": "p3",
+        "share": "192306832146406332164"
+      },
+      {
+        "addr": "p4",
+        "share": "239175300296640955490"
+      },
+      {
+        "addr": "p5",
+        "share": "286043768446875578817"
+      },
+      {
+        "addr": "p6",
+        "share": "336284068838134275764"
+      },
+      {
+        "addr": "p7",
+        "share": "383152536988368899091"
+      },
+      {
+        "addr": "p8",
+        "share": "430021005138603522417"
+      },
+      {
+        "addr": "p9",
+        "share": "476889473288838145744"
+      },
+      {
+        "addr": "p10",
+        "share": "523757941439072769071"
+      },
+      {
+        "addr": "p11",
+        "share": "570626409589307392398"
+      },
+      {
+        "addr": "p12",
+        "share": "617494877739542015724"
+      },
+      {
+        "addr": "p13",
+        "share": "664363345889776639052"
+      },
+      {
+        "addr": "p14",
+        "share": "714603646281035335999"
+      },
+      {
+        "addr": "p15",
+        "share": "750231549683776039232"
+      },
+      {
+        "addr": "p16",
+        "share": "797100017834010662559"
+      },
+      {
+        "addr": "p17",
+        "share": "843968485984245285886"
+      },
+      {
+        "addr": "p18",
+        "share": "890836954134479909213"
+      },
+      {
+        "addr": "p19",
+        "share": "937705422284714532542"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": false,
+      "pairwise_worst_deviation": "431085668417572751006940000000000000000"
+    }
+  },
+  "expected_exact": {
+    "total_weight": "88469950000000000000",
+    "shares": [
+      {
+        "addr": "p0",
+        "share": "100000000000000000000"
+      },
+      {
+        "addr": "p1",
+        "share": "100000000000000000000"
+      },
+      {
+        "addr": "p2",
+        "share": "145438363996171708837"
+      },
+      {
+        "addr": "p3",
+        "share": "192306832146406332163"
+      },
+      {
+        "addr": "p4",
+        "share": "239175300296640955490"
+      },
+      {
+        "addr": "p5",
+        "share": "286043768446875578817"
+      },
+      {
+        "addr": "p6",
+        "share": "336284068838134275764"
+      },
+      {
+        "addr": "p7",
+        "share": "383152536988368899091"
+      },
+      {
+        "addr": "p8",
+        "share": "430021005138603522418"
+      },
+      {
+        "addr": "p9",
+        "share": "476889473288838145745"
+      },
+      {
+        "addr": "p10",
+        "share": "523757941439072769071"
+      },
+      {
+        "addr": "p11",
+        "share": "570626409589307392398"
+      },
+      {
+        "addr": "p12",
+        "share": "617494877739542015725"
+      },
+      {
+        "addr": "p13",
+        "share": "664363345889776639052"
+      },
+      {
+        "addr": "p14",
+        "share": "714603646281035335999"
+      },
+      {
+        "addr": "p15",
+        "share": "750231549683776039233"
+      },
+      {
+        "addr": "p16",
+        "share": "797100017834010662559"
+      },
+      {
+        "addr": "p17",
+        "share": "843968485984245285886"
+      },
+      {
+        "addr": "p18",
+        "share": "890836954134479909213"
+      },
+      {
+        "addr": "p19",
+        "share": "937705422284714532539"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": false,
+      "pairwise_worst_deviation": "431085668417572751008230000000000000000"
+    }
+  },
+  "rounding_analysis": {
+    "max_share_delta": "3",
+    "max_share_delta_addr": "p19",
+    "total_rounding_gain": "4",
+    "total_rounding_loss": "4",
+    "rounding_subsidy_exists": false,
+    "per_participant": [
+      {
+        "addr": "p0",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p1",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p2",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p3",
+        "weight_delta": "0",
+        "share_delta": "-1"
+      },
+      {
+        "addr": "p4",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p5",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p6",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p7",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p8",
+        "weight_delta": "0",
+        "share_delta": "1"
+      },
+      {
+        "addr": "p9",
+        "weight_delta": "0",
+        "share_delta": "1"
+      },
+      {
+        "addr": "p10",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p11",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p12",
+        "weight_delta": "0",
+        "share_delta": "1"
+      },
+      {
+        "addr": "p13",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p14",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p15",
+        "weight_delta": "0",
+        "share_delta": "1"
+      },
+      {
+        "addr": "p16",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p17",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p18",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "p19",
+        "weight_delta": "0",
+        "share_delta": "-3"
+      }
+    ]
+  }
+}

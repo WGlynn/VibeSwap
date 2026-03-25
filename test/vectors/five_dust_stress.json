@@ -1,0 +1,201 @@
+{
+  "metadata": {
+    "generator": "shapley_reference.py",
+    "precision": 1000000000000000000,
+    "bps_precision": 10000,
+    "weights": {
+      "direct": 4000,
+      "enabling": 3000,
+      "scarcity": 2000,
+      "stability": 1000
+    },
+    "lawson_floor_bps": 100
+  },
+  "input": {
+    "total_value": "999999999999999997",
+    "participants": [
+      {
+        "addr": "a",
+        "direct_contribution": "7000000000000000000",
+        "time_in_pool": 2592000,
+        "scarcity_score": 3000,
+        "stability_score": 7000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "b",
+        "direct_contribution": "3000000000000000000",
+        "time_in_pool": 1209600,
+        "scarcity_score": 7000,
+        "stability_score": 3000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "c",
+        "direct_contribution": "1000000000000000000",
+        "time_in_pool": 86400,
+        "scarcity_score": 1000,
+        "stability_score": 1000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "d",
+        "direct_contribution": "15000000000000000000",
+        "time_in_pool": 15552000,
+        "scarcity_score": 8000,
+        "stability_score": 8000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      },
+      {
+        "addr": "e",
+        "direct_contribution": "5000000000000000000",
+        "time_in_pool": 604800,
+        "scarcity_score": 5000,
+        "stability_score": 5000,
+        "quality_set": false,
+        "quality_activity": 0,
+        "quality_reputation": 0,
+        "quality_economic": 0,
+        "pioneer_score": 0
+      }
+    ]
+  },
+  "expected_solidity": {
+    "total_weight": "13660000000000000000",
+    "weights": [
+      {
+        "addr": "a",
+        "weight": "3050000000000000000"
+      },
+      {
+        "addr": "b",
+        "weight": "1460000000000000000"
+      },
+      {
+        "addr": "c",
+        "weight": "460000000000000000"
+      },
+      {
+        "addr": "d",
+        "weight": "6450000000000000000"
+      },
+      {
+        "addr": "e",
+        "weight": "2240000000000000000"
+      }
+    ],
+    "shares": [
+      {
+        "addr": "a",
+        "share": "223279648609077598"
+      },
+      {
+        "addr": "b",
+        "share": "106881405563689604"
+      },
+      {
+        "addr": "c",
+        "share": "33674963396778916"
+      },
+      {
+        "addr": "d",
+        "share": "472181551976573937"
+      },
+      {
+        "addr": "e",
+        "share": "163982430453879942"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": true,
+      "pairwise_worst_deviation": "7020000000000000000"
+    }
+  },
+  "expected_exact": {
+    "total_weight": "13660000000000000000",
+    "shares": [
+      {
+        "addr": "a",
+        "share": "223279648609077598"
+      },
+      {
+        "addr": "b",
+        "share": "106881405563689604"
+      },
+      {
+        "addr": "c",
+        "share": "33674963396778916"
+      },
+      {
+        "addr": "d",
+        "share": "472181551976573937"
+      },
+      {
+        "addr": "e",
+        "share": "163982430453879942"
+      }
+    ],
+    "axioms": {
+      "efficiency_holds": true,
+      "efficiency_error": "0",
+      "null_player_holds": true,
+      "symmetry_holds": true,
+      "pairwise_holds": true,
+      "pairwise_worst_deviation": "7020000000000000000"
+    }
+  },
+  "rounding_analysis": {
+    "max_share_delta": "0",
+    "max_share_delta_addr": "",
+    "total_rounding_gain": "0",
+    "total_rounding_loss": "0",
+    "rounding_subsidy_exists": false,
+    "per_participant": [
+      {
+        "addr": "a",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "b",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "c",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "d",
+        "weight_delta": "0",
+        "share_delta": "0"
+      },
+      {
+        "addr": "e",
+        "weight_delta": "0",
+        "share_delta": "0"
+      }
+    ]
+  }
+}

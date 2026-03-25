@@ -1,6 +1,6 @@
 # One Token Per Function: Decomposing Money in DeFi
 
-*ethresear.ch — VibeSwap*
+*ethresear.ch*
 *March 2026*
 
 ---

@@ -91,6 +91,13 @@ def generate_all():
         Participant("real2", 5 * PRECISION,  7 * 86400,  3000, 8000),
     ]))
 
+    # ============ Vector 11: Null Player at Last Position (Regression) ============
+    vectors.append(("null_player_last", 100 * PRECISION, [
+        Participant("real1", 10 * PRECISION, 30 * 86400, 5000, 5000),
+        Participant("real2", 5 * PRECISION,  7 * 86400,  3000, 8000),
+        Participant("null",  0,              0,          0,    0),  # Last = dust position
+    ]))
+
     # Generate all vectors
     manifest = []
     for name, total_value, participants in vectors:

@@ -58,5 +58,11 @@
     "file": "null_player.json",
     "num_participants": 3,
     "total_value": "100000000000000000000"
+  },
+  {
+    "name": "null_player_last",
+    "file": "null_player_last.json",
+    "num_participants": 3,
+    "total_value": "100000000000000000000"
   }
 ]

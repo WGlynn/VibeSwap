@@ -275,6 +275,36 @@ contract ShapleyReplayTest is Test {
         assertGt(bShare, aShare, "b should dominate with 2x direct+time");
     }
 
+    // ============ Vector: null_player_last (Regression for dust fix) ============
+    // Null player at last position must get exactly 0 (not dust)
+
+    function test_replay_nullPlayerLast() public {
+        bytes32 gameId = keccak256("null_player_last");
+        uint256 totalValue = 100 * PRECISION;
+
+        address real1 = makeAddr("real1");
+        address real2 = makeAddr("real2");
+        address null_addr = makeAddr("null");
+
+        ShapleyDistributor.Participant[] memory ps = new ShapleyDistributor.Participant[](3);
+        ps[0] = ShapleyDistributor.Participant(real1, 10 * PRECISION, 30 days, 5000, 5000);
+        ps[1] = ShapleyDistributor.Participant(real2, 5 * PRECISION,  7 days,  3000, 8000);
+        ps[2] = ShapleyDistributor.Participant(null_addr, 0, 0, 0, 0);  // Last position
+
+        _createAndSettle(gameId, totalValue, ps);
+
+        // Null player axiom: zero weight => zero share, even at last position
+        assertEq(_getShare(gameId, null_addr), 0, "null player at last position got nonzero share");
+
+        // Efficiency: total must still sum correctly
+        uint256 total = _getShare(gameId, real1) + _getShare(gameId, real2) + _getShare(gameId, null_addr);
+        assertEq(total, totalValue, "efficiency violated");
+
+        // Dust went to real2 (last non-zero-weight participant)
+        assertGt(_getShare(gameId, real1), 0, "real1 should get share");
+        assertGt(_getShare(gameId, real2), 0, "real2 should get share (including dust)");
+    }
+
     // ============ Cross-Layer Pairwise Verification ============
 
     function test_replay_pairwiseFairnessOnChain() public {

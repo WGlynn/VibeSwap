@@ -192,36 +192,66 @@ class TestExhaustiveAxioms:
 
         assert failures == 0, f"Null player (non-dust) violated in {failures}/{self.ROUNDS} games"
 
-    def test_null_player_dust_position_known_violation(self):
+    def test_null_player_dust_position_fixed(self):
         """
-        FINDING #3: Dust collection violates null player axiom.
+        FINDING #3 (FIXED): Dust no longer goes to null players.
 
-        When a zero-weight participant is last in the array, they receive
-        `totalValue - sum(other shares)` as dust. This is typically tiny
-        (< n wei) but technically non-zero, violating the null player axiom.
+        After the fix, dust goes to the last non-zero-weight participant.
+        The null player axiom now holds universally, even when a zero-weight
+        participant is last in the array.
 
-        92/500 random games showed this in initial testing.
-
-        Mitigation: authorized callers should never place null players last,
-        or the contract should check weight > 0 before dust assignment.
+        Original finding: 92/500 games violated null player axiom.
+        After fix: 0/500 games should violate.
         """
         total = 100 * PRECISION
         ps = [
             Participant("real", 10 * PRECISION, 30 * 86400, 5000, 5000),
-            Participant("null", 0, 0, 0, 0),  # Last position = dust recipient
+            Participant("null", 0, 0, 0, 0),  # Last position, but no dust
         ]
 
         result = self.ref.compute_solidity(total, ps)
 
-        # Real participant gets their proportional share (slightly truncated)
-        # Null player gets dust: totalValue - real_share
-        null_share = result.results[1].share
-        real_share = result.results[0].share
+        # Null player should get exactly 0
+        assert result.results[1].share == 0, "Null player should get zero after fix"
+        # Real player gets everything (including dust)
+        assert result.results[0].share == total, "Real player gets all value"
+        # Conservation still holds
+        assert result.efficiency_holds
 
-        # The null player's share is the dust from truncation
-        assert real_share + null_share == total, "Conservation still holds"
-        # But null player got free tokens — this is the known violation
-        # In practice, dust is tiny, but it's technically a null player violation
+    def test_null_player_universal_all_positions(self):
+        """After fix: null player axiom holds regardless of position."""
+        ref = ShapleyReference(use_quality_weights=True)
+        rng = random.Random(99999)
+        failures = 0
+
+        for _ in range(500):
+            n = rng.randint(2, 10)
+            total = rng.randint(PRECISION, 10**20)
+            ps = [
+                Participant(
+                    addr=f"p{i}",
+                    direct_contribution=rng.randint(1, 100000) * PRECISION,
+                    time_in_pool=rng.randint(1, 365) * 86400,
+                    scarcity_score=rng.randint(0, 10000),
+                    stability_score=rng.randint(0, 10000),
+                ) for i in range(n)
+            ]
+
+            # Force null player at random position (including last!)
+            null_idx = rng.randint(0, n - 1)
+            ps[null_idx] = Participant(
+                addr=f"null_{null_idx}", direct_contribution=0,
+                time_in_pool=0, scarcity_score=0, stability_score=0,
+            )
+
+            try:
+                result = ref.compute_solidity(total, ps)
+                if not result.null_player_holds:
+                    failures += 1
+            except (ValueError, ZeroDivisionError):
+                continue
+
+        assert failures == 0, f"Null player violated in {failures}/500 games (should be 0 after fix)"
 
     def test_symmetry_universal(self):
         """AXIOM: equal inputs => equal outputs (pre-dust)."""

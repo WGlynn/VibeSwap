@@ -299,9 +299,25 @@ class ShapleyReference:
                     else:
                         shares[i] = floor_amount
 
-        # Step 4: Dust collection on last participant
-        distributed = sum(shares[:n - 1])
-        shares[n - 1] = total_value - distributed
+        # Step 4: Force efficiency on last non-zero-weight participant
+        # (Mirrors contract fix: null player axiom preserved)
+        # Find the dust recipient
+        dust_idx = n - 1
+        for i in range(n - 1, -1, -1):
+            if weights[i] > 0:
+                dust_idx = i
+                break
+
+        # Force total to match by adjusting dust recipient's share
+        distributed = sum(shares[i] for i in range(n) if i != dust_idx)
+        shares[dust_idx] = total_value - distributed
+
+        # Find dust recipient (last non-zero-weight participant)
+        dust_idx = n - 1
+        for i in range(n - 1, -1, -1):
+            if weights[i] > 0:
+                dust_idx = i
+                break
 
         # Build results
         results = []
@@ -312,7 +328,7 @@ class ShapleyReference:
                 share=shares[i],
                 share_pre_floor=shares_pre_floor[i],
                 floor_applied=floor_applied[i],
-                dust_recipient=(i == n - 1),
+                dust_recipient=(i == dust_idx),
             ))
 
         return self._verify_and_build(total_value, total_weight, results, weights, shares)

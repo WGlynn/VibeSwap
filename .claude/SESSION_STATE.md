@@ -1,61 +1,64 @@
 # Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: TRP + three-layer testing + convergence architecture + Mellus assessment
+- **Session**: MARATHON — TRP + testing + convergence + job assessment + content pipeline + library
 - **Parent**: `aa0edab`
-- **Branch**: `master` @ `bd66bd6`
-- **Status**: MASSIVE session. 33 VibeSwap commits. 92 tests. TRP formalized. All 4 convergence points coded. Mellus job assessment fixes applied. Anthropic letter written.
+- **Branch**: `master` @ `adf649a`
+- **Status**: 49 commits. 98 tests. Most productive session ever.
 
-## What Exists Now
+## Session Deliverables
 
-### Testing (92 tests, all green)
-- Python: 74 tests (reference model, adversarial, halving, exhaustive, state machine)
-- Solidity: 18 tests (replay, conservation, sybil guard)
-- Formal: 6 Halmos specs written (not yet runnable on Windows)
+### Code (98 tests, all green)
+- Three-layer testing framework: reference model + adversarial search + Foundry replay
+- Null player dust fix (contract + model)
+- Sybil guard (ISybilGuard + SoulboundSybilGuard + ShapleyDistributor integration)
+- AttributionBridge.sol (Jarvis → Shapley rewards)
+- Formal verification specs (6 Halmos/Foundry fuzz lemmas)
+- Sub-block WAL system (Ergo-style crash recovery)
+- Admin override for user level (creator sees everything)
+- PairwiseFairness standalone library published (github.com/WGlynn/pairwise-fairness)
 
-### TRP (Trinity Recursion Protocol)
-- `docs/TRINITY_RECURSION_PROTOCOL.md` — main spec (v1.1, 4 recursions)
-- `docs/TRP_VERIFICATION_REPORT.md` — anti-hallucination audit (7 corrections)
-- `docs/trp/` — 5 standalone docs (4 recursions + boomer explainer)
-- Key insight: weight augmentation without weight modification
+### Jarvis × VibeSwap Convergence
+- attribution-bridge.js (merkle epoch builder)
+- claude-code-bridge.js (session state ↔ knowledge chain)
+- shard-shapley.js (AI agents as economic actors)
+- reward_feedback.py (frustration-directed adversarial search)
 
-### Convergence (Jarvis × VibeSwap)
-- `docs/JARVIS_VIBESWAP_CONVERGENCE.md` — 4 integration points
-- `contracts/bridge/AttributionBridge.sol` — Jarvis attribution → Shapley rewards
-- `jarvis-bot/src/attribution-bridge.js` — merkle epoch builder
-- `jarvis-bot/src/claude-code-bridge.js` — session state ↔ knowledge chain
-- `jarvis-bot/src/shard-shapley.js` — AI agents as economic actors
-- `oracle/backtest/reward_feedback.py` — frustration-directed adversarial search
+### Documentation
+- Trinity Recursion Protocol v1.1 (3+1 recursions, verified, audited)
+- Weight augmentation without weight modification
+- Jarvis × VibeSwap convergence spec
+- Mechanism coverage matrix (all gaps resolved)
+- Open source strategy (extractable libraries)
+- Anthropic feedback letter
 
-### Contract Fixes
-- ShapleyDistributor: null player dust fix + sybil guard (ISybilGuard)
-- PairwiseFairness: NatSpec correction
-- EmissionController tests: 6-param initialize
+### Content Pipeline
+- 39 LinkedIn posts (Tue/Thu through Aug 5)
+- 8 ethresear.ch posts (pure research, zero self-promotion)
+- 3 old ethresear.ch posts cleaned (stripped project pitching)
 
-### Mellus Job Assessment (DONE)
-- Both fixes applied to `C:\Users\Will\mellus-assessment\Mellus-contract\`
-- Issue 1: borrowRateMaxMantissa scaled for per-second (÷12)
-- Issue 2: uint32→uint48 for timestamps, struct repacked (208+48=256)
-- Guide on Desktop: `mellus-assessment-fixes.md`
-- Will needs to commit as himself and push to his own repo
+### Job Assessment
+- Mellus: 2 fixes + bonus observations → github.com/WGlynn/mellus-assessment
+- Reply sent. Waiting on interview scheduling.
 
-## On Desktop
-1. `mellus-assessment-fixes.md` — job assessment commit guide
-2. `anthropic-letter.md` — feedback on request-response anti-pattern
-3. `Will_Glynn_Smart_Contract_Engineer.docx` — updated resume
+### Other
+- Knowledge test written (40 questions, Will scored 35/40)
+- Knowledge gaps tracked (specifics > concepts, AMM formula priority)
+- Resume updated on Desktop
+- Vercel deployed with admin override
 
 ## Manual Queue
-1. Commit Mellus fixes as yourself, push, send repo URL
-2. Post GitHub discussion reply (drafted)
-3. Apply to ETH Boston 2026 FIRST (monitor for date announcement)
-4. LinkedIn post #3 (Security, Tue Apr 1)
-5. LinkedIn post #4 (TRP, Thu Apr 3)
-6. Contribute code to other repos for visibility (see memory)
-7. Deploy VIBE emission on Base
+1. TOMORROW: Green light VIBE rewards on Base
+2. Post ethresear.ch articles (start with Shapley fairness — Post 1)
+3. Start LinkedIn cadence (Post #3: Security, Tue Apr 1)
+4. Apply to ETH Boston FIRST when applications open
+5. Mellus interview when scheduled
+6. Contribute to open source (pairwise-fairness library → awesome-solidity lists)
+7. Open source contribution PRs to high-visibility repos
 
 ## Next Session
-- Verify Mellus assessment submitted
-- Run Halmos formal specs on CI (Linux)
-- Start open source contribution PRs (a16z/auction-zoo, OpenZeppelin)
-- Canonical FeeRouter decision
-- Build AttributionBridge tests with full merkle proof flow
+- Run second full R1 adversarial cycle post-all-fixes
+- VIBE emission activation on Base
+- Start posting ethresear.ch (1 per week)
+- Start LinkedIn cadence (Tue/Thu)
+- More knowledge tests targeting Will's weak areas (specifics, AMM math)

@@ -67,10 +67,10 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 | **3-of-5 threshold enforcement** | `WalletRecovery.t.sol` | - | - | TODO | |
 | **24h notification delay** | `WalletRecovery.t.sol` | - | - | TODO | |
 | **Owner cancel + bond slash** | `WalletRecovery.t.sol` | - | - | TODO | |
-| **Guardian collusion (3 collude)** | TODO | - | TODO | TODO | **CRITICAL GAP**: not tested anywhere |
-| **Guardian add/remove gaming** | - | - | TODO | TODO | **GAP**: rapid add/remove to game threshold |
-| **Bond sufficiency for deterrence** | - | - | TODO | - | **GAP**: is bond > reward for collusion? |
-| **Sleeping owner attack window** | - | - | TODO | TODO | **GAP**: 24h may not be enough if owner is offline |
+| **Guardian collusion (3 collude)** | TODO | `guardian_collusion.py` | `guardian_collusion.py` | TODO | Owner ≤24h: safe. 48h: 34% bond. 168h+: VULNERABLE (Dead Man's Switch only) |
+| **Guardian add/remove gaming** | TODO | `guardian_collusion.py` | `guardian_collusion.py` | TODO | FINDING: additions need ≥48h cooldown > notification delay |
+| **Bond sufficiency for deterrence** | - | `guardian_collusion.py` | `guardian_collusion.py` | - | Modeled: bond as function of owner offline duration |
+| **Sleeping owner attack window** | - | `guardian_collusion.py` | `guardian_collusion.py` | TODO | 1-24h: safe. 48h: needs bond. 168h+: vulnerable |
 | **AGI-resistant behavioral checks** | `WalletRecovery.t.sol` | - | - | - | MockAGIGuard only |
 | **Rate limiting (3 attempts, 7d cool)** | `WalletRecovery.t.sol` | - | - | - | |
 | **Dead man's switch timing** | `WalletRecovery.t.sol` | - | - | - | |

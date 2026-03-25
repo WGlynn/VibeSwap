@@ -137,6 +137,9 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     uint256 public constant ATTEMPT_COOLDOWN = 7 days;          // Cooldown between attempts
     uint256 public constant MIN_ACCOUNT_AGE = 30 days;          // Minimum age for recovery
     uint256 public constant MIN_BEHAVIORAL_SCORE = 50;          // Minimum behavioral match score
+    uint256 public constant GUARDIAN_ACTIVATION_DELAY = 48 hours; // New guardians can't vote for 48h
+    // ^ Found by adversarial collusion analysis: additions must exceed notification delay (24h)
+    // to prevent owner-key-compromise → add colluding guardians → immediate recovery attack
 
     // AGI Resistance State
     AGIResistantRecovery public agiGuard;
@@ -718,6 +721,12 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
         Guardian[] storage guards = guardians[tokenId];
         for (uint i = 0; i < guards.length; i++) {
             if (guards[i].addr == addr && guards[i].isActive) {
+                // Guardian must have been active for >= GUARDIAN_ACTIVATION_DELAY
+                // Prevents: compromise owner key → add colluding guardians → recover instantly
+                // Found by adversarial collusion analysis (oracle/backtest/guardian_collusion.py)
+                if (block.timestamp < guards[i].addedAt + GUARDIAN_ACTIVATION_DELAY) {
+                    return false; // Too new — can't participate in recovery yet
+                }
                 return true;
             }
         }

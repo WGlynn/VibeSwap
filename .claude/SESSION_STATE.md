@@ -1,49 +1,46 @@
-# Session Tip — 2026-03-24
+# Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: Independence Protocol Day 2 — LinkedIn/resume beefup + chain-agnostic emission
-- **Parent**: `489f3c1`
-- **Branch**: `master` @ `43785ea`
-- **Status**: Resume + LinkedIn complete with full work history. Emission model now chain-portable.
+- **Session**: Martin Grabowski call prep + LinkedIn Shapley post + custom doc delivery
+- **Parent**: `9035e98`
+- **Branch**: `master` @ `aa0edab`
+- **Status**: Martin call successful. Custom doc delivered. JARVIS co-credited. Relationship locked in as twice-monthly slow burn.
 
 ## What Exists Now
-- `~/Will_Glynn_Smart_Contract_Engineer.html` — resume with 5 roles, education, Medium link
-- `~/Will_Glynn_Smart_Contract_Engineer.docx` — Word version (pandoc-generated, properly formatted)
-- `~/build_resume_docx.py` — script to regenerate docx from HTML
-- `~/LinkedIn_Experience.md` — all 5 roles copy-paste ready
-- `~/LinkedIn_Posts.md` — 3 posts with algorithm protocol (link in comments, closing questions)
-- `~/LinkedIn_Content_Protocol.md` — 12-post narrative arc over 6 weeks
-- `contracts/incentives/EmissionController.sol` — chain-portable genesis + drift guard
-- `script/DeployTokenomics.s.sol` — GENESIS_TIME env var for migration
+- `docs/for-martin/vibeswap-overview-martin.md` — custom overview for Martin (forgiveness layer, MEV 3-component breakdown, three-token economy, tiered reading list, JARVIS co-author credit)
+- `~/LinkedIn_Posts.md` — Post #2 (Shapley) published early (today, not Thu) with tokenomics/agentic AI winks for Martin
 
 ## What Will Did Today (Manual Queue)
-- LinkedIn profile updated with full experience
-- Resume docx sent to mom for review
-- Blog post #1 (MEV) published on Medium + LinkedIn
-- "Open to Work" enabled
-
-## Manual Queue Remaining
-1. Publish blog posts #2 (Shapley, Thu Mar 27) and #3 (Security, Tue Apr 1)
-2. LinkedIn post #2 Thursday — link in FIRST COMMENT not body
-3. Review mom's feedback on resume
-4. Study interview prep docs out loud
-5. Create accounts: Code4rena, Sherlock, Cantina
-6. First competitive audit
-7. Add Medium page to LinkedIn Featured + Contact info
+- Published Shapley LinkedIn post (Post #2) — Martin reacted with 5 eye emojis after the call
+- Had successful call with Martin Grabowski (tokenization advisor, blockchain veteran)
+- Martin: "Send me everything you think I need to know" — doc sent
 
 ## Key Changes This Session
-- Resume: added Sidepit, Nervos, Independent Researcher, ETH News, Education
-- Resume: "eliminating MEV" → "designed to eliminate MEV" (honest framing)
-- Resume: HTML + docx coupled — always regenerate docx after HTML edit
-- EmissionController: genesisTime now a parameter (0 = block.timestamp, nonzero = migration)
-- EmissionController: MAX_DRIP_DELTA (1 day) drift guard against sequencer timestamp manipulation
-- EmissionController: _pendingEmissionsUntil() refactor for capped/uncapped dual use
-- DeployTokenomics: reads GENESIS_TIME env var
-- LinkedIn content protocol: 12-post arc, Tue/Thu cadence, link in comments rule
+- Anti-Stale Feed Protocol created (`memory/feedback_anti-stale-feed-protocol.md`) — verify current state before advising externally
+- Martin Grabowski contact saved (`memory/project_martin-grabowski.md`) — full context, Dell EMC connection, what resonated
+- MEMORY.md updated: Martin added to Key Partnerships, anti-stale protocol added
+- LinkedIn Post #2 adjusted: added tokenomics/tokenization/agentic AI lines, #Tokenomics hashtag replaced #SmartContracts
+- Session state + session chain daemon confirmed as separate-but-complementary systems (semantic vs mechanical layers)
+
+## Martin Relationship Summary
+- Twice-monthly calls, he reads docs between sessions, brings questions
+- What resonated: forgiveness layer (clawback/recovery), five-tier governance, Shapley fairness
+- Dell EMC connection via Will's dad (30 years) — genuine human bond
+- He's a router/connector — depth over time, no rushing
+- Agentic AI curious — JARVIS co-credit was well-received signal
+
+## Manual Queue Remaining
+1. Follow up with Martin in ~2 weeks (next call)
+2. Publish blog post #3 (Security, Tue Apr 1)
+3. LinkedIn post #3 Tuesday — link in FIRST COMMENT not body
+4. Review mom's feedback on resume
+5. Study interview prep docs out loud
+6. Create accounts: Code4rena, Sherlock, Cantina
+7. First competitive audit
+8. Add Medium page to LinkedIn Featured + Contact info
+9. Tomorrow: initiate VIBE emission rewards on Base (has funding)
 
 ## Next Session
-- Blog posts #2 and #3 still need Will's review before publishing
-- Write full text for LinkedIn posts 4-12 (Act II-IV) as schedule approaches
-- Consider adding migration state params (totalEmitted, shapleyPool, lastDripTime) to initialize()
-- Mom's resume feedback → incorporate
-- Phase 2 starts April 6 (applications + bridge income)
+- **PRIORITY**: End-to-end technical deep dive — Will needs to internalize the full stack (AMM → MEV → commit-reveal → batch auctions → Fisher-Yates → Shapley → three-token → emission → governance → cross-chain) so he can explain any aspect without Jarvis assistance
+- Deploy VIBE emission on Base (EmissionController is chain-portable, genesisTime param ready)
+- Canonical FeeRouter decision still outstanding (3 competing contracts)

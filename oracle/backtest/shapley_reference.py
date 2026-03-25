@@ -124,6 +124,80 @@ class ComparisonResult:
 
 # ============ Core Reference Model ============
 
+class HalvingSchedule:
+    """
+    Exact arithmetic mirror of ShapleyDistributor's Bitcoin-style halving.
+
+    Mirrors: getCurrentHalvingEra(), getEmissionMultiplier()
+    """
+
+    def __init__(
+        self,
+        games_per_era: int = DEFAULT_GAMES_PER_ERA,
+        max_eras: int = MAX_HALVING_ERAS,
+    ):
+        self.games_per_era = games_per_era
+        self.max_eras = max_eras
+
+    def get_era(self, total_games_created: int) -> int:
+        """Mirror of getCurrentHalvingEra()."""
+        if self.games_per_era == 0:
+            return 0
+        era = total_games_created // self.games_per_era
+        return min(era, self.max_eras)
+
+    def get_emission_multiplier_sol(self, era: int) -> int:
+        """Mirror of getEmissionMultiplier() — Solidity integer math."""
+        if era == 0:
+            return INITIAL_EMISSION
+        if era >= self.max_eras:
+            return 0
+        return INITIAL_EMISSION >> era  # PRECISION / 2^era
+
+    def get_emission_multiplier_exact(self, era: int) -> Fraction:
+        """Exact arithmetic emission multiplier."""
+        if era == 0:
+            return Fraction(INITIAL_EMISSION)
+        if era >= self.max_eras:
+            return Fraction(0)
+        return Fraction(INITIAL_EMISSION, 2**era)
+
+    def apply_halving_sol(self, total_value: int, total_games: int) -> int:
+        """Apply halving to a TOKEN_EMISSION game (Solidity math)."""
+        era = self.get_era(total_games)
+        if era == 0:
+            return total_value
+        multiplier = self.get_emission_multiplier_sol(era)
+        return (total_value * multiplier) // PRECISION
+
+    def apply_halving_exact(self, total_value: int, total_games: int) -> Fraction:
+        """Apply halving to a TOKEN_EMISSION game (exact math)."""
+        era = self.get_era(total_games)
+        if era == 0:
+            return Fraction(total_value)
+        multiplier = self.get_emission_multiplier_exact(era)
+        return Fraction(total_value) * multiplier / PRECISION
+
+    def total_emitted_sol(self, total_value_per_game: int, total_games: int) -> int:
+        """Total tokens emitted across all games (Solidity math)."""
+        total = 0
+        for g in range(total_games):
+            total += self.apply_halving_sol(total_value_per_game, g)
+        return total
+
+    def verify_supply_cap(self, total_value_per_game: int, total_games: int) -> bool:
+        """
+        Verify that cumulative emissions converge (like Bitcoin's 21M cap).
+        After MAX_HALVING_ERAS * games_per_era games, multiplier = 0.
+        Total supply = sum of geometric series: V * (1 + 1/2 + 1/4 + ...) = ~2V per era.
+        """
+        total = self.total_emitted_sol(total_value_per_game, total_games)
+        # Theoretical max: 2 * total_value_per_game * games_per_era
+        # (geometric series sum for infinite halvings)
+        theoretical_max = 2 * total_value_per_game * self.games_per_era
+        return total <= theoretical_max
+
+
 class ShapleyReference:
     """
     Exact arithmetic reference model for ShapleyDistributor.sol.
@@ -135,6 +209,7 @@ class ShapleyReference:
 
     def __init__(self, use_quality_weights: bool = True):
         self.use_quality_weights = use_quality_weights
+        self.halving = HalvingSchedule()
 
     # ============ Solidity-Emulated Computation ============
 

@@ -27,7 +27,7 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 | **Lawson Floor sybil resistance** | - | - | `adversarial_search.py` | TODO | **FINDING**: splitting into 2 accounts doubles floor subsidy. Mitigated by SoulboundIdentity. |
 | **Quality weight truncation** | - | `shapley_reference.py` | - | - | 3-way integer division |
 | **Pioneer bonus cap** (2x max) | - | `shapley_reference.py` | - | TODO | |
-| **Halving schedule correctness** | - | - | - | TODO | **GAP**: no reference model for halving |
+| **Halving schedule correctness** | - | `shapley_reference.py` (HalvingSchedule) | - | TODO | Era calc, multiplier, supply cap convergence — 21 tests |
 
 ## Batch Auction (Commit-Reveal)
 

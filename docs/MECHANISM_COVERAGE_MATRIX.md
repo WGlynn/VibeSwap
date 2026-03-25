@@ -16,7 +16,7 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 | Property | L1 | L2 | L3 | FV | Notes |
 |----------|:--:|:--:|:--:|:--:|-------|
-| **Efficiency** (sum = total) | `ShapleyFuzz.t.sol` | `shapley_reference.py` | - | TODO | Dust collection on last participant |
+| **Efficiency** (sum = total) | `ShapleyFuzz.t.sol` | `shapley_reference.py` | `test_property_exhaustive.py` (0/500) | `testFuzz_conservation` | Dust → last non-zero-weight participant. Proven across 500 rounds + 256 fuzz runs. |
 | **Symmetry** (equal in = equal out) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | Pre-dust only |
 | **Null Player** (zero in = zero out) | `ShapleyGameTheory.t.sol` + `ShapleyReplay.t.sol` | `shapley_reference.py` | `test_property_exhaustive.py` (0/500 post-fix) | `testFuzz_nonNegativity` | **FIXED**: dust goes to last non-zero-weight participant. 0/500 violations post-fix. |
 | **Pairwise Proportionality** | `PairwiseFairness.sol` (on-chain) | `shapley_reference.py` | - | TODO | Contract uses totalWeight as tolerance (correct). NatSpec was misleading — fixed. |

@@ -67,7 +67,7 @@ contract AMMFormalSpecs is Test {
         token0.mint(address(this), amountIn);
         token0.approve(address(amm), amountIn);
 
-        try amm.executeSwap(poolId, address(token0), amountIn, 0, 1) {
+        try amm.swap(poolId, address(token0), amountIn, 0, address(this)) {
             IVibeAMM.Pool memory poolAfter = amm.getPool(poolId);
             uint256 kAfter = poolAfter.reserve0 * poolAfter.reserve1;
             assertGe(kAfter, kBefore, "K DECREASED after swap");
@@ -83,7 +83,7 @@ contract AMMFormalSpecs is Test {
         token0.mint(address(this), amountIn);
         token0.approve(address(amm), amountIn);
 
-        try amm.executeSwap(poolId, address(token0), amountIn, 0, 1) {
+        try amm.swap(poolId, address(token0), amountIn, 0, address(this)) {
             IVibeAMM.Pool memory pool = amm.getPool(poolId);
             assertGt(pool.reserve0, 0, "Reserve0 hit zero");
             assertGt(pool.reserve1, 0, "Reserve1 hit zero");

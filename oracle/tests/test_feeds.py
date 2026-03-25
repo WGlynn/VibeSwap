@@ -152,6 +152,11 @@ class TestOracleInputData:
                 usdt_mint_volume_24h=100e6,
                 usdt_derivatives_flow=60e6,
                 usdt_spot_flow=25e6,
+                usdt_hourly_flows=[4e6] * 24,
+                usdc_mint_volume_24h=80e6,
+                usdc_spot_flow=20e6,
+                usdc_custody_flow=10e6,
+                usdc_defi_flow=15e6,
             ),
         )
 

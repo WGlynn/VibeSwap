@@ -1,46 +1,51 @@
 # Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: Martin Grabowski call prep + LinkedIn Shapley post + custom doc delivery
-- **Parent**: `9035e98`
-- **Branch**: `master` @ `aa0edab`
-- **Status**: Martin call successful. Custom doc delivered. JARVIS co-credited. Relationship locked in as twice-monthly slow burn.
+- **Session**: Three-layer testing architecture — Shapley reference model, adversarial search, coverage matrix
+- **Parent**: `aa0edab` (Martin call session)
+- **Branch**: `master` @ `d590bb8`
+- **Status**: Three-layer testing framework built. 52 Python tests passing. Forge compiling (446 files, slow machine). 6 commits today.
 
 ## What Exists Now
-- `docs/for-martin/vibeswap-overview-martin.md` — custom overview for Martin (forgiveness layer, MEV 3-component breakdown, three-token economy, tiered reading list, JARVIS co-author credit)
-- `~/LinkedIn_Posts.md` — Post #2 (Shapley) published early (today, not Thu) with tokenomics/agentic AI winks for Martin
+- `oracle/backtest/shapley_reference.py` — Exact arithmetic mirror of ShapleyDistributor.sol (dual mode: Fraction + Solidity-emulated integer)
+- `oracle/backtest/adversarial_search.py` — Layer 3 adversarial search with 4 strategies
+- `oracle/backtest/generate_vectors.py` — Generates JSON test vectors for Foundry replay
+- `oracle/tests/test_shapley_reference.py` — 25 tests: axiom verification, rounding analysis, edge cases
+- `oracle/tests/test_adversarial_search.py` — 6 tests: position independence, sybil, input integrity
+- `oracle/tests/test_halving_schedule.py` — 21 tests: era calc, multiplier, supply cap convergence
+- `test/crosslayer/ShapleyReplay.t.sol` — Foundry replay of Python vectors (awaiting compilation)
+- `test/crosslayer/ConservationInvariant.t.sol` — Cross-contract value conservation proofs
+- `test/vectors/*.json` — 10 test vectors + adversarial report + manifest
+- `docs/MECHANISM_COVERAGE_MATRIX.md` — Per-property verification matrix across all layers
+- `scripts/test_all_layers.sh` — Single command for all three layers
 
-## What Will Did Today (Manual Queue)
-- Published Shapley LinkedIn post (Post #2) — Martin reacted with 5 eye emojis after the call
-- Had successful call with Martin Grabowski (tokenization advisor, blockchain veteran)
-- Martin: "Send me everything you think I need to know" — doc sent
+## Key Findings
+1. **Position independence PROVEN**: 0 deviations across 50 rounds — mechanism is order-independent
+2. **Lawson Floor sybil vulnerability**: splitting accounts doubles floor subsidy. Mitigated by SoulboundIdentity.
+3. **Input integrity is load-bearing**: onlyAuthorized access control prevents 232 trivial exploits
+4. **PairwiseFairness NatSpec was misleading**: contract uses totalWeight tolerance (correct), docs said numParticipants
+5. **Halving schedule matches exact arithmetic**: all 32 eras produce identical results
 
-## Key Changes This Session
-- Anti-Stale Feed Protocol created (`memory/feedback_anti-stale-feed-protocol.md`) — verify current state before advising externally
-- Martin Grabowski contact saved (`memory/project_martin-grabowski.md`) — full context, Dell EMC connection, what resonated
-- MEMORY.md updated: Martin added to Key Partnerships, anti-stale protocol added
-- LinkedIn Post #2 adjusted: added tokenomics/tokenization/agentic AI lines, #Tokenomics hashtag replaced #SmartContracts
-- Session state + session chain daemon confirmed as separate-but-complementary systems (semantic vs mechanical layers)
+## Context: GitHub Discussion
+- Someone gave expert feedback on three-layer testing for mechanism-heavy Solidity
+- Their framework: L1 (Solidity invariants) + L2 (off-chain reference) + L3 (adversarial search)
+- Will crafted reply showing existing coverage + gaps + open question about approximation vs exact
+- This session implements their entire framework
 
-## Martin Relationship Summary
-- Twice-monthly calls, he reads docs between sessions, brings questions
-- What resonated: forgiveness layer (clawback/recovery), five-tier governance, Shapley fairness
-- Dell EMC connection via Will's dad (30 years) — genuine human bond
-- He's a router/connector — depth over time, no rushing
-- Agentic AI curious — JARVIS co-credit was well-received signal
+## Fixes Applied
+- EmissionController tests updated for 6-param initialize (_genesisTime)
+- PairwiseFairness.sol NatSpec corrected
 
-## Manual Queue Remaining
-1. Follow up with Martin in ~2 weeks (next call)
-2. Publish blog post #3 (Security, Tue Apr 1)
-3. LinkedIn post #3 Tuesday — link in FIRST COMMENT not body
-4. Review mom's feedback on resume
-5. Study interview prep docs out loud
-6. Create accounts: Code4rena, Sherlock, Cantina
-7. First competitive audit
-8. Add Medium page to LinkedIn Featured + Contact info
-9. Tomorrow: initiate VIBE emission rewards on Base (has funding)
+## Manual Queue (Will does these)
+1. Post GitHub discussion reply (drafted, ready to paste)
+2. Follow up with Martin in ~2 weeks
+3. Publish blog post #3 (Security, Tue Apr 1)
+4. Create accounts: Code4rena, Sherlock, Cantina
+5. Deploy VIBE emission on Base
 
 ## Next Session
-- **PRIORITY**: End-to-end technical deep dive — Will needs to internalize the full stack (AMM → MEV → commit-reveal → batch auctions → Fisher-Yates → Shapley → three-token → emission → governance → cross-chain) so he can explain any aspect without Jarvis assistance
-- Deploy VIBE emission on Base (EmissionController is chain-portable, genesisTime param ready)
-- Canonical FeeRouter decision still outstanding (3 competing contracts)
+- Verify Foundry cross-layer tests pass (forge compilation pending)
+- Wire SoulboundIdentity check into ShapleyDistributor for Lawson floor sybil defense
+- Add Certora/Halmos specs for conservation + monotonicity (FV column in matrix)
+- Respond to GitHub discussion if they reply to Will's post
+- Canonical FeeRouter decision still outstanding

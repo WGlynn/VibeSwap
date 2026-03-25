@@ -13,7 +13,26 @@ import { useLocation } from 'react-router-dom'
 const STORAGE_KEY = 'vibeswap:user-level'
 const INTERACTION_THRESHOLD = 5
 
+// Admin override: ?admin=true in URL forces Level 3
+function isAdminMode() {
+  try {
+    return new URLSearchParams(window.location.search).get('admin') === 'true'
+  } catch { return false }
+}
+
 function loadState() {
+  // Creator always sees everything
+  if (isAdminMode()) {
+    return {
+      level: 3,
+      walletConnected: true,
+      swapCount: 99,
+      interactions: 99,
+      developerMode: true,
+      lastUpgrade: Date.now(),
+    }
+  }
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) return JSON.parse(raw)

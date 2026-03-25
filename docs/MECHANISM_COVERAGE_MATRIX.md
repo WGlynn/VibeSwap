@@ -101,7 +101,7 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 | **L1 (Solidity)** | ~80% of properties | STRONG — axiom tests, fuzz, invariants, cross-layer replay, conservation |
 | **L2 (Reference)** | ~60% of properties | STRONG — Shapley, halving, scarcity, state machine, 500-round exhaustive |
 | **L3 (Adversarial)** | ~30% of properties | ACTIVE — 4 strategies, ~430 runs, position independence proven |
-| **FV (Formal)** | 0% | TODO — Certora/Halmos for local lemmas |
+| **FV (Formal)** | ~40% of Shapley properties | SPECS WRITTEN — 6 lemmas (conservation, non-neg, upper bound, floor, monotonicity, pairwise). Halmos not yet runnable on Windows (pysha3 build fail). |
 
 ## Key Findings
 
@@ -114,8 +114,8 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 ## Remaining Gaps (Priority Order)
 
-1. **Lawson Floor sybil enforcement** — SoulboundIdentity exists but isn't wired to ShapleyDistributor
-2. **Formal verification (Certora/Halmos)** — local lemmas for conservation, monotonicity, payoff bounds
+1. ~~Lawson Floor sybil enforcement~~ — RESOLVED: ISybilGuard + SoulboundSybilGuard wired into ShapleyDistributor
+2. **Formal verification execution** — specs written (6 lemmas), need Halmos/Certora CI runner (pysha3 doesn't build on Windows)
 3. ~~Monotonic slashing~~ — RESOLVED via state_machine.py
 4. ~~Cross-contract conservation~~ — RESOLVED via state_machine.py + ConservationInvariant.t.sol
 5. ~~No actor above honest baseline~~ — RESOLVED via state_machine.py + ConservationInvariant.t.sol

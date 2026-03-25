@@ -40,7 +40,9 @@ library PairwiseFairness {
      * @param rewardB Shapley value of participant B
      * @param weightA Weighted contribution of participant A
      * @param weightB Weighted contribution of participant B
-     * @param tolerance Maximum acceptable deviation (typically numParticipants for 1 wei/participant rounding)
+     * @param tolerance Maximum acceptable deviation. Must scale with value magnitude:
+     *        cross-multiplication amplifies 1 wei of rounding by max(weight), so
+     *        tolerance ≈ totalWeight is appropriate. See ShapleyDistributor.verifyPairwiseFairness().
      * @return result FairnessResult with fair flag and deviation amount
      */
     function verifyPairwiseProportionality(

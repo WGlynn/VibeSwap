@@ -117,7 +117,8 @@ contract EmissionControllerTest is Test {
                 address(vibe),
                 address(shapley),
                 gauge,
-                address(staking)
+                address(staking),
+                block.timestamp
             ))
         );
         ec = EmissionController(address(proxy));

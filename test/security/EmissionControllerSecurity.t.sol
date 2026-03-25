@@ -249,7 +249,8 @@ contract EmissionControllerSecurity is Test {
                 address(vibe),
                 address(shapley),
                 gauge,
-                address(staking)
+                address(staking),
+                block.timestamp
             ))
         );
         ec = EmissionController(address(proxy));
@@ -277,7 +278,8 @@ contract EmissionControllerSecurity is Test {
                 address(rVibe),
                 address(rShapley),
                 gauge,
-                address(rStaking)
+                address(rStaking),
+                block.timestamp
             ))
         );
         EmissionController ecAttack = EmissionController(address(proxy));
@@ -313,7 +315,8 @@ contract EmissionControllerSecurity is Test {
                 address(vibe),
                 address(shapley),
                 gauge,
-                address(rStaking)
+                address(rStaking),
+                block.timestamp
             ))
         );
         EmissionController ecAttack = EmissionController(address(proxy));
@@ -352,7 +355,8 @@ contract EmissionControllerSecurity is Test {
                 address(vibe),
                 address(rShapley),
                 gauge,
-                address(staking)
+                address(staking),
+                block.timestamp
             ))
         );
         EmissionController ecAttack = EmissionController(address(proxy));
@@ -471,7 +475,7 @@ contract EmissionControllerSecurity is Test {
     /// @dev Cannot re-initialize the proxy
     function testSecurityCannotReinitialize() public {
         vm.expectRevert();
-        ec.initialize(attacker, address(vibe), address(shapley), gauge, address(staking));
+        ec.initialize(attacker, address(vibe), address(shapley), gauge, address(staking), block.timestamp);
     }
 
     /// @dev Non-owner cannot upgrade the proxy
@@ -947,7 +951,8 @@ contract EmissionControllerSecurity is Test {
                 address(vibe),
                 address(shapley),
                 gauge,
-                address(staking)
+                address(staking),
+                block.timestamp
             ))
         );
     }
@@ -964,7 +969,8 @@ contract EmissionControllerSecurity is Test {
                 address(0),
                 address(shapley),
                 gauge,
-                address(staking)
+                address(staking),
+                block.timestamp
             ))
         );
     }
@@ -974,7 +980,7 @@ contract EmissionControllerSecurity is Test {
         EmissionController impl = new EmissionController();
 
         vm.expectRevert();
-        impl.initialize(owner, address(vibe), address(shapley), gauge, address(staking));
+        impl.initialize(owner, address(vibe), address(shapley), gauge, address(staking), block.timestamp);
     }
 
     // ============ 13. CROSS-CONTRACT TOKEN FLOW INTEGRITY ============

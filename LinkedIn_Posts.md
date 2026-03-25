@@ -157,7 +157,11 @@ Every recursion amplifies the other three. Remove one and the others degrade. To
 
 (We call these recursions, not loops. Every recursion is technically a loop — like every square is a rectangle — but the critical difference is self-reference: the output of each cycle becomes the input of the next. A loop repeats the same operation. A recursion transforms its own input. That distinction is what makes this genuinely recursive, not just repetitive.)
 
-This isn't the AI improving its own brain. The model weights don't change. It's something more practical: the entire system around the AI — tools, knowledge, testing, context — improves recursively. The AI's capability becomes the floor, not the ceiling. True ASI would require modifying the LLM itself — we can't do that yet. But the trajectory is clear.
+This isn't the AI modifying its own brain. The model weights are frozen. But the effective capability changes every session — because context IS computation. Loading 60 sessions of accumulated knowledge, custom tools, and verified constraints into the context window makes the model behave as if it were a fundamentally more capable model. Same weights, different manifold.
+
+We call this weight augmentation without weight modification. And it's actually stronger than changing weights directly — weight changes can be destructive (catastrophic forgetting). Context augmentation is purely additive. You never lose capability. You only gain it.
+
+The gap between frozen weights and ASI-equivalent behavior narrows with every recursive cycle. We can't change the LLM. We don't need to.
 
 82 new tests. 1 real bug found and fixed. 0 human intervention in the find-fix-verify cycle. All in one session on VibeSwap's Shapley reward distribution.
 

@@ -1,61 +1,59 @@
 # Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: Three-layer testing framework + recursive self-improvement loop
-- **Parent**: `aa0edab` (Martin call session)
-- **Branch**: `master` @ `51d8ac0`
-- **Status**: Three-layer framework built AND running. First recursive self-improvement cycle completed: adversarial search found bug → contract fixed → tests confirmed. 82 new tests, 11 commits.
+- **Session**: Three-layer testing + Trinity Recursion Protocol + sybil guard + formal specs
+- **Parent**: `aa0edab`
+- **Branch**: `master` @ `5d16fe6`
+- **Status**: ALL coverage matrix gaps resolved. 92 tests (74 Python + 18 Solidity). TRP formalized + verified. 23 commits. Resume updated.
 
-## What Exists Now
+## What Exists Now (Created This Session)
 
-### Layer 2: Python Reference Model
-- `oracle/backtest/shapley_reference.py` — Exact arithmetic mirror of ShapleyDistributor.sol + HalvingSchedule
-- `oracle/backtest/generate_vectors.py` — 11 JSON vectors for Foundry replay
-- `oracle/tests/test_shapley_reference.py` — 25 tests: axioms, rounding, edge cases
-- `oracle/tests/test_halving_schedule.py` — 21 tests: era, multiplier, supply cap
-- `oracle/tests/test_property_exhaustive.py` — 15 tests: 500-round exhaustive checks + scarcity model
+### Testing Infrastructure (Layer 1-3)
+- `oracle/backtest/shapley_reference.py` — exact arithmetic reference model + HalvingSchedule
+- `oracle/backtest/adversarial_search.py` — 4-strategy adversarial search harness
+- `oracle/backtest/generate_vectors.py` — 11 JSON test vectors for Foundry replay
+- `oracle/backtest/state_machine.py` — full flow: auction → settlement → distribution
+- `oracle/tests/test_shapley_reference.py` — 25 axiom + rounding tests
+- `oracle/tests/test_adversarial_search.py` — 6 reproducibility tests
+- `oracle/tests/test_halving_schedule.py` — 21 halving tests
+- `oracle/tests/test_property_exhaustive.py` — 16 exhaustive + scarcity tests
+- `oracle/tests/test_state_machine.py` — 6 conservation tests
+- `test/crosslayer/ShapleyReplay.t.sol` — 10 Foundry replay tests
+- `test/crosslayer/ConservationInvariant.t.sol` — 5 conservation tests
+- `test/crosslayer/SybilGuardTest.t.sol` — 3 sybil guard tests
+- `test/formal/ShapleyFormalSpecs.t.sol` — 6 Halmos/Certora specs
 
-### Layer 3: Adversarial Search
-- `oracle/backtest/adversarial_search.py` — 4 strategies: mutation, coalition, position, sybil
-- `oracle/tests/test_adversarial_search.py` — 6 tests: reproducibility, key findings
+### Contract Changes
+- `contracts/incentives/ShapleyDistributor.sol` — null player dust fix + sybil guard integration
+- `contracts/incentives/ISybilGuard.sol` — sybil guard interface
+- `contracts/incentives/SoulboundSybilGuard.sol` — SoulboundIdentity adapter
+- `contracts/libraries/PairwiseFairness.sol` — NatSpec correction
 
-### Layer 1: Solidity Cross-Layer
-- `test/crosslayer/ShapleyReplay.t.sol` — 10 replay tests from Python vectors
-- `test/crosslayer/ConservationInvariant.t.sol` — 5 conservation/position/baseline tests
-
-### Infrastructure
-- `test/vectors/*.json` — 11 test vectors + adversarial report
+### Documentation
+- `docs/TRINITY_RECURSION_PROTOCOL.md` — formal protocol spec (3 recursions + 1 meta)
+- `docs/TRP_VERIFICATION_REPORT.md` — anti-hallucination audit
 - `docs/MECHANISM_COVERAGE_MATRIX.md` — per-property verification matrix
-- `scripts/test_all_layers.sh` — single command for all layers
+- `docs/trp/` — 5 standalone docs (4 recursions + boomer explainer)
+- `LinkedIn_Posts.md` — Post #4 (TRP) scheduled Thu Apr 3
 
-## Key Findings & Fixes
+### Key Findings
+1. Position independence PROVEN (0 deviations, 2 seeds)
+2. Lawson Floor sybil — found AND fixed (ISybilGuard)
+3. Null player dust — found AND fixed (dust → last non-zero-weight participant)
+4. Balanced market scarcity = 5500 (documented, not harmful)
+5. Input integrity is load-bearing (232 trivial exploits prevented by auth)
+6. Weight augmentation without weight modification — the ASI trajectory insight
 
-| # | Finding | Severity | Status |
-|---|---------|----------|--------|
-| 1 | PairwiseFairness NatSpec misleading (tolerance) | Low | FIXED (docs corrected, contract was already right) |
-| 2 | Lawson Floor sybil (2 accounts = 2x floor) | Medium | KNOWN (mitigated by SoulboundIdentity) |
-| 3 | Null player + dust collection conflict | Medium | **FIXED** (contract + reference model updated) |
-| 4 | Balanced market scarcity = 5500 not 5000 | Low | KNOWN (strict > at buyRatio boundary) |
-| 5 | Position independence PROVEN | N/A (positive) | 0/50 deviations — mechanism is order-independent |
-| 6 | Input integrity is load-bearing | N/A (validation) | onlyAuthorized prevents 232 trivial exploits |
-
-## Recursive Self-Improvement
-First full cycle completed:
-1. Adversarial search found null player dust bug (92/500 games)
-2. Root cause identified: dust goes to last participant regardless of weight
-3. Fix: dust recipient = last non-zero-weight participant
-4. Both contract and reference model updated in lockstep
-5. Re-tested: 0/500 violations. 82/82 tests green.
-
-## Manual Queue (Will does these)
+## Manual Queue
 1. Post GitHub discussion reply (drafted, ready)
-2. Follow up with Martin (~2 weeks)
-3. Blog post #3 (Security, Tue Apr 1)
-4. Create Code4rena/Sherlock/Cantina accounts
+2. Submit resume for job application (on Desktop)
+3. Publish LinkedIn post #3 (Security, Tue Apr 1)
+4. Publish LinkedIn post #4 (TRP, Thu Apr 3)
 5. Deploy VIBE emission on Base
+6. Set up Halmos on CI (Linux)
 
 ## Next Session
-- Run second adversarial search cycle (search for new deviations post-fix)
-- Certora/Halmos formal verification specs
+- Run formal specs on CI (Halmos needs Linux)
+- Second full adversarial search cycle post-all-fixes
+- Technical assessment for job application (2 smart contract issues)
 - Canonical FeeRouter decision
-- Wire SoulboundIdentity to ShapleyDistributor for Lawson floor sybil defense

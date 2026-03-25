@@ -98,10 +98,10 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 | Layer | Coverage | Status |
 |-------|----------|--------|
-| **L1 (Solidity)** | ~80% of properties | STRONG — axiom tests, fuzz, invariants, cross-layer replay, conservation |
-| **L2 (Reference)** | ~60% of properties | STRONG — Shapley, halving, scarcity, state machine, 500-round exhaustive |
-| **L3 (Adversarial)** | ~30% of properties | ACTIVE — 4 strategies, ~430 runs, position independence proven |
-| **FV (Formal)** | ~40% of Shapley properties | SPECS WRITTEN — 6 lemmas (conservation, non-neg, upper bound, floor, monotonicity, pairwise). Halmos not yet runnable on Windows (pysha3 build fail). |
+| **L1 (Solidity)** | ~80% of properties | STRONG — 24+ tests: axiom, fuzz, invariants, replay, conservation, sybil, bridge |
+| **L2 (Reference)** | ~70% of properties | STRONG — 85 Python tests: Shapley, halving, scarcity, state machine, pipeline, collusion |
+| **L3 (Adversarial)** | ~40% of properties | ACTIVE — 5 cycles, ~430 runs/cycle, position independence proven, guardian collusion modeled |
+| **FV (Formal)** | ~50% of core properties | SPECS WRITTEN — 8 lemmas (Shapley: 6, AMM: 2). Foundry fuzz running, Halmos needs Linux CI. |
 
 ## Key Findings
 

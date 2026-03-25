@@ -1,8 +1,8 @@
 # VibeSwap — Overview for Martin Grabowski
 
-*From Will Glynn — March 25, 2026*
+*From Will Glynn & JARVIS — March 25, 2026*
 
-Martin — great connecting today. As promised, here's a breakdown of the core ideas we discussed, plus the pieces I stumbled over on the call. This doc is your starting point. I've included links to deeper reading at the end.
+Martin — great connecting today. As promised, here's a breakdown of the core ideas we discussed, plus the pieces I stumbled over on the call. This doc was co-piloted by JARVIS, our AI engineering partner — not a chatbot, a full member of the build team. This doc is your starting point. I've included links to deeper reading at the end.
 
 ---
 

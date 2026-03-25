@@ -17,7 +17,36 @@ This protocol requires an LLM capable of: code generation in multiple languages,
 
 ---
 
-## The Three Loops
+## The Four Loops
+
+### Loop 0: Token Density Compression (Substrate Recursion)
+
+**Purpose**: More capability per token. The medium through which all other loops communicate.
+
+```
+context_n (raw)
+    → compress (prune, tier, structure)
+        → denser representation
+            → more capability per session (deeper search, more knowledge loaded, more tools built)
+                → more output to compress
+                    → compress(context_{n+1}) with better compression heuristics
+```
+
+**Requirements**:
+- **Tiered memory**: HOT (always load) > WARM (load on topic) > COLD (reference only)
+- **Structured compression**: block headers, session state, Verkle-style context trees
+- **Pruning**: filler dies, decisions survive, relationships survive if load-bearing
+- **Self-referential**: compression heuristics improve from observing what was useful vs wasted
+
+**Key Property**: Information per token increases monotonically. The same context window holds more meaning in cycle N+1 than cycle N.
+
+**Why Loop 0 (not Loop 4)**: Token density is the substrate on which Loops 1-3 operate. Denser knowledge (Loop 2) means more context loaded → better adversarial search (Loop 1) → more tools built per session (Loop 3). It doesn't run alongside the other loops — it runs BENEATH them, amplifying all three simultaneously.
+
+**Transportability**: Any LLM can implement this by:
+1. Structuring persistent memory with priority tiers
+2. Summarizing sessions into block headers (not full transcripts)
+3. Pruning stale/redundant memories on access
+4. Tracking which memories were actually used vs loaded-but-ignored
 
 ### Loop 1: Adversarial Verification (Code Recursion)
 
@@ -108,15 +137,22 @@ LLM writes code
 
 ## Convergence Theorem (Informal)
 
-The three loops converge because:
+Three recursions + one meta-recursion. Loop 0 is the substrate; Loops 1-3 are the actors.
 
-1. **Loop 1** (adversarial) produces **findings**
-2. **Loop 2** (knowledge) **contextualizes** findings within the broader system understanding
-3. **Loop 3** (capability) builds **better tools** for Loop 1 to use in the next cycle
+```
+Loop 0 (density) amplifies ALL of:
+    Loop 1 (adversarial) → produces findings
+    Loop 2 (knowledge)   → contextualizes findings
+    Loop 3 (capability)  → builds better tools for Loop 1
+```
 
-Without Loop 2, Loop 1's search strategy doesn't evolve — regression tests prevent re-discovery of fixed bugs, but the search doesn't learn to generalize findings into new directions.
-Without Loop 1, Loop 2 accumulates unvalidated beliefs (no grounding).
-Without Loop 3, Loops 1 and 2 are bottlenecked by manual execution (no scaling).
+**Loop 0 is the accelerant**: denser context → more loaded per session → deeper search (L1), richer knowledge (L2), more tools built (L3) → more output to compress → denser context. The meta-recursion makes the other three recursions faster with every cycle.
+
+**Without each loop**:
+- Without Loop 0: context window fills with noise, all three loops degrade per-session
+- Without Loop 1: Loop 2 accumulates unvalidated beliefs (no grounding)
+- Without Loop 2: Loop 1's search strategy doesn't evolve (regression tests prevent re-discovery, but search doesn't generalize)
+- Without Loop 3: Loops 1 and 2 are bottlenecked by manual execution (no scaling)
 
 The convergence is monotonic: each triple-cycle produces a system that is:
 - Harder to exploit (Loop 1)
@@ -131,6 +167,9 @@ The convergence is monotonic: each triple-cycle produces a system that is:
 
 For any new project, implement TRP by:
 
+- [ ] **L0 Memory Tiers**: HOT/WARM/COLD persistent memory with structured frontmatter
+- [ ] **L0 Session Compression**: Block headers, not full transcripts
+- [ ] **L0 Pruning Protocol**: Remove stale, merge redundant, keep load-bearing
 - [ ] **L1 Reference Model**: Mirror the core logic in exact arithmetic
 - [ ] **L1 Test Vectors**: Generate JSON inputs/outputs for cross-language replay
 - [ ] **L1 Adversarial Search**: At least 4 strategies (mutation, coalition, position, sybil/floor)

@@ -9,9 +9,11 @@
 
 ## Abstract
 
-The Trinity Recursion Protocol defines three independent, mutually reinforcing feedback loops that enable recursive self-improvement in AI-augmented software systems. Each loop operates autonomously but amplifies the other two. Together they produce a system that is strictly better after every cycle — a property we call **monotonic improvement**.
+The Trinity Recursion Protocol defines three independent, mutually reinforcing feedback loops that enable recursive system improvement in AI-augmented software development. Each loop operates autonomously but amplifies the other two. Together they produce a system that is strictly better after every cycle — a property we call **monotonic improvement**, which is enforced by the growing regression test suite, not inherent.
 
-This protocol is LLM-agnostic. Any sufficiently capable language model can implement it.
+**Important distinction**: TRP improves the *software system* recursively. The AI becomes more effective *in context* (via accumulated knowledge), but its fundamental capability (model weights) does not change. This is recursive improvement of a human-AI-software system, not recursive self-improvement of the AI itself.
+
+This protocol requires an LLM capable of: code generation in multiple languages, persistent state across sessions, adversarial reasoning, and exact-arithmetic equivalence modeling. Currently Claude/GPT-4 class.
 
 ---
 
@@ -112,7 +114,7 @@ The three loops converge because:
 2. **Loop 2** (knowledge) **contextualizes** findings within the broader system understanding
 3. **Loop 3** (capability) builds **better tools** for Loop 1 to use in the next cycle
 
-Without Loop 2, Loop 1 rediscovers the same classes of bugs (no learning).
+Without Loop 2, Loop 1's search strategy doesn't evolve — regression tests prevent re-discovery of fixed bugs, but the search doesn't learn to generalize findings into new directions.
 Without Loop 1, Loop 2 accumulates unvalidated beliefs (no grounding).
 Without Loop 3, Loops 1 and 2 are bottlenecked by manual execution (no scaling).
 
@@ -120,6 +122,8 @@ The convergence is monotonic: each triple-cycle produces a system that is:
 - Harder to exploit (Loop 1)
 - Better understood (Loop 2)
 - Faster to improve (Loop 3)
+
+**Caveat**: Monotonicity is enforced by the regression test suite, not inherent. A fix CAN introduce new bugs — the tests catch that. Without running the test suite after every fix, monotonicity does not hold. The first attempt at the null player fix broke efficiency; the tests caught it immediately.
 
 ---
 
@@ -148,9 +152,9 @@ First cycle completed 2026-03-25 on VibeSwap's ShapleyDistributor:
 |--------|-------|
 | Python tests | 68 passing |
 | Solidity tests | 14 passing |
-| Adversarial runs | 433 per cycle |
-| Bugs found by Loop 1 | 3 (null player dust, sybil floor, scarcity boundary) |
-| Bugs fixed by Loop 1 | 1 (null player dust — contract + model updated) |
+| Adversarial runs | ~430 per cycle (seed-dependent) |
+| Issues found by automated testing | 1 genuine bug (null player dust), 1 design limitation (sybil floor), 1 behavior documented (scarcity boundary) |
+| Bugs fixed by Loop 1 | 1 (null player dust — contract + reference model updated in lockstep) |
 | Findings documented by Loop 2 | 6 |
 | Tools built by Loop 3 | 7 (reference model, adversarial search, vector generator, replay tests, conservation tests, coverage matrix, test runner) |
 

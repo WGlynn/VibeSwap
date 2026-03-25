@@ -18,7 +18,7 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 |----------|:--:|:--:|:--:|:--:|-------|
 | **Efficiency** (sum = total) | `ShapleyFuzz.t.sol` | `shapley_reference.py` | - | TODO | Dust collection on last participant |
 | **Symmetry** (equal in = equal out) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | Pre-dust only |
-| **Null Player** (zero in = zero out) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | |
+| **Null Player** (zero in = zero out) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | `test_property_exhaustive.py` | TODO | **FINDING #3**: dust collection on last participant violates null player if they have zero weight. 92/500 random games. Mitigation: caller must not place null players last. |
 | **Pairwise Proportionality** | `PairwiseFairness.sol` (on-chain) | `shapley_reference.py` | - | TODO | Contract uses totalWeight as tolerance (correct). NatSpec was misleading — fixed. |
 | **Time Neutrality** | `PairwiseFairness.sol` | - | - | TODO | Only for FEE_DISTRIBUTION type |
 | **Lawson Floor** (1% minimum) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | Floor + efficiency interaction |
@@ -108,6 +108,9 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 1. **Position independence PROVEN** — 0 deviations across 50 rounds of position gaming
 2. **Lawson Floor sybil vulnerability** — splitting into 2 accounts doubles floor subsidy. Mitigated by SoulboundIdentity but not enforced in ShapleyDistributor directly.
 3. **Input integrity is load-bearing** — authorization model (onlyAuthorized) prevents 199 random mutation + 33 coalition deviations. Without it, mechanism is trivially exploitable.
+4. **Null player + dust collection conflict** — when zero-weight participant is last in array, they receive truncation dust (typically < n wei). 92/500 random games. Caller must not place null players last.
+5. **Balanced market scarcity inflated** — buyRatio == 5000 exactly enters "buy is scarce" path (strict `>`), giving both sides above-neutral scores. Not harmful but mathematically imprecise.
+6. **All 7 axioms hold universally** — across 500 random games each: efficiency (0 failures), symmetry (0), monotonicity (0), conservation (0), Lawson floor (0), no negatives (0). Null player holds when dust recipient is not null.
 
 ## Remaining Gaps (Priority Order)
 

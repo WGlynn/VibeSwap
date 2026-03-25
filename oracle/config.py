@@ -503,23 +503,22 @@ def _dict_to_config(d: Dict) -> OracleConfig:
         else:
             venues.append(v)
 
-    # Convert chains
-    chains = {}
+    # Convert chains — always start from defaults, overlay config overrides
     default_chains = get_default_chains()
-    for name, c in d.get("chains", default_chains).items():
-        if isinstance(c, dict):
-            # Env overrides may create partial dicts — merge with defaults
-            if name in default_chains:
-                defaults = {k: v for k, v in default_chains[name].__dict__.items()}
-                defaults.update(c)
-                c = defaults
+    chains = dict(default_chains)
+    if "chains" in d:
+        for name, c in d["chains"].items():
+            if isinstance(c, dict):
+                if name in default_chains:
+                    defaults = {k: v for k, v in default_chains[name].__dict__.items()}
+                    defaults.update(c)
+                    c = defaults
+                else:
+                    c.setdefault("chain_id", 0)
+                    c.setdefault("name", name)
+                chains[name] = ChainConfig(**c)
             else:
-                # Unknown chain from config — ensure required fields
-                c.setdefault("chain_id", 0)
-                c.setdefault("name", name)
-            chains[name] = ChainConfig(**c)
-        else:
-            chains[name] = c
+                chains[name] = c
 
     return OracleConfig(
         kalman=kalman,

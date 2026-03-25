@@ -155,6 +155,21 @@ class TestOracleConfig:
 
 
 class TestConfigLoading:
+    # Env vars like ACTIVE_CHAIN, BASE_RPC_URL etc. override config;
+    # clear them so tests get deterministic defaults
+    ORACLE_ENV_VARS = [
+        "ACTIVE_CHAIN", "LOG_LEVEL", "ORACLE_CONFIG_PATH", "ORACLE_SIGNER_KEY",
+        "ETH_RPC_URL", "ARB_RPC_URL", "BASE_RPC_URL", "OP_RPC_URL", "SEPOLIA_RPC_URL",
+        "TRUE_PRICE_ORACLE_ADDRESS", "STABLECOIN_REGISTRY_ADDRESS", "VIBE_AMM_ADDRESS",
+        "BINANCE_API_KEY", "BINANCE_API_SECRET", "COINBASE_API_KEY", "COINBASE_API_SECRET",
+        "GLASSNODE_API_KEY", "CRYPTOQUANT_API_KEY",
+    ]
+
+    @pytest.fixture(autouse=True)
+    def clean_env(self, monkeypatch):
+        for var in self.ORACLE_ENV_VARS:
+            monkeypatch.delenv(var, raising=False)
+
     def test_load_default(self):
         config = load_config()
         assert isinstance(config, OracleConfig)
@@ -169,14 +184,15 @@ kalman:
 """
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             f.write(yaml_content)
-            f.flush()
+            tmp_path = f.name
 
-            config = load_config(f.name)
+        try:
+            config = load_config(tmp_path)
             assert config.active_chain == "arbitrum"
             assert config.update_interval_seconds == 60
             assert config.kalman.drift_persistence == 0.95
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
     def test_load_from_json(self):
         json_content = {
@@ -185,13 +201,14 @@ kalman:
         }
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(json_content, f)
-            f.flush()
+            tmp_path = f.name
 
-            config = load_config(f.name)
+        try:
+            config = load_config(tmp_path)
             assert config.active_chain == "base"
             assert config.update_interval_seconds == 45
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
     def test_env_override(self, monkeypatch):
         monkeypatch.setenv("ACTIVE_CHAIN", "optimism")
@@ -205,25 +222,27 @@ kalman:
         config = OracleConfig(active_chain="base")
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            save_config(config, f.name, format="yaml")
+            tmp_path = f.name
 
-            # Reload and verify
-            loaded = load_config(f.name)
+        try:
+            save_config(config, tmp_path, format="yaml")
+            loaded = load_config(tmp_path)
             assert loaded.active_chain == "base"
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
     def test_save_config_json(self):
         config = OracleConfig(active_chain="arbitrum")
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            save_config(config, f.name, format="json")
+            tmp_path = f.name
 
-            # Reload and verify
-            loaded = load_config(f.name)
+        try:
+            save_config(config, tmp_path, format="json")
+            loaded = load_config(tmp_path)
             assert loaded.active_chain == "arbitrum"
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
     def test_save_removes_sensitive(self):
         config = OracleConfig()
@@ -231,28 +250,35 @@ kalman:
         config.venues[0].api_key = "api_secret"
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            save_config(config, f.name, format="json")
+            tmp_path = f.name
 
-            # Read raw file
-            with open(f.name, 'r') as rf:
+        try:
+            save_config(config, tmp_path, format="json")
+            with open(tmp_path, 'r') as rf:
                 content = rf.read()
                 assert "secret_key" not in content
                 assert "api_secret" not in content
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
     def test_generate_default_config(self):
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            generate_default_config(f.name)
+            tmp_path = f.name
 
-            # Should be loadable
-            config = load_config(f.name)
+        try:
+            generate_default_config(tmp_path)
+            config = load_config(tmp_path)
             assert isinstance(config, OracleConfig)
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
 
 class TestValidation:
+    @pytest.fixture(autouse=True)
+    def clean_env(self, monkeypatch):
+        for var in TestConfigLoading.ORACLE_ENV_VARS:
+            monkeypatch.delenv(var, raising=False)
+
     def test_invalid_config_raises(self):
         yaml_content = """
 kalman:
@@ -260,14 +286,14 @@ kalman:
 """
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             f.write(yaml_content)
-            f.flush()
+            tmp_path = f.name
 
+        try:
             with pytest.raises(ValueError) as exc_info:
-                load_config(f.name)
-
+                load_config(tmp_path)
             assert "validation failed" in str(exc_info.value).lower()
-
-            Path(f.name).unlink()
+        finally:
+            Path(tmp_path).unlink()
 
 
 class TestChainSpecificConfig:

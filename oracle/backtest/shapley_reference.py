@@ -207,9 +207,11 @@ class ShapleyReference:
     error surface — where bugs in the contract would hide.
     """
 
-    def __init__(self, use_quality_weights: bool = True):
+    def __init__(self, use_quality_weights: bool = True, sybil_guard_addrs: Optional[set] = None):
         self.use_quality_weights = use_quality_weights
         self.halving = HalvingSchedule()
+        # When set, only these addresses get Lawson floor boost
+        self.sybil_guard_addrs = sybil_guard_addrs
 
     # ============ Solidity-Emulated Computation ============
 
@@ -282,7 +284,12 @@ class ShapleyReference:
         floor_applied = [False] * n
 
         for i in range(n):
-            if weights[i] > 0 and shares[i] < floor_amount:
+            eligible = weights[i] > 0 and shares[i] < floor_amount
+            # Sybil guard: only verified addresses get floor boost
+            if eligible and self.sybil_guard_addrs is not None:
+                eligible = participants[i].addr in self.sybil_guard_addrs
+
+            if eligible:
                 floor_deficit += floor_amount - shares[i]
                 shares[i] = floor_amount
                 floor_applied[i] = True

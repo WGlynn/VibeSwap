@@ -1,13 +1,13 @@
 # x402 Just Got Sessions. We Already Shipped It.
 
-*ethresear.ch — Faraday1*
+*ethresear.ch*
 *March 2026*
 
 ---
 
 ## TL;DR
 
-x402 — the HTTP 402 Payment Required protocol — just shipped its biggest upgrade: SIWX (Sign-In-With-X), a wallet-based session layer built on CAIP-122. Pay once, authenticate every subsequent request with a wallet signature in microseconds. No blockchain round-trip. No accumulated latency. We implemented it the same day it was announced — 290 lines, deployed on Base. Here's how it works and why it matters for AI agent economics on Ethereum L2s.
+x402 — the HTTP 402 Payment Required protocol — just shipped its biggest upgrade: SIWX (Sign-In-With-X), a wallet-based session layer built on CAIP-122. Pay once, authenticate every subsequent request with a wallet signature in microseconds. No blockchain round-trip. No accumulated latency. This post presents a reference implementation (290 lines, two files) and analyzes the implications for AI agent economics on Ethereum L2s.
 
 ---
 
@@ -42,11 +42,9 @@ The key insight: **signature verification is local, instantaneous, and free.** N
 
 ## We Implemented It In One Session
 
-When the upgrade dropped, we didn't write a blog post about it. We shipped it.
+The reference implementation is 290 lines across two files.
 
-**290 lines of code. Two files. Same day.**
-
-### The Architecture
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐

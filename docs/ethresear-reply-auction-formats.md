@@ -1,7 +1,7 @@
 # Reply to: Open vs. Sealed Auction Format Choice for MEV
 # https://ethresear.ch/t/open-vs-sealed-auction-format-choice-for-maximal-extractable-value/24454
 
-## Draft reply for Will to post:
+## Reply — ready to post:
 
 ---
 
@@ -43,15 +43,8 @@ The ~$10-18M annual gap between SPSB and FPSB that you identify is meaningful fo
 
 Your finding that revenue declines at extreme affiliation (rho -> 0.9) with large n is fascinating. In batch auctions, the analog is: when all participants submit near-identical orders (high affiliation), the uniform clearing price converges to the true market price, and the "spread" available for extraction collapses to zero. The non-monotonicity you observe in sequential auctions is structurally guaranteed in batch mechanisms.
 
-### Practical Note
+### Practical Considerations
 
-We're building this at VibeSwap — a commit-reveal batch auction DEX on LayerZero V2. The mechanism has been formally designed and is in testing. The batch duration is 10 seconds (8s commit + 2s reveal), which balances latency against the security of the commit-reveal scheme.
+A reference implementation of this mechanism uses 10-second batches (8s commit + 2s reveal), which balances latency against the security guarantees of the commit-reveal scheme. Settlement can be made permissionless — anyone triggers it after reveal closes, because the computation is purely deterministic (Fisher-Yates shuffle + uniform clearing price from batch math). No trusted party needed.
 
-The settlement function was recently made permissionless — anyone can trigger settlement once the reveal phase ends, because the computation is purely deterministic (Fisher-Yates shuffle + uniform clearing price). No trusted party needed.
-
-Happy to share our mechanism design docs if useful for extending your analysis to batch auction formats.
-
----
-
-*Will Glynn — VibeSwap (vibeswap.org)*
-*github.com/WGlynn/VibeSwap*
+Happy to discuss extending your analysis to batch auction formats — the linkage principle behaves differently when the information channel is structurally closed.

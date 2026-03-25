@@ -239,3 +239,26 @@ Break the matrix by building something they didn't think was possible.
 **FIRST COMMENT:** The protocol that can't extract: github.com/WGlynn/VibeSwap
 
 ---
+
+## Post #8: I Use an AI Copilot
+**Schedule: Thu Apr 17**
+
+I use an AI copilot. There, I said it.
+
+Every senior engineer uses one now. Most won't admit it. I'd rather be honest and let the results speak.
+
+In a single session this week, my AI-augmented workflow produced: 98 tests across three verification layers, an adversarial search harness that found a real bug in my own contract, the fix for that bug, a cross-layer reference model with exact arithmetic, and formal verification specs. One session.
+
+The question isn't whether engineers use AI tools. The question is whether they're good enough to use them well.
+
+Anyone can paste code into ChatGPT. Building a recursive testing framework where the system attacks itself, finds its own bugs, and generates its own regression tests — that requires deep understanding of what you're building. The AI doesn't replace the thinking. It amplifies it.
+
+When I interview, I say this upfront. If a company penalizes me for using the best tools available, that tells me everything I need to know about their engineering culture.
+
+The engineers who pretend they don't use AI are optimizing for optics. The engineers who use it openly and effectively are optimizing for output. I know which one I'd hire.
+
+#AI #Engineering #BuildInPublic #Honesty #DeFi
+
+**FIRST COMMENT:** The framework that one session produced: github.com/WGlynn/VibeSwap
+
+---

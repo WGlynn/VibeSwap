@@ -174,3 +174,68 @@ Three recursions. One meta-recursion. Not theoretical. Running code.
 **FIRST COMMENT:** Full protocol spec + verification report: github.com/WGlynn/VibeSwap/blob/master/docs/TRINITY_RECURSION_PROTOCOL.md
 
 ---
+
+## Post #5: Hardened Then Decentralized
+**Schedule: Tue Apr 8**
+
+The hardest part of building a decentralized protocol isn't the decentralization. It's what comes before it.
+
+VibeSwap was developed centrally first — deliberately. Every mechanism, every invariant, every safety check was designed so that the protocol can't be broken by bad actors, bad code, or bad governance.
+
+The commit-reveal auction can't be front-run. The Shapley distribution can't over-allocate. The circuit breakers can't be bypassed. The bonding curve, once sealed, can't be unsealed. These aren't policies. They're physics.
+
+Only after the mechanism is structurally sound do you open the door. Permissionless contribution — anyone can submit code, anyone can propose changes — but consensus decides what gets merged. The math has veto power over governance.
+
+Most protocols decentralize first and pray. We hardened first and decentralized with confidence.
+
+The goal was never to build something I control. It was to build something nobody needs to control.
+
+#DeFi #MechanismDesign #SmartContracts #Decentralization #BuildInPublic
+
+**FIRST COMMENT:** Full architecture: github.com/WGlynn/VibeSwap
+
+---
+
+## Post #6: Anti-Slop
+**Schedule: Thu Apr 10**
+
+Everyone was building the same DEX with different logos. Copy-paste Uniswap, change the colors, call it innovation. The entire DeFi space was feeding into the slop.
+
+I went the other direction.
+
+VibeSwap doesn't mitigate MEV. It dissolves it — mathematically. Uniform clearing prices mean there's no information advantage to extract. Fisher-Yates shuffling with XORed user secrets means ordering is provably random. Commit-reveal means your trade is invisible until settlement.
+
+This isn't a better mousetrap. It's a room with no mice.
+
+While everyone was optimizing the same broken architecture, we rebuilt from first principles: cooperative game theory, mechanism design, and the simple premise that a DEX should be structurally incapable of extracting from its users.
+
+Anti-slop. Built from scratch. 360+ contracts. Every one of them exists because the math required it, not because a competitor had it.
+
+#DeFi #MEV #MechanismDesign #BuildInPublic #VibeSwap
+
+**FIRST COMMENT:** The math behind dissolution: github.com/WGlynn/VibeSwap
+
+---
+
+## Post #7: Breaking the Matrix
+**Schedule: Tue Apr 15**
+
+Everyone in crypto asks the same question: "How do we make money?"
+
+We asked a different one: "How do we make sure this is fair?"
+
+That distinction changes everything. When you optimize for extraction, you build systems that are sophisticated but predatory. When you optimize for fairness, you build systems that are sustainable and trust doesn't have to be earned — it's enforced by math.
+
+This isn't idealism. It's better engineering. Fairness isn't a constraint on profitability — it's the foundation of it. Markets that don't extract from participants attract more participants. Protocols that can't be gamed don't need to be defended. Systems built on cooperation outperform systems built on exploitation, given enough time.
+
+And we're not just talking about it. We're not writing manifestos or holding signs. We're shipping code. 360+ smart contracts that make extraction structurally unprofitable. Shapley values that distribute rewards based on marginal contribution, not political power. Circuit breakers that protect users without asking permission.
+
+Building something out of love for what it could be — not just what it could earn — hasn't really been tried in this space. Most people can't even conceive of it. That's the real edge.
+
+Break the matrix by building something they didn't think was possible.
+
+#DeFi #CooperativeCapitalism #MechanismDesign #BuildInPublic #VibeSwap
+
+**FIRST COMMENT:** The protocol that can't extract: github.com/WGlynn/VibeSwap
+
+---

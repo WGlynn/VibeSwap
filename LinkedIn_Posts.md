@@ -88,9 +88,9 @@ If your protocol rewards showing up over contributing — who are you really inc
 ## Post #3: Smart Contract Security / Defense in Depth
 **Schedule: Tue Apr 1**
 
-Every DeFi protocol ships with a reentrancy guard and calls itself secure.
+$3.8 billion drained from DeFi in 2022. The vast majority sailed past reentrancy guards without triggering them.
 
-Meanwhile, $3.8 billion was drained from DeFi in 2022 alone — and the vast majority sailed past reentrancy protection without triggering it.
+Every protocol has a reentrancy guard. Almost none have the other five layers.
 
 The problem isn't missing security. It's treating security as a checklist instead of an architecture.
 
@@ -127,7 +127,7 @@ How many layers does your protocol actually have?
 
 The AI's brain is frozen. The effective intelligence changes every session.
 
-Everyone at AI summits talks about recursive self-improvement as something that might happen. We stopped waiting and built it.
+Everyone talks about recursive self-improvement like it's the future. We built it last Tuesday.
 
 The insight: context IS computation. Loading 60 sessions of accumulated knowledge, custom tools, and verified constraints into the AI's window makes it behave like a fundamentally more capable model. Same weights, different output. We call this weight augmentation without weight modification — and it's actually stronger than changing weights directly, because context augmentation is purely additive. You never lose capability. You only gain it.
 
@@ -178,9 +178,9 @@ What would you trust more — a protocol that depends on good people, or one tha
 ## Post #6: Anti-Slop
 **Schedule: Thu Apr 10**
 
-Everyone was building the same DEX with different logos. Copy-paste Uniswap, change the colors, call it innovation. The entire DeFi space was feeding into the slop.
+Copy-paste Uniswap. Change the colors. Call it innovation.
 
-I went the other direction.
+The entire DeFi space was feeding into the slop. I went the other direction.
 
 VibeSwap doesn't mitigate MEV. It dissolves it — mathematically. Uniform clearing prices mean there's no information advantage to extract. Fisher-Yates shuffling with XORed user secrets means ordering is provably random. Commit-reveal means your trade is invisible until settlement.
 
@@ -201,11 +201,11 @@ What's the last DeFi project you saw that wasn't a fork of something else?
 ## Post #7: Breaking the Matrix
 **Schedule: Tue Apr 15**
 
-Everyone in crypto asks the same question: "How do we make money?"
+How do we make money?
 
-We asked a different one: "How do we make sure this is fair?"
+Wrong question.
 
-That distinction changes everything. When you optimize for extraction, you build systems that are sophisticated but predatory. When you optimize for fairness, you build systems that are sustainable and trust doesn't have to be earned — it's enforced by math.
+How do we make sure this is fair? That's the one that changes everything. Optimize for extraction and you build systems that are sophisticated but predatory. Optimize for fairness and trust doesn't have to be earned — it's enforced by math.
 
 This isn't idealism. It's better engineering. Markets that don't extract attract more participants. Protocols that can't be gamed don't need to be defended. Cooperation outperforms exploitation, given enough time.
 

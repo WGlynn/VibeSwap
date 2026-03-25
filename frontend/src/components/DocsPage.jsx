@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
@@ -262,56 +263,82 @@ function SearchBar({ value, onChange }) {
 function QuickStartCard({ step, icon, title, description, link, index }) {
   return (
     <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={index + 1}>
-      <GlassCard
-        glowColor="matrix"
-        spotlight
-        className="relative p-6 h-full group cursor-pointer"
-      >
-        {/* Step number */}
-        <div className="absolute top-4 right-4 text-[10px] font-mono text-zinc-600 bg-zinc-800/60 rounded-full w-6 h-6 flex items-center justify-center border border-zinc-700/50">
-          {step}
-        </div>
-        {/* Icon */}
-        <div className="text-amber-400 mb-4">{icon}</div>
-        {/* Title */}
-        <h3 className="text-base font-semibold text-zinc-100 mb-2">{title}</h3>
-        {/* Description */}
-        <p className="text-sm text-zinc-400 leading-relaxed mb-4">{description}</p>
-        {/* Link */}
-        <div className="flex items-center gap-1.5 text-xs font-mono text-amber-400/80 group-hover:text-amber-400 transition-colors">
-          Start
-          <svg className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-          </svg>
-        </div>
-      </GlassCard>
+      <Link to={link} className="block h-full">
+        <GlassCard
+          glowColor="matrix"
+          spotlight
+          className="relative p-6 h-full group cursor-pointer"
+        >
+          {/* Step number */}
+          <div className="absolute top-4 right-4 text-[10px] font-mono text-zinc-600 bg-zinc-800/60 rounded-full w-6 h-6 flex items-center justify-center border border-zinc-700/50">
+            {step}
+          </div>
+          {/* Icon */}
+          <div className="text-amber-400 mb-4">{icon}</div>
+          {/* Title */}
+          <h3 className="text-base font-semibold text-zinc-100 mb-2">{title}</h3>
+          {/* Description */}
+          <p className="text-sm text-zinc-400 leading-relaxed mb-4">{description}</p>
+          {/* Link */}
+          <div className="flex items-center gap-1.5 text-xs font-mono text-amber-400/80 group-hover:text-amber-400 transition-colors">
+            Start
+            <svg className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </div>
+        </GlassCard>
+      </Link>
     </motion.div>
   )
 }
 
 function GuideRow({ guide }) {
-  return (
+  // Guides with real destination pages
+  const GUIDE_LINKS = {
+    'What is VibeSwap?': '/whitepaper',
+    'Your First Swap': '/swap',
+    'Wallet Setup & Security': '/wallet',
+    'Supported Networks': '/bridge',
+    'Commit-Reveal Explained': '/whitepaper',
+    'Batch Auctions & Fair Pricing': '/whitepaper',
+    'Liquidity Pools Overview': '/pools',
+    'API Reference & SDK': '/api',
+  }
+
+  const link = GUIDE_LINKS[guide.title]
+  const comingSoon = !link
+
+  const content = (
     <motion.div
       initial={{ opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 1 / (PHI * PHI * PHI), ease: [0.25, 0.1, 1 / PHI, 1] }}
-      className="group flex items-center justify-between py-3 px-4 -mx-4 rounded-lg hover:bg-zinc-800/40 cursor-pointer transition-colors duration-150"
+      className={`group flex items-center justify-between py-3 px-4 -mx-4 rounded-lg transition-colors duration-150 ${comingSoon ? 'opacity-60' : 'hover:bg-zinc-800/40 cursor-pointer'}`}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-1 h-1 rounded-full bg-zinc-600 group-hover:bg-amber-400 transition-colors flex-shrink-0" />
-        <span className="text-sm text-zinc-300 group-hover:text-zinc-100 transition-colors truncate">
+        <div className={`w-1 h-1 rounded-full flex-shrink-0 ${comingSoon ? 'bg-zinc-700' : 'bg-zinc-600 group-hover:bg-amber-400'} transition-colors`} />
+        <span className={`text-sm truncate ${comingSoon ? 'text-zinc-500' : 'text-zinc-300 group-hover:text-zinc-100'} transition-colors`}>
           {guide.title}
         </span>
       </div>
       <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-        <DifficultyBadge level={guide.difficulty} />
+        {comingSoon ? (
+          <span className="text-[10px] font-mono text-zinc-700 px-2 py-0.5 rounded-full border border-zinc-800">Soon</span>
+        ) : (
+          <DifficultyBadge level={guide.difficulty} />
+        )}
         <span className="text-[11px] font-mono text-zinc-600 w-14 text-right">{guide.time}</span>
-        <svg className="w-3.5 h-3.5 text-zinc-700 group-hover:text-zinc-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className={`w-3.5 h-3.5 transition-colors ${comingSoon ? 'text-zinc-800' : 'text-zinc-700 group-hover:text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
         </svg>
       </div>
     </motion.div>
   )
+
+  if (link) {
+    return <Link to={link}>{content}</Link>
+  }
+  return content
 }
 
 function CategorySection({ category, isExpanded, onToggle, index }) {
@@ -403,12 +430,12 @@ function APIReferenceCard() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-mono text-cyan-400/80 hover:text-cyan-400 cursor-pointer transition-colors flex-shrink-0 ml-4 mt-1">
+          <Link to="/api" className="flex items-center gap-1.5 text-xs font-mono text-cyan-400/80 hover:text-cyan-400 cursor-pointer transition-colors flex-shrink-0 ml-4 mt-1">
             View
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
             </svg>
-          </div>
+          </Link>
         </div>
       </GlassCard>
     </motion.div>

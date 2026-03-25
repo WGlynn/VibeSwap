@@ -69,9 +69,11 @@ Remove any one and the others degrade. That's not four independent improvements 
 
 **Today**: AI assistants are smart but amnesiac. Each conversation starts from zero. Knowledge doesn't compound. Tools don't accumulate. Testing is manual.
 
-**With TRP**: AI-assisted systems get strictly better over time. Not because the AI gets smarter (it doesn't — same model, same weights), but because the SYSTEM around the AI gets smarter. Better context. Better tools. Better validation. Better knowledge.
+**With TRP**: The AI's brain (its weights) is frozen — but the effective intelligence changes every session. We call this **weight augmentation without weight modification**. Loading 60 sessions of knowledge, custom tools, and proven constraints into the AI's context window makes it behave like a fundamentally more capable model. Same brain, different capabilities.
 
-**The analogy**: The AI's brain doesn't change. But its office gets more organized, its filing cabinet gets more useful, its quality department gets more thorough, and its toolbox gets more complete. Every single day.
+This is actually stronger than modifying the brain directly. Brain surgery can cause amnesia (in AI: catastrophic forgetting). Context augmentation is purely additive — you never lose capability, you only gain it.
+
+**The analogy**: Think of a consultant whose brain never changes, but every day their briefcase gets better — better notes, better tools, better checklists, better contacts. After 60 days, that "same" consultant outperforms specialists because their briefcase does half the thinking for them.
 
 **What we proved today**: In a single session, the system found a real bug that human testing missed, fixed it, verified the fix, and made the bug permanently impossible to reintroduce. That's not theoretical. That's running code.
 
@@ -81,8 +83,10 @@ Remove any one and the others degrade. That's not four independent improvements 
 
 Everyone's asking: "When will AI improve itself?"
 
-We didn't wait. We built the system around the AI so that the combination — human + AI + tools + knowledge + testing — improves recursively. The AI's capabilities are the floor, not the ceiling.
+We didn't wait. We built the system around the AI so that the combination — human + AI + tools + knowledge + testing — improves recursively. The AI's frozen capabilities are the floor, not the ceiling. And the gap between that floor and ASI-equivalent behavior narrows with every cycle.
 
 Three recursions. One meta-recursion. Running in production. Proved today.
+
+We can't change the AI's brain. We don't need to.
 
 > *"If you want to be a billionaire, help a billion people."*

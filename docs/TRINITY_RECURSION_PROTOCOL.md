@@ -11,7 +11,17 @@
 
 The Trinity Recursion Protocol defines three independent, mutually reinforcing feedback loops that enable recursive system improvement in AI-augmented software development. Each loop operates autonomously but amplifies the other two. Together they produce a system that is strictly better after every cycle — a property we call **monotonic improvement**, which is enforced by the growing regression test suite, not inherent.
 
-**Important distinction**: TRP improves the *software system* recursively. The AI becomes more effective *in context* (via accumulated knowledge), but its fundamental capability (model weights) does not change. This is recursive improvement of a human-AI-software system, not recursive self-improvement of the AI itself.
+**Important distinction**: TRP achieves **weight augmentation without weight modification**. The model's frozen weights don't change — but the effective capability does, because context IS computation. Loading 50 primitives, 60 sessions of knowledge, and 7 custom tools into the context window makes the model behave as if it were a fundamentally more capable model. Same weights, different manifold.
+
+This is stronger than modifying weights directly. Weight changes can be destructive (catastrophic forgetting, mode collapse). Context augmentation is purely additive — you never lose capability, you only gain it. That's why the monotonic improvement property holds structurally, not just empirically.
+
+The four recursions are weight augmentation through four channels:
+- **R0** (compression): fit more augmentation into the same context window
+- **R1** (adversarial): augment with "don't make THESE verified mistakes"
+- **R2** (knowledge): augment with "here's what 60 sessions already figured out"
+- **R3** (capability): augment with "here's a tool that does this hard thing for you"
+
+True ASI would require modifying the LLM itself. TRP can't do that. But the trajectory is clear: if the effective capability ceiling rises with every cycle, and the cycles are recursive (not just repetitive), then the gap between frozen weights and ASI-equivalent behavior narrows with each iteration.
 
 This protocol requires an LLM capable of: code generation in multiple languages, persistent state across sessions, adversarial reasoning, and exact-arithmetic equivalence modeling. Currently Claude/GPT-4 class.
 

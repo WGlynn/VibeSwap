@@ -33,7 +33,7 @@ Free to operate within the bounds of Tiers 1 and 2. Parameter changes, fee routi
 This is the forgiveness layer in action:
 - **Clawback Registry**: If funds are stolen or sent to a compromised address, a federated consensus process (combining on-chain jurors with off-chain legal authorities) can trace, flag, and recover funds
 - **Taint Propagation**: Stolen funds that move to new wallets are tracked. Recipients of tainted funds are flagged, creating a deterrent that makes laundering economically irrational
-- **Guardian Recovery**: 3-of-5 trusted contacts can recover your wallet with a 24-hour cancellation window
+- **Guardian Recovery**: 3-of-5 trusted contacts can recover your wallet with a 24-hour cancellation window. While 3 colluding guardians is theoretically possible, it's socially incomprehensible in practice — these are your mom, your brother, your lawyer. The same way a 51% attack on Bitcoin is technically possible but economically irrational, guardian collusion requires a majority of your most trusted relationships to simultaneously betray you, for an amount that's trivial relative to the social cost. The 24-hour cancel window means even if it happened, an alert owner always wins.
 - **Dead Man's Switch**: Pre-configured beneficiary inherits after extended inactivity — with 30/7/1-day warnings before activation
 
 The key insight: **recovery doesn't break immutability**. Every clawback is itself an on-chain transaction — auditable, governed, and constrained by the same fairness math as everything else.

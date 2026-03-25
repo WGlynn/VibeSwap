@@ -1,59 +1,61 @@
 # Session Tip — 2026-03-25
 
 ## Block Header
-- **Session**: Three-layer testing + Trinity Recursion Protocol + sybil guard + formal specs
+- **Session**: TRP + three-layer testing + convergence architecture + Mellus assessment
 - **Parent**: `aa0edab`
-- **Branch**: `master` @ `5d16fe6`
-- **Status**: ALL coverage matrix gaps resolved. 92 tests (74 Python + 18 Solidity). TRP formalized + verified. 23 commits. Resume updated.
+- **Branch**: `master` @ `bd66bd6`
+- **Status**: MASSIVE session. 33 VibeSwap commits. 92 tests. TRP formalized. All 4 convergence points coded. Mellus job assessment fixes applied. Anthropic letter written.
 
-## What Exists Now (Created This Session)
+## What Exists Now
 
-### Testing Infrastructure (Layer 1-3)
-- `oracle/backtest/shapley_reference.py` — exact arithmetic reference model + HalvingSchedule
-- `oracle/backtest/adversarial_search.py` — 4-strategy adversarial search harness
-- `oracle/backtest/generate_vectors.py` — 11 JSON test vectors for Foundry replay
-- `oracle/backtest/state_machine.py` — full flow: auction → settlement → distribution
-- `oracle/tests/test_shapley_reference.py` — 25 axiom + rounding tests
-- `oracle/tests/test_adversarial_search.py` — 6 reproducibility tests
-- `oracle/tests/test_halving_schedule.py` — 21 halving tests
-- `oracle/tests/test_property_exhaustive.py` — 16 exhaustive + scarcity tests
-- `oracle/tests/test_state_machine.py` — 6 conservation tests
-- `test/crosslayer/ShapleyReplay.t.sol` — 10 Foundry replay tests
-- `test/crosslayer/ConservationInvariant.t.sol` — 5 conservation tests
-- `test/crosslayer/SybilGuardTest.t.sol` — 3 sybil guard tests
-- `test/formal/ShapleyFormalSpecs.t.sol` — 6 Halmos/Certora specs
+### Testing (92 tests, all green)
+- Python: 74 tests (reference model, adversarial, halving, exhaustive, state machine)
+- Solidity: 18 tests (replay, conservation, sybil guard)
+- Formal: 6 Halmos specs written (not yet runnable on Windows)
 
-### Contract Changes
-- `contracts/incentives/ShapleyDistributor.sol` — null player dust fix + sybil guard integration
-- `contracts/incentives/ISybilGuard.sol` — sybil guard interface
-- `contracts/incentives/SoulboundSybilGuard.sol` — SoulboundIdentity adapter
-- `contracts/libraries/PairwiseFairness.sol` — NatSpec correction
-
-### Documentation
-- `docs/TRINITY_RECURSION_PROTOCOL.md` — formal protocol spec (3 recursions + 1 meta)
-- `docs/TRP_VERIFICATION_REPORT.md` — anti-hallucination audit
-- `docs/MECHANISM_COVERAGE_MATRIX.md` — per-property verification matrix
+### TRP (Trinity Recursion Protocol)
+- `docs/TRINITY_RECURSION_PROTOCOL.md` — main spec (v1.1, 4 recursions)
+- `docs/TRP_VERIFICATION_REPORT.md` — anti-hallucination audit (7 corrections)
 - `docs/trp/` — 5 standalone docs (4 recursions + boomer explainer)
-- `LinkedIn_Posts.md` — Post #4 (TRP) scheduled Thu Apr 3
+- Key insight: weight augmentation without weight modification
 
-### Key Findings
-1. Position independence PROVEN (0 deviations, 2 seeds)
-2. Lawson Floor sybil — found AND fixed (ISybilGuard)
-3. Null player dust — found AND fixed (dust → last non-zero-weight participant)
-4. Balanced market scarcity = 5500 (documented, not harmful)
-5. Input integrity is load-bearing (232 trivial exploits prevented by auth)
-6. Weight augmentation without weight modification — the ASI trajectory insight
+### Convergence (Jarvis × VibeSwap)
+- `docs/JARVIS_VIBESWAP_CONVERGENCE.md` — 4 integration points
+- `contracts/bridge/AttributionBridge.sol` — Jarvis attribution → Shapley rewards
+- `jarvis-bot/src/attribution-bridge.js` — merkle epoch builder
+- `jarvis-bot/src/claude-code-bridge.js` — session state ↔ knowledge chain
+- `jarvis-bot/src/shard-shapley.js` — AI agents as economic actors
+- `oracle/backtest/reward_feedback.py` — frustration-directed adversarial search
+
+### Contract Fixes
+- ShapleyDistributor: null player dust fix + sybil guard (ISybilGuard)
+- PairwiseFairness: NatSpec correction
+- EmissionController tests: 6-param initialize
+
+### Mellus Job Assessment (DONE)
+- Both fixes applied to `C:\Users\Will\mellus-assessment\Mellus-contract\`
+- Issue 1: borrowRateMaxMantissa scaled for per-second (÷12)
+- Issue 2: uint32→uint48 for timestamps, struct repacked (208+48=256)
+- Guide on Desktop: `mellus-assessment-fixes.md`
+- Will needs to commit as himself and push to his own repo
+
+## On Desktop
+1. `mellus-assessment-fixes.md` — job assessment commit guide
+2. `anthropic-letter.md` — feedback on request-response anti-pattern
+3. `Will_Glynn_Smart_Contract_Engineer.docx` — updated resume
 
 ## Manual Queue
-1. Post GitHub discussion reply (drafted, ready)
-2. Submit resume for job application (on Desktop)
-3. Publish LinkedIn post #3 (Security, Tue Apr 1)
-4. Publish LinkedIn post #4 (TRP, Thu Apr 3)
-5. Deploy VIBE emission on Base
-6. Set up Halmos on CI (Linux)
+1. Commit Mellus fixes as yourself, push, send repo URL
+2. Post GitHub discussion reply (drafted)
+3. Apply to ETH Boston 2026 FIRST (monitor for date announcement)
+4. LinkedIn post #3 (Security, Tue Apr 1)
+5. LinkedIn post #4 (TRP, Thu Apr 3)
+6. Contribute code to other repos for visibility (see memory)
+7. Deploy VIBE emission on Base
 
 ## Next Session
-- Run formal specs on CI (Halmos needs Linux)
-- Second full adversarial search cycle post-all-fixes
-- Technical assessment for job application (2 smart contract issues)
+- Verify Mellus assessment submitted
+- Run Halmos formal specs on CI (Linux)
+- Start open source contribution PRs (a16z/auction-zoo, OpenZeppelin)
 - Canonical FeeRouter decision
+- Build AttributionBridge tests with full merkle proof flow

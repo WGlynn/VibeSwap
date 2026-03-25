@@ -22,8 +22,9 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 | **Pairwise Proportionality** | `PairwiseFairness.sol` (on-chain) | `shapley_reference.py` | - | TODO | Contract uses totalWeight as tolerance (correct). NatSpec was misleading — fixed. |
 | **Time Neutrality** | `PairwiseFairness.sol` | - | - | TODO | Only for FEE_DISTRIBUTION type |
 | **Lawson Floor** (1% minimum) | `ShapleyGameTheory.t.sol` | `shapley_reference.py` | - | TODO | Floor + efficiency interaction |
-| **Rounding subsidy** (no micro-arb) | - | `shapley_reference.py` | TODO | TODO | **GAP**: no Solidity test for this |
-| **Monotonic contribution** (more in = more out) | - | - | TODO | TODO | **GAP**: not tested anywhere |
+| **Rounding subsidy** (no micro-arb) | `ConservationInvariant.t.sol` | `shapley_reference.py` | `adversarial_search.py` (position_gaming: 0 deviations) | TODO | Position independence PROVEN — zero position advantage across 50 rounds |
+| **Monotonic contribution** (more in = more out) | `ShapleyReplay.t.sol` | - | `adversarial_search.py` (validates input integrity) | TODO | Proven in Foundry replay |
+| **Lawson Floor sybil resistance** | - | - | `adversarial_search.py` | TODO | **FINDING**: splitting into 2 accounts doubles floor subsidy. Mitigated by SoulboundIdentity. |
 | **Quality weight truncation** | - | `shapley_reference.py` | - | - | 3-way integer division |
 | **Pioneer bonus cap** (2x max) | - | `shapley_reference.py` | - | TODO | |
 | **Halving schedule correctness** | - | - | - | TODO | **GAP**: no reference model for halving |
@@ -97,15 +98,22 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 | Layer | Coverage | Status |
 |-------|----------|--------|
-| **L1 (Solidity)** | ~70% of properties | STRONG — axiom tests, fuzz, invariants |
-| **L2 (Reference)** | ~25% of properties | IN PROGRESS — Shapley model done, need cross-contract |
-| **L3 (Adversarial)** | ~10% of properties | TODO — agent types exist but no guided search |
+| **L1 (Solidity)** | ~75% of properties | STRONG — axiom tests, fuzz, invariants, cross-layer replay |
+| **L2 (Reference)** | ~35% of properties | ACTIVE — Shapley model + vector comparison pipeline |
+| **L3 (Adversarial)** | ~25% of properties | ACTIVE — 4 search strategies, 432 runs, 1 real finding |
 | **FV (Formal)** | 0% | TODO — Certora/Halmos for local lemmas |
 
-## Critical Gaps (Priority Order)
+## Key Findings
 
-1. **No actor above honest baseline** — not tested in any layer
-2. **Monotonic slashing** — not proven anywhere
-3. **Cross-contract conservation** — tested per-contract but not end-to-end
-4. **Rounding subsidy across full flow** — Python catches per-contract, not pipeline
-5. ~~Pairwise tolerance scaling~~ — RESOLVED: contract already uses totalWeight, NatSpec was misleading
+1. **Position independence PROVEN** — 0 deviations across 50 rounds of position gaming
+2. **Lawson Floor sybil vulnerability** — splitting into 2 accounts doubles floor subsidy. Mitigated by SoulboundIdentity but not enforced in ShapleyDistributor directly.
+3. **Input integrity is load-bearing** — authorization model (onlyAuthorized) prevents 199 random mutation + 33 coalition deviations. Without it, mechanism is trivially exploitable.
+
+## Remaining Gaps (Priority Order)
+
+1. **Monotonic slashing** — not formally proven anywhere
+2. **Cross-contract conservation end-to-end** — Shapley conservation proven, need auction→settlement→distribution pipeline
+3. **Lawson Floor sybil enforcement** — SoulboundIdentity exists but isn't wired to ShapleyDistributor
+4. ~~No actor above honest baseline~~ — RESOLVED via ConservationInvariant.t.sol
+5. ~~Pairwise tolerance scaling~~ — RESOLVED: contract already uses totalWeight
+6. ~~Rounding subsidy~~ — RESOLVED: position independence proven

@@ -21,9 +21,7 @@ Commit-reveal batch auctions process trades in 10-second batches with three phas
 2. REVEAL (2s) — you reveal the actual order. Too late for anyone to react.
 3. SETTLE — all orders execute simultaneously at a single uniform clearing price.
 
-A sandwich attack requires three things: visibility, ordering control, and sequential price impact. This mechanism removes all three.
-
-When every trade in a batch settles at the same price, there is no "before" and "after." The attack isn't just unprofitable — it's structurally impossible.
+A sandwich attack requires visibility, ordering control, and sequential price impact. This mechanism removes all three. No "before" and "after." The attack isn't unprofitable — it's impossible.
 
 The execution order is cryptographically random — seeded by combined secrets from every participant. Even the last person to reveal can't predict or influence the ordering.
 
@@ -58,11 +56,9 @@ Pro-rata says: split three ways. $0.33 each.
 
 But Carol is the scarce resource. Without her, nobody makes money. Alice and Bob are interchangeable.
 
-Shapley values compute the average marginal contribution of each player across all possible orderings. Result: Carol gets $0.67. Alice and Bob get $0.17 each.
+Shapley values compute the marginal contribution of each player across all possible orderings. Carol gets $0.67. Alice and Bob get $0.17 each. Not an opinion — the only mathematically consistent definition of fairness.
 
-This isn't an opinion about fairness. It's the only mathematically consistent definition.
-
-In VibeSwap, every batch settlement creates an independent cooperative game. Each LP's reward comes from four weighted components:
+We put this on a blockchain. Every batch settlement is an independent cooperative game. Each LP's reward comes from four components:
 
 Direct Contribution (40%) — raw liquidity provided
 Enabling Contribution (30%) — how long you've been in the pool
@@ -96,17 +92,12 @@ The problem isn't missing security. It's treating security as a checklist instea
 
 A reentrancy guard is layer one. The real attacks target layers three through six — where most protocols have nothing at all.
 
-Layer 1: Reentrancy Guards — table stakes. If you're not using OpenZeppelin's ReentrancyGuard on every state-mutating function, stop reading and go fix that.
-
-Layer 2: Flash Loan Protection — track interactions per user per pool per block. Legitimate users almost never add liquidity and swap in the same block. Flash loan attackers always do.
-
-Layer 3: TWAP Validation — spot price can be pushed anywhere with enough capital. A time-weighted average resists manipulation because distorting it requires sustaining the manipulated price across many blocks.
-
-Layer 4: Circuit Breakers — monitor aggregate volume, price deviation, and withdrawal velocity. When thresholds breach, halt operations automatically. This is defense against the exploit you didn't model.
-
-Layer 5: Rate Limiting — cap per-user throughput. 100K tokens per hour per user. An attacker who creates 100 wallets to bypass this still trips the circuit breaker.
-
-Layer 6: Economic Security — align incentives so attacking is negative-expected-value before it begins. 50% slashing on failed reveals. Shapley values exclude zero-contribution actors from rewards. The game theory doesn't merely discourage attacks — it makes honest participation the dominant strategy.
+**Layer 1: Reentrancy Guards** — table stakes.
+**Layer 2: Flash Loan Protection** — same-block interaction detection.
+**Layer 3: TWAP Validation** — spot price manipulation resisted across blocks.
+**Layer 4: Circuit Breakers** — volume, price, withdrawal thresholds. Automatic halt.
+**Layer 5: Rate Limiting** — per-user caps. 100 wallets to bypass? Circuit breaker catches that too.
+**Layer 6: Economic Security** — game theory makes attacking negative-expected-value. Honest play is the dominant strategy.
 
 Most audits verify layers one and two. Some check three. Almost none touch four through six — those require game theory, not just Solidity.
 
@@ -186,9 +177,9 @@ VibeSwap doesn't mitigate MEV. It dissolves it — mathematically. Uniform clear
 
 This isn't a better mousetrap. It's a room with no mice.
 
-While everyone was optimizing the same broken architecture, we rebuilt from first principles: cooperative game theory, mechanism design, and the simple premise that a DEX should be structurally incapable of extracting from its users.
+While everyone optimized the same broken architecture, we rebuilt from first principles: cooperative game theory, mechanism design, and one premise — a DEX should be structurally incapable of extracting from its users.
 
-Anti-slop. Built from scratch. 360+ contracts. Every one of them exists because the math required it, not because a competitor had it.
+Anti-slop. 360+ contracts. Every one exists because the math required it, not because a competitor had it.
 
 What's the last DeFi project you saw that wasn't a fork of something else?
 
@@ -230,7 +221,7 @@ I use an AI copilot. There, I said it.
 
 Every senior engineer uses one now. Most won't admit it. I'd rather be honest and let the results speak.
 
-In a single session this week, my AI-augmented workflow produced: 98 tests across three verification layers, an adversarial search harness that found a real bug in my own contract, the fix for that bug, a cross-layer reference model with exact arithmetic, and formal verification specs. One session.
+One session this week: 98 tests across three verification layers, an adversarial search that found a real bug in my own contract, the fix, a cross-layer reference model with exact arithmetic, and formal verification specs.
 
 The question isn't whether engineers use AI. It's whether they're good enough to use it well.
 

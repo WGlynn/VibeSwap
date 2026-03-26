@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "./interfaces/IRosettaSIE.sol";
 
 /**
  * @title RosettaProtocol — On-Chain Lexicon Registry and Translation Verification
@@ -75,6 +76,7 @@ contract RosettaProtocol is
         bytes32 universalConcept;   // UCI identifier this term resolves to
         bool active;                // Soft-delete flag (removeTerm)
         uint256 addedAt;
+        bytes32 sieAssetId;         // Deterministic SIE asset ID (zero if SIE not set at add time)
     }
 
     /// @notice A pointer used in the reverse index for getEquivalents()
@@ -135,6 +137,11 @@ contract RosettaProtocol is
     /// @notice Trusted resolvers for challenge outcomes (oracle/multisig)
     mapping(address => bool) public isTrustedResolver;
 
+    /// @notice IntelligenceExchange (SIE) address — optional; zero = disabled
+    /// @dev When set, term registrations and successful translations are forwarded
+    ///      to the SIE so concept contributors earn Shapley rewards.
+    address public sieAddress;
+
     // ============ Events ============
 
     event LexiconRegistered(address indexed owner, string domain, uint256 timestamp);
@@ -163,6 +170,9 @@ contract RosettaProtocol is
     );
     event ChallengeCancelled(uint256 indexed challengeId, string reason);
     event TrustedResolverUpdated(address indexed resolver, bool trusted);
+    event SIESet(address indexed sieAddress);
+    event ConceptRegisteredInSIE(address indexed owner, bytes32 termHash, bytes32 assetId);
+    event CitationForwardedToSIE(bytes32 indexed sourceAssetId, bytes32 indexed targetAssetId, bytes32 universalConcept);
 
     // ============ Errors ============
 
@@ -323,7 +333,49 @@ contract RosettaProtocol is
             result
         );
 
+        // ── SIE Citation Hook ─────────────────────────────────────────────────
+        // When a translation succeeds, the target concept was "used through" the
+        // universal concept bridge. The source term's asset cites the target
+        // term's asset, reflecting epistemic dependency.
+        if (result) {
+            _onTranslation(
+                sourceEntry.sieAssetId,
+                targetEntry.sieAssetId,
+                sourceEntry.universalConcept
+            );
+        }
+
         return result;
+    }
+
+    /**
+     * @notice Hook called by verifyTranslation when a translation succeeds.
+     * @dev Records a citation in the SIE: the source term (translated from)
+     *      cites the target term (translated to) because both resolve to the
+     *      same UCI — they are semantically dependent. This allows concept
+     *      contributors to earn Shapley rewards proportional to how often
+     *      their terms are used as translation bridges.
+     *
+     *      Called internally; no access restriction needed.
+     *
+     * @param sourceAssetId  SIE asset ID of the source term
+     * @param targetAssetId  SIE asset ID of the target term
+     * @param universalConcept The UCI that bridged the two terms (for logging)
+     */
+    function _onTranslation(
+        bytes32 sourceAssetId,
+        bytes32 targetAssetId,
+        bytes32 universalConcept
+    ) internal {
+        if (sieAddress == address(0)) return;
+        if (sourceAssetId == bytes32(0) || targetAssetId == bytes32(0)) return;
+        if (sourceAssetId == targetAssetId) return;
+
+        try IRosettaSIE(sieAddress).recordCitation(sourceAssetId, targetAssetId) {
+            emit CitationForwardedToSIE(sourceAssetId, targetAssetId, universalConcept);
+        } catch {
+            // SIE failure is non-fatal — translation result is already emitted
+        }
     }
 
     /**
@@ -536,6 +588,18 @@ contract RosettaProtocol is
     // ============ Admin ============
 
     /**
+     * @notice Connect to an IntelligenceExchange (SIE) deployment.
+     * @dev When set, every new term registration and every successful translation
+     *      are forwarded to the SIE so concept contributors can earn Shapley rewards.
+     *      Set to address(0) to disable the integration without upgrading.
+     * @param _sieAddress Address of the IntelligenceExchange proxy (or zero to disable)
+     */
+    function setSIE(address _sieAddress) external onlyOwner {
+        sieAddress = _sieAddress;
+        emit SIESet(_sieAddress);
+    }
+
+    /**
      * @notice Add or remove a trusted resolver for challenge outcomes.
      * @dev Resolver set should be a multisig or time-locked oracle until ZK hardens.
      */
@@ -549,6 +613,9 @@ contract RosettaProtocol is
 
     /**
      * @dev Core term-addition logic shared by registerLexicon and addTerm.
+     *      If the SIE is connected, also registers the concept as a knowledge
+     *      asset so the contributor can earn Shapley rewards when the term
+     *      is cited via verifyTranslation().
      */
     function _addTerm(
         address owner,
@@ -563,9 +630,13 @@ contract RosettaProtocol is
         TermEntry storage entry = terms[owner][termHash];
         if (entry.active) revert TermAlreadyExists();
 
+        // Deterministic SIE asset ID: binds the term to its owner + UCI
+        bytes32 sieAssetId = keccak256(abi.encodePacked(owner, universalConcept, termHash));
+
         entry.universalConcept = universalConcept;
         entry.active = true;
         entry.addedAt = block.timestamp;
+        entry.sieAssetId = sieAssetId;
 
         lexiconOf[owner].termCount += 1;
 
@@ -577,6 +648,49 @@ contract RosettaProtocol is
         }));
 
         emit TermAdded(owner, term, termHash, universalConcept);
+
+        // ── SIE Integration ──────────────────────────────────────────────────
+        // Best-effort: failures must not block term registration.
+        // The term is stored on-chain regardless of SIE availability.
+        _registerConceptInSIE(owner, termHash, sieAssetId);
+    }
+
+    /**
+     * @dev Forward a new concept registration to the SIE. No-op if SIE not set.
+     *      Uses try/catch so SIE failure never blocks term registration.
+     */
+    function _registerConceptInSIE(
+        address owner,
+        bytes32 termHash,
+        bytes32 sieAssetId
+    ) internal {
+        if (sieAddress == address(0)) return;
+
+        try IRosettaSIE(sieAddress).registerConceptAsset(sieAssetId, owner) {
+            emit ConceptRegisteredInSIE(owner, termHash, sieAssetId);
+        } catch {
+            // SIE failure is non-fatal — Rosetta is the source of truth for lexicons
+        }
+    }
+
+    // ============ View: SIE Integration ============
+
+    /**
+     * @notice Compute the deterministic SIE asset ID for a given term.
+     * @dev Mirrors the derivation in _addTerm. Useful for off-chain tools and
+     *      integration tests to verify the SIE registration without reading storage.
+     * @param owner           Lexicon owner address
+     * @param term            Domain-specific term string
+     * @param universalConcept UCI identifier the term maps to
+     * @return sieAssetId Deterministic ID passed to SIE on registration
+     */
+    function getSIEAssetId(
+        address owner,
+        string calldata term,
+        bytes32 universalConcept
+    ) external pure returns (bytes32 sieAssetId) {
+        bytes32 termHash = keccak256(bytes(term));
+        return keccak256(abi.encodePacked(owner, universalConcept, termHash));
     }
 
     // ============ UUPS ============

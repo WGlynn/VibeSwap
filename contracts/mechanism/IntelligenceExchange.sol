@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/ICognitiveConsensusMarket.sol";
 import "./ISIEShapleyAdapter.sol";
+import "./interfaces/IRosettaSIE.sol";
 
 /**
  * @title IntelligenceExchange — Sovereign Intelligence Exchange Orchestrator
@@ -34,13 +35,14 @@ import "./ISIEShapleyAdapter.sol";
 contract IntelligenceExchange is
     OwnableUpgradeable,
     UUPSUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    IRosettaSIE
 {
     using SafeERC20 for IERC20;
 
     // ============ Enums ============
 
-    enum AssetType { RESEARCH, MODEL, DATASET, INSIGHT, PROOF, PROTOCOL }
+    enum AssetType { RESEARCH, MODEL, DATASET, INSIGHT, PROOF, PROTOCOL, CONCEPT }
     enum AssetState { SUBMITTED, EVALUATING, VERIFIED, DISPUTED, SETTLED }
 
     // ============ Structs ============
@@ -142,8 +144,11 @@ contract IntelligenceExchange is
     /// @notice SIEShapleyAdapter for Shapley true-up on settlement
     address public shapleyAdapter;
 
+    /// @notice RosettaProtocol — authorised to register concept assets and record citations
+    address public rosettaProtocol;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[49] private __gap;
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -181,6 +186,8 @@ contract IntelligenceExchange is
     event EvaluationRequested(bytes32 indexed assetId, uint256 indexed claimId, uint256 bounty);
     event EvaluationSettled(bytes32 indexed assetId, uint256 indexed claimId, bool verified);
     event ShapleyAdapterNotified(bytes32 indexed assetId, address indexed contributor, bool verified);
+    event ConceptAssetRegistered(bytes32 indexed assetId, address indexed contributor);
+    event CitationRecorded(bytes32 indexed citingAsset, bytes32 indexed citedAsset, uint256 newBondingPrice);
 
     // ============ Errors ============
 
@@ -200,6 +207,9 @@ contract IntelligenceExchange is
     error EvaluationAlreadyRequested();
     error ClaimNotResolved();
     error NotAssetContributor();
+    error NotRosettaProtocol();
+    error RosettaProtocolNotSet();
+    error InvalidAddress();
 
     // ============ Initializer ============
 
@@ -567,6 +577,95 @@ contract IntelligenceExchange is
     /// @notice Set the SIEShapleyAdapter address (Phase 2 activation)
     function setShapleyAdapter(address adapter) external onlyOwner {
         shapleyAdapter = adapter;
+    }
+
+    /// @notice Set the RosettaProtocol address (Rosetta → SIE wiring)
+    function setRosettaProtocol(address _rosettaProtocol) external onlyOwner {
+        rosettaProtocol = _rosettaProtocol;
+    }
+
+    // ============ Rosetta Protocol Integration ============
+
+    /**
+     * @notice Register a Rosetta concept term as a verified knowledge asset.
+     * @dev Called by RosettaProtocol when a term is added to a lexicon.
+     *      No ETH stake is required — the on-chain lexicon registration is
+     *      the anti-spam signal. The asset is immediately VERIFIED so it
+     *      participates in the bonding curve and Shapley distribution from day one.
+     * @param assetId     Deterministic ID: keccak256(owner, universalConcept, termHash)
+     * @param contributor Address of the lexicon owner who registered the term
+     */
+    function registerConceptAsset(bytes32 assetId, address contributor) external override {
+        if (msg.sender != rosettaProtocol) revert NotRosettaProtocol();
+        if (assetId == bytes32(0)) revert InvalidContentHash();
+        if (contributor == address(0)) revert InvalidAddress();
+        if (assets[assetId].submittedAt != 0) return; // idempotent: already registered
+
+        assets[assetId] = IntelligenceAsset({
+            assetId: assetId,
+            contributor: contributor,
+            contentHash: assetId,     // concept ID doubles as its own content hash
+            metadataURI: "",
+            assetType: AssetType.CONCEPT,
+            state: AssetState.VERIFIED,
+            bondingPrice: BONDING_BASE_PRICE,
+            citations: 0,
+            totalRevenue: 0,
+            shapleyRevenue: 0,
+            submittedAt: block.timestamp,
+            stakeAmount: 0
+        });
+
+        assetCount++;
+
+        emit ConceptAssetRegistered(assetId, contributor);
+        emit IntelligenceSubmitted(assetId, contributor, assetId, AssetType.CONCEPT, 0);
+        emit AssetVerified(assetId);
+
+        // Notify adapter immediately — CONCEPT assets are born verified,
+        // so they bypass settleEvaluation and must be manually notified.
+        // citationCount = 0 at registration; bondingPrice = base price.
+        _notifyShapleyAdapter(assetId, contributor, true);
+    }
+
+    /**
+     * @notice Record a citation between two Rosetta concept assets.
+     * @dev Called by RosettaProtocol inside verifyTranslation() when a
+     *      translation succeeds. citedAsset's bonding curve price rises;
+     *      the SIEShapleyAdapter is NOT notified here — citations accumulate
+     *      naturally and feed into the next executeTrueUp() round via the
+     *      updated bondingPrice stored on the asset.
+     * @param citingAsset  Asset ID of the source concept (translated from)
+     * @param citedAsset   Asset ID of the universal concept being cited
+     */
+    function recordCitation(bytes32 citingAsset, bytes32 citedAsset) external override {
+        if (msg.sender != rosettaProtocol) revert NotRosettaProtocol();
+        if (citingAsset == bytes32(0) || citedAsset == bytes32(0)) return;
+        if (assets[citedAsset].submittedAt == 0) return; // silently skip unregistered
+
+        // Self-citation guard (same concept in both lexicons)
+        if (citingAsset == citedAsset) return;
+
+        // Check for duplicate citation (avoid double-counting same translation pair)
+        bytes32[] storage existing = citedBy[citingAsset];
+        for (uint256 i = 0; i < existing.length; i++) {
+            if (existing[i] == citedAsset) return; // already cited, no-op
+        }
+
+        // Register citingAsset as a stub if it doesn't exist yet
+        // (the from-term might not have been registered yet at time of first translation)
+        if (assets[citingAsset].submittedAt == 0) return;
+
+        // Record citation in both directions
+        citedBy[citingAsset].push(citedAsset);
+        citationsOf[citedAsset].push(citingAsset);
+
+        IntelligenceAsset storage cited = assets[citedAsset];
+        cited.citations++;
+        cited.bondingPrice = _calculateBondingPrice(cited.citations);
+
+        emit CitationRecorded(citingAsset, citedAsset, cited.bondingPrice);
+        emit AssetCited(citingAsset, citedAsset, cited.bondingPrice);
     }
 
     // ============ Internal: Shapley Adapter Notification ============

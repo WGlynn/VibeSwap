@@ -239,6 +239,78 @@ export const EXTENDED_UNIVERSAL_CONCEPTS = {
   pre_commitment_audit:      'Investigation conducted before entering a binding agreement',
   trust_obligation:          'A duty to act in another\'s best interest above your own',
 
+  // Ecology
+  ecosystem_health:          'The overall vitality and self-sustaining capacity of an interconnected community',
+  directional_succession:    'The predictable sequence of changes a system moves through over time toward maturity',
+  specialized_role:          'The unique functional position an entity occupies within a larger system',
+  disproportionate_influence:'The property of a single element whose removal collapses the broader network',
+  population_ceiling:        'The maximum number of entities an environment can support indefinitely',
+  cross_tier_amplification:  'A change at one level of a hierarchy that propagates and amplifies through other levels',
+  variety_buffer:            'The protection against systemic collapse provided by many distinct functional types',
+  competitive_displacement:  'When a newly introduced entity outcompetes established ones by exploiting the same niche',
+  trophic_level:             'A position in the energy transfer hierarchy from producers to apex consumers',
+  habitat_fragmentation:     'Dividing a continuous environment into isolated patches that reduce system resilience',
+
+  // Astronomy
+  recessional_redshift:      'The stretching of signal wavelength indicating a source is moving away or space is expanding',
+  angular_distance_measure:  'Using the apparent shift of a nearby object against a distant background to measure its distance',
+  gravitational_inflow:      'The process by which matter is drawn inward and accumulated around a massive center',
+  point_of_no_return:        'A boundary beyond which escape from a dominant force is impossible',
+  stable_fusion_phase:       'The long equilibrium period when a system fuses input to produce steady energy output',
+  catastrophic_collapse:     'A sudden, energetic end-state following the exhaustion of sustaining fuel',
+  hidden_mass_effect:        'The inferred presence of unseen components from their observable gravitational effects',
+  primordial_expansion:      'The rapid initial scaling that set the large-scale structure of a system',
+  stellar_classification:    'Grouping objects by shared physical characteristics that predict their behavior',
+  orbital_resonance:         'A stable relationship where periodic cycles lock into integer ratios through mutual influence',
+
+  // Linguistics
+  minimal_unit:              'The smallest discrete element that carries meaning or function in a system',
+  structural_arrangement:    'The rules governing how elements are ordered and combined to produce valid output',
+  contextual_meaning:        'The layer of meaning derived from situational context beyond literal content',
+  use_in_context:            'How meaning is negotiated through actual use rather than abstract definition',
+  atomic_sound_unit:         'The smallest sound distinction that can change the meaning of an utterance',
+  contact_hybrid:            'A simplified shared system that emerges when two groups must communicate across a language barrier',
+  nativized_contact_language:'A contact system that has been adopted as a first language, gaining full complexity',
+  register_switching:        'Adapting communication style and vocabulary to fit the social context or audience',
+  layered_language_situation:'A community using different language varieties for different social functions',
+  semantic_drift:            'The gradual shift in a term\'s meaning over time through accumulated usage patterns',
+
+  // Film / Cinema
+  spatial_composition:       'The deliberate arrangement of all visual elements within a frame to create meaning',
+  juxtaposition_edit:        'Cutting between shots to create meaning from their collision, not their continuity',
+  source_attribution_sound:  'Whether audio originates from within or outside the story world',
+  continuity_rupture:        'A cut that deliberately breaks spatial or temporal continuity to create disorientation',
+  continuous_perspective:    'A camera movement that follows a subject through space in a single unbroken take',
+  narrative_pretext:         'An object or goal that motivates plot movement but whose specifics are irrelevant',
+  director_as_author:        'The theory that a director\'s consistent vision makes them the true author of a film',
+  broken_immersion:          'A moment when a character or element directly acknowledges the audience\'s presence',
+  diegetic_world:            'The complete story-world including all events, spaces, and time the narrative inhabits',
+  visual_motif:              'A recurring image or pattern that accumulates symbolic meaning across a work',
+
+  // Mathematics
+  deductive_chain:           'A sequence of logical steps that establishes truth from accepted premises',
+  unproven_hypothesis:       'A statement believed likely true but not yet formally established by proof',
+  auxiliary_result:          'A proved statement used as a stepping stone toward a larger theorem',
+  structure_preserving_map:  'A correspondence between two systems that preserves all their structural relationships',
+  topological_equivalence:   'A correspondence between spaces that can be continuously deformed into each other',
+  limit_approach:            'The behavior of a sequence or function as its input approaches a boundary value',
+  infinite_set_size:         'The measure of how many elements an infinite collection contains — some infinities are larger than others',
+  smooth_curved_space:       'A space that locally resembles flat space but has global curvature or topology',
+  mathematical_object:       'An abstract entity defined entirely by its relationships and properties within a formal system',
+  axiomatic_system:          'A complete formal theory built from a minimal set of starting assumptions',
+
+  // Sociology
+  durable_disposition:       'An internalized set of habits and perceptions that shape how an agent navigates social space',
+  normlessness:              'A condition where social norms break down and individuals lose their behavioral compass',
+  relational_resource:       'The value embedded in social networks and relationships that can be mobilized',
+  structural_convergence:    'The tendency for organizations in the same field to resemble each other over time',
+  power_through_categories:  'The imposition of dominant group\'s categories of perception as the natural order',
+  overlapping_oppression:    'The compounding effect of multiple simultaneous systems of disadvantage',
+  social_reproduction:       'The mechanisms by which social structures and inequalities are perpetuated across generations',
+  field_dynamics:            'The competitive space of positions and relationships within a domain of social activity',
+  dramaturgical_performance: 'The management of self-presentation to construct an impression for an audience',
+  legitimation:              'The process by which power arrangements come to be accepted as natural and right',
+
   // Music / aesthetics
   productive_tension:        'Friction that demands resolution — the useful kind of conflict',
   tension_release:           'The move from an unstable state back to stability',
@@ -388,7 +460,7 @@ export const EXTENDED_UNIVERSAL_CONCEPTS = {
   stop_loss:                 'A predefined exit point that limits the maximum loss on a position',
 }
 
-// ============ Domain Lexicons — All 24 ============
+// ============ Domain Lexicons — All 30 ============
 
 export const LEXICONS = {
   // ── Agent Lexicons ──────────────────────────────────────────────────────────
@@ -1033,6 +1105,9 @@ export const LEXICONS = {
 /** Reverse map: universal concept → list of { agent, term, desc } entries */
 let _universalIndex = null
 
+/** Cache for buildTermSurfaces: lexiconId → Map<normPhrase, entry> */
+const _termSurfaceCache = new Map()
+
 /** User-defined lexicons persisted to localStorage: userId → { domain, concepts } */
 let _userLexicons = new Map()
 
@@ -1390,6 +1465,7 @@ export function registerUserLexicon(userId, domain, terms = {}) {
 
   _userLexicons.set(userId, { domain, concepts })
   _universalIndex = null // invalidate
+  _termSurfaceCache.clear() // invalidate surface cache
   saveUserLexicons()
 
   return { registered: true, userId, domain, termCount: Object.keys(concepts).length }
@@ -1419,6 +1495,7 @@ export function addUserTerm(userId, term, universalConcept, description = '') {
   }
 
   _universalIndex = null // invalidate
+  _termSurfaceCache.delete(userId) // invalidate just this user's surface cache
   saveUserLexicons()
 
   return { added: true, userId, term, universal: lexicon.concepts[term].universal }
@@ -1527,6 +1604,7 @@ export function importLexicon(jsonString) {
   }
 
   _universalIndex = null // invalidate
+  _termSurfaceCache.clear() // invalidate all surface caches on import
   saveUserLexicons()
 
   return { imported: true, userId, domain: lexicon.domain, termCount: imported }
@@ -1670,10 +1748,14 @@ function normaliseForMatch(s) {
 /**
  * Build a flat lookup of all terms in a lexicon, keyed by normalised surface form.
  * Terms with underscores are also registered as their space-separated equivalents.
+ * Results are cached by lexiconId so repeated calls (e.g. per-keystroke) are O(1).
  *
  * Returns Map<normalisedPhrase, { term: string, universal: string, desc: string }>
  */
-function buildTermSurfaces(lexicon) {
+function buildTermSurfaces(lexicon, lexiconId) {
+  if (lexiconId && _termSurfaceCache.has(lexiconId)) {
+    return _termSurfaceCache.get(lexiconId)
+  }
   const map = new Map()
   if (!lexicon) return map
   for (const [term, mapping] of Object.entries(lexicon.concepts)) {
@@ -1687,6 +1769,7 @@ function buildTermSurfaces(lexicon) {
       if (norm) map.set(norm, { term, universal: mapping.universal, desc: mapping.desc })
     }
   }
+  if (lexiconId) _termSurfaceCache.set(lexiconId, map)
   return map
 }
 
@@ -1741,8 +1824,8 @@ export function translateSentence(fromId, text, toId) {
     return { segments: [{ type: 'text', text }], translatedText: text, matchCount: 0, translatedCount: 0 }
   }
 
-  // Build surface-form lookup for the source lexicon
-  const surfaces = buildTermSurfaces(fromLexicon)
+  // Build surface-form lookup for the source lexicon (cached by lexiconId)
+  const surfaces = buildTermSurfaces(fromLexicon, fromId)
 
   // Sort surface keys longest-first for greedy match
   const sortedKeys = [...surfaces.keys()].sort((a, b) => b.length - a.length)

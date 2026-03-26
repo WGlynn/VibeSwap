@@ -223,9 +223,9 @@ const REST_ENDPOINTS = [
       token_a: { symbol: "ETH", reserve: "14520.45" },
       token_b: { symbol: "USDC", reserve: "47125000.00" },
       tvl: "94250000.00",
-      apr: "12.45",
-      fee_apr: "8.20",
-      reward_apr: "4.25",
+      fee_rate_7d: "1.82",
+      fee_rate_30d: "8.20",
+      reward_rate_30d: "4.25",
       il_protection: true
     },
   },

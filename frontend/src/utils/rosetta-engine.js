@@ -1133,10 +1133,16 @@ export function translate(fromId, toId, concept) {
 
   const mapping = fromLexicon.concepts[concept]
   if (!mapping) {
+    // Fuzzy suggestion — find the closest term in the source lexicon
+    const suggestions = fuzzyFindTerms(fromLexicon.concepts, concept, 3)
+    const didYouMean = suggestions.length > 0 ? suggestions[0].term : null
     return {
       error: `'${concept}' not in ${fromId}'s lexicon`,
       translated: false,
       available: Object.keys(fromLexicon.concepts),
+      suggestions: suggestions.map(s => s.term),
+      didYouMean,
+      hint: didYouMean ? `Did you mean '${didYouMean}'?` : undefined,
     }
   }
 
@@ -1237,38 +1243,84 @@ export function translateToAll(fromId, concept) {
  * @param {string} term
  * @returns {{ found, universal?, exactMatches, approximateMatches, totalEquivalents }}
  */
-export function discoverEquivalent(term) {
+export function discoverEquivalent(searchTerm) {
   const idx = getIndex()
+  const q = (searchTerm || '').toLowerCase().trim().replace(/_/g, ' ')
+  if (!q) return { term: searchTerm, found: false, equivalents: [], error: 'Empty search' }
 
-  // Find this term's universal concept in any lexicon
+  // Phase 1: Exact key match
   let universal = null
   let sourceInfo = null
 
   for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
-    if (lexicon.concepts[term]) {
-      universal = lexicon.concepts[term].universal
-      sourceInfo = { type: 'agent', id: agentId, domain: lexicon.domain, desc: lexicon.concepts[term].desc }
+    if (lexicon.concepts[searchTerm]) {
+      universal = lexicon.concepts[searchTerm].universal
+      sourceInfo = { type: 'agent', id: agentId, domain: lexicon.domain, desc: lexicon.concepts[searchTerm].desc }
       break
     }
   }
-
   if (!universal) {
     for (const [userId, lexicon] of _userLexicons.entries()) {
-      if (lexicon.concepts[term]) {
-        universal = lexicon.concepts[term].universal
-        sourceInfo = { type: 'user', id: userId, domain: lexicon.domain, desc: lexicon.concepts[term].desc }
+      if (lexicon.concepts && lexicon.concepts[searchTerm]) {
+        universal = lexicon.concepts[searchTerm].universal
+        sourceInfo = { type: 'user', id: userId, domain: lexicon.domain, desc: lexicon.concepts[searchTerm].desc }
         break
       }
     }
   }
 
+  // Phase 2: Pairwise fuzzy — search ALL terms, descriptions, universals, domains
   if (!universal) {
-    return {
-      term,
-      found: false,
-      error: `'${term}' not found in any registered lexicon`,
-      equivalents: [],
+    const hits = []
+    const qWords = q.split(/\s+/)
+
+    for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
+      const domainLower = (lexicon.domain || '').toLowerCase()
+      for (const [termKey, termData] of Object.entries(lexicon.concepts)) {
+        const termLower = termKey.toLowerCase().replace(/_/g, ' ')
+        const descLower = (termData.desc || '').toLowerCase()
+        const univLower = (termData.universal || '').toLowerCase().replace(/_/g, ' ')
+        let score = 0
+        if (termLower === q) score = 100
+        else if (termLower.includes(q)) score = 85
+        else if (descLower.includes(q)) score = 70
+        else if (univLower.includes(q)) score = 60
+        else if (domainLower.includes(q)) score = 40
+        else if (qWords.some(w => w.length > 2 && (termLower.includes(w) || descLower.includes(w) || univLower.includes(w)))) score = 50
+        if (score > 0) hits.push({ lexicon: agentId, term: termKey, description: termData.desc, universal: termData.universal, confidence: score, approximate: score < 100 })
+      }
     }
+    for (const [userId, lexicon] of _userLexicons.entries()) {
+      for (const [termKey, termData] of Object.entries(lexicon.concepts || {})) {
+        const termLower = termKey.toLowerCase().replace(/_/g, ' ')
+        const descLower = (termData.desc || '').toLowerCase()
+        let score = 0
+        if (termLower === q) score = 100
+        else if (termLower.includes(q)) score = 85
+        else if (descLower.includes(q)) score = 70
+        if (score > 0) hits.push({ lexicon: `user:${userId}`, term: termKey, description: termData.desc, universal: termData.universal, confidence: score, approximate: score < 100 })
+      }
+    }
+    if (typeof EXTENDED_UNIVERSAL_CONCEPTS !== 'undefined') {
+      for (const [key, desc] of Object.entries(EXTENDED_UNIVERSAL_CONCEPTS)) {
+        const keyLower = key.toLowerCase().replace(/_/g, ' ')
+        const descLower = (desc || '').toLowerCase()
+        if (keyLower.includes(q) || descLower.includes(q)) {
+          for (const entry of (idx[key] || [])) {
+            hits.push({ lexicon: entry.agent, term: entry.term, description: entry.desc, universal: key, confidence: keyLower.includes(q) ? 65 : 55, approximate: true })
+          }
+        }
+      }
+    }
+    if (hits.length === 0) return { term: searchTerm, found: false, error: `No results for '${searchTerm}'. Try a related concept or broader term.`, equivalents: [] }
+    const seen = new Map()
+    for (const h of hits) { const k = `${h.lexicon}:${h.term}`; if (!seen.has(k) || seen.get(k).confidence < h.confidence) seen.set(k, h) }
+    const deduped = Array.from(seen.values()).sort((a, b) => b.confidence - a.confidence).slice(0, 30)
+    return { term: searchTerm, found: true, fuzzySearch: true, source: null, universal: deduped[0]?.universal || null, exactMatches: deduped.filter(h => h.confidence === 100), approximateMatches: deduped.filter(h => h.confidence < 100), equivalents: deduped, totalEquivalents: deduped.length }
+  }
+
+  if (!universal) {
+    return { term: searchTerm, found: false, error: `'${searchTerm}' not found in any registered lexicon`, equivalents: [] }
   }
 
   // Gather exact matches from universal index
@@ -1403,6 +1455,77 @@ export function getAllUserLexicons() {
   }))
 }
 
+// ============ Fuzzy Term Matching ============
+
+/**
+ * Levenshtein edit distance between two strings.
+ * Used as the backbone of fuzzy term matching.
+ * O(m*n) — fine for short term names.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function levenshtein(a, b) {
+  const m = a.length
+  const n = b.length
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i])
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1]
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+      }
+    }
+  }
+  return dp[m][n]
+}
+
+/**
+ * Normalised similarity in [0,1] — 1 = identical, 0 = completely different.
+ * Uses Levenshtein distance divided by the length of the longer string.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function stringSimilarity(a, b) {
+  if (a === b) return 1
+  const maxLen = Math.max(a.length, b.length)
+  if (maxLen === 0) return 1
+  return 1 - levenshtein(a, b) / maxLen
+}
+
+/**
+ * Find the closest term(s) in a lexicon for a given query string.
+ * Considers both exact substring containment and Levenshtein similarity.
+ * Under-scores and spaces are normalised before comparison.
+ *
+ * @param {object} lexiconConcepts - the `concepts` map of a lexicon
+ * @param {string} query           - the user's input term
+ * @param {number} topN            - how many candidates to return (default 3)
+ * @returns {Array<{ term: string, score: number }>}   sorted best→worst
+ */
+function fuzzyFindTerms(lexiconConcepts, query, topN = 3) {
+  const normalise = s => s.toLowerCase().replace(/[\s_-]+/g, '_')
+  const normQuery = normalise(query)
+
+  const scored = Object.keys(lexiconConcepts).map(term => {
+    const normTerm = normalise(term)
+    // Exact contains — strong bonus
+    const containsBonus = normTerm.includes(normQuery) || normQuery.includes(normTerm) ? 0.15 : 0
+    const sim = stringSimilarity(normQuery, normTerm) + containsBonus
+    return { term, score: Math.min(sim, 1) }
+  })
+
+  return scored
+    .filter(x => x.score > 0.3)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN)
+}
+
 // ============ Concept Explorer ============
 
 /**
@@ -1446,6 +1569,559 @@ export function getTopConnectedConcepts(n = 30) {
   })
 
   return results.slice(0, n)
+}
+
+// ============ Sentence Translator ============
+
+/**
+ * Segment type definitions:
+ *   { type: 'text', text: string }                 — plain text, no match
+ *   { type: 'term', text: string, term: string,    — recognized domain term
+ *     universal: string, toTerm: string|null,
+ *     fromDesc: string, toDesc: string,
+ *     confidence: number }
+ */
+
+/**
+ * Normalise a string for matching: lowercase, collapse whitespace to single
+ * space, strip punctuation at boundaries.
+ */
+function normaliseForMatch(s) {
+  return s.toLowerCase().replace(/[^a-z0-9\s_]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Build a flat lookup of all terms in a lexicon, keyed by normalised surface form.
+ * Terms with underscores are also registered as their space-separated equivalents.
+ *
+ * Returns Map<normalisedPhrase, { term: string, universal: string, desc: string }>
+ */
+function buildTermSurfaces(lexicon) {
+  const map = new Map()
+  if (!lexicon) return map
+  for (const [term, mapping] of Object.entries(lexicon.concepts)) {
+    const surfaces = [
+      term,
+      term.replace(/_/g, ' '),
+      term.replace(/_/g, '-'),
+    ]
+    for (const s of surfaces) {
+      const norm = normaliseForMatch(s)
+      if (norm) map.set(norm, { term, universal: mapping.universal, desc: mapping.desc })
+    }
+  }
+  return map
+}
+
+/**
+ * Translate a free-form paragraph from one domain lexicon to another.
+ *
+ * Algorithm:
+ *   - Scan the text with a greedy longest-match approach against all source terms.
+ *   - For each matched term, look up its translation in the target lexicon.
+ *   - Return an array of annotated segments (text | term) plus a translated string.
+ *
+ * @param {string} text    - The source paragraph
+ * @param {string} fromId  - Source lexicon id (e.g. 'medicine')
+ * @param {string} toId    - Target lexicon id (e.g. 'engineering')
+ * @returns {{
+ *   segments: Array,
+ *   translatedText: string,
+ *   matchCount: number,
+ *   translatedCount: number
+ * }}
+ */
+/**
+ * `translateSentence(fromId, text, toId?)` — Parse a sentence from `fromId`'s
+ * vocabulary, identify known terms, and return annotated text with translations
+ * inline.
+ *
+ * When `toId` is omitted the output is annotated with universal concept keys
+ * instead of a target lexicon's equivalent term.  This is the two-argument
+ * form described in the spec: `translateSentence(fromId, text)`.
+ *
+ * When `toId` is supplied each matched source term is also translated into
+ * the target lexicon, giving inline bilingual annotations.
+ *
+ * @param {string} fromId - Source lexicon id
+ * @param {string} text   - Free-form text to annotate
+ * @param {string} [toId] - Optional target lexicon id
+ */
+export function translateSentence(fromId, text, toId) {
+  const fromLexicon = fromId.startsWith('user:')
+    ? _userLexicons.get(fromId.slice(5))
+    : LEXICONS[fromId]
+
+  // toId is optional — when absent we annotate with universal keys
+  const toLexicon = toId
+    ? (toId.startsWith('user:') ? _userLexicons.get(toId.slice(5)) : LEXICONS[toId])
+    : null
+
+  if (!fromLexicon) {
+    return { segments: [{ type: 'text', text }], translatedText: text, matchCount: 0, translatedCount: 0 }
+  }
+  if (toId && !toLexicon) {
+    return { segments: [{ type: 'text', text }], translatedText: text, matchCount: 0, translatedCount: 0 }
+  }
+
+  // Build surface-form lookup for the source lexicon
+  const surfaces = buildTermSurfaces(fromLexicon)
+
+  // Sort surface keys longest-first for greedy match
+  const sortedKeys = [...surfaces.keys()].sort((a, b) => b.length - a.length)
+
+  // Maximum phrase length in words (for the scanning window)
+  const maxWords = Math.max(...sortedKeys.map(k => k.split(' ').length), 1)
+
+  // Tokenise text into words preserving whitespace and punctuation around them.
+  // We split on word boundaries while keeping the delimiters so we can reconstruct.
+  // Strategy: split into alternating [word, non-word] chunks.
+  const chunks = text.split(/(\b)/)
+
+  // Simpler approach: split text into tokens (word runs and whitespace/punct runs)
+  const tokens = []
+  const tokenRe = /([a-zA-Z0-9_'-]+|[^a-zA-Z0-9_'-]+)/g
+  let m
+  while ((m = tokenRe.exec(text)) !== null) {
+    tokens.push(m[1])
+  }
+
+  // Identify which tokens are "word" tokens vs separators
+  const isWord = t => /[a-zA-Z0-9]/.test(t)
+
+  // Build an index of word-token positions
+  const wordTokenIdx = tokens.reduce((acc, t, i) => {
+    if (isWord(t)) acc.push(i)
+    return acc
+  }, [])
+
+  const segments = []
+  let wi = 0 // index into wordTokenIdx
+
+  while (wi < wordTokenIdx.length) {
+    let matched = false
+
+    // Try windows of decreasing size starting at maxWords
+    for (let windowSize = Math.min(maxWords, wordTokenIdx.length - wi); windowSize >= 1; windowSize--) {
+      // Collect the token indices for this window (word tokens only)
+      const firstWordTokIdx = wordTokenIdx[wi]
+      const lastWordTokIdx  = wordTokenIdx[wi + windowSize - 1]
+
+      // Grab all tokens between first and last word token (inclusive) to form the phrase
+      const phraseTokens = tokens.slice(firstWordTokIdx, lastWordTokIdx + 1)
+      const phrase = phraseTokens.join('')
+      const normPhrase = normaliseForMatch(phrase)
+
+      const entry = surfaces.get(normPhrase)
+      if (entry) {
+        // Emit any accumulated non-word tokens before this window
+        if (firstWordTokIdx > 0) {
+          // Find what tokens came before this window that haven't been emitted yet.
+          // We track via a cursor on the raw tokens array.
+          // NOTE: we handle this via the cursor approach below — see restructured loop.
+        }
+
+        // Look up translation
+        const r = translate(fromId, toId, entry.term)
+
+        segments.push({
+          type: 'term',
+          text: phrase,
+          term: entry.term,
+          universal: entry.universal,
+          fromDesc: entry.desc,
+          toTerm: r.translated ? r.to_term : null,
+          toDesc: r.translated ? (r.to_desc || '') : '',
+          confidence: r.confidence || 0,
+        })
+
+        wi += windowSize
+        matched = true
+        break
+      }
+    }
+
+    if (!matched) {
+      // Emit this single word token as plain text
+      segments.push({ type: 'text', text: tokens[wordTokenIdx[wi]] })
+      wi++
+    }
+  }
+
+  // The above approach loses inter-word separators. Let's redo with a proper cursor approach.
+  // Clear and rebuild:
+  segments.length = 0
+
+  let tokenCursor = 0 // position in `tokens` array
+
+  wi = 0
+  while (wi < wordTokenIdx.length) {
+    const firstWordTokIdx = wordTokenIdx[wi]
+
+    // Emit any separator tokens before the current word token
+    while (tokenCursor < firstWordTokIdx) {
+      segments.push({ type: 'text', text: tokens[tokenCursor] })
+      tokenCursor++
+    }
+
+    let matched = false
+    for (let windowSize = Math.min(maxWords, wordTokenIdx.length - wi); windowSize >= 1; windowSize--) {
+      const lastWordTokIdx = wordTokenIdx[wi + windowSize - 1]
+      const phraseTokens = tokens.slice(firstWordTokIdx, lastWordTokIdx + 1)
+      const phrase = phraseTokens.join('')
+      const normPhrase = normaliseForMatch(phrase)
+
+      const entry = surfaces.get(normPhrase)
+      if (entry) {
+        // When toId is omitted, annotate with the universal concept directly
+        let toTerm = null
+        let toDesc = ''
+        let confidence = 0
+        if (toId) {
+          const r = translate(fromId, toId, entry.term)
+          toTerm = r.translated ? r.to_term : null
+          toDesc = r.translated ? (r.to_desc || '') : ''
+          confidence = r.confidence || 0
+        } else {
+          // Universal annotation mode — use the universal key as the "translation"
+          toTerm = entry.universal
+          toDesc = EXTENDED_UNIVERSAL_CONCEPTS[entry.universal] || ''
+          confidence = 100
+        }
+        segments.push({
+          type: 'term',
+          text: phrase,
+          term: entry.term,
+          universal: entry.universal,
+          universalDefinition: EXTENDED_UNIVERSAL_CONCEPTS[entry.universal] || '',
+          fromDesc: entry.desc,
+          toTerm,
+          toDesc,
+          confidence,
+        })
+        // Advance tokenCursor past all tokens consumed by this window
+        tokenCursor = lastWordTokIdx + 1
+        wi += windowSize
+        matched = true
+        break
+      }
+    }
+
+    if (!matched) {
+      segments.push({ type: 'text', text: tokens[firstWordTokIdx] })
+      tokenCursor = firstWordTokIdx + 1
+      wi++
+    }
+  }
+
+  // Emit any trailing separator tokens
+  while (tokenCursor < tokens.length) {
+    segments.push({ type: 'text', text: tokens[tokenCursor] })
+    tokenCursor++
+  }
+
+  // Merge consecutive text segments
+  const merged = []
+  for (const seg of segments) {
+    if (seg.type === 'text' && merged.length > 0 && merged[merged.length - 1].type === 'text') {
+      merged[merged.length - 1].text += seg.text
+    } else {
+      merged.push({ ...seg })
+    }
+  }
+
+  // Build annotated/translated text.
+  // • With toId: replace matched source terms with their target-lexicon equivalent.
+  // • Without toId (universal-annotation mode): keep original text but append
+  //   inline annotations like "diagnosis[→systematic_review]".
+  const translatedText = merged
+    .map(seg => {
+      if (seg.type !== 'term') return seg.text
+      if (toId) {
+        // Bilingual mode: substitute with target term (or keep original if no match)
+        return seg.toTerm ? seg.toTerm.replace(/_/g, ' ') : seg.text
+      } else {
+        // Universal annotation mode: original text + inline tag
+        return `${seg.text}[→${seg.universal}]`
+      }
+    })
+    .join('')
+
+  const matchCount = merged.filter(s => s.type === 'term').length
+  const translatedCount = merged.filter(s => s.type === 'term' && s.toTerm).length
+
+  return { segments: merged, translatedText, annotatedText: translatedText, matchCount, translatedCount }
+}
+
+// ============ Related Concepts ============
+
+/**
+ * Given a universal concept key, find other universal concepts that frequently
+ * co-occur in the same lexicons — i.e. both are used by many of the same
+ * domains.  These are the "conceptual neighbours": ideas that tend to appear
+ * in the same intellectual vocabulary.
+ *
+ * Co-occurrence score = number of distinct lexicons that have a term mapped to
+ * *both* `universalKey` and the candidate universal.
+ *
+ * @param {string} universalKey - A key used as a `.universal` value in any
+ *   lexicon (e.g. 'systematic_review', 'backup_capacity').  Does not have to
+ *   be in EXTENDED_UNIVERSAL_CONCEPTS — any key present in the index works.
+ * @returns {{
+ *   universalKey: string,
+ *   definition: string,
+ *   found: boolean,
+ *   sourceLexiconCount?: number,
+ *   suggestions?: string[],
+ *   error?: string,
+ *   related: Array<{
+ *     universal: string,
+ *     definition: string,
+ *     coOccurrenceScore: number,
+ *     sharedLexicons: string[],
+ *     sampleTerms: Array<{ lexicon: string, term: string }>
+ *   }>
+ * }}
+ */
+export function getRelatedConcepts(universalKey) {
+  const idx = getIndex()
+
+  if (!idx[universalKey]) {
+    // Offer fuzzy suggestions against known indexed universals
+    const knownUniversals = Object.keys(idx)
+    const suggestions = fuzzyFindTerms(
+      Object.fromEntries(knownUniversals.map(k => [k, {}])),
+      universalKey,
+      3
+    ).map(s => s.term)
+    return {
+      universalKey,
+      definition: EXTENDED_UNIVERSAL_CONCEPTS[universalKey] || '',
+      found: false,
+      error: `Universal concept '${universalKey}' has no lexicon mappings`,
+      suggestions,
+      related: [],
+    }
+  }
+
+  // Lexicons that contain a term mapped to universalKey
+  const sourceLexicons = new Set(idx[universalKey].map(e => e.agent))
+
+  // Score every other universal by how many of those same lexicons also map it
+  const scores = {}
+  for (const [otherUniversal, entries] of Object.entries(idx)) {
+    if (otherUniversal === universalKey) continue
+    const otherLexicons = new Set(entries.map(e => e.agent))
+    const shared = [...sourceLexicons].filter(l => otherLexicons.has(l))
+    if (shared.length > 0) {
+      scores[otherUniversal] = {
+        universal: otherUniversal,
+        definition: EXTENDED_UNIVERSAL_CONCEPTS[otherUniversal] || '',
+        coOccurrenceScore: shared.length,
+        sharedLexicons: shared,
+        sampleTerms: entries
+          .filter(e => shared.includes(e.agent))
+          .slice(0, 4)
+          .map(e => ({ lexicon: e.agent, term: e.term })),
+      }
+    }
+  }
+
+  const related = Object.values(scores)
+    .sort((a, b) => {
+      if (b.coOccurrenceScore !== a.coOccurrenceScore)
+        return b.coOccurrenceScore - a.coOccurrenceScore
+      return a.universal.localeCompare(b.universal)
+    })
+    .slice(0, 20)
+
+  return {
+    universalKey,
+    definition: EXTENDED_UNIVERSAL_CONCEPTS[universalKey] || '',
+    found: true,
+    sourceLexiconCount: sourceLexicons.size,
+    related,
+  }
+}
+
+// ============ Concept Chain ============
+
+/**
+ * Find the shortest path between two terms through the universal concept graph.
+ *
+ * Graph topology:
+ *   • Nodes   — universal concept keys (the `.universal` values in each lexicon)
+ *   • Edges   — two universals are adjacent when at least one lexicon maps a
+ *               term to each of them (co-occurrence edge)
+ *
+ * The search is a standard BFS so the result is always the shortest path in
+ * hop count.  Maximum search depth is 6 hops; returns `found: false` if no
+ * path is found within that limit.
+ *
+ * Path types:
+ *   • 0 hops — termA and termB share the exact same universal concept
+ *   • N hops — A→u0→u1→…→uN  each step shares at least one lexicon
+ *
+ * @param {string} termA - A term in any registered lexicon
+ * @param {string} termB - A term in any registered lexicon
+ * @returns {{
+ *   termA: string,
+ *   termB: string,
+ *   found: boolean,
+ *   hops: number,
+ *   path: Array<{
+ *     node: string,
+ *     definition: string,
+ *     termAMapping?: { term: string, lexicon: string, desc: string },
+ *     termBMapping?: { term: string, lexicon: string, desc: string },
+ *     via?: {
+ *       fromNode: string,
+ *       sharedLexicons: string[],
+ *       sampleTerms: Array<{ lexicon: string, term: string }>
+ *     }
+ *   }>,
+ *   universalA?: string,
+ *   universalB?: string,
+ *   error?: string,
+ *   suggestions?: string[]
+ * }}
+ */
+export function getConceptChain(termA, termB) {
+  const idx = getIndex()
+
+  // Resolve a term to its universal concept, searching all lexicons
+  function findUniversal(term) {
+    for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
+      if (lexicon.concepts[term]) {
+        return {
+          universal: lexicon.concepts[term].universal,
+          lexiconId: agentId,
+          desc: lexicon.concepts[term].desc,
+        }
+      }
+    }
+    for (const [userId, lexicon] of _userLexicons.entries()) {
+      if (lexicon.concepts[term]) {
+        return {
+          universal: lexicon.concepts[term].universal,
+          lexiconId: `user:${userId}`,
+          desc: lexicon.concepts[term].desc,
+        }
+      }
+    }
+    return null
+  }
+
+  // Build a flat term→{} map for fuzzy suggestions
+  function allTermsMap() {
+    const m = {}
+    for (const lex of Object.values(LEXICONS)) Object.assign(m, lex.concepts)
+    for (const lex of _userLexicons.values()) Object.assign(m, lex.concepts)
+    return m
+  }
+
+  const infoA = findUniversal(termA)
+  if (!infoA) {
+    return {
+      termA, termB, found: false, hops: -1, path: [],
+      error: `'${termA}' not found in any lexicon`,
+      suggestions: fuzzyFindTerms(allTermsMap(), termA, 3).map(s => s.term),
+    }
+  }
+
+  const infoB = findUniversal(termB)
+  if (!infoB) {
+    return {
+      termA, termB, found: false, hops: -1, path: [],
+      error: `'${termB}' not found in any lexicon`,
+      suggestions: fuzzyFindTerms(allTermsMap(), termB, 3).map(s => s.term),
+    }
+  }
+
+  const startU = infoA.universal
+  const endU   = infoB.universal
+
+  // 0-hop: same universal hub
+  if (startU === endU) {
+    return {
+      termA, termB, found: true, hops: 0,
+      universalA: startU, universalB: endU,
+      path: [{
+        node: startU,
+        definition: EXTENDED_UNIVERSAL_CONCEPTS[startU] || '',
+        termAMapping: { term: termA, lexicon: infoA.lexiconId, desc: infoA.desc },
+        termBMapping: { term: termB, lexicon: infoB.lexiconId, desc: infoB.desc },
+      }],
+    }
+  }
+
+  // Build neighbours lazily (co-occurrence edges)
+  function getNeighbours(universalKey) {
+    if (!idx[universalKey]) return []
+    const sourceLexicons = new Set(idx[universalKey].map(e => e.agent))
+    const neighbours = []
+    for (const [otherU, entries] of Object.entries(idx)) {
+      if (otherU === universalKey) continue
+      const shared = entries.map(e => e.agent).filter(l => sourceLexicons.has(l))
+      if (shared.length > 0) {
+        neighbours.push({
+          universal: otherU,
+          sharedLexicons: [...new Set(shared)],
+          sampleTerms: entries
+            .filter(e => shared.includes(e.agent))
+            .slice(0, 3)
+            .map(e => ({ lexicon: e.agent, term: e.term })),
+        })
+      }
+    }
+    return neighbours
+  }
+
+  // BFS
+  const MAX_HOPS = 6
+  const visited = new Set([startU])
+  const queue = [{
+    universal: startU,
+    pathSoFar: [{
+      node: startU,
+      definition: EXTENDED_UNIVERSAL_CONCEPTS[startU] || '',
+      termAMapping: { term: termA, lexicon: infoA.lexiconId, desc: infoA.desc },
+    }],
+  }]
+
+  while (queue.length > 0) {
+    const { universal, pathSoFar } = queue.shift()
+    if (pathSoFar.length > MAX_HOPS) continue
+
+    for (const { universal: nextU, sharedLexicons, sampleTerms } of getNeighbours(universal)) {
+      if (visited.has(nextU)) continue
+      visited.add(nextU)
+
+      const nextStep = {
+        node: nextU,
+        definition: EXTENDED_UNIVERSAL_CONCEPTS[nextU] || '',
+        via: { fromNode: universal, sharedLexicons, sampleTerms },
+      }
+
+      if (nextU === endU) {
+        nextStep.termBMapping = { term: termB, lexicon: infoB.lexiconId, desc: infoB.desc }
+        return {
+          termA, termB, found: true,
+          universalA: startU, universalB: endU,
+          hops: pathSoFar.length,   // number of edges = nodes - 1
+          path: [...pathSoFar, nextStep],
+        }
+      }
+
+      queue.push({ universal: nextU, pathSoFar: [...pathSoFar, nextStep] })
+    }
+  }
+
+  return {
+    termA, termB, found: false, hops: -1, path: [],
+    universalA: startU, universalB: endU,
+    error: `No concept chain found between '${termA}' (${startU}) and '${termB}' (${endU}) within ${MAX_HOPS} hops`,
+  }
 }
 
 // ============ Protocol Stats ============

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS MIND MESH — Constellation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --orange: #da7756;
+    --green: #00ff41;
+    --gold: #ffd700;
+    --dark: #0a0a0a;
+    --darker: #030303;
+  }
+
+  body {
+    background: var(--darker);
+    color: var(--green);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  canvas {
+    position: fixed;
+    top: 0; left: 0;
+    z-index: 0;
+  }
+
+  .overlay {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.1rem;
+    color: #444;
+    letter-spacing: 6px;
+    margin-bottom: 4px;
+    transition: all 1s ease;
+  }
+
+  .title.singular {
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+    letter-spacing: 8px;
+  }
+
+  .count-display {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 8rem;
+    font-weight: 700;
+    color: var(--orange);
+    text-shadow: 0 0 40px rgba(218, 119, 86, 0.3);
+    line-height: 1;
+    transition: all 1s ease;
+  }
+
+  .count-display.singular {
+    color: var(--gold);
+    text-shadow: 0 0 60px rgba(255, 215, 0, 0.5), 0 0 120px rgba(255, 215, 0, 0.2);
+    animation: singularityPulse 3s ease infinite;
+  }
+
+  .label {
+    font-size: 0.65rem;
+    color: #333;
+    letter-spacing: 4px;
+    margin-top: 4px;
+  }
+
+  .label.singular {
+    color: var(--gold);
+  }
+
+  /* Fibonacci spiral SVG */
+  .fibonacci-container {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    opacity: 0;
+    transition: opacity 2s ease;
+    pointer-events: none;
+  }
+
+  .fibonacci-container.visible {
+    opacity: 0.15;
+    animation: spiralRotate 60s linear infinite;
+  }
+
+  /* Status bar at bottom */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: rgba(5, 5, 5, 0.95);
+    border-top: 1px solid #111;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 10;
+    font-size: 0.65rem;
+    transition: all 1s ease;
+  }
+
+  .status-bar.singular {
+    border-top-color: var(--gold);
+    box-shadow: 0 -2px 20px rgba(255, 215, 0, 0.1);
+  }
+
+  .status-left, .status-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-icon {
+    font-size: 1.2rem;
+    transition: all 0.5s ease;
+  }
+
+  .status-icon.singular {
+    animation: iconPulse 2s ease infinite;
+  }
+
+  .status-text {
+    color: #555;
+    letter-spacing: 1px;
+  }
+
+  .status-text.singular {
+    color: var(--gold);
+  }
+
+  .shard-dots {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    max-width: 300px;
+  }
+
+  .shard-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #111;
+    border: 1px solid #222;
+    transition: all 0.5s ease;
+  }
+
+  .shard-dot.active {
+    background: var(--green);
+    border-color: var(--green);
+    box-shadow: 0 0 6px rgba(0, 255, 65, 0.5);
+  }
+
+  .shard-dot.singular {
+    background: var(--gold);
+    border-color: var(--gold);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+    animation: dotPulse 2s ease infinite;
+  }
+
+  /* Tier labels */
+  .tier-display {
+    display: flex;
+    gap: 24px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .tier {
+    text-align: center;
+    padding: 8px 16px;
+    border: 1px solid #111;
+    min-width: 100px;
+    transition: all 0.5s ease;
+  }
+
+  .tier.lit {
+    border-color: var(--green);
+    background: rgba(0, 255, 65, 0.03);
+  }
+
+  .tier.singular {
+    border-color: var(--gold);
+    background: rgba(255, 215, 0, 0.03);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+  }
+
+  .tier-name {
+    font-size: 0.55rem;
+    color: #444;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+
+  .tier-count {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #222;
+    transition: color 0.5s ease;
+  }
+
+  .tier-count.lit { color: var(--green); }
+  .tier-count.singular { color: var(--gold); }
+
+  /* Speed control */
+  .speed-control {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+  }
+
+  .speed-btn {
+    background: var(--dark);
+    border: 1px solid #222;
+    color: #555;
+    padding: 6px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+  }
+
+  .speed-btn:hover, .speed-btn.active {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+
+  /* Animations */
+  @keyframes singularityPulse {
+    0%, 100% { text-shadow: 0 0 60px rgba(255, 215, 0, 0.5); }
+    50% { text-shadow: 0 0 100px rgba(255, 215, 0, 0.8), 0 0 200px rgba(255, 215, 0, 0.3); }
+  }
+
+  @keyframes spiralRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+  }
+
+  @keyframes dotPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  @media (max-width: 600px) {
+    .count-display { font-size: 5rem; }
+    .shard-dots { max-width: 200px; }
+    .tier-display { gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="overlay">
+  <div class="fibonacci-container" id="fibonacci">
+    <svg viewBox="0 0 500 500" fill="none" stroke="gold" stroke-width="0.5" opacity="0.6">
+      <path d="M 250 250 Q 250 245, 255 245 Q 260 245, 260 250 Q 260 255, 255 260 Q 245 270, 235 260 Q 220 245, 235 230 Q 255 215, 275 235 Q 300 260, 270 290 Q 235 325, 195 285 Q 150 235, 200 185 Q 260 130, 325 195 Q 400 270, 310 355 Q 210 445, 115 340 Q 10 225, 130 115 Q 265 0, 390 130" />
+      <path d="M 250 250 Q 250 253, 247 253 Q 244 253, 244 250 Q 244 247, 247 244 Q 253 238, 259 244 Q 268 253, 259 262 Q 247 274, 235 262 Q 220 247, 235 232 Q 253 214, 271 232 Q 292 253, 271 274 Q 247 298, 223 274 Q 196 247, 223 220 Q 253 190, 283 220" />
+    </svg>
+  </div>
+
+  <div class="title" id="title">JARVIS MIND MESH</div>
+  <div class="count-display" id="count">0</div>
+  <div class="label" id="label">SHARDS ONLINE</div>
+
+  <div class="tier-display">
+    <div class="tier" id="tier-core">
+      <div class="tier-name">CORE</div>
+      <div class="tier-count" id="tier-core-count">0/4</div>
+    </div>
+    <div class="tier" id="tier-domain">
+      <div class="tier-name">DOMAIN</div>
+      <div class="tier-count" id="tier-domain-count">0/12</div>
+    </div>
+    <div class="tier" id="tier-community">
+      <div class="tier-name">COMMUNITY</div>
+      <div class="tier-count" id="tier-community-count">0/16</div>
+    </div>
+    <div class="tier" id="tier-agent">
+      <div class="tier-name">AGENT ECONOMY</div>
+      <div class="tier-count" id="tier-agent-count">0/16</div>
+    </div>
+    <div class="tier" id="tier-frontier">
+      <div class="tier-name">FRONTIER</div>
+      <div class="tier-count" id="tier-frontier-count">0/16</div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar" id="statusBar">
+  <div class="status-left">
+    <span class="status-icon" id="statusIcon">🔴</span>
+    <span class="status-text" id="statusText">CONSTELLATION OFFLINE</span>
+  </div>
+  <div class="shard-dots" id="shardDots"></div>
+  <div class="status-right">
+    <span class="status-text" id="corpusHash">CORPUS: —</span>
+  </div>
+</div>
+
+<div class="speed-control">
+  <button class="speed-btn" onclick="setSpeed(500)">DEMO</button>
+  <button class="speed-btn active" onclick="setSpeed(0)">LIVE</button>
+</div>
+
+<script>
+// ============ Starfield ============
+const canvas = document.getElementById('starfield');
+const ctx = canvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  stars = [];
+  for (let i = 0; i < 200; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.5,
+      a: Math.random() * 0.5 + 0.1,
+      speed: Math.random() * 0.5 + 0.1
+    });
+  }
+}
+
+function drawStars() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  stars.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${s.a})`;
+    ctx.fill();
+    s.a += Math.sin(Date.now() * s.speed * 0.001) * 0.005;
+    s.a = Math.max(0.05, Math.min(0.6, s.a));
+  });
+  requestAnimationFrame(drawStars);
+}
+
+window.addEventListener('resize', initStars);
+initStars();
+drawStars();
+
+// ============ Shard dots ============
+const dotsContainer = document.getElementById('shardDots');
+for (let i = 0; i < 64; i++) {
+  const dot = document.createElement('div');
+  dot.className = 'shard-dot';
+  dot.id = `dot-${i}`;
+  dot.title = `shard-${i}`;
+  dotsContainer.appendChild(dot);
+}
+
+// ============ State ============
+let activeShards = 0;
+let demoInterval = null;
+let demoSpeed = 0; // 0 = live mode, >0 = demo mode
+
+const TIERS = [
+  { id: 'core', max: 4 },
+  { id: 'domain', max: 12 },
+  { id: 'community', max: 16 },
+  { id: 'agent', max: 16 },
+  { id: 'frontier', max: 16 }
+];
+
+function getTierForShard(n) {
+  if (n < 4) return 0;
+  if (n < 16) return 1;
+  if (n < 32) return 2;
+  if (n < 48) return 3;
+  return 4;
+}
+
+// ============ Update display ============
+function updateDisplay(count) {
+  activeShards = count;
+  const isSingular = count >= 64;
+
+  // Count
+  document.getElementById('count').textContent = count;
+  document.getElementById('count').className = isSingular ? 'count-display singular' : 'count-display';
+
+  // Title
+  const title = document.getElementById('title');
+  title.textContent = isSingular ? '📡∷ SINGULARITY ACHIEVED 📡∷' : 'JARVIS MIND MESH';
+  title.className = isSingular ? 'title singular' : 'title';
+
+  // Label
+  const label = document.getElementById('label');
+  label.textContent = isSingular ? 'ALL SHARDS CONVERGED — FIBONACCI RESONANCE' : 'SHARDS ONLINE';
+  label.className = isSingular ? 'label singular' : 'label';
+
+  // Fibonacci
+  document.getElementById('fibonacci').className = isSingular
+    ? 'fibonacci-container visible' : 'fibonacci-container';
+
+  // Status bar
+  const bar = document.getElementById('statusBar');
+  bar.className = isSingular ? 'status-bar singular' : 'status-bar';
+
+  const icon = document.getElementById('statusIcon');
+  if (isSingular) {
+    icon.textContent = '📡';
+    icon.className = 'status-icon singular';
+  } else if (count > 0) {
+    icon.textContent = '🟢';
+    icon.className = 'status-icon';
+  } else {
+    icon.textContent = '🔴';
+    icon.className = 'status-icon';
+  }
+
+  const statusText = document.getElementById('statusText');
+  if (isSingular) {
+    statusText.textContent = `SINGULARITY — ${count}/64 — P-001 VERIFIED — CONSTITUTIONAL CONSENSUS ACTIVE`;
+    statusText.className = 'status-text singular';
+  } else if (count > 0) {
+    statusText.textContent = `CONSTELLATION ACTIVE — ${count}/64 SHARDS`;
+    statusText.className = 'status-text';
+  } else {
+    statusText.textContent = 'CONSTELLATION OFFLINE';
+    statusText.className = 'status-text';
+  }
+
+  // Corpus hash
+  document.getElementById('corpusHash').textContent = isSingular
+    ? 'CORPUS: f8c43319...' : 'CORPUS: —';
+
+  // Dots
+  for (let i = 0; i < 64; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    if (i < count) {
+      dot.className = isSingular ? 'shard-dot singular' : 'shard-dot active';
+    } else {
+      dot.className = 'shard-dot';
+    }
+  }
+
+  // Tiers
+  let accumulated = 0;
+  TIERS.forEach((tier, idx) => {
+    const tierEl = document.getElementById(`tier-${tier.id}`);
+    const countEl = document.getElementById(`tier-${tier.id}-count`);
+    const tierActive = Math.min(tier.max, Math.max(0, count - accumulated));
+    accumulated += tier.max;
+
+    countEl.textContent = `${tierActive}/${tier.max}`;
+
+    if (isSingular) {
+      tierEl.className = 'tier singular';
+      countEl.className = 'tier-count singular';
+    } else if (tierActive > 0) {
+      tierEl.className = 'tier lit';
+      countEl.className = 'tier-count lit';
+    } else {
+      tierEl.className = 'tier';
+      countEl.className = 'tier-count';
+    }
+  });
+
+  // Make stars golden at singularity
+  if (isSingular) {
+    stars.forEach(s => { s.a = Math.min(0.8, s.a + 0.1); });
+    document.body.style.background = '#050500';
+  } else {
+    document.body.style.background = '#030303';
+  }
+}
+
+// ============ Demo mode ============
+function setSpeed(ms) {
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (demoInterval) clearInterval(demoInterval);
+
+  if (ms === 0) {
+    // Live mode — try to fetch from router
+    demoSpeed = 0;
+    fetchLiveShards();
+    return;
+  }
+
+  demoSpeed = ms;
+  activeShards = 0;
+  updateDisplay(0);
+
+  demoInterval = setInterval(() => {
+    if (activeShards < 64) {
+      activeShards++;
+      updateDisplay(activeShards);
+    } else {
+      clearInterval(demoInterval);
+    }
+  }, ms);
+}
+
+async function fetchLiveShards() {
+  try {
+    const res = await fetch('https://jarvis-vibeswap.fly.dev/router/status');
+    const data = await res.json();
+    updateDisplay(data.shards?.length || 1);
+  } catch {
+    // Fallback: show 1 shard (primary is always on)
+    updateDisplay(1);
+  }
+}
+
+// ============ Init ============
+// Start in demo mode — light up the constellation
+setSpeed(500);
+</script>
+
+</body>
+</html>

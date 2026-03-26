@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title OmniscientAdversaryDefense — Security Against God-Tier Attackers
+ * @title OmniscientAdversaryDefense — Security Against Omniscient Attackers
  * @notice What if the attacker has infinite energy, perfect knowledge,
  *         time travel, and multi-dimensional existence? They still lose.
  *
@@ -59,8 +59,8 @@ pragma solidity ^0.8.20;
  *   - Self-referential trap detection
  *   - State root integrity proofs that prevent history rewriting
  *
- *   "Even if God is your enemy, the game theory still holds.
- *    Because the game IS God." — Will
+ *   "Even an omniscient adversary cannot break the game theory.
+ *    Because the mechanism is the authority." — Will
  */
 contract OmniscientAdversaryDefense {
     // ============ Constants ============
@@ -338,7 +338,7 @@ contract OmniscientAdversaryDefense {
                "3. Meaning is irreducibly interactive (cannot be predetermined). "
                "4. Knowledge of the defense IS the defense. "
                "5. Attack = contribution (payoff function identity). "
-               "Even God plays by the rules of game theory.";
+               "Even an omniscient adversary plays by the rules of game theory.";
     }
 
     /// @notice Receive ETH for challenge stakes

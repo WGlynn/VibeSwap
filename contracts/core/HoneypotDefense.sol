@@ -46,7 +46,7 @@ pragma solidity ^0.8.20;
  *   The attacker can't distinguish real from shadow until it's too late.
  *   By the time they realize, they've already burned everything.
  *
- *   "He thought he was hacking God. God was hacking him." — Will
+ *   "He thought he was hacking the system. The system was hacking him." — Will
  */
 contract HoneypotDefense {
     // ============ Constants ============

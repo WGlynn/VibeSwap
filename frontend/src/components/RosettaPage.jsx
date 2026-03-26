@@ -809,9 +809,9 @@ function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
               <div className="text-white text-sm font-medium font-mono">{result.to_term}</div>
             ) : (
               <div>
-                <div className="text-[11px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(239,68,68,0.7)' }}>no equivalent</div>
+                <div className="text-[11px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(16,185,129,0.7)' }}>new concept</div>
                 <div className="text-[9px] font-mono text-black-600 leading-snug">
-                  {to?.name} has no term for this concept
+                  {to?.name} doesn't have a word for this yet — be the first to name it
                 </div>
               </div>
             )}
@@ -846,9 +846,9 @@ function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <p className="text-[10px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(245,158,11,0.7)' }}>No direct translation found</p>
+                <p className="text-[10px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(16,185,129,0.9)' }}>New concept discovered</p>
                 <p className="text-[10px] font-mono text-black-500 leading-relaxed">
-                  Switch on <span className="text-white font-bold">Translate to All</span> to see every domain that has an equivalent, or use <span className="text-white font-bold">Discover</span> to search the universal concept graph directly.
+                  This domain doesn't have a word for this yet — you've found a gap in the graph. <span className="text-white font-bold">Register your own term</span> below to fill it, or use <span className="text-white font-bold">Translate to All</span> to see which domains do have an equivalent.
                 </p>
               </div>
             </div>
@@ -4643,6 +4643,15 @@ const MOBILE_NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'section-compare',
+    label: 'Compare',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+      </svg>
+    ),
+  },
 ]
 
 function MobileBottomNav() {
@@ -5073,6 +5082,13 @@ export default function RosettaPage() {
           el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
           break
         }
+        case 'x': {
+          e.preventDefault()
+          const el = document.getElementById('rosetta-compare-search')
+          el?.focus()
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          break
+        }
         case '?': {
           e.preventDefault()
           setShowHelp(v => !v)
@@ -5324,13 +5340,16 @@ export default function RosettaPage() {
 
       {/* ============ Concept Chain ============ */}
       <div id="section-chain">
-        <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} />
+        <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} /></LazySection>
+      </div>
 
       {/* ============ Compare Lexicons ============ */}
       <div id="section-compare">
         <LazySection rootMargin="300px"><CompareLexicons userLexicons={userLexicons} /></LazySection>
-      </div></LazySection>
       </div>
+
+      {/* ============ Domain Overlap ============ */}
+      <LazySection rootMargin="300px"><DomainOverlapSection userLexicons={userLexicons} /></LazySection>
 
       {/* ============ Recent Translations ============ */}
       <AnimatePresence>

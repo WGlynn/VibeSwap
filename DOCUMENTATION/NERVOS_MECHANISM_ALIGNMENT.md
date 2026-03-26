@@ -102,4 +102,4 @@ That's how you know the fit is real.
 
 ---
 
-*This is part of a series on VibeSwap's design philosophy. See also: [Parallel All The Way Down](/link), [The UTXO Advantage](/link), [Provable Fairness](/link).*
+*This is part of a series on VibeSwap's design philosophy. See also: [Parallel All The Way Down](PARALLEL_SYMMETRY_TALK.md), [The UTXO Advantage](VIBESWAP_UTXO_BENEFITS.md), [Provable Fairness](FORMAL_FAIRNESS_PROOFS.md).*

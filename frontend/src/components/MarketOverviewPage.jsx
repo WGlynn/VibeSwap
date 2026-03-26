@@ -705,7 +705,7 @@ export default function MarketOverviewPage() {
           {!isConnected && (
             <motion.div variants={fadeUp} className="mb-8">
               <GlassCard glowColor="matrix" className="p-6 text-center">
-                <div className="text-lg font-semibold mb-2">Connect Your Wallet</div>
+                <div className="text-lg font-semibold mb-2">Sign In</div>
                 <p className="text-sm text-black-400 mb-4 max-w-md mx-auto">
                   Sign in to access personalized watchlists, price alerts, and portfolio tracking
                   powered by VibeSwap's MEV-protected infrastructure.

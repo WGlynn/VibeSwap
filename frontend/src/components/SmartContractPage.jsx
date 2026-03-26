@@ -439,7 +439,7 @@ function WriteFunctionForm({ fn, isConnected }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!isConnected) {
-      setStatus({ type: 'error', message: 'Connect wallet to execute transactions' })
+      setStatus({ type: 'error', message: 'Sign in to execute transactions' })
       return
     }
     const empty = fn.params.find((p) => !params[p.name])
@@ -495,7 +495,7 @@ function WriteFunctionForm({ fn, isConnected }) {
             cursor: isConnected ? 'pointer' : 'not-allowed',
           }}
         >
-          {isConnected ? 'Simulate' : 'Connect Wallet'}
+          {isConnected ? 'Simulate' : 'Sign In'}
         </button>
         {status && (
           <motion.span

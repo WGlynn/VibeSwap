@@ -485,7 +485,7 @@ export default function MEVDashboardPage() {
         ) : (
           <motion.section custom={2} variants={sectionV} initial="hidden" animate="visible">
             <GlassCard className="p-6 text-center">
-              <div className="text-zinc-400 text-sm mb-2">Connect your wallet to view personal MEV savings</div>
+              <div className="text-zinc-400 text-sm mb-2">Sign in to view personal MEV savings</div>
               <div className="text-xs text-zinc-600 font-mono">Your trades are always protected, even without connecting</div>
             </GlassCard>
           </motion.section>

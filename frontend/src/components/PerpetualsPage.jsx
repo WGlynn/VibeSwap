@@ -659,7 +659,7 @@ export default function PerpetualsPage() {
                       : 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/10'
                   } disabled:bg-black-700 disabled:text-black-500 disabled:shadow-none`}
                 >
-                  {!isConnected ? 'Connect Wallet' : `Open ${side === 'long' ? 'Long' : 'Short'} ${leverage}x`}
+                  {!isConnected ? 'Sign In' : `Open ${side === 'long' ? 'Long' : 'Short'} ${leverage}x`}
                 </button>
               </div>
             </GlassCard>

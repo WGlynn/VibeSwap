@@ -459,7 +459,7 @@ function MyPositions({ isConnected }) {
         <GlassCard className="p-8">
           <div className="text-center">
             <div className="text-3xl mb-3 opacity-40">{'\u26A1'}</div>
-            <p className="text-sm font-mono text-black-400">Connect your wallet to view positions</p>
+            <p className="text-sm font-mono text-black-400">Sign in to view positions</p>
             <p className="text-xs font-mono text-black-500 mt-1">Your LP performance data will appear here</p>
           </div>
         </GlassCard>

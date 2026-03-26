@@ -379,7 +379,7 @@ export default function AirdropClaimsPage() {
               <span className="text-2xl font-mono font-bold text-amber-400">?</span>
             </div>
             <p className="text-lg font-mono font-bold text-amber-400 mb-2">
-              Connect Wallet to View Airdrops
+              Sign In to View Airdrops
             </p>
             <p className="text-xs font-mono text-gray-400 max-w-md mx-auto leading-relaxed">
               Sign in with an external wallet or device wallet to check your

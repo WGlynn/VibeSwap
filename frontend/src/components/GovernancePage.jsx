@@ -536,7 +536,7 @@ export default function GovernancePage() {
                     </div>
                   )}
                   {myVote && <div className="mt-3 text-[11px] font-mono text-cyan-400/70 text-center">You voted: {myVote}</div>}
-                  {isActive && !isConnected && <div className="mt-3 text-[10px] font-mono text-black-600 text-center">Connect wallet to vote</div>}
+                  {isActive && !isConnected && <div className="mt-3 text-[10px] font-mono text-black-600 text-center">Sign in to vote</div>}
                 </div>
               )
             })}
@@ -577,7 +577,7 @@ export default function GovernancePage() {
                 <div className="text-sm font-mono text-black-500 text-center py-4">No vote history yet</div>
               )
             ) : (
-              <div className="text-sm font-mono text-black-500 text-center py-4">Connect wallet to view vote history</div>
+              <div className="text-sm font-mono text-black-500 text-center py-4">Sign in to view vote history</div>
             )}
           </div>
         )}
@@ -633,7 +633,7 @@ export default function GovernancePage() {
                 : 'Delegating transfers your voting weight but not your tokens. Revoke at any time.'}
             </div>
           </div>
-        ) : <div className="text-sm font-mono text-black-500 text-center py-4">Connect wallet to manage delegation</div>}
+        ) : <div className="text-sm font-mono text-black-500 text-center py-4">Sign in to manage delegation</div>}
       </Section>
 
       {/* ============ 6. Proposal Creation Form ============ */}
@@ -687,7 +687,7 @@ export default function GovernancePage() {
               </div>
             </motion.div>
           )
-        ) : <div className="text-sm font-mono text-black-500 text-center py-4">{isConnected ? 'Insufficient voting power (need 10,000+)' : 'Connect wallet to create proposals'}</div>}
+        ) : <div className="text-sm font-mono text-black-500 text-center py-4">{isConnected ? 'Insufficient voting power (need 10,000+)' : 'Sign in to create proposals'}</div>}
       </Section>
 
       {/* ============ 7. Governance Timeline ============ */}
@@ -711,7 +711,7 @@ export default function GovernancePage() {
       </Section>
 
       {/* ============ 8. Voting Power Breakdown ============ */}
-      <Section index={5} title="Voting Power Breakdown" subtitle={isConnected ? 'Staked JUL + delegated + LP boost' : 'Connect wallet to view'}>
+      <Section index={5} title="Voting Power Breakdown" subtitle={isConnected ? 'Staked JUL + delegated + LP boost' : 'Sign in to view'}>
         {isConnected ? (
           <div className="space-y-4">
             {/* Pie chart visualization */}
@@ -801,7 +801,7 @@ export default function GovernancePage() {
       {!isConnected && (
         <motion.div className="text-center mt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}>
           <div className="text-black-500 text-xs font-mono py-4 border-t border-black-800/50">
-            Connect wallet to vote on proposals, delegate power, and participate in governance
+            Sign in to vote on proposals, delegate power, and participate in governance
           </div>
         </motion.div>
       )}

@@ -174,7 +174,7 @@ export default function WalletPage() {
             <div className="text-4xl mb-4">🔒</div>
             <h3 className="text-lg font-bold text-white mb-2">Wallet Not Connected</h3>
             <p className="text-sm font-mono text-black-400 mb-4">
-              Connect your wallet to view balances, transactions, and manage your on-chain identity.
+              Sign in to view balances, transactions, and manage your on-chain identity.
             </p>
             <motion.div
               className="inline-block px-4 py-1.5 rounded-full text-xs font-mono"

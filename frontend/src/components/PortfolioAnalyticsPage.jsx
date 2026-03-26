@@ -405,7 +405,7 @@ export default function PortfolioAnalyticsPage() {
                 <PortfolioChart data={portfolioData} color={CYAN} />
               ) : (
                 <div className="text-center py-16 text-black-500 text-sm">
-                  Connect wallet to view portfolio history
+                  Sign in to view portfolio history
                 </div>
               )}
             </GlassCard>

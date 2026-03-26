@@ -563,7 +563,7 @@ function TradeForm({ tokens, onSwap, swapState, isLoading, quote, getQuote, isCo
           onClick={connect}
           className="w-full py-3 rounded-lg font-medium"
         >
-          Connect Wallet to Trade
+          Sign In to Trade
         </InteractiveButton>
       )}
 
@@ -610,7 +610,7 @@ function PositionSummary({ isConnected }) {
   if (positions.length === 0) {
     return (
       <div className="text-center py-6 text-black-500 text-sm">
-        {isConnected ? 'No open positions' : 'Connect wallet to view positions'}
+        {isConnected ? 'No open positions' : 'Sign in to view positions'}
       </div>
     )
   }

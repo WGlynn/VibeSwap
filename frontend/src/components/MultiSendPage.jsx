@@ -398,9 +398,9 @@ export default function MultiSendPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
                     </motion.div>
-                    <h2 className="text-xl font-bold text-white mb-2">Connect Wallet</h2>
+                    <h2 className="text-xl font-bold text-white mb-2">Sign In</h2>
                     <p className="text-black-400 text-sm mb-6 max-w-sm mx-auto">
-                      Connect your wallet to send tokens to multiple recipients in a single gas-efficient transaction.
+                      Sign in to send tokens to multiple recipients in a single gas-efficient transaction.
                     </p>
                     <motion.button
                       whileHover={{ scale: 1.02 }}
@@ -409,7 +409,7 @@ export default function MultiSendPage() {
                       className="px-8 py-3 rounded-xl font-semibold text-sm transition-colors"
                       style={{ backgroundColor: CYAN + '22', color: CYAN, border: `1px solid ${CYAN}33` }}
                     >
-                      Connect Wallet
+                      Sign In
                     </motion.button>
                   </div>
                 </GlassCard>

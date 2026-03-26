@@ -693,7 +693,7 @@ function RouteBuilder({ isConnected }) {
             : 'bg-black-700/50 text-black-500 border border-black-600 cursor-not-allowed'
         }`}
       >
-        {isConnected ? 'Calculate Optimal Route' : 'Connect Wallet to Build Routes'}
+        {isConnected ? 'Calculate Optimal Route' : 'Sign In to Build Routes'}
       </button>
 
       {/* Route result */}

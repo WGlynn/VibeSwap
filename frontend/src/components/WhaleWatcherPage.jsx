@@ -588,7 +588,7 @@ export default function WhaleWatcherPage() {
 
               {!isConnected && (
                 <div className="mt-4 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs font-mono text-blue-400/80">
-                  Connect wallet to enable push notifications for whale alerts
+                  Sign in to enable push notifications for whale alerts
                 </div>
               )}
             </GlassCard>

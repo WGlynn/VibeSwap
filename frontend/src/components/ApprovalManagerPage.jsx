@@ -359,7 +359,7 @@ export default function ApprovalManagerPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.5 }}
             className="mb-6 rounded-xl p-6 text-center"
             style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-[11px] font-mono text-black-400 mb-1">Connect your wallet to view live approvals</p>
+            <p className="text-[11px] font-mono text-black-400 mb-1">Sign in to view live approvals</p>
             <p className="text-[10px] font-mono text-black-600">Showing demo data below</p>
           </motion.div>
         )}

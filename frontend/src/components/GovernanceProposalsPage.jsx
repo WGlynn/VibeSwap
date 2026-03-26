@@ -303,7 +303,7 @@ function DelegationSection({ isConnected }) {
           </div>
         </div>
       ) : (
-        <div className="text-sm font-mono text-black-500 text-center py-4">Connect wallet to delegate voting power</div>
+        <div className="text-sm font-mono text-black-500 text-center py-4">Sign in to delegate voting power</div>
       )}
     </GlassCard>
   )
@@ -323,7 +323,7 @@ function CreateProposalCTA({ isConnected }) {
       <p className="text-[10px] font-mono text-black-500 mb-3">Requires minimum 10,000 VIBE staked</p>
       <div className="h-px mb-3" style={{ background: `linear-gradient(90deg, ${CYAN}40, transparent)` }} />
       {!isConnected ? (
-        <div className="text-sm font-mono text-black-500 text-center py-4">Connect wallet to create proposals</div>
+        <div className="text-sm font-mono text-black-500 text-center py-4">Sign in to create proposals</div>
       ) : mockStaked < 10000 ? (
         <div className="text-center py-4">
           <div className="text-sm font-mono text-black-500 mb-1">Insufficient stake</div>
@@ -480,7 +480,7 @@ export default function GovernanceProposalsPage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 / PHI }}>
               <GlassCard glowColor="none" hover={false} className="p-4">
                 <div className="text-center text-[11px] font-mono text-black-500">
-                  Connect wallet to vote on proposals, delegate power, and submit new proposals
+                  Sign in to vote on proposals, delegate power, and submit new proposals
                 </div>
               </GlassCard>
             </motion.div>

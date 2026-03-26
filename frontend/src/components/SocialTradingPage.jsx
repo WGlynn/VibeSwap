@@ -299,7 +299,7 @@ export default function SocialTradingPage() {
           ) : (
             <motion.div custom={0} variants={cardV} initial="hidden" animate="visible"
               className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="text-[11px] font-mono text-black-500 mb-2">Connect your wallet to configure copy trading</div>
+              <div className="text-[11px] font-mono text-black-500 mb-2">Sign in to configure copy trading</div>
               <div className="text-[10px] font-mono text-black-600">Set allocation limits, stop losses, and start copying top traders</div>
             </motion.div>
           )}
@@ -345,7 +345,7 @@ export default function SocialTradingPage() {
           ) : (
             <motion.div custom={0} variants={cardV} initial="hidden" animate="visible"
               className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="text-[11px] font-mono text-black-500 mb-2">Connect your wallet to view active copy positions</div>
+              <div className="text-[11px] font-mono text-black-500 mb-2">Sign in to view active copy positions</div>
               <div className="text-[10px] font-mono text-black-600">Positions are automatically mirrored when you follow a trader</div>
             </motion.div>
           )}

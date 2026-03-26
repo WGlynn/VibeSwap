@@ -638,7 +638,7 @@ export default function ContributorsPage() {
           <motion.div custom={4} variants={sectionV} initial="hidden" animate="visible">
             <GlassCard className="p-6 text-center" hover={false}>
               <div className="text-sm font-mono text-black-400 mb-3">
-                Connect your wallet to see your contribution stats and claim rewards
+                Sign in to see your contribution stats and claim rewards
               </div>
               <div className="text-[10px] font-mono text-black-500">
                 Your Shapley score is calculated automatically based on on-chain activity

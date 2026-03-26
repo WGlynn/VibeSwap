@@ -115,7 +115,7 @@ export default function NotificationsPage() {
             <div className="p-8 text-center">
               <div className="text-2xl mb-2" style={{ color: `${CYAN}30` }}>{'{ }'}</div>
               <h3 className="text-lg font-bold text-white mb-2 font-mono">No Notifications</h3>
-              <p className="text-sm font-mono text-gray-400">Connect your wallet to receive transaction updates, alerts, and system notifications.</p>
+              <p className="text-sm font-mono text-gray-400">Sign in to receive transaction updates, alerts, and system notifications.</p>
             </div>
           </GlassCard>
         </div>

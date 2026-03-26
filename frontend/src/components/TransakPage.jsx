@@ -313,7 +313,7 @@ function TransakPage() {
                 isConnected && hasAmount
                   ? mode === 'buy' ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
                   : 'bg-black-700 text-black-400 border border-black-700'}`}>
-                {!isConnected ? 'Connect Wallet' : !hasAmount ? 'Enter Amount' : mode === 'buy' ? `Buy ${selectedToken.symbol}` : `Sell ${selectedToken.symbol}`}
+                {!isConnected ? 'Sign In' : !hasAmount ? 'Enter Amount' : mode === 'buy' ? `Buy ${selectedToken.symbol}` : `Sell ${selectedToken.symbol}`}
               </button>
             </GlassCard>
 
@@ -388,7 +388,7 @@ function TransakPage() {
               {tab === 'history' && (
                 <motion.div key="hi" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.18 }}>
                   {!isConnected ? (
-                    <GlassCard className="p-8"><div className="text-center"><p className="text-black-400 text-sm">Connect wallet to view history</p></div></GlassCard>
+                    <GlassCard className="p-8"><div className="text-center"><p className="text-black-400 text-sm">Sign in to view history</p></div></GlassCard>
                   ) : (
                     <div className="space-y-2">
                       {MOCK_HISTORY.map((tx, i) => (

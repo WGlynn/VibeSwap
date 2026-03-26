@@ -327,7 +327,7 @@ function BidPlacement({ isConnected }) {
         }}
       >
         {!isConnected
-          ? 'Connect Wallet to Bid'
+          ? 'Sign In to Bid'
           : !bidAmount || parseFloat(bidAmount) <= 0
             ? 'Enter Bid Amount'
             : `Place Priority Bid — ${bidAmount} JUL`}

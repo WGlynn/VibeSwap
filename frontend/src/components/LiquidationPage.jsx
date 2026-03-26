@@ -206,7 +206,7 @@ function AuctionCard({ auction, index, isConnected }) {
             className="w-full py-2.5 rounded-xl font-bold font-mono text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110"
             style={{ backgroundColor: remaining > 0 ? CYAN : '#374151', color: remaining > 0 ? '#0a0a0a' : '#6B7280' }}
           >
-            {!isConnected ? 'Connect Wallet' : remaining <= 0 ? 'Auction Ended' : `Place Bid (min ${fmt(auction.currentBid + auction.minIncrement)})`}
+            {!isConnected ? 'Sign In' : remaining <= 0 ? 'Auction Ended' : `Place Bid (min ${fmt(auction.currentBid + auction.minIncrement)})`}
           </button>
         </div>
       </GlassCard>
@@ -466,7 +466,7 @@ export default function LiquidationPage() {
           <GlassCard glowColor="terminal" hover={false}>
             <div className="p-8 text-center">
               <div className="text-2xl mb-2" style={{ color: `${CYAN}30` }}>{'{ }'}</div>
-              <div className="text-gray-400 text-sm font-mono">Connect wallet to view your liquidator stats</div>
+              <div className="text-gray-400 text-sm font-mono">Sign in to view your liquidator stats</div>
             </div>
           </GlassCard>
         ) : (
@@ -602,7 +602,7 @@ export default function LiquidationPage() {
                         Initiate Liquidation Auction
                       </button>
                     ) : (
-                      <div className="text-center text-[10px] text-gray-500 font-mono py-2">Connect wallet to initiate liquidation</div>
+                      <div className="text-center text-[10px] text-gray-500 font-mono py-2">Sign in to initiate liquidation</div>
                     )
                   )}
                 </div>

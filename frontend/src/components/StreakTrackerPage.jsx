@@ -545,7 +545,7 @@ export default function StreakTrackerPage() {
                 <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: `${CYAN}15`, border: `2px solid ${CYAN}33` }}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={CYAN} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 </div>
-                <p className="text-lg font-bold font-mono text-white mb-2">Connect Wallet to Track Streaks</p>
+                <p className="text-lg font-bold font-mono text-white mb-2">Sign In to Track Streaks</p>
                 <p className="text-xs font-mono text-white/40 max-w-md mx-auto">Sign in with your wallet to start building your streak, earn JUL rewards, and climb the leaderboard.</p>
               </div>
             </GlassCard>

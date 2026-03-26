@@ -463,7 +463,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
     try {
       await connect()
     } catch (error) {
-      toast.error('Failed to connect wallet')
+      toast.error('Failed to sign in')
     }
   }
 
@@ -653,7 +653,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     ? 'Select Options to Continue'
                     : isConnected
                       ? `Set Up ${selectedOptions.size} Option${selectedOptions.size > 1 ? 's' : ''}`
-                      : 'Connect Wallet to Continue'
+                      : 'Sign In to Continue'
                   }
                 </button>
 
@@ -666,7 +666,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
               </motion.div>
             )}
 
-            {/* Connect Wallet Step */}
+            {/* Sign In Step */}
             {step === 'connect' && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -679,7 +679,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Connect Your Wallet</h3>
+                  <h3 className="text-xl font-bold mb-2">Sign In</h3>
                   <p className="text-black-400 text-sm">
                     Your wallet signature confirms each recovery setting.
                   </p>
@@ -690,7 +690,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     <div className="flex items-center space-x-3">
                       <span className="text-matrix-500">✓</span>
                       <div>
-                        <div className="font-medium text-sm text-matrix-400">Wallet Connected</div>
+                        <div className="font-medium text-sm text-matrix-400">Signed In</div>
                         <div className="text-xs text-black-400 font-mono">{account}</div>
                       </div>
                     </div>
@@ -700,7 +700,7 @@ Timestamp: ${Math.floor(Date.now() / 1000)}`
                     onClick={handleConnect}
                     className="w-full py-3 rounded-lg bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold transition-colors"
                   >
-                    Connect Wallet
+                    Sign In
                   </button>
                 )}
 

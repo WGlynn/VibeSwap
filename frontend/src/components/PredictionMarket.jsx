@@ -191,7 +191,7 @@ function BuySharesForm({ market, isConnected }) {
             ? 'bg-green-500 hover:bg-green-400 disabled:bg-black-700 text-white disabled:text-black-500'
             : 'bg-red-500 hover:bg-red-400 disabled:bg-black-700 text-white disabled:text-black-500'
         }`}>
-        {!isConnected ? 'Connect Wallet' : submitting ? 'Confirming...' : `Buy ${side.toUpperCase()} Shares`}
+        {!isConnected ? 'Sign In' : submitting ? 'Confirming...' : `Buy ${side.toUpperCase()} Shares`}
       </button>
     </form>
   )
@@ -400,7 +400,7 @@ function CreateMarketForm({ isConnected }) {
           className={`w-full py-2.5 font-mono text-sm font-bold rounded-lg transition-colors ${
             isConnected && isValid ? 'hover:opacity-90 text-black' : 'bg-black-700 text-black-500'
           }`} style={isConnected && isValid ? { backgroundColor: CYAN } : undefined}>
-          {!isConnected ? 'Connect Wallet' : submitting ? 'Submitting...' : 'Submit for Approval'}
+          {!isConnected ? 'Sign In' : submitting ? 'Submitting...' : 'Submit for Approval'}
         </button>
       </form>
       <AnimatePresence>
@@ -417,7 +417,7 @@ function CreateMarketForm({ isConnected }) {
 function PortfolioView({ positions, markets, trades, winnings, isConnected }) {
   if (!isConnected) return (
     <div className="text-center py-12">
-      <p className="text-black-400 font-mono text-sm">Connect wallet to view portfolio</p>
+      <p className="text-black-400 font-mono text-sm">Sign in to view portfolio</p>
     </div>
   )
 
@@ -536,7 +536,7 @@ function PortfolioView({ positions, markets, trades, winnings, isConnected }) {
 function ResolutionHistory({ resolved, isConnected }) {
   if (!isConnected) return (
     <div className="text-center py-12">
-      <p className="text-black-400 font-mono text-sm">Connect wallet to view history</p>
+      <p className="text-black-400 font-mono text-sm">Sign in to view history</p>
     </div>
   )
 

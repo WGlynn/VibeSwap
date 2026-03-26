@@ -394,7 +394,7 @@ export default function LeaderboardPage() {
               style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <div className="text-[11px] font-mono text-black-500 mb-2">
-                Connect your wallet to see your ranking
+                Sign in to see your ranking
               </div>
               <div className="text-[10px] font-mono text-black-600">
                 Track your PnL, volume, and position on the leaderboard

@@ -369,7 +369,7 @@ function HowItWorks() {
         <GlassCard className="p-5" glowColor={isConnected ? 'matrix' : 'terminal'}>
           {isConnected ? (
             <>
-              <p className="text-sm font-bold mb-1" style={{ color: GREEN }}>Wallet Connected</p>
+              <p className="text-sm font-bold mb-1" style={{ color: GREEN }}>Signed In</p>
               <p className="text-xs text-gray-400 mb-3">You are ready to trade with MEV protection.</p>
               <a
                 href="/swap"
@@ -382,7 +382,7 @@ function HowItWorks() {
           ) : (
             <>
               <p className="text-sm font-bold mb-1" style={{ color: CYAN }}>Ready to try fair trading?</p>
-              <p className="text-xs text-gray-400">Connect your wallet to start trading with zero MEV extraction.</p>
+              <p className="text-xs text-gray-400">Sign in to start trading with zero MEV extraction.</p>
             </>
           )}
         </GlassCard>

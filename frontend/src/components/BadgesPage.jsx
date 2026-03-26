@@ -601,7 +601,7 @@ export default function BadgesPage() {
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </div>
-                <p className="text-lg font-bold font-mono text-white mb-2">Connect Wallet to View Badges</p>
+                <p className="text-lg font-bold font-mono text-white mb-2">Sign In to View Badges</p>
                 <p className="text-xs font-mono text-white/40 max-w-md mx-auto">
                   Sign in with your wallet to see which badges you have earned and track your progress
                   toward unlocking new achievements.

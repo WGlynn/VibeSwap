@@ -20,7 +20,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: 'How do I start trading?',
-        a: 'Simply connect your wallet using MetaMask, WalletConnect, or create a device wallet with your fingerprint or face ID. Once connected, navigate to the Swap page, select your tokens, enter an amount, and confirm. Your order enters the next 10-second batch automatically.',
+        a: 'Simply sign in using MetaMask, WalletConnect, or create a device wallet with your fingerprint or face ID. Once connected, navigate to the Swap page, select your tokens, enter an amount, and confirm. Your order enters the next 10-second batch automatically.',
         link: { text: 'Learn more', to: '/swap' },
       },
       {

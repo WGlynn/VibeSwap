@@ -354,7 +354,7 @@ export default function PortfolioRebalancerPage() {
               <div className="text-4xl mb-4">◎</div>
               <h2 className="text-xl font-mono font-bold text-white mb-2">Connect to Rebalance</h2>
               <p className="text-sm font-mono text-gray-400 mb-4 max-w-md mx-auto">
-                Connect your wallet to view your portfolio, set target allocations, and execute one-click rebalancing across all positions.
+                Sign in to view your portfolio, set target allocations, and execute one-click rebalancing across all positions.
               </p>
               <Link
                 to="/"

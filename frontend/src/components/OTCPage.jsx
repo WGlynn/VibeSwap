@@ -272,7 +272,7 @@ export default function OTCPage() {
                       color: isConnected && meetsMin ? CYAN : 'rgba(255,255,255,0.3)',
                       border: `1px solid ${isConnected && meetsMin ? 'rgba(6,182,212,0.3)' : 'rgba(255,255,255,0.06)'}` }}
                     onClick={isConnected ? undefined : connect}>
-                    {!isConnected ? 'Connect Wallet to Submit RFQ' : !meetsMin ? `Minimum ${fmt(MIN_TRADE)}` : 'Submit RFQ'}
+                    {!isConnected ? 'Sign In to Submit RFQ' : !meetsMin ? `Minimum ${fmt(MIN_TRADE)}` : 'Submit RFQ'}
                   </motion.button>
                 </GlassCard>
               </Section>

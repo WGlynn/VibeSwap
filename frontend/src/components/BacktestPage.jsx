@@ -508,7 +508,7 @@ export default function BacktestPage() {
                       Deploy Strategy
                     </Link>
                   </div>
-                  {!isConnected && <div className="mt-3 text-center text-[11px] font-mono text-white/25">Connect wallet to deploy strategies with real capital</div>}
+                  {!isConnected && <div className="mt-3 text-center text-[11px] font-mono text-white/25">Sign in to deploy strategies with real capital</div>}
                 </GlassCard>
               </Section>
             </motion.div>

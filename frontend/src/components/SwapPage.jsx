@@ -219,7 +219,7 @@ function SwapPage() {
   const getButtonText = () => {
     if (isDemo && !isConnected) {
       if (!amountIn) return 'enter amount to try'
-      if (demoCompleted) return 'demo complete! connect wallet to trade for real'
+      if (demoCompleted) return 'demo complete! sign in to trade for real'
       return 'try demo exchange'
     }
     if (!isConnected) return 'get started'
@@ -298,7 +298,7 @@ function SwapPage() {
               onClick={connect}
               className="text-xs px-3 py-1 rounded bg-terminal-500/20 text-terminal-500 hover:bg-terminal-500/30 transition-colors"
             >
-              connect wallet for real trades
+              sign in for real trades
             </button>
           </div>
         </motion.div>
@@ -325,7 +325,7 @@ function SwapPage() {
               onClick={connect}
               className="px-4 py-2 rounded-lg bg-matrix-600 hover:bg-matrix-500 text-black-900 font-medium text-sm transition-colors"
             >
-              connect wallet
+              sign in
             </button>
           </div>
         </motion.div>

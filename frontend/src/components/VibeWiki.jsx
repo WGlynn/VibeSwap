@@ -70,7 +70,7 @@ const ARTICLES = [
     pinned: true,
     preview: 'Complete beginner guide to connecting your wallet, making your first swap, and exploring the ecosystem.',
     content: [
-      { heading: 'Connect Your Wallet', body: '**External wallets** (MetaMask, Rabby, WalletConnect) work out of the box \u2014 click "Sign In" and select yours. **Device wallets** use your Secure Element via WebAuthn passkeys; your private key never leaves the hardware. This is the most secure option for everyday trading.' },
+      { heading: 'Sign In', body: '**External wallets** (MetaMask, Rabby, WalletConnect) work out of the box \u2014 click "Sign In" and select yours. **Device wallets** use your Secure Element via WebAuthn passkeys; your private key never leaves the hardware. This is the most secure option for everyday trading.' },
       { heading: 'Your First Swap', body: 'Select input/output tokens, enter the amount, click "Commit Swap." Your order enters the next 10-second batch auction. During the commit phase your details are hidden; after reveals, all orders settle at a single uniform clearing price.\n\nBeyond swapping, explore liquidity provision with **IL protection**, governance through **conviction voting**, cross-chain bridging via **LayerZero V2**, and reputation tied to your on-chain identity.' },
     ],
   },

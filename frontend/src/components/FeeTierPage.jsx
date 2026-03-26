@@ -410,7 +410,7 @@ export default function FeeTierPage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               transition={{ duration: 1 / PHI, delay: 1.2 }} className="text-center py-6">
               <div className="text-xs font-mono text-black-500">
-                Connect your wallet to see your trading activity and pool participation
+                Sign in to see your trading activity and pool participation
               </div>
             </motion.div>
           )}

@@ -603,7 +603,7 @@ const getAdaptiveTips = (cryptoLevel) => {
     return [
       {
         hook: 'new to crypto?',
-        message: "That's okay! VibeSwap works the same for everyone. Just connect your wallet, pick your tokens, and trade.",
+        message: "That's okay! VibeSwap works the same for everyone. Just sign in, pick your tokens, and trade.",
       },
       {
         hook: 'worried about mistakes?',

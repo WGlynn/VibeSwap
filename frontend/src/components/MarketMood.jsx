@@ -369,7 +369,7 @@ function MarketMood() {
             </div>
           ) : (
             <div className="text-center py-4">
-              <p className="text-xs text-gray-500 mb-1">Connect wallet to view detailed sentiment factors</p>
+              <p className="text-xs text-gray-500 mb-1">Sign in to view detailed sentiment factors</p>
               <p className="text-[10px] text-gray-600">BTC dominance, volatility, volume, social signals, whale activity</p>
             </div>
           )}

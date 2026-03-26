@@ -188,8 +188,8 @@ export default function PrivacyPage() {
         {[
           { label: 'Pool TVL', val: '8,932 ETH', sub: '~$25M' },
           { label: 'Anonymous Set', val: '2,695', sub: 'active deposits' },
-          { label: 'Your Deposits', val: isConnected ? '2' : '--', sub: isConnected ? '1.1 ETH shielded' : 'connect wallet' },
-          { label: 'Withdrawal Ready', val: isConnected ? '1' : '--', sub: isConnected ? '1 ETH available' : 'connect wallet' },
+          { label: 'Your Deposits', val: isConnected ? '2' : '--', sub: isConnected ? '1.1 ETH shielded' : 'sign in' },
+          { label: 'Withdrawal Ready', val: isConnected ? '1' : '--', sub: isConnected ? '1 ETH available' : 'sign in' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 + i * 0.06 * PHI }}>
@@ -257,7 +257,7 @@ export default function PrivacyPage() {
             className="w-full py-3 rounded-xl font-mono font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: isConnected ? CYAN : 'rgba(255,255,255,0.06)', color: isConnected ? '#0a0a0a' : 'rgba(255,255,255,0.3)' }}
             whileHover={isConnected ? { scale: 1.01 } : undefined} whileTap={isConnected ? { scale: 0.99 } : undefined}>
-            {isConnected ? `Deposit ${denom.label} into Shielded Pool` : 'Connect Wallet to Deposit'}
+            {isConnected ? `Deposit ${denom.label} into Shielded Pool` : 'Sign In to Deposit'}
           </motion.button>
         </GlassCard>
       </Section>
@@ -296,7 +296,7 @@ export default function PrivacyPage() {
             style={{ backgroundColor: isConnected && withdrawNote && recipientAddr ? CYAN : 'rgba(255,255,255,0.06)',
               color: isConnected && withdrawNote && recipientAddr ? '#0a0a0a' : 'rgba(255,255,255,0.3)' }}
             whileHover={isConnected ? { scale: 1.01 } : undefined} whileTap={isConnected ? { scale: 0.99 } : undefined}>
-            {isConnected ? 'Generate ZK Proof & Withdraw' : 'Connect Wallet to Withdraw'}
+            {isConnected ? 'Generate ZK Proof & Withdraw' : 'Sign In to Withdraw'}
           </motion.button>
         </GlassCard>
       </Section>

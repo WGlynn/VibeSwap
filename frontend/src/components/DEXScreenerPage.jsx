@@ -836,7 +836,7 @@ export default function DEXScreenerPage() {
             <GlassCard glowColor="terminal" className="p-8 text-center">
               <div className="text-lg font-bold mb-2">Connect to Track & Trade</div>
               <p className="text-sm text-zinc-400 max-w-md mx-auto mb-4">
-                Connect your wallet to set price alerts, add tokens to your watchlist, and trade directly from the screener.
+                Sign in to set price alerts, add tokens to your watchlist, and trade directly from the screener.
               </p>
               <Link
                 to="/wallet"

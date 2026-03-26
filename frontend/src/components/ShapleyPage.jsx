@@ -498,13 +498,13 @@ export default function ShapleyPage() {
         </GlassCard>
       </Section>
 
-      {/* ============ 8. Your Position (Wallet Connected) ============ */}
+      {/* ============ 8. Your Position (Signed In) ============ */}
       <Section title="Your Position">
         {!isConnected ? (
           <GlassCard glowColor="terminal" hover={false}>
             <div className="p-8 text-center">
               <div className="text-2xl mb-2" style={{ color: `${CYAN}30` }}>φᵢ</div>
-              <div className="text-gray-400 text-sm font-mono">Connect wallet to view your Shapley position</div>
+              <div className="text-gray-400 text-sm font-mono">Sign in to view your Shapley position</div>
               <div className="text-gray-600 text-xs font-mono mt-1">See your marginal contribution and reward share across all pools</div>
             </div>
           </GlassCard>

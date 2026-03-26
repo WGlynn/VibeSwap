@@ -1593,8 +1593,7 @@ export default function RosettaPage() {
         />
       </div>
 
-      {/* ============ Ten Covenants ============ */}
-      <TenCovenantsSection />
+      {/* Ten Covenants moved to dedicated governance page */}
 
       {/* ============ Lexicon Grid — AI Agents ============ */}
       <div className="mb-4">

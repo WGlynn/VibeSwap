@@ -221,8 +221,8 @@ Pick two:
 
 ## Q&A
 
-Contact: [your contact]
-GitHub: [repo link]
+GitHub: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
+X: [@viaborz](https://x.com/viaborz)
 Security paper: `docs/wallet-security-fundamentals-2018.md`
 
 ---

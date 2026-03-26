@@ -2443,7 +2443,8 @@ function ConceptChainFinder({ userLexicons = [] }) {
   )
 }
 
-// ============ Ten Covenants Section ============
+// ============ Ten Covenants Section (REMOVED — not relevant to translation page) ============
+// Components preserved in git history (commit 701c494) if ever needed on a governance page.
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 

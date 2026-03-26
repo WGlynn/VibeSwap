@@ -283,7 +283,7 @@ function AgentDot({ color, size = 8 }) {
 
 // ============ Lexicon Select Dropdown (agents + user lexicons) ============
 
-function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [] }) {
+function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [], selectId }) {
   const allOptions = [
     ...ALL_LEXICONS.map(l => ({ id: l.id, name: l.name, color: l.color })),
     ...userLexicons.map(u => ({
@@ -302,6 +302,7 @@ function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [] })
       </label>
       <div className="relative">
         <select
+          id={selectId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
@@ -1086,6 +1087,7 @@ function DiscoverSection({ onSuggestionClick }) {
         </div>
         <input
           ref={inputRef}
+          id="rosetta-discover-input"
           type="text"
           value={searchTerm}
           onChange={(e) => handleInputChange(e.target.value)}
@@ -1821,6 +1823,7 @@ function SentenceTranslator({ userLexicons = [] }) {
           </label>
           <div className="relative">
             <textarea
+              id="rosetta-sentence-textarea"
               value={sourceText}
               onChange={(e) => { setSourceText(e.target.value); setResult(null); setActiveTermIdx(null) }}
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleTranslate() }}
@@ -2120,7 +2123,7 @@ function ConceptChainFinder({ userLexicons = [] }) {
       <div className="flex flex-col sm:flex-row gap-2 mt-4">
         <div className="flex-1">
           <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Term A</label>
-          <input type="text" value={termA}
+          <input id="rosetta-chain-term-a" type="text" value={termA}
             onChange={(e) => { setTermA(e.target.value); setResult(null); setSelectedNode(null) }}
             onKeyDown={handleKey}
             placeholder="e.g. triage, liquidity, cadence..."
@@ -3054,6 +3057,7 @@ export default function RosettaPage() {
             }}
             excludeId={toId}
             userLexicons={userLexicons}
+            selectId="rosetta-translate-from"
           />
 
           {!translateAll && (

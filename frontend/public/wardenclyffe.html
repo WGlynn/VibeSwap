@@ -95,15 +95,22 @@
   <div class="hint-box">
     This message is encrypted with a <span class="hl">Vigenère cipher</span> — a polyalphabetic substitution
     where each letter of the keyword shifts the corresponding plaintext letter by a different amount.<br><br>
-    <span class="hl">The keyword</span> is 5 letters. It is the name of the protocol.<br>
-    The alphabet table below updates as you type. When the keyword is correct, the message decrypts.<br><br>
+    <span class="hl">The keyword</span> is hidden in this riddle:<br><br>
+    <span style="color:var(--green); line-height: 2.2;">
+    &nbsp;&nbsp;I am not a sound, yet I resonate.<br>
+    &nbsp;&nbsp;I am not a frequency, yet I oscillate.<br>
+    &nbsp;&nbsp;I am the plural of a feeling<br>
+    &nbsp;&nbsp;that markets were never supposed to have.<br>
+    &nbsp;&nbsp;Five letters. What Tesla transmitted.<br>
+    &nbsp;&nbsp;What Faraday induced. What the protocol emits.<br>
+    </span><br>
     <span style="color:#444">Blaise de Vigenère, 1553. Unbroken for 300 years. Crackable by hand with the keyword.</span>
   </div>
 
   <div class="control-panel">
     <div class="control-label">ENTER THE KEYWORD</div>
     <input class="keyword-input" id="keywordInput" type="text" maxlength="10" placeholder="_ _ _ _ _" autocomplete="off" spellcheck="false">
-    <div class="keyword-help">5 letters — the name of this protocol</div>
+    <div class="keyword-help">5 letters — solve the riddle above</div>
   </div>
 
   <!-- Live alphabet substitution table -->

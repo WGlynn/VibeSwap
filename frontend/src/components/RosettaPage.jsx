@@ -379,6 +379,60 @@ function CopyButton({ text }) {
   )
 }
 
+// ============ Share Button ============
+
+function ShareButton() {
+  const [toast, setToast] = useState(false)
+
+  const handleShare = useCallback(() => {
+    const url = window.location.href
+    navigator.clipboard.writeText(url).then(() => {
+      setToast(true)
+      setTimeout(() => setToast(false), 2500)
+    })
+  }, [])
+
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        onClick={handleShare}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider transition-all hover:opacity-90 active:scale-[0.97]"
+        style={{
+          backgroundColor: 'rgba(0,255,65,0.10)',
+          border: '1px solid rgba(0,255,65,0.30)',
+          color: '#00ff41',
+        }}
+        title="Copy shareable link"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+        </svg>
+        Share
+      </button>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.92 }}
+            transition={{ duration: 0.2 }}
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold whitespace-nowrap pointer-events-none z-50"
+            style={{
+              backgroundColor: 'rgba(0,255,65,0.15)',
+              border: '1px solid rgba(0,255,65,0.40)',
+              color: '#00ff41',
+              boxShadow: '0 0 12px rgba(0,255,65,0.25)',
+            }}
+          >
+            Link copied!
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ============ Translation Result Card ============
 
 function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
@@ -408,7 +462,10 @@ function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
     >
       <GlassCard glowColor="matrix" spotlight className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Translation Result</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">Translation Result</span>
+            <ShareButton />
+          </div>
           <span
             className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full"
             style={{
@@ -494,11 +551,14 @@ function TranslateAllResults({ results, fromId, userLexicons = [] }) {
       className="mt-4"
     >
       <GlassCard glowColor="terminal" spotlight className="p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <AgentDot color={from?.color} size={8} />
-          <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
-            {from?.name} &rarr; All Lexicons
-          </span>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <AgentDot color={from?.color} size={8} />
+            <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
+              {from?.name} &rarr; All Lexicons
+            </span>
+          </div>
+          <ShareButton />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -918,7 +978,12 @@ const DISCOVER_SUGGESTIONS = [
 function DiscoverSection({ onSuggestionClick }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState(null)
+  const [suggestions, setSuggestions] = useState([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const [suggestionIdx] = useState(() => Math.floor(Math.random() * DISCOVER_SUGGESTIONS.length))
+  const inputRef = useRef(null)
+  const dropdownRef = useRef(null)
 
   // Rotate suggestion every 3s when input is empty
   const [rotatingIdx, setRotatingIdx] = useState(suggestionIdx)
@@ -934,14 +999,73 @@ function DiscoverSection({ onSuggestionClick }) {
     : `Try searching: "${DISCOVER_SUGGESTIONS[rotatingIdx]}"...`
 
   // Instant — engine is synchronous + in-memory, no debounce needed
+  const runSearch = useCallback((value) => {
+    if (!value.trim()) { setResults(null); return }
+    setResults(discoverEquivalent(value.trim()))
+  }, [])
+
   const handleInputChange = useCallback((value) => {
     setSearchTerm(value)
+    setActiveIndex(-1)
     if (!value.trim()) {
+      setSuggestions([])
+      setShowDropdown(false)
       setResults(null)
       return
     }
-    const data = discoverEquivalent(value.trim())
-    setResults(data)
+    const hits = autocomplete(value, 8)
+    setSuggestions(hits)
+    setShowDropdown(hits.length > 0)
+    runSearch(value)
+  }, [runSearch])
+
+  const commitSuggestion = useCallback((suggestion) => {
+    const term = suggestion.term.replace(/_/g, ' ')
+    setSearchTerm(term)
+    setSuggestions([])
+    setShowDropdown(false)
+    setActiveIndex(-1)
+    runSearch(term)
+    inputRef.current?.focus()
+  }, [runSearch])
+
+  const handleKeyDown = useCallback((e) => {
+    if (!showDropdown || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex(i => Math.min(i + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex(i => Math.max(i - 1, -1))
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault()
+      commitSuggestion(suggestions[activeIndex])
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false)
+      setActiveIndex(-1)
+    }
+  }, [showDropdown, suggestions, activeIndex, commitSuggestion])
+
+  const handleBlur = useCallback(() => {
+    // Delay so mousedown on a suggestion fires before the dropdown hides
+    setTimeout(() => {
+      if (!dropdownRef.current?.contains(document.activeElement)) {
+        setShowDropdown(false)
+        setActiveIndex(-1)
+      }
+    }, 150)
+  }, [])
+
+  const handleFocus = useCallback(() => {
+    if (suggestions.length > 0) setShowDropdown(true)
+  }, [suggestions])
+
+  const clearSearch = useCallback(() => {
+    setSearchTerm('')
+    setResults(null)
+    setSuggestions([])
+    setShowDropdown(false)
+    setActiveIndex(-1)
   }, [])
 
   const activeSearch = searchTerm.trim()
@@ -953,29 +1077,99 @@ function DiscoverSection({ onSuggestionClick }) {
         Type any word — see how every domain expresses the same concept. Results appear instantly.
       </p>
 
+      {/* Search input + autocomplete dropdown */}
       <div className="relative">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">
           <svg className="w-4 h-4 text-black-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
         <input
+          ref={inputRef}
           type="text"
           value={searchTerm}
           onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder={activePlaceholder}
+          autoComplete="off"
           className="w-full bg-black-900/80 border border-black-700 rounded-lg pl-9 pr-10 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
         />
         {searchTerm && (
           <button
-            onClick={() => { setSearchTerm(''); setResults(null) }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors"
+            onClick={clearSearch}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors z-10"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         )}
+
+        {/* Autocomplete dropdown */}
+        <AnimatePresence>
+          {showDropdown && suggestions.length > 0 && (
+            <motion.div
+              ref={dropdownRef}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-black-700 overflow-hidden"
+              style={{ background: 'rgba(5,10,8,0.97)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+            >
+              {suggestions.map((s, i) => {
+                const isUser = s.lexiconId?.startsWith('user:')
+                const meta = !isUser ? LEXICON_MAP[s.lexiconId] : null
+                const dotColor = meta?.color || USER_LEXICON_COLOR
+                const domainLabel = meta?.name || s.domain || s.lexiconId
+                return (
+                  <button
+                    key={`${s.lexiconId}:${s.term}`}
+                    onMouseDown={(e) => { e.preventDefault(); commitSuggestion(s) }}
+                    onMouseEnter={() => setActiveIndex(i)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-black-800 last:border-b-0"
+                    style={{ background: i === activeIndex ? 'rgba(0,255,65,0.07)' : 'transparent' }}
+                  >
+                    {/* Domain colored dot */}
+                    <span
+                      className="inline-block rounded-full flex-shrink-0"
+                      style={{
+                        width: 8,
+                        height: 8,
+                        backgroundColor: dotColor,
+                        boxShadow: `0 0 5px ${dotColor}70`,
+                      }}
+                    />
+                    {/* Term + short description */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[13px] font-mono text-white">
+                        <HighlightMatch text={s.term.replace(/_/g, ' ')} query={activeSearch} />
+                      </span>
+                      {s.description && (
+                        <span className="text-[10px] font-mono text-black-500 ml-2">
+                          {s.description.length > 60 ? s.description.slice(0, 60) + '\u2026' : s.description}
+                        </span>
+                      )}
+                    </div>
+                    {/* Domain pill */}
+                    <span
+                      className="flex-shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: `${dotColor}15`,
+                        color: dotColor,
+                        border: `1px solid ${dotColor}30`,
+                      }}
+                    >
+                      {domainLabel}
+                    </span>
+                  </button>
+                )
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Discover results — instant, no AnimatePresence key flicker */}
@@ -1043,7 +1237,6 @@ function DiscoverSection({ onSuggestionClick }) {
     </GlassCard>
   )
 }
-
 // ============ My Lexicon Panel ============
 
 function MyLexiconPanel({ userId, isConnected }) {
@@ -1792,6 +1985,353 @@ function SentenceTranslator({ userLexicons = [] }) {
 }
 
 
+// ============ Related Concepts Panel ============
+
+function RelatedConceptsPanel({ universalKey, onClose, userLexicons = [] }) {
+  const data = useMemo(() => getRelatedConcepts(universalKey), [universalKey])
+  if (!data) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="mt-4 rounded-xl border overflow-hidden"
+      style={{ background: 'rgba(8,12,8,0.92)', borderColor: 'rgba(0,255,65,0.2)' }}
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(0,255,65,0.12)' }}>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#00ff41', boxShadow: '0 0 6px #00ff4180' }} />
+          <span className="text-[11px] font-mono font-semibold text-white">{universalKey}</span>
+          {data.found && (
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(0,255,65,0.1)', color: '#00ff41' }}>
+              {data.sourceLexiconCount} domain{data.sourceLexiconCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <button onClick={onClose} className="text-black-600 hover:text-black-400 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="p-4">
+        {data.definition && <p className="text-[11px] font-mono text-black-400 mb-3 italic">{data.definition}</p>}
+        {!data.found ? (
+          <p className="text-[11px] font-mono text-black-500">{data.error}</p>
+        ) : data.related.length === 0 ? (
+          <p className="text-[11px] font-mono text-black-500">No related concepts found.</p>
+        ) : (
+          <>
+            <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider mb-2">
+              Conceptual neighbors &mdash; sorted by co-occurrence
+            </div>
+            <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
+              {data.related.map((rel, i) => (
+                <motion.div
+                  key={rel.universal}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.025 }}
+                  className="p-2.5 rounded-lg border"
+                  style={{ backgroundColor: 'rgba(15,20,15,0.5)', borderColor: 'rgba(37,37,37,0.8)' }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-white text-[11px] font-mono font-semibold">{rel.universal}</span>
+                    <span className="text-[8px] font-mono font-bold px-1 py-0.5 rounded flex-shrink-0" style={{ backgroundColor: 'rgba(0,255,65,0.1)', color: '#00ff41' }}>
+                      {rel.coOccurrenceScore}
+                    </span>
+                  </div>
+                  {rel.definition && <p className="text-[10px] font-mono text-black-500 mb-1.5">{rel.definition}</p>}
+                  {rel.sampleTerms.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {rel.sampleTerms.map((st, si) => {
+                        const meta = getLexiconLabel(st.lexicon, userLexicons)
+                        if (!meta) return null
+                        return (
+                          <span key={si} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono"
+                            style={{ backgroundColor: `${meta.color}14`, border: `1px solid ${meta.color}2a`, color: meta.color }}>
+                            <span className="inline-block rounded-full flex-shrink-0" style={{ width: 4, height: 4, backgroundColor: meta.color }} />
+                            {st.term}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+// ============ Concept Chain Finder ============
+
+function getNodeColor(universalKey) {
+  for (const [id, lex] of Object.entries(LEXICONS)) {
+    for (const [, mapping] of Object.entries(lex.concepts)) {
+      if (mapping.universal === universalKey) {
+        const isAgent = AI_AGENT_IDS.includes(id)
+        return isAgent ? (AGENT_COLORS[id] || '#00ff41') : (HUMAN_DOMAIN_COLORS[id] || '#94a3b8')
+      }
+    }
+  }
+  return '#00ff41'
+}
+
+function ConceptChainFinder({ userLexicons = [] }) {
+  const [termA, setTermA] = useState('')
+  const [termB, setTermB] = useState('')
+  const [result, setResult] = useState(null)
+  const [selectedNode, setSelectedNode] = useState(null)
+
+  const handleFind = useCallback(() => {
+    if (!termA.trim() || !termB.trim()) return
+    setSelectedNode(null)
+    setResult(getConceptChain(termA.trim().toLowerCase(), termB.trim().toLowerCase()))
+  }, [termA, termB])
+
+  const handleKey = useCallback((e) => {
+    if (e.key === 'Enter' && termA.trim() && termB.trim()) handleFind()
+  }, [termA, termB, handleFind])
+
+  const handleNodeClick = useCallback((k) => setSelectedNode(prev => prev === k ? null : k), [])
+  const isDirect = result?.found && result?.hops === 0
+
+  return (
+    <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            Concept Chain
+            <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(0,255,65,0.12)', color: '#00ff41' }}>NEW</span>
+          </h2>
+          <p className="text-black-500 text-[10px] font-mono mt-0.5">
+            Find the shortest path between any two terms through the universal concept graph. Click any node to explore its neighbors.
+          </p>
+        </div>
+      </div>
+
+      {/* Inputs */}
+      <div className="flex flex-col sm:flex-row gap-2 mt-4">
+        <div className="flex-1">
+          <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Term A</label>
+          <input type="text" value={termA}
+            onChange={(e) => { setTermA(e.target.value); setResult(null); setSelectedNode(null) }}
+            onKeyDown={handleKey}
+            placeholder="e.g. triage, liquidity, cadence..."
+            className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+          />
+        </div>
+        <div className="flex items-end pb-0.5 flex-shrink-0">
+          <div className="w-8 h-9 flex items-center justify-center text-black-600 text-lg font-mono select-none">&#8596;</div>
+        </div>
+        <div className="flex-1">
+          <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Term B</label>
+          <input type="text" value={termB}
+            onChange={(e) => { setTermB(e.target.value); setResult(null); setSelectedNode(null) }}
+            onKeyDown={handleKey}
+            placeholder="e.g. leverage, fault tolerance..."
+            className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+          />
+        </div>
+        <div className="flex items-end pb-0.5 flex-shrink-0">
+          <button onClick={handleFind} disabled={!termA.trim() || !termB.trim()}
+            className={`px-5 h-9 rounded-lg font-mono text-sm font-bold transition-all ${termA.trim() && termB.trim() ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]' : 'bg-black-800 text-black-600 cursor-not-allowed'}`}
+          >
+            Find Path
+          </button>
+        </div>
+      </div>
+
+      {/* Results */}
+      <AnimatePresence mode="wait">
+        {result && (
+          <motion.div
+            key={result.termA + '|' + result.termB}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="mt-5"
+          >
+            {/* Error */}
+            {!result.found && result.error && (
+              <div className="p-4 rounded-xl border text-center" style={{ backgroundColor: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.2)' }}>
+                <p className="text-red-400 text-xs font-mono">{result.error}</p>
+                {result.suggestions?.length > 0 && (
+                  <div className="mt-2">
+                    <span className="text-[10px] font-mono text-black-500">Did you mean: </span>
+                    {result.suggestions.map((s) => (
+                      <button key={s}
+                        onClick={() => { if (result.error?.includes(`'${termA}'`)) setTermA(s); else setTermB(s); setResult(null) }}
+                        className="text-[10px] font-mono text-matrix-400 hover:text-matrix-300 underline mx-1 transition-colors"
+                      >{s}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Direct match */}
+            {result.found && isDirect && (
+              <div className="p-4 rounded-xl border text-center" style={{ backgroundColor: 'rgba(0,255,65,0.06)', borderColor: 'rgba(0,255,65,0.25)' }}>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-matrix-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-matrix-400 font-mono font-bold text-sm">Direct match!</span>
+                </div>
+                <p className="text-[11px] font-mono text-black-400">
+                  <span className="text-white font-semibold">&ldquo;{result.termA}&rdquo;</span>
+                  {' '}and{' '}
+                  <span className="text-white font-semibold">&ldquo;{result.termB}&rdquo;</span>
+                  {' '}both map to the same universal concept.
+                </p>
+                {result.path[0] && (
+                  <button onClick={() => handleNodeClick(result.path[0].node)}
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-mono text-xs transition-all hover:opacity-80"
+                    style={{ backgroundColor: 'rgba(0,255,65,0.1)', borderColor: 'rgba(0,255,65,0.3)', color: '#00ff41' }}
+                  >
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#00ff41', boxShadow: '0 0 5px #00ff4180' }} />
+                    {result.path[0].node}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Multi-hop chain */}
+            {result.found && !isDirect && result.path.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
+                    {result.hops} hop{result.hops !== 1 ? 's' : ''}
+                  </span>
+                  <span className="text-[10px] font-mono text-black-700">/</span>
+                  <span className="text-[10px] font-mono text-black-500">{result.path.length} nodes</span>
+                  <span className="text-[10px] font-mono text-black-700">&mdash;</span>
+                  <span className="text-[10px] font-mono text-black-500">click any node to explore</span>
+                </div>
+
+                {/* Chain — horizontally scrollable */}
+                <div className="overflow-x-auto pb-2">
+                  <div className="flex items-start gap-0 min-w-max">
+                    {result.path.map((step, si) => {
+                      const nodeColor = getNodeColor(step.node)
+                      const isFirst = si === 0
+                      const isLast = si === result.path.length - 1
+                      const isSelected = selectedNode === step.node
+                      const edgeLexicons = step.via?.sharedLexicons || []
+
+                      return (
+                        <div key={step.node + si} className="flex items-start">
+                          {/* Node column */}
+                          <div className="flex flex-col items-center w-32">
+                            {/* Term badge */}
+                            <div className="h-7 flex items-end mb-1">
+                              {isFirst && step.termAMapping && (
+                                <div className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border truncate max-w-[120px]"
+                                  style={{ color: nodeColor, borderColor: `${nodeColor}40`, backgroundColor: `${nodeColor}0d` }}
+                                  title={`${step.termAMapping.term} (${step.termAMapping.lexicon})`}
+                                >
+                                  &ldquo;{step.termAMapping.term}&rdquo;
+                                </div>
+                              )}
+                              {isLast && step.termBMapping && (
+                                <div className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border truncate max-w-[120px]"
+                                  style={{ color: nodeColor, borderColor: `${nodeColor}40`, backgroundColor: `${nodeColor}0d` }}
+                                  title={`${step.termBMapping.term} (${step.termBMapping.lexicon})`}
+                                >
+                                  &ldquo;{step.termBMapping.term}&rdquo;
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Universal concept bubble */}
+                            <button onClick={() => handleNodeClick(step.node)}
+                              className="w-28 px-2 py-2 rounded-xl border font-mono text-[9px] font-semibold transition-all hover:opacity-80 active:scale-95 text-center leading-tight"
+                              style={{
+                                backgroundColor: isSelected ? `${nodeColor}20` : `${nodeColor}0e`,
+                                borderColor: isSelected ? nodeColor : `${nodeColor}40`,
+                                color: nodeColor,
+                                boxShadow: isSelected ? `0 0 14px ${nodeColor}30` : 'none',
+                              }}
+                              title={step.definition || step.node}
+                            >
+                              {step.node}
+                            </button>
+
+                            {/* Shared lexicon pills below node */}
+                            {edgeLexicons.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap justify-center gap-0.5 max-w-[120px]">
+                                {edgeLexicons.slice(0, 2).map((lex) => {
+                                  const meta = getLexiconLabel(lex, userLexicons)
+                                  return (
+                                    <span key={lex} className="text-[7px] font-mono px-1 rounded"
+                                      style={{ backgroundColor: meta ? `${meta.color}14` : 'rgba(37,37,37,0.6)', color: meta?.color || '#64748b' }}
+                                    >
+                                      {meta?.name || lex}
+                                    </span>
+                                  )
+                                })}
+                                {edgeLexicons.length > 2 && (
+                                  <span className="text-[7px] font-mono text-black-700">+{edgeLexicons.length - 2}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Arrow */}
+                          {si < result.path.length - 1 && (
+                            <div className="flex items-center self-start mt-10 mx-0.5 flex-shrink-0">
+                              <svg className="w-5 h-5 text-black-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Compact definitions list */}
+                <div className="mt-4 space-y-1">
+                  {result.path.map((step, si) => (
+                    <div key={step.node + '-def-' + si} className="flex items-start gap-2 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: 'rgba(15,20,15,0.4)' }}>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: getNodeColor(step.node) }} />
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-mono font-semibold" style={{ color: getNodeColor(step.node) }}>{step.node}</span>
+                        {step.definition && <span className="text-[10px] font-mono text-black-500 ml-2">{step.definition}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Related Concepts panel */}
+            <AnimatePresence>
+              {selectedNode && (
+                <RelatedConceptsPanel
+                  key={selectedNode}
+                  universalKey={selectedNode}
+                  onClose={() => setSelectedNode(null)}
+                  userLexicons={userLexicons}
+                />
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </GlassCard>
+  )
+}
+
 // ============ Ten Covenants Section ============
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
@@ -1933,89 +2473,189 @@ function TenCovenantsSection() {
             className="text-[11px] font-mono font-bold tracking-wider"
             style={{ color: "#d4aa50" }}
           >
-            0x{COVENANT_HASH}
+        <p className="text-black-300 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
+          Every domain speaks every other domain.{' '}
+          <span className="text-white font-semibold">Live. Client-side. Zero backend.</span>
+        </p>
+
+        {/* One-sentence intro for first-time visitors */}
+        <p className="text-black-400 text-xs sm:text-sm font-mono mt-4 max-w-2xl mx-auto leading-relaxed px-2">
+          Pick any term from your field and instantly see what every other domain calls the same idea &mdash; medicine, engineering, law, music, trading, and more share a hidden universal language.
+        </p>
+
+        {/* Subtitle line */}
+        <p className="text-black-600 text-[10px] font-mono mt-2">
+          AI Agents + Human Domains + User Lexicons — 100% client-side
+        </p>
+      </motion.div>
+
+      {/* ============ Live Stats Dashboard ============ */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
+        className="mb-6"
+      >
+        {/* Dashboard header bar */}
+        <div className="flex items-center gap-2 mb-3">
+          <motion.span
+            className="inline-block w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: '#00ff41' }}
+            animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 10px #00ff41cc', '0 0 4px #00ff4166'] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-matrix-500">
+            Live Protocol Stats
           </span>
-          <button
-            onClick={handleCopyHash}
-            className="transition-colors"
-            title="Copy full hash"
-            style={{ color: hashCopied ? "#10b981" : "rgba(140,110,50,0.7)" }}
-          >
-            {hashCopied ? (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            )}
-          </button>
+          <span className="flex-1 h-px" style={{ background: 'rgba(0,255,65,0.12)' }} />
         </div>
 
-        {/* Enforcement legend */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
-          {Object.entries(ENFORCEMENT_META).map(([key, m]) => (
-            <span
-              key={key}
-              className="text-[9px] font-mono font-bold px-2.5 py-1 rounded-full tracking-widest uppercase"
-              style={{ background: m.bg, border: `1px solid ${m.border}`, color: m.text }}
+        {/* Primary stat tiles — 4-col grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          {[
+            {
+              label: 'Lexicons',
+              value: detailedStats.totalLexicons,
+              color: '#00ff41',
+              glow: 'rgba(0,255,65,0.18)',
+              border: 'rgba(0,255,65,0.22)',
+              bg: 'rgba(0,255,65,0.05)',
+              delay: 0.20,
+            },
+            {
+              label: 'Terms',
+              value: detailedStats.totalTerms,
+              color: '#22d3ee',
+              glow: 'rgba(34,211,238,0.18)',
+              border: 'rgba(34,211,238,0.22)',
+              bg: 'rgba(34,211,238,0.05)',
+              delay: 0.28,
+            },
+            {
+              label: 'Concepts',
+              value: detailedStats.totalUniversalConcepts,
+              color: '#a855f7',
+              glow: 'rgba(168,85,247,0.18)',
+              border: 'rgba(168,85,247,0.22)',
+              bg: 'rgba(168,85,247,0.05)',
+              delay: 0.36,
+            },
+            {
+              label: 'Cross-Domain Bridges',
+              value: detailedStats.crossDomainBridges,
+              color: '#f59e0b',
+              glow: 'rgba(245,158,11,0.18)',
+              border: 'rgba(245,158,11,0.22)',
+              bg: 'rgba(245,158,11,0.05)',
+              delay: 0.44,
+            },
+          ].map((tile) => (
+            <motion.div
+              key={tile.label}
+              initial={{ opacity: 0, scale: 0.88 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.45, delay: tile.delay, ease: 'easeOut' }}
+              className="relative rounded-xl p-4 text-center overflow-hidden"
+              style={{
+                background: tile.bg,
+                border: `1px solid ${tile.border}`,
+              }}
             >
-              {m.label}
-            </span>
+              {/* Subtle inner glow pulse */}
+              <motion.div
+                className="absolute inset-0 pointer-events-none rounded-xl"
+                style={{
+                  background: `radial-gradient(ellipse at 50% 0%, ${tile.glow} 0%, transparent 65%)`,
+                }}
+                animate={{ opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: tile.delay }}
+              />
+              <div className="relative z-10">
+                <div
+                  className="text-2xl sm:text-3xl font-bold font-mono leading-none"
+                  style={{ color: tile.color, textShadow: `0 0 18px ${tile.color}55` }}
+                >
+                  <AnimatedCounter target={tile.value} duration={1400} />
+                </div>
+                <div className="text-[10px] font-mono text-black-400 uppercase tracking-wider mt-1.5 leading-tight">
+                  {tile.label}
+                </div>
+              </div>
+            </motion.div>
           ))}
-          <span className="text-[9px] font-mono" style={{ color: "rgba(80,65,35,0.8)" }}>
-            — enforcement types
-          </span>
         </div>
-      </div>
 
-      {/* Covenant cards grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {TEN_COVENANTS.map((covenant, i) => (
-          <CovenantCard key={covenant.number} covenant={covenant} index={i} />
-        ))}
-      </div>
-    </div>
-  )
-}
+        {/* Most-connected banner + secondary metrics */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.52, ease: 'easeOut' }}
+          className="rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,255,65,0.04) 0%, rgba(0,10,5,0.7) 100%)',
+            border: '1px solid rgba(0,255,65,0.14)',
+          }}
+        >
+          {/* Most connected concept */}
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider whitespace-nowrap">
+              Most connected
+            </span>
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold truncate max-w-[200px]"
+              style={{
+                backgroundColor: 'rgba(0,255,65,0.10)',
+                border: '1px solid rgba(0,255,65,0.25)',
+                color: '#00ff41',
+              }}
+              title={detailedStats.mostConnected.name}
+            >
+              {detailedStats.mostConnected.name}
+            </span>
+            <span className="text-[9px] font-mono text-black-400 whitespace-nowrap">
+              {' — bridges '}
+              <span className="text-white font-bold">
+                {detailedStats.mostConnected.count}
+              </span>
+              {' domains'}
+            </span>
+          </div>
 
-// ============ Popular Translations ============
+          {/* Secondary metrics */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {[
+              { label: 'AI Agents', value: AGENT_LEXICONS.length, color: '#22d3ee' },
+              { label: 'Human Domains', value: HUMAN_LEXICONS.length, color: '#10b981' },
+              { label: 'Avg Terms', value: detailedStats.avgTermsPerLexicon, color: '#a855f7' },
+              {
+                label: 'Covenant Hash',
+                value: stats.covenantHash
+                  ? `0x${stats.covenantHash.slice(0, 6)}…`
+                  : '--',
+                color: '#d4aa50',
+                copyable: stats.covenantHash,
+              },
+            ].map((m) => (
+              <div key={m.label} className="text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <span className="font-mono font-bold text-xs" style={{ color: m.color }}>
+                    {m.value}
+                  </span>
+                  {m.copyable && <CopyButton text={m.copyable} />}
+                </div>
+                <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider whitespace-nowrap">
+                  {m.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </motion.div>
 
-const POPULAR_PAIRS = [
-  {
-    fromId: 'medicine',
-    toId: 'engineering',
-    term: 'diagnosis',
-    fromColor: '#ef4444',
-    toColor: '#f97316',
-    insight: 'Root-cause analysis — isolate the fault before you fix anything.',
-  },
-  {
-    fromId: 'trading',
-    toId: 'medicine',
-    term: 'liquidity',
-    fromColor: '#eab308',
-    toColor: '#ef4444',
-    insight: 'Perfusion — resources must flow to where they are needed or the system fails.',
-  },
-  {
-    fromId: 'cooking',
-    toId: 'military',
-    term: 'mise en place',
-    fromColor: '#f59e0b',
-    toColor: '#78716c',
-    insight: 'OPSEC brief — arrange everything before the chaos starts, or it wins.',
-  },
-  {
-    fromId: 'music',
-    toId: 'psychology',
-    term: 'cadence',
-    fromColor: '#ec4899',
-    toColor: '#8b5cf6',
-    insight: 'Closure — the sequence resolves, the phrase ends, the mind can rest.',
-  },
-  {
+      {/* ============ Did You Know? ============ */}
+      <DidYouKnow />
+
+      
     fromId: 'philosophy',
     toId: 'engineering',
     term: 'axiom',
@@ -2371,6 +3011,9 @@ export default function RosettaPage() {
 
       {/* ============ Sentence Translator ============ */}
       <SentenceTranslator userLexicons={userLexicons} />
+
+      {/* ============ Concept Chain ============ */}
+      <ConceptChainFinder userLexicons={userLexicons} />
 
       {/* ============ Translation Interface ============ */}
       <GlassCard glowColor="matrix" className="p-5 mb-6">

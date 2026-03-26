@@ -79,7 +79,7 @@ export default function VibePlayer() {
         },
         events: {
           onReady: (e) => {
-            console.log('[vibe-player] YouTube player ready')
+            // YouTube player ready
             // Restore saved position if available
             const saved = loadPlayerState()
             try {

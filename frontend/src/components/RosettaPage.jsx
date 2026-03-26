@@ -11,12 +11,16 @@ import {
   translateToAll,
   translateSentence,
   discoverEquivalent,
+  autocomplete,
   registerUserLexicon,
   addUserTerm,
   getUserLexicon,
   getAllUserLexicons,
   getProtocolStats,
   getTopConnectedConcepts,
+  getDetailedStats,
+  getConceptChain,
+  getRelatedConcepts,
 } from '../utils/rosetta-engine'
 
 // ============ Rosetta Stone Protocol — Universal Translation ============
@@ -898,9 +902,36 @@ function HighlightMatch({ text, query }) {
 
 // ============ Discover Section ============
 
-function DiscoverSection() {
+const DISCOVER_SUGGESTIONS = [
+  'harmony',
+  'diagnosis',
+  'liquidity',
+  'mise en place',
+  'triage',
+  'cadence',
+  'axiom',
+  'flow state',
+  'fault tolerance',
+  'precedent',
+]
+
+function DiscoverSection({ onSuggestionClick }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState(null)
+  const [suggestionIdx] = useState(() => Math.floor(Math.random() * DISCOVER_SUGGESTIONS.length))
+
+  // Rotate suggestion every 3s when input is empty
+  const [rotatingIdx, setRotatingIdx] = useState(suggestionIdx)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRotatingIdx(i => (i + 1) % DISCOVER_SUGGESTIONS.length)
+    }, 3000)
+    return () => clearInterval(id)
+  }, [])
+
+  const activePlaceholder = searchTerm
+    ? ''
+    : `Try searching: "${DISCOVER_SUGGESTIONS[rotatingIdx]}"...`
 
   // Instant — engine is synchronous + in-memory, no debounce needed
   const handleInputChange = useCallback((value) => {
@@ -932,7 +963,7 @@ function DiscoverSection() {
           type="text"
           value={searchTerm}
           onChange={(e) => handleInputChange(e.target.value)}
-          placeholder="Type to search instantly — try &quot;triage&quot;, &quot;liquidity&quot;, &quot;cadence&quot;..."
+          placeholder={activePlaceholder}
           className="w-full bg-black-900/80 border border-black-700 rounded-lg pl-9 pr-10 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
         />
         {searchTerm && (
@@ -1496,7 +1527,7 @@ function SentenceTranslator({ userLexicons = [] }) {
 
   const handleTranslate = useCallback(() => {
     if (!stFromId || !stToId || !sourceText.trim()) return
-    const r = translateSentence(sourceText.trim(), stFromId, stToId)
+    const r = translateSentence(stFromId, sourceText.trim(), stToId)
     setResult(r)
     setActiveTermIdx(null)
   }, [stFromId, stToId, sourceText])
@@ -1949,6 +1980,183 @@ function TenCovenantsSection() {
   )
 }
 
+// ============ Popular Translations ============
+
+const POPULAR_PAIRS = [
+  {
+    fromId: 'medicine',
+    toId: 'engineering',
+    term: 'diagnosis',
+    fromColor: '#ef4444',
+    toColor: '#f97316',
+    insight: 'Root-cause analysis — isolate the fault before you fix anything.',
+  },
+  {
+    fromId: 'trading',
+    toId: 'medicine',
+    term: 'liquidity',
+    fromColor: '#eab308',
+    toColor: '#ef4444',
+    insight: 'Perfusion — resources must flow to where they are needed or the system fails.',
+  },
+  {
+    fromId: 'cooking',
+    toId: 'military',
+    term: 'mise en place',
+    fromColor: '#f59e0b',
+    toColor: '#78716c',
+    insight: 'OPSEC brief — arrange everything before the chaos starts, or it wins.',
+  },
+  {
+    fromId: 'music',
+    toId: 'psychology',
+    term: 'cadence',
+    fromColor: '#ec4899',
+    toColor: '#8b5cf6',
+    insight: 'Closure — the sequence resolves, the phrase ends, the mind can rest.',
+  },
+  {
+    fromId: 'philosophy',
+    toId: 'engineering',
+    term: 'axiom',
+    fromColor: '#06b6d4',
+    toColor: '#f97316',
+    insight: 'Spec — ground truth so basic it cannot be derived from anything simpler.',
+  },
+  {
+    fromId: 'law',
+    toId: 'trading',
+    term: 'precedent',
+    fromColor: '#6b7280',
+    toColor: '#eab308',
+    insight: 'Support level — a price the market tested and respected; it carries weight.',
+  },
+]
+
+function PopularTranslations({ onTryPair }) {
+  return (
+    <GlassCard glowColor="matrix" className="p-5 mb-6">
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Popular Translations</h2>
+          <p className="text-black-500 text-[10px] font-mono mt-0.5">
+            Click any pair to pre-fill the translator and see it live.
+          </p>
+        </div>
+        <span
+          className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full flex-shrink-0 ml-4 mt-0.5"
+          style={{ backgroundColor: 'rgba(0,255,65,0.1)', color: '#00ff41' }}
+        >
+          START HERE
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
+        {POPULAR_PAIRS.map((pair) => (
+          <motion.button
+            key={`${pair.fromId}-${pair.term}`}
+            onClick={() => onTryPair(pair)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="text-left p-3 rounded-xl border transition-all duration-200 group"
+            style={{
+              backgroundColor: 'rgba(10,16,10,0.7)',
+              borderColor: 'rgba(0,255,65,0.12)',
+            }}
+          >
+            {/* Domain route */}
+            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold"
+                style={{ backgroundColor: `${pair.fromColor}18`, border: `1px solid ${pair.fromColor}35`, color: pair.fromColor }}
+              >
+                <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: pair.fromColor }} />
+                {pair.fromId.charAt(0).toUpperCase() + pair.fromId.slice(1)}
+              </span>
+              <svg className="w-3 h-3 text-black-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold"
+                style={{ backgroundColor: `${pair.toColor}18`, border: `1px solid ${pair.toColor}35`, color: pair.toColor }}
+              >
+                <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: pair.toColor }} />
+                {pair.toId.charAt(0).toUpperCase() + pair.toId.slice(1)}
+              </span>
+            </div>
+
+            {/* Term */}
+            <div className="text-white text-sm font-mono font-semibold mb-1 group-hover:text-matrix-300 transition-colors">
+              &ldquo;{pair.term}&rdquo;
+            </div>
+
+            {/* Insight */}
+            <p className="text-[10px] font-mono text-black-500 leading-snug">{pair.insight}</p>
+
+            {/* Try hint */}
+            <div
+              className="mt-2 text-[9px] font-mono font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ color: '#00ff41' }}
+            >
+              Try it &rarr;
+            </div>
+          </motion.button>
+        ))}
+      </div>
+    </GlassCard>
+  )
+}
+
+// ============ Example Translation Placeholder Cards ============
+
+const EXAMPLE_PLACEHOLDER_PAIRS = [
+  { fromId: 'medicine',  toId: 'engineering',  term: 'diagnosis',    fromLabel: 'Medicine',  toLabel: 'Engineering', fromColor: '#ef4444', toColor: '#f97316' },
+  { fromId: 'cooking',   toId: 'military',     term: 'mise en place', fromLabel: 'Cooking',   toLabel: 'Military',    fromColor: '#f59e0b', toColor: '#78716c' },
+  { fromId: 'trading',   toId: 'agriculture',  term: 'liquidity',     fromLabel: 'Trading',   toLabel: 'Agriculture', fromColor: '#eab308', toColor: '#84cc16' },
+]
+
+function ExampleTranslationCards({ onTry }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="mt-4"
+    >
+      <p className="text-[10px] font-mono text-black-600 mb-3 text-center uppercase tracking-wider">
+        &mdash; or click an example to try instantly &mdash;
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {EXAMPLE_PLACEHOLDER_PAIRS.map((ex) => (
+          <button
+            key={`${ex.fromId}-${ex.term}`}
+            onClick={() => onTry(ex)}
+            className="text-left p-3 rounded-lg border transition-all hover:border-matrix-700/50 group"
+            style={{ backgroundColor: 'rgba(8,12,8,0.6)', borderColor: 'rgba(30,40,30,0.8)' }}
+          >
+            <div className="text-[9px] font-mono text-black-600 mb-1">Try:</div>
+            <div className="flex items-center gap-1 flex-wrap mb-1.5">
+              <span className="text-[10px] font-mono font-semibold" style={{ color: ex.fromColor }}>
+                {ex.fromLabel}
+              </span>
+              <svg className="w-2.5 h-2.5 text-black-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+              <span className="text-[10px] font-mono font-semibold" style={{ color: ex.toColor }}>
+                {ex.toLabel}
+              </span>
+            </div>
+            <div className="text-white text-xs font-mono font-bold group-hover:text-matrix-300 transition-colors">
+              &ldquo;{ex.term}&rdquo;
+            </div>
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
@@ -1969,6 +2177,7 @@ export default function RosettaPage() {
 
   // ---- Protocol stats (computed client-side) ----
   const [protocolData] = useState(() => getProtocolStats())
+  const [detailedStats] = useState(() => getDetailedStats())
 
   // ---- Agent lexicon: selected + computed terms ----
   const [selectedAgent, setSelectedAgent] = useState(null)
@@ -2015,6 +2224,22 @@ export default function RosettaPage() {
       translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }, 80)
   }, [fromId, toId, concept, translateAll])
+
+  // ---- Try a pre-filled example or popular pair ----
+  const handleTryPair = useCallback((pair) => {
+    setFromId(pair.fromId)
+    setToId(pair.toId)
+    setConcept(pair.term)
+    setTranslateAll(false)
+    setTranslationResult(null)
+    setTranslateAllResults(null)
+    // Auto-translate immediately
+    const result = translate(pair.fromId, pair.toId, pair.term)
+    setTranslationResult(result)
+    setTimeout(() => {
+      translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 80)
+  }, [])
 
   // ---- Derived ----
   const stats = {
@@ -2088,6 +2313,11 @@ export default function RosettaPage() {
           ))}
         </div>
 
+        {/* One-sentence intro for first-time visitors */}
+        <p className="text-black-400 text-xs sm:text-sm font-mono mt-4 max-w-2xl mx-auto leading-relaxed px-2">
+          Pick any term from your field and instantly see what every other domain calls the same idea &mdash; medicine, engineering, law, music, trading, and more share a hidden universal language.
+        </p>
+
         {/* Subtitle line */}
         <p className="text-black-600 text-[10px] font-mono mt-3">
           Runs 100% client-side — AI Agents + Human Domains + User Lexicons
@@ -2096,6 +2326,9 @@ export default function RosettaPage() {
 
       {/* ============ Did You Know? ============ */}
       <DidYouKnow />
+
+      {/* ============ Popular Translations — first-time onboarding ============ */}
+      <PopularTranslations onTryPair={handleTryPair} />
 
       {/* ============ Protocol Stats — compact ============ */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
@@ -2270,6 +2503,10 @@ export default function RosettaPage() {
                 fromId={fromId}
                 userLexicons={userLexicons}
               />
+            )}
+            {/* Empty state: example cards when nothing has been translated yet */}
+            {!translationResult && !translateAllResults && (
+              <ExampleTranslationCards key="examples" onTry={handleTryPair} />
             )}
           </AnimatePresence>
         </div>

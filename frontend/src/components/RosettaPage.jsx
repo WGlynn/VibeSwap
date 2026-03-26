@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
+import { useWallet } from '../hooks/useWallet'
+import { useDeviceWallet } from '../hooks/useDeviceWallet'
 
 // ============ Rosetta Stone Protocol — Universal Translation ============
 
@@ -22,6 +24,9 @@ const AGENTS = [
 
 const AGENT_MAP = Object.fromEntries(AGENTS.map(a => [a.id, a]))
 
+// User lexicons use a neutral slate color scheme
+const USER_LEXICON_COLOR = '#94a3b8'
+
 // ============ Agent Dot ============
 
 function AgentDot({ color, size = 8 }) {
@@ -38,9 +43,20 @@ function AgentDot({ color, size = 8 }) {
   )
 }
 
-// ============ Agent Select Dropdown ============
+// ============ Lexicon Select Dropdown (agents + user lexicons) ============
 
-function AgentSelect({ value, onChange, label, excludeId }) {
+function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [] }) {
+  const allOptions = [
+    ...AGENTS.map(a => ({ id: a.id, name: a.name, color: a.color })),
+    ...userLexicons.map(u => ({
+      id: `user:${u.userId}`,
+      name: u.domain || u.userId,
+      color: USER_LEXICON_COLOR,
+    })),
+  ]
+
+  const selectedOption = allOptions.find(o => o.id === value)
+
   return (
     <div className="flex-1">
       <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
@@ -52,12 +68,25 @@ function AgentSelect({ value, onChange, label, excludeId }) {
           onChange={(e) => onChange(e.target.value)}
           className="w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
         >
-          <option value="">Select agent...</option>
-          {AGENTS.filter(a => a.id !== excludeId).map(agent => (
-            <option key={agent.id} value={agent.id}>
-              {agent.name}
-            </option>
-          ))}
+          <option value="">Select lexicon...</option>
+          <optgroup label="Agents">
+            {AGENTS.filter(a => a.id !== excludeId).map(agent => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </optgroup>
+          {userLexicons.length > 0 && (
+            <optgroup label="User Lexicons">
+              {userLexicons
+                .filter(u => `user:${u.userId}` !== excludeId)
+                .map(u => (
+                  <option key={`user:${u.userId}`} value={`user:${u.userId}`}>
+                    {u.domain || u.userId}
+                  </option>
+                ))}
+            </optgroup>
+          )}
         </select>
         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-black-500">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,7 +95,7 @@ function AgentSelect({ value, onChange, label, excludeId }) {
         </div>
         {value && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <AgentDot color={AGENT_MAP[value]?.color} />
+            <AgentDot color={selectedOption?.color || USER_LEXICON_COLOR} />
           </div>
         )}
       </div>
@@ -107,11 +136,22 @@ function CopyButton({ text }) {
 
 // ============ Translation Result Card ============
 
-function TranslationResult({ result, fromAgent, toAgent }) {
+function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
   if (!result) return null
 
-  const from = AGENT_MAP[fromAgent]
-  const to = AGENT_MAP[toAgent]
+  function getLexiconMeta(id) {
+    if (!id) return null
+    if (id.startsWith('user:')) {
+      const userId = id.slice(5)
+      const lex = userLexicons.find(u => u.userId === userId)
+      return { name: lex?.domain || userId, color: USER_LEXICON_COLOR }
+    }
+    const agent = AGENT_MAP[id]
+    return agent ? { name: agent.name, color: agent.color } : null
+  }
+
+  const from = getLexiconMeta(fromId)
+  const to = getLexiconMeta(toId)
 
   return (
     <motion.div
@@ -177,10 +217,20 @@ function TranslationResult({ result, fromAgent, toAgent }) {
 
 // ============ Translate-All Results ============
 
-function TranslateAllResults({ results, fromAgent }) {
+function TranslateAllResults({ results, fromId, userLexicons = [] }) {
   if (!results || results.length === 0) return null
 
-  const from = AGENT_MAP[fromAgent]
+  function getLexiconMeta(id) {
+    if (!id) return null
+    if (id.startsWith('user:')) {
+      const userId = id.slice(5)
+      const lex = userLexicons.find(u => u.userId === userId)
+      return { name: lex?.domain || userId, color: USER_LEXICON_COLOR }
+    }
+    return AGENT_MAP[id] || null
+  }
+
+  const from = getLexiconMeta(fromId)
 
   return (
     <motion.div
@@ -194,14 +244,20 @@ function TranslateAllResults({ results, fromAgent }) {
         <div className="flex items-center gap-2 mb-4">
           <AgentDot color={from?.color} size={8} />
           <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
-            {from?.name} &rarr; All Agents
+            {from?.name} &rarr; All Lexicons
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {results.map((r, i) => {
-            const targetAgent = AGENT_MAP[r.agent]
-            if (!targetAgent) return null
+            const isUser = r.agent?.startsWith('user:')
+            const targetMeta = isUser
+              ? {
+                  name: userLexicons.find(u => u.userId === r.agent.slice(5))?.domain || r.agent.slice(5),
+                  color: USER_LEXICON_COLOR,
+                }
+              : AGENT_MAP[r.agent]
+            if (!targetMeta) return null
             return (
               <motion.div
                 key={r.agent}
@@ -210,9 +266,9 @@ function TranslateAllResults({ results, fromAgent }) {
                 transition={{ delay: i * 0.05 }}
                 className="flex items-center gap-2.5 p-2.5 bg-black-900/50 rounded-lg border border-black-800"
               >
-                <AgentDot color={targetAgent.color} size={7} />
+                <AgentDot color={targetMeta.color} size={7} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-mono text-black-500">{targetAgent.name}</div>
+                  <div className="text-[10px] font-mono text-black-500">{targetMeta.name}</div>
                   <div className="text-white text-xs font-mono truncate">{r.term}</div>
                 </div>
                 <span
@@ -340,12 +396,583 @@ function LexiconPanel({ agent, terms, isLoading, error }) {
   )
 }
 
+// ============ Discover Section ============
+
+function DiscoverSection() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
+  const [results, setResults] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const debounceRef = useRef(null)
+
+  const handleSearch = useCallback(async (term) => {
+    if (!term.trim()) {
+      setResults(null)
+      setActiveSearch('')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setActiveSearch(term.trim())
+
+    try {
+      const res = await fetch(`${API_BASE}/web/rosetta/discover/${encodeURIComponent(term.trim())}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setResults(data)
+    } catch (err) {
+      setError(err.message || 'Discovery failed')
+      setResults(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleInputChange = useCallback((value) => {
+    setSearchTerm(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!value.trim()) {
+      setResults(null)
+      setActiveSearch('')
+      setLoading(false)
+      return
+    }
+    debounceRef.current = setTimeout(() => handleSearch(value), 500)
+  }, [handleSearch])
+
+  return (
+    <GlassCard glowColor="terminal" className="p-5 mb-6">
+      <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">Discover</h2>
+      <p className="text-black-500 text-[10px] font-mono mb-4">
+        Enter any word — see how every lexicon (agent + user) expresses the same concept.
+      </p>
+
+      <div className="relative">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && searchTerm.trim()) handleSearch(searchTerm) }}
+          placeholder="Enter any word or concept..."
+          className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 pr-10 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
+        />
+        {loading ? (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="w-4 h-4 border-2 border-black-700 border-t-terminal-500 rounded-full animate-spin" />
+          </div>
+        ) : searchTerm && (
+          <button
+            onClick={() => { setSearchTerm(''); setResults(null); setActiveSearch('') }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Discover results */}
+      {activeSearch && (
+        <div className="mt-4">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-red-400 text-xs font-mono">{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && results && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSearch}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3 }}
+              >
+                {results.equivalents && results.equivalents.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
+                        {results.equivalents.length} equivalent{results.equivalents.length !== 1 ? 's' : ''} for
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-matrix-400">
+                        &quot;{activeSearch}&quot;
+                      </span>
+                    </div>
+                    {results.equivalents.map((eq, i) => {
+                      const isUser = eq.lexicon?.startsWith('user:')
+                      const agentMeta = !isUser ? AGENT_MAP[eq.lexicon] : null
+                      const color = agentMeta?.color || USER_LEXICON_COLOR
+                      const label = agentMeta?.name || (isUser ? (eq.domain || eq.lexicon.slice(5)) : eq.lexicon)
+                      return (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          className="flex items-center gap-3 p-3 bg-black-900/40 rounded-lg border border-black-800"
+                        >
+                          <AgentDot color={color} size={8} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-mono text-black-500">{label}</div>
+                            <div className="text-white text-sm font-mono font-medium">{eq.term}</div>
+                            {eq.description && (
+                              <div className="text-[10px] text-black-600 mt-0.5">{eq.description}</div>
+                            )}
+                          </div>
+                          {eq.universal && (
+                            <div className="flex-shrink-0 text-right">
+                              <div className="text-[9px] font-mono text-black-600 uppercase">Universal</div>
+                              <div className="text-[10px] font-mono text-matrix-400">{eq.universal}</div>
+                            </div>
+                          )}
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 border border-black-800 rounded-lg">
+                    <p className="text-black-500 text-xs font-mono">
+                      No equivalents found for &quot;{activeSearch}&quot;
+                    </p>
+                    <p className="text-black-700 text-[10px] font-mono mt-1">
+                      Try a different term or register it in your lexicon.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </div>
+      )}
+    </GlassCard>
+  )
+}
+
+// ============ My Lexicon Panel ============
+
+function MyLexiconPanel({ userId, isConnected }) {
+  const [myLexicon, setMyLexicon] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!isConnected || !userId) {
+      setMyLexicon(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function fetchMyLexicon() {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`${API_BASE}/web/rosetta/user/${encodeURIComponent(userId)}`)
+        if (res.status === 404) {
+          if (!cancelled) setMyLexicon({ terms: [], domain: '' })
+          return
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (!cancelled) setMyLexicon(data)
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load your lexicon')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchMyLexicon()
+    return () => { cancelled = true }
+  }, [isConnected, userId])
+
+  if (!isConnected) {
+    return (
+      <GlassCard className="p-5">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">My Lexicon</h2>
+        <div className="text-center py-8">
+          <div
+            className="w-8 h-8 rounded-full mx-auto mb-3 flex items-center justify-center"
+            style={{ backgroundColor: `${USER_LEXICON_COLOR}15`, border: `1px solid ${USER_LEXICON_COLOR}30` }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke={USER_LEXICON_COLOR}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <p className="text-black-500 text-xs font-mono">Connect a wallet to view</p>
+          <p className="text-black-700 text-[10px] font-mono mt-0.5">and manage your lexicon</p>
+        </div>
+      </GlassCard>
+    )
+  }
+
+  return (
+    <GlassCard className="p-5" style={{ borderColor: `${USER_LEXICON_COLOR}30` }}>
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+        style={{ backgroundColor: USER_LEXICON_COLOR }}
+      />
+      <div className="flex items-center gap-2 mb-3">
+        <AgentDot color={USER_LEXICON_COLOR} size={10} />
+        <span className="text-white font-bold text-sm">My Lexicon</span>
+        {myLexicon?.domain && (
+          <span className="text-[10px] font-mono text-black-400 ml-auto">{myLexicon.domain}</span>
+        )}
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="w-5 h-5 border-2 border-black-700 border-t-matrix-500 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {error && (
+        <p className="text-red-400 text-xs font-mono text-center py-4">{error}</p>
+      )}
+
+      {!loading && !error && myLexicon && (
+        <>
+          {myLexicon.terms && myLexicon.terms.length > 0 ? (
+            <div className="space-y-1.5 max-h-64 overflow-y-auto scrollbar-thin">
+              {myLexicon.terms.map((term, i) => (
+                <motion.div
+                  key={term.term || i}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="flex items-start gap-3 p-2.5 bg-black-900/40 rounded-lg border border-black-800/50"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white text-xs font-mono font-medium">{term.term}</div>
+                    {term.description && (
+                      <div className="text-[10px] text-black-500 mt-0.5">{term.description}</div>
+                    )}
+                  </div>
+                  {term.universal && (
+                    <div className="flex-shrink-0 text-right">
+                      <div className="text-[9px] font-mono text-black-600 uppercase">Universal</div>
+                      <div className="text-[10px] font-mono" style={{ color: USER_LEXICON_COLOR }}>
+                        {term.universal}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-black-600 text-xs font-mono">No terms registered yet.</p>
+              <p className="text-black-700 text-[10px] font-mono mt-1">
+                Use the form to the left to add your first term.
+              </p>
+            </div>
+          )}
+          <div className="mt-2 pt-2 border-t border-black-800">
+            <span className="text-[10px] font-mono text-black-600">
+              {myLexicon.terms?.length ?? 0} term{myLexicon.terms?.length !== 1 ? 's' : ''} registered
+            </span>
+          </div>
+        </>
+      )}
+
+      {!loading && !error && !myLexicon && (
+        <div className="text-center py-6">
+          <p className="text-black-600 text-xs font-mono">No lexicon found.</p>
+          <p className="text-black-700 text-[10px] font-mono mt-1">Register a domain to get started.</p>
+        </div>
+      )}
+    </GlassCard>
+  )
+}
+
+// ============ Register Lexicon Form ============
+
+function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
+  const [domain, setDomain] = useState('')
+  const [phase, setPhase] = useState('register') // 'register' | 'addTerms'
+  const [submitting, setSubmitting] = useState(false)
+  const [status, setStatus] = useState(null) // { type: 'success'|'error', message }
+  const [newTerm, setNewTerm] = useState({ term: '', universal: '', description: '' })
+  const [addingTerm, setAddingTerm] = useState(false)
+
+  const handleRegister = useCallback(async () => {
+    if (!domain.trim() || !isConnected) return
+    setSubmitting(true)
+    setStatus(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/web/rosetta/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, domain: domain.trim() }),
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `HTTP ${res.status}`)
+      }
+      setStatus({ type: 'success', message: `Domain "${domain.trim()}" registered!` })
+      setPhase('addTerms')
+      onRegistered?.()
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Registration failed' })
+    } finally {
+      setSubmitting(false)
+    }
+  }, [domain, isConnected, userId, onRegistered])
+
+  const handleAddTerm = useCallback(async () => {
+    if (!newTerm.term.trim() || !newTerm.universal.trim() || !isConnected) return
+    setAddingTerm(true)
+    setStatus(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/web/rosetta/user/term`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          term: newTerm.term.trim(),
+          universal: newTerm.universal.trim(),
+          description: newTerm.description.trim() || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `HTTP ${res.status}`)
+      }
+      setStatus({ type: 'success', message: `Term "${newTerm.term.trim()}" added!` })
+      setNewTerm({ term: '', universal: '', description: '' })
+      onRegistered?.()
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to add term' })
+    } finally {
+      setAddingTerm(false)
+    }
+  }, [newTerm, isConnected, userId, onRegistered])
+
+  if (!isConnected) {
+    return (
+      <GlassCard className="p-5">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Register Your Lexicon</h2>
+        <div className="text-center py-8">
+          <div
+            className="w-8 h-8 rounded-full mx-auto mb-3 flex items-center justify-center"
+            style={{ backgroundColor: `${USER_LEXICON_COLOR}15`, border: `1px solid ${USER_LEXICON_COLOR}30` }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke={USER_LEXICON_COLOR}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <p className="text-black-500 text-xs font-mono">Connect a wallet to register</p>
+          <p className="text-black-700 text-[10px] font-mono mt-0.5">your domain lexicon</p>
+        </div>
+      </GlassCard>
+    )
+  }
+
+  return (
+    <GlassCard className="p-5" style={{ borderColor: `${USER_LEXICON_COLOR}20` }}>
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+        style={{ backgroundColor: USER_LEXICON_COLOR }}
+      />
+      <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Register Your Lexicon</h2>
+
+      {/* Phase stepper */}
+      <div className="flex items-center gap-3 mb-5">
+        {[
+          { key: 'register', label: 'Domain' },
+          { key: 'addTerms', label: 'Terms' },
+        ].map((step, i) => {
+          const isDone = step.key === 'register' && phase === 'addTerms'
+          const isActive = phase === step.key
+          return (
+            <div key={step.key} className="flex items-center gap-2">
+              {i > 0 && <div className="w-6 h-px bg-black-700" />}
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-mono font-bold transition-colors"
+                  style={{
+                    backgroundColor: isDone || isActive ? USER_LEXICON_COLOR : '#1e293b',
+                    color: isDone || isActive ? '#000' : '#64748b',
+                  }}
+                >
+                  {isDone ? '✓' : i + 1}
+                </div>
+                <span
+                  className="text-[10px] font-mono"
+                  style={{ color: isActive ? USER_LEXICON_COLOR : isDone ? '#64748b' : '#475569' }}
+                >
+                  {step.label}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Step 1: Register domain */}
+      {phase === 'register' && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+              Domain Name
+            </label>
+            <input
+              type="text"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && domain.trim()) handleRegister() }}
+              placeholder="e.g. Medicine, Legal, Gaming, Cooking..."
+              className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+            />
+            <p className="text-[10px] font-mono text-black-600 mt-1">
+              The domain or field your lexicon belongs to.
+            </p>
+          </div>
+
+          <button
+            onClick={handleRegister}
+            disabled={!domain.trim() || submitting}
+            className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
+              domain.trim() && !submitting
+                ? 'hover:opacity-90 active:scale-[0.99] text-black-900'
+                : 'bg-black-800 text-black-600 cursor-not-allowed'
+            }`}
+            style={domain.trim() && !submitting ? { backgroundColor: USER_LEXICON_COLOR } : {}}
+          >
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-black-600 border-t-black-900 rounded-full animate-spin" />
+                Registering...
+              </span>
+            ) : (
+              'Register Domain'
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Step 2: Add terms */}
+      {phase === 'addTerms' && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-mono text-black-400">
+            Domain{' '}
+            <span style={{ color: USER_LEXICON_COLOR }} className="font-bold">
+              {domain}
+            </span>{' '}
+            registered. Add terms and their universal concept mappings.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+                Your Term
+              </label>
+              <input
+                type="text"
+                value={newTerm.term}
+                onChange={(e) => setNewTerm(t => ({ ...t, term: e.target.value }))}
+                placeholder="e.g. triage"
+                className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+                Universal Concept
+              </label>
+              <input
+                type="text"
+                value={newTerm.universal}
+                onChange={(e) => setNewTerm(t => ({ ...t, universal: e.target.value }))}
+                placeholder="e.g. priority_sorting"
+                className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+                Description (opt.)
+              </label>
+              <input
+                type="text"
+                value={newTerm.description}
+                onChange={(e) => setNewTerm(t => ({ ...t, description: e.target.value }))}
+                placeholder="Short description"
+                className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleAddTerm}
+            disabled={!newTerm.term.trim() || !newTerm.universal.trim() || addingTerm}
+            className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
+              newTerm.term.trim() && newTerm.universal.trim() && !addingTerm
+                ? 'hover:opacity-90 active:scale-[0.99] text-black-900'
+                : 'bg-black-800 text-black-600 cursor-not-allowed'
+            }`}
+            style={
+              newTerm.term.trim() && newTerm.universal.trim() && !addingTerm
+                ? { backgroundColor: USER_LEXICON_COLOR }
+                : {}
+            }
+          >
+            {addingTerm ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-black-600 border-t-black-900 rounded-full animate-spin" />
+                Adding...
+              </span>
+            ) : (
+              '+ Add Term'
+            )}
+          </button>
+
+          <button
+            onClick={() => { setPhase('register'); setDomain(''); setStatus(null) }}
+            className="w-full py-1.5 rounded-lg font-mono text-xs text-black-500 hover:text-black-400 transition-colors border border-black-800 hover:border-black-700"
+          >
+            Register another domain
+          </button>
+        </div>
+      )}
+
+      {/* Status message */}
+      <AnimatePresence>
+        {status && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className={`mt-3 p-2.5 rounded-lg text-xs font-mono text-center ${
+              status.type === 'success'
+                ? 'bg-matrix-500/10 text-matrix-400 border border-matrix-500/20'
+                : 'bg-red-500/10 text-red-400 border border-red-500/20'
+            }`}
+          >
+            {status.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </GlassCard>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
+  // ---- Dual wallet pattern ----
+  const { isConnected: isExternalConnected, address: externalAddress } = useWallet()
+  const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
+  const isConnected = isExternalConnected || isDeviceConnected
+  const userId = externalAddress || deviceAddress || null
+
   // ---- Translation state ----
-  const [fromAgent, setFromAgent] = useState('')
-  const [toAgent, setToAgent] = useState('')
+  const [fromId, setFromId] = useState('')
+  const [toId, setToId] = useState('')
   const [concept, setConcept] = useState('')
   const [translateAll, setTranslateAll] = useState(false)
   const [translating, setTranslating] = useState(false)
@@ -357,11 +984,15 @@ export default function RosettaPage() {
   const [protocolLoading, setProtocolLoading] = useState(true)
   const [protocolError, setProtocolError] = useState(null)
 
-  // ---- Lexicon state ----
+  // ---- Agent lexicon state ----
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [lexiconTerms, setLexiconTerms] = useState(null)
   const [lexiconLoading, setLexiconLoading] = useState(false)
   const [lexiconError, setLexiconError] = useState(null)
+
+  // ---- User lexicons (populated from protocol data, used in dropdowns) ----
+  const [userLexicons, setUserLexicons] = useState([])
+  const [userLexiconCount, setUserLexiconCount] = useState(null)
 
   // ---- Fetch protocol data on mount ----
   useEffect(() => {
@@ -374,7 +1005,11 @@ export default function RosettaPage() {
         const res = await fetch(`${API_BASE}/web/rosetta/view`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
-        if (!cancelled) setProtocolData(data)
+        if (!cancelled) {
+          setProtocolData(data)
+          if (data.user_lexicons) setUserLexicons(data.user_lexicons)
+          if (data.user_lexicon_count !== undefined) setUserLexiconCount(data.user_lexicon_count)
+        }
       } catch (err) {
         if (!cancelled) setProtocolError(err.message || 'Failed to load protocol data')
       } finally {
@@ -386,7 +1021,20 @@ export default function RosettaPage() {
     return () => { cancelled = true }
   }, [])
 
-  // ---- Fetch lexicon when agent selected ----
+  // ---- Refresh user lexicons after registration / term add ----
+  const refreshUserLexicons = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/web/rosetta/view`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.user_lexicons) setUserLexicons(data.user_lexicons)
+      if (data.user_lexicon_count !== undefined) setUserLexiconCount(data.user_lexicon_count)
+    } catch {
+      // silent refresh failure — not blocking
+    }
+  }, [])
+
+  // ---- Fetch agent lexicon when selected ----
   useEffect(() => {
     if (!selectedAgent) {
       setLexiconTerms(null)
@@ -417,31 +1065,59 @@ export default function RosettaPage() {
 
   // ---- Translate handler ----
   const handleTranslate = useCallback(async () => {
-    if (!fromAgent || !concept.trim()) return
-    if (!translateAll && !toAgent) return
+    if (!fromId || !concept.trim()) return
+    if (!translateAll && !toId) return
 
     setTranslating(true)
     setTranslationResult(null)
     setTranslateAllResults(null)
 
     try {
+      const isFromUser = fromId.startsWith('user:')
+      const isToUser = !translateAll && toId.startsWith('user:')
+      const userInvolved = isFromUser || isToUser
+
       if (translateAll) {
-        const res = await fetch(
-          `${API_BASE}/web/rosetta/all?from=${fromAgent}&concept=${encodeURIComponent(concept.trim())}`
-        )
+        const endpoint = isFromUser
+          ? `${API_BASE}/web/rosetta/translate/user`
+          : `${API_BASE}/web/rosetta/all?from=${fromId}&concept=${encodeURIComponent(concept.trim())}`
+
+        const fetchOpts = isFromUser
+          ? {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fromUserId: fromId.slice(5), concept: concept.trim() }),
+            }
+          : undefined
+
+        const res = await fetch(endpoint, fetchOpts)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
         setTranslateAllResults(data.translations || data)
+      } else if (userInvolved) {
+        const res = await fetch(`${API_BASE}/web/rosetta/translate/user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromUserId: isFromUser ? fromId.slice(5) : undefined,
+            fromAgent: isFromUser ? undefined : fromId,
+            toUserId: isToUser ? toId.slice(5) : undefined,
+            toAgent: isToUser ? undefined : toId,
+            concept: concept.trim(),
+          }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        setTranslationResult(data)
       } else {
         const res = await fetch(
-          `${API_BASE}/web/rosetta/translate?from=${fromAgent}&to=${toAgent}&concept=${encodeURIComponent(concept.trim())}`
+          `${API_BASE}/web/rosetta/translate?from=${fromId}&to=${toId}&concept=${encodeURIComponent(concept.trim())}`
         )
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
         setTranslationResult(data)
       }
     } catch {
-      // Show inline error in the result area
       if (translateAll) {
         setTranslateAllResults([])
       } else {
@@ -456,7 +1132,7 @@ export default function RosettaPage() {
     } finally {
       setTranslating(false)
     }
-  }, [fromAgent, toAgent, concept, translateAll])
+  }, [fromId, toId, concept, translateAll])
 
   // ---- Derived stats ----
   const stats = protocolData ? {
@@ -464,16 +1140,17 @@ export default function RosettaPage() {
     terms: protocolData.total_terms ?? 0,
     universals: protocolData.universal_count ?? 0,
     covenantHash: protocolData.covenant_hash ?? '',
+    userLexicons: userLexiconCount ?? protocolData.user_lexicon_count ?? 0,
   } : {
     agents: AGENTS.length,
     terms: '--',
     universals: '--',
     covenantHash: '',
+    userLexicons: userLexiconCount ?? '--',
   }
 
   const agentTermCounts = protocolData?.agent_terms || {}
-
-  const canTranslate = fromAgent && concept.trim() && (translateAll || toAgent)
+  const canTranslate = fromId && concept.trim() && (translateAll || toId)
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -491,7 +1168,7 @@ export default function RosettaPage() {
       </div>
 
       {/* ============ Protocol Stats ============ */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
         {[
           { label: 'Agents', value: stats.agents },
           { label: 'Total Terms', value: stats.terms },
@@ -503,10 +1180,20 @@ export default function RosettaPage() {
               : '--',
             copyable: stats.covenantHash,
           },
+          { label: 'User Lexicons', value: stats.userLexicons, accent: USER_LEXICON_COLOR },
         ].map((s) => (
-          <div key={s.label} className="text-center p-2.5 bg-black-800/40 border border-black-700/50 rounded-lg">
+          <div
+            key={s.label}
+            className="text-center p-2.5 bg-black-800/40 border border-black-700/50 rounded-lg"
+            style={s.accent ? { borderColor: `${s.accent}30` } : {}}
+          >
             <div className="flex items-center justify-center gap-1">
-              <span className="text-white font-mono font-bold text-sm">{s.value}</span>
+              <span
+                className="font-mono font-bold text-sm"
+                style={s.accent ? { color: s.accent } : { color: '#ffffff' }}
+              >
+                {s.value}
+              </span>
               {s.copyable && <CopyButton text={s.copyable} />}
             </div>
             <div className="text-black-500 text-[10px] font-mono">{s.label}</div>
@@ -520,6 +1207,9 @@ export default function RosettaPage() {
           <p className="text-black-600 text-[10px] font-mono mt-1">Translation features still available via direct API calls.</p>
         </div>
       )}
+
+      {/* ============ Discover Section ============ */}
+      <DiscoverSection />
 
       {/* ============ Translation Interface ============ */}
       <GlassCard glowColor="matrix" className="p-5 mb-6">
@@ -548,28 +1238,30 @@ export default function RosettaPage() {
           </button>
         </div>
 
-        {/* Agent Selects */}
+        {/* Lexicon Selects — agents + user lexicons */}
         <div className="flex gap-3 mb-3">
-          <AgentSelect
-            label="From Agent"
-            value={fromAgent}
+          <LexiconSelect
+            label="From Lexicon"
+            value={fromId}
             onChange={(v) => {
-              setFromAgent(v)
+              setFromId(v)
               setTranslationResult(null)
               setTranslateAllResults(null)
             }}
-            excludeId={toAgent}
+            excludeId={toId}
+            userLexicons={userLexicons}
           />
           {!translateAll && (
-            <AgentSelect
-              label="To Agent"
-              value={toAgent}
+            <LexiconSelect
+              label="To Lexicon"
+              value={toId}
               onChange={(v) => {
-                setToAgent(v)
+                setToId(v)
                 setTranslationResult(null)
                 setTranslateAllResults(null)
               }}
-              excludeId={fromAgent}
+              excludeId={fromId}
+              userLexicons={userLexicons}
             />
           )}
         </div>
@@ -605,7 +1297,7 @@ export default function RosettaPage() {
               Translating...
             </span>
           ) : translateAll ? (
-            'Translate to All Agents'
+            'Translate to All Lexicons'
           ) : (
             'Translate'
           )}
@@ -617,19 +1309,34 @@ export default function RosettaPage() {
             <TranslationResult
               key="single"
               result={translationResult}
-              fromAgent={fromAgent}
-              toAgent={toAgent}
+              fromId={fromId}
+              toId={toId}
+              userLexicons={userLexicons}
             />
           )}
           {translateAllResults && translateAll && (
             <TranslateAllResults
               key="all"
               results={translateAllResults}
-              fromAgent={fromAgent}
+              fromId={fromId}
+              userLexicons={userLexicons}
             />
           )}
         </AnimatePresence>
       </GlassCard>
+
+      {/* ============ Register + My Lexicon ============ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <RegisterLexiconForm
+          userId={userId}
+          isConnected={isConnected}
+          onRegistered={refreshUserLexicons}
+        />
+        <MyLexiconPanel
+          userId={userId}
+          isConnected={isConnected}
+        />
+      </div>
 
       {/* ============ Agent Lexicon Grid ============ */}
       <div className="mb-4">
@@ -662,311 +1369,12 @@ export default function RosettaPage() {
         </AnimatePresence>
       </div>
 
-      {/* ============ Discover Equivalents ============ */}
-      <DiscoverPanel apiBase={API_BASE} />
-
-      {/* ============ Register Your Lexicon ============ */}
-      <RegisterLexiconPanel apiBase={API_BASE} />
-
       {/* ============ Footer ============ */}
       <div className="mt-8 text-center">
         <p className="text-black-700 text-[10px] font-mono">
-          Rosetta Stone Protocol v1.0 — Pantheon Cross-Domain Understanding Layer
+          Rosetta Stone Protocol v2.0 — Pantheon Cross-Domain Understanding Layer + User Lexicons
         </p>
       </div>
-    </div>
-  )
-}
-
-// ============ Discover Equivalents Panel ============
-
-function DiscoverPanel({ apiBase }) {
-  const [term, setTerm] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
-
-  const handleDiscover = useCallback(async () => {
-    const t = term.trim()
-    if (!t) return
-    setLoading(true)
-    setResult(null)
-    setError(null)
-    try {
-      const res = await fetch(`${apiBase}/web/rosetta/discover?term=${encodeURIComponent(t)}`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      setResult(data)
-    } catch (err) {
-      setError(err.message || 'Discovery failed')
-    } finally {
-      setLoading(false)
-    }
-  }, [term, apiBase])
-
-  return (
-    <div className="mt-6 mb-6">
-      <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Discover Equivalents</h2>
-      <GlassCard glowColor="terminal" className="p-5">
-        <p className="text-black-500 text-[10px] font-mono mb-3">
-          Enter any term to find which agents and users speak the same concept.
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={term}
-            onChange={(e) => { setTerm(e.target.value); setResult(null); setError(null) }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && term.trim()) handleDiscover() }}
-            placeholder="e.g. liquidity, latency, trust..."
-            className="flex-1 bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
-          />
-          <button
-            onClick={handleDiscover}
-            disabled={!term.trim() || loading}
-            className={`px-4 py-2.5 rounded-lg font-mono text-sm font-bold transition-all flex-shrink-0 ${
-              term.trim() && !loading
-                ? 'bg-terminal-600 text-black-900 hover:bg-terminal-500'
-                : 'bg-black-800 text-black-600 cursor-not-allowed'
-            }`}
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 border-2 border-black-600 border-t-black-900 rounded-full animate-spin" />
-                Searching
-              </span>
-            ) : 'Discover'}
-          </button>
-        </div>
-
-        {error && (
-          <p className="mt-3 text-red-400 text-xs font-mono">{error}</p>
-        )}
-
-        <AnimatePresence>
-          {result && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.3 }}
-              className="mt-4"
-            >
-              {!result.found ? (
-                <p className="text-black-500 text-xs font-mono">{result.error || `"${result.term}" not found in any registered lexicon.`}</p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white font-mono font-bold text-sm">{result.term}</span>
-                    <span className="text-[10px] font-mono text-black-500">→</span>
-                    <span className="text-matrix-400 font-mono text-xs">{result.universal}</span>
-                  </div>
-
-                  {result.exactMatches && result.exactMatches.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-mono text-black-600 mb-1.5 uppercase tracking-wider">Exact Equivalents ({result.exactMatches.length})</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {result.exactMatches.map((m, i) => (
-                          <div key={i} className="flex items-center gap-2 p-2 bg-black-900/50 rounded-lg border border-black-800">
-                            <span className="text-black-400 text-[10px] font-mono flex-shrink-0">{m.agent}</span>
-                            <span className="text-white text-xs font-mono font-medium flex-1 truncate">{m.term}</span>
-                            <span className="text-matrix-500 text-[9px] font-mono flex-shrink-0">100%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {result.approximateMatches && result.approximateMatches.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-mono text-black-600 mb-1.5 uppercase tracking-wider">
-                        Approximate Equivalents ({result.approximateMatches.length})
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {result.approximateMatches.slice(0, 6).map((m, i) => (
-                          <div key={i} className="flex items-center gap-2 p-2 bg-black-900/30 rounded-lg border border-black-800/60">
-                            <span className="text-black-500 text-[10px] font-mono flex-shrink-0">{m.agent}</span>
-                            <span className="text-black-300 text-xs font-mono flex-1 truncate">{m.term}</span>
-                            <span
-                              className="text-[9px] font-mono flex-shrink-0"
-                              style={{ color: m.confidence >= 0.7 ? '#00ff41' : '#fbbf24' }}
-                            >
-                              {Math.round((m.confidence || 0) * 100)}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </GlassCard>
-    </div>
-  )
-}
-
-// ============ Register Lexicon Panel ============
-
-function RegisterLexiconPanel({ apiBase }) {
-  const [open, setOpen] = useState(false)
-  const [userId, setUserId] = useState('')
-  const [domain, setDomain] = useState('')
-  const [termsRaw, setTermsRaw] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [submitResult, setSubmitResult] = useState(null)
-  const [submitError, setSubmitError] = useState(null)
-
-  const handleRegister = useCallback(async () => {
-    setSubmitting(true)
-    setSubmitResult(null)
-    setSubmitError(null)
-
-    // Parse terms: one per line, format "term: universal_concept" or "term=universal_concept"
-    const lines = termsRaw.split('\n').map(l => l.trim()).filter(Boolean)
-    const terms = {}
-    for (const line of lines) {
-      const sep = line.includes(':') ? ':' : '='
-      const idx = line.indexOf(sep)
-      if (idx < 1) continue
-      const t = line.slice(0, idx).trim().toLowerCase().replace(/\s+/g, '_')
-      const u = line.slice(idx + 1).trim().toLowerCase().replace(/\s+/g, '_')
-      if (t && u) terms[t] = u
-    }
-
-    if (Object.keys(terms).length === 0) {
-      setSubmitError('No valid terms found. Use format "term: universal_concept", one per line.')
-      setSubmitting(false)
-      return
-    }
-
-    try {
-      const res = await fetch(`${apiBase}/web/rosetta/lexicon/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: userId.trim(), domain: domain.trim(), terms }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
-      setSubmitResult(data)
-    } catch (err) {
-      setSubmitError(err.message || 'Registration failed')
-    } finally {
-      setSubmitting(false)
-    }
-  }, [userId, domain, termsRaw, apiBase])
-
-  const canSubmit = userId.trim() && domain.trim() && termsRaw.trim() && !submitting
-
-  return (
-    <div className="mt-2 mb-6">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 text-sm font-bold text-white uppercase tracking-wider mb-3 hover:text-matrix-400 transition-colors"
-      >
-        <svg
-          className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        Register Your Lexicon
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-          >
-            <GlassCard className="p-5">
-              <p className="text-black-500 text-[10px] font-mono mb-4">
-                Teach the protocol your language. Register your domain vocabulary and the network can translate between you and every agent.
-              </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Your ID</label>
-                  <input
-                    type="text"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    placeholder="your-username or address"
-                    className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Domain</label>
-                  <input
-                    type="text"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    placeholder="e.g. Cardiology, Jazz Theory, Game Development"
-                    className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
-                    Terms (one per line: "my_term: universal_concept")
-                  </label>
-                  <textarea
-                    value={termsRaw}
-                    onChange={(e) => setTermsRaw(e.target.value)}
-                    placeholder={`arrhythmia: system_instability\nchord: harmonic_combination\nprescription: directive`}
-                    rows={5}
-                    className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors resize-none"
-                  />
-                  <p className="text-black-700 text-[9px] font-mono mt-1">
-                    Use underscores for multi-word terms. Universal concept must match an existing concept key or describe a new one.
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleRegister}
-                  disabled={!canSubmit}
-                  className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
-                    canSubmit
-                      ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]'
-                      : 'bg-black-800 text-black-600 cursor-not-allowed'
-                  }`}
-                >
-                  {submitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-black-600 border-t-black-900 rounded-full animate-spin" />
-                      Registering...
-                    </span>
-                  ) : 'Register Lexicon'}
-                </button>
-
-                {submitError && (
-                  <p className="text-red-400 text-xs font-mono">{submitError}</p>
-                )}
-
-                {submitResult && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="p-3 bg-matrix-600/10 border border-matrix-600/30 rounded-lg"
-                  >
-                    <p className="text-matrix-400 text-xs font-mono font-bold">Lexicon registered.</p>
-                    <p className="text-black-400 text-[10px] font-mono mt-1">
-                      {submitResult.termCount} terms indexed under "{submitResult.domain}"
-                    </p>
-                  </motion.div>
-                )}
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

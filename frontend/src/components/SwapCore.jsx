@@ -124,7 +124,7 @@ function WelcomeModal({ isOpen, onClose, onGetStarted, onUseDevice, deviceWallet
 
           {/* Rabbit Hole - Documentation */}
           <a
-            href="https://github.com/WGlynn/VibeSwap/tree/master/docs"
+            href="/docs"
             target="_blank"
             rel="noopener noreferrer"
             className="block mt-4 p-3 rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border border-matrix-500/40 hover:border-matrix-500 transition-all group"
@@ -241,7 +241,7 @@ function ExistingWalletModal({ isOpen, onSignIn, onCreateNew, walletAddress, isS
 
           {/* Rabbit Hole - Documentation */}
           <a
-            href="https://github.com/WGlynn/VibeSwap/tree/master/docs"
+            href="/docs"
             target="_blank"
             rel="noopener noreferrer"
             className="block mt-4 p-3 rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border border-matrix-500/40 hover:border-matrix-500 transition-all group"
@@ -486,7 +486,7 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
 
           {/* Rabbit Hole - Documentation */}
           <a
-            href="https://github.com/WGlynn/VibeSwap/tree/master/docs"
+            href="/docs"
             target="_blank"
             rel="noopener noreferrer"
             className="block mt-6 p-4 rounded-xl bg-gradient-to-r from-matrix-600/20 via-matrix-500/10 to-matrix-600/20 border border-matrix-500/40 hover:border-matrix-500 transition-all group"

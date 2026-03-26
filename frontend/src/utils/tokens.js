@@ -45,11 +45,11 @@ export function getTokenAbbr(symbol) {
   return s.length <= 2 ? s : s.slice(0, 2)
 }
 
-// Mock prices — in production these come from oracle
-export const MOCK_PRICES = {
+// Fallback prices — used only when global cache and CoinGecko are both unavailable
+const FALLBACK_PRICES = {
   ETH: 3520, WETH: 3520, BTC: 97500, WBTC: 97500,
   USDC: 1.0, USDT: 1.0, DAI: 1.0,
-  VIBE: 0.042, JUL: 0.15,
+  VIBE: 0.85, JUL: 0.042,
   MATIC: 0.38, ARB: 1.12, OP: 2.85,
   LINK: 18.5, UNI: 12.3, AAVE: 285,
   CRV: 0.42, MKR: 1850, SNX: 3.2,
@@ -57,6 +57,19 @@ export const MOCK_PRICES = {
   GMX: 42, PENDLE: 5.8, CKB: 0.012,
 }
 
+// Live price proxy — reads from global cache first, falls back to static
+export const MOCK_PRICES = new Proxy(FALLBACK_PRICES, {
+  get(target, prop) {
+    const cache = window.__vibePriceCache
+    if (cache && cache[prop] !== undefined) return cache[prop]
+    return target[prop]
+  }
+})
+
 export function getMockPrice(symbol) {
-  return MOCK_PRICES[symbol?.toUpperCase()] || 0
+  const upper = symbol?.toUpperCase()
+  // Global cache first (populated by usePriceFeed)
+  const cache = window.__vibePriceCache
+  if (cache?.[upper]) return cache[upper]
+  return FALLBACK_PRICES[upper] || 0
 }

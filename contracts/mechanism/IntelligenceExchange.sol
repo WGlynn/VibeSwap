@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/ICognitiveConsensusMarket.sol";
+import "./ISIEShapleyAdapter.sol";
 
 /**
  * @title IntelligenceExchange — Sovereign Intelligence Exchange Orchestrator
@@ -136,8 +137,13 @@ contract IntelligenceExchange is
     /// @notice Mapping: SIE assetId => CCM claimId (for lookup)
     mapping(bytes32 => uint256) public assetToClaimId;
 
+    // ============ Phase 2: SIEShapleyAdapter Integration ============
+
+    /// @notice SIEShapleyAdapter for Shapley true-up on settlement
+    address public shapleyAdapter;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -174,6 +180,7 @@ contract IntelligenceExchange is
     event RewardsClaimed(address indexed contributor, uint256 amount);
     event EvaluationRequested(bytes32 indexed assetId, uint256 indexed claimId, uint256 bounty);
     event EvaluationSettled(bytes32 indexed assetId, uint256 indexed claimId, bool verified);
+    event ShapleyAdapterNotified(bytes32 indexed assetId, address indexed contributor, bool verified);
 
     // ============ Errors ============
 
@@ -483,11 +490,17 @@ contract IntelligenceExchange is
                 asset.state = AssetState.VERIFIED;
                 emit AssetVerified(assetId);
                 emit EvaluationSettled(assetId, claimId, true);
+
+                // Phase 2: Notify Shapley adapter for true-up accumulation
+                _notifyShapleyAdapter(assetId, asset.contributor, true);
             } else {
                 // FALSE or UNCERTAIN — mark as disputed
                 asset.state = AssetState.DISPUTED;
                 emit AssetDisputed(assetId);
                 emit EvaluationSettled(assetId, claimId, false);
+
+                // Phase 2: Notify adapter of disputed settlement (for tracking)
+                _notifyShapleyAdapter(assetId, asset.contributor, false);
             }
         } else if (claimState == ICognitiveConsensusMarket.ClaimState.EXPIRED) {
             // Evaluation expired (not enough evaluators) — revert to SUBMITTED
@@ -540,6 +553,45 @@ contract IntelligenceExchange is
     /// @notice Set the CognitiveConsensusMarket address (Phase 1 activation)
     function setCognitiveConsensusMarket(address ccm) external onlyOwner {
         cognitiveConsensusMarket = ccm;
+    }
+
+    /// @notice Set the SIEShapleyAdapter address (Phase 2 activation)
+    function setShapleyAdapter(address adapter) external onlyOwner {
+        shapleyAdapter = adapter;
+    }
+
+    // ============ Internal: Shapley Adapter Notification ============
+
+    /**
+     * @notice Notify the Shapley adapter of a settlement result.
+     * @dev Called after settleEvaluation resolves an asset. The adapter
+     *      accumulates verified settlements for periodic Shapley true-up.
+     *      If the adapter is not set, this is a no-op (Phase 1 compatibility).
+     *      Failures in the adapter do NOT revert the settlement — the SIE
+     *      settlement is the source of truth; adapter is downstream.
+     */
+    function _notifyShapleyAdapter(
+        bytes32 assetId,
+        address contributor,
+        bool verified
+    ) internal {
+        if (shapleyAdapter == address(0)) return;
+
+        // Get citation count for weight computation
+        bytes32[] storage cited = citedBy[assetId];
+
+        // Best-effort: adapter failure must not block settlement
+        try ISIEShapleyAdapter(shapleyAdapter).onSettlement(
+            assetId,
+            contributor,
+            verified,
+            assets[assetId].bondingPrice,
+            cited.length
+        ) {
+            emit ShapleyAdapterNotified(assetId, contributor, verified);
+        } catch {
+            // Adapter failure is non-fatal — settlement is the source of truth
+        }
     }
 
     // ============ Bonding Curve ============

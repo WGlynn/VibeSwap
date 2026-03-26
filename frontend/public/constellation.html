@@ -529,20 +529,10 @@ function setSpeed(ms) {
   }, ms);
 }
 
-async function fetchLiveShards() {
-  try {
-    const res = await fetch('https://jarvis-vibeswap.fly.dev/health');
-    if (res.ok) {
-      const data = await res.json();
-      // Health endpoint returns shard info if available
-      const count = data?.shard?.totalShards || data?.shards || 1;
-      updateDisplay(Math.min(64, count));
-    } else {
-      updateDisplay(1); // Primary is always on
-    }
-  } catch {
-    updateDisplay(1);
-  }
+function fetchLiveShards() {
+  // Live mode: shows 1 shard (primary) until multi-shard deployment
+  // When shards are deployed, this will poll the router for real count
+  updateDisplay(1);
 }
 
 // ============ Init ============

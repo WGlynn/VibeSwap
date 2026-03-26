@@ -162,6 +162,10 @@ contract VibeGovernanceHub is
     /// @dev Trusted cross-chain senders (chainId => address)
     mapping(uint32 => address) public trustedRemotes;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProposalCreated(

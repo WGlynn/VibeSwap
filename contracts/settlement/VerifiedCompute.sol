@@ -70,6 +70,9 @@ abstract contract VerifiedCompute is
     uint256 public constant SLASH_RATE = 5000;   // 50% slash on invalid result
     uint256 public constant BASIS_POINTS = 10000;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Init ============
 
     function __VerifiedCompute_init(uint256 _disputeWindow, uint256 _bondAmount) internal onlyInitializing {

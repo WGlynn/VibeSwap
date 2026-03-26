@@ -85,6 +85,10 @@ contract VibeAgentReputation is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     uint256 public totalEndorsements;
     uint256 public totalUpdates;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ReputationInitialized(bytes32 indexed agentId);

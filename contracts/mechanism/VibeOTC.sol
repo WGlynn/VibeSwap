@@ -45,6 +45,10 @@ contract VibeOTC is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     uint256 public protocolFees;
     uint256 public totalVolume;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DealCreated(uint256 indexed id, address maker, uint256 makerAmount, uint256 takerAmount);

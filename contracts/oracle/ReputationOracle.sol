@@ -115,6 +115,10 @@ contract ReputationOracle is
     /// @notice Treasury for slashed funds
     address public treasury;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ComparisonCreated(bytes32 indexed comparisonId, uint256 indexed round, address walletA, address walletB);

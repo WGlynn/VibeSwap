@@ -81,6 +81,10 @@ contract VibeAgentInsurance is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     /// @notice Claim verifiers
     mapping(address => bool) public claimVerifiers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PolicyCreated(uint256 indexed policyId, bytes32 indexed agentId, RiskPool pool, uint256 coverage, uint256 premium);

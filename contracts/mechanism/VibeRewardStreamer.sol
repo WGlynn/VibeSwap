@@ -41,6 +41,10 @@ contract VibeRewardStreamer is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalClaimed;
     uint256 public stakerCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event StreamCreated(uint256 indexed id, uint256 totalReward, uint256 duration);

@@ -65,6 +65,10 @@ contract SIEShapleyAdapter is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public roundCount;
     uint256 public lastTrueUpTimestamp;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TrueUpInitiated(bytes32 indexed roundId, uint256 totalPool, uint256 participantCount);

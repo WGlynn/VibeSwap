@@ -51,6 +51,10 @@ contract ILProtectionVault is
     uint256 public totalILPaid;
     uint256 public totalPositionsRegistered;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error Unauthorized();

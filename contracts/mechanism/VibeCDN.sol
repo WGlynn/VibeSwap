@@ -68,6 +68,10 @@ contract VibeCDN is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     uint256 public minNodeStake;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event NodeRegistered(address indexed node, uint256 stake, string endpoint);

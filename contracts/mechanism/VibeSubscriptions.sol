@@ -54,6 +54,10 @@ contract VibeSubscriptions is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     uint256 public constant PLATFORM_FEE_BPS = 200; // 2%
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PlanCreated(uint256 indexed id, address merchant, string name, uint256 price, uint256 period);

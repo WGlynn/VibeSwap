@@ -58,6 +58,10 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     uint256 public totalDistributed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FeesReceived(uint256 amount, uint256 epoch);

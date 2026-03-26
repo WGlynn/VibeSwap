@@ -40,6 +40,10 @@ contract VibeRebalancer is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public constant MIN_INTERVAL = 1 hours;
     uint256 public constant MAX_TOKENS = 10;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PortfolioCreated(address indexed user, uint256 tokenCount);

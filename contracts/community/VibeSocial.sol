@@ -59,6 +59,10 @@ contract VibeSocial is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Total tips per user
     mapping(address => uint256) public totalTipsReceived;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProfileCreated(address indexed owner, string handle);

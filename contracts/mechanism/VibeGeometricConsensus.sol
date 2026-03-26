@@ -78,6 +78,10 @@ contract VibeGeometricConsensus is OwnableUpgradeable, UUPSUpgradeable, Reentran
     uint256 public totalSignalsProcessed;
     uint256 public avgAlignmentScore;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event RoundCreated(uint256 indexed roundId, bytes32 topic, AggregationMethod method);

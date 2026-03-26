@@ -73,6 +73,10 @@ contract VibePrivacyPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     uint256 public totalDeposited;
     uint256 public totalWithdrawn;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DepositMade(bytes32 indexed commitment, uint256 amount, uint256 depositIndex);

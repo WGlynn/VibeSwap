@@ -69,6 +69,10 @@ contract VibePayment is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     uint256 public totalPaymentsProcessed;
     uint256 public totalVolumeProcessed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PaymentRequested(uint256 indexed requestId, address indexed payee, uint256 amount);

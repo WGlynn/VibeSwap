@@ -74,6 +74,10 @@ contract SubnetRouter is
     /// @notice Total number of subnets created
     uint256 private _totalSubnets;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor

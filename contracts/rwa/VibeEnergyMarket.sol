@@ -84,6 +84,10 @@ contract VibeEnergyMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public totalVolume;       // ETH
     uint256 public totalCO2Offset;    // kg
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProducerRegistered(address indexed producer, EnergySource source, uint256 capacityKw);

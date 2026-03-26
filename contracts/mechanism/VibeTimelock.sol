@@ -55,6 +55,10 @@ contract VibeTimelock is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalExecuted;
     uint256 public totalCancelled;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TransactionQueued(bytes32 indexed txHash, address indexed target, uint256 eta, DelayTier tier);

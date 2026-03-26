@@ -105,6 +105,10 @@ contract VibeRWA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     uint256 public totalYieldPaid;
     uint256 public totalSecondaryVolume;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AssetRegistered(bytes32 indexed assetId, address indexed issuer, AssetClass assetClass, string name);

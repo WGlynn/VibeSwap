@@ -255,6 +255,9 @@ contract ShapleyDistributor is
     ///      instead of computing on-chain. Execution/settlement separation.
     IShapleyVerifier public shapleyVerifier;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BondingCurveSealed(address indexed bondingCurve);

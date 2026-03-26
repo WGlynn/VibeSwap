@@ -61,6 +61,10 @@ contract VibeCrossChainSwap is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalSwapsCompleted;
     uint256 public totalSwapsRefunded;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SwapInitiated(bytes32 indexed swapId, address indexed initiator, address counterparty, uint256 amount, bytes32 hashLock);

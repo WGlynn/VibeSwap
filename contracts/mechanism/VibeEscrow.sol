@@ -56,6 +56,10 @@ contract VibeEscrow is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
     uint256 public totalEscrowVolume;
     uint256 public activeEscrowCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event EscrowCreated(uint256 indexed escrowId, address indexed depositor, address indexed beneficiary, uint256 amount);

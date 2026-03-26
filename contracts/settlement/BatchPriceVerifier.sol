@@ -44,6 +44,9 @@ contract BatchPriceVerifier is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public bondAmount;
     uint64 public disputeWindow;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor

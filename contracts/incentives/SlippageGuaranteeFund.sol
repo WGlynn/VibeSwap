@@ -47,6 +47,10 @@ contract SlippageGuaranteeFund is
     uint256 public totalCompensationPaid;
     uint256 public claimNonce;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error Unauthorized();

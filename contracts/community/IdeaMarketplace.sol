@@ -134,6 +134,10 @@ contract IdeaMarketplace is
     /// @notice Treasury address for slashed collateral
     address public treasury;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Modifiers ============
 
     modifier ideaExists(uint256 ideaId) {

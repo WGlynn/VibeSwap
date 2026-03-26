@@ -59,6 +59,9 @@ contract VerifierCheckpointBridge is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Total results checkpointed
     uint256 public totalCheckpointed;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Init ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor

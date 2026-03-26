@@ -136,6 +136,10 @@ contract CrossChainRouter is
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PeerSet(uint32 indexed eid, bytes32 peer);

@@ -128,6 +128,10 @@ contract GPUComputeMarket is
     /// @notice Total insurance fees collected
     uint256 public totalInsuranceFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProviderRegistered(address indexed provider, uint256 stake, uint256 vramGB, uint256 tflops, uint256 pricePerHour);

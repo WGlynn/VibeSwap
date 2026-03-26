@@ -68,6 +68,10 @@ contract VibeOracle is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Staleness threshold
     uint256 public stalenessThreshold;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PriceUpdated(bytes32 indexed feedId, uint256 price, uint256 confidence, uint256 sourceCount);

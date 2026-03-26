@@ -78,6 +78,10 @@ contract VibeRouter is
     /// @dev key = keccak256(abi.encodePacked(tokenA, tokenB)) where tokenA < tokenB
     mapping(bytes32 => address[]) public pairPools;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PoolRegistered(address indexed pool, uint256 poolType);

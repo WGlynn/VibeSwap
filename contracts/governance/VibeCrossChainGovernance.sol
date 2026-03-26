@@ -79,6 +79,10 @@ contract VibeCrossChainGovernance is
     /// @notice Proposal ID => chain ID => attestation count
     mapping(uint256 => mapping(uint256 => uint256)) public attestationCounts;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProposalCreated(

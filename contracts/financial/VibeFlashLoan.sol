@@ -79,6 +79,10 @@ contract VibeFlashLoan is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     /// @notice Callback interface selector (EIP-3156)
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FlashLoanExecuted(address indexed borrower, address indexed token, uint256 amount, uint256 fee);

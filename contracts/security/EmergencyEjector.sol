@@ -45,6 +45,10 @@ contract EmergencyEjector is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     mapping(bytes32 => mapping(address => bool)) public emergencyVotes;
     mapping(bytes32 => uint256) public emergencyVoteCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SafeHouseRegistered(address indexed user, address safeAddress);

@@ -148,6 +148,10 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     mapping(uint256 => uint256) public notificationTime;        // requestId => when notified
     mapping(uint256 => uint256) public recoveryBonds;           // requestId => bonded amount
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event GuardianAdded(uint256 indexed tokenId, address indexed guardian, string label);

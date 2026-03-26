@@ -75,6 +75,10 @@ contract VolatilityInsurancePool is
     uint256 public maxClaimPercentBps;    // Max % of reserve per claim
     uint256 public minVolatilityTierForClaim; // Minimum tier to trigger claims
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FeesDeposited(bytes32 indexed poolId, address indexed token, uint256 amount);

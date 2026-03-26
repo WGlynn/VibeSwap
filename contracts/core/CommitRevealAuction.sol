@@ -183,6 +183,9 @@ contract CommitRevealAuction is
     /// @notice Slashed amounts per user (for recovery if treasury was broken)
     mapping(address => uint256) public userSlashedAmounts;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Security Fix #7: Excess ETH Refund ============
 
     event ExcessETHRefundFailed(address indexed user, uint256 amount);
@@ -1282,11 +1285,9 @@ contract CommitRevealAuction is
         // Refund non-slashed portion to user
         if (refundAmount > 0) {
             (bool success, ) = commitment.depositor.call{value: refundAmount}("");
-            // If refund fails, funds stay in contract (user can try again)
+            // If refund fails, accrue to pendingRefunds (pull pattern) — never revert status
             if (!success) {
-                // Revert status so user can try to withdraw later
-                commitment.status = CommitStatus.COMMITTED;
-                return;
+                pendingRefunds[commitment.depositor] += refundAmount;
             }
         }
 

@@ -39,6 +39,10 @@ contract VibeVesting is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     uint256 public totalAllocated;
     uint256 public totalReleased;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ScheduleCreated(uint256 indexed id, address beneficiary, uint256 amount, uint256 duration);

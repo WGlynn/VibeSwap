@@ -66,6 +66,10 @@ contract KeyRecoveryVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public constant MAX_ATTEMPTS = 5;
     uint256 public constant LOCKOUT_DURATION = 1 hours;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event KeyStored(address indexed user, uint256 version);

@@ -15,6 +15,10 @@ contract VibeFeeMarket is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalPriorityFees;
     mapping(uint256 => uint256) public blockGasUsed;
     mapping(uint256 => uint256) public blockBaseFee;
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     event BaseFeeUpdated(uint256 indexed blockNumber, uint256 newBaseFee, uint256 gasUsed);
 
     function initialize() external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); baseFee = 100 gwei; }

@@ -67,6 +67,10 @@ contract VibeGovernanceToken is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     /// @notice Lock count
     uint256 public lockCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Locked(address indexed user, uint256 amount, uint256 lockEnd, uint256 votingPower);

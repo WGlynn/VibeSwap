@@ -70,6 +70,10 @@ contract VIBEToken is
     /// @notice Total VIBE burned (for deflationary tracking)
     uint256 public totalBurned;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MinterUpdated(address indexed minter, bool authorized);

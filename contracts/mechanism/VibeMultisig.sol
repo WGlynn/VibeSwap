@@ -31,6 +31,10 @@ contract VibeMultisig is Initializable, UUPSUpgradeable {
 
     mapping(uint256 => mapping(address => bool)) public confirmed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TransactionSubmitted(uint256 indexed txId, address indexed submitter, address to, uint256 value);

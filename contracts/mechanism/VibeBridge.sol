@@ -87,6 +87,10 @@ contract VibeBridge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
     /// @notice Total bridged volume
     uint256 public totalBridgedVolume;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BridgeInitiated(bytes32 indexed messageId, address indexed sender, address token, uint256 amount, uint256 dstChainId);

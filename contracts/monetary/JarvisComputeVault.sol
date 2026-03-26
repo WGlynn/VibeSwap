@@ -144,6 +144,10 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalCreditsConsumed;
     uint256 public totalFraudSlashed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DepositCommitted(address indexed depositor, bytes32 commitHash);

@@ -77,6 +77,9 @@ contract UtilizationAccumulator is
     /// @notice Authorized callers (VibeSwapCore, IncentiveController)
     mapping(address => bool) public authorized;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BatchRecorded(bytes32 indexed poolId, uint256 indexed epochId, uint32 batchCount);

@@ -145,6 +145,13 @@ contract VibeSwapCore is
     /// @notice IncentiveController for auction proceeds distribution and execution tracking
     IIncentiveController public incentiveController;
 
+    /// @notice Temporary cumulative validated amounts per trader-token pair (cleared after each batch)
+    mapping(bytes32 => uint256) private _cumulativeValidated;
+
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SwapCommitted(
@@ -778,27 +785,17 @@ contract VibeSwapCore is
         // and griefing all other traders. By accumulating per-trader-token, excess
         // orders are marked invalid before they can poison the batch.
 
-        // Temporary arrays to track cumulative validated amounts per trader-token pair.
-        // We use parallel arrays since memory mappings are not supported in Solidity.
-        address[] memory trackedTraders = new address[](executionOrder.length);
-        address[] memory trackedTokens = new address[](executionOrder.length);
-        uint256[] memory trackedAmounts = new uint256[](executionOrder.length);
-        uint256 trackedCount = 0;
+        // Track unique trader-token keys for cleanup after the loop.
+        bytes32[] memory usedKeys = new bytes32[](executionOrder.length);
+        uint256 usedKeyCount = 0;
 
         for (uint256 i = 0; i < executionOrder.length; i++) {
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
-            // Find or create cumulative tracker for this trader-token pair
-            uint256 cumulativeAmount = order.amountIn;
-            uint256 trackerIdx = type(uint256).max;
-            for (uint256 t = 0; t < trackedCount; t++) {
-                if (trackedTraders[t] == order.trader && trackedTokens[t] == order.tokenIn) {
-                    trackerIdx = t;
-                    cumulativeAmount = trackedAmounts[t] + order.amountIn;
-                    break;
-                }
-            }
+            // O(1) cumulative lookup via storage mapping keyed on keccak256(trader, tokenIn)
+            bytes32 pairKey = keccak256(abi.encodePacked(order.trader, order.tokenIn));
+            uint256 cumulativeAmount = _cumulativeValidated[pairKey] + order.amountIn;
 
             // Verify cumulative deposit does not exceed available balance
             if (deposits[order.trader][order.tokenIn] < cumulativeAmount) {
@@ -807,14 +804,11 @@ contract VibeSwapCore is
             }
 
             // Update cumulative tracker
-            if (trackerIdx == type(uint256).max) {
-                trackedTraders[trackedCount] = order.trader;
-                trackedTokens[trackedCount] = order.tokenIn;
-                trackedAmounts[trackedCount] = cumulativeAmount;
-                trackedCount++;
-            } else {
-                trackedAmounts[trackerIdx] = cumulativeAmount;
+            if (_cumulativeValidated[pairKey] == 0) {
+                usedKeys[usedKeyCount] = pairKey;
+                usedKeyCount++;
             }
+            _cumulativeValidated[pairKey] = cumulativeAmount;
 
             bytes32 poolId = amm.getPoolId(order.tokenIn, order.tokenOut);
             orderPoolIds[i] = poolId;
@@ -829,6 +823,11 @@ contract VibeSwapCore is
                 poolIds[uniquePoolCount] = poolId;
                 uniquePoolCount++;
             }
+        }
+
+        // Clean up storage mapping to avoid stale state and reclaim gas
+        for (uint256 k = 0; k < usedKeyCount; k++) {
+            delete _cumulativeValidated[usedKeys[k]];
         }
     }
 

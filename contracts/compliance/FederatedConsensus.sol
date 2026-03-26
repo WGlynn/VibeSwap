@@ -96,6 +96,10 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Proposal counter
     uint256 public proposalCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AuthorityAdded(address indexed authority, AuthorityRole role, string jurisdiction);

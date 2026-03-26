@@ -93,6 +93,10 @@ contract DataMarketplace is
     /// @notice Total protocol fees accumulated (Shapley pool)
     uint256 public protocolRevenue;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AssetPublished(

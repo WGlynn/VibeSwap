@@ -74,6 +74,10 @@ contract VibeGovernor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
     uint256 public totalProposals;
     uint256 public totalVotesCast;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProposalCreated(uint256 indexed proposalId, address indexed proposer, ProposalType pType, string description);

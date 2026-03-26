@@ -60,6 +60,10 @@ contract VibeRevenueShare is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public totalRevenueDistributed;
     uint256 public totalStakers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Staked(address indexed user, uint256 amount);

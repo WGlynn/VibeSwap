@@ -57,6 +57,10 @@ contract VibeRewards is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     /// @notice Lock duration to boost multiplier mapping
     mapping(uint256 => uint256) public lockBoosts; // seconds => boost BPS
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PoolCreated(uint256 indexed poolId, address stakingToken, address rewardToken);

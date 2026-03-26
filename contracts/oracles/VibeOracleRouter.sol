@@ -116,6 +116,9 @@ contract VibeOracleRouter is
     /// @notice Whether a feed has been initialized with at least one report
     mapping(bytes32 => bool) public feedInitialized;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProviderRegistered(address indexed provider, FeedType feedType);

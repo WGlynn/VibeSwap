@@ -90,6 +90,10 @@ contract VibeProtocolTreasury is
     /// @notice Total revenue received per token (address(0) for ETH)
     mapping(address => uint256) public totalRevenue;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProposalCreated(uint256 indexed proposalId, address indexed proposer, Category category, uint256 amount);

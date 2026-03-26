@@ -56,6 +56,10 @@ contract VibeDCA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     uint256 public totalVolume;
     uint256 public totalExecutions;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DCACreated(uint256 indexed orderId, address indexed user, address tokenIn, address tokenOut, Frequency freq);

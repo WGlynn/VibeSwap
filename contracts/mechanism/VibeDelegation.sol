@@ -64,6 +64,10 @@ contract VibeDelegation is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalDelegations;
     uint256 public totalDelegators;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Delegated(address indexed delegator, address indexed delegate, uint256 amount);

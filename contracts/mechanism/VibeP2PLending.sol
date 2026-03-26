@@ -63,6 +63,10 @@ contract VibeP2PLending is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public constant PROTOCOL_FEE_BPS = 50;        // 0.5%
     uint256 public protocolFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event LoanProposed(uint256 indexed id, address borrower, uint256 principal, uint256 interestRate);

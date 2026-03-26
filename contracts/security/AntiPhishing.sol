@@ -54,6 +54,10 @@ contract AntiPhishing is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public constant CONFIRM_THRESHOLD = 3;
     mapping(address => bool) public reporters; // Trusted reporters
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ContractVerified(address indexed contractAddr, string name, string domain);

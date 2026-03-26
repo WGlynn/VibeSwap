@@ -53,6 +53,10 @@ contract VibeComposer is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
     /// @notice Execution counter
     uint256 public totalExecutions;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ModuleAllowed(address indexed module, bool allowed);

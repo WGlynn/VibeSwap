@@ -68,6 +68,10 @@ contract VibeReputation is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Total profiles
     uint256 public totalProfiles;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ScoreUpdated(address indexed account, string category, uint256 newScore);

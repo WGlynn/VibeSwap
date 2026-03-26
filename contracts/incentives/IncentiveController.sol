@@ -101,6 +101,10 @@ contract IncentiveController is
     // Authorized callers
     mapping(address => bool) public authorizedCallers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error Unauthorized();

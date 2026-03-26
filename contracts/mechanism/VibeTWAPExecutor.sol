@@ -48,6 +48,10 @@ contract VibeTWAPExecutor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public constant KEEPER_FEE_BPS = 15; // 0.15%
     uint256 public constant DEFAULT_MAX_DEVIATION = 500; // 5%
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TWAPCreated(uint256 indexed id, address user, uint256 totalAmount, uint256 chunks, uint256 interval);

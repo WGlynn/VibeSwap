@@ -69,6 +69,10 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalStaked;
     mapping(address => uint256) public userStake;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FeesCollected(address indexed token, uint256 amount, address indexed source);

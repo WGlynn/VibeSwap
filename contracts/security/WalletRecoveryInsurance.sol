@@ -71,6 +71,10 @@ contract WalletRecoveryInsurance is OwnableUpgradeable, UUPSUpgradeable, Reentra
     uint256 public constant PREMIUM_PERIOD = 30 days;
     uint256 public constant GRACE_PERIOD = 7 days;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PolicyCreated(uint256 indexed id, address holder, uint256 coverage);

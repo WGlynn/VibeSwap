@@ -36,6 +36,10 @@ contract VibeRegistry is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Category index: category => nameHashes
     mapping(string => bytes32[]) public categoryIndex;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ContractRegistered(string name, address implementation, address proxy, string category);

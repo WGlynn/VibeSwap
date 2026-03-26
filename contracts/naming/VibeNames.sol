@@ -131,6 +131,10 @@ contract VibeNames is
     /// @notice Number of names owned per address (for portfolio tax calculation)
     mapping(address => uint256) public portfolioSize;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event NameRegistered(

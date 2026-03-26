@@ -82,6 +82,10 @@ contract VibeLendPool is
     /// @dev asset => user => last Shapley accrual timestamp
     mapping(address => mapping(address => uint256)) public shapleyLastUpdate;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor

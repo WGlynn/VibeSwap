@@ -56,6 +56,10 @@ contract VibeLiquidityLocker is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     /// @notice Total fees collected
     uint256 public totalFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event LiquidityLocked(uint256 indexed lockId, address indexed owner, address lpToken, uint256 amount, uint256 cliffEnd, uint256 vestingEnd);

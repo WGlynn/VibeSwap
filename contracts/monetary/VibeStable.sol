@@ -140,6 +140,10 @@ contract VibeStable is
     /// @notice Bad debt (deficit from under-collateralized liquidations)
     uint256 public badDebt;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event CollateralTypeAdded(address indexed token, uint256 minCollateralRatio, uint256 debtCeiling, address priceFeed);

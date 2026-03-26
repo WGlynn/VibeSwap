@@ -56,6 +56,10 @@ contract VibeEmergencyDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public lastActionTime;
     uint256 public totalActionsExecuted;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event EmergencyProposed(uint256 indexed id, ActionType actionType, address target, string reason);

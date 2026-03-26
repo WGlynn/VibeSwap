@@ -81,6 +81,10 @@ contract VibeMessenger is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public validatorCount;
     uint256 public requiredAttestations;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ChannelCreated(uint256 indexed channelId, address indexed owner, string name);

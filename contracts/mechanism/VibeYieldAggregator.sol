@@ -56,6 +56,10 @@ contract VibeYieldAggregator is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
 
     address public treasury; // Performance fee recipient
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Deposited(address indexed user, uint256 amount, uint256 shares);

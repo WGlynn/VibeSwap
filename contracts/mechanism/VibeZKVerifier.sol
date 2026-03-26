@@ -55,6 +55,10 @@ contract VibeZKVerifier is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalValid;
     uint256 public totalInvalid;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event VerificationKeyRegistered(bytes32 indexed keyId, string circuit, ProofSystem proofSystem);

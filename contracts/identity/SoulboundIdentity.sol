@@ -94,6 +94,10 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     // Flag to allow recovery transfers (bypasses soulbound check)
     bool private _isRecoveryTransfer;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event IdentityMinted(address indexed owner, uint256 indexed tokenId, string username, bool quantumEnabled);

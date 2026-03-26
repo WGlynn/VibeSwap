@@ -52,6 +52,10 @@ contract VibeShieldTransfer is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalExpired;
     uint256 public activeTransfers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ShieldCreated(uint256 indexed transferId, address indexed sender, bytes32 recipientHash, uint256 amount);

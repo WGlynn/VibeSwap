@@ -117,6 +117,10 @@ contract VibeAttentionToken is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public protocolRevenue;
     uint256 public totalAttentionSeconds;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event CampaignCreated(uint256 indexed campaignId, address indexed advertiser, CampaignType cType, uint256 budget);

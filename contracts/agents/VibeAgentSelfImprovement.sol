@@ -75,6 +75,10 @@ contract VibeAgentSelfImprovement is OwnableUpgradeable, UUPSUpgradeable, Reentr
     uint256 public totalRollbacks;
     uint256 public totalApplied;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ImprovementProposed(uint256 indexed id, bytes32 indexed agentId, ImprovementType iType);

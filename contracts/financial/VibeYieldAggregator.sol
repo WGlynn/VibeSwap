@@ -92,6 +92,10 @@ contract VibeYieldAggregator is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     address public keeper;              // Authorized harvester
     uint256 public keeperTip;           // Tip per harvest (in asset tokens)
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event VaultCreated(uint256 indexed vaultId, address indexed asset, string name);

@@ -72,6 +72,10 @@ contract VibePortfolio is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public totalValueLocked;
     uint256 public totalPortfolios;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PortfolioCreated(uint256 indexed portfolioId, address indexed owner, string name);

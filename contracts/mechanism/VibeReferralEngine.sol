@@ -58,6 +58,10 @@ contract VibeReferralEngine is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public constant GOLD_THRESHOLD = 1000 ether;
     uint256 public constant DIAMOND_THRESHOLD = 10000 ether;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ReferralRegistered(address indexed user, address indexed referrer, bytes32 code);

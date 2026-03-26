@@ -136,6 +136,9 @@ contract IntelligenceExchange is
     /// @notice Mapping: SIE assetId => CCM claimId (for lookup)
     mapping(bytes32 => uint256) public assetToClaimId;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event IntelligenceSubmitted(

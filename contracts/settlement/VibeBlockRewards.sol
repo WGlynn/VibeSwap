@@ -29,6 +29,10 @@ contract VibeBlockRewards is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     mapping(address => uint256) public pendingRewards;
     uint256 public totalDistributed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     event RewardDistributed(address indexed validator, uint256 amount, uint256 blockNumber);
     event EpochAdvanced(uint256 indexed epochId, uint256 newReward);
 

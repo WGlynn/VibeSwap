@@ -69,6 +69,10 @@ contract VibeYieldFarming is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     /// @notice Total rewards distributed
     uint256 public totalRewardsDistributed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PoolAdded(uint256 indexed pid, address stakeToken, uint256 allocPoint);

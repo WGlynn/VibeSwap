@@ -131,6 +131,10 @@ contract NakamotoConsensusInfinity is
     /// @notice VibeAgentReputation — AI agent multi-dimensional reputation
     address public agentReputation;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor

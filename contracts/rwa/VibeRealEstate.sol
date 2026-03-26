@@ -120,6 +120,10 @@ contract VibeRealEstate is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public totalRentalDistributed;
     uint256 public totalFractionalInvestors;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PropertyListed(bytes32 indexed propertyId, address indexed owner, PropertyType pType, uint256 askingPrice);

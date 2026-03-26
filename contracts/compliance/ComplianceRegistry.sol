@@ -101,6 +101,10 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public securityTokens;
     mapping(address => bool) public derivativeTokens;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event UserTierUpdated(address indexed user, UserTier oldTier, UserTier newTier, address indexed updatedBy);

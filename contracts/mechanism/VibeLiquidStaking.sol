@@ -36,6 +36,10 @@ contract VibeLiquidStaking is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     mapping(address => uint256) public stakedAt;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Staked(address indexed user, uint256 ethAmount, uint256 vsEthMinted);

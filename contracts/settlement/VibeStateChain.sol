@@ -173,6 +173,10 @@ contract VibeStateChain is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     /// @notice subblockId => proposer => already proposed (detect conflicting subblocks)
     mapping(uint256 => mapping(address => bool)) public subblockProposals;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BlockProposed(uint256 indexed blockNumber, address indexed proposer, bytes32 blockHash, bytes32 stateRoot);

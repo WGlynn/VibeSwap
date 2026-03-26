@@ -59,6 +59,10 @@ contract TreasuryStabilizer is
     uint32 public shortTermPeriod;
     uint32 public longTermPeriod;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error Unauthorized();

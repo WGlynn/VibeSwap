@@ -105,6 +105,10 @@ contract VibeAgentTrading is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public totalProfitGenerated;
     uint256 public totalFeesCollected;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event VaultCreated(uint256 indexed vaultId, bytes32 indexed agentId, StrategyType strategy);

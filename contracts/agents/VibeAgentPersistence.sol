@@ -91,6 +91,10 @@ contract VibeAgentPersistence is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     uint256 public totalMemoryAccesses;
     uint256 public totalBanksCreated;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MemoryStored(uint256 indexed memoryId, bytes32 indexed agentId, bytes32 bankId, MemoryType memType, uint256 importance);

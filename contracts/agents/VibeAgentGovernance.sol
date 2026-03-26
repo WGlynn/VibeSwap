@@ -77,6 +77,10 @@ contract VibeAgentGovernance is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     uint256 public totalAgentVotes;
     uint256 public totalOverrides;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AgentGovernanceRegistered(bytes32 indexed agentId, address indexed operator, uint256 maxWeight);

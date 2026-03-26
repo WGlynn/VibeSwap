@@ -231,6 +231,9 @@ contract VibeAMM is
     ///      High vol + normal regime = organic volatility (don't over-dampen)
     IVolatilityOracle public volatilityOracle;
 
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);

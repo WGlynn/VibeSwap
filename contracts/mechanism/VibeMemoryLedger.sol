@@ -98,6 +98,10 @@ contract VibeMemoryLedger is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public totalReadTokensRecorded;
     uint256 public totalObservationsVerified;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ObservationCaptured(uint256 indexed observationId, bytes32 indexed contributorId, bytes32 projectId, ObservationType obsType, uint256 discoveryTokens);

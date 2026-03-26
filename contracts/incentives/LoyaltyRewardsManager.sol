@@ -50,6 +50,10 @@ contract LoyaltyRewardsManager is
     uint256 public totalPenaltiesCollected;
     uint256 public totalRewardsDistributed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error Unauthorized();

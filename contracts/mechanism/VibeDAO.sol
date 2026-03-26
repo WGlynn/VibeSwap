@@ -54,6 +54,10 @@ contract VibeDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     mapping(address => bool) public vetoCouncil;
     uint256 public totalVotingPower;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProposalCreated(uint256 indexed id, address proposer, string title);

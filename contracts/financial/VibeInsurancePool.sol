@@ -87,6 +87,10 @@ contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public totalPremiums;
     uint256 public totalPayouts;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Underwritten(address indexed underwriter, uint256 amount, uint256 shares);

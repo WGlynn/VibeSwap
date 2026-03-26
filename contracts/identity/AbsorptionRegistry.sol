@@ -75,6 +75,10 @@ contract AbsorptionRegistry is
     /// @notice Authorized usage recorders
     mapping(address => bool) public recorders;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProtocolAbsorbed(

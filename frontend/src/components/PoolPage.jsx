@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { getMockPrice } from '../utils/tokens'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
@@ -34,9 +35,15 @@ function buildPools() {
     ['AAVE','ETH',7009],['WBTC','USDC',7010],
   ].map(([a, b, seed]) => {
     const r = seededRandom(seed)
-    const tvl = 1e6 + r() * 18e6, vol = tvl * (0.05 + r() * 0.25)
+    // TVL scales with real token prices (getMockPrice reads from CoinGecko cache)
+    const priceA = getMockPrice(a) || 1
+    const priceB = getMockPrice(b) || 1
+    const avgPrice = (priceA + priceB) / 2
+    const tvlMultiplier = Math.max(1, avgPrice / 100) // Higher-value pairs get deeper pools
+    const tvl = (500_000 + r() * 2_000_000) * tvlMultiplier
+    const vol = tvl * (0.05 + r() * 0.15)
     return { id: `${a}-${b}`, tokenA: TK[a], tokenB: TK[b], tvl, volume24h: vol,
-      apr: 8 + r() * 37, fees24h: vol * 0.003, feeTier: r() > 0.5 ? 0.3 : 0.05,
+      apr: 4 + r() * 18, fees24h: vol * 0.003, feeTier: r() > 0.5 ? 0.3 : 0.05,
       sparkData: generateSparklineData(seed, 24, 0.04), seed }
   })
 }

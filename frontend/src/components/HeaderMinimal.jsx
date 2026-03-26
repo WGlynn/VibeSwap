@@ -109,8 +109,8 @@ function HeaderMinimal() {
                   className="hidden sm:flex items-center space-x-1 px-2 py-1 rounded-full bg-black-800/40 border border-black-700/50 hover:border-black-500 transition-colors"
                   title="Gas Tracker"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: gasGwei > 40 ? '#ef4444' : gasGwei > 25 ? '#f59e0b' : '#22c55e' }} />
-                  <span className="text-[10px] font-mono text-black-400">{Math.round(gasGwei)}</span>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: gasGwei > 1 ? '#ef4444' : gasGwei > 0.1 ? '#f59e0b' : '#22c55e' }} />
+                  <span className="text-[10px] font-mono text-black-400">{gasGwei < 1 ? gasGwei.toFixed(3) : Math.round(gasGwei)}</span>
                 </Link>
               )}
 

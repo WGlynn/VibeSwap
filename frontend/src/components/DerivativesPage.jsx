@@ -146,28 +146,28 @@ const VAULTS = [
   {
     id: 1, name: 'Covered Call Vault', underlying: 'ETH',
     strategy: 'Sells weekly OTM calls on deposited ETH. Earns premium yield with capped upside.',
-    apy: 18.4, tvl: 12_400_000, capacity: 25_000_000,
+    feeRate30d: 18.4, tvl: 12_400_000, capacity: 25_000_000,
     risk: 'Medium', riskColor: '#fbbf24',
     deposits: Math.floor(rng2() * 500 + 200),
   },
   {
     id: 2, name: 'Put Selling Vault', underlying: 'BTC',
     strategy: 'Sells cash-secured puts on BTC. Earns premium or acquires BTC at a discount.',
-    apy: 14.2, tvl: 8_800_000, capacity: 20_000_000,
+    feeRate30d: 14.2, tvl: 8_800_000, capacity: 20_000_000,
     risk: 'Medium-High', riskColor: '#f97316',
     deposits: Math.floor(rng2() * 400 + 150),
   },
   {
     id: 3, name: 'Straddle Vault', underlying: 'SOL',
     strategy: 'Sells ATM straddles on SOL. Profits from low volatility. High risk if large moves occur.',
-    apy: 24.8, tvl: 3_200_000, capacity: 10_000_000,
+    feeRate30d: 24.8, tvl: 3_200_000, capacity: 10_000_000,
     risk: 'High', riskColor: '#ef4444',
     deposits: Math.floor(rng2() * 200 + 80),
   },
   {
     id: 4, name: 'Principal Protected', underlying: 'USDC',
     strategy: 'Deposits USDC into lending, uses yield to buy ETH call options. Principal guaranteed.',
-    apy: 6.8, tvl: 22_100_000, capacity: 50_000_000,
+    feeRate30d: 6.8, tvl: 22_100_000, capacity: 50_000_000,
     risk: 'Low', riskColor: '#10b981',
     deposits: Math.floor(rng2() * 800 + 400),
   },
@@ -460,8 +460,8 @@ function VaultCard({ vault, index }) {
             <span className="text-[10px] font-mono text-black-500">{vault.underlying}</span>
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold font-mono text-emerald-400">{vault.apy}%</div>
-            <div className="text-[9px] text-black-500">APY</div>
+            <div className="text-lg font-bold font-mono text-emerald-400">{vault.feeRate30d}%</div>
+            <div className="text-[9px] text-black-500">30d Fees</div>
           </div>
         </div>
 

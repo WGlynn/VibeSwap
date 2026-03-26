@@ -1,5 +1,5 @@
 # ============ Frontend Build Stage ============
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json* ./
 
 # Install dependencies
-RUN npm ci --production=false
+RUN npm ci --include=dev
 
 # Copy source
 COPY frontend/ .

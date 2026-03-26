@@ -913,7 +913,7 @@ contract VibeSwapCore is
         bytes32[] memory usedKeys = new bytes32[](executionOrder.length);
         uint256 usedKeyCount = 0;
 
-        for (uint256 i = 0; i < executionOrder.length; i++) {
+        for (uint256 i = 0; i < executionOrder.length;) {
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
@@ -924,13 +924,14 @@ contract VibeSwapCore is
             // Verify cumulative deposit does not exceed available balance
             if (deposits[order.trader][order.tokenIn] < cumulativeAmount) {
                 emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Insufficient deposit");
+                unchecked { ++i; }
                 continue;
             }
 
             // Update cumulative tracker
             if (_cumulativeValidated[pairKey] == 0) {
                 usedKeys[usedKeyCount] = pairKey;
-                usedKeyCount++;
+                unchecked { ++usedKeyCount; }
             }
             _cumulativeValidated[pairKey] = cumulativeAmount;
 
@@ -940,18 +941,21 @@ contract VibeSwapCore is
 
             // Track unique pools
             bool found = false;
-            for (uint256 j = 0; j < uniquePoolCount; j++) {
+            for (uint256 j = 0; j < uniquePoolCount;) {
                 if (poolIds[j] == poolId) { found = true; break; }
+                unchecked { ++j; }
             }
             if (!found) {
                 poolIds[uniquePoolCount] = poolId;
-                uniquePoolCount++;
+                unchecked { ++uniquePoolCount; }
             }
+            unchecked { ++i; }
         }
 
         // Clean up storage mapping to avoid stale state and reclaim gas
-        for (uint256 k = 0; k < usedKeyCount; k++) {
+        for (uint256 k = 0; k < usedKeyCount;) {
             delete _cumulativeValidated[usedKeys[k]];
+            unchecked { ++k; }
         }
     }
 
@@ -967,7 +971,7 @@ contract VibeSwapCore is
         bytes32[] memory orderPoolIds,
         bool[] memory orderValid
     ) internal returns (uint256 totalVolume, uint256 lastClearingPrice) {
-        for (uint256 p = 0; p < uniquePoolCount; p++) {
+        for (uint256 p = 0; p < uniquePoolCount;) {
             bytes32 poolId = poolIds[p];
 
             // Build SwapOrder array and collect original indices
@@ -977,7 +981,7 @@ contract VibeSwapCore is
                 uint256 count
             ) = _buildPoolSwapOrders(batchId, orders, executionOrder, orderPoolIds, orderValid, poolId);
 
-            if (count == 0) continue;
+            if (count == 0) { unchecked { ++p; } continue; }
 
             // Execute ALL orders for this pool in one batch -> one uniform clearing price
             IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, batchId, swapOrders);
@@ -990,6 +994,7 @@ contract VibeSwapCore is
             } else {
                 _emitFailedOrders(batchId, orders, originalIndices, count);
             }
+            unchecked { ++p; }
         }
     }
 
@@ -1009,8 +1014,9 @@ contract VibeSwapCore is
         uint256 count
     ) {
         // Count valid orders for this pool
-        for (uint256 i = 0; i < executionOrder.length; i++) {
-            if (orderValid[i] && orderPoolIds[i] == poolId) count++;
+        for (uint256 i = 0; i < executionOrder.length;) {
+            if (orderValid[i] && orderPoolIds[i] == poolId) { unchecked { ++count; } }
+            unchecked { ++i; }
         }
         if (count == 0) return (swapOrders, originalIndices, 0);
 
@@ -1018,8 +1024,8 @@ contract VibeSwapCore is
         originalIndices = new uint256[](count);
         uint256 cursor = 0;
 
-        for (uint256 i = 0; i < executionOrder.length; i++) {
-            if (!orderValid[i] || orderPoolIds[i] != poolId) continue;
+        for (uint256 i = 0; i < executionOrder.length;) {
+            if (!orderValid[i] || orderPoolIds[i] != poolId) { unchecked { ++i; } continue; }
 
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
@@ -1036,7 +1042,7 @@ contract VibeSwapCore is
                 isPriority: order.priorityBid > 0
             });
             originalIndices[cursor] = idx;
-            cursor++;
+            unchecked { ++cursor; ++i; }
         }
     }
 
@@ -1073,8 +1079,9 @@ contract VibeSwapCore is
     ) internal {
         // SEC-1: Compute total input sent to AMM and detect partial failures
         uint256 totalInputSent = 0;
-        for (uint256 k = 0; k < count; k++) {
+        for (uint256 k = 0; k < count;) {
             totalInputSent += orders[originalIndices[k]].amountIn;
+            unchecked { ++k; }
         }
         bool hasFailures = result.totalTokenInSwapped < totalInputSent;
 
@@ -1084,7 +1091,7 @@ contract VibeSwapCore is
             pool = amm.getPool(poolId);
         }
 
-        for (uint256 k = 0; k < count; k++) {
+        for (uint256 k = 0; k < count;) {
             uint256 idx = originalIndices[k];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
@@ -1113,6 +1120,7 @@ contract VibeSwapCore is
                         batchId, order.trader, order.tokenIn, order.amountIn,
                         "Partial batch: slippage or liquidity failure"
                     );
+                    unchecked { ++k; }
                     continue;
                 }
             }
@@ -1132,6 +1140,7 @@ contract VibeSwapCore is
 
             // Record execution + compliance
             _recordExecution(poolId, order, estimatedOut);
+            unchecked { ++k; }
         }
     }
 
@@ -1209,10 +1218,11 @@ contract VibeSwapCore is
         uint256[] memory originalIndices,
         uint256 count
     ) internal {
-        for (uint256 k = 0; k < count; k++) {
+        for (uint256 k = 0; k < count;) {
             uint256 idx = originalIndices[k];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
             emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Swap execution failed");
+            unchecked { ++k; }
         }
     }
 
